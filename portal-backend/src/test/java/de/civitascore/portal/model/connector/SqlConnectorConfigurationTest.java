@@ -3,18 +3,19 @@ package de.civitascore.portal.model.connector;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @DisplayName("SqlConnectorConfiguration Tests")
 class SqlConnectorConfigurationTest {
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final ObjectMapper MAPPER = new JsonMapper();
 
   @Nested
   @DisplayName("DSN validation and credential stripping")
@@ -59,6 +60,18 @@ class SqlConnectorConfigurationTest {
       config.setDsn("");
 
       assertThat(config.getDsn()).isEqualTo("");
+    }
+
+    @Test
+    @DisplayName("Should preserve sslmode (TLS) while stripping credentials from a postgres DSN")
+    void shouldPreserveSslModeAndStripCredentials() {
+      // SSL to the source DB is configured via the dsn's sslmode; the credential-stripping URI
+      // round-trip must keep the query so it survives to the deployed JDBC connection
+      SqlConnectorConfiguration config = new SqlConnectorConfiguration();
+      config.setDsn("postgres://reader:secret@db:5432/in?sslmode=require");
+
+      assertThat(config.getDsn()).isEqualTo("postgres://db:5432/in?sslmode=require");
+      assertThat(config.getPassword()).isNull();
     }
 
     @Test

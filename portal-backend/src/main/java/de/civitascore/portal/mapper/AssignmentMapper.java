@@ -4,6 +4,7 @@ import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import org.mapstruct.BeanMapping;
+import org.mapstruct.Builder;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -13,11 +14,15 @@ import org.mapstruct.ReportingPolicy;
 /**
  * MapStruct mapper for converting between {@link AssignmentInputDTO}, {@link AssignmentOutputDTO},
  * and {@link Assignment}.
+ *
+ * <p>Builder is disabled because {@link Assignment#getScope()} is a derived getter (no backing
+ * field), which confuses MapStruct's builder detection when {@code @SuperBuilder} is present.
  */
 @Mapper(
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
-    unmappedTargetPolicy = ReportingPolicy.IGNORE)
+    unmappedTargetPolicy = ReportingPolicy.IGNORE,
+    builder = @Builder(disableBuilder = true))
 public interface AssignmentMapper
     extends DtoMapper<AssignmentInputDTO, AssignmentOutputDTO, Assignment> {
 

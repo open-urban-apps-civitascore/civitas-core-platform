@@ -9,7 +9,7 @@ API test collection for the Portal Backend, built with [Bruno](https://www.usebr
 | Portal Backend   | `http://localhost:8089`     | All tests            |
 | Keycloak         | `http://localhost:8080`     | Authentication       |
 | PostgreSQL       | `localhost:5432`            | Backend persistence  |
-| Model Atlas      | `http://localhost:8086`     | DataStructure publish/version patch |
+| Model Atlas      | `http://localhost:8086`     | DataStructure release/version patch |
 
 Start the backend with:
 
@@ -71,9 +71,9 @@ bruno-api/
 ├── dataset-saga-workflow/       # End-to-end saga test (standalone)
 │   ├── 0a..0f-find-saga-*.bru   # Find existing entities from prior runs
 │   ├── 1..6-create-*.bru        # Create datasource/group/role/dataset/pipeline/assignment
-│   ├── 7-publish / 8-release    # Lifecycle transitions (triggers async saga)
+│   ├── 7-stage / 8-release      # Lifecycle transitions (triggers async saga)
 │   ├── 9..10-verify-*.bru       # Verify state after saga
-│   ├── 11-unrelease / 12-unpub  # Reverse lifecycle
+│   ├── 11-unrelease / 12-unstage # Reverse lifecycle
 │   └── 13..17-cleanup-*.bru     # Delete all created entities
 ├── zz-teardown/                 # Delete setup entities
 ├── environments/
@@ -98,7 +98,7 @@ Tests accept multiple HTTP status codes, each documented with inline comments:
 // 201=created, 409=already exists from previous run
 expect(status === 201 || status === 409).to.be.true;
 
-// 200=published, 400=not in DRAFT state (already published)
+// 200=released, 400=not in READY state (already released)
 expect(status === 200 || status === 400).to.be.true;
 
 // 204=deleted, 404=already gone, 400=not in deletable state
@@ -143,3 +143,18 @@ Uses Docker Compose service names to reach containers within the CI network.
 | `password`     | `dev123`                           |
 
 Authentication is handled automatically via OAuth2 password grant (configured in `collection.bru`).
+
+### Gateway routing (issue #1368)
+
+FROST published-data routes are served under the configured API virtual host at
+`/v1/datasets/{id}/*`. All environments define one variable used by the dataset
+saga workflow tests (`9c`, `9d`):
+
+| Variable         | Purpose                                                              |
+|------------------|----------------------------------------------------------------------|
+| `apisixApiUrl`   | Gateway URL whose hostname matches the `hosts` filter on FROST routes |
+
+The hostname in `apisixApiUrl` (e.g. `api.localhost`) must match the `hosts` value on
+the saga-provisioned APISIX routes; that happens automatically when the HTTP client
+resolves the hostname (either via Docker network alias in CI or via `/etc/hosts`
+locally — see `dev-environment/README.md`).

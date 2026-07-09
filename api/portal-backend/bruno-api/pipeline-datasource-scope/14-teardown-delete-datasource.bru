@@ -1,0 +1,25 @@
+meta {
+  name: 14. Teardown - delete datasource
+  type: http
+  seq: 15
+}
+
+delete {
+  url: {{baseUrl}}/datasources/{{scopeDataSourceId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: in [200, 204, 400, 404, 409]
+}
+
+tests {
+  test("DataSource cleanup tolerated", function() {
+    expect([200, 204, 400, 404, 409]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  Deletes the DRAFT datasource, freeing its scopedDataPools reference on Pool B.
+}

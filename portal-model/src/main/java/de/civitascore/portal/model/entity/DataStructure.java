@@ -13,8 +13,11 @@ import jakarta.persistence.Table;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 
 /**
  * Represents a data structure definition that contains one or more {@link DataStructureVersion
@@ -26,13 +29,40 @@ import lombok.Setter;
 @Table(name = "data_structures")
 @Getter
 @Setter
+@SuperBuilder
+@NoArgsConstructor
 public class DataStructure extends BaseDataEntity {
+
+  /**
+   * Custom builder impl: routes {@code dataStructureVersions} through {@link
+   * #setDataStructureVersions(Set)} so that back-references are set on each version.
+   */
+  static final class DataStructureBuilderImpl
+      extends DataStructureBuilder<DataStructure, DataStructureBuilderImpl> {
+
+    @Override
+    public DataStructure build() {
+      DataStructure instance = this.buildInternal();
+      if (instance.dataStructureVersions != null && !instance.dataStructureVersions.isEmpty()) {
+        Set<DataStructureVersion> versions = new HashSet<>(instance.dataStructureVersions);
+        instance.dataStructureVersions.clear();
+        instance.setDataStructureVersions(versions);
+      }
+      return instance;
+    }
+
+    private DataStructure buildInternal() {
+      return new DataStructure(this);
+    }
+  }
 
   @Enumerated(EnumType.STRING)
   @Column(name = "data_structure_status", nullable = false)
+  @Builder.Default
   private DataStructureStatus dataStructureStatus = DataStructureStatus.DRAFT;
 
   @Column(name = "created_from_data_source", nullable = false)
+  @Builder.Default
   private Boolean createdFromDataSource = false;
 
   @Setter(AccessLevel.NONE)
@@ -41,6 +71,7 @@ public class DataStructure extends BaseDataEntity {
       fetch = FetchType.LAZY,
       cascade = CascadeType.ALL,
       orphanRemoval = true)
+  @Builder.Default
   private Set<Assignment> assignments = new HashSet<>();
 
   @OneToMany(
@@ -48,6 +79,7 @@ public class DataStructure extends BaseDataEntity {
       fetch = FetchType.LAZY,
       cascade = CascadeType.ALL,
       orphanRemoval = true)
+  @Builder.Default
   private Set<DataStructureVersion> dataStructureVersions = new HashSet<>();
 
   /** {@inheritDoc} Links the assignment to this data structure by setting its scope. */

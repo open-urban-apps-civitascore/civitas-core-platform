@@ -11,10 +11,11 @@ const dataset: Dataset = {
   description: 'Test description',
   createdAt: '2024-01-01T00:00:00Z',
   modifiedAt: '2024-01-02T00:00:00Z',
+  createdBy: { id: 'u1', name: 'User 1' },
   openDataAccess: true,
   dataSetStatus: DATASET_STATUS_TYPES.DRAFT,
-  distributions: [],
   pipelines: [],
+  datapool: null,
 }
 
 describe('mapDatasetToFormData', () => {
@@ -27,6 +28,7 @@ describe('mapDatasetToFormData', () => {
       description: 'Test description',
       openDataAccess: true,
       dataSetStatus: DATASET_STATUS_TYPES.DRAFT,
+      datapoolId: null,
     })
   })
 

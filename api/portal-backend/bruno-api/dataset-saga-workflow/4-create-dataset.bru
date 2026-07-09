@@ -14,7 +14,11 @@ body:json {
   {
     "name": "Saga Test DataSet",
     "description": "Dataset for end-to-end saga workflow test",
-    "openDataAccess": false
+    "openDataAccess": false,
+    "namedApis": [
+      { "name": "Things", "slug": "things", "standard": "STA", "version": "1.1" },
+      { "name": "Map", "slug": "map", "standard": "OWS" }
+    ]
   }
 }
 
@@ -22,6 +26,15 @@ script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('sagaDataSetId', res.body.id);
   }
+  // Per-NamedApi route model (#1368): remember the API slug so the route guards (9b/9g) can
+  // target the per-slug route /v1/datasets/{id}/{slug} instead of the old flat datasetId scheme.
+  const apis = (res.body && res.body.namedApis) || [];
+  const sta = apis.find(a => a.standard === 'STA') || apis[0];
+  bru.setVar('sagaSlug', (sta && sta.slug) || 'things');
+  // OWS named-API slug for the anonymous OWS open-data e2e (9g4): proves open data is universal
+  // across routable backends, not FROST-only.
+  const ows = apis.find(a => a.standard === 'OWS');
+  bru.setVar('sagaOwsSlug', (ows && ows.slug) || 'map');
 }
 
 tests {
@@ -35,7 +48,7 @@ tests {
 docs {
   **Saga step 4 of 18** — Prerequisites: create supporting resources before triggering the saga.
 
-  Creates the dataset ("Saga Test DataSet") that will be published, released (triggering the DATASET_CREATE saga), and later unreleased (triggering the DATASET_DELETE saga).
+  Creates the dataset ("Saga Test DataSet") that will be staged, released (triggering the DATASET_CREATE saga), and later unreleased (triggering the DATASET_DELETE saga).
 
   **Expected Response:** 201 Created, body contains `id`. 409 if the dataset already existed (idempotent).
 

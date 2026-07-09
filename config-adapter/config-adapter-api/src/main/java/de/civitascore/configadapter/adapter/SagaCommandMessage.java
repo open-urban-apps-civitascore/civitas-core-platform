@@ -14,8 +14,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Incoming saga command message dispatched by the orchestrator. Deserialized from the flat JSON
- * structure produced by {@code KafkaSagaActionDispatcher}.
+ * Incoming saga command message dispatched by the saga orchestrator (the Flowable engine in the
+ * config-adapter). Deserialized from the flat JSON structure the orchestrator emits per step.
  *
  * <p>The orchestrator flattens all payload fields into the top-level JSON object alongside the
  * envelope fields ({@code type}, {@code messageId}, {@code stepId}, {@code adapter}, {@code
@@ -25,7 +25,7 @@ import java.util.Set;
  * @param messageId unique message identifier
  * @param sagaId saga instance identifier (from payload)
  * @param stepId saga step identifier
- * @param adapter target adapter name (e.g. {@code "frost"}, {@code "apisix"}, {@code "redpanda"})
+ * @param adapter target adapter name (e.g. {@code "frost"}, {@code "apisix"}, {@code "nifi"})
  * @param operation adapter-specific operation (e.g. {@code "CREATE_PROJECT"}, {@code
  *     "DELETE_ROUTE"})
  * @param payload remaining fields (datasetId, datasetName, description, etc.)

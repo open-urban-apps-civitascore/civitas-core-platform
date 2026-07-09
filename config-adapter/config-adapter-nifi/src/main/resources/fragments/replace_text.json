@@ -1,0 +1,92 @@
+{
+  "name": "RestoreEntityBody",
+  "comments": "Restores the entity object as the FlowFile content after a lookup GET overwrote it with the response, so the subsequent POST sends the entity (the entity JSON was captured into an attribute before the lookup). Replacement Value is set per instance by the flow builder.",
+  "position": {
+    "x": 0.0,
+    "y": 200.0
+  },
+  "type": "org.apache.nifi.processors.standard.ReplaceText",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-standard-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "Replacement Strategy": "Always Replace",
+    "Search Value": "(?s)(^.*$)",
+    "Replacement Value": "${frost.body}",
+    "Character Set": "UTF-8",
+    "Maximum Buffer Size": "20 MB",
+    "Evaluation Mode": "Entire text",
+    "Line-by-Line Evaluation Mode": "All"
+  },
+  "propertyDescriptors": {
+    "Replacement Strategy": {
+      "name": "Replacement Strategy",
+      "displayName": "Replacement Strategy",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Search Value": {
+      "name": "Search Value",
+      "displayName": "Search Value",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Replacement Value": {
+      "name": "Replacement Value",
+      "displayName": "Replacement Value",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Character Set": {
+      "name": "Character Set",
+      "displayName": "Character Set",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Maximum Buffer Size": {
+      "name": "Maximum Buffer Size",
+      "displayName": "Maximum Buffer Size",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Evaluation Mode": {
+      "name": "Evaluation Mode",
+      "displayName": "Evaluation Mode",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Line-by-Line Evaluation Mode": {
+      "name": "Line-by-Line Evaluation Mode",
+      "displayName": "Line-by-Line Evaluation Mode",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "style": {},
+  "schedulingPeriod": "0 sec",
+  "schedulingStrategy": "TIMER_DRIVEN",
+  "executionNode": "ALL",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "autoTerminatedRelationships": [
+    "failure"
+  ],
+  "scheduledState": "ENABLED",
+  "retryCount": 10,
+  "retriedRelationships": [],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins",
+  "componentType": "PROCESSOR"
+}

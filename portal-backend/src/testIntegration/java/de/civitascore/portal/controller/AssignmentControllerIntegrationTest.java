@@ -2,24 +2,13 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
-import de.civitascore.portal.model.entity.Catalog;
-import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.Group;
-import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
-import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.CatalogRepository;
-import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
-import de.civitascore.portal.repository.GroupRepository;
-import de.civitascore.portal.repository.RoleRepository;
-import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import tools.jackson.core.type.TypeReference;
 
 @DisplayName("Assignment Controller Integration Tests")
 class AssignmentControllerIntegrationTest
@@ -39,13 +29,7 @@ class AssignmentControllerIntegrationTest
 
   private final String ASSIGNMENTS_ENDPOINT = "/assignments";
 
-  @Autowired private AssignmentRepository assignmentRepository;
-  @Autowired private GroupRepository groupRepository;
-  @Autowired private RoleRepository roleRepository;
-  @Autowired private DataSpaceRepository dataSpaceRepository;
-  @Autowired private DataSetRepository dataSetRepository;
-  @Autowired private CatalogRepository catalogRepository;
-  @Autowired private UserRepository userRepository;
+  @Autowired protected PortalTestDataFactory portalData;
 
   @Override
   protected String getEndpointPath() {
@@ -54,13 +38,12 @@ class AssignmentControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
-    assignmentRepository.deleteAll();
-    dataSetRepository.deleteAll();
-    dataSpaceRepository.deleteAll();
-    catalogRepository.deleteAll();
-    groupRepository.deleteAll();
-    roleRepository.deleteAll();
-    userRepository.deleteAll();
+    portalData.cleanAll();
+  }
+
+  @Override
+  protected boolean supportsUpdateAndPatch() {
+    return false;
   }
 
   @Override
@@ -101,82 +84,47 @@ class AssignmentControllerIntegrationTest
   }
 
   private UUID createTestGroup() {
-    Group group = new Group();
-    group.setName("Test Group " + UUID.randomUUID().toString().substring(0, 8));
-    group.setDescription("Test group for assignment");
-    return groupRepository.save(group).getId();
+    return portalData.group(b -> b.description("Test group for assignment")).getId();
   }
 
   private UUID createTestRole(String name) {
-    Role role = new Role();
-    role.setName(name);
-    role.setDescription("Test role for assignment");
-    role.setRoleType(RoleType.DATA);
-    return roleRepository.save(role).getId();
+    return portalData
+        .role(b -> b.name(name).description("Test role for assignment").roleType(RoleType.DATA))
+        .getId();
   }
 
   private UUID createTestRole() {
-    return createTestRole("Test Role " + System.currentTimeMillis());
+    return portalData.role(b -> b.description("Test role for assignment")).getId();
   }
 
   private UUID createTestRole(String name, RoleType roleType) {
-    Role role = new Role();
-    role.setName(name);
-    role.setDescription("Test role for assignment");
-    role.setRoleType(roleType);
-    return roleRepository.save(role).getId();
+    return portalData
+        .role(b -> b.name(name).description("Test role for assignment").roleType(roleType))
+        .getId();
   }
 
   private User createTestUser() {
-    User user = new User();
-    user.setFirstName("Test");
-    user.setLastName("User " + UUID.randomUUID().toString().substring(0, 8));
-    user.setEmail("test" + UUID.randomUUID().toString().substring(0, 8) + "@example.com");
-    return userRepository.save(user);
+    return portalData.user();
   }
 
   private Group createTestGroupWithMember(User user) {
-    Group group = new Group();
-    group.setName("Test Group " + UUID.randomUUID().toString().substring(0, 8));
-    group.setDescription("Test group for assignment");
-    group.setMembers(Set.of(user));
-    return groupRepository.save(group);
+    return portalData.group(b -> b.description("Test group for assignment").members(Set.of(user)));
   }
 
-  private UUID createTestDataSpace() {
-    return createTestDataSpaceEntity().getId();
-  }
-
-  private DataSpace createTestDataSpaceEntity() {
-    DataSpace dataSpace = new DataSpace();
-    dataSpace.setName("Test DataSpace " + UUID.randomUUID().toString().substring(0, 8));
-    dataSpace.setDescription("Test dataspace for assignment");
-    return dataSpaceRepository.save(dataSpace);
-  }
-
-  private UUID createTestDataSet(UUID dataSpaceId) {
-    DataSpace dataSpace = dataSpaceRepository.findById(dataSpaceId).orElseThrow();
-    DataSet dataSet = new DataSet();
-    dataSet.setName("Test DataSet " + UUID.randomUUID().toString().substring(0, 8));
-    dataSet.setDescription("Test dataset for assignment");
-    dataSet.setDataSpaces(Set.of(dataSpace));
-    return dataSetRepository.save(dataSet).getId();
+  private UUID createTestDataSet() {
+    return portalData.dataSet(b -> b.description("Test dataset for assignment")).getId();
   }
 
   private UUID createTestCatalog() {
-    Catalog catalog = new Catalog();
-    catalog.setName("Test Catalog " + UUID.randomUUID().toString().substring(0, 8));
-    catalog.setDescription("Test catalog for assignment");
-    return catalogRepository.save(catalog).getId();
+    return portalData.catalog(b -> b.description("Test catalog for assignment")).getId();
   }
 
   private UUID getScopeIdForType(ScopeType scopeType) {
     return switch (scopeType) {
       case TENANT -> null;
-      case DATASPACE -> createTestDataSpace();
-      case DATASET -> createTestDataSet(createTestDataSpace());
+      case DATASET -> createTestDataSet();
       case CATALOG -> createTestCatalog();
-      case DATASOURCE, DATASTRUCTURE -> null;
+      case DATASOURCE, DATASTRUCTURE, DATAPOOL -> null;
     };
   }
 
@@ -231,7 +179,6 @@ class AssignmentControllerIntegrationTest
           .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
-    // TODO v2.1: add DATASPACE and CATALOG back to scope types list
     @Test
     @DisplayName("Should create assignment with different scope types")
     void shouldCreateAssignmentWithDifferentScopeTypes() {
@@ -253,21 +200,6 @@ class AssignmentControllerIntegrationTest
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getScopeType()).isEqualTo(scopeType);
       }
-    }
-
-    // TODO v2.1: re-enable when DATASPACE scope is available
-    @Test
-    @DisplayName("Should reject assignment with dataspace scope (not available in this release)")
-    void shouldCreateAssignmentWithDataspaceScope() {
-      DataSpace dataSpace = createTestDataSpaceEntity();
-
-      AssignmentInputDTO input = createValidInput();
-      input.setScopeType(ScopeType.DATASPACE);
-      input.setScopeId(dataSpace.getId());
-
-      ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
@@ -486,17 +418,11 @@ class AssignmentControllerIntegrationTest
       input1.setRoleId(role1Id);
       input1.setScopeType(ScopeType.TENANT);
 
-      // TODO v2.1: switch back to DATASPACE scope
-      // AssignmentInputDTO input2 = new AssignmentInputDTO();
-      // input2.setGroupId(groupId);
-      // input2.setRoleId(role2Id);
-      // input2.setScopeType(ScopeType.DATASPACE);
-      // input2.setScopeId(createTestDataSpace());
       AssignmentInputDTO input2 = new AssignmentInputDTO();
       input2.setGroupId(groupId);
       input2.setRoleId(role2Id);
       input2.setScopeType(ScopeType.DATASET);
-      input2.setScopeId(createTestDataSet(createTestDataSpace()));
+      input2.setScopeId(createTestDataSet());
 
       ResponseEntity<AssignmentOutputDTO> response1 = performCreate(input1);
       ResponseEntity<AssignmentOutputDTO> response2 = performCreate(input2);
@@ -567,7 +493,7 @@ class AssignmentControllerIntegrationTest
       String suffix = UUID.randomUUID().toString().substring(0, 8);
       UUID tenantRoleId = createTestRole("Tenant Role " + suffix, RoleType.DATA);
       UUID datasetRoleId = createTestRole("Dataset Role " + suffix, RoleType.DATA);
-      UUID dataSetId = createTestDataSet(createTestDataSpace());
+      UUID dataSetId = createTestDataSet();
 
       AssignmentInputDTO tenantInput = new AssignmentInputDTO();
       tenantInput.setGroupId(groupId);
@@ -618,7 +544,7 @@ class AssignmentControllerIntegrationTest
 
       // DATASET-scoped DATA role — should NOT match
       UUID datasetRoleId = createTestRole("Dataset Role " + suffix, RoleType.DATA);
-      UUID dataSetId = createTestDataSet(createTestDataSpace());
+      UUID dataSetId = createTestDataSet();
       AssignmentInputDTO datasetInput = new AssignmentInputDTO();
       datasetInput.setGroupId(groupId);
       datasetInput.setRoleId(datasetRoleId);

@@ -1,0 +1,90 @@
+{
+  "name": "mapping",
+  "comments": "",
+  "position": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "type": "org.apache.nifi.processors.standard.UpdateRecord",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-standard-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "/measurement_time": "toDate( /ts , \"yyyy-MM-dd'T'HH:mm:ss'Z'\")",
+    "Record Writer": "${CS:JsonRecordSetWriter}",
+    "Record Reader": "${CS:JsonTreeReader}",
+    "/station_id": "/station_id",
+    "/geom": "concat('POINT(', /lon, ' ', /lat, ')')",
+    "Replacement Value Strategy": "record-path-value",
+    "/temperature": "/temperature"
+  },
+  "propertyDescriptors": {
+    "/measurement_time": {
+      "name": "/measurement_time",
+      "displayName": "/measurement_time",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": true
+    },
+    "Record Writer": {
+      "name": "Record Writer",
+      "displayName": "Record Writer",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Record Reader": {
+      "name": "Record Reader",
+      "displayName": "Record Reader",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "/station_id": {
+      "name": "/station_id",
+      "displayName": "/station_id",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": true
+    },
+    "/geom": {
+      "name": "/geom",
+      "displayName": "/geom",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": true
+    },
+    "Replacement Value Strategy": {
+      "name": "Replacement Value Strategy",
+      "displayName": "Replacement Value Strategy",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "/temperature": {
+      "name": "/temperature",
+      "displayName": "/temperature",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": true
+    }
+  },
+  "style": {},
+  "schedulingPeriod": "0 sec",
+  "schedulingStrategy": "TIMER_DRIVEN",
+  "executionNode": "ALL",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "autoTerminatedRelationships": [],
+  "scheduledState": "ENABLED",
+  "retryCount": 10,
+  "retriedRelationships": [],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins",
+  "componentType": "PROCESSOR"
+}

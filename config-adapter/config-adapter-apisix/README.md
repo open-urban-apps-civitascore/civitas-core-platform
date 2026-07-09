@@ -2,6 +2,56 @@
 
 Production-ready adapter for managing [Apache APISIX](https://apisix.apache.org/) API Gateway configuration through CloudEvents.
 
+## ⚠️ Breaking change — issue #1368 (gateway routing)
+
+The saga-provisioned published-data API is now pinned to the configured API virtual host and
+carries the `/v1` prefix, so APISIX can dispatch incoming requests deterministically and the
+portal-backend catch-all `/v1/*` route cannot shadow it.
+
+| Aspect                  | Before                                         | After (this release)                                            |
+|-------------------------|------------------------------------------------|------------------------------------------------------------------|
+| Published-data URL      | `https://<host>/datasets/{id}[/...]`           | `https://<api-host>/v1/datasets/{id}[/...]`                      |
+| APISIX route `hosts`    | unset (wildcard)                               | set to `apisix.api.host` on saga routes                          |
+| OPA FROST provider path | `/datasets/{id}`                               | `/v1/datasets/{id}` + `Host` header guard                        |
+| Config properties       | `apisix.admin.*`, `apisix.gateway.url`, …      | `apisix.gateway.url` removed; **additionally required**: `apisix.api.host`, `apisix.api.public.url` |
+
+**Operator migration steps**
+
+1. Provision a DNS record (or ingress hostname) for the APISIX gateway — e.g.
+   `api.core.example.org`. For local dev use `api.localhost` (add to `/etc/hosts`; see
+   `dev-environment/README.md`).
+2. Set `APISIX_API_HOST` and `APISIX_API_PUBLIC_URL` on the `config-adapter` deployment. The
+   adapter fails fast at startup when either is missing — no silent fallback. The previous
+   `APISIX_GATEWAY_URL` is no longer read and can be removed.
+3. Overlay `data.backends.frost_server.api_host` in the OPA data bundle (Helm/Kustomize) to the
+   same value as `APISIX_API_HOST`. The Dev default (`api.localhost`) in
+   `authz/rego/data/backends/frost_server/data.json` is explicitly flagged as dev-only.
+4. Update clients of the published-data API: prepend `/v1` to dataset paths. Existing routes
+   under `/datasets/{id}` are no longer served (404).
+
+**Compatibility note:** this is a bugfix for a production-blocking route shadow — there is
+intentionally no backwards-compatible shim. Any consumer of the legacy `/datasets/{id}` path
+(e.g. cached dashboards, STA clients) must be repointed before rollout. If a rolling migration
+is needed, operators can temporarily mirror the old path behind a proxy-rewrite route while
+consumers are updated; this is out of scope for the adapter itself.
+
+**Migrating from an interim two-host iteration.** An earlier iteration of #1368 briefly
+introduced a separate `data.<host>` virtual host (`APISIX_DATA_HOST` / `APISIX_DATA_PUBLIC_URL`)
+alongside `api.<host>`. That split has been rolled back — `/v1/datasets/{id}` is now strictly
+more specific than any `/v1/*` catch-all, so APISIX' radix tree dispatches it deterministically
+without a second host. If a deployment pipeline was already configured against the interim
+variant, drop `APISIX_DATA_HOST` / `APISIX_DATA_PUBLIC_URL` and the `data.<host>` DNS record —
+they are no longer read. Only `APISIX_API_HOST` / `APISIX_API_PUBLIC_URL` remain required.
+
+**Per-named-API routes (#1311/#1379).** The `CREATE_ROUTE` saga step does not create a single
+dataset-level route. It creates **one shared upstream per dataset** plus **one route per named API**
+at `/v1/datasets/{datasetId}/{slug}`, each with a deterministic id `NamedApiHelper.derive(datasetId,
+slug)`, and returns a **slug-keyed `routeIds` map** that the portal-backend persists onto each
+`NamedApi`. `UPDATE_ROUTE`/`DELETE_ROUTE`/`RESTORE_ROUTE` iterate that map (DELETE/RESTORE are
+404-idempotent). A command without `namedApis` falls back to a single dataset-level route
+(legacy/edge). The reserved slug `apis` keeps the discovery endpoint `/v1/datasets/{id}/apis` from
+being shadowed.
+
 ## Overview
 
 The APISIX adapter integrates with Apache APISIX API Gateway's Admin API to manage upstream backend services. It consumes CloudEvents from Kafka and translates them into APISIX Admin API calls, enabling automated configuration management for your API Gateway infrastructure.
@@ -66,9 +116,19 @@ The APISIX adapter integrates with Apache APISIX API Gateway's Admin API to mana
 | UPDATE | PUT | `/apisix/admin/routes/{id}` | Update existing route |
 | DELETE | DELETE | `/apisix/admin/routes/{id}` | Delete route |
 
+> **Two provisioning paths.** The tables above describe the **event-driven `ApisixAdapter`**
+> (`AbstractConfigAdapter`), which consumes the CloudEvent topics below and creates routes with a
+> server-assigned id via `POST`. **Dataset routes are provisioned separately** by the
+> **`ApisixSagaHandler`**, which is driven by saga commands (`CREATE_ROUTE`, `UPDATE_ROUTE`,
+> `DELETE_ROUTE`, `RESTORE_ROUTE`) — not by Kafka topics — and uses `PUT /apisix/admin/routes/{id}`
+> with a deterministic id (`NamedApiHelper.derive(datasetId, slug)`), one route per named API at
+> `/v1/datasets/{datasetId}/{slug}`. The deterministic id is what makes CREATE/UPDATE/DELETE
+> idempotent (issue #1368). See `config-adapter/docs/SAGA-DATASET-USE-CASES.md`.
+
 ### Subscribed Topics
 
-The adapter subscribes to backend and route lifecycle events:
+The **event-driven `ApisixAdapter`** subscribes to backend and route lifecycle events. (Dataset
+route provisioning does **not** use these topics — it is saga-command-driven; see the note above.)
 
 **Backend Topics:**
 - `de.civitascore.api.backend.created` - New backend services
@@ -93,7 +153,56 @@ apisix.admin.key=edd1c9f034335f136f87ad84b625c8f1
 
 # Topics to subscribe to (backend and route events)
 apisix.topics=de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted,de.civitascore.api.route.created,de.civitascore.api.route.updated,de.civitascore.api.route.deleted
+
+# Public API host (issue #1368) — required by the ApisixSagaHandler when provisioning dataset
+# routes. Saga-created FROST routes are pinned to this virtual host so APISIX can match
+# them deterministically against incoming requests.
+apisix.api.host=api.localhost
+apisix.api.public.url=http://api.localhost:9080
+
+# Gateway-side auth plugin_config_id — required. EVERY dataset route attaches this plugin_config so
+# APISIX enforces OIDC/OPA in front of the upstream — routes are always protected, and open-data
+# access is an OPA per-request decision (not a route variant). The referenced plugin_config must be
+# provisioned in APISIX before any dataset is created. The dev/CI stack provisions it as
+# plugin_config id `1` (see dev-environment apisix seeding).
+apisix.plugin.config.id=1
+
+# Headers the saga route's proxy-rewrite must strip — optional but typically required in
+# production. Applied to EVERY saga route (all routes are protected), because APISIX merges
+# plugins by Route-over-PluginConfig precedence: the saga always defines its own proxy-rewrite,
+# so any proxy-rewrite.headers.remove in the shared plugin_config is silently overridden.
+# Mirror the strip list from plugin_config here so e.g. client-supplied X-Allowed-Scope-Ids
+# (used by OPA for collection filtering) cannot bypass authorization. Comma-separated.
+apisix.proxy.rewrite.headers.remove=X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
+
+# FROST upstream auth — required. APISIX injects credentials into proxy-rewrite when forwarding
+# to private FROST projects. Configure ONE of the two schemes (mirroring the FROST adapter):
+#   1) Basic Auth (takes precedence when both are configured)
+apisix.frost.basic.auth.username=frost-admin
+apisix.frost.basic.auth.password=changeme
+#   2) API key (used when no basic.auth.username is set)
+#apisix.frost.api.key=frost-api-key
+#apisix.frost.api.key.header=X-API-Key
 ```
+
+### Migration: pre-label routes with custom API-key headers
+
+The adapter tracks the FROST upstream auth header it sets via the APISIX route label
+`civitas-frost-upstream-auth-header`. New routes carry the label automatically. Routes that
+predate the label (created by an earlier version of this adapter) are cleaned on public flips
+via a fallback list of historical adapter-managed header names (`Authorization`,
+`X-API-Key`).
+
+**Limitation:** if you previously ran the adapter with a custom `apisix.frost.api.key.header`
+(e.g. `X-Frost-Key`), routes provisioned at that time without the label may keep the stale
+custom header on a public flip when you've since reconfigured the adapter. To migrate cleanly:
+
+1. Trigger an UPDATE through the saga while the adapter is still configured with the
+   historical header name — the cleanup picks up the currently-configured name regardless of
+   label state.
+2. Optionally rotate the configuration afterwards.
+
+Alternatively clean up via the APISIX admin API directly.
 
 ### Environment Variables
 
@@ -102,6 +211,16 @@ All properties can be overridden with environment variables:
 ```bash
 APISIX_ADMIN_URL=http://apisix:9180
 APISIX_ADMIN_KEY=your-api-key
+APISIX_API_HOST=api.core.example.org
+APISIX_API_PUBLIC_URL=https://api.core.example.org
+APISIX_PLUGIN_CONFIG_ID=1
+APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
+# Pick ONE FROST upstream auth scheme:
+APISIX_FROST_BASIC_AUTH_USERNAME=frost-admin
+APISIX_FROST_BASIC_AUTH_PASSWORD=changeme
+# or
+#APISIX_FROST_API_KEY=frost-api-key
+#APISIX_FROST_API_KEY_HEADER=X-API-Key
 APISIX_TOPICS=de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted,de.civitascore.api.route.created,de.civitascore.api.route.updated,de.civitascore.api.route.deleted
 ```
 

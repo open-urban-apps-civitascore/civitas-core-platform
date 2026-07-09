@@ -1,0 +1,34 @@
+meta {
+  name: 3d. Release DataStructure Version
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{sagaDataStructureId}}
+  versionId: {{sagaDataStructureVersionId}}
+}
+
+tests {
+  test("Released or already released", function() {
+    const status = res.getStatus();
+    // 200=released, 400=not in DRAFT state (already released)
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Saga step 3d of 18** — Prerequisites: DataStructure (step 3b), DataStructure version (step 3c).
+
+  Releases the DataStructure version so it becomes immutable and can be referenced. A version must be released before the parent DataStructure itself can be released (step 3e).
+
+  **Expected Response:** 200 OK. 400 if not in DRAFT state (already released — idempotent).
+
+  **Post-condition:** DataStructure version status transitions from `DRAFT` to `PUBLISHED`.
+}

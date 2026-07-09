@@ -1,11 +1,16 @@
 {
-  "_comment": "FROST Server (OGC SensorThings API) via APISIX Gateway proxy. Owner: Team 2",
-  "_version": "2.0.0",
+  "_comment": "FROST Server (OGC SensorThings API) via APISIX Gateway proxy on the public API host. Owner: Team 2",
+  "_version": "2.1.0",
   "_backend_id": "frost-server",
 
+  "_api_host_comment": "No api_host default here. The host guard is configured at runtime via the platform-wide API_HOST env var (see providers/frost_server.rego, policy/env_contract.rego).",
+
+  "_permission_comment": "Reading SensorThings content through this protected data-plane route requires DATASET_PAYLOAD_READ (payload access), NOT the broader metadata-level DATASET_READ. A user with only DATASET_READ (e.g. DATASET_ARCHITECT) must NOT be able to read FROST content. The /apis discovery endpoint is portal_backend, not this backend.",
+  "_open_data_comment": "`_open_data: true` marks an endpoint as anonymously readable when the dataset is flagged openDataAccess=true (see policy/open_data.rego). It covers ALL FROST sub-resources because they all map to this single /v1/datasets/{id} pattern. Reads only; writes are never open.",
   "endpoints": {
-    "/datasets/{id}": {
-      "GET": "DATASET_READ"
+    "/v1/datasets/{id}": {
+      "GET": "DATASET_PAYLOAD_READ",
+      "_open_data": true
     }
   }
 }

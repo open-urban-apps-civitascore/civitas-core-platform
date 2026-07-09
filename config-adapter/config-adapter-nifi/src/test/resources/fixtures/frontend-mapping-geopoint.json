@@ -1,0 +1,25 @@
+{
+  "$schema": "https://civitasconnect.digital/core/mapping/v1",
+  "source": "urn:core:platform:civitas:datastructure:common:Source:ggb6odzea5:1.0.0",
+  "target": "urn:core:platform:civitas:datastructure:common:Target:qemy9w8u7g:2.0.0",
+  "fields": {
+    "$.geo": {
+      "op": "geoPoint",
+      "lon": "$.lat",
+      "lat": {
+        "op": "toFloat",
+        "input": "$.long"
+      }
+    }
+  },
+  "positions": {
+    "$.geo#geoPoint": {
+      "x": 408.7469684721099,
+      "y": 11.221907841552119
+    },
+    "$.geo#geoPoint.1#toFloat": {
+      "x": 333.338722716249,
+      "y": 145.75707356507678
+    }
+  }
+}

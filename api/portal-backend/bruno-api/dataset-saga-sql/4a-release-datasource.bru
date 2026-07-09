@@ -1,0 +1,41 @@
+meta {
+  name: 4a. Release DataSource
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sqlDataSourceId}}
+}
+
+tests {
+  test("Released", function() {
+    const status = res.getStatus();
+    // 200=released
+    expect(status).to.equal(200);
+  });
+}
+
+docs {
+  **SQL saga step 4a** — Prerequisites: DataSource patched with source version (step 4).
+
+  Releases the datasource (DRAFT → AVAILABLE). A pipeline can only link a datasource that is AVAILABLE.
+
+  **Expected Response:** 200 OK. 400 if not in DRAFT state (already released — idempotent).
+
+  **Post-condition:** DataSource status transitions from `DRAFT` to `AVAILABLE`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource status updated to `AVAILABLE` in `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 LABEL maintainer="CIVITAS/Interfaces Team"
 LABEL description="CIVITAS/CORE Configuration Adapter"
@@ -7,7 +7,9 @@ LABEL civitas=true
 WORKDIR /civitas
 
 ENV TZ=Europe/Berlin
-RUN apk add --no-cache curl tzdata
+# gcompat: snappy-java ships a glibc-linked native library; without the shim the Kafka
+# consumer cannot read snappy-compressed messages on this musl-based image
+RUN apk add --no-cache curl tzdata gcompat
 
 COPY config-adapter-application/target/config-adapter-application-*.jar ./config-adapter.jar
 

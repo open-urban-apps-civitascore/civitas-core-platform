@@ -1,0 +1,77 @@
+{
+  "name": "ExtractJson",
+  "comments": "Extracts values from the FlowFile JSON into attributes (e.g. the entity reference, or the @iot.id from a lookup response). The dynamic attribute->JsonPath properties are set per instance by the flow builder.",
+  "position": {
+    "x": 0.0,
+    "y": 200.0
+  },
+  "type": "org.apache.nifi.processors.standard.EvaluateJsonPath",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-standard-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "Destination": "flowfile-attribute",
+    "Return Type": "auto-detect",
+    "Path Not Found Behavior": "ignore",
+    "Null Value Representation": "empty string",
+    "Max String Length": "20 MB"
+  },
+  "propertyDescriptors": {
+    "Destination": {
+      "name": "Destination",
+      "displayName": "Destination",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Return Type": {
+      "name": "Return Type",
+      "displayName": "Return Type",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Path Not Found Behavior": {
+      "name": "Path Not Found Behavior",
+      "displayName": "Path Not Found Behavior",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Null Value Representation": {
+      "name": "Null Value Representation",
+      "displayName": "Null Value Representation",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Max String Length": {
+      "name": "Max String Length",
+      "displayName": "Max String Length",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "style": {},
+  "schedulingPeriod": "0 sec",
+  "schedulingStrategy": "TIMER_DRIVEN",
+  "executionNode": "ALL",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "autoTerminatedRelationships": [
+    "unmatched",
+    "failure"
+  ],
+  "scheduledState": "ENABLED",
+  "retryCount": 10,
+  "retriedRelationships": [],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins",
+  "componentType": "PROCESSOR"
+}

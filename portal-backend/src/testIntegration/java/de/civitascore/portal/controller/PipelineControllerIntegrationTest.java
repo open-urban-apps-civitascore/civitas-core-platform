@@ -2,14 +2,20 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.model.output.PipelineOutputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.RestPage;
@@ -35,9 +41,11 @@ import org.springframework.http.ResponseEntity;
 class PipelineControllerIntegrationTest
     extends BaseControllerIntegrationTest<PipelineInputDTO, PipelineOutputDTO> {
 
+  @Autowired protected PortalTestDataFactory portalData;
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
+  @Autowired private DataSinkRepository dataSinkRepository;
 
   private UUID testDataSetId;
 
@@ -74,38 +82,27 @@ class PipelineControllerIntegrationTest
 
   /** Create a test DataSet to associate pipelines with. */
   private DataSet createTestDataSet() {
-    DataSet dataSet = new DataSet();
-    dataSet.setName("test_dataset_for_pipelines_" + System.currentTimeMillis());
-    dataSet.setDescription("Test dataset for pipeline integration tests");
-    dataSet.setDataSetStatus(DataSetStatus.DRAFT);
-    dataSet.setPersistenceId(12345L);
-    dataSet.setIdentifier("test-identifier-" + System.currentTimeMillis());
-    dataSet.setVersion("1.0.0");
-    dataSet.setExternalId("ext-dataset-" + System.currentTimeMillis());
-    dataSet.setFormat("JSON");
-    dataSet.setOpenDataAccess(false);
-    return dataSetRepository.save(dataSet);
+    return portalData.dataSet(
+        b ->
+            b.description("Test dataset for pipeline integration tests")
+                .dataSetStatus(DataSetStatus.DRAFT));
   }
 
   /** Create a test DataSource for pipeline associations. */
   private DataSource createTestDataSource() {
-    DataSource dataSource = new DataSource();
-    dataSource.setName("test_data_source_" + System.currentTimeMillis());
-    dataSource.setDescription("Test data source for pipelines");
-    return dataSourceRepository.save(dataSource);
+    return portalData.dataSource(b -> b.description("Test data source for pipelines"));
   }
 
   private DataSource createAvailableTestDataSource() {
-    DataSource dataSource = createTestDataSource();
-    dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-    return dataSourceRepository.save(dataSource);
+    return portalData.dataSource(
+        b ->
+            b.description("Test data source for pipelines")
+                .dataSourceStatus(DataSourceStatus.AVAILABLE));
   }
 
   @Override
   protected void performAdditionalCleanup() {
-    pipelineRepository.deleteAll();
-    dataSourceRepository.deleteAll();
-    dataSetRepository.deleteAll();
+    portalData.cleanAll();
     testDataSetId = null; // Reset for next test
   }
 
@@ -116,8 +113,6 @@ class PipelineControllerIntegrationTest
     input.setDescription("A test pipeline for integration testing");
     input.setStyles(createSampleStyles());
     input.setModel(createSampleModel());
-    input.setApis(new String[] {"/api/v1/traffic", "/api/v1/weather"});
-    input.setPersistences(new Long[] {12345L});
     return input;
   }
 
@@ -136,8 +131,6 @@ class PipelineControllerIntegrationTest
     input.setDescription("Updated description");
     input.setStyles(createSampleStyles());
     input.setModel(createSampleModel());
-    input.setApis(new String[] {"/api/v1/sensors"});
-    input.setPersistences(new Long[] {12345L});
     return input;
   }
 
@@ -181,10 +174,7 @@ class PipelineControllerIntegrationTest
           .isEqualTo(input.getDescription());
       assertThat(output.getStyles()).as("Styles should match input").isEqualTo(input.getStyles());
       assertThat(output.getModel()).as("Model should match input").isEqualTo(input.getModel());
-      assertThat(output.getApis()).as("APIs should match input").containsExactly(input.getApis());
-      assertThat(output.getPersistences())
-          .as("Persistences should match input")
-          .containsExactly(input.getPersistences());
+      assertThat(output.getDataSinkIds()).as("DataSink IDs should be empty").isEmpty();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -204,7 +194,7 @@ class PipelineControllerIntegrationTest
 
       // Verify data sources are associated in database using eager fetch
       UUID pipelineId = response.getBody().getId();
-      Pipeline savedPipeline = pipelineRepository.findByIdWithRelations(pipelineId).orElseThrow();
+      Pipeline savedPipeline = pipelineRepository.findById(pipelineId).orElseThrow();
 
       assertThat(savedPipeline.getDataSources())
           .hasSize(2)
@@ -482,20 +472,6 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should update pipeline's APIs with PATCH")
-    void shouldUpdateApisWithPatch() {
-      UUID pipelineId = createTestEntity();
-
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("apis", new String[] {"/api/v2/newapi"});
-
-      ResponseEntity<PipelineOutputDTO> response = performPatch(pipelineId, patchMap);
-
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getApis()).containsExactly("/api/v2/newapi");
-    }
-
-    @Test
     @DisplayName("Should update pipeline's model with PATCH")
     void shouldUpdateModelWithPatch() {
       UUID pipelineId = createTestEntity();
@@ -721,6 +697,29 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should detach (not delete) DataSinks when pipeline is deleted")
+    void shouldDetachDataSinksWhenPipelineIsDeleted() {
+      UUID pipelineId = createTestEntity();
+      Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
+
+      DataSink sink = new DataSink();
+      sink.setDataSet(pipeline.getDataSet());
+      sink.setPipeline(pipeline);
+      sink.setDataSinkType(DataSinkType.FROST);
+      DataSink savedSink = dataSinkRepository.save(sink);
+      assertThat(dataSinkRepository.findByPipelineId(pipelineId)).hasSize(1);
+
+      ResponseEntity<Void> deleteResponse = performDelete(pipelineId);
+      assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+      assertThat(dataSinkRepository.findById(savedSink.getId()))
+          .as("DataSink survives pipeline deletion")
+          .isPresent()
+          .get()
+          .satisfies(s -> assertThat(s.getPipeline()).isNull());
+    }
+
+    @Test
     @DisplayName("Should cascade delete pipeline data sources associations")
     void shouldCascadeDeletePipelineDataSourceAssociations() {
       DataSource ds1 = createAvailableTestDataSource();
@@ -734,7 +733,7 @@ class PipelineControllerIntegrationTest
       UUID pipelineId = createResponse.getBody().getId();
 
       // Verify associations exist
-      Pipeline pipeline = pipelineRepository.findByIdWithRelations(pipelineId).orElseThrow();
+      Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
       assertThat(pipeline.getDataSources()).hasSize(2);
 
       // Delete pipeline
@@ -815,43 +814,6 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should handle empty APIs array")
-    void shouldHandleEmptyApisArray() {
-      PipelineInputDTO input = createValidInput();
-      input.setApis(new String[] {});
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getApis()).isEmpty();
-    }
-
-    @Test
-    @DisplayName("Should handle null APIs")
-    void shouldHandleNullApis() {
-      PipelineInputDTO input = createValidInput();
-      input.setApis(null);
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-    }
-
-    @Test
-    @DisplayName("Should handle empty persistences array")
-    void shouldHandleEmptyPersistencesArray() {
-      PipelineInputDTO input = createValidInput();
-      input.setPersistences(new Long[] {});
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getPersistences()).isEmpty();
-    }
-
-    @Test
     @DisplayName("Should handle complex nested JSON in styles")
     void shouldHandleComplexNestedJsonInStyles() {
       PipelineInputDTO input = createValidInput();
@@ -898,32 +860,16 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should handle multiple API paths")
-    void shouldHandleMultipleApiPaths() {
+    @DisplayName("Should handle null dataSinkIds (treated as empty — no DataSinks linked)")
+    void shouldHandleNullDataSinkIds() {
       PipelineInputDTO input = createValidInput();
-      input.setApis(
-          new String[] {
-            "/api/v1/traffic", "/api/v1/weather", "/api/v1/sensors", "/api/v2/advanced"
-          });
+      input.setDataSinkIds(null);
 
       ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getApis()).hasSize(4);
-    }
-
-    @Test
-    @DisplayName("Should handle multiple persistence IDs")
-    void shouldHandleMultiplePersistenceIds() {
-      PipelineInputDTO input = createValidInput();
-      input.setPersistences(new Long[] {12345L, 67890L});
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getPersistences()).containsExactly(12345L, 67890L);
+      assertThat(response.getBody().getDataSinkIds()).isEmpty();
     }
 
     @Test
@@ -938,7 +884,7 @@ class PipelineControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
 
       Pipeline savedPipeline =
-          pipelineRepository.findByIdWithRelations(response.getBody().getId()).orElseThrow();
+          pipelineRepository.findById(response.getBody().getId()).orElseThrow();
       assertThat(savedPipeline.getDataSources()).isEmpty();
     }
   }
@@ -1168,7 +1114,7 @@ class PipelineControllerIntegrationTest
     @Test
     @DisplayName(
         "Should allow updating pipeline fields without re-validating unchanged datasource associations")
-    void shouldAllowPatchWhenLinkedDataSourceBecomesUnpublished() {
+    void shouldAllowPatchWhenLinkedDataSourceBecomesUnreleased() {
       // Create pipeline with an AVAILABLE datasource
       DataSource dataSource = createTestDataSource();
       dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
@@ -1180,25 +1126,25 @@ class PipelineControllerIntegrationTest
       assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       UUID pipelineId = createResponse.getBody().getId();
 
-      // Unpublish the datasource (revert to DRAFT)
+      // Unrelease the datasource (revert to DRAFT)
       dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
       dataSourceRepository.save(dataSource);
 
       // PATCH a non-datasource field — should succeed because dataSourceIds is not in the patch
       Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("description", "Updated after datasource unpublished");
+      patchMap.put("description", "Updated after datasource unreleased");
 
       ResponseEntity<PipelineOutputDTO> patchResponse = performPatch(pipelineId, patchMap);
 
       assertThat(patchResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(patchResponse.getBody().getDescription())
-          .isEqualTo("Updated after datasource unpublished");
+          .isEqualTo("Updated after datasource unreleased");
     }
 
     @Test
     @DisplayName(
         "Should reject updating datasource associations when a linked datasource is no longer AVAILABLE")
-    void shouldRejectUpdateWhenReSubmittingUnpublishedDataSource() {
+    void shouldRejectUpdateWhenReSubmittingUnreleasedDataSource() {
       // Create pipeline with an AVAILABLE datasource
       DataSource dataSource = createTestDataSource();
       dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
@@ -1210,7 +1156,7 @@ class PipelineControllerIntegrationTest
       assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       UUID pipelineId = createResponse.getBody().getId();
 
-      // Unpublish the datasource (revert to DRAFT)
+      // Unrelease the datasource (revert to DRAFT)
       dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
       dataSourceRepository.save(dataSource);
 
@@ -1227,6 +1173,305 @@ class PipelineControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       assertThat(response.getBody()).contains("AVAILABLE status");
+    }
+  }
+
+  @Nested
+  @DisplayName("DataSource Scope Violation Tests (Epic 3 / Schicht C)")
+  class DataSourceScopeViolationTests {
+
+    /** Creates an AVAILABLE DataSource with the given datapool scope type and scoped pools. */
+    private DataSource availableScopedDataSource(DatapoolScopeType scopeType, DataPool... pools) {
+      return portalData.dataSource(
+          b ->
+              b.description("scope test datasource")
+                  .dataSourceStatus(DataSourceStatus.AVAILABLE)
+                  .datapoolScopeType(scopeType)
+                  .scopedDataPools(new HashSet<>(Set.of(pools))));
+    }
+
+    /** Points the endpoint at a fresh DRAFT dataset that belongs to the given pool. */
+    private void useDatasetInPool(DataPool pool) {
+      DataSet dataset =
+          portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT).dataPool(pool));
+      testDataSetId = dataset.getId();
+    }
+
+    private ResponseEntity<String> postPipelineWith(Set<UUID> dataSourceIds) {
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(dataSourceIds);
+      return restTemplate.exchange(
+          getEndpointPath(),
+          HttpMethod.POST,
+          new HttpEntity<>(input, createAuthHeaders()),
+          String.class);
+    }
+
+    @Test
+    @DisplayName("Should reject NONE-scope DataSource (dataset without pool)")
+    void shouldRejectNoneScopeDataSource() {
+      // Endpoint lazily creates a pool-less dataset; NONE is rejected regardless of pool.
+      DataSource noneDs = availableScopedDataSource(DatapoolScopeType.NONE);
+
+      ResponseEntity<String> response = postPipelineWith(Set.of(noneDs.getId()));
+
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody())
+          .contains("offendingDataSourceIds")
+          .contains(noneDs.getId().toString());
+    }
+
+    @Test
+    @DisplayName("Should reject SPECIFIC DataSource when DataSet's pool is not in scopedDataPools")
+    void shouldRejectSpecificDataSourcePoolMismatch() {
+      DataPool poolA = portalData.dataPool(b -> {});
+      DataPool poolB = portalData.dataPool(b -> {});
+      useDatasetInPool(poolA);
+      DataSource specificDs = availableScopedDataSource(DatapoolScopeType.SPECIFIC, poolB);
+
+      ResponseEntity<String> response = postPipelineWith(Set.of(specificDs.getId()));
+
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody()).contains(specificDs.getId().toString());
+    }
+
+    @Test
+    @DisplayName("Should allow SPECIFIC DataSource when DataSet's pool matches scopedDataPools")
+    void shouldAllowSpecificDataSourceMatchingPool() {
+      DataPool poolA = portalData.dataPool(b -> {});
+      useDatasetInPool(poolA);
+      DataSource specificDs = availableScopedDataSource(DatapoolScopeType.SPECIFIC, poolA);
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(Set.of(specificDs.getId()));
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      Pipeline saved = pipelineRepository.findById(response.getBody().getId()).orElseThrow();
+      assertThat(saved.getDataSources())
+          .extracting(DataSource::getId)
+          .containsExactly(specificDs.getId());
+    }
+
+    @Test
+    @DisplayName("Should allow ALL-scope DataSource regardless of DataSet's pool")
+    void shouldAllowAllScopeDataSource() {
+      DataPool poolA = portalData.dataPool(b -> {});
+      useDatasetInPool(poolA);
+      DataSource allDs = availableScopedDataSource(DatapoolScopeType.ALL);
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(Set.of(allDs.getId()));
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("Should reject SPECIFIC DataSource when DataSet has no pool")
+    void shouldRejectSpecificDataSourceWhenDatasetHasNoPool() {
+      // Endpoint lazily creates a pool-less dataset; a SPECIFIC datasource is confined to its pools
+      // and must NOT be usable in a pool-less dataset (would defeat the confinement, F3).
+      DataPool poolB = portalData.dataPool(b -> {});
+      DataSource specificDs = availableScopedDataSource(DatapoolScopeType.SPECIFIC, poolB);
+
+      ResponseEntity<String> response = postPipelineWith(Set.of(specificDs.getId()));
+
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody()).contains(specificDs.getId().toString());
+    }
+
+    @Test
+    @DisplayName("Should report all offending DataSources without fail-fast")
+    void shouldReportAllOffendingDataSources() {
+      DataPool poolA = portalData.dataPool(b -> {});
+      DataPool poolB = portalData.dataPool(b -> {});
+      useDatasetInPool(poolA);
+      DataSource noneDs = availableScopedDataSource(DatapoolScopeType.NONE);
+      DataSource specificMismatch = availableScopedDataSource(DatapoolScopeType.SPECIFIC, poolB);
+
+      ResponseEntity<String> response =
+          postPipelineWith(Set.of(noneDs.getId(), specificMismatch.getId()));
+
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody())
+          .contains(noneDs.getId().toString())
+          .contains(specificMismatch.getId().toString());
+    }
+
+    @Test
+    @DisplayName("Should reject PUT that adds an offending DataSource to an existing pipeline")
+    void shouldRejectUpdateIntroducingOffendingDataSource() {
+      // Pool-less dataset; create a valid pipeline with an ALL-scope datasource.
+      DataSource allDs = availableScopedDataSource(DatapoolScopeType.ALL);
+      PipelineInputDTO createInput = createValidInput();
+      createInput.setDataSourceIds(Set.of(allDs.getId()));
+      ResponseEntity<PipelineOutputDTO> createResponse = performCreate(createInput);
+      assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID pipelineId = createResponse.getBody().getId();
+
+      // PUT adding a NONE-scope datasource must be rejected.
+      DataSource noneDs = availableScopedDataSource(DatapoolScopeType.NONE);
+      PipelineInputDTO updateInput = createUpdateInput();
+      updateInput.setDataSourceIds(Set.of(allDs.getId(), noneDs.getId()));
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + pipelineId,
+              HttpMethod.PUT,
+              new HttpEntity<>(updateInput, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody()).contains(noneDs.getId().toString());
+    }
+  }
+
+  @Nested
+  @DisplayName("DataSink linkage via dataSinkIds")
+  class DataSinkLinkageTests {
+
+    private DataSink saveFreeSink(DataSet dataSet) {
+      DataSink sink = new DataSink();
+      sink.setDataSet(dataSet);
+      sink.setDataSinkType(DataSinkType.FROST);
+      return dataSinkRepository.save(sink);
+    }
+
+    @Test
+    @DisplayName("Creating a pipeline with dataSinkIds attaches existing DataSinks")
+    void shouldAttachDataSinksOnCreate() {
+      getEndpointPath();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      DataSink sink = saveFreeSink(dataSet);
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSinkIds(Set.of(sink.getId()));
+
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      UUID pipelineId = response.getBody().getId();
+
+      assertThat(response.getBody().getDataSinkIds()).containsExactly(sink.getId());
+      assertThat(dataSinkRepository.findByPipelineId(pipelineId))
+          .extracting(DataSink::getId)
+          .containsExactly(sink.getId());
+    }
+
+    @Test
+    @DisplayName("Updating a pipeline with empty dataSinkIds detaches but preserves DataSinks")
+    void shouldDetachDataSinksOnEmptyList() {
+      UUID pipelineId = createTestEntity();
+      Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
+      DataSet dataSet = pipeline.getDataSet();
+
+      DataSink sink = saveFreeSink(dataSet);
+      sink.setPipeline(pipeline);
+      dataSinkRepository.save(sink);
+      UUID sinkId = sink.getId();
+      assertThat(dataSinkRepository.findByPipelineId(pipelineId)).hasSize(1);
+
+      PipelineInputDTO updateInput = createUpdateInput();
+      updateInput.setDataSinkIds(Set.of());
+
+      ResponseEntity<PipelineOutputDTO> response = performUpdate(pipelineId, updateInput);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(dataSinkRepository.findByPipelineId(pipelineId)).isEmpty();
+      assertThat(dataSinkRepository.findById(sinkId))
+          .as("DataSink should survive pipeline detachment")
+          .isPresent();
+    }
+
+    @Test
+    @DisplayName("GET pipeline includes its dataSinkIds in the response")
+    void shouldReturnDataSinkIdsInGetResponse() {
+      UUID pipelineId = createTestEntity();
+      Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
+      DataSet dataSet = pipeline.getDataSet();
+
+      DataSink sink = saveFreeSink(dataSet);
+      sink.setPipeline(pipeline);
+      DataSink saved = dataSinkRepository.save(sink);
+
+      ResponseEntity<PipelineOutputDTO> response = performGetById(pipelineId);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSinkIds()).containsExactly(saved.getId());
+    }
+
+    @Test
+    @DisplayName("Should reject create when dataSinkIds includes an unknown UUID")
+    void shouldRejectUnknownDataSinkId() {
+      PipelineInputDTO input = createValidInput();
+      input.setDataSinkIds(Set.of(UUID.randomUUID()));
+
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject create when a DataSink belongs to a different dataset")
+    void shouldRejectCrossDatasetDataSink() {
+      getEndpointPath();
+      DataSet otherDataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
+      DataSink crossSink = saveFreeSink(otherDataSet);
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSinkIds(Set.of(crossSink.getId()));
+
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject update when a DataSink is already attached to another pipeline")
+    void shouldRejectDataSinkAttachedElsewhere() {
+      UUID pipelineId = createTestEntity();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+
+      Pipeline otherPipeline =
+          pipelineRepository.save(
+              Pipeline.builder()
+                  .name("other-pipeline-" + UUID.randomUUID())
+                  .dataSet(dataSet)
+                  .build());
+      DataSink sink = saveFreeSink(dataSet);
+      sink.setPipeline(otherPipeline);
+      dataSinkRepository.save(sink);
+
+      PipelineInputDTO updateInput = createUpdateInput();
+      updateInput.setDataSinkIds(Set.of(sink.getId()));
+
+      ResponseEntity<PipelineOutputDTO> response = performUpdate(pipelineId, updateInput);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Deleting a pipeline detaches its DataSinks but does not delete them")
+    void deletingPipelineDetachesDataSinks() {
+      UUID pipelineId = createTestEntity();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
+
+      DataSink sink = saveFreeSink(dataSet);
+      sink.setPipeline(pipeline);
+      DataSink saved = dataSinkRepository.save(sink);
+
+      ResponseEntity<Void> response = performDelete(pipelineId);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+      assertThat(dataSinkRepository.findById(saved.getId()))
+          .as("DataSink should survive pipeline deletion")
+          .isPresent()
+          .get()
+          .satisfies(s -> assertThat(s.getPipeline()).isNull());
     }
   }
 }

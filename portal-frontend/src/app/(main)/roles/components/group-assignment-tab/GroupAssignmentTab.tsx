@@ -8,9 +8,8 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
-import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { AlertBox, InfoBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
@@ -34,13 +33,6 @@ interface GroupAssignmentTabProps {
   getAssignmentsError?: Error | null
 }
 
-const SCOPE_TABS: Tab<AssignmentScope>[] = [
-  { label: 'roles.groupAssignmentTab.scopeTabs.platformWide', value: ASSIGNMENT_SCOPE_TYPES.TENANT },
-  { label: 'roles.groupAssignmentTab.scopeTabs.dataset', value: ASSIGNMENT_SCOPE_TYPES.DATASET },
-  { label: 'roles.groupAssignmentTab.scopeTabs.datasource', value: ASSIGNMENT_SCOPE_TYPES.DATASOURCE },
-  { label: 'roles.groupAssignmentTab.scopeTabs.datastructure', value: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE },
-]
-
 export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const {
     selectedGroupIds,
@@ -51,11 +43,22 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     isSystemRole,
     getAssignmentsError,
   } = props
+
   const t = useTranslations('roles.groupAssignmentTab')
   const tCommon = useTranslations('common')
+
+  const scopeTabs: { value: AssignmentScope; label: string }[] = [
+    { value: ASSIGNMENT_SCOPE_TYPES.TENANT, label: t('scopeTabs.platformWide') },
+    { value: ASSIGNMENT_SCOPE_TYPES.DATAPOOL, label: t('scopeTabs.datapool') },
+    { value: ASSIGNMENT_SCOPE_TYPES.DATASET, label: t('scopeTabs.dataset') },
+    { value: ASSIGNMENT_SCOPE_TYPES.DATASOURCE, label: t('scopeTabs.datasource') },
+    { value: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE, label: t('scopeTabs.datastructure') },
+  ]
+
   const router = useRouter()
   const { hasPermission } = usePermissions()
   const canCreateAssignment = hasPermission(PERMISSION_NAMES.ASSIGNMENT_CREATE)
+  const canDeleteAssignment = hasPermission(PERMISSION_NAMES.ASSIGNMENT_DELETE)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedScope, setSelectedScope] = useState<AssignmentScope>(ASSIGNMENT_SCOPE_TYPES.TENANT)
   const [groupToRemove, setGroupToRemove] = useState<GroupTableRow | null>(null)
@@ -76,12 +79,13 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     if (selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT) return selectedGroupIds.join(',')
     else {
       const scopeAssignments = initialAssignments.filter(assignment => assignment.scopeType === selectedScope)
-      const scopeAssignmentGroupIds = scopeAssignments.map(assignment => assignment.group.id)
+      const scopeAssignmentGroupIds = [...new Set(scopeAssignments.map(assignment => assignment.group.id))]
       return scopeAssignmentGroupIds.join(',')
     }
   }
 
   const groupRequestIds = getGroupRequestIds()
+
   const requestParams = useMemo(() => {
     const requestParams = getApiRequestParams({ pageIndex, pageSize, sorting, search })
     if (!!groupRequestIds) requestParams.set('id', groupRequestIds)
@@ -98,31 +102,37 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, pageSize, setTotalPages])
 
-  // Build a map from group ID to scopeType from assignments
-  const groupScopeMap = useMemo(() => {
-    const map: Record<string, AssignmentScope | null> = {}
-    initialAssignments.forEach(a => {
-      map[a.group.id] = a.scopeType
-    })
-    return map
-  }, [initialAssignments])
+  useEffect(() => {
+    setPaginationParams({ pageSize: pageSize ?? 10, pageIndex: 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedScope])
 
   // Filter assignments by selected scope
-  const scopeFilteredGroupIds = useMemo(() => {
-    if (selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT) return selectedGroupIds
-    return initialAssignments.filter(a => a.scopeType === selectedScope).map(a => a.group.id)
+  const scopeFilteredAssignments = useMemo(() => {
+    if (selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT) {
+      return selectedGroupIds.map(id => ({ groupId: id, scopeType: ASSIGNMENT_SCOPE_TYPES.TENANT as AssignmentScope }))
+    }
+    return initialAssignments
+      .filter(a => a.scopeType === selectedScope)
+      .map(a => ({ groupId: a.group.id, scopeType: a.scopeType }))
   }, [initialAssignments, selectedScope, selectedGroupIds])
+
+  const scopeFilteredGroupIds = useMemo(
+    () => [...new Set(scopeFilteredAssignments.map(a => a.groupId))],
+    [scopeFilteredAssignments],
+  )
 
   const groups = useMemo(() => {
     if (!groupsData?.data) {
       return []
     }
-    const filteredGroups = groupsData.data.filter(group => scopeFilteredGroupIds.includes(group.id))
-    return filteredGroups.map(group => ({
-      ...group,
-      scopeType: groupScopeMap[group.id],
-    })) as GroupTableRow[]
-  }, [groupsData?.data, scopeFilteredGroupIds, groupScopeMap])
+    return groupsData.data
+      .filter(group => scopeFilteredGroupIds.includes(group.id))
+      .map(group => ({
+        ...group,
+        scopeType: scopeFilteredAssignments.find(a => a.groupId === group.id)?.scopeType,
+      })) as GroupTableRow[]
+  }, [groupsData?.data, scopeFilteredGroupIds, scopeFilteredAssignments])
 
   const onRowClick = (row: Row<GroupTableRow>) => {
     router.push(`/groups/${row.original.id}`)
@@ -162,7 +172,21 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
       <div className="flex flex-col gap-4 h-full">
         {!isSystemRole && (
           <div className="flex items-center justify-between gap-4">
-            <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />
+            <div className="flex gap-2" role="tablist">
+              {scopeTabs.map(tab => (
+                <Button
+                  key={tab.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={selectedScope === tab.value}
+                  variant={selectedScope === tab.value ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedScope(tab.value)}
+                >
+                  {tab.label}
+                </Button>
+              ))}
+            </div>
             {!isTenantScope && <AlertBox text={t(`scopeReadOnlyMessage${selectedScope}`)} />}
             {isTenantScope && <InfoBox text={t('infoBox')} />}
           </div>
@@ -190,10 +214,24 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div data-testid="groupAssignmentTab" className="flex flex-col gap-4">
       {!isSystemRole && (
         <div className="flex items-center justify-between gap-4">
-          <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />
+          <div className="flex gap-2" role="tablist">
+            {scopeTabs.map(tab => (
+              <Button
+                key={tab.value}
+                type="button"
+                role="tab"
+                aria-selected={selectedScope === tab.value}
+                variant={selectedScope === tab.value ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedScope(tab.value)}
+              >
+                {tab.label}
+              </Button>
+            ))}
+          </div>
           {!isTenantScope && <AlertBox text={t(`scopeReadOnlyMessage${selectedScope}`)} />}
           {isTenantScope && <InfoBox text={t('infoBox')} />}
         </div>
@@ -216,7 +254,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         totalPages={totalPages}
         onRowClick={canEdit ? undefined : onRowClick}
         isEditMode={canEdit}
-        onRemoveGroup={canEdit ? group => setGroupToRemove(group) : undefined}
+        onRemoveGroup={canEdit && canDeleteAssignment ? group => setGroupToRemove(group) : undefined}
       />
       {isTenantScope && (
         <GroupAssignmentModal

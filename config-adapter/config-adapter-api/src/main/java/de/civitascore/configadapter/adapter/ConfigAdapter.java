@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.adapter;
 
 import de.civitascore.configadapter.ConfigBase;
+import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.exception.AdapterException;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
@@ -18,6 +19,13 @@ import de.civitascore.configadapter.model.ConfigEvent;
 import java.util.List;
 
 public interface ConfigAdapter extends ConfigBase {
+
+  /**
+   * Initializes this adapter with the given configuration.
+   *
+   * @param config the adapter configuration, must not be null
+   */
+  void initialize(AdapterConfig config);
 
   void processConfigEvent(String topic, ConfigEvent event)
       throws FatalAdapterException, RetryableAdapterException;

@@ -34,11 +34,7 @@ export const RelationshipTool: React.FC<RelationshipToolProps> = props => {
   const isActive = activeRelationshipType === relationshipType
 
   const handleClick = useCallback(() => {
-    if (isActive) {
-      setActiveRelationshipType('association')
-    } else {
-      setActiveRelationshipType(relationshipType)
-    }
+    setActiveRelationshipType(isActive ? null : relationshipType)
   }, [relationshipType, isActive, setActiveRelationshipType])
 
   return (

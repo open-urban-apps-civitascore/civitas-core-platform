@@ -34,7 +34,7 @@ The Pipeline Editor provides a visual interface for creating and configuring dat
 
 - React 18 with TypeScript
 - React Flow for canvas rendering
-- Monaco Editor for code editing (Bloblang mappings)
+- Node-based visual mapping editor (Schema-as-MegaNode) for field mappings
 - Zustand-like state management via React Context + useReducer
 
 ---
@@ -309,8 +309,8 @@ Each node type has a corresponding inspector panel:
 | ApiRequest  | `ApiPanel`        | Entity dropdown + metadata |
 | ApiResponse | `ApiPanel`        | Entity dropdown + metadata |
 | Cron        | `CronPanel`       | Expression input           |
-| Frost       | `FrostPanel`      | Entity dropdown + metadata |
-| Mapping     | `MappingPanel`    | Monaco code editor         |
+| Frost       | `FrostPanel`      | Entity dropdown + metadata        |
+| Mapping     | `MappingPanel`    | Source/target selectors + mapping editor |
 
 ### EntitySelector
 
@@ -656,6 +656,5 @@ Exposes data from a FROST server via a REST API. Does **not** generate a RedPand
 ## External References
 
 - [React Flow Documentation](https://reactflow.dev/)
-- [Monaco Editor](https://microsoft.github.io/monaco-editor/)
 - [Bloblang Documentation](https://docs.redpanda.com/redpanda-connect/guides/bloblang/about/)
 - [RedPandaConnect Configuration](https://docs.redpanda.com/redpanda-connect/configuration/about/)

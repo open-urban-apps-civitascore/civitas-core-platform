@@ -44,7 +44,6 @@ class DatasetSerializationTest {
   void shouldDeserializeDatasetFields() {
     assertEquals("b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a", dataset.id());
     assertEquals("Neustadt Traffic Counts 2025", dataset.name());
-    assertTrue(dataset.openDataAccess());
   }
 
   @Test
@@ -54,7 +53,7 @@ class DatasetSerializationTest {
 
   @Test
   void shouldDeserializePostgresqlDatasource() {
-    Datasource pg = dataset.datasources().get(0);
+    Datasource pg = dataset.datasources().getFirst();
     assertEquals("0a7b8c9d-1e2f-4a5b-9c0d-1e2f3a4b5c6d", pg.getId());
     assertEquals("postgresql", pg.getType());
     assertEquals("Neustadt Mobility DB", pg.getName());
@@ -95,7 +94,7 @@ class DatasetSerializationTest {
     @SuppressWarnings("unchecked")
     List<String> topics = (List<String>) mqtt.getAdditionalProperties().get("topics");
     assertEquals(3, topics.size());
-    assertEquals("neustadt/traffic/+/counts", topics.get(0));
+    assertEquals("neustadt/traffic/+/counts", topics.getFirst());
 
     @SuppressWarnings("unchecked")
     Map<String, Object> tls = (Map<String, Object>) mqtt.getAdditionalProperties().get("tls");
@@ -116,7 +115,7 @@ class DatasetSerializationTest {
 
   @Test
   void shouldDeserializeAddPipeline() {
-    DataPipeline addPipeline = dataset.datapipelines().get(0);
+    DataPipeline addPipeline = dataset.datapipelines().getFirst();
     assertEquals("db-to-frost-01", addPipeline.id());
     assertEquals("1", addPipeline.version());
     assertEquals("ADD", addPipeline.action());
@@ -136,15 +135,105 @@ class DatasetSerializationTest {
   }
 
   @Test
+  void absentSourceAndSinkIdsDeserializeAsEmptyLists() {
+    // Triggers published before the per-pipeline association existed omit the fields; the record
+    // normalizes them so consumers never see null.
+    DataPipeline pipeline = dataset.datapipelines().getFirst();
+    assertEquals(List.of(), pipeline.dataSourceIds());
+    assertEquals(List.of(), pipeline.dataSinkIds());
+  }
+
+  @Test
+  void shouldDeserializeSourceAndSinkIds() throws Exception {
+    DataPipeline pipeline =
+        objectMapper.readValue(
+            """
+            {"id":"p1","version":"1","action":"ADD","data":{},
+             "dataSourceIds":["src-1"],"dataSinkIds":["sink-1","sink-2"]}
+            """,
+            DataPipeline.class);
+    assertEquals(List.of("src-1"), pipeline.dataSourceIds());
+    assertEquals(List.of("sink-1", "sink-2"), pipeline.dataSinkIds());
+  }
+
+  @Test
+  void shouldDeserializeNamedApis() {
+    assertNotNull(dataset.namedApis());
+    assertEquals(2, dataset.namedApis().size());
+
+    NamedApi traffic = dataset.namedApis().getFirst();
+    assertEquals("traffic", traffic.slug());
+    assertEquals(ApiStandards.STA, traffic.standard());
+    assertEquals("1.1", traffic.version());
+
+    // Second fixture entry exercises a non-STA standard and an absent (null) version.
+    NamedApi boundaries = dataset.namedApis().get(1);
+    assertEquals("boundaries", boundaries.slug());
+    assertEquals(ApiStandards.OWS, boundaries.standard());
+    assertNull(boundaries.version());
+  }
+
+  /**
+   * Pins the forward-compat property documented on {@link NamedApi}: the record uses
+   * {@code @JsonIgnoreProperties(ignoreUnknown = true)} so portal-backend can add fields (e.g. the
+   * portal-backend-private {@code name} and {@code description}) without breaking config-adapter
+   * deserialization.
+   */
+  @Test
+  void shouldDeserializeNamedApiIgnoringUnknownFields() throws Exception {
+    String json =
+        """
+        {
+          "slug": "traffic",
+          "standard": "STA",
+          "version": "1.1",
+          "name": "Traffic Sensor Readings",
+          "description": "Live traffic counter readings from city sensors."
+        }
+        """;
+
+    NamedApi api = objectMapper.readValue(json, NamedApi.class);
+
+    assertEquals("traffic", api.slug());
+    assertEquals(ApiStandards.STA, api.standard());
+    assertEquals("1.1", api.version());
+  }
+
+  /**
+   * #1309: {@code standard} is a String, so a value outside the current controlled vocabulary must
+   * deserialize cleanly (an adapter can then ignore or diagnose it) instead of failing the whole
+   * event — the forward-compatibility property that a Java enum would break.
+   */
+  @Test
+  void shouldDeserializeUnknownStandardValueForForwardCompatibility() throws Exception {
+    String json =
+        """
+        {
+          "slug": "coverage",
+          "standard": "COVERAGE",
+          "version": null
+        }
+        """;
+
+    NamedApi api = objectMapper.readValue(json, NamedApi.class);
+
+    assertEquals("coverage", api.slug());
+    assertEquals("COVERAGE", api.standard());
+    assertNull(api.version());
+  }
+
+  @Test
   void shouldRoundTripSerializeDataset() throws Exception {
     String json = objectMapper.writeValueAsString(dataset);
     Dataset roundTripped = objectMapper.readValue(json, Dataset.class);
     assertEquals(dataset.id(), roundTripped.id());
     assertEquals(dataset.name(), roundTripped.name());
-    assertEquals(dataset.openDataAccess(), roundTripped.openDataAccess());
     assertEquals(dataset.datasources().size(), roundTripped.datasources().size());
     assertEquals(dataset.datapipelines().size(), roundTripped.datapipelines().size());
     assertEquals(dataset.datasources().get(0), roundTripped.datasources().get(0));
     assertEquals(dataset.datasources().get(1), roundTripped.datasources().get(1));
+    assertEquals(dataset.namedApis().size(), roundTripped.namedApis().size());
+    assertEquals(dataset.namedApis().get(0), roundTripped.namedApis().get(0));
+    assertEquals(dataset.namedApis().get(1), roundTripped.namedApis().get(1));
   }
 }

@@ -4,6 +4,7 @@ import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.Operation;
+import de.civitascore.portal.configuration.EventProperties;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
@@ -13,7 +14,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.logging.log4j.util.Strings;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -25,12 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 public abstract class EventPublishingService<T, I extends BaseInputDTO> extends BaseService<T, I> {
 
   protected final ConfigEventPublisherService configEventPublisher;
+  protected final EventProperties eventProperties;
 
-  @Value("${event.config-adapter-timeout-seconds:10}")
-  private int configAdapterTimeoutSeconds;
-
-  protected EventPublishingService(ConfigEventPublisherService configEventPublisher) {
+  protected EventPublishingService(
+      ConfigEventPublisherService configEventPublisher, EventProperties eventProperties) {
     this.configEventPublisher = configEventPublisher;
+    this.eventProperties = eventProperties;
   }
 
   @Override
@@ -111,13 +111,13 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
           configEventPublisher.publishConfigEvent(
               topic, targetComponent, targetResource, configOperation, configPath, configValue);
 
-      ConfigResultEvent result = futureResult.get(configAdapterTimeoutSeconds, TimeUnit.SECONDS);
+      ConfigResultEvent result =
+          futureResult.get(eventProperties.configAdapterTimeoutSeconds(), TimeUnit.SECONDS);
 
       if (result != null && result.status() == ConfigResultEvent.Status.FAILURE) {
         throw new ExternalSystemRejectionException(
-            String.format(
-                "Config Adapter rejected %s: %s - %s",
-                operation, result.errorCode(), result.message()));
+            "Config Adapter rejected %s: %s - %s"
+                .formatted(operation, result.errorCode(), result.message()));
       }
 
       return result;

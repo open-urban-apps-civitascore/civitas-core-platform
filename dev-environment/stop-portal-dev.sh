@@ -23,10 +23,16 @@ else
 fi
 echo
 
-# Stop application processes (started by start-portal-dev.sh in background)
+# Stop application Docker containers (started by start-portal-dev.sh in Docker mode)
+echo "Stopping application services (Docker)..."
+cd "$SCRIPT_DIR/apps"
+$COMPOSE_DOWN 2>/dev/null && echo "  Application services stopped (Docker)" || true
+
+# Stop application processes (started by IDE mode or frontend in background)
 # Kill by port — this is reliable regardless of how the process was started
 # (Maven forks child JVMs that don't match pkill patterns)
-echo "Stopping application processes..."
+echo "Stopping application processes (local)..."
+docker rm -f civitas-portal-frontend 2>/dev/null || true
 for port_info in "8088:Config Adapter" "8089:Portal Backend" "3000:Portal Frontend"; do
     port="${port_info%%:*}"
     name="${port_info##*:}"
@@ -51,11 +57,11 @@ sleep 1
 echo
 echo "Stopping Docker services..."
 
-cd "$SCRIPT_DIR/modelatlas"
-$COMPOSE_DOWN 2>/dev/null && echo "  Model Atlas stopped" || true
+cd "$SCRIPT_DIR/nifi"
+$COMPOSE_DOWN 2>/dev/null && echo "  Apache NiFi stopped" || true
 
-cd "$SCRIPT_DIR/redpanda-connect"
-$COMPOSE_DOWN 2>/dev/null && echo "  Redpanda Connect stopped" || true
+cd "$SCRIPT_DIR/geoserver"
+$COMPOSE_DOWN 2>/dev/null && echo "  GeoServer stopped" || true
 
 cd "$SCRIPT_DIR/frost"
 $COMPOSE_DOWN 2>/dev/null && echo "  FROST Server stopped" || true

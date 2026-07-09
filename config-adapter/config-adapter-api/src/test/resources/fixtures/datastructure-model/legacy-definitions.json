@@ -1,0 +1,31 @@
+{
+  "$id": "http://civitas.org/model/LegacyDefinitions/1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LegacyDefinitions",
+  "type": "object",
+  "properties": {
+    "reading": { "$ref": "#/definitions/Reading" }
+  },
+  "definitions": {
+    "Reading": {
+      "type": "object",
+      "title": "Reading",
+      "properties": {
+        "legacyOnly": { "type": "string" },
+        "shadowed": { "type": "integer" }
+      },
+      "required": ["legacyOnly"]
+    }
+  },
+  "$defs": {
+    "Reading": {
+      "type": "object",
+      "title": "Reading",
+      "properties": {
+        "shadowed": { "type": "string" },
+        "current": { "type": "number" }
+      },
+      "required": ["shadowed"]
+    }
+  }
+}

@@ -1,0 +1,36 @@
+meta {
+  name: Release Data Structure Version
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  versionId: {{dataStructureVersionId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in draft state.
+
+  **Expected Response:** 200 OK, body reflects version in released state.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Version status updated to released (the model/JSON Schema is persisted on the version) |
+  | Config Adapter | -- |
+  | External System | -- |
+}

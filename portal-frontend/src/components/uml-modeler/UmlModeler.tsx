@@ -14,8 +14,7 @@ interface UmlModelerProps {
   isReadOnly?: boolean
   isMultiSessionMode?: boolean
   modelSessionManager?: UseMultiSessionReturn
-  canExportXmi?: boolean
-  canImportXmi?: boolean
+  canExportModel?: boolean
   placeHolder?: JSX.Element
   onImportFromDatastructure?: () => void
 }
@@ -26,8 +25,7 @@ export const UmlModeler = (props: UmlModelerProps) => {
     isReadOnly = false,
     isMultiSessionMode = true,
     modelSessionManager,
-    canExportXmi = true,
-    canImportXmi = true,
+    canExportModel = true,
     placeHolder,
     onImportFromDatastructure,
   } = props
@@ -39,8 +37,7 @@ export const UmlModeler = (props: UmlModelerProps) => {
             className="rounded-xl"
             externalSessionManager={modelSessionManager}
             isMultiSessionMode={isMultiSessionMode}
-            canExportXmi={canExportXmi}
-            canImportXmi={canImportXmi}
+            canExportModel={canExportModel}
             placeHolder={placeHolder}
             onImportFromDatastructure={onImportFromDatastructure}
           />

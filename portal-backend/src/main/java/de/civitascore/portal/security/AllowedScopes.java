@@ -20,6 +20,10 @@ import org.springframework.web.context.annotation.RequestScope;
  *   <li>"" or missing - No scopes (return empty results)
  * </ul>
  *
+ * <p>OPA additionally returns X-Allowed-Pool-Ids for the dataset collection (Epic 1 union): the
+ * datapools whose datasets the user may see via a DATAPOOL-scoped grant. Dataset filtering ORs the
+ * direct scope IDs with these pool IDs ({@code id IN (...) OR datapool_id IN (...)}).
+ *
  * <p>Spring manages the lifecycle - no manual cleanup needed.
  *
  * @see AllowedScopesFilter
@@ -44,10 +48,21 @@ public class AllowedScopes {
   /** Specific scope IDs the user is authorized to access. */
   private Set<UUID> scopeIds = Set.of();
 
-  /** Set wildcard access (user has TENANT scope). */
+  /**
+   * Datapool IDs the user may access via DATAPOOL-scoped grants (Epic 1 union). Relevant only for
+   * the dataset collection; ORed with {@link #scopeIds} during dataset filtering.
+   */
+  private Set<UUID> poolIds = Set.of();
+
+  /**
+   * Set wildcard access (user has TENANT scope). Clears any specific scope/pool IDs so the object
+   * cannot represent the contradictory "wildcard AND specific IDs" state.
+   */
   public void setWildcard() {
     this.headerPresent = true;
     this.wildcard = true;
+    this.scopeIds = Set.of();
+    this.poolIds = Set.of();
   }
 
   /**
@@ -58,6 +73,17 @@ public class AllowedScopes {
   public void setScopeIds(Set<UUID> ids) {
     this.headerPresent = true;
     this.wildcard = false;
-    this.scopeIds = ids != null ? ids : Set.of();
+    this.scopeIds = ids != null ? Set.copyOf(ids) : Set.of();
+  }
+
+  /**
+   * Set the datapool IDs the user may access (Epic 1 union). Marks the scope header as present so a
+   * user whose only grant is pool-based is still scoped (not treated as direct backend access).
+   *
+   * @param ids the authorized datapool IDs, or empty set for none
+   */
+  public void setPoolIds(Set<UUID> ids) {
+    this.headerPresent = true;
+    this.poolIds = ids != null ? Set.copyOf(ids) : Set.of();
   }
 }

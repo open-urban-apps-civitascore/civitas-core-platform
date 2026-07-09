@@ -14,7 +14,7 @@ interface StatusDropdownProps<T extends StatusTypes> {
   status: T
   onStatusChange: (status: T) => void
   statusOptions: readonly T[]
-  canSetAvailable?: boolean
+  canStage?: boolean
   canSetDraft?: boolean
   canRelease?: boolean
   isReadOnly?: boolean
@@ -24,7 +24,7 @@ export const StatusDropdown = <T extends StatusTypes>(props: StatusDropdownProps
   const {
     status,
     onStatusChange,
-    canSetAvailable = false,
+    canStage = false,
     canSetDraft = true,
     canRelease = true,
     isReadOnly = false,
@@ -82,16 +82,16 @@ export const StatusDropdown = <T extends StatusTypes>(props: StatusDropdownProps
               data-testid={`statusOption-${option.toLowerCase()}`}
               onClick={() => onStatusChange(option)}
               disabled={
-                // AVAILABLE requires both form validation (canSetAvailable) and *_RELEASE permission (canRelease).
-                // READY is a publish step requiring only *_UPDATE (implied by edit mode) — no RELEASE permission needed.
-                (option === STATUS_TYPES.AVAILABLE && (!canSetAvailable || !canRelease)) ||
-                (option === STATUS_TYPES.READY && !canSetAvailable) ||
+                // canStage means the content passes validation to leave DRAFT (stage to READY).
+                // AVAILABLE additionally needs *_RELEASE permission (canRelease); READY only needs *_UPDATE (implied by edit mode).
+                (option === STATUS_TYPES.AVAILABLE && (!canStage || !canRelease)) ||
+                (option === STATUS_TYPES.READY && !canStage) ||
                 (option === STATUS_TYPES.DRAFT && !canSetDraft)
               }
               className={cn(
                 status === option && 'bg-accent',
-                ((option === STATUS_TYPES.AVAILABLE && (!canSetAvailable || !canRelease)) ||
-                  (option === STATUS_TYPES.READY && !canSetAvailable)) &&
+                ((option === STATUS_TYPES.AVAILABLE && (!canStage || !canRelease)) ||
+                  (option === STATUS_TYPES.READY && !canStage)) &&
                   'opacity-50 cursor-not-allowed',
               )}
             >

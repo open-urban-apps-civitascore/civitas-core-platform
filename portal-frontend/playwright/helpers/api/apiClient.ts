@@ -248,12 +248,12 @@ export class ApiClient {
     return this.post<{ id: string; name: string }>('/datasets', data)
   }
 
-  async publishDataset(datasetId: string) {
-    return this.post<{ id: string; dataSetStatus: string }>(`/datasets/${datasetId}/publish`, {})
+  async stageDataset(datasetId: string) {
+    return this.post<{ id: string; dataSetStatus: string }>(`/datasets/${datasetId}/stage`, {})
   }
 
-  async unpublishDataset(datasetId: string) {
-    return this.post<{ id: string; dataSetStatus: string }>(`/datasets/${datasetId}/unpublish`, {})
+  async unstageDataset(datasetId: string) {
+    return this.post<{ id: string; dataSetStatus: string }>(`/datasets/${datasetId}/unstage`, {})
   }
 
   async deleteDataset(datasetId: string) {
@@ -293,12 +293,12 @@ export class ApiClient {
     })
   }
 
-  async publishDatasource(datasourceId: string) {
-    return this.post<{ id: string; dataSourceStatus: string }>(`/datasources/${datasourceId}/publish`, {})
+  async releaseDatasource(datasourceId: string) {
+    return this.post<{ id: string; dataSourceStatus: string }>(`/datasources/${datasourceId}/release`, {})
   }
 
-  async unpublishDatasource(datasourceId: string) {
-    return this.post<{ id: string; dataSourceStatus: string }>(`/datasources/${datasourceId}/unpublish`, {})
+  async unreleaseDatasource(datasourceId: string) {
+    return this.post<{ id: string; dataSourceStatus: string }>(`/datasources/${datasourceId}/unrelease`, {})
   }
 
   async deleteDatasource(datasourceId: string) {
@@ -326,7 +326,6 @@ export class ApiClient {
     data: {
       version: string
       description?: string
-      modelAtlasUri: string
       modelName: string
       model: string
     },
@@ -342,19 +341,19 @@ export class ApiClient {
     )
   }
 
-  async publishDatastructureVersion(datastructureId: string, versionId: string) {
+  async releaseDatastructureVersion(datastructureId: string, versionId: string) {
     return this.post<{ id: string; dataStructureVersionStatus: string }>(
-      `/datastructures/${datastructureId}/versions/${versionId}/publish`,
+      `/datastructures/${datastructureId}/versions/${versionId}/release`,
       {},
     )
   }
 
-  async publishDatastructure(datastructureId: string) {
-    return this.post<{ id: string; dataStructureStatus: string }>(`/datastructures/${datastructureId}/publish`, {})
+  async releaseDatastructure(datastructureId: string) {
+    return this.post<{ id: string; dataStructureStatus: string }>(`/datastructures/${datastructureId}/release`, {})
   }
 
-  async unpublishDatastructure(datastructureId: string) {
-    return this.post<{ id: string; dataStructureStatus: string }>(`/datastructures/${datastructureId}/unpublish`, {})
+  async unreleaseDatastructure(datastructureId: string) {
+    return this.post<{ id: string; dataStructureStatus: string }>(`/datastructures/${datastructureId}/unrelease`, {})
   }
 
   async deleteDatastructure(datastructureId: string) {

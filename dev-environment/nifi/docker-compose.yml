@@ -1,0 +1,113 @@
+# Apache NiFi — Data integration and pipeline engine
+#
+# Provides a web-based UI for designing, controlling, and monitoring data flows.
+# Used for dataset pipeline deployment (replaces Redpanda Connect).
+#
+# UI: https://localhost:8443/nifi (self-signed cert, accept browser warning). Login is delegated to
+# Keycloak (OpenID Connect); there is no single-user login. The config-adapter authenticates as the
+# 'nifi' service account via the OIDC client-credentials grant.
+# OIDC client secret: dev default in .env.example (see NIFI_OIDC_CLIENT_SECRET), override in .env.
+
+services:
+  nifi:
+    # AUTH=oidc needs an explicit keystore/truststore (single-user's auto-generation is gone), so
+    # bake a throwaway self-signed pair into the image. The config-adapter trusts all certs in dev.
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM apache/nifi:2.9.0
+        USER root
+        RUN mkdir -p /opt/nifi/certs \
+          && keytool -genkeypair -alias nifi -keyalg RSA -keysize 2048 -validity 3650 \
+               -dname CN=nifi -storetype PKCS12 -keystore /opt/nifi/certs/keystore.p12 \
+               -storepass changeit -keypass changeit -ext SAN=dns:civitas-nifi,dns:localhost \
+          && keytool -exportcert -alias nifi -keystore /opt/nifi/certs/keystore.p12 \
+               -storepass changeit -rfc -file /opt/nifi/certs/nifi.crt \
+          && keytool -importcert -alias nifi -keystore /opt/nifi/certs/truststore.p12 \
+               -storetype PKCS12 -storepass changeit -noprompt -file /opt/nifi/certs/nifi.crt \
+          && chown -R nifi:nifi /opt/nifi/certs
+        USER nifi
+    container_name: civitas-nifi
+    restart: unless-stopped
+    ports:
+      - "8443:8443" # HTTPS UI / REST API
+      - "10000:10000" # Site-to-Site
+      - "8000:8000" # JVM debug
+    env_file:
+      - path: .env
+        required: false
+      - path: .env.example
+        required: false
+    environment:
+      # Secure NiFi with OpenID Connect (Keycloak). AUTH=oidc switches the official image off the
+      # single-user login provider and onto the OIDC provider + managed authorizer.
+      AUTH: "oidc"
+      NIFI_WEB_HTTPS_PORT: "8443"
+      # Whitelist both the browser host (localhost) and the in-network service name the
+      # config-adapter connects to (civitas-nifi). NiFi rejects requests whose Host header is not
+      # listed here; without civitas-nifi:8443 the adapter's deploys are refused at the host-header
+      # check. Comma-separated, no spaces.
+      NIFI_WEB_PROXY_HOST: "localhost:8443,civitas-nifi:8443"
+      # Keycloak realm discovery. Reached in-network at civitas-keycloak:8080; the realm's
+      # KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true keeps the JWKS endpoint reachable here while the token
+      # issuer stays stable, so NiFi can validate the config-adapter's tokens.
+      NIFI_SECURITY_USER_OIDC_DISCOVERY_URL: "http://civitas-keycloak:8080/realms/civitas-core/.well-known/openid-configuration"
+      NIFI_SECURITY_USER_OIDC_CLIENT_ID: "nifi"
+      NIFI_SECURITY_USER_OIDC_CLIENT_SECRET: "${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}"
+      # NiFi identifies a bearer (client-credentials) token by its 'sub' claim — the service account's
+      # Keycloak user id, pinned in the realm export. So the initial admin is that id, not the
+      # username. The config-adapter then self-provisions its own root-canvas policies on first deploy.
+      INITIAL_ADMIN_IDENTITY: "a11ce55a-0000-4000-8000-000000001838"
+      KEYSTORE_PATH: "/opt/nifi/certs/keystore.p12"
+      KEYSTORE_TYPE: "PKCS12"
+      KEYSTORE_PASSWORD: "changeit"
+      KEY_PASSWORD: "changeit"
+      TRUSTSTORE_PATH: "/opt/nifi/certs/truststore.p12"
+      TRUSTSTORE_TYPE: "PKCS12"
+      TRUSTSTORE_PASSWORD: "changeit"
+      NIFI_JVM_HEAP_INIT: "1g"
+      NIFI_JVM_HEAP_MAX: "2g"
+    volumes:
+      - nifi_database_repository:/opt/nifi/nifi-current/database_repository
+      - nifi_flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
+      - nifi_content_repository:/opt/nifi/nifi-current/content_repository
+      - nifi_provenance_repository:/opt/nifi/nifi-current/provenance_repository
+      - nifi_state:/opt/nifi/nifi-current/state
+      - nifi_logs:/opt/nifi/nifi-current/logs
+      - nifi_conf:/opt/nifi/nifi-current/conf
+      # Drop the Postgres JDBC driver here so NiFi can load it (see README).
+      - ./extensions:/opt/nifi/nifi-current/extensions
+      - ./drivers:/opt/nifi/drivers:ro
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - |
+          TOKEN=$$(curl -sf -X POST \
+            -d "grant_type=client_credentials" \
+            -d "client_id=nifi" \
+            -d "client_secret=$$NIFI_SECURITY_USER_OIDC_CLIENT_SECRET" \
+            http://civitas-keycloak:8080/realms/civitas-core/protocol/openid-connect/token \
+            | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p') \
+          && curl -k -sf -o /dev/null -H 'Host: localhost:8443' \
+            -H "Authorization: Bearer $$TOKEN" \
+            https://$$HOSTNAME:8443/nifi-api/flow/current-user
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 90s
+    networks:
+      - civitas-network
+
+volumes:
+  nifi_database_repository:
+  nifi_flowfile_repository:
+  nifi_content_repository:
+  nifi_provenance_repository:
+  nifi_state:
+  nifi_logs:
+  nifi_conf:
+
+networks:
+  civitas-network:
+    name: civitas-network
+    external: true

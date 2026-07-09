@@ -36,11 +36,15 @@ public class AllowedScopesFilter extends OncePerRequestFilter {
   /** Header name set by OPA via APISIX send_headers_upstream. */
   public static final String HEADER_NAME = "X-Allowed-Scope-Ids";
 
+  /** Datapool header set by OPA for dataset collection filtering (Epic 1 union). */
+  public static final String HEADER_NAME_POOL = "X-Allowed-Pool-Ids";
+
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   /**
-   * Extracts the {@value HEADER_NAME} header from the request and populates the request-scoped
-   * {@link AllowedScopes} bean with wildcard or specific scope IDs.
+   * Extracts the {@value HEADER_NAME} and {@value HEADER_NAME_POOL} headers from the request and
+   * populates the request-scoped {@link AllowedScopes} bean with wildcard, specific scope IDs
+   * and/or datapool IDs.
    *
    * @param request the incoming HTTP request
    * @param response the HTTP response
@@ -53,37 +57,49 @@ public class AllowedScopesFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
 
-    String header = request.getHeader(HEADER_NAME);
+    String scopeHeader = request.getHeader(HEADER_NAME);
+    String poolHeader = request.getHeader(HEADER_NAME_POOL);
 
-    if (header != null) {
+    if (scopeHeader != null || poolHeader != null) {
       AllowedScopes scopes = allowedScopesProvider.getObject();
 
-      if (AllowedScopes.WILDCARD.equals(header)) {
-        scopes.setWildcard();
-        log.debug("Scope filter: wildcard access (TENANT scope)");
-      } else {
-        Set<UUID> ids =
-            Arrays.stream(header.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .map(this::parseUuidSafely)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        scopes.setScopeIds(ids);
-        log.debug("Scope filter: {} specific scope IDs", ids.size());
+      if (scopeHeader != null) {
+        if (AllowedScopes.WILDCARD.equals(scopeHeader)) {
+          scopes.setWildcard();
+          log.debug("Scope filter: wildcard access (TENANT scope)");
+        } else {
+          Set<UUID> ids = parseUuidSet(HEADER_NAME, scopeHeader);
+          scopes.setScopeIds(ids);
+          log.debug("Scope filter: {} specific scope IDs", ids.size());
+        }
+      }
+
+      if (poolHeader != null) {
+        Set<UUID> poolIds = parseUuidSet(HEADER_NAME_POOL, poolHeader);
+        scopes.setPoolIds(poolIds);
+        log.debug("Scope filter: {} datapool IDs", poolIds.size());
       }
     } else {
-      log.trace("Scope filter: no {} header present", HEADER_NAME);
+      log.trace("Scope filter: no {} / {} header present", HEADER_NAME, HEADER_NAME_POOL);
     }
 
     filterChain.doFilter(request, response);
   }
 
-  private UUID parseUuidSafely(String value) {
+  private Set<UUID> parseUuidSet(String headerName, String header) {
+    return Arrays.stream(header.split(","))
+        .map(String::trim)
+        .filter(s -> !s.isEmpty())
+        .map(value -> parseUuidSafely(headerName, value))
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
+  }
+
+  private UUID parseUuidSafely(String headerName, String value) {
     try {
       return UUID.fromString(value);
     } catch (IllegalArgumentException e) {
-      log.warn("Invalid UUID in {}: {}", HEADER_NAME, Encode.forJava(value));
+      log.warn("Invalid UUID in {}: {}", headerName, Encode.forJava(value));
       return null;
     }
   }

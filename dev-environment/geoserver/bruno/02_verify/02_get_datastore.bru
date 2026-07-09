@@ -1,0 +1,29 @@
+meta {
+  name: 02 Get DataStore (check PostGIS connection)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/datastores/{{datastore_name}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{geoserver_admin_user}}
+  password: {{geoserver_admin_password}}
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("DataStore exists", function() {
+    expect(res.status).to.equal(200);
+  });
+  test("DataStore is enabled", function() {
+    expect(res.body.dataStore.enabled).to.equal(true);
+  });
+}

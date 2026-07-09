@@ -1,5 +1,6 @@
 package de.civitascore.portal.util;
 
+import java.util.Collection;
 import java.util.UUID;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
@@ -12,10 +13,19 @@ public class ResourceNotFoundException extends RuntimeException {
 
   private final String resourceType;
   private final UUID resourceId;
+  private final Collection<UUID> resourceIds;
 
   public ResourceNotFoundException(String resourceType, UUID resourceId) {
-    super(String.format("%s with id '%s' not found", resourceType, resourceId));
+    super("%s with id '%s' not found".formatted(resourceType, resourceId));
     this.resourceType = resourceType;
     this.resourceId = resourceId;
+    this.resourceIds = null;
+  }
+
+  public ResourceNotFoundException(String resourceType, Collection<UUID> resourceIds) {
+    super("%s with ids %s not found".formatted(resourceType, resourceIds));
+    this.resourceType = resourceType;
+    this.resourceId = null;
+    this.resourceIds = resourceIds;
   }
 }

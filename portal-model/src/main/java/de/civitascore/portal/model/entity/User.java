@@ -16,8 +16,11 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.Formula;
 
 /**
@@ -41,10 +44,13 @@ import org.hibernate.annotations.Formula;
     })
 @Getter
 @Setter
+@SuperBuilder
+@NoArgsConstructor
 public class User extends BaseEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "title", nullable = false)
+  @Builder.Default
   private UserTitleType title = UserTitleType.OTHER;
 
   @NotBlank @Column(name = "first_name", nullable = false)
@@ -63,10 +69,12 @@ public class User extends BaseEntity {
   private String externalId;
 
   @Column(nullable = false)
+  @Builder.Default
   private Boolean active = true;
 
   @ManyToMany(fetch = FetchType.LAZY, mappedBy = "members")
   @Setter(AccessLevel.NONE) // setGroups overwritten to handle the bidirectional relationship
+  @Builder.Default
   private Set<Group> groups = new HashSet<>();
 
   @Setter(AccessLevel.NONE)

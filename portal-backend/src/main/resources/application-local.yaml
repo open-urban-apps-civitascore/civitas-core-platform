@@ -9,12 +9,8 @@ app:
 
 civitas:
   master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-
-server:
-  error:
-    include-message: always
-    include-exception: true
-    include-stacktrace: on_param
+  api:
+    base-url: https://api.civitas.local
 
 spring:
   datasource:
@@ -30,6 +26,12 @@ spring:
   # Kafka local deployment settings
   kafka:
     bootstrap-servers: localhost:9092
+
+  web:
+    error:
+      include-exception: true
+      include-message: always
+      include-stacktrace: on_param
 
 keycloak:
   realm: "civitas-core"
@@ -63,11 +65,6 @@ springdoc:
       # Dev-only secret for local Swagger UI OAuth — never use in deployed environments
       client-secret: dev-only-portal-frontend-secret
 
-model-atlas:
-  baseUrl: "http://localhost:8086"
-  scope: civitas
-  stage: draft
-
 # Seed data for local development — activated by the "init" Spring profile.
 # On startup, these groups and users are created in the DB (if they don't exist yet)
 # and synced to Keycloak via config-adapter (if no externalId is set).
@@ -95,7 +92,7 @@ init:
     - name: 'Local Data Consumers'
       roleName: 'Data Consumer'
       scopeType: TENANT
-      description: 'Local dev group — read access to published data'
+      description: 'Local dev group — read access to released data'
   users:
     - firstName: Developer
       lastName: User
@@ -104,5 +101,6 @@ init:
       title: OTHER
       groups:
         - 'Local Tenant Admins'
+        - 'Local Data Architects'
         - 'Local Data Owners'
         - 'Local Data Gatekeepers'

@@ -1,0 +1,37 @@
+meta {
+  name: Release Data Source
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+tests {
+  test("Release accepted or precondition not met", function() {
+    const status = res.getStatus();
+    // 200=released, 400=missing data structure version or wrong state
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataSourceId` is set and source is in `DRAFT` state.
+
+  **Expected Response:** 200 OK, body reflects data source in released state.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource status updated to released |
+  | Config Adapter | Consumes `de.civitascore.api.backend.created` Kafka event; registers the backend with APISIX |
+  | APISIX | New upstream/route registered (verify at `http://localhost:9180`) |
+}

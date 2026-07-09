@@ -3,6 +3,7 @@ import { QUERY_PARAMS, QueryParams } from '@/const/searchParams'
 /* eslint-disable @typescript-eslint/naming-convention */
 export type ApiRequestParams = Partial<Omit<Record<QueryParams, string>, typeof QUERY_PARAMS.sort>> & {
   [QUERY_PARAMS.sort]?: string | string[]
+  [key: string]: string | string[] | undefined
 }
 
 export type JsonServerRequestParams = {

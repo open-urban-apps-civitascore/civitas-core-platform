@@ -4,8 +4,8 @@ import de.civitascore.portal.model.entity.Pipeline;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data JPA repository for {@link Pipeline} entities. */
@@ -20,8 +20,8 @@ public interface PipelineRepository extends NamedEntityRepository<Pipeline, UUID
    * @return the pipeline with eagerly fetched dataSet and dataSources
    */
   @EntityGraph(attributePaths = {"dataSet", "dataSources"})
-  @Query("SELECT p FROM Pipeline p WHERE p.id = :id")
-  Optional<Pipeline> findByIdWithRelations(UUID id);
+  @Override
+  @NonNull Optional<Pipeline> findById(@NonNull UUID id);
 
   /**
    * Find an entity by name and dataset ID.

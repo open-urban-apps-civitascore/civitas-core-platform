@@ -1,0 +1,33 @@
+meta {
+  name: 18. Cleanup - Delete Source DataStructure
+  type: http
+  seq: 27
+}
+
+delete {
+  url: {{baseUrl}}/datastructures/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{pgSourceDataStructureId}}
+}
+
+tests {
+  test("Source DataStructure deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone
+    expect(status === 204 || status === 404).to.be.true;
+  });
+}
+
+docs {
+  **PostGIS saga step 18** — Delete the source DataStructure (final cleanup).
+
+  Deletes the source structure created in step 2. Must run after the datasource (step 16) is gone, since the datasource referenced this structure's version (a 409 here means the datasource delete in step 16 did not complete).
+
+  **Expected Response:** 204 No Content. 404 if already deleted.
+
+  **Post-condition:** Source DataStructure record removed from `portal_backend` DB.
+}

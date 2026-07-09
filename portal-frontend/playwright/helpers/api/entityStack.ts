@@ -3,7 +3,7 @@
  * where each entity is in AVAILABLE/READY state, suitable for testing status transition gating.
  *
  * The stack is built bottom-up: datastructure version must be AVAILABLE before datasource
- * can be published, and datasource must be AVAILABLE before dataset can be published.
+ * can be released, and datasource must be AVAILABLE before dataset can be marked ready.
  */
 import { ApiClient } from './apiClient'
 import { type TestResources, uid } from './testSetup'
@@ -36,20 +36,20 @@ export type EntityStack = {
 }
 
 /**
- * Creates a full entity stack with all entities published/available.
+ * Creates a full entity stack with all entities released/available.
  *
  * Final states:
  * - DataStructure: DRAFT (parent status independent of version)
  * - DataStructureVersion: AVAILABLE
  * - DataSource: AVAILABLE
- * - Dataset: READY (published, not released — release triggers a saga)
+ * - Dataset: READY (marked ready, not released — release triggers a saga)
  */
 export const createAvailableEntityStack = async (
   adminApi: ApiClient,
   resources: TestResources,
   suffix = uid(),
 ): Promise<EntityStack> => {
-  // 1. Datastructure + version → publish version
+  // 1. Datastructure + version → release version
   const datastructure = await adminApi.createDatastructure({
     name: `E2E-ds-${suffix}`,
     description: 'E2E test datastructure',
@@ -61,14 +61,13 @@ export const createAvailableEntityStack = async (
   const version = await adminApi.createDatastructureVersion(datastructure.id, {
     version: '1.0.0',
     description: 'E2E version',
-    modelAtlasUri: modelUri,
     modelName,
     model: buildUmlModel(modelName, modelUri),
   })
-  await adminApi.publishDatastructureVersion(datastructure.id, version.id)
-  await adminApi.publishDatastructure(datastructure.id)
+  await adminApi.releaseDatastructureVersion(datastructure.id, version.id)
+  await adminApi.releaseDatastructure(datastructure.id)
 
-  // 2. Datasource linked to the available version → publish
+  // 2. Datasource linked to the available version → release
   const datasource = await adminApi.createDatasource({
     name: `E2E-src-${suffix}`,
     description: 'E2E test datasource',
@@ -89,9 +88,9 @@ export const createAvailableEntityStack = async (
     dataStructureVersionId: version.id,
   })
   resources.datasourceIds.push(datasource.id)
-  await adminApi.publishDatasource(datasource.id)
+  await adminApi.releaseDatasource(datasource.id)
 
-  // 3. Dataset + pipeline with linked datasource → publish (DRAFT → READY)
+  // 3. Dataset + pipeline with linked datasource → mark ready (DRAFT → READY)
   const dataset = await adminApi.createDataset({
     name: `E2E-dset-${suffix}`,
     description: 'E2E test dataset',
@@ -103,13 +102,13 @@ export const createAvailableEntityStack = async (
     description: 'E2E test pipeline',
     dataSourceIds: [datasource.id],
   })
-  await adminApi.publishDataset(dataset.id)
+  await adminApi.stageDataset(dataset.id)
 
-  // 4. Unpublish dataset and datasource back to DRAFT so tests can enter edit mode.
-  //    The datastructure + version stay AVAILABLE (can't unpublish while version is referenced).
+  // 4. Unstage dataset and datasource back to DRAFT so tests can enter edit mode.
+  //    The datastructure + version stay AVAILABLE (can't unrelease while version is referenced).
   //    Order: dataset first (depends on datasource), then datasource.
-  await adminApi.unpublishDataset(dataset.id)
-  await adminApi.unpublishDatasource(datasource.id)
+  await adminApi.unstageDataset(dataset.id)
+  await adminApi.unreleaseDatasource(datasource.id)
 
   return { datastructure, version, datasource, dataset, pipeline }
 }
@@ -135,11 +134,10 @@ export const createDraftDatastructureWithAvailableVersion = async (
   const version = await adminApi.createDatastructureVersion(datastructure.id, {
     version: '1.0.0',
     description: 'E2E version',
-    modelAtlasUri: modelUri,
     modelName,
     model: buildUmlModel(modelName, modelUri),
   })
-  await adminApi.publishDatastructureVersion(datastructure.id, version.id)
+  await adminApi.releaseDatastructureVersion(datastructure.id, version.id)
 
   return { datastructure, version }
 }

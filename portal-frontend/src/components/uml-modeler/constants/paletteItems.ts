@@ -1,4 +1,4 @@
-import type { UMLElementType } from '../types/uml'
+import type { UMLElementType, UMLRelationshipType } from '../types/uml'
 
 // Element palette items for drag & drop
 export const ELEMENT_PALETTE_ITEMS = [
@@ -10,20 +10,6 @@ export const ELEMENT_PALETTE_ITEMS = [
     icon: 'box',
   },
   {
-    id: 'interface',
-    type: 'interface' as UMLElementType,
-    label: 'Interface',
-    description: 'UML Interface with operations only',
-    icon: 'puzzle',
-  },
-  {
-    id: 'abstractClass',
-    type: 'abstractClass' as UMLElementType,
-    label: 'Abstract Class',
-    description: 'UML Abstract Class with abstract operations',
-    icon: 'boxSelect',
-  },
-  {
     id: 'enumeration',
     type: 'enumeration' as UMLElementType,
     label: 'Enumeration',
@@ -32,48 +18,29 @@ export const ELEMENT_PALETTE_ITEMS = [
   },
 ]
 
-// Relationship palette items for drawing connections
-export const RELATIONSHIP_PALETTE_ITEMS = [
+// Relationship palette items for drawing connections. Single source of the supported relationship
+// scope: the palette (drawing) and the edge inspector (retyping) both derive what users may pick
+// from here. Adding a type widens the scope for the whole editor; the export/mapping side
+// additionally needs its containment category registered in umlContainment.ts.
+export const RELATIONSHIP_PALETTE_ITEMS: {
+  id: string
+  type: UMLRelationshipType
+  label: string
+  description: string
+  icon: string
+}[] = [
   {
     id: 'inheritance',
-    type: 'inheritance' as const,
+    type: 'inheritance',
     label: 'Inheritance',
     description: 'Hollow triangle arrow (extends/inherits)',
     icon: 'arrowUpRight',
   },
   {
-    id: 'realization',
-    type: 'realization' as const,
-    label: 'Realization',
-    description: 'Dashed hollow triangle (implements interface)',
-    icon: 'moveUpRight',
-  },
-  {
-    id: 'association',
-    type: 'association' as const,
-    label: 'Association',
-    description: 'Solid line with arrow (uses/knows about)',
-    icon: 'arrowRight',
-  },
-  {
-    id: 'aggregation',
-    type: 'aggregation' as const,
-    label: 'Aggregation',
-    description: 'Hollow diamond (has-a, weak ownership)',
-    icon: 'gem',
-  },
-  {
     id: 'composition',
-    type: 'composition' as const,
+    type: 'composition',
     label: 'Composition',
     description: 'Filled diamond (strong ownership)',
     icon: 'diamond',
-  },
-  {
-    id: 'dependency',
-    type: 'dependency' as const,
-    label: 'Dependency',
-    description: 'Dashed arrow (temporary relationship)',
-    icon: 'moveRight',
   },
 ]

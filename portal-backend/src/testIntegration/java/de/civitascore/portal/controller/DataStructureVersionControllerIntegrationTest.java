@@ -1,21 +1,9 @@
 package de.civitascore.portal.controller;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.binaryEqualTo;
-import static com.github.tomakehurst.wiremock.client.WireMock.delete;
-import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
-import static com.github.tomakehurst.wiremock.client.WireMock.get;
-import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.post;
-import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
-import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
@@ -29,14 +17,10 @@ import de.civitascore.portal.model.output.summary.DataStructureSummaryDTO;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,23 +28,17 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.wiremock.spring.ConfigureWireMock;
-import org.wiremock.spring.EnableWireMock;
 
-@Slf4j
 @DisplayName("DataStructureVersion Controller Integration Tests")
-@EnableWireMock(
-    @ConfigureWireMock(
-        baseUrlProperties = {"model-atlas.base-url"},
-        portProperties = "model-atlas.port"))
 class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrationTest {
+
+  @Autowired protected PortalTestDataFactory portalData;
 
   @Autowired private DataStructureRepository dataStructureRepository;
 
@@ -68,121 +46,47 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
   @Autowired private DataSourceRepository dataSourceRepository;
 
-  private static final String TEST_NS_URI = "http://test/test/myuml/1.0.0";
-  private static final String TEST_MODEL_FILE_PATH = "mocks/models/Simple_model.xmi";
-  private static final String TEST_UPLOAD_METADATA_PATH =
-      "mocks/models/upload_metadata_response.json";
-  private static final String TEST_SCOPE = "default";
-  private static final String TEST_STAGE = "draft";
-  private static final String MOCK_MODEL_RESPONSE = "<xml>mock model content</xml>";
-
-  private String modelContent;
-  private byte[] modelContentBinary;
-  private String uploadMetadataResponse;
-
   private UUID dataStructureId;
   private UUID versionId1;
 
   @BeforeEach
-  void initTestData() throws IOException {
-    ClassPathResource modelFile = new ClassPathResource(TEST_MODEL_FILE_PATH);
-    modelContentBinary = modelFile.getContentAsByteArray();
-    modelContent = new String(modelContentBinary, StandardCharsets.UTF_8);
-    uploadMetadataResponse =
-        new String(
-            new ClassPathResource(TEST_UPLOAD_METADATA_PATH).getContentAsByteArray(),
-            StandardCharsets.UTF_8);
-
+  void initTestData() {
     // Create parent data structure
-    DataStructure dataStructure = new DataStructure();
-    dataStructure.setName("Test Data Structure");
-    dataStructure.setDescription("Data structure for version testing");
-    dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
-    dataStructure.setCreatedFromDataSource(false);
-    dataStructure = dataStructureRepository.save(dataStructure);
+    DataStructure dataStructure =
+        portalData.dataStructure(
+            b ->
+                b.name("Test Data Structure")
+                    .description("Data structure for version testing")
+                    .dataStructureStatus(DataStructureStatus.DRAFT));
     dataStructureId = dataStructure.getId();
 
     // Create test versions
-    DataStructureVersion version1 = new DataStructureVersion();
-    version1.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-    version1.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-    version1.setVersion("1.0.0");
-    version1.setDescription("First version of the test data structure");
-    version1.setModelAtlasUri("https://modelatlas.example.com/model1");
-    version1.setModelName("TestModel1");
-    version1.setDataStructure(dataStructure);
-
-    Map<String, Object> styles1 = new HashMap<>();
-    styles1.put("color", "blue");
-    styles1.put("size", 10);
-    version1.setStyles(styles1);
-
-    version1 = dataStructureVersionRepository.save(version1);
+    DataStructureVersion version1 =
+        portalData.dataStructureVersion(
+            dataStructure,
+            b ->
+                b.version("1.0.0")
+                    .description("First version of the test data structure")
+                    .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
+                    .model(portalData.dataStructureVersionModel("Model1"))
+                    .modelName("TestModel1")
+                    .styles(Map.of("color", "blue", "size", 10)));
     versionId1 = version1.getId();
 
-    DataStructureVersion version2 = new DataStructureVersion();
-    version2.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-    version2.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-    version2.setVersion("2.0.0");
-    version2.setDescription("Second version with updated fields");
-    version2.setModelAtlasUri("https://modelatlas.example.com/model2");
-    version2.setModelName("TestModel2");
-    version2.setDataStructure(dataStructure);
-
-    Map<String, Object> styles2 = new HashMap<>();
-    styles2.put("color", "red");
-    styles2.put("size", 20);
-    version2.setStyles(styles2);
-
-    dataStructureVersionRepository.save(version2);
+    portalData.dataStructureVersion(
+        dataStructure,
+        b ->
+            b.version("2.0.0")
+                .description("Second version with updated fields")
+                .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
+                .model(portalData.dataStructureVersionModel("Model2"))
+                .modelName("TestModel2")
+                .styles(Map.of("color", "red", "size", 20)));
   }
 
   @AfterEach
   void cleanup() {
-    dataSourceRepository.deleteAll();
-    dataStructureVersionRepository.deleteAll();
-    dataStructureRepository.deleteAll();
-  }
-
-  private String stubModelDownload(String nsUri) {
-    String downloadPath =
-        String.format(
-            "/atlas/rest/%s/schema/stages/%s/content?nsUri=%s", TEST_SCOPE, TEST_STAGE, nsUri);
-    stubFor(
-        get(urlEqualTo(downloadPath))
-            .willReturn(
-                aResponse()
-                    .withStatus(200)
-                    .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
-                    .withBody(MOCK_MODEL_RESPONSE)));
-
-    return downloadPath;
-  }
-
-  private String stubModelUpload(String nsUri) {
-    String expectedPath =
-        String.format(
-            "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
-            TEST_SCOPE, TEST_STAGE, nsUri);
-
-    stubFor(
-        post(urlEqualTo(expectedPath))
-            .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml"))
-            .withRequestBody(binaryEqualTo(modelContentBinary))
-            .willReturn(
-                aResponse()
-                    .withStatus(200)
-                    .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .withBody(uploadMetadataResponse)));
-
-    return expectedPath;
-  }
-
-  private String stubModelDelete(String nsUri) {
-    String deletePath =
-        String.format("/atlas/rest/%s/schema/stages/%s?nsUri=%s", TEST_SCOPE, TEST_STAGE, nsUri);
-    stubFor(delete(urlEqualTo(deletePath)).willReturn(aResponse().withStatus(200)));
-    return deletePath;
+    portalData.cleanAll();
   }
 
   private HttpHeaders createAuthHeaders() {
@@ -208,15 +112,11 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @Test
     @DisplayName("Should create data structure version successfully with valid data")
     void shouldCreateDataStructureVersionSuccessfully() {
-      stubModelDownload("https://modelatlas.example.com/model3");
-      String expectedUploadPath = stubModelUpload("https://modelatlas.example.com/model3");
-
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setVersion("3.0.0");
       input.setDescription("Third version with new features");
-      input.setModelAtlasUri("https://modelatlas.example.com/model3");
-      input.setModel(modelContent);
+      input.setModel(portalData.dataStructureVersionModel("Model3"));
       input.setModelName("TestModel3");
 
       Map<String, Object> styles = new HashMap<>();
@@ -248,9 +148,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(output.getDataStructureVersionSource())
           .as("Source should match input")
           .isEqualTo(DataStructureVersionSource.OWN);
-      assertThat(output.getModelAtlasUri())
-          .as("Model atlas URI should match input")
-          .isEqualTo("https://modelatlas.example.com/model3");
+      assertThat(output.getModel())
+          .as("Model (JSON Schema) should be persisted and returned")
+          .containsEntry("title", "Model3");
       assertThat(output.getModelName()).as("Model name should match input").isEqualTo("TestModel3");
       assertThat(output.getStyles().get("color"))
           .as("Styles color should match input")
@@ -263,9 +163,28 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getHeaders().getLocation())
           .as("Location header should be present")
           .isNotNull();
+    }
 
-      verify(
-          postRequestedFor(urlEqualTo(expectedUploadPath)).withRequestBody(equalTo(modelContent)));
+    @Test
+    @DisplayName("Should create a DRAFT version without a model")
+    void shouldCreateVersionWithoutModel() {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setVersion("3.0.0");
+      input.setModelName("NoModelYet");
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint(),
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getModel())
+          .as("Model is optional in DRAFT and may be null")
+          .isNull();
     }
 
     @Test
@@ -274,7 +193,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setModelAtlasUri("https://modelatlas.example.com/model");
 
       ResponseEntity<String> response =
           restTemplate.exchange(
@@ -293,8 +211,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     void shouldFailToCreateVersionWithoutAuth() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("4.0.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/model");
-      input.setModelAtlasUri("https://modelatlas.example.com/model");
 
       ResponseEntity<String> response =
           restTemplate.exchange(
@@ -306,111 +222,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should upload model to Model Atlas when model is provided on create")
-    void shouldUploadModelWhenProvidedOnCreate() {
-      String expectedUploadPath = stubModelUpload(TEST_NS_URI);
-      stubModelDownload(TEST_NS_URI);
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setVersion("3.0.0");
-      input.setModelAtlasUri(TEST_NS_URI);
-      input.setModelName("TestModel3");
-      input.setModel(modelContent);
-
-      ResponseEntity<DataStructureVersionOutputDTO> response =
-          restTemplate.exchange(
-              getEndpoint(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      verify(
-          postRequestedFor(urlEqualTo(expectedUploadPath)).withRequestBody(equalTo(modelContent)));
-    }
-
-    @Test
-    @DisplayName(
-        "Should fail creation when model is provided but modelAtlasUri is missing on create")
-    void shouldFailWhenModelProvidedButNoModelAtlasUriOnCreate() {
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setVersion("3.0.0");
-      input.setModelName("TestModel3");
-      input.setModel(modelContent);
-
-      ResponseEntity<DataStructureVersionOutputDTO> response =
-          restTemplate.exchange(
-              getEndpoint(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      verify(0, postRequestedFor(urlMatching("/atlas/rest/.*/schema/stages/.*")));
-    }
-
-    @Test
-    @DisplayName(
-        "Should fail creation when modelAtlasUri is provided but model is missing on create")
-    void shouldFailWhenModelAtlasUriProvidedButNoModelOnCreate() {
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setVersion("3.0.0");
-      input.setModelName("TestModel3");
-      input.setModelAtlasUri(TEST_NS_URI);
-
-      ResponseEntity<DataStructureVersionOutputDTO> response =
-          restTemplate.exchange(
-              getEndpoint(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      verify(0, postRequestedFor(urlMatching("/atlas/rest/.*/schema/stages/.*")));
-    }
-
-    @Test
-    @DisplayName("Should return 502 and roll back create when Model Atlas upload fails")
-    void shouldRollBackCreateWhenModelAtlasUploadFails() {
-      String expectedPath =
-          String.format(
-              "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
-              TEST_SCOPE, TEST_STAGE, TEST_NS_URI);
-
-      stubFor(
-          post(urlEqualTo(expectedPath))
-              .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml"))
-              .willReturn(aResponse().withStatus(500).withBody("Internal Server Error")));
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setVersion("3.0.0");
-      input.setModelAtlasUri(TEST_NS_URI);
-      input.setModelName("TestModel3");
-      input.setModel(modelContent);
-
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpoint(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              String.class);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
-
-      List<DataStructureVersion> versions = dataStructureVersionRepository.findAll();
-      assertThat(versions).noneMatch(v -> "3.0.0".equals(v.getVersion()));
-    }
-
-    @Test
     @DisplayName("Should set dataStructureId from path variable, not from payload")
     void shouldSetDataStructureIdFromPathVariable() {
-      stubModelDownload("https://modelatlas.example.com/model");
-      stubModelUpload("https://modelatlas.example.com/model");
-
       // Create another data structure
       DataStructure otherDataStructure = new DataStructure();
       otherDataStructure.setName("Other Data Structure");
@@ -423,8 +236,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("5.0.0");
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setModelAtlasUri("https://modelatlas.example.com/model");
-      input.setModel(modelContent);
+      input.setModel(portalData.dataStructureVersionModel("Model5"));
       // Try to set a different dataStructureId - should be ignored due to @JsonIgnore
       input.setDataStructureId(otherDataStructureId);
 
@@ -476,8 +288,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @Test
     @DisplayName("Should retrieve data structure version by ID successfully")
     void shouldRetrieveDataStructureVersionById() {
-      stubModelDownload("https://modelatlas.example.com/model1");
-
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
               getEndpoint() + "/" + versionId1,
@@ -495,12 +305,11 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(output.getDataStructureVersionStatus())
           .isEqualTo(DataStructureVersionStatus.DRAFT);
       assertThat(output.getDataStructureVersionSource()).isEqualTo(DataStructureVersionSource.OWN);
-      assertThat(output.getModelAtlasUri()).isEqualTo("https://modelatlas.example.com/model1");
       assertThat(output.getModelName()).isEqualTo("TestModel1");
       assertThat(output.getStyles().get("color")).isEqualTo("blue");
       assertThat(output.getModel())
-          .as("Model should be auto-downloaded from Model Atlas")
-          .isEqualTo(MOCK_MODEL_RESPONSE);
+          .as("Persisted model (JSON Schema) should round-trip from the DB")
+          .containsEntry("title", "Model1");
 
       DataStructureSummaryDTO dataStructureSummary = output.getDataStructure();
       assertThat(dataStructureSummary).isNotNull();
@@ -509,47 +318,19 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should auto-download model from Model Atlas when modelAtlasUri is set")
-    void shouldAutoDownloadModelFromModelAtlasWhenModelAtlasUriIsSet() {
-      stubModelDownload("https://modelatlas.example.com/model1");
-
-      ResponseEntity<DataStructureVersionOutputDTO> response =
-          restTemplate.exchange(
-              getEndpoint() + "/" + versionId1,
-              HttpMethod.GET,
-              new HttpEntity<>(createAuthHeaders()),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-
-      DataStructureVersionOutputDTO output = response.getBody();
-      assertThat(output).isNotNull();
-      assertThat(output.getModel())
-          .as("Model content should be fetched from Model Atlas via modelAtlasUri")
-          .isEqualTo(MOCK_MODEL_RESPONSE);
-
-      String expectedDownloadPath =
-          String.format(
-              "/atlas/rest/%s/schema/stages/%s/content?nsUri=%s",
-              TEST_SCOPE, TEST_STAGE, "https://modelatlas.example.com/model1");
-      verify(getRequestedFor(urlEqualTo(expectedDownloadPath)));
-    }
-
-    @Test
-    @DisplayName("Should return model as null when modelAtlasUri is not set")
-    void shouldReturnNullModelWhenModelAtlasUriIsNotSet() {
-      // Create a version without modelAtlasUri
-      DataStructureVersion versionWithoutUri = new DataStructureVersion();
-      versionWithoutUri.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      versionWithoutUri.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      versionWithoutUri.setVersion("3.0.0");
-      versionWithoutUri.setDataStructure(
+    @DisplayName("Should return model as null when none was persisted")
+    void shouldReturnNullModelWhenNoneSet() {
+      DataStructureVersion versionWithoutModel = new DataStructureVersion();
+      versionWithoutModel.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      versionWithoutModel.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      versionWithoutModel.setVersion("3.0.0");
+      versionWithoutModel.setDataStructure(
           dataStructureRepository.findById(dataStructureId).orElseThrow());
-      versionWithoutUri = dataStructureVersionRepository.save(versionWithoutUri);
+      versionWithoutModel = dataStructureVersionRepository.save(versionWithoutModel);
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + versionWithoutUri.getId(),
+              getEndpoint() + "/" + versionWithoutModel.getId(),
               HttpMethod.GET,
               new HttpEntity<>(createAuthHeaders()),
               getOutputTypeReference());
@@ -557,7 +338,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getModel())
-          .as("Model should be null when no modelAtlasUri is set")
+          .as("Model should be null when none was persisted")
           .isNull();
     }
 
@@ -596,17 +377,12 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @Test
     @DisplayName("Should update data structure version successfully")
     void shouldUpdateDataStructureVersionSuccessfully() {
-      stubModelDelete("https://modelatlas.example.com/model1");
-      stubModelDownload("https://modelatlas.example.com/model1-updated");
-      String expectedUploadPath = stubModelUpload("https://modelatlas.example.com/model1-updated");
-
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setVersion("1.1.0");
       input.setDescription("Updated description for version 1.1.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/model1-updated");
+      input.setModel(portalData.dataStructureVersionModel("Model1Updated"));
       input.setModelName("TestModel1-Updated");
-      input.setModel(modelContent);
 
       Map<String, Object> styles = new HashMap<>();
       styles.put("color", "purple");
@@ -630,148 +406,12 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(output.getDataStructureVersionStatus())
           .as("Status should remain DRAFT (not changed by update)")
           .isEqualTo(DataStructureVersionStatus.DRAFT);
-      assertThat(output.getModelAtlasUri())
-          .isEqualTo("https://modelatlas.example.com/model1-updated");
+      assertThat(output.getModel())
+          .as("Model should be replaced by the update")
+          .containsEntry("title", "Model1Updated");
       assertThat(output.getModelName()).isEqualTo("TestModel1-Updated");
       assertThat(output.getStyles().get("color")).isEqualTo("purple");
       assertThat(output.getStyles().get("size")).isEqualTo(25);
-
-      verify(
-          postRequestedFor(urlEqualTo(expectedUploadPath)).withRequestBody(equalTo(modelContent)));
-    }
-
-    @Test
-    @DisplayName("Should upload model to Model Atlas when model is provided")
-    void shouldUploadModelWhenProvided() {
-      stubModelDelete("https://modelatlas.example.com/model1");
-
-      String expectedPath =
-          String.format(
-              "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
-              TEST_SCOPE, TEST_STAGE, "https://modelatlas.example.com/model1-updated");
-
-      stubFor(
-          post(urlEqualTo(expectedPath))
-              .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml"))
-              .willReturn(
-                  aResponse()
-                      .withStatus(200)
-                      .withHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-                      .withBody(uploadMetadataResponse)));
-      stubModelDownload("https://modelatlas.example.com/model1-updated");
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setVersion("1.1.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/model1-updated");
-      input.setModelName("UpdatedModel");
-      input.setModel(modelContent);
-
-      ResponseEntity<DataStructureVersionOutputDTO> response =
-          restTemplate.exchange(
-              getEndpoint() + "/" + versionId1,
-              HttpMethod.PUT,
-              new HttpEntity<>(input, createAuthHeaders()),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      verify(postRequestedFor(urlEqualTo(expectedPath)).withRequestBody(equalTo(modelContent)));
-    }
-
-    @Test
-    @DisplayName("Should fail upload when model is provided but modelAtlasUri is missing")
-    void shouldFailUploadWhenModelProvidedButNoModelAtlasUri() {
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setVersion("1.1.0");
-      input.setModelName("TestModel");
-      input.setModel(modelContent);
-      // No modelAtlasUri
-
-      ResponseEntity<DataStructureVersionOutputDTO> response =
-          restTemplate.exchange(
-              getEndpoint() + "/" + versionId1,
-              HttpMethod.PUT,
-              new HttpEntity<>(input, createAuthHeaders()),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      verify(0, postRequestedFor(urlMatching("/atlas/rest/.*/schema/stages/.*")));
-    }
-
-    @Test
-    @DisplayName(
-        "Should allow update with modelAtlasUri but no model (keeps existing model at URI)")
-    void shouldAllowUpdateWhenModelAtlasUriProvidedButNoModel() {
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setVersion("1.1.0");
-      input.setModelName("TestModel");
-      input.setModelAtlasUri(TEST_NS_URI);
-      // No model — should be allowed, no upload happens
-
-      ResponseEntity<DataStructureVersionOutputDTO> response =
-          restTemplate.exchange(
-              getEndpoint() + "/" + versionId1,
-              HttpMethod.PUT,
-              new HttpEntity<>(input, createAuthHeaders()),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getModelAtlasUri())
-          .as("ModelAtlasUri should be updated")
-          .isEqualTo(TEST_NS_URI);
-      // No upload should have been attempted since model content was not provided
-      verify(0, postRequestedFor(urlMatching("/atlas/rest/.*/schema/stages/.*")));
-    }
-
-    @Test
-    @DisplayName("Should return 502 and roll back update when Model Atlas upload fails")
-    void shouldRollBackUpdateWhenModelAtlasUploadFails() {
-      stubModelDelete("https://modelatlas.example.com/model1");
-
-      String expectedPath =
-          String.format(
-              "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
-              TEST_SCOPE, TEST_STAGE, TEST_NS_URI);
-
-      stubFor(
-          post(urlEqualTo(expectedPath))
-              .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml"))
-              .willReturn(aResponse().withStatus(500).withBody("Internal Server Error")));
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setVersion("1.1.0");
-      input.setModelAtlasUri(TEST_NS_URI);
-      input.setModelName("TestModel");
-      input.setModel(modelContent);
-
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpoint() + "/" + versionId1,
-              HttpMethod.PUT,
-              new HttpEntity<>(input, createAuthHeaders()),
-              String.class);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
-
-      // Stub download for the verification GET (version1 rolled back to original modelAtlasUri)
-      stubModelDownload("https://modelatlas.example.com/model1");
-
-      // Verify entity was not modified (transaction rolled back)
-      DataStructureVersionOutputDTO unchanged =
-          restTemplate
-              .exchange(
-                  getEndpoint() + "/" + versionId1,
-                  HttpMethod.GET,
-                  new HttpEntity<>(createAuthHeaders()),
-                  getOutputTypeReference())
-              .getBody();
-      assertThat(unchanged).isNotNull();
-      assertThat(unchanged.getVersion()).isEqualTo("1.0.0");
-      assertThat(unchanged.getModelAtlasUri()).isEqualTo("https://modelatlas.example.com/model1");
     }
 
     @Test
@@ -781,7 +421,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       input.setVersion("99.0.0");
       input.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setModelAtlasUri("https://modelatlas.example.com/model");
 
       ResponseEntity<String> response =
           restTemplate.exchange(
@@ -798,8 +437,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @Test
     @DisplayName("Should maintain dataStructureId on update")
     void shouldMaintainDataStructureIdOnUpdate() {
-      stubModelDownload("https://modelatlas.example.com/model");
-
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("1.2.0");
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
@@ -824,7 +461,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @Test
     @DisplayName(
         "Should return 409 when updating a version to a version string that already exists for the same DataStructure")
-    void shouldReturn400WhenUpdatingToDuplicateVersion() {
+    void shouldReturn409WhenUpdatingToDuplicateVersion() {
       // versionId1 has "1.0.0"; "2.0.0" is already used by another version in the same
       // DataStructure
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
@@ -857,11 +494,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   class PatchDataStructureVersionTests {
 
     @Test
-    @DisplayName("Should patch description without requiring model")
-    void shouldPatchDescriptionWithoutRequiringModel() {
-      // Stub model download so the patch() override can load the existing model for the response
-      stubModelDownload("https://modelatlas.example.com/model1");
-
+    @DisplayName("Should patch description without affecting the model")
+    void shouldPatchDescriptionOnly() {
       Map<String, Object> patchMap =
           Collections.singletonMap("description", "Patched version description");
 
@@ -880,31 +514,16 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output.getDescription()).isEqualTo("Patched version description");
       assertThat(output.getVersion()).as("Version should remain unchanged").isEqualTo("1.0.0");
-      assertThat(output.getModelAtlasUri())
-          .as("ModelAtlasUri should remain unchanged")
-          .isEqualTo("https://modelatlas.example.com/model1");
-
-      // Verify model was downloaded from Model Atlas (loaded by patch() override for response)
-      verify(
-          getRequestedFor(
-              urlEqualTo(
-                  String.format(
-                      "/atlas/rest/%s/schema/stages/%s/content?nsUri=%s",
-                      TEST_SCOPE, TEST_STAGE, "https://modelatlas.example.com/model1"))));
+      assertThat(output.getModel())
+          .as("Model should remain unchanged by a description-only patch")
+          .containsEntry("title", "Model1");
     }
 
     @Test
-    @DisplayName("Should patch with model and modelAtlasUri")
-    void shouldPatchWithModelAndModelAtlasUri() {
-      stubModelDownload("https://modelatlas.example.com/model1-patched");
-      String expectedUploadPath = stubModelUpload("https://modelatlas.example.com/model1-patched");
-
+    @DisplayName("Should patch the model")
+    void shouldPatchModel() {
       Map<String, Object> patchMap =
-          Map.of(
-              "modelAtlasUri",
-              "https://modelatlas.example.com/model1-patched",
-              "model",
-              modelContent);
+          Collections.singletonMap("model", portalData.dataStructureVersionModel("Model1Patched"));
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
@@ -917,10 +536,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .as("PATCH with model should return OK")
           .isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getModelAtlasUri())
-          .isEqualTo("https://modelatlas.example.com/model1-patched");
-
-      verify(postRequestedFor(urlEqualTo(expectedUploadPath)));
+      assertThat(response.getBody().getModel()).containsEntry("title", "Model1Patched");
     }
 
     @Test
@@ -946,10 +562,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   class DeleteDataStructureVersionTests {
 
     @Test
-    @DisplayName("Should delete data structure version and model from Atlas successfully")
+    @DisplayName("Should delete data structure version successfully")
     void shouldDeleteDataStructureVersionSuccessfully() {
-      String expectedDeletePath = stubModelDelete("https://modelatlas.example.com/model1");
-
       ResponseEntity<Void> response =
           restTemplate.exchange(
               getEndpoint() + "/" + versionId1,
@@ -960,8 +574,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getStatusCode())
           .as("Should return NO_CONTENT status")
           .isEqualTo(HttpStatus.NO_CONTENT);
-
-      verify(deleteRequestedFor(urlEqualTo(expectedDeletePath)));
 
       ResponseEntity<String> getResponse =
           restTemplate.exchange(
@@ -976,8 +588,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should fail to delete last published version of a published data structure")
-    void shouldFailToDeleteLastPublishedVersionOfPublishedDataStructure() {
+    @DisplayName("Should fail to delete last released version of a released data structure")
+    void shouldFailToDeleteLastReleasedVersionOfReleasedDataStructure() {
       DataStructureVersion version1 =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
@@ -987,7 +599,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       dataStructureRepository.save(dataStructure);
 
-      // Try to delete the only published version - should fail
+      // Try to delete the only released version - should fail
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpoint() + "/" + versionId1,
@@ -1021,24 +633,21 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   }
 
   @Nested
-  @DisplayName("Publish DataStructureVersion Tests")
-  class PublishDataStructureVersionTests {
+  @DisplayName("Release DataStructureVersion Tests")
+  class ReleaseDataStructureVersionTests {
 
     @Test
-    @DisplayName("Should publish version with modelAtlasUri successfully")
-    void shouldPublishVersionWithModelAtlasUri() {
+    @DisplayName("Should release version with a model successfully")
+    void shouldReleaseVersionWithModel() {
       DataStructureVersion version =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       assertThat(version.getDataStructureVersionStatus())
           .isEqualTo(DataStructureVersionStatus.DRAFT);
-      assertThat(version.getModelAtlasUri()).isNotBlank();
-
-      // Stub Model Atlas download so the publish validation can verify the model exists
-      stubModelDownload(version.getModelAtlasUri());
+      assertThat(version.getModel()).isNotNull();
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + versionId1 + "/publish",
+              getEndpoint() + "/" + versionId1 + "/release",
               HttpMethod.POST,
               new HttpEntity<>(createAuthHeaders()),
               getOutputTypeReference());
@@ -1049,10 +658,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output.getId()).isEqualTo(versionId1);
       assertThat(output.getDataStructureVersionStatus())
-          .as("Status should be AVAILABLE after publishing")
+          .as("Status should be AVAILABLE after releasing")
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
       assertThat(output.getVersion()).isEqualTo("1.0.0");
-      assertThat(output.getModelAtlasUri()).isEqualTo("https://modelatlas.example.com/model1");
 
       DataStructureVersion reloadedVersion =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
@@ -1061,21 +669,21 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should fail to publish version without modelAtlasUri")
-    void shouldFailToPublishVersionWithoutModelAtlasUri() {
-      DataStructureVersion versionWithoutUri = new DataStructureVersion();
-      versionWithoutUri.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      versionWithoutUri.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      versionWithoutUri.setVersion("3.0.0");
-      versionWithoutUri.setModelName("TestModel3");
-      versionWithoutUri.setDataStructure(
+    @DisplayName("Should fail to release version without a model")
+    void shouldFailToReleaseVersionWithoutModel() {
+      DataStructureVersion versionWithoutModel = new DataStructureVersion();
+      versionWithoutModel.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      versionWithoutModel.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      versionWithoutModel.setVersion("3.0.0");
+      versionWithoutModel.setModelName("TestModel3");
+      versionWithoutModel.setDataStructure(
           dataStructureRepository.findById(dataStructureId).orElseThrow());
-      versionWithoutUri = dataStructureVersionRepository.save(versionWithoutUri);
-      UUID versionWithoutUriId = versionWithoutUri.getId();
+      versionWithoutModel = dataStructureVersionRepository.save(versionWithoutModel);
+      UUID versionWithoutModelId = versionWithoutModel.getId();
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + versionWithoutUriId + "/publish",
+              getEndpoint() + "/" + versionWithoutModelId + "/release",
               HttpMethod.POST,
               new HttpEntity<>(createAuthHeaders()),
               String.class);
@@ -1085,24 +693,23 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .isEqualTo(HttpStatus.BAD_REQUEST);
 
       DataStructureVersion reloadedVersion =
-          dataStructureVersionRepository.findById(versionWithoutUriId).orElseThrow();
+          dataStructureVersionRepository.findById(versionWithoutModelId).orElseThrow();
       assertThat(reloadedVersion.getDataStructureVersionStatus())
           .as("Status should remain DRAFT")
           .isEqualTo(DataStructureVersionStatus.DRAFT);
     }
 
     @Test
-    @DisplayName("Should fail to publish already published version")
-    void shouldFailToPublishAlreadyPublishedVersion() {
+    @DisplayName("Should fail to release already released version")
+    void shouldFailToReleaseAlreadyReleasedVersion() {
       DataStructureVersion version1 =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       dataStructureVersionRepository.save(version1);
 
-      // Try to publish again via API
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + versionId1 + "/publish",
+              getEndpoint() + "/" + versionId1 + "/release",
               HttpMethod.POST,
               new HttpEntity<>(createAuthHeaders()),
               String.class);
@@ -1113,11 +720,11 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should return 404 when publishing non-existent version")
-    void shouldReturn404WhenPublishingNonExistentVersion() {
+    @DisplayName("Should return 404 when releasing non-existent version")
+    void shouldReturn404WhenReleasingNonExistentVersion() {
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + UUID.randomUUID() + "/publish",
+              getEndpoint() + "/" + UUID.randomUUID() + "/release",
               HttpMethod.POST,
               new HttpEntity<>(createAuthHeaders()),
               String.class);
@@ -1128,13 +735,13 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should fail to publish without authentication")
-    void shouldFailToPublishWithoutAuth() {
+    @DisplayName("Should fail to release without authentication")
+    void shouldFailToReleaseWithoutAuth() {
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + versionId1 + "/publish",
+              getEndpoint() + "/" + versionId1 + "/release",
               HttpMethod.POST,
-              new HttpEntity<>(null),
+              new HttpEntity<>((HttpHeaders) null),
               String.class);
 
       assertThat(response.getStatusCode())
@@ -1144,25 +751,20 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   }
 
   @Nested
-  @DisplayName("Unpublish DataStructureVersion Tests")
-  class UnpublishDataStructureVersionTests {
+  @DisplayName("Unrelease DataStructureVersion Tests")
+  class UnreleaseDataStructureVersionTests {
 
     @Test
-    @DisplayName("Should unpublish published version successfully")
-    void shouldUnpublishPublishedVersionSuccessfully() {
+    @DisplayName("Should unrelease released version successfully")
+    void shouldUnreleaseReleasedVersionSuccessfully() {
       DataStructureVersion version1 =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       dataStructureVersionRepository.save(version1);
 
-      DataStructureVersion publishedVersion =
-          dataStructureVersionRepository.findById(versionId1).orElseThrow();
-      assertThat(publishedVersion.getDataStructureVersionStatus())
-          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
-
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + versionId1 + "/unpublish",
+              getEndpoint() + "/" + versionId1 + "/unrelease",
               HttpMethod.POST,
               new HttpEntity<>(createAuthHeaders()),
               getOutputTypeReference());
@@ -1173,7 +775,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output.getId()).isEqualTo(versionId1);
       assertThat(output.getDataStructureVersionStatus())
-          .as("Status should be DRAFT after unpublishing")
+          .as("Status should be DRAFT after unreleasing")
           .isEqualTo(DataStructureVersionStatus.DRAFT);
 
       DataStructureVersion reloadedVersion =
@@ -1183,8 +785,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should fail to unpublish already unpublished version")
-    void shouldFailToUnpublishDraftVersion() {
+    @DisplayName("Should fail to unrelease already draft version")
+    void shouldFailToUnreleaseDraftVersion() {
       DataStructureVersion version =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       assertThat(version.getDataStructureVersionStatus())
@@ -1192,7 +794,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + versionId1 + "/unpublish",
+              getEndpoint() + "/" + versionId1 + "/unrelease",
               HttpMethod.POST,
               new HttpEntity<>(createAuthHeaders()),
               String.class);
@@ -1203,11 +805,11 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should return 404 when unpublishing non-existent version")
-    void shouldReturn404WhenUnpublishingNonExistentVersion() {
+    @DisplayName("Should return 404 when unreleasing non-existent version")
+    void shouldReturn404WhenUnreleasingNonExistentVersion() {
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + UUID.randomUUID() + "/unpublish",
+              getEndpoint() + "/" + UUID.randomUUID() + "/unrelease",
               HttpMethod.POST,
               new HttpEntity<>(createAuthHeaders()),
               String.class);
@@ -1218,13 +820,13 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should fail to unpublish without authentication")
-    void shouldFailToUnpublishWithoutAuth() {
+    @DisplayName("Should fail to unrelease without authentication")
+    void shouldFailToUnreleaseWithoutAuth() {
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + versionId1 + "/unpublish",
+              getEndpoint() + "/" + versionId1 + "/unrelease",
               HttpMethod.POST,
-              new HttpEntity<>(null),
+              new HttpEntity<>((HttpHeaders) null),
               String.class);
 
       assertThat(response.getStatusCode())
@@ -1233,8 +835,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should fail to unpublish the only published version of a published DataStructure")
-    void shouldFailToUnpublishOnlyPublishedVersionOfPublishedDataStructure() {
+    @DisplayName("Should fail to unrelease the only released version of a released DataStructure")
+    void shouldFailToUnreleaseOnlyReleasedVersionOfReleasedDataStructure() {
       DataStructureVersion version1 =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
@@ -1244,10 +846,10 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       dataStructureRepository.save(dataStructure);
 
-      // Try to unpublish the only published version - should fail
+      // Try to unrelease the only released version - should fail
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + versionId1 + "/unpublish",
+              getEndpoint() + "/" + versionId1 + "/unrelease",
               HttpMethod.POST,
               new HttpEntity<>(createAuthHeaders()),
               String.class);
@@ -1256,23 +858,23 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .as("Should return BAD_REQUEST status")
           .isEqualTo(HttpStatus.BAD_REQUEST);
 
-      // Verify version is still published
+      // Verify version is still released
       DataStructureVersion reloadedVersion =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       assertThat(reloadedVersion.getDataStructureVersionStatus())
-          .as("Version should remain published")
+          .as("Version should remain released")
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
     }
 
     @Test
     @DisplayName(
-        "Should allow unpublishing when DataStructure has multiple published versions and is published")
-    void shouldAllowUnpublishingWhenMultiplePublishedVersionsExist() {
+        "Should allow unreleasing when DataStructure has multiple released versions and is released")
+    void shouldAllowUnreleasingWhenMultipleReleasedVersionsExist() {
       DataStructureVersion version3 = new DataStructureVersion();
       version3.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version3.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       version3.setVersion("3.0.0");
-      version3.setModelAtlasUri("https://modelatlas.example.com/model3");
+      version3.setModel(portalData.dataStructureVersionModel("Model3"));
       version3.setModelName("TestModel3");
       version3.setDataStructure(dataStructureRepository.findById(dataStructureId).orElseThrow());
       version3 = dataStructureVersionRepository.save(version3);
@@ -1290,41 +892,38 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       dataStructureRepository.save(dataStructure);
 
-      // Now unpublish one version - should succeed because there's another published version
+      // Now unrelease one version - should succeed because there's another released version
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + versionId1 + "/unpublish",
+              getEndpoint() + "/" + versionId1 + "/unrelease",
               HttpMethod.POST,
               new HttpEntity<>(createAuthHeaders()),
               getOutputTypeReference());
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
 
-      // Verify version1 is unpublished
       DataStructureVersion reloadedVersion1 =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       assertThat(reloadedVersion1.getDataStructureVersionStatus())
-          .as("Version 1 should be unpublished")
+          .as("Version 1 should be unreleased")
           .isEqualTo(DataStructureVersionStatus.DRAFT);
 
-      // Verify version3 is still published
       DataStructureVersion reloadedVersion3 =
           dataStructureVersionRepository.findById(version3Id).orElseThrow();
       assertThat(reloadedVersion3.getDataStructureVersionStatus())
-          .as("Version 3 should still be published")
+          .as("Version 3 should still be released")
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
 
-      // Verify DataStructure is still published
       DataStructure reloadedDataStructure =
           dataStructureRepository.findById(dataStructureId).orElseThrow();
       assertThat(reloadedDataStructure.getDataStructureStatus())
-          .as("DataStructure should remain published")
+          .as("DataStructure should remain released")
           .isEqualTo(DataStructureStatus.AVAILABLE);
     }
 
     @Test
-    @DisplayName("Should allow unpublishing when DataStructure is in DRAFT status")
-    void shouldAllowUnpublishingWhenDataStructureIsDraft() {
+    @DisplayName("Should allow unreleasing when DataStructure is in DRAFT status")
+    void shouldAllowUnreleasingWhenDataStructureIsDraft() {
       DataStructureVersion version1 =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
@@ -1333,49 +932,50 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructure dataStructure = dataStructureRepository.findById(dataStructureId).orElseThrow();
       assertThat(dataStructure.getDataStructureStatus()).isEqualTo(DataStructureStatus.DRAFT);
 
-      // Unpublish the version - should succeed because DataStructure is DRAFT
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + versionId1 + "/unpublish",
+              getEndpoint() + "/" + versionId1 + "/unrelease",
               HttpMethod.POST,
               new HttpEntity<>(createAuthHeaders()),
               getOutputTypeReference());
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
 
-      // Verify version is unpublished
       DataStructureVersion reloadedVersion =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       assertThat(reloadedVersion.getDataStructureVersionStatus())
-          .as("Version should be unpublished")
+          .as("Version should be unreleased")
           .isEqualTo(DataStructureVersionStatus.DRAFT);
     }
   }
 
   @Nested
-  @DisplayName("Update Published Meta Tests")
-  class UpdatePublishedMetaTests {
+  @DisplayName("Update Released Meta Tests")
+  class UpdateReleasedMetaTests {
 
-    private UUID publishedVersionId;
+    private UUID releasedVersionId;
 
     @BeforeEach
-    void publishVersion() {
+    void releaseVersion() {
       DataStructureVersion version1 =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       dataStructureVersionRepository.save(version1);
 
-      publishedVersionId = versionId1;
+      releasedVersionId = versionId1;
     }
 
     @Test
     @DisplayName(
-        "Should allow full update (version, styles, modelAtlasUri) via published/meta when not in use")
+        "Should allow full update (version, styles, modelName) via released/meta when not in use")
     void shouldAllowFullUpdateWhenNotInUse() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("1.1.0");
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setModelName("UpdatedPublishedModel");
+      input.setModelName("UpdatedReleasedModel");
+      // PUT /released/meta is a full replace (SET_TO_NULL); a released version must always retain a
+      // non-empty model, so the model is sent here.
+      input.setModel(portalData.dataStructureVersionModel("ReleasedModel"));
 
       Map<String, Object> newStyles = new HashMap<>();
       newStyles.put("color", "red");
@@ -1384,7 +984,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + publishedVersionId + "/published/meta",
+              getEndpoint() + "/" + releasedVersionId + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(input, createAuthHeaders()),
               getOutputTypeReference());
@@ -1393,10 +993,10 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getBody()).as("Response body should not be null").isNotNull();
 
       DataStructureVersionOutputDTO output = response.getBody();
-      assertThat(output.getId()).isEqualTo(publishedVersionId);
+      assertThat(output.getId()).isEqualTo(releasedVersionId);
       assertThat(output.getModelName())
           .as("Model name should be updated")
-          .isEqualTo("UpdatedPublishedModel");
+          .isEqualTo("UpdatedReleasedModel");
       assertThat(output.getVersion()).as("Version should be updated").isEqualTo("1.1.0");
       assertThat(output.getStyles().get("color")).as("Styles should be updated").isEqualTo("red");
       assertThat(output.getDataStructureVersionStatus())
@@ -1405,22 +1005,16 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName(
-        "Should delete old model and upload new one when modelAtlasUri changes via published/meta")
-    void shouldAllowModelAtlasUriChangeWhenNotInUse() {
-      String expectedDeletePath = stubModelDelete("https://modelatlas.example.com/model1");
-      stubModelUpload("https://modelatlas.example.com/updated-model");
-      stubModelDownload("https://modelatlas.example.com/updated-model");
-
+    @DisplayName("Should update the model via released/meta when not in use")
+    void shouldUpdateModelWhenNotInUse() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("1.0.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/updated-model");
-      input.setModel(modelContent);
+      input.setModel(portalData.dataStructureVersionModel("UpdatedModel"));
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + publishedVersionId + "/published/meta",
+              getEndpoint() + "/" + releasedVersionId + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(input, createAuthHeaders()),
               getOutputTypeReference());
@@ -1428,21 +1022,19 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output).isNotNull();
-      assertThat(output.getModelAtlasUri())
-          .as("ModelAtlasUri should be updated when not in use")
-          .isEqualTo("https://modelatlas.example.com/updated-model");
-
-      verify(deleteRequestedFor(urlEqualTo(expectedDeletePath)));
+      assertThat(output.getModel())
+          .as("Model should be updated when not in use")
+          .containsEntry("title", "UpdatedModel");
     }
 
     @Test
-    @DisplayName("Should fail to update published meta for DRAFT version")
-    void shouldFailToUpdatePublishedMetaForDraftVersion() {
+    @DisplayName("Should fail to update released meta for DRAFT version")
+    void shouldFailToUpdateReleasedMetaForDraftVersion() {
       DataStructureVersion draftVersion = new DataStructureVersion();
       draftVersion.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       draftVersion.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       draftVersion.setVersion("4.0.0");
-      draftVersion.setModelAtlasUri("https://modelatlas.example.com/model4");
+      draftVersion.setModel(portalData.dataStructureVersionModel("Model4"));
       draftVersion.setModelName("TestModel4");
       draftVersion.setDataStructure(
           dataStructureRepository.findById(dataStructureId).orElseThrow());
@@ -1454,7 +1046,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + draftVersionId + "/published/meta",
+              getEndpoint() + "/" + draftVersionId + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(input, createAuthHeaders()),
               String.class);
@@ -1465,15 +1057,15 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should return 404 when updating published meta for non-existent version")
-    void shouldReturn404WhenUpdatingPublishedMetaForNonExistentVersion() {
+    @DisplayName("Should return 404 when updating released meta for non-existent version")
+    void shouldReturn404WhenUpdatingReleasedMetaForNonExistentVersion() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("99.0.0");
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + UUID.randomUUID() + "/published/meta",
+              getEndpoint() + "/" + UUID.randomUUID() + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(input, createAuthHeaders()),
               String.class);
@@ -1484,14 +1076,14 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should fail to update published meta without authentication")
-    void shouldFailToUpdatePublishedMetaWithoutAuth() {
+    @DisplayName("Should fail to update released meta without authentication")
+    void shouldFailToUpdateReleasedMetaWithoutAuth() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("1.2.0");
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + publishedVersionId + "/published/meta",
+              getEndpoint() + "/" + releasedVersionId + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(input),
               String.class);
@@ -1503,42 +1095,12 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   }
 
   @Nested
-  @DisplayName("PATCH Tests")
-  class PatchTests {
-
-    @Test
-    @DisplayName("Should patch description without triggering model validation error")
-    void shouldPatchDescriptionWithoutModelValidationError() {
-      String patchBody = "{\"description\": \"Patched version description\"}";
-
-      HttpHeaders headers = createAuthHeaders();
-      headers.setContentType(MediaType.APPLICATION_JSON);
-
-      ResponseEntity<DataStructureVersionOutputDTO> response =
-          restTemplate.exchange(
-              getEndpoint() + "/" + versionId1,
-              HttpMethod.PATCH,
-              new HttpEntity<>(patchBody, headers),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDescription())
-          .as("Description should be updated")
-          .isEqualTo("Patched version description");
-      assertThat(response.getBody().getModelAtlasUri())
-          .as("ModelAtlasUri should remain unchanged")
-          .isEqualTo("https://modelatlas.example.com/model1");
-    }
-  }
-
-  @Nested
   @DisplayName("Regular Update Restrictions Tests")
   class RegularUpdateRestrictionsTests {
 
     @Test
-    @DisplayName("Should fail to update published version with regular PUT endpoint")
-    void shouldFailToUpdatePublishedVersionWithRegularPut() {
+    @DisplayName("Should fail to update released version with regular PUT endpoint")
+    void shouldFailToUpdateReleasedVersionWithRegularPut() {
       DataStructureVersion version1 =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
@@ -1585,7 +1147,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       version.setVersion("1.0.0");
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      version.setModelAtlasUri("http://modelatlas.example.com/models/inuse");
+      version.setModel(portalData.dataStructureVersionModel("InUse"));
       version.setModelName("InUse Model");
       version = dataStructureVersionRepository.save(version);
       inUseVersionId = version.getId();
@@ -1598,8 +1160,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should return 409 when unpublishing in-use version")
-    void shouldReturn409WhenUnpublishingInUseVersion() {
+    @DisplayName("Should return 409 when unreleasing in-use version")
+    void shouldReturn409WhenUnreleasingInUseVersion() {
       ResponseEntity<String> response =
           restTemplate.exchange(
               "/datastructures/"
@@ -1607,7 +1169,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
                   + "/versions"
                   + "/"
                   + inUseVersionId
-                  + "/unpublish",
+                  + "/unrelease",
               HttpMethod.POST,
               new HttpEntity<>(createAuthHeaders()),
               String.class);
@@ -1650,12 +1212,11 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName(
-        "Should protect modelAtlasUri and version via published/meta when version is in use")
+    @DisplayName("Should protect model and version via released/meta when version is in use")
     void shouldProtectStructuralFieldsWhenInUse() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("2.0.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/SHOULD_NOT_CHANGE");
+      input.setModel(portalData.dataStructureVersionModel("SHOULD_NOT_CHANGE"));
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setModelName("UpdatedModelName");
 
@@ -1667,7 +1228,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
                   + inUseDataStructureId
                   + "/versions/"
                   + inUseVersionId
-                  + "/published/meta",
+                  + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(input, createAuthHeaders()),
               getOutputTypeReference());
@@ -1675,9 +1236,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output).isNotNull();
-      assertThat(output.getModelAtlasUri())
-          .as("ModelAtlasUri should be protected when in use")
-          .isEqualTo("http://modelatlas.example.com/models/inuse");
+      assertThat(output.getModel())
+          .as("Model should be protected when in use")
+          .containsEntry("title", "InUse");
       assertThat(output.getVersion())
           .as("Version should be protected when in use")
           .isEqualTo("1.0.0");
@@ -1716,6 +1277,97 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getBody().isInUse())
           .as("inUse should be false when no DataSource references this version")
           .isFalse();
+    }
+
+    /** Builds a released version referenced by a DataSink, not a DataSource. */
+    private DataStructureVersion createSinkReferencedVersion() {
+      DataStructure ds = new DataStructure();
+      ds.setName("Sink-Referenced Data Structure");
+      ds.setDescription("Data structure with a version referenced by a DataSink");
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      ds.setCreatedFromDataSource(false);
+      ds = dataStructureRepository.save(ds);
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setDataStructure(ds);
+      version.setVersion("1.0.0");
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      version.setModel(portalData.dataStructureVersionModel("SinkReferenced"));
+      version.setModelName("Sink Referenced Model");
+      version = dataStructureVersionRepository.save(version);
+
+      UUID versionId = version.getId();
+      var dataSet = portalData.dataSet();
+      portalData.dataSink(
+          dataSet,
+          null,
+          sink -> sink.setConfiguration(Map.of("dataStructureVersionId", versionId.toString())));
+
+      return version;
+    }
+
+    @Test
+    @DisplayName("Should return inUse=true in version output DTO when a DataSink references it")
+    void shouldReturnInUseTrueWhenDataSinkReferencesVersion() {
+      DataStructureVersion version = createSinkReferencedVersion();
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              "/datastructures/"
+                  + version.getDataStructure().getId()
+                  + "/versions/"
+                  + version.getId(),
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().isInUse())
+          .as("inUse should be true when a DataSink references this version")
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("Should return 409 when deleting a version referenced by a DataSink")
+    void shouldReturn409WhenDeletingDataSinkReferencedVersion() {
+      DataStructureVersion version = createSinkReferencedVersion();
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              "/datastructures/"
+                  + version.getDataStructure().getId()
+                  + "/versions/"
+                  + version.getId(),
+              HttpMethod.DELETE,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status")
+          .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when unreleasing a version referenced by a DataSink")
+    void shouldReturn409WhenUnreleasingDataSinkReferencedVersion() {
+      DataStructureVersion version = createSinkReferencedVersion();
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              "/datastructures/"
+                  + version.getDataStructure().getId()
+                  + "/versions/"
+                  + version.getId()
+                  + "/unrelease",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status")
+          .isEqualTo(HttpStatus.CONFLICT);
     }
   }
 }

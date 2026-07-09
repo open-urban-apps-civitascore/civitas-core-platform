@@ -1,0 +1,21 @@
+meta {
+  name: 17. Teardown - delete datastructure
+  type: http
+  seq: 18
+}
+
+delete {
+  url: {{baseUrl}}/datastructures/{{scopeDataStructureId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: in [200, 204, 400, 404, 409]
+}
+
+tests {
+  test("DataStructure cleanup tolerated", function() {
+    expect([200, 204, 400, 404, 409]).to.include(res.getStatus());
+  });
+}

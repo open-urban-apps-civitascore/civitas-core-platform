@@ -1,8 +1,5 @@
 package de.civitascore.portal.messaging.saga;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.model.embedded.SagaResultType;
 import de.civitascore.portal.service.DataSetService;
 import java.util.Map;
@@ -12,6 +9,9 @@ import org.owasp.encoder.Encode;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Kafka listener for dataset saga result messages. Consumes {@code SAGA_COMPLETED} and {@code
@@ -66,7 +66,7 @@ public class DataSetSagaResultListener {
           handleSagaFailed(result);
         }
       }
-    } catch (JsonProcessingException e) {
+    } catch (JacksonException e) {
       log.error("Failed to deserialize saga result: {}", e.getMessage(), e);
       throw new IllegalStateException("Saga result deserialization failed", e);
     } catch (IllegalArgumentException e) {

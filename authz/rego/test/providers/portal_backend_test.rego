@@ -61,9 +61,9 @@ test_path_pattern_unknown if {
 # SUB-RESOURCE PATH PATTERN TESTS
 # =============================================================================
 
-test_path_pattern_4_segment_publish if {
-	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datasets/abc-123/publish")
-	result == "/v1/datasets/{id}/publish"
+test_path_pattern_4_segment_stage if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datasets/abc-123/stage")
+	result == "/v1/datasets/{id}/stage"
 }
 
 test_path_pattern_4_segment_assignments if {
@@ -71,14 +71,19 @@ test_path_pattern_4_segment_assignments if {
 	result == "/v1/datasets/{id}/assignments"
 }
 
+test_path_pattern_4_segment_apis if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datasets/abc-123/apis")
+	result == "/v1/datasets/{id}/apis"
+}
+
 test_path_pattern_4_segment_pipelines if {
 	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datasets/abc-123/pipelines")
 	result == "/v1/datasets/{id}/pipelines"
 }
 
-test_path_pattern_datasource_publish if {
-	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datasources/ds-123/publish")
-	result == "/v1/datasources/{id}/publish"
+test_path_pattern_datasource_release if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datasources/ds-123/release")
+	result == "/v1/datasources/{id}/release"
 }
 
 test_path_pattern_datastructure_assignments if {
@@ -90,9 +95,9 @@ test_path_pattern_datastructure_assignments if {
 # 5-SEGMENT PATH TESTS
 # =============================================================================
 
-test_path_pattern_5_segment_published_meta if {
-	result := portal_backend.path_pattern with input as portal_request("PUT", "/v1/datasets/abc-123/published/meta")
-	result == "/v1/datasets/{id}/published/meta"
+test_path_pattern_5_segment_released_meta if {
+	result := portal_backend.path_pattern with input as portal_request("PUT", "/v1/datasets/abc-123/released/meta")
+	result == "/v1/datasets/{id}/released/meta"
 }
 
 test_path_pattern_5_segment_pipelines_id if {
@@ -109,19 +114,19 @@ test_path_pattern_5_segment_versions_id if {
 # 6-SEGMENT PATH TESTS
 # =============================================================================
 
-test_path_pattern_6_segment_versions_publish if {
-	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datastructures/dstr-123/versions/v-456/publish")
-	result == "/v1/datastructures/{id}/versions/{id}/publish"
+test_path_pattern_6_segment_versions_release if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datastructures/dstr-123/versions/v-456/release")
+	result == "/v1/datastructures/{id}/versions/{id}/release"
 }
 
-test_path_pattern_6_segment_versions_unpublish if {
-	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datastructures/dstr-123/versions/v-456/unpublish")
-	result == "/v1/datastructures/{id}/versions/{id}/unpublish"
+test_path_pattern_6_segment_versions_unrelease if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datastructures/dstr-123/versions/v-456/unrelease")
+	result == "/v1/datastructures/{id}/versions/{id}/unrelease"
 }
 
-test_path_pattern_7_segment_versions_published_meta if {
-	result := portal_backend.path_pattern with input as portal_request("PUT", "/v1/datastructures/dstr-123/versions/v-456/published/meta")
-	result == "/v1/datastructures/{id}/versions/{id}/published/meta"
+test_path_pattern_7_segment_versions_released_meta if {
+	result := portal_backend.path_pattern with input as portal_request("PUT", "/v1/datastructures/dstr-123/versions/v-456/released/meta")
+	result == "/v1/datastructures/{id}/versions/{id}/released/meta"
 }
 
 # =============================================================================
@@ -185,7 +190,7 @@ test_scope_type_datastructures if {
 
 # Sub-resource resource_id should be the parent resource ID (parts[2])
 test_resource_id_4_segment if {
-	result := portal_backend.resource_id with input as portal_request("POST", "/v1/datasets/abc-123/publish")
+	result := portal_backend.resource_id with input as portal_request("POST", "/v1/datasets/abc-123/stage")
 	result == "abc-123"
 }
 
@@ -195,13 +200,13 @@ test_resource_id_5_segment if {
 }
 
 test_resource_id_6_segment if {
-	result := portal_backend.resource_id with input as portal_request("POST", "/v1/datastructures/dstr-123/versions/v-456/publish")
+	result := portal_backend.resource_id with input as portal_request("POST", "/v1/datastructures/dstr-123/versions/v-456/release")
 	result == "dstr-123"
 }
 
 # Sub-resource paths are resource endpoints (not collection)
 test_is_resource_endpoint_4_segment if {
-	portal_backend.is_resource_endpoint with input as portal_request("POST", "/v1/datasets/abc-123/publish")
+	portal_backend.is_resource_endpoint with input as portal_request("POST", "/v1/datasets/abc-123/stage")
 }
 
 test_is_resource_endpoint_5_segment if {
@@ -209,7 +214,7 @@ test_is_resource_endpoint_5_segment if {
 }
 
 test_is_resource_endpoint_6_segment if {
-	portal_backend.is_resource_endpoint with input as portal_request("POST", "/v1/datastructures/dstr-123/versions/v-456/publish")
+	portal_backend.is_resource_endpoint with input as portal_request("POST", "/v1/datastructures/dstr-123/versions/v-456/release")
 }
 
 # =============================================================================
@@ -225,9 +230,64 @@ test_not_collection_endpoint_resource if {
 }
 
 test_not_collection_endpoint_sub_resource if {
-	not portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/datasets/abc-123/publish")
+	not portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/datasets/abc-123/stage")
 }
 
 test_not_collection_endpoint_users_me if {
 	not portal_backend.is_collection_endpoint with input as portal_request("GET", "/v1/users/me")
+}
+
+# =============================================================================
+# DATAPOOL ENDPOINT TESTS
+# =============================================================================
+
+test_endpoints_contains_datapools if {
+	portal_backend.endpoints["/v1/datapools"]
+}
+
+test_endpoints_contains_datapools_id if {
+	portal_backend.endpoints["/v1/datapools/{id}"]
+}
+
+test_endpoints_contains_datapools_assignments if {
+	portal_backend.endpoints["/v1/datapools/{id}/assignments"]
+}
+
+test_path_pattern_datapools_collection if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datapools")
+	result == "/v1/datapools"
+}
+
+test_path_pattern_datapools_with_id if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datapools/pool-123")
+	result == "/v1/datapools/{id}"
+}
+
+test_path_pattern_datapools_assignments if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datapools/pool-123/assignments")
+	result == "/v1/datapools/{id}/assignments"
+}
+
+# Datapools are scoped by DATAPOOL (the {id} is the scopeId)
+test_scope_type_datapools if {
+	result := portal_backend.expected_scope_type with input as portal_request("GET", "/v1/datapools/pool-123")
+	result == "DATAPOOL"
+}
+
+# Sub-resource resource_id is the parent pool ID (parts[2])
+test_resource_id_datapools_assignments if {
+	result := portal_backend.resource_id with input as portal_request("GET", "/v1/datapools/pool-123/assignments")
+	result == "pool-123"
+}
+
+test_is_resource_endpoint_datapools if {
+	portal_backend.is_resource_endpoint with input as portal_request("GET", "/v1/datapools/pool-123")
+}
+
+test_is_collection_endpoint_datapools if {
+	portal_backend.is_collection_endpoint with input as portal_request("GET", "/v1/datapools")
+}
+
+test_not_collection_endpoint_datapools_resource if {
+	not portal_backend.is_collection_endpoint with input as portal_request("GET", "/v1/datapools/pool-123")
 }

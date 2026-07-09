@@ -46,6 +46,46 @@ test_backend_data_key_conversion if {
 	result == "portal_backend"
 }
 
+# FROST data-plane dispatch (#1368): the per-named-API APISIX route carries
+# service_id=svc-frost-server, whose Service name is "frost-server" (see
+# dev-environment/apisix/seed-routes.sh). With with_service=true APISIX forwards that Service, so
+# OPA reads input.service.name == "frost-server" and routes to the frost_server backend. These
+# tests pin that contract — the route-level service_id is what selects the frost_server policy.
+frost_request(method, path) := {
+	"request": {
+		"method": method,
+		"path": path,
+		"headers": {},
+	},
+	"service": {"name": "frost-server"},
+}
+
+test_backend_frost_server_from_service if {
+	result := resource_mapping.backend with input as frost_request("GET", "/v1/datasets/abc-123/Things")
+	result == "frost-server"
+}
+
+test_backend_data_key_frost_conversion if {
+	# "frost-server" → "frost_server" → data.backends.frost_server
+	result := resource_mapping.backend_data_key with input as frost_request("GET", "/v1/datasets/abc-123/Things")
+	result == "frost_server"
+}
+
+# Without the FROST service (route missing its service_id, or wrong service), the same FROST
+# data-plane path does NOT dispatch to frost_server — proving the service binding is load-bearing.
+test_frost_dataplane_without_service_not_frost if {
+	result := resource_mapping.backend with input as {"request": {"method": "GET", "path": "/v1/datasets/abc-123/Things", "headers": {}}}
+	result == "unknown"
+}
+
+test_frost_dataplane_wrong_service_not_frost if {
+	result := resource_mapping.backend with input as {
+		"request": {"method": "GET", "path": "/v1/datasets/abc-123/Things", "headers": {}},
+		"service": {"name": "portal-backend"},
+	}
+	result != "frost-server"
+}
+
 # =============================================================================
 # PATH PATTERN MATCHING TESTS
 # =============================================================================
@@ -199,14 +239,14 @@ test_all_resource_paths if {
 # Test: Sub-resource paths resolve correctly
 test_sub_resource_paths if {
 	patterns := [
-		["/v1/datasets/abc/publish", "/v1/datasets/{id}/publish"],
-		["/v1/datasets/abc/unpublish", "/v1/datasets/{id}/unpublish"],
+		["/v1/datasets/abc/stage", "/v1/datasets/{id}/stage"],
+		["/v1/datasets/abc/unstage", "/v1/datasets/{id}/unstage"],
 		["/v1/datasets/abc/assignments", "/v1/datasets/{id}/assignments"],
 		["/v1/datasets/abc/pipelines", "/v1/datasets/{id}/pipelines"],
-		["/v1/datasources/abc/publish", "/v1/datasources/{id}/publish"],
-		["/v1/datasources/abc/unpublish", "/v1/datasources/{id}/unpublish"],
-		["/v1/datastructures/abc/publish", "/v1/datastructures/{id}/publish"],
-		["/v1/datastructures/abc/unpublish", "/v1/datastructures/{id}/unpublish"],
+		["/v1/datasources/abc/release", "/v1/datasources/{id}/release"],
+		["/v1/datasources/abc/unrelease", "/v1/datasources/{id}/unrelease"],
+		["/v1/datastructures/abc/release", "/v1/datastructures/{id}/release"],
+		["/v1/datastructures/abc/unrelease", "/v1/datastructures/{id}/unrelease"],
 		["/v1/datastructures/abc/versions", "/v1/datastructures/{id}/versions"],
 	]
 	every pattern in patterns {
@@ -217,9 +257,9 @@ test_sub_resource_paths if {
 
 # Test: 5-segment paths resolve correctly (both literal-tail and both-{id} variants)
 test_5_segment_paths if {
-	# Literal tail: published/meta
-	result1 := resource_mapping.path_pattern with input as portal_request("PUT", "/v1/datasets/abc/published/meta")
-	result1 == "/v1/datasets/{id}/published/meta"
+	# Literal tail: released/meta
+	result1 := resource_mapping.path_pattern with input as portal_request("PUT", "/v1/datasets/abc/released/meta")
+	result1 == "/v1/datasets/{id}/released/meta"
 
 	# Both-{id}: pipelines/{id}
 	result2 := resource_mapping.path_pattern with input as portal_request("GET", "/v1/datasets/abc/pipelines/pipe-1")
@@ -232,11 +272,11 @@ test_5_segment_paths if {
 
 # Test: 6-segment paths resolve correctly
 test_6_segment_paths if {
-	result1 := resource_mapping.path_pattern with input as portal_request("POST", "/v1/datastructures/abc/versions/xyz/publish")
-	result1 == "/v1/datastructures/{id}/versions/{id}/publish"
+	result1 := resource_mapping.path_pattern with input as portal_request("POST", "/v1/datastructures/abc/versions/xyz/release")
+	result1 == "/v1/datastructures/{id}/versions/{id}/release"
 
-	result2 := resource_mapping.path_pattern with input as portal_request("POST", "/v1/datastructures/abc/versions/xyz/unpublish")
-	result2 == "/v1/datastructures/{id}/versions/{id}/unpublish"
+	result2 := resource_mapping.path_pattern with input as portal_request("POST", "/v1/datastructures/abc/versions/xyz/unrelease")
+	result2 == "/v1/datastructures/{id}/versions/{id}/unrelease"
 }
 
 # Test: Dataspaces and catalogs do NOT resolve (removed from v2.0, see #989)

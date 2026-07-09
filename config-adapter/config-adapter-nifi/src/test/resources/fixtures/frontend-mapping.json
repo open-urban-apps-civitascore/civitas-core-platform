@@ -1,0 +1,29 @@
+{
+  "$schema": "https://civitasconnect.digital/core/mapping/v1",
+  "source": "urn:core:platform:civitas:datastructure:common:Source:ggb6odzea5:1.0.0",
+  "target": "urn:core:platform:civitas:datastructure:common:Target:qemy9w8u7g:1.0.0",
+  "fields": {
+    "$.titel": "$.name",
+    "$.groups.boolean": {
+      "op": "toString",
+      "input": "$.klasse.offen"
+    },
+    "$.groups.datum": {
+      "op": "toDate",
+      "input": "$.klasse.Stufe",
+      "pattern": "yyyy-MM-dd"
+    },
+    "$.adresse": {
+      "op": "concat",
+      "inputs": [
+        "$.adresse",
+        "$.klasse.Bezeichnung"
+      ]
+    }
+  },
+  "positions": {
+    "$.groups.boolean#toString": { "x": 502.23514049427126, "y": 220.14580312446782 },
+    "$.groups.datum#toDate": { "x": 503.3017574093086, "y": 98.55147481019506 },
+    "$.adresse#concat": { "x": 503.30175740930883, "y": -69.9739977657269 }
+  }
+}

@@ -4,31 +4,36 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
-import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.RoleRepository;
-import de.civitascore.portal.service.DataSpaceService;
+import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.service.GroupService;
 import de.civitascore.portal.util.ResourceInUseException;
 import jakarta.persistence.EntityManager;
@@ -53,16 +58,17 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private EntityManager entityManager;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private PipelineRepository pipelineRepository;
+  @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private DistributionRepository distributionRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataStructureRepository dataStructureRepository;
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
   @Autowired private GroupRepository groupRepository;
-  @Autowired private DataSpaceRepository dataSpaceRepository;
   @Autowired private AssignmentRepository assignmentRepository;
   @Autowired private RoleRepository roleRepository;
+  @Autowired private LayerRepository layerRepository;
+  @Autowired private StyleRepository styleRepository;
   @Autowired private GroupService groupService;
-  @Autowired private DataSpaceService dataSpaceService;
 
   private static String uniqueName(String prefix) {
     return prefix + "-" + UUID.randomUUID().toString().substring(0, 8);
@@ -71,13 +77,15 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @AfterEach
   void cleanup() {
     assignmentRepository.deleteAll();
+    layerRepository.deleteAll();
+    styleRepository.deleteAll();
+    dataSinkRepository.deleteAll();
     pipelineRepository.deleteAll();
     distributionRepository.deleteAll();
     dataSetRepository.deleteAll();
     dataStructureVersionRepository.deleteAll();
     dataStructureRepository.deleteAll();
     dataSourceRepository.deleteAll();
-    dataSpaceRepository.deleteAll();
     groupRepository.deleteAll();
     roleRepository.deleteAll();
   }
@@ -90,6 +98,7 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     DataSet ds = new DataSet();
     ds.setName(uniqueName("dataset"));
     ds.setDescription("cascade test dataset");
+    ds.setDataSetStatus(DataSetStatus.DRAFT);
     return dataSetRepository.save(ds);
   }
 
@@ -142,10 +151,28 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     return dataSourceRepository.save(ds);
   }
 
-  private DataSpace createDataSpace() {
-    DataSpace ds = new DataSpace();
-    ds.setName(uniqueName("dataspace"));
-    return dataSpaceRepository.save(ds);
+  private DataSink createDataSink(DataSet dataSet, Pipeline pipeline) {
+    DataSink sink = new DataSink();
+    sink.setDataSet(dataSet);
+    sink.setPipeline(pipeline);
+    sink.setDataSinkType(DataSinkType.FROST);
+    return dataSinkRepository.save(sink);
+  }
+
+  private Layer createLayer(DataSet dataSet, DataSink dataSink) {
+    Layer layer = new Layer();
+    layer.setDataSet(dataSet);
+    layer.setDataSink(dataSink);
+    layer.setLayerName(uniqueName("layer"));
+    return layerRepository.save(layer);
+  }
+
+  private Style createStyle(DataSet dataSet) {
+    Style style = new Style();
+    style.setDataSet(dataSet);
+    style.setName(uniqueName("style"));
+    style.setSldContent("<StyledLayerDescriptor/>");
+    return styleRepository.save(style);
   }
 
   private Assignment createUnscopedAssignment(Group group, Role role) {
@@ -165,7 +192,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
       case DATASET -> a.setDataset((DataSet) scopeEntity);
       case DATASOURCE -> a.setDataSource((DataSource) scopeEntity);
       case DATASTRUCTURE -> a.setDataStructure((DataStructure) scopeEntity);
-      case DATASPACE -> a.setDataSpace((DataSpace) scopeEntity);
       default -> throw new IllegalArgumentException("Unsupported scope type: " + scopeType);
     }
     return assignmentRepository.save(a);
@@ -211,6 +237,47 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
       entityManager.flush();
 
       assertThat(distributionRepository.findById(distributionId)).isEmpty();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("Deleting DataSet should cascade-delete its Layers")
+    void deletingDataSet_shouldCascadeDeleteLayers() {
+      DataSet dataSet = createDataSet();
+
+      // DataSink lives under a separate dataset/pipeline so it does not block
+      // cascade deletion of dataSet's own pipelines via fk_data_sinks_on_pipeline
+      DataSet otherDataSet = createDataSet();
+      Pipeline otherPipeline = createPipeline(otherDataSet);
+      DataSink dataSink = createDataSink(otherDataSet, otherPipeline);
+
+      Layer layer = createLayer(dataSet, dataSink);
+      UUID layerId = layer.getId();
+
+      entityManager.flush();
+      entityManager.clear();
+
+      dataSetRepository.deleteById(dataSet.getId());
+      entityManager.flush();
+
+      assertThat(layerRepository.findById(layerId)).isEmpty();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("Deleting DataSet should cascade-delete its Styles")
+    void deletingDataSet_shouldCascadeDeleteStyles() {
+      DataSet dataSet = createDataSet();
+      Style style = createStyle(dataSet);
+      UUID styleId = style.getId();
+
+      entityManager.flush();
+      entityManager.clear();
+
+      dataSetRepository.deleteById(dataSet.getId());
+      entityManager.flush();
+
+      assertThat(styleRepository.findById(styleId)).isEmpty();
     }
 
     @Test
@@ -350,34 +417,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
       entityManager.flush();
 
       assertThat(assignmentRepository.findById(assignmentId)).isEmpty();
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // DataSpace cascades
-  // ---------------------------------------------------------------------------
-
-  @Nested
-  @DisplayName("DataSpace cascades")
-  class DataSpaceCascades {
-
-    @Test
-    @Transactional
-    @DisplayName("Deleting DataSpace with children should be prevented")
-    void deletingDataSpace_withChildren_shouldThrowResourceInUseException() {
-      DataSpace parent = createDataSpace();
-      DataSpace child = new DataSpace();
-      child.setName(uniqueName("child-dataspace"));
-      child.setParentDataSpace(parent);
-      dataSpaceRepository.save(child);
-
-      entityManager.flush();
-      entityManager.clear();
-
-      UUID parentId = parent.getId();
-      assertThatThrownBy(() -> dataSpaceService.deleteById(parentId))
-          .isInstanceOf(ResourceInUseException.class)
-          .hasMessageContaining("child data spaces");
     }
   }
 }

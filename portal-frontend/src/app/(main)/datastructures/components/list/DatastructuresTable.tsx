@@ -16,6 +16,7 @@ import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { usePermissions } from '@/hooks/use-permissions'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DATASTRUCTURE_STATUS_TYPES, DatastructuresListData } from '@/types/datastructures'
 import { TableProps } from '@/types/table'
@@ -125,7 +126,11 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     {
       id: 'actions',
       cell: ({ row }: { row: Row<DatastructuresListData> }) => {
-        const canDelete = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_DELETE, 'DATASTRUCTURE', row.original.id)
+        const canDelete = hasScopedPermission(
+          PERMISSION_NAMES.DATASTRUCTURE_DELETE,
+          ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+          row.original.id,
+        )
         return canDelete ? (
           <TableDropdownMenu
             classNameDropdownContent="w-50"

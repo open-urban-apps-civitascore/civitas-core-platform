@@ -7,13 +7,14 @@
  * Extracts:
  * - Entity IDs from configured nodes
  * - React Flow styles (viewport + positions) for frontend reload
- * - RedPandaConnect model from the graph
+ * - The engine-neutral pipeline graph (React-Flow nodes/edges) forwarded to the config-adapter as-is
  */
 
-import type { ApiNodeData, DataSourceNodeData } from '../_types/nodes'
-import { isApiNodeData, isDataSourceNodeData } from '../_types/nodes'
+import { DATASINK_TYPES, type DataSinkPayload } from '@/types/datasinks'
+
+import type { DataSourceNodeData } from '../_types/nodes'
+import { isDataSourceNodeData, isFrostNodeData, isGeoPersistenceNodeData, isMappingNodeData } from '../_types/nodes'
 import type { Pipeline, PipelinePayload, PipelineStylesPayload } from '../_types/pipeline'
-import { buildRedPandaConnectModel } from './modelBuilderService'
 
 /**
  * Builds the complete PipelinePayload for backend API submission.
@@ -32,30 +33,178 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
 
   // 2. Extract entity data by node type
 
-  // DataSources: numeric entity IDs from configured DataSource nodes
+  // DataSources: entity IDs from configured DataSource nodes
   const dataSourceIds: string[] = pipeline.nodes
     .filter(n => isDataSourceNodeData(n.data) && n.data.entityId != null)
     .map(n => (n.data as DataSourceNodeData).entityId as string)
 
-  // APIs: unique apiPath strings from ApiRequest/ApiResponse nodes
-  const apis: string[] = [
-    ...new Set(pipeline.nodes.filter(n => isApiNodeData(n.data)).map(n => (n.data as ApiNodeData).apiPath)),
-  ]
+  // DataSinks: only IDs (config is saved separately via data sink API)
+  const dataSinkIds: string[] = pipeline.nodes
+    .filter(n => (isGeoPersistenceNodeData(n.data) || isFrostNodeData(n.data)) && n.data.entityId != null)
+    .map(n => n.data.entityId as string)
 
-  // Persistences: numeric IDs (Long[] in backend). Currently empty array.
-  const persistences: number[] = []
-
-  // 3. Build RedPandaConnect model
-  const model = buildRedPandaConnectModel(pipeline)
-
-  // 4. Assemble payload — styles is JSON-stringified for the backend
+  // 3. Assemble payload. `model` is the engine-neutral pipeline graph (React-Flow nodes/edges +
+  //    inline mappingConfig) that the backend forwards to the config-adapter as-is; the
+  //    config-adapter (NiFi) is the only place engine specifics appear. `styles` carries the same
+  //    React-Flow layout for editor round-tripping. No engine-specific (RedPanda) model is built
+  //    on the frontend anymore.
   return {
     name: pipeline.name,
     description: pipeline.description || '-',
     styles: styles,
+    model: styles,
     dataSourceIds,
-    apis,
-    persistences,
-    model: model || {},
+    dataSinkIds,
+  }
+}
+
+// ============================================================================
+// Data sink Payload Extraction & Change Detection
+// ============================================================================
+
+/**
+ * Represents an extracted data sink payload tied to a specific pipeline node.
+ */
+export interface DataSinkNodePayload {
+  /** The pipeline node ID this data sink belongs to */
+  nodeId: string
+  /** The existing backend data sink ID, or null for new data sinks */
+  entityId: string | null
+  /** The payload ready for POST/PUT to the data sinks API */
+  payload: DataSinkPayload
+}
+
+/**
+ * Extracts data sink payloads from all data sink nodes in the pipeline.
+ * Returns an array of payloads with their associated node IDs and entity IDs.
+ */
+export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[] => {
+  return pipeline.nodes.flatMap<DataSinkNodePayload>(node => {
+    if (isGeoPersistenceNodeData(node.data) && node.data.dataStructureVersionId != null) {
+      return [
+        {
+          nodeId: node.id,
+          entityId: node.data.entityId ?? null,
+          payload: {
+            id: node.data.entityId ?? null,
+            dataSinkType: DATASINK_TYPES.POSTGIS,
+            configuration: {
+              tableName: node.data.tableName,
+              dataStructureVersionId: node.data.dataStructureVersionId.split('/')[1],
+            },
+          },
+        },
+      ]
+    }
+    if (isFrostNodeData(node.data)) {
+      // The deploy engine derives the FROST match keys from the mapping's Thing-shaped target
+      // structure, so the sink references it; a passthrough pipeline (no mapping) sends none.
+      const targetVersionId = mappingTargetVersionBefore(pipeline, node.id)
+      return [
+        {
+          nodeId: node.id,
+          entityId: node.data.entityId ?? null,
+          payload: {
+            id: node.data.entityId ?? null,
+            dataSinkType: DATASINK_TYPES.FROST,
+            configuration: targetVersionId ? { dataStructureVersionId: targetVersionId } : {},
+          },
+        },
+      ]
+    }
+    return []
+  })
+}
+
+/**
+ * The target datastructure version of the last mapping feeding the given sink node: a backward
+ * walk stopping at the first mapping it reaches. The flow-shape validation only lets a single
+ * linear path deploy, so on a valid graph exactly one final mapping exists; on an invalid
+ * multi-branch canvas the pick is arbitrary but the deploy is blocked anyway.
+ */
+const mappingTargetVersionBefore = (pipeline: Pipeline, sinkNodeId: string): string | null => {
+  const incoming = new Map<string, string[]>()
+  pipeline.edges.forEach(edge => {
+    incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source])
+  })
+  const nodesById = new Map(pipeline.nodes.map(node => [node.id, node]))
+
+  const queue = [sinkNodeId]
+  const visited = new Set(queue)
+  while (queue.length > 0) {
+    for (const previous of incoming.get(queue.shift() as string) ?? []) {
+      if (visited.has(previous)) continue
+      visited.add(previous)
+      const node = nodesById.get(previous)
+      if (node && isMappingNodeData(node.data)) {
+        return node.data.targetVersionId ?? null
+      }
+      queue.push(previous)
+    }
+  }
+  return null
+}
+
+/**
+ * Snapshot entry for a single data sink node: tracks both the entityId and configuration.
+ */
+export interface DataSinkSnapshotEntry {
+  /** The backend data sink ID at snapshot time, or null for unsaved nodes */
+  entityId: string | null
+  /** JSON-stringified payload config (dataSinkType + configuration, excluding `id`) */
+  configJson: string
+}
+
+/**
+ * Snapshot type for change detection: maps nodeId → snapshot entry.
+ */
+export type DataSinkSnapshot = Record<string, DataSinkSnapshotEntry>
+
+/**
+ * Creates a snapshot of the current data sink payloads for later change detection.
+ * The snapshot stores the entityId and a JSON string of the payload configuration
+ */
+export const createDataSinkSnapshot = (pipeline: Pipeline): DataSinkSnapshot => {
+  const payloads = buildDataSinkPayloads(pipeline)
+  const snapshot: DataSinkSnapshot = {}
+  for (const { nodeId, entityId, payload } of payloads) {
+    const { id: _id, ...comparable } = payload
+    snapshot[nodeId] = {
+      entityId,
+      configJson: JSON.stringify(comparable),
+    }
+  }
+  return snapshot
+}
+
+/**
+ * Checks whether a single data sink payload has changed compared to the saved snapshot.
+ * Returns true if the data sink is new (not in snapshot) or its configuration differs.
+ */
+export const hasDataSinkChanged = (nodeId: string, payload: DataSinkPayload, snapshot: DataSinkSnapshot): boolean => {
+  const entry = snapshot[nodeId]
+  if (!entry) return true // new node, not in snapshot
+
+  const { id: _id, ...comparable } = payload
+  return JSON.stringify(comparable) !== entry.configJson
+}
+
+/**
+ * Finds data sink IDs that were in the snapshot but no longer exist in the current pipeline.
+ */
+export const getRemovedDataSinkIds = (pipeline: Pipeline, snapshot: DataSinkSnapshot): string[] => {
+  const currentNodeIds = new Set(pipeline.nodes.map(n => n.id))
+  return Object.entries(snapshot)
+    .filter(([nodeId, entry]) => !currentNodeIds.has(nodeId) && entry.entityId != null)
+    .map(([, entry]) => entry.entityId as string)
+}
+
+/**
+ * Updates a single node's entityId in the pipeline. Returns the updated pipeline.
+ */
+export const updateNodeEntityId = (pipeline: Pipeline, nodeId: string, entityId: string): Pipeline => {
+  return {
+    ...pipeline,
+    nodes: pipeline.nodes.map(node => (node.id === nodeId ? { ...node, data: { ...node.data, entityId } } : node)),
   }
 }

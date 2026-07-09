@@ -1,0 +1,3 @@
+.env
+drivers/postgresql.jar
+drivers/postgresql.jar.tmp

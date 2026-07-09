@@ -6,12 +6,13 @@ import { QUERY_PARAMS } from '@/const/searchParams'
 import { useQueryParams } from './use-query-params'
 
 const push = vi.fn()
+const replace = vi.fn()
 let mockSearchParams: URLSearchParams
 const pathname = '/test'
 
 vi.mock('next/navigation', () => {
   return {
-    useRouter: () => ({ push }),
+    useRouter: () => ({ push, replace }),
     usePathname: () => pathname,
     useSearchParams: () => mockSearchParams,
     ReadonlyURLSearchParams: URLSearchParams,
@@ -21,6 +22,7 @@ vi.mock('next/navigation', () => {
 describe('useQueryParams', () => {
   beforeEach(() => {
     push.mockClear()
+    replace.mockClear()
     mockSearchParams = new URLSearchParams()
   })
 
@@ -131,7 +133,7 @@ describe('useQueryParams', () => {
     )
   })
 
-  it('should update tabValue param', () => {
+  it('should update tabValue param and reset pagination to page 0', () => {
     const { result } = renderHook(() => useQueryParams())
     const tabValue = 'mockTab'
 
@@ -140,7 +142,10 @@ describe('useQueryParams', () => {
     })
 
     expect(push).toHaveBeenCalledWith(
-      `${pathname}?${new URLSearchParams({ [QUERY_PARAMS.tabValue]: tabValue }).toString()}`,
+      `${pathname}?${new URLSearchParams({
+        [QUERY_PARAMS.tabValue]: tabValue,
+        [QUERY_PARAMS.pageIndex]: '0',
+      }).toString()}`,
     )
   })
 
@@ -152,6 +157,24 @@ describe('useQueryParams', () => {
       result.current.setTabValueParam('')
     })
 
-    expect(push).toHaveBeenCalledWith(`${pathname}?`)
+    expect(push).toHaveBeenCalledWith(
+      `${pathname}?${new URLSearchParams({ [QUERY_PARAMS.pageIndex]: '0' }).toString()}`,
+    )
+  })
+
+  it('should use replace instead of push when replace flag is set', () => {
+    const { result } = renderHook(() => useQueryParams())
+
+    act(() => {
+      result.current.setTabValueParam('mockTab', true)
+    })
+
+    expect(push).not.toHaveBeenCalled()
+    expect(replace).toHaveBeenCalledWith(
+      `${pathname}?${new URLSearchParams({
+        [QUERY_PARAMS.tabValue]: 'mockTab',
+        [QUERY_PARAMS.pageIndex]: '0',
+      }).toString()}`,
+    )
   })
 })

@@ -427,32 +427,32 @@ class RouteConfigValueTest {
   }
 
   @Test
-  void toApiMap_protectedToPublicUpdate_shouldOmitPluginConfigId() {
-    // Simulate UPDATE_ROUTE: openDataAccess changed from false to true
-    // The route should lose plugin_config_id and gain priority
-    RouteConfigValue publicRoute = new RouteConfigValue();
-    publicRoute.setUri("/api/dataspace/ds-001/*");
-    publicRoute.setServiceId("svc-frost-server");
-    publicRoute.setPriority(1);
-    // pluginConfigId deliberately NOT set (null) -> public
+  void toApiMap_withoutPluginConfigId_shouldOmitPluginConfigId() {
+    // Generic model behaviour: a RouteConfigValue with no pluginConfigId omits plugin_config_id and
+    // serializes the other set fields. (toApiMap only emits fields that are set.)
+    RouteConfigValue route = new RouteConfigValue();
+    route.setUri("/api/dataspace/ds-001/*");
+    route.setServiceId("svc-frost-server");
+    route.setPriority(1);
+    // pluginConfigId deliberately NOT set (null)
 
-    Map<String, Object> map = publicRoute.toApiMap();
+    Map<String, Object> map = route.toApiMap();
     assertFalse(map.containsKey("plugin_config_id"));
     assertEquals(1, map.get("priority"));
     assertEquals("svc-frost-server", map.get("service_id"));
   }
 
   @Test
-  void toApiMap_publicToProtectedUpdate_shouldIncludePluginConfigId() {
-    // Simulate UPDATE_ROUTE: openDataAccess changed from true to false
-    // The route should gain plugin_config_id and lose priority
-    RouteConfigValue protectedRoute = new RouteConfigValue();
-    protectedRoute.setUri("/api/dataspace/ds-001/*");
-    protectedRoute.setServiceId("svc-frost-server");
-    protectedRoute.setPluginConfigId(1);
-    // priority deliberately NOT set (null) -> protected, default priority
+  void toApiMap_withPluginConfigId_shouldIncludePluginConfigId() {
+    // Generic model behaviour: a RouteConfigValue with a pluginConfigId emits plugin_config_id and
+    // omits the unset priority.
+    RouteConfigValue route = new RouteConfigValue();
+    route.setUri("/api/dataspace/ds-001/*");
+    route.setServiceId("svc-frost-server");
+    route.setPluginConfigId(1);
+    // priority deliberately NOT set (null)
 
-    Map<String, Object> map = protectedRoute.toApiMap();
+    Map<String, Object> map = route.toApiMap();
     assertEquals(1, map.get("plugin_config_id"));
     assertFalse(map.containsKey("priority"));
     assertEquals("svc-frost-server", map.get("service_id"));

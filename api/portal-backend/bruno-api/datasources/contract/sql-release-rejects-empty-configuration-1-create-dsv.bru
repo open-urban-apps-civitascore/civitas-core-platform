@@ -1,0 +1,53 @@
+meta {
+  name: Contract SQL — release rejects empty config (1/6 create DSV)
+  type: http
+  seq: 39
+}
+
+post {
+  url: {{baseUrl}}/datastructures/{{setupDataStructureId}}/versions
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "998.0.1",
+    "description": "DSV for sql-release-rejects-empty-configuration",
+    "modelName": "ContractSqlReleaseEmpty",
+    "model": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ContractSqlReleaseEmpty",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "styles": {}
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('contractSqlReleaseEmptyDsvId', res.body.id);
+  }
+}
+
+tests {
+  test("DSV created (201)", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  Sets up a fresh DataStructureVersion under the setup DataStructure so the
+  release-validation test in step 3 reaches the configuration-validation
+  branch of `DataSourceService.validateRelease`. Without a DSV, release
+  would short-circuit with "Data structure version must be set before
+  releasing" before the configuration check runs.
+}

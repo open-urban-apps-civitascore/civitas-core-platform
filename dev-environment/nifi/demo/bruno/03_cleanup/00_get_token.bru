@@ -1,0 +1,44 @@
+meta {
+  name: 00 Get NiFi Access Token
+  type: http
+  seq: 0
+}
+
+post {
+  url: {{keycloakTokenUrl}}
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  grant_type: client_credentials
+  client_id: {{nifiClientId}}
+  client_secret: {{nifiClientSecret}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    // Use setEnvVar (not setVar): Bruno's `auth:bearer { token: {{var}} }`
+    // block only resolves env-scope vars at request-send time.
+    bru.setEnvVar('nifiToken', res.body.access_token);
+  }
+}
+
+tests {
+  test("Status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  test("Token captured", function() {
+    expect(bru.getEnvVar('nifiToken')).to.be.a('string');
+  });
+}
+
+docs {
+  Obtains an access token from Keycloak via the OIDC client-credentials grant
+  (the 'nifi' service account) and stashes it in the `nifiToken` environment
+  variable. NiFi validates this token against Keycloak; all subsequent requests
+  use `Authorization: Bearer {{nifiToken}}`.
+
+  NiFi uses a self-signed cert in dev — run the CLI with `--insecure`, or
+  disable SSL verification in Bruno Desktop's settings.
+}

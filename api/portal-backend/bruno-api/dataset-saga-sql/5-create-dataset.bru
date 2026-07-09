@@ -1,0 +1,59 @@
+meta {
+  name: 5. Create DataSet
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "SQL Saga DataSet",
+    "description": "Dataset for end-to-end PostGIS + geoPoint saga workflow test",
+    "openDataAccess": false,
+    "namedApis": [
+      { "name": "Things", "slug": "things", "standard": "STA", "version": "1.1" }
+    ]
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sqlDataSetId', res.body.id);
+  }
+  const slug =
+    (res.body && res.body.namedApis && res.body.namedApis[0] && res.body.namedApis[0].slug) ||
+    'things';
+  bru.setVar('sqlSlug', slug);
+}
+
+tests {
+  test("DataSet created", function() {
+    const status = res.getStatus();
+    // 201=created. This collection assumes a clean DB per run (CI uses an ephemeral stack); a 409
+    // would mean a previous run leaked — fail loudly rather than carry a stale id downstream.
+    expect(status).to.equal(201);
+  });
+}
+
+docs {
+  **SQL saga step 5** — Prerequisites: datasource released (step 4a), target structure released (step 3c).
+
+  Creates the dataset ("SQL Saga DataSet") that will be staged, released (triggering the DATASET_CREATE saga), and later unreleased (triggering DATASET_DELETE). The POSTGIS DataSink (step 6) and the pipeline (step 7) are both nested under this dataset.
+
+  **Expected Response:** 201 Created, body contains `id`. A 409 means a previous run leaked (the test asserts a strict 201 and fails).
+
+  **Post-condition:** Save `sqlDataSetId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

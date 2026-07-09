@@ -1,0 +1,22 @@
+meta {
+  name: Get Style by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/styles/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{styleId}}
+}
+
+docs {
+  **Precondition:** `dataSetId` and `styleId` are set.
+
+  **Expected Response:** 200 OK, body contains the Style with matching `id`, including the `inUse` flag (true when any Layer references it as default or alternative).
+}

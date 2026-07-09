@@ -3,9 +3,11 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.DataStructureMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -13,18 +15,16 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for managing {@link DataStructure} entities through their lifecycle (DRAFT to AVAILABLE).
- * Handles version relationship resolution, publish/unpublish status transitions, and validates that
+ * Handles version relationship resolution, release/unrelease status transitions, and validates that
  * no referenced versions are in use before allowing structural changes.
  */
 @Service
@@ -37,6 +37,7 @@ public class DataStructureService
   private final DataStructureVersionRepository dataStructureVersionRepository;
   private final AssignmentFactory assignmentFactory;
   private final DataSourceRepository dataSourceRepository;
+  private final DataSinkRepository dataSinkRepository;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -58,15 +59,24 @@ public class DataStructureService
     return assignmentFactory;
   }
 
-  /**
-   * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
-   * DataStructure along with dataStructureVersions in a single JOIN query, preventing N+1 query
-   * problems that would occur with lazy loading.
-   */
   @Override
-  public Optional<DataStructure> findById(UUID id) {
-    Optional<DataStructure> entity = dataStructureRepository.findByIdWithRelations(id);
-    return postLoad(entity);
+  protected ReleasableStatus getEntityStatus(DataStructure entity) {
+    return entity.getDataStructureStatus();
+  }
+
+  @Override
+  protected void setEntityStatus(DataStructure entity, ReleasableStatus status) {
+    entity.setDataStructureStatus((DataStructureStatus) status);
+  }
+
+  @Override
+  protected ReleasableStatus getDraftStatus() {
+    return DataStructureStatus.DRAFT;
+  }
+
+  @Override
+  protected ReleasableStatus getAvailableStatus() {
+    return DataStructureStatus.AVAILABLE;
   }
 
   /**
@@ -131,8 +141,8 @@ public class DataStructureService
   }
 
   /**
-   * Override update to ensure it can only be called for DRAFT data structures. For published data
-   * structures, use updatePublishedMeta instead.
+   * Override update to ensure it can only be called for DRAFT data structures. For released data
+   * structures, use updateReleasedMeta instead.
    *
    * @param id the data structure ID
    * @param input the update input
@@ -144,97 +154,42 @@ public class DataStructureService
     DataStructure existingEntity = findByIdOrThrow(id);
     if (existingEntity.getDataStructureStatus() != DataStructureStatus.DRAFT) {
       throw new InvalidInputException(
-          "dataStructureStatus", id, "Cannot update non-DRAFT DataStructure.");
+          "dataStructureStatus",
+          id,
+          "Cannot update a released DataStructure. Use the released/meta endpoint instead.");
     }
     return super.update(id, input);
   }
 
-  /**
-   * Updates only the metadata (name, description) of a published data structure. Cannot modify
-   * status or createdFromDataSource.
-   *
-   * @param id the data structure ID
-   * @param input the update input
-   * @return the updated data structure
-   * @throws InvalidInputException if trying to update a DRAFT data structure
-   */
-  @Transactional
-  public DataStructure updatePublishedMeta(UUID id, DataStructureInputDTO input) {
-    DataStructure existingEntity = findByIdOrThrow(id);
-    if (existingEntity.getDataStructureStatus() == DataStructureStatus.DRAFT) {
-      throw new InvalidInputException(
-          "dataStructureStatus", id, "Cannot use updatePublishedMeta for DRAFT DataStructure.");
-    }
-
-    return super.update(id, input);
-  }
-
-  /**
-   * Publishes a data structure by validating it has at least one published version and setting
-   * status to AVAILABLE.
-   *
-   * @param id the data structure ID
-   * @return the published data structure
-   * @throws InvalidInputException if data structure has no published versions or is already
-   *     published
-   */
-  @Transactional
-  public DataStructure publish(UUID id) {
-    DataStructure dataStructure = findByIdOrThrow(id);
-
-    // Validate that data structure is currently in DRAFT status
-    if (dataStructure.getDataStructureStatus() != DataStructureStatus.DRAFT) {
-      throw new InvalidInputException(
-          "dataStructureStatus", id, "DataStructure is already published");
-    }
-
-    // Validate that data structure has at least one published version (any non-DRAFT version)
-    boolean hasPublishedVersion =
-        dataStructure.getDataStructureVersions().stream()
+  @Override
+  protected void validateRelease(DataStructure entity) {
+    boolean hasReleasedVersion =
+        entity.getDataStructureVersions().stream()
             .anyMatch(
                 version ->
                     version.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT);
 
-    if (!hasPublishedVersion) {
+    if (!hasReleasedVersion) {
       throw new InvalidInputException(
           "dataStructureVersions",
-          id,
-          "DataStructure must contain at least one published DataStructureVersion before"
-              + " publishing");
+          entity.getId(),
+          "DataStructure must contain at least one released DataStructureVersion before"
+              + " releasing");
     }
+  }
 
-    dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-    return dataStructureRepository.save(dataStructure);
+  @Override
+  protected void validateUnrelease(DataStructure entity) {
+    validateNoVersionInUse(entity);
   }
 
   /**
-   * Unpublishes a data structure by setting status back to DRAFT. Always allowed.
-   *
-   * @param id the data structure ID
-   * @return the unpublished data structure
-   */
-  @Transactional
-  public DataStructure unpublish(UUID id) {
-    DataStructure dataStructure = findByIdOrThrow(id);
-
-    if (dataStructure.getDataStructureStatus() == DataStructureStatus.DRAFT) {
-      throw new InvalidInputException(
-          "dataStructureStatus", id, "DataStructure is already in DRAFT status");
-    }
-
-    validateNoVersionInUse(dataStructure);
-
-    dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
-    return dataStructureRepository.save(dataStructure);
-  }
-
-  /**
-   * Validates that none of the data structure's versions are in use by a data source before
-   * allowing deletion.
+   * Validates that none of the data structure's versions are in use by a data source or a data sink
+   * before allowing deletion.
    *
    * @param id the data structure ID to delete
    * @return the data structure entity to be deleted
-   * @throws ResourceInUseException if any version is referenced by a data source
+   * @throws ResourceInUseException if any version is referenced by a data source or a data sink
    */
   @Override
   protected DataStructure preProcessDelete(UUID id) {
@@ -251,11 +206,12 @@ public class DataStructureService
     if (versionIds.isEmpty()) {
       return;
     }
-    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)) {
+    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
+        || dataSinkRepository.existsByDataStructureVersionIdIn(versionIds)) {
       throw new ResourceInUseException(
           "DataStructure",
           dataStructure.getId(),
-          "Cannot modify DataStructure because one or more of its versions is referenced by a DataSource.");
+          "Cannot modify DataStructure because one or more of its versions is referenced by a DataSource or DataSink.");
     }
   }
 }

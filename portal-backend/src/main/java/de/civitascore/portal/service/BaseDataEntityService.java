@@ -1,10 +1,14 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.base.BaseDataEntity;
 import de.civitascore.portal.model.input.BaseDataEntityInputDTO;
+import de.civitascore.portal.util.InvalidInputException;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Base service for entities that carry scoped {@link Assignment} collections. Extends {@link
@@ -41,4 +45,59 @@ public abstract class BaseDataEntityService<
     }
     return super.postConvertToEntity(entity, input);
   }
+
+  // --- Status accessors (abstract — each concrete service implements) ---
+
+  protected abstract ReleasableStatus getEntityStatus(E entity);
+
+  protected abstract void setEntityStatus(E entity, ReleasableStatus status);
+
+  protected abstract ReleasableStatus getDraftStatus();
+
+  protected abstract ReleasableStatus getAvailableStatus();
+
+  // --- Release lifecycle template methods ---
+
+  @Transactional
+  public E release(UUID id) {
+    E entity = findByIdOrThrow(id);
+    if (!getEntityStatus(entity).isDraft()) {
+      throw new InvalidInputException(
+          getEntityName(), id, "Only entities in DRAFT status can be released");
+    }
+    validateRelease(entity);
+    setEntityStatus(entity, getAvailableStatus());
+    return save(entity);
+  }
+
+  @Transactional
+  public E unrelease(UUID id) {
+    E entity = findByIdOrThrow(id);
+    if (!getEntityStatus(entity).isAvailable()) {
+      throw new InvalidInputException(
+          getEntityName(), id, "Only entities in AVAILABLE status can be unreleased");
+    }
+    validateUnrelease(entity);
+    setEntityStatus(entity, getDraftStatus());
+    return save(entity);
+  }
+
+  @Transactional
+  public E updateReleasedMeta(UUID id, I input) {
+    E entity = findByIdOrThrow(id);
+    if (getEntityStatus(entity).isDraft()) {
+      throw new InvalidInputException(
+          getEntityName(), id, "Cannot update released metadata on a DRAFT entity");
+    }
+    validateUpdateReleasedMeta(entity, input);
+    return super.update(id, input);
+  }
+
+  // --- Validation hooks (default no-op, subclasses override) ---
+
+  protected void validateRelease(E entity) {}
+
+  protected void validateUnrelease(E entity) {}
+
+  protected void validateUpdateReleasedMeta(E entity, I input) {}
 }

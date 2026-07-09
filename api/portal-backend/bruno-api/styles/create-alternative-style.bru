@@ -1,0 +1,45 @@
+meta {
+  name: Create Alternative Style
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/styles
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "name": "alternative_point_style",
+    "sldContent": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><StyledLayerDescriptor xmlns=\"http://www.opengis.net/sld\" xmlns:ogc=\"http://www.opengis.net/ogc\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.0.0\"><NamedLayer><Name>alternative_point_style</Name><UserStyle><FeatureTypeStyle><Rule><PointSymbolizer><Graphic><Mark><WellKnownName>square</WellKnownName><Fill><CssParameter name=\"fill\">#a8501e</CssParameter></Fill></Mark><Size>10</Size></Graphic></PointSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('styleId', res.body.id);
+    bru.setVar('alternativeStyleId', res.body.id);
+  }
+}
+
+docs {
+  **Precondition:** `dataSetId` is set. Run *after* `create-style.bru` so both `defaultStyleId` and `alternativeStyleId` are populated for the Layer create request.
+
+  **Expected Response:** 201 Created, body contains `id`.
+
+  **Post-condition:** Save `styleId` (current cursor) and `alternativeStyleId` (sticky reference for `layers/create-layer.bru#alternativeStyleIds`).
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Style record created in `portal_backend` DB, linked to the DataSet |
+  | Config Adapter | — |
+  | External System | — |
+}

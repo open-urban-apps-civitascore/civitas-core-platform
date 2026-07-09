@@ -1,0 +1,30 @@
+meta {
+  name: 07 Get Layer (check default style assignment)
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/layers/{{featuretype_point}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{geoserver_admin_user}}
+  password: {{geoserver_admin_password}}
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("Layer exists", function() {
+    expect(res.status).to.equal(200);
+  });
+  test("Default style is set to our custom style (not GeoServer fallback)", function() {
+    const styleName = res.body.layer.defaultStyle.name;
+    expect(styleName).to.include(bru.getEnvVar("style_point"));
+  });
+}

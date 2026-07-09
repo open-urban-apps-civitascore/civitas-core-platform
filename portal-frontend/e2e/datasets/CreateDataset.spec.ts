@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test'
 
 import { getMockDatasetData } from '../../playwright/helpers/dataset/datasetFactory'
-import { getSelectOptions } from '../utils/formUtils'
 
 const MOCK_DATASET_1 = getMockDatasetData()
 
@@ -43,14 +42,6 @@ test.describe('Create Dataset Flow', async () => {
   })
 
   test('creates new dataset with all the entered information', async ({ page }) => {
-    // fill in form data
-    let selectOptionText = 'Select Data Space...'
-    const selectedOptions = await getSelectOptions(page, 'dataspace')
-    if ((await selectedOptions.count()) > 0) {
-      selectOptionText = (await selectedOptions.nth(1).textContent()) ?? 'Select Data Space...'
-      await selectedOptions.nth(1).click()
-    }
-
     await page.getByTestId('nameTextField').fill(MOCK_DATASET_1.name)
     await page.getByTestId('descriptionTextField').fill(MOCK_DATASET_1.description)
 
@@ -66,18 +57,11 @@ test.describe('Create Dataset Flow', async () => {
       await expect(field).toBeDisabled()
     }
 
-    await expect(page.getByTestId('dataspaceSelectTrigger')).toHaveText(selectOptionText)
     await expect(page.getByTestId('nameTextField')).toHaveValue(MOCK_DATASET_1.name)
     await expect(page.getByTestId('descriptionTextField')).toHaveValue(MOCK_DATASET_1.description)
   })
 
   test('new created dataset appears in datasets list', async ({ page }) => {
-    // fill in form data
-    const selectedOptions = await getSelectOptions(page, 'dataspace')
-    if ((await selectedOptions.count()) > 0) {
-      await selectedOptions.nth(1).click()
-    }
-
     await page.getByTestId('nameTextField').fill(MOCK_DATASET_1.name)
     await page.getByTestId('descriptionTextField').fill(MOCK_DATASET_1.description)
 

@@ -4,15 +4,23 @@ import type { Connection } from '@xyflow/react'
 import { createContext, useContext } from 'react'
 
 import { createEmptyDiagram, getDiagramStats } from '../services/diagramService'
-import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
-import type { UMLElement, UMLRelationship } from '../types/uml'
+import type {
+  DiagramAction,
+  NodeCreationContext,
+  UMLDiagram,
+  UMLEdge,
+  UMLElementUpdate,
+  UMLNode,
+} from '../types/diagram'
+import type { UMLRelationship, UMLRelationshipType } from '../types/uml'
 
 interface ActiveDiagramContextValue {
   // Current active diagram
   diagram: UMLDiagram
   stats: ReturnType<typeof getDiagramStats>
   isDirty: boolean
-  activeRelationshipType: string
+  // null = no relationship tool selected (neutral). Connections cannot be drawn until a tool is picked.
+  activeRelationshipType: UMLRelationshipType | null
 
   // Selected elements
   selectedNode: UMLNode | undefined
@@ -23,7 +31,9 @@ interface ActiveDiagramContextValue {
 
   // Node operations
   addNode: (context: NodeCreationContext) => void
-  updateNode: (nodeId: string, updates: Partial<UMLElement>) => void
+  updateNode: (nodeId: string, updates: UMLElementUpdate) => void
+  /** Designates the node as the diagram's root (clearing any other flag); `null` clears it. */
+  setRootNode: (nodeId: string | null) => void
   deleteNodes: (nodeIds: string[]) => void
   selectNode: (nodeId: string, isMultiSelect?: boolean) => void
 
@@ -34,7 +44,7 @@ interface ActiveDiagramContextValue {
   selectEdge: (edgeId: string, isMultiSelect?: boolean) => void
 
   // Relationship type setting
-  setActiveRelationshipType: (type: string) => void
+  setActiveRelationshipType: (type: UMLRelationshipType | null) => void
 
   // Selection operations
   clearSelection: () => void
@@ -63,12 +73,13 @@ export const useActiveDiagram = (): ActiveDiagramContextValue => {
       diagram: emptyDiagram,
       stats: getDiagramStats(emptyDiagram),
       isDirty: false,
-      activeRelationshipType: 'association',
+      activeRelationshipType: null,
       selectedNode: undefined,
       selectedEdge: undefined,
       dispatch: () => {},
       addNode: () => {},
       updateNode: () => {},
+      setRootNode: () => {},
       deleteNodes: () => {},
       selectNode: () => {},
       addEdge: () => {},

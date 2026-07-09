@@ -1,0 +1,114 @@
+meta {
+  name: 11b. Verify APISIX Route Removed (delete saga)
+  type: http
+  seq: 34
+}
+
+get {
+  url: {{apisixAdminUrl}}/apisix/admin/routes
+  body: none
+  auth: none
+}
+
+headers {
+  X-API-KEY: {{apisixAdminKey}}
+}
+
+script:pre-request {
+  // The DATASET_DELETE saga (step 11) removes the dataset's per-named-API routes + upstreams
+  // asynchronously (#1368: one route per slug at /v1/datasets/{id}/{slug}). The dataset now has TWO
+  // named APIs — STA (sagaSlug → upstream {datasetId}) and OWS (sagaOwsSlug → map upstream
+  // {datasetId}-ows) — so BOTH routes and BOTH upstreams must be torn down. Poll the Admin API until
+  // both routes are gone (max ~30s). Listing always returns 200, avoiding the QuickJS axios
+  // "throws on 404" trap. Then record upstream presence for the assertions below.
+  const axios = require('axios');
+  const adminUrl = bru.getEnvVar('apisixAdminUrl');
+  const adminKey = bru.getEnvVar('apisixAdminKey');
+  const datasetId = bru.getVar('sagaDataSetId');
+  const staWanted = `/v1/datasets/${datasetId}/${bru.getVar('sagaSlug') || 'things'}`;
+  const owsWanted = `/v1/datasets/${datasetId}/${bru.getVar('sagaOwsSlug') || 'map'}`;
+  const hdr = { headers: { 'X-API-KEY': adminKey }, validateStatus: () => true };
+  const nodes = (d) => (d && (d.list || (d.node && d.node.nodes))) || [];
+  const hasUri = (items, w) =>
+    items.map(n => n.value || n).some(r => (r.uris || [r.uri]).some(u => u && u.indexOf(w) === 0));
+  // Read upstreams returning BOTH the HTTP status and the ids — a failed Admin API call
+  // (401/500/network) must NOT masquerade as "no upstreams = everything cleaned up".
+  const readUpstreams = async () => {
+    try {
+      const up = await axios.get(`${adminUrl}/apisix/admin/upstreams`, hdr);
+      const ids = nodes(up.data)
+        .map(n => (n.value && n.value.id) || n.id || (n.key && String(n.key).split('/').pop()))
+        .map(String);
+      return { status: up.status, ids: ids };
+    } catch (e) {
+      return { status: 0, ids: [] };
+    }
+  };
+
+  // DELETE_ROUTE removes the routes first, then the upstream(s) — poll until BOTH routes AND both
+  // upstreams ({datasetId}, {datasetId}-ows) are gone. "Gone" only counts when the Admin API call
+  // actually returned 200, so an error response cannot be mistaken for an empty (cleaned-up) list.
+  let ups = { status: 0, ids: [] };
+  for (let i = 0; i < 15; i++) {
+    const resp = await axios.get(`${adminUrl}/apisix/admin/routes`, hdr);
+    const items = nodes(resp.data);
+    ups = await readUpstreams();
+    const routesGone =
+      resp.status === 200 && !hasUri(items, staWanted) && !hasUri(items, owsWanted);
+    const upsGone =
+      ups.status === 200 &&
+      ups.ids.indexOf(String(datasetId)) === -1 &&
+      ups.ids.indexOf(String(datasetId) + '-ows') === -1;
+    if (routesGone && upsGone) break;
+    await new Promise(res => setTimeout(res, 2000));
+  }
+  bru.setVar('upstreamFetchStatus', ups.status);
+  bru.setVar('staUpstreamGone', ups.ids.indexOf(String(datasetId)) === -1);
+  bru.setVar('owsUpstreamGone', ups.ids.indexOf(String(datasetId) + '-ows') === -1);
+}
+
+tests {
+  const items = (res.body && (res.body.list || (res.body.node && res.body.node.nodes))) || [];
+  const datasetId = bru.getVar('sagaDataSetId');
+  const staWanted = `/v1/datasets/${datasetId}/${bru.getVar('sagaSlug') || 'things'}`;
+  const owsWanted = `/v1/datasets/${datasetId}/${bru.getVar('sagaOwsSlug') || 'map'}`;
+  const findUri = (w) =>
+    items.map(n => n.value || n).find(r => (r.uris || [r.uri]).some(u => u && u.indexOf(w) === 0));
+
+  // Guard against a false-positive cleanup: both Admin API calls MUST have returned 200, else an
+  // error response would look like an empty (cleaned-up) list and the absence checks below would
+  // pass without ever having reached APISIX.
+  test("Admin API route list returned 200", function() {
+    expect(res.getStatus(), 'GET /apisix/admin/routes').to.equal(200);
+  });
+
+  test("Admin API upstream list returned 200", function() {
+    expect(bru.getVar('upstreamFetchStatus'), 'GET /apisix/admin/upstreams').to.equal(200);
+  });
+
+  test("STA per-slug route no longer exists after the delete saga", function() {
+    expect(findUri(staWanted), `route for ${staWanted} should be gone`).to.be.undefined;
+  });
+
+  test("OWS per-slug route no longer exists after the delete saga", function() {
+    expect(findUri(owsWanted), `route for ${owsWanted} should be gone`).to.be.undefined;
+  });
+
+  test("STA dataset upstream removed", function() {
+    expect(bru.getVar('staUpstreamGone'), `upstream ${datasetId} should be gone`).to.equal(true);
+  });
+
+  test("OWS map upstream ({datasetId}-ows) removed", function() {
+    expect(bru.getVar('owsUpstreamGone'), `upstream ${datasetId}-ows should be gone`).to.equal(true);
+  });
+}
+
+docs {
+  **Saga step 11b of 18** — Verify the DATASET_DELETE saga de-provisioned the gateway routes (issue #1368, journey J5).
+
+  After unrelease (step 11) triggers the DELETE saga, the dataset's per-named-API routes (created in step 8, verified in 9b) must be removed. Lists the APISIX Admin API routes and asserts no route matches `/v1/datasets/{datasetId}/{slug}` — the teardown counterpart to 9b. A lingering route would leave a dangling, orphaned data-plane path after the dataset is gone.
+
+  **Precondition:** step 11 (unrelease) accepted; pre-request polled the Admin API route list until the slug route disappeared; `sagaDataSetId` and `sagaSlug` are set.
+
+  **Expected Response:** 200 OK from the route list; the dataset's slug route is absent.
+}

@@ -4,7 +4,6 @@ import type { NodeProps } from '@xyflow/react'
 
 import type { UMLNodeData } from '../../types/diagram'
 import type { UMLAbstractClass, UMLParameter, UMLType } from '../../types/uml'
-import { VISIBILITY_SYMBOLS } from '../../types/uml'
 import { BaseUMLNode, NodeLine, NodeSection } from './BaseUMLNode'
 
 // Helper to format UML type names
@@ -31,12 +30,14 @@ export const AbstractClassNode: React.FC<NodeProps> = ({ data, selected: isSelec
       isSelected={isSelected}
       stereotype={element.stereotype}
       name={element.name}
+      isRoot={element.isRoot}
     >
       {/* Attributes Section */}
       <NodeSection isEmpty={!element.attributes || element.attributes.length === 0}>
         {element.attributes?.map(attribute => (
           <NodeLine key={attribute.id}>
-            {VISIBILITY_SYMBOLS[attribute.visibility]} {attribute.name}: {formatTypeName(attribute.type)}
+            {attribute.name}: {formatTypeName(attribute.type)}
+            {attribute.isId && ' {id}'}
             {attribute.multiplicity && ` [${attribute.multiplicity}]`}
             {attribute.isStatic && ' {static}'}
             {attribute.isReadonly && ' {readonly}'}
@@ -49,7 +50,7 @@ export const AbstractClassNode: React.FC<NodeProps> = ({ data, selected: isSelec
       <NodeSection isEmpty={!element.operations || element.operations.length === 0}>
         {element.operations?.map(operation => (
           <NodeLine key={operation.id} isAbstract={operation.isAbstract}>
-            {VISIBILITY_SYMBOLS[operation.visibility]} {operation.name}({formatParameters(operation.parameters)})
+            {operation.name}({formatParameters(operation.parameters)})
             {operation.returnType && `: ${formatTypeName(operation.returnType)}`}
             {operation.isStatic && ' {static}'}
             {operation.isAbstract && ' {abstract}'}

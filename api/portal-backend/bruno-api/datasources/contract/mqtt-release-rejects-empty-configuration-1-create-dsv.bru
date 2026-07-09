@@ -1,0 +1,53 @@
+meta {
+  name: Contract MQTT — release rejects empty config (1/6 create DSV)
+  type: http
+  seq: 45
+}
+
+post {
+  url: {{baseUrl}}/datastructures/{{setupDataStructureId}}/versions
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "999.0.1",
+    "description": "DSV for mqtt-release-rejects-empty-configuration",
+    "modelName": "ContractMqttReleaseEmpty",
+    "model": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ContractMqttReleaseEmpty",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "styles": {}
+  }
+}
+
+script:post-response {
+  if (!res.body || !res.body.id) {
+    throw new Error("Expected create response to include non-empty 'id'");
+  }
+  bru.setVar('contractMqttReleaseEmptyDsvId', res.body.id);
+}
+
+tests {
+  test("DSV created (201)", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  Sets up a fresh DataStructureVersion under the setup DataStructure so the
+  release-validation test in step 3 reaches the configuration-validation
+  branch of `DataSourceService.validateRelease` instead of short-circuiting
+  on a missing DSV.
+}

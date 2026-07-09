@@ -1,5 +1,6 @@
 package de.civitascore.portal.controller.exception;
 
+import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
 import de.civitascore.portal.util.ForbiddenException;
@@ -16,6 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
+import org.owasp.encoder.Encode;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -56,7 +58,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(ResourceNotFoundException.class)
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ProblemDetail handleNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
-    log.warn("Resource not found: {}", ex.getMessage());
+    log.warn("Resource not found: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 L-5: message echoes back the UUID the client already submitted in the URL.
+    // Resources are UUID-addressed (not enumerable), so returning it is not a disclosure.
     return createProblemDetail(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), request);
   }
 
@@ -70,7 +74,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(InvalidInputException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ProblemDetail handleInvalidInput(InvalidInputException ex, HttpServletRequest request) {
-    log.warn("Invalid input: {}", ex.getMessage());
+    log.warn("Invalid input: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 L-5: message is constructed by our own validation code (not reflected from DB or
+    // framework internals). Clients rely on it to render actionable errors.
     return createProblemDetail(HttpStatus.BAD_REQUEST, "INVALID_INPUT", ex.getMessage(), request);
   }
 
@@ -85,7 +91,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ResponseStatus(HttpStatus.CONFLICT)
   public ProblemDetail handleUniqueConstraint(
       UniqueConstraintViolationException ex, HttpServletRequest request) {
-    log.warn("Unique constraint violation: {}", ex.getMessage());
+    log.warn("Unique constraint violation: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 L-5: message contains the column name (public API schema) and the value the client
+    // just submitted. Required for clients to render which field collided.
     return createProblemDetail(
         HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", ex.getMessage(), request);
   }
@@ -100,7 +108,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(ResourceInUseException.class)
   @ResponseStatus(HttpStatus.CONFLICT)
   public ProblemDetail handleResourceInUse(ResourceInUseException ex, HttpServletRequest request) {
-    log.warn("Resource in use: {}", ex.getMessage());
+    log.warn("Resource in use: {}", Encode.forJava(ex.getMessage()));
     return createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
   }
 
@@ -111,10 +119,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    * @param request the current HTTP request
    * @return a Problem Detail with HTTP 403 status
    */
+  @ExceptionHandler(DataSourceScopeViolationException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+  public ProblemDetail handleDataSourceScopeViolation(
+      DataSourceScopeViolationException ex, HttpServletRequest request) {
+    log.warn("DataSource scope violation: offending IDs {}", ex.getOffendingDataSourceIds());
+    ProblemDetail pd =
+        createProblemDetail(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "DATASOURCE_SCOPE_VIOLATION",
+            ex.getMessage(),
+            request);
+    pd.setProperty("offendingDataSourceIds", ex.getOffendingDataSourceIds());
+    return pd;
+  }
+
   @ExceptionHandler(ForbiddenException.class)
   @ResponseStatus(HttpStatus.FORBIDDEN)
   public ProblemDetail handleForbidden(ForbiddenException ex, HttpServletRequest request) {
-    log.warn("Forbidden: {}", ex.getMessage());
+    log.warn("Forbidden: {}", Encode.forJava(ex.getMessage()));
     return createProblemDetail(HttpStatus.FORBIDDEN, "FORBIDDEN", ex.getMessage(), request);
   }
 
@@ -135,7 +158,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       if (UNIQUE_VIOLATION_STATE.equals(sqlState)) {
         String dbMessage = ex.getMostSpecificCause().getMessage();
         UniqueConstraintViolationException mapped = extractUniqueViolationException(dbMessage);
-        log.warn("Unique constraint violation: {}", mapped.getMessage());
+        log.warn("Unique constraint violation: {}", Encode.forJava(mapped.getMessage()));
+        // TR-03187 L-5: same rationale as handleUniqueConstraint — column name + submitted value
+        // are needed by clients; extracted via regex from the DB error, not the raw DB message.
         return toProblemDetailResponse(
             HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", mapped.getMessage(), request);
       }
@@ -143,8 +168,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       if (FOREIGN_KEY_VIOLATION_STATE.equals(sqlState)) {
         log.warn(
             "Foreign key violation on constraint '{}': {}",
-            cve.getConstraintName(),
-            cve.getMessage());
+            Encode.forJava(cve.getConstraintName()),
+            Encode.forJava(cve.getMessage()));
         return toProblemDetailResponse(
             HttpStatus.CONFLICT,
             "FOREIGN_KEY_VIOLATION",
@@ -154,13 +179,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
       if (NOT_NULL_VIOLATION_STATE.equals(sqlState)) {
         log.warn(
-            "Not-null violation on constraint '{}': {}", cve.getConstraintName(), cve.getMessage());
+            "Not-null violation on constraint '{}': {}",
+            Encode.forJava(cve.getConstraintName()),
+            Encode.forJava(cve.getMessage()));
         return toProblemDetailResponse(
             HttpStatus.BAD_REQUEST, "NOT_NULL_VIOLATION", "A required field is missing", request);
       }
     }
 
-    log.error("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+    log.error(
+        "Data integrity violation: {}", Encode.forJava(ex.getMostSpecificCause().getMessage()));
     return toProblemDetailResponse(
         HttpStatus.INTERNAL_SERVER_ERROR,
         "DATA_INTEGRITY_ERROR",
@@ -180,11 +208,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public ResponseEntity<ProblemDetail> handlePersistenceException(
       PersistenceException ex, HttpServletRequest request) {
     if (ex.getCause() instanceof IllegalStateException ise) {
-      log.warn("Entity validation failed: {}", ise.getMessage());
+      log.warn("Entity validation failed: {}", Encode.forJava(ise.getMessage()));
       return toProblemDetailResponse(
-          HttpStatus.BAD_REQUEST, "ENTITY_VALIDATION_FAILED", ise.getMessage(), request);
+          HttpStatus.BAD_REQUEST, "ENTITY_VALIDATION_FAILED", "Entity validation failed", request);
     }
-    log.error("Persistence error: {}", ex.getMessage(), ex);
+    log.error("Persistence error: {}", Encode.forJava(ex.getMessage()), ex);
     return toProblemDetailResponse(
         HttpStatus.INTERNAL_SERVER_ERROR,
         "PERSISTENCE_ERROR",
@@ -203,7 +231,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ResponseStatus(HttpStatus.BAD_GATEWAY)
   public ProblemDetail handleExternalSystemRejection(
       ExternalSystemRejectionException ex, HttpServletRequest request) {
-    log.error("External system rejected request: {}", ex.getMessage());
+    log.error("External system rejected request: {}", Encode.forJava(ex.getMessage()));
     return createProblemDetail(
         HttpStatus.BAD_GATEWAY,
         "EXTERNAL_SYSTEM_ERROR",
@@ -222,7 +250,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ResponseStatus(HttpStatus.GATEWAY_TIMEOUT)
   public ProblemDetail handleExternalSystemTimeout(
       ExternalSystemTimeoutException ex, HttpServletRequest request) {
-    log.error("External system timed out: {}", ex.getMessage());
+    log.error("External system timed out: {}", Encode.forJava(ex.getMessage()));
     return createProblemDetail(
         HttpStatus.GATEWAY_TIMEOUT,
         "EXTERNAL_SYSTEM_TIMEOUT",
@@ -280,29 +308,30 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       HttpHeaders headers,
       HttpStatusCode status,
       WebRequest request) {
-    log.warn("Malformed request body: {}", ex.getMessage());
+    log.warn("Malformed request body: {}", Encode.forJava(ex.getMessage()));
     ProblemDetail problemDetail =
         createProblemDetail(
             HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", "Request body is missing or malformed");
     return ResponseEntity.badRequest().body(problemDetail);
   }
 
-  private ProblemDetail createProblemDetail(HttpStatus status, String errorCode, String detail) {
+  private ProblemDetail createProblemDetail(
+      HttpStatusCode status, String errorCode, String detail) {
     ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, detail);
     problemDetail.setType(URI.create(ERROR_URN_PREFIX + errorCode));
-    problemDetail.setTitle(status.getReasonPhrase());
+    problemDetail.setTitle(HttpStatus.valueOf(status.value()).getReasonPhrase());
     return problemDetail;
   }
 
   private ProblemDetail createProblemDetail(
-      HttpStatus status, String errorCode, String detail, HttpServletRequest request) {
+      HttpStatusCode status, String errorCode, String detail, HttpServletRequest request) {
     ProblemDetail problemDetail = createProblemDetail(status, errorCode, detail);
     problemDetail.setInstance(URI.create(request.getRequestURI()));
     return problemDetail;
   }
 
   private ResponseEntity<ProblemDetail> toProblemDetailResponse(
-      HttpStatus status, String errorCode, String detail, HttpServletRequest request) {
+      HttpStatusCode status, String errorCode, String detail, HttpServletRequest request) {
     return ResponseEntity.status(status)
         .body(createProblemDetail(status, errorCode, detail, request));
   }

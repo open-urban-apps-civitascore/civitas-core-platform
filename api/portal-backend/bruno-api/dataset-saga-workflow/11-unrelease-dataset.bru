@@ -1,7 +1,7 @@
 meta {
   name: 11. Unrelease DataSet (triggers delete saga)
   type: http
-  seq: 27
+  seq: 33
 }
 
 post {
@@ -14,11 +14,63 @@ params:path {
   id: {{sagaDataSetId}}
 }
 
+script:pre-request {
+  // The preceding toggle UPDATE sagas (9f/9h) must fully settle (pendingSagaType null) before we can
+  // unrelease, else the backend returns 409 (a saga is already in flight); 9i/9j/10 are read-only and
+  // don't wait. With two named APIs (STA + OWS) those sagas provision/re-apply two routes, so settling
+  // takes a bit longer — poll until settled (deterministic, not a fixed sleep). Same pattern (and
+  // QuickJS token boilerplate) as 9f/9h.
+  const axios = require('axios');
+  const base = bru.getEnvVar('baseUrl');
+  const kc = bru.getEnvVar('keycloakUrl');
+  const realm = bru.getEnvVar('realm');
+  const id = bru.getVar('sagaDataSetId');
+
+  const form =
+    'grant_type=password' +
+    '&client_id=' + encodeURIComponent(bru.getEnvVar('clientId')) +
+    '&client_secret=' + encodeURIComponent(bru.getEnvVar('clientSecret')) +
+    '&username=' + encodeURIComponent(bru.getEnvVar('username')) +
+    '&password=' + encodeURIComponent(bru.getEnvVar('password'));
+
+  // Fail loudly if readiness can't be proven — otherwise we'd POST the unrelease while the previous
+  // saga is still active and hit the very 409 race this guard exists to remove.
+  let bearer = '';
+  try {
+    const tok = await axios.post(`${kc}/realms/${realm}/protocol/openid-connect/token`, form, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    bearer = tok.data && tok.data.access_token;
+  } catch (e) {
+    throw new Error(`Settle-check token fetch failed: ${e.message}`);
+  }
+  if (!bearer) {
+    throw new Error('Settle-check token fetch returned no access_token');
+  }
+
+  let settled = false;
+  for (let i = 0; i < 30; i++) {
+    let pending = 'unknown'; // sentinel: a failed read stays "not settled", never breaks the loop
+    try {
+      const r = await axios.get(`${base}/datasets/${id}`, { headers: { Authorization: `Bearer ${bearer}` } });
+      pending = r.data.pendingSagaType;
+    } catch (e) { /* transient; retry */ }
+    if (pending === null || pending === undefined) { settled = true; break; }
+    await new Promise(res => setTimeout(res, 2000));
+  }
+  if (!settled) {
+    throw new Error('Dataset did not settle (pendingSagaType still set) — refusing to unrelease during an active saga');
+  }
+}
+
 tests {
-  test("Unreleased or already not released", function() {
-    const status = res.getStatus();
-    // 202=delete saga triggered, 400=not in AVAILABLE state
-    expect(status === 202 || status === 400).to.be.true;
+  test("Unrelease accepted — DELETE saga triggered (exactly 202)", function() {
+    // The precondition guarantees an AVAILABLE, settled dataset (pre-request polled pendingSagaType
+    // to null), so the unrelease MUST be accepted with 202. A 400 means the dataset was not in
+    // AVAILABLE state — i.e. the DELETE saga did NOT start — which would silently invalidate the
+    // downstream cleanup checks (11b). Accepting it here would mask that state error. (A genuine
+    // not-AVAILABLE rejection belongs in a dedicated sad-path test, not the happy path.)
+    expect(res.getStatus()).to.equal(202);
   });
 }
 
@@ -27,8 +79,8 @@ docs {
 
   Transitions the dataset from `AVAILABLE` back to `READY` and triggers the **DATASET_DELETE** saga asynchronously. The saga de-provisions infrastructure in reverse order:
 
-  1. **Redpanda Connect** — removes deployed pipelines
-  2. **APISIX Gateway** — removes route + upstream
+  1. **Pipeline engine** — removes deployed pipelines
+  2. **APISIX Gateway** — removes all named-API routes + the dataset's upstream
   3. **FROST Server** — removes the Project
 
   On completion, the dataset reverts to `READY` state and `pendingSagaType` becomes `null`.
@@ -46,8 +98,8 @@ docs {
   | System | Expected Change |
   |---|---|
   | Backend | DataSet status → `READY`; `pendingSagaType` set to `DELETE` until saga completes |
-  | Config Adapter (Orchestrator) | Receives saga trigger; de-provisions Redpanda → APISIX → FROST in reverse |
+  | Config Adapter (Orchestrator) | Receives saga trigger; de-provisions pipeline engine → APISIX → FROST in reverse |
   | FROST Server | Project removed |
   | APISIX Gateway | Route + upstream removed |
-  | Redpanda Connect | Pipelines undeployed |
+  | Pipeline engine | Pipelines undeployed |
 }

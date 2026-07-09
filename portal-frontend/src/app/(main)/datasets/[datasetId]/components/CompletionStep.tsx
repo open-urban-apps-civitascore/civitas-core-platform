@@ -1,4 +1,4 @@
-import { Circle, CircleCheckBig } from 'lucide-react'
+import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
@@ -57,23 +57,31 @@ export const CompletionStep = (props: CompletionStepProps) => {
   return (
     <div data-testid="completionStep">
       <div className={cn('flex justify-between items-center ', className)}>
-        <div className="w-full items-center flex gap-2">
-          {step.isCompleted ? <CircleCheckBig data-testid="circleCheck" /> : <Circle data-testid="circle" />}
-          <div className="flex-1">
-            <h3 className="text-2xl font-bold">{step.title}</h3>
+        <div className="w-full flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            {step.isCompleted ? (
+              <CircleCheckBig data-testid="circleCheck" className="w-6 h-6 text-green-600" />
+            ) : (
+              <CircleDashed data-testid="circle" className="w-6 h-6 text-muted-foreground" />
+            )}
+            <h3 className="text-xl font-semibold">{step.title}</h3>
           </div>
+          {step.description && <p className="text-sm text-muted-foreground ml-8">{step.description}</p>}
         </div>
         <div className="flex gap-10">
-          {step.buttons.map(button => (
-            <ButtonLink
-              key={button.text}
-              buttonText={button.text}
-              routeParam={button.routeParam}
-              queryParam={button.queryParam}
-            />
-          ))}
+          {step.actionElement
+            ? step.actionElement
+            : step.buttons.map(button => (
+                <ButtonLink
+                  key={button.text}
+                  buttonText={button.text}
+                  routeParam={button.routeParam}
+                  queryParam={button.queryParam}
+                />
+              ))}
         </div>
       </div>
+      {step.description && <div className="border-t mt-4" />}
       {step.content && (
         <div data-testid="completionStepContent" className="font-semibold mt-6 ml-8.5">
           {step.content}

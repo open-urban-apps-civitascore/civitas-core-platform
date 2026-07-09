@@ -21,6 +21,7 @@ const defaultFormValues: DatasourceBaseFormData = {
   name: '',
   description: '',
   dataSourceStatus: 'DRAFT',
+  dataStructureVersionId: null,
 }
 
 interface WrapperProps {
@@ -106,7 +107,7 @@ describe('BasicInfoTab', () => {
   describe('Read-Only Mode', () => {
     test('name field is disabled when isReadOnly is true', () => {
       setup({ isReadOnly: true })
-      const nameInput = screen.getByPlaceholderText('form.namePlaceholder')
+      const nameInput = screen.getByTestId('nameTextField')
       expect(nameInput).toBeDisabled()
     })
 

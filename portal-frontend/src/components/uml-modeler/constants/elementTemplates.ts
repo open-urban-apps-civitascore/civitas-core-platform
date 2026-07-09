@@ -32,7 +32,8 @@ export const resetElementCounters = (): void => {
   }
 }
 
-// Default UML Class template
+// Default UML Class template. Operations are unsupported for the first release and
+// hidden from the editor, so a new class starts without one.
 export const createClassTemplate = (name?: string): UMLClass => ({
   id: generateId(),
   name: name || getNextElementName('class'),
@@ -42,18 +43,9 @@ export const createClassTemplate = (name?: string): UMLClass => ({
       id: generateId(),
       name: 'attribut',
       type: 'String',
-      visibility: 'private',
     },
   ],
-  operations: [
-    {
-      id: generateId(),
-      name: 'operation',
-      visibility: 'public',
-      parameters: [],
-      returnType: 'void',
-    },
-  ],
+  operations: [],
 })
 
 // Default UML Interface template
@@ -66,7 +58,6 @@ export const createInterfaceTemplate = (name?: string): UMLInterface => ({
     {
       id: generateId(),
       name: 'operation',
-      visibility: 'public',
       parameters: [],
       returnType: 'void',
     },
@@ -83,14 +74,12 @@ export const createAbstractClassTemplate = (name?: string): UMLAbstractClass => 
       id: generateId(),
       name: 'attribut',
       type: 'String',
-      visibility: 'protected',
     },
   ],
   operations: [
     {
       id: generateId(),
       name: 'abstractOperation',
-      visibility: 'public',
       isAbstract: true,
       parameters: [],
       returnType: 'void',

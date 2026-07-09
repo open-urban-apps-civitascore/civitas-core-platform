@@ -15,7 +15,7 @@ import java.util.UUID;
 
 /**
  * Shared verification and polling helpers for saga integration tests. Provides methods to await
- * saga completion and verify infrastructure state (FROST, Redpanda, APISIX).
+ * saga completion and verify infrastructure state (FROST, Redpanda).
  */
 public class SagaInfraVerifier {
 
@@ -142,27 +142,6 @@ public class SagaInfraVerifier {
                   .as("Redpanda GET /streams/%s should return 404 after deletion", pipelineId)
                   .isEqualTo(404);
             });
-  }
-
-  public void verifyApisixReceivedRequests(
-      SagaOrchestratorTestHelper sagaHelper, UUID dataSetId, String expectedMethod) {
-    assertThat(sagaHelper.getApisixRequests())
-        .as("APISIX mock should have received %s requests", expectedMethod)
-        .isNotEmpty();
-
-    String routeSuffix = "/apisix/admin/routes/" + dataSetId;
-    assertThat(sagaHelper.getApisixRequests())
-        .as(
-            "APISIX mock should have received %s route request for dataset %s",
-            expectedMethod, dataSetId)
-        .anyMatch(r -> expectedMethod.equals(r.method()) && r.path().contains(routeSuffix));
-
-    if ("PUT".equals(expectedMethod)) {
-      String upstreamSuffix = "/apisix/admin/upstreams/" + dataSetId;
-      assertThat(sagaHelper.getApisixRequests())
-          .as("APISIX mock should have received PUT upstream request for dataset %s", dataSetId)
-          .anyMatch(r -> "PUT".equals(r.method()) && r.path().contains(upstreamSuffix));
-    }
   }
 
   private static HttpResponse<String> httpGet(String url) throws Exception {

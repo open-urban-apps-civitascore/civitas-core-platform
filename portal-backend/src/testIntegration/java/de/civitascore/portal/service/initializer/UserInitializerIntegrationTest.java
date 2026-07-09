@@ -13,11 +13,13 @@ import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @ActiveProfiles({"test-integration", "init", "init-test"})
 @DisplayName("UserInitializer Integration Tests")
@@ -28,9 +30,32 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
   private static final String TEST_GROUP_NAME = "Init Test Admins";
   private static final String TEST_SCOPED_GROUP_NAME = "Init Test Architects";
 
+  @Autowired private GroupInitializer groupInitializer;
   @Autowired private UserInitializer userInitializer;
+  @Autowired private PermissionInitializer permissionInitializer;
+  @Autowired private RoleInitializer roleInitializer;
   @Autowired private GroupRepository groupRepository;
   @Autowired private AssignmentRepository assignmentRepository;
+  @Autowired private TransactionTemplate txTemplate;
+
+  /**
+   * Re-seed permissions, roles, and groups before each test, then run the user initializer. The
+   * base class {@code tearDown()} calls {@code portalData.cleanAll()} which deletes all roles and
+   * groups. The {@link GroupInitializer} depends on seeded roles ("Tenant Admin", "Data
+   * Architect"), and {@link UserInitializer} depends on seeded groups, so they must be re-created
+   * in order. Permission and role re-seeding runs inside a transaction because {@link
+   * RoleInitializer} accesses lazy-loaded permission collections.
+   */
+  @BeforeEach
+  void reseedAndRunInitializers() {
+    txTemplate.executeWithoutResult(
+        status -> {
+          permissionInitializer.initialize();
+          roleInitializer.initialize();
+        });
+    groupInitializer.initialize();
+    userInitializer.initialize();
+  }
 
   @AfterEach
   void tearDownInitTest() {
@@ -41,7 +66,6 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
   @Test
   @DisplayName("Should create group with Tenant Admin assignment")
   void shouldCreateGroupWithRoleAssignment() {
-    userInitializer.initialize();
 
     Group group = groupRepository.findByName(TEST_GROUP_NAME).orElseThrow();
     assertThat(group.getName()).isEqualTo(TEST_GROUP_NAME);
@@ -56,7 +80,6 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
   @Test
   @DisplayName("Should create group with scoped Data Architect assignment")
   void shouldCreateGroupWithScopedAssignment() {
-    userInitializer.initialize();
 
     Group group = groupRepository.findByName(TEST_SCOPED_GROUP_NAME).orElseThrow();
     assertThat(group.getDescription()).isEqualTo("Init test data architect group");
@@ -71,7 +94,6 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
   @Transactional
   @DisplayName("Should sync user to Keycloak and persist externalId automatically")
   void shouldSyncUserAndSetExternalId() {
-    userInitializer.initialize();
 
     Optional<User> user = userRepository.findByEmail(TEST_EMAIL);
     assertThat(user).isPresent();
@@ -93,7 +115,6 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
   @DisplayName(
       "Should sync user without externalId to Keycloak with requiredActions and emailVerified=false")
   void shouldSyncUserWithoutExternalIdToKeycloak() {
-    userInitializer.initialize();
 
     Optional<User> user = userRepository.findByEmail(TEST_SYNC_EMAIL);
     assertThat(user).isPresent();
@@ -111,7 +132,7 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
   @Test
   @DisplayName("Should not duplicate groups, users or assignments when called twice")
   void shouldBeIdempotent() {
-    userInitializer.initialize();
+    groupInitializer.initialize();
     userInitializer.initialize();
 
     assertThat(groupRepository.count()).isEqualTo(2);
@@ -122,7 +143,6 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
   @Test
   @DisplayName("Should create all configured groups, users and assignments")
   void shouldCreateConfiguredGroupsAndUsers() {
-    userInitializer.initialize();
 
     assertThat(groupRepository.count()).isEqualTo(2);
     assertThat(userRepository.count()).isEqualTo(2);

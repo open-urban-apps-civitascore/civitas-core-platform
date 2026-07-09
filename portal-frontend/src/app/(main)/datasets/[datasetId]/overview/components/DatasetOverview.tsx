@@ -1,7 +1,6 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
@@ -10,16 +9,16 @@ import { toast } from 'sonner'
 
 import {
   usePatchDataset,
-  usePublishDataset,
   useReleaseDataset,
-  useUnpublishDataset,
+  useStageDataset,
   useUnreleaseDataset,
-  useUpdatePublishedDatasetMeta,
+  useUnstageDataset,
+  useUpdateReleasedDatasetMeta,
 } from '@/app/services/api/datasets/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FooterElement } from '@/components/form/FooterElement'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import PageEditControls from '@/components/page-edit-controls/PageEditControls'
@@ -31,6 +30,8 @@ import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import { SelectOption } from '@/types/common'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   CompletionStepData,
@@ -43,38 +44,63 @@ import {
   DatasetUpdateApiData,
   DatasetUpdateApiSchema,
 } from '@/types/datasets'
-import { isNameConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { mapDatasetToFormData } from '../../../utils/mappers'
 import { BaseInfoForm } from '../../components/BaseInfoForm'
 import { CompletionStep } from '../../components/CompletionStep'
+import { usePipelinePermissions } from '../../data-flow/pipeline-editor/_hooks/use-pipeline-permissions'
+import { ApiList } from './ApiList'
+import { PipelineList } from './PipelineList'
 
 interface DatasetOverviewProps {
   dataset: Dataset
   groupCount: number
   roleCount: number
   testId?: string
+  datapoolOptions: SelectOption[]
 }
 export const DatasetOverview = (props: DatasetOverviewProps) => {
-  const { dataset, groupCount, roleCount, testId } = props
+  const { dataset, groupCount, roleCount, testId, datapoolOptions } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
 
   const { hasPermission, hasScopedPermission } = usePermissions()
-  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASET_UPDATE, 'DATASET', dataset.id)
-  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASET_RELEASE, 'DATASET', dataset.id)
-  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
+
+  const canRead = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_READ,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
+
+  const canUpdate = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
+
+  const canRelease = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_RELEASE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
+
+  const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
+
+  const { canCreatePipeline } = usePipelinePermissions(dataset.id, dataset.datapool?.id)
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
 
-  const { pipelines, distributions } = dataset
-  const pipelineNames = pipelines?.map(pipeline => pipeline.name) || []
-  const distributionAccessURL = distributions?.map(distribution => distribution.accessUrl) || []
+  const { pipelines, namedApis } = dataset
+  const pipelineList = pipelines ?? []
+  const namedApiList = namedApis ?? []
 
   const router = useRouter()
-  const { handleFormValidationError, handleNameError } = useError()
+  const { handleFormValidationError } = useError()
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
   const [dataSetStatus, setDataSetStatus] = useState<DatasetStatusTypes>(
     dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT,
@@ -83,17 +109,17 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const updateDataset = usePatchDataset()
-  const updatePublishedMeta = useUpdatePublishedDatasetMeta()
-  const publishDataset = usePublishDataset()
-  const unpublishDataset = useUnpublishDataset()
+  const updateReleasedMeta = useUpdateReleasedDatasetMeta()
+  const stageDataset = useStageDataset()
+  const unstageDataset = useUnstageDataset()
   const releaseDataset = useReleaseDataset()
   const unreleaseDataset = useUnreleaseDataset()
 
   const isLoading =
     updateDataset.isPending ||
-    updatePublishedMeta.isPending ||
-    publishDataset.isPending ||
-    unpublishDataset.isPending ||
+    updateReleasedMeta.isPending ||
+    stageDataset.isPending ||
+    unstageDataset.isPending ||
     releaseDataset.isPending ||
     unreleaseDataset.isPending
 
@@ -105,7 +131,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   // Reset form and local status when dataset prop changes (e.g. after router.refresh())
   useEffect(() => {
-    form.reset(mapDatasetToFormData(dataset))
+    const formData = mapDatasetToFormData(dataset)
+    form.reset(formData)
     setDataSetStatus(dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset])
@@ -118,17 +145,16 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const formValues = useWatch({ control: form.control })
 
-  const canSetAvailable = useMemo(() => {
-    const hasDistribution = !!dataset.pipelines?.length || !!dataset.distributions?.length
-    const hasAssignments = groupCount > 0 && roleCount > 0
-    return DatasetFormAvailableSchema.safeParse(formValues).success && hasDistribution && hasAssignments
-  }, [formValues, dataset.pipelines, dataset.distributions, groupCount, roleCount])
+  const canStage = useMemo(() => {
+    const hasDistribution = !!dataset.pipelines?.length || !!dataset.namedApis?.length
+    return DatasetFormAvailableSchema.safeParse(formValues).success && hasDistribution
+  }, [formValues, dataset.pipelines, dataset.namedApis])
 
   // Auto-revert status to draft when required fields become invalid
   const revalidateDraftMode = () => {
     const isReadyOrAvailable =
       dataSetStatus === DATASET_STATUS_TYPES.READY || dataSetStatus === DATASET_STATUS_TYPES.AVAILABLE
-    if (isReadyOrAvailable && !canSetAvailable) {
+    if (isReadyOrAvailable && !canStage) {
       setDataSetStatus(DATASET_STATUS_TYPES.DRAFT)
       toast.info(tCommon('info.switchMode'))
     }
@@ -146,7 +172,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   useEffect(() => {
     revalidateDraftMode()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSetAvailable, dataSetStatus])
+  }, [canStage, dataSetStatus])
 
   const getTransitionSteps = (
     oldStatus: DatasetStatusTypes,
@@ -155,12 +181,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     if (oldStatus === newStatus) return []
 
     const transitions: Record<string, ((id: string) => Promise<unknown>)[]> = {
-      'DRAFT->READY': [publishDataset.mutateAsync],
-      'READY->DRAFT': [unpublishDataset.mutateAsync],
+      'DRAFT->READY': [stageDataset.mutateAsync],
+      'READY->DRAFT': [unstageDataset.mutateAsync],
       'READY->AVAILABLE': [releaseDataset.mutateAsync],
       'AVAILABLE->READY': [unreleaseDataset.mutateAsync],
-      'DRAFT->AVAILABLE': [publishDataset.mutateAsync, releaseDataset.mutateAsync],
-      'AVAILABLE->DRAFT': [unreleaseDataset.mutateAsync, unpublishDataset.mutateAsync],
+      'DRAFT->AVAILABLE': [stageDataset.mutateAsync, releaseDataset.mutateAsync],
+      'AVAILABLE->DRAFT': [unreleaseDataset.mutateAsync, unstageDataset.mutateAsync],
     }
 
     return transitions[`${oldStatus}->${newStatus}`] ?? []
@@ -194,7 +220,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         if (serverStatus === DATASET_STATUS_TYPES.DRAFT) {
           await updateDataset.mutateAsync(updateData)
         } else {
-          await updatePublishedMeta.mutateAsync({ ...parsed.data, id: dataset.id })
+          await updateReleasedMeta.mutateAsync({ ...parsed.data, id: dataset.id })
         }
       }
 
@@ -207,27 +233,23 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       // Success message
       if (steps.length > 0) {
         const messageMap: Record<string, string> = {
-          'DRAFT->READY': t('messages.publishSuccess'),
-          'READY->DRAFT': t('messages.unpublishSuccess'),
+          'DRAFT->READY': t('messages.stageSuccess'),
+          'READY->DRAFT': t('messages.unstageSuccess'),
           'READY->AVAILABLE': t('messages.releaseSuccess'),
           'AVAILABLE->READY': t('messages.unreleaseSuccess'),
           'DRAFT->AVAILABLE': t('messages.releaseSuccess'),
-          'AVAILABLE->DRAFT': t('messages.unpublishSuccess'),
+          'AVAILABLE->DRAFT': t('messages.unstageSuccess'),
         }
         toast.success(messageMap[`${serverStatus}->${dataSetStatus}`] ?? t('messages.updateSuccess'))
       } else {
         toast.success(t('messages.updateSuccess'))
       }
 
+      form.reset(formData)
       router.refresh()
-      setIsReadOnly(true)
       return true
-    } catch (error) {
-      if (isNameConflictError(error as AxiosError)) {
-        handleNameError(form, form.getValues('name'))
-      } else {
-        toast.error(t('messages.transitionError'))
-      }
+    } catch {
+      toast.error(t('messages.transitionError'))
       return false
     }
   }
@@ -274,15 +296,17 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const handleSaveAndExit = () => {
     // Handle status-only change (form not dirty)
     if (hasOnlyStatusChanges) {
-      void handleSaveAndTransition(form.getValues() as DatasetFormDraft).then(() => {
+      void handleSaveAndTransition(form.getValues() as DatasetFormDraft).then(isSaved => {
         setIsExitModalOpen(false)
+        if (isSaved) setIsReadOnly(true)
       })
       return
     }
 
     void form.handleSubmit(data => {
-      void handleSaveAndTransition(data as DatasetFormDraft).then(() => {
+      void handleSaveAndTransition(data as DatasetFormDraft).then(isSaved => {
         setIsExitModalOpen(false)
+        if (isSaved) setIsReadOnly(true)
       })
     })()
   }
@@ -305,28 +329,22 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const completionSteps: CompletionStepData[] = [
     {
       title: t('overview.completion.dataFlow.title'),
-      isCompleted: pipelineNames?.length > 0 || distributionAccessURL?.length > 0,
-      buttons:
-        canUpdate && canReadDatasources
-          ? [
-              {
-                text: isReadOnly
-                  ? t('overview.completion.dataFlow.button.readOnly')
-                  : t('overview.completion.dataFlow.button.editable'),
-                routeParam: 'data-flow',
-              },
-            ]
-          : [],
-      content:
-        pipelineNames?.length > 0 || distributionAccessURL?.length > 0 ? (
-          <>
-            {pipelineNames?.length > 0 && getList(t('overview.completion.dataFlow.pipelines'), pipelineNames)}
-            {distributionAccessURL?.length > 0 &&
-              getList(t('overview.completion.dataFlow.distributionAccessURLs'), distributionAccessURL)}
-          </>
-        ) : (
-          <div>{t('overview.completion.dataFlow.noDataFlow')}</div>
-        ),
+      description: t('overview.completion.dataFlow.description'),
+      isCompleted: pipelineList.length > 0 || namedApiList.length > 0,
+      buttons: [],
+      content: (
+        <>
+          <PipelineList datasetId={dataset.id} pipelines={pipelineList} canCreatePipeline={canCreatePipeline} />
+          <div className="border-t" />
+          <ApiList
+            datasetId={dataset.id}
+            apis={namedApiList}
+            canEdit={canRead && canUpdate && canReadDatastructures}
+            canView={canRead && canReadDatastructures}
+            isOpenDataAccess={dataset.openDataAccess}
+          />
+        </>
+      ),
     },
     {
       title: t('overview.completion.accessManagement.title'),
@@ -380,7 +398,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       status={dataSetStatus}
       onStatusChange={handleStatusChange}
       statusOptions={Object.values(DATASET_STATUS_TYPES)}
-      canSetAvailable={canSetAvailable}
+      canStage={canStage}
       canRelease={canRelease}
       confirmButtonType="submit"
       formId="dataset-form"
@@ -414,7 +432,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
             className="h-full"
           >
             <ContentCard className={cn('h-auto')} footerElement={<FooterElement />}>
-              <BaseInfoForm form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
+              <BaseInfoForm
+                form={form}
+                isReadOnly={isReadOnly}
+                isLoading={isLoading}
+                datapoolOptions={datapoolOptions}
+              />
             </ContentCard>
 
             <div className="mt-6">

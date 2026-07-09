@@ -26,7 +26,7 @@ export const FrostPanel: React.FC<FrostPanelProps> = ({ data }) => {
         title={t('frostPanel.details')}
         items={[
           { label: t('frostPanel.serverName'), value: data.serverName },
-          { label: t('frostPanel.serverUrl'), value: data.serverUrl },
+          { label: t('frostPanel.serverUrl'), value: t('frostPanel.internalServer') },
           { label: t('frostPanel.version'), value: data.version },
         ]}
       />

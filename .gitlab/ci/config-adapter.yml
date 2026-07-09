@@ -2,6 +2,8 @@
 # All config-adapter jobs should extend this
 .only-config-adapter-changes:
   rules:
+    # Always run on the nightly scheduled pipeline so the full build/scan runs
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
     # Always run on main and develop branch
@@ -14,12 +16,13 @@
         - .gitlab-ci.yml
         - .gitlab/ci/config-adapter.yml
 
+
 # Setup version for config-adapter from pom.xml with branch-based suffixes
 # - main/tags: release version (e.g., 1.0.2)
 # - develop: snapshot version (e.g., 1.0.2-SNAPSHOT)
 # - MR: merge request version (e.g., 1.0.2-MR-123)
 setup-version-config-adapter:
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: .pre
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -42,7 +45,7 @@ setup-version-config-adapter:
       elif [ "$CI_COMMIT_BRANCH" = "develop" ]; then
         CONFIG_ADAPTER_VERSION="${BASE_VERSION}-SNAPSHOT"
       elif [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
-        CONFIG_ADAPTER_VERSION="${BASE_VERSION}-MR-${CI_MERGE_REQUEST_IID}"
+        CONFIG_ADAPTER_VERSION="${BASE_VERSION}-MR-${CI_MERGE_REQUEST_IID}-SNAPSHOT"
       else
         CONFIG_ADAPTER_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
       fi
@@ -56,13 +59,16 @@ setup-version-config-adapter:
 # This must always run (needs: []) to ensure dependency scanning has the graph
 # even when the build job is skipped due to no changes
 generate-graph-config-adapter:
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs:
     - job: setup-version-config-adapter
   rules:
+    # Always run on the nightly scheduled pipeline
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
+
     # Always run on main and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "develop"
@@ -89,7 +95,7 @@ generate-graph-config-adapter:
 
 lint-config-adapter:
   extends: .only-config-adapter-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs:
     - job: setup-version-config-adapter
@@ -108,7 +114,7 @@ lint-config-adapter:
 
 dependency-prune-config-adapter:
   extends: .only-config-adapter-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs:
     - job: setup-version-config-adapter
@@ -130,7 +136,7 @@ dependency-prune-config-adapter:
 
 test-config-adapter:
   extends: .only-config-adapter-changes
-  image: maven:3.9-eclipse-temurin-21
+  image: maven:3.9-eclipse-temurin-25
   stage: build-package
   needs:
     - job: setup-version-config-adapter
@@ -139,7 +145,6 @@ test-config-adapter:
   services:
     - name: docker:27-dind
       alias: docker
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_HOST: tcp://docker:2375
@@ -156,6 +161,10 @@ test-config-adapter:
   script:
     - cd config-adapter
     - mvn $MAVEN_CLI_OPTS test -Drevision=$CONFIG_ADAPTER_VERSION -T 2
+    # Failsafe integration tests (*IT.java) — same explicit-goals pattern as backend.yml so
+    # package/spotless/spotbugs don't re-run here. Currently the Flowable saga IT
+    # (Testcontainers: PostGIS + FROST) via the dind service above.
+    - mvn $MAVEN_CLI_OPTS test-compile failsafe:integration-test failsafe:verify -Drevision=$CONFIG_ADAPTER_VERSION
     # Aggregate coverage from all modules
     - |
       awk -F, \
@@ -170,16 +179,19 @@ test-config-adapter:
     expire_in: 1 month
     paths:
       - config-adapter/*/target/surefire-reports/
+      - config-adapter/*/target/failsafe-reports/
       - config-adapter/*/target/site/jacoco/
     reports:
-      junit: config-adapter/*/target/surefire-reports/TEST-*.xml
+      junit:
+        - config-adapter/*/target/surefire-reports/TEST-*.xml
+        - config-adapter/*/target/failsafe-reports/TEST-*.xml
       coverage_report:
         coverage_format: jacoco
         path: config-adapter/*/target/site/jacoco/jacoco.xml
 
 build-config-adapter:
   extends: .only-config-adapter-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: build-package
   needs:
     - job: setup-version-config-adapter
@@ -210,10 +222,17 @@ build-config-adapter:
 # Runs in QA stage so backend tests can use the published artifacts
 publish-config-adapter:
   extends: .only-config-adapter-changes # overridden by rules: below, kept for documentation
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: deploy-package
   rules:
     # Same conditions as .only-config-adapter-changes, but with per-rule needs:
+    # Nightly schedule: publish only after tests pass (same as main/develop)
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
+      needs:
+        - job: setup-version-config-adapter
+        - job: build-config-adapter
+          optional: true
+        - job: test-config-adapter
     # Tags/main/develop: publish only after tests pass
     - if: $CI_COMMIT_TAG
       needs:
@@ -221,6 +240,7 @@ publish-config-adapter:
         - job: build-config-adapter
           optional: true
         - job: test-config-adapter
+
     - if: $CI_COMMIT_BRANCH == "main"
       needs:
         - job: setup-version-config-adapter
@@ -274,7 +294,6 @@ build-config-adapter-image:
       optional: true
   services:
     - name: docker:27-dind
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
@@ -331,7 +350,10 @@ deploy-config-adapter:
   stage: deploy
   needs:
     - job: setup-version-config-adapter
+    - job: setup-version
+      artifacts: true
     - job: container-scan-config-adapter
+
   services:
     - docker:27-dind
   variables:
@@ -348,6 +370,12 @@ deploy-config-adapter:
       if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
         docker buildx imagetools create $CI_REGISTRY_IMAGE/config-adapter:$CONFIG_ADAPTER_VERSION --tag $CI_REGISTRY_IMAGE/config-adapter:$CI_COMMIT_BRANCH
       fi
+    # Nightly build: additionally tag with <branch>-nightly-<YYYYMMDD>
+    - |
+      if [ "$IS_NIGHTLY" = "true" ] && [ -n "$NIGHTLY_IMAGE_TAG" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/config-adapter:$CONFIG_ADAPTER_VERSION --tag $CI_REGISTRY_IMAGE/config-adapter:$NIGHTLY_IMAGE_TAG
+      fi
+
 
 sbom-config-adapter-image:
   extends: .only-config-adapter-changes

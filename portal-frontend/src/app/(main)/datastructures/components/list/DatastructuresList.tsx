@@ -17,6 +17,7 @@ import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatastructuresListData } from '@/types/datastructures'
 
@@ -37,7 +38,7 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
   const [isDeletionWarningModalOpen, setIsDeletionWarningModalOpen] = useState(false)
   const deleteDatastructure = useDeleteDatastructure()
   const isLoading = deleteDatastructure.isPending
-  const { hasPermission } = usePermissions()
+  const { hasPermissionInScope } = usePermissions()
   const {
     pageIndex,
     pageSize,
@@ -85,7 +86,7 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
     setIsDeletionWarningModalOpen(false)
   }
 
-  const CustomElement = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_CREATE) ? (
+  const CustomElement = hasPermissionInScope(PERMISSION_NAMES.DATASTRUCTURE_CREATE, ASSIGNMENT_SCOPE_TYPES.TENANT) ? (
     <Button data-testid="addDatastructureButton" onClick={() => router.push('datastructures/create')}>
       <Plus />
       {t('newDatasource')}

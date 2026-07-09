@@ -18,7 +18,9 @@ import jakarta.persistence.UniqueConstraint;
 import java.util.Objects;
 import java.util.stream.Stream;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 
 /**
  * Links a {@link Group} to a {@link Role} with an optional {@link ScopeType scope}, forming the
@@ -38,8 +40,8 @@ import lombok.Setter;
               "data_structure_id",
               "data_source_id",
               "dataset_id",
-              "data_space_id",
-              "catalog_id"
+              "catalog_id",
+              "datapool_id"
             }),
     indexes = {
       @Index(name = "idx_assignment_group", columnList = "group_id"),
@@ -47,16 +49,17 @@ import lombok.Setter;
       @Index(name = "idx_assignment_datastructure", columnList = "data_structure_id"),
       @Index(name = "idx_assignment_datasource", columnList = "data_source_id"),
       @Index(name = "idx_assignment_dataset", columnList = "dataset_id"),
-      @Index(name = "idx_assignment_dataspace", columnList = "data_space_id"),
       @Index(name = "idx_assignment_catalog", columnList = "catalog_id"),
+      @Index(name = "idx_assignment_datapool", columnList = "datapool_id"),
       @Index(
           name = "idx_assignment_scope",
           columnList =
-              "scope_type, data_structure_id, data_source_id, dataset_id, data_space_id,"
-                  + " catalog_id")
+              "scope_type, data_structure_id, data_source_id, dataset_id, catalog_id, datapool_id")
     })
 @Getter
 @Setter
+@SuperBuilder
+@NoArgsConstructor
 public class Assignment extends BaseEntity {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -84,22 +87,22 @@ public class Assignment extends BaseEntity {
   private DataSet dataset;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "data_space_id")
-  private DataSpace dataSpace;
-
-  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "catalog_id")
   private Catalog catalog;
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "datapool_id")
+  private DataPool dataPool;
+
   /**
    * Returns the scoped entity (e.g. {@link DataStructure}, {@link DataSource}, {@link DataSet},
-   * {@link DataSpace}, or {@link Catalog}) associated with this assignment, or {@code null} for
+   * {@link Catalog}, or {@link DataPool}) associated with this assignment, or {@code null} for
    * unscoped (system/tenant) assignments.
    *
    * @return the scope entity, or {@code null}
    */
   public NamedEntity getScope() {
-    return Stream.of(dataStructure, dataSource, dataset, dataSpace, catalog)
+    return Stream.of(dataStructure, dataSource, dataset, catalog, dataPool)
         .filter(Objects::nonNull)
         .findFirst()
         .orElse(null);
@@ -123,8 +126,8 @@ public class Assignment extends BaseEntity {
       if (dataStructure != null
           || dataSource != null
           || dataset != null
-          || dataSpace != null
-          || catalog != null) {
+          || catalog != null
+          || dataPool != null) {
         throw new IllegalStateException("No scope entity should be set for SYSTEM or TENANT scope");
       }
     } else {
@@ -138,11 +141,11 @@ public class Assignment extends BaseEntity {
       if (dataset != null && scopeType != ScopeType.DATASET) {
         throw new IllegalStateException("DataSet requires DATASET scope");
       }
-      if (dataSpace != null && scopeType != ScopeType.DATASPACE) {
-        throw new IllegalStateException("DataSpace requires DATASPACE scope");
-      }
       if (catalog != null && scopeType != ScopeType.CATALOG) {
         throw new IllegalStateException("Catalog requires DATACATALOGUE scope");
+      }
+      if (dataPool != null && scopeType != ScopeType.DATAPOOL) {
+        throw new IllegalStateException("DataPool requires DATAPOOL scope");
       }
     }
   }
@@ -157,7 +160,8 @@ public class Assignment extends BaseEntity {
   }
 
   // Convenience setters used by BaseDataEntity.linkAssignment implementations.
-  // Each overload sets both the FK reference and the scopeType atomically.
+  // Each overload sets the FK reference and the scopeType; sibling FKs are not cleared — caller
+  // responsibility.
 
   /**
    * Sets the scope to the given {@link DataStructure} and updates the {@link #scopeType}
@@ -191,16 +195,6 @@ public class Assignment extends BaseEntity {
   }
 
   /**
-   * Sets the scope to the given {@link DataSpace} and updates the {@link #scopeType} accordingly.
-   *
-   * @param scope the dataspace to scope this assignment to
-   */
-  public void setScope(DataSpace scope) {
-    this.dataSpace = scope;
-    this.scopeType = ScopeType.DATASPACE;
-  }
-
-  /**
    * Sets the scope to the given {@link Catalog} and updates the {@link #scopeType} accordingly.
    *
    * @param scope the catalog to scope this assignment to
@@ -208,5 +202,15 @@ public class Assignment extends BaseEntity {
   public void setScope(Catalog scope) {
     this.catalog = scope;
     this.scopeType = ScopeType.CATALOG;
+  }
+
+  /**
+   * Sets the scope to the given {@link DataPool} and updates the {@link #scopeType} accordingly.
+   *
+   * @param scope the data pool to scope this assignment to
+   */
+  public void setScope(DataPool scope) {
+    this.dataPool = scope;
+    this.scopeType = ScopeType.DATAPOOL;
   }
 }

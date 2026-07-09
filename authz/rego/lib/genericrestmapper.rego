@@ -145,7 +145,7 @@ match_pattern(path, endpoints) := pattern if {
 }
 
 # 5. Pattern match - 5-segment with literal tail: /version/resource/id/literal/literal
-# e.g., /v1/datasets/{id}/published/meta (only parts[2] is {id})
+# e.g., /v1/datasets/{id}/released/meta (only parts[2] is {id})
 # Guard: only fires if the both-{id} variant does NOT exist in endpoints,
 # preventing conflict with rule 4.
 #
@@ -172,7 +172,7 @@ match_pattern(path, endpoints) := pattern if {
 }
 
 # 6. Pattern match - 6-segment sub-resource: /version/resource/id/sub/id/action
-# e.g., /v1/datastructures/{id}/versions/{id}/publish
+# e.g., /v1/datastructures/{id}/versions/{id}/release
 match_pattern(path, endpoints) := pattern if {
 	is_valid_path(path)
 	not endpoints[path]
@@ -189,7 +189,7 @@ match_pattern(path, endpoints) := pattern if {
 }
 
 # 7. Pattern match - 7-segment with literal tail: /version/resource/id/sub/id/literal/literal
-# e.g., /v1/datastructures/{id}/versions/{id}/published/meta
+# e.g., /v1/datastructures/{id}/versions/{id}/released/meta
 match_pattern(path, endpoints) := pattern if {
 	is_valid_path(path)
 	not endpoints[path]

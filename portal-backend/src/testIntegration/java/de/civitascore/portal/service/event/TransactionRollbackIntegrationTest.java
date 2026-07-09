@@ -1,9 +1,9 @@
 package de.civitascore.portal.service.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.model.input.UserInputDTO;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -23,10 +23,9 @@ class TransactionRollbackIntegrationTest extends BaseEventPublishingIntegrationT
 
     long countBefore = userRepository.count();
 
-    Assertions.assertThrows(
-        Exception.class,
-        () -> userService.create(duplicateInput),
-        "Should prevent duplicate email");
+    assertThatThrownBy(() -> userService.create(duplicateInput))
+        .as("Should prevent duplicate email")
+        .isInstanceOf(Exception.class);
 
     assertThat(userRepository.count()).isEqualTo(countBefore);
   }

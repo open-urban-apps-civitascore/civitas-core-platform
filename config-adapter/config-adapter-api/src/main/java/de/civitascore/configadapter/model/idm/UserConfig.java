@@ -102,10 +102,18 @@ public final class UserConfig implements IdmConfigValue {
     this.realmRoles = realmRoles;
   }
 
+  /**
+   * Returns the desired set of group memberships as Keycloak group externalIds (UUIDs). Membership
+   * sync uses externalId rather than name to remain stable across portal-side group renames.
+   */
   public List<String> getGroups() {
     return groups;
   }
 
+  /**
+   * Sets the desired group memberships. Values must be Keycloak group externalIds, not display
+   * names. Groups without an externalId (not yet synced) must be excluded by the producer.
+   */
   public void setGroups(List<String> groups) {
     this.groups = groups;
   }

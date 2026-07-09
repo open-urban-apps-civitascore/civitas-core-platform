@@ -1,0 +1,44 @@
+{
+  "name": "RouteExists",
+  "comments": "Routes an entity FlowFile by whether the find lookup resolved an @iot.id: a matching dynamic relationship (e.g. 'exists') vs. 'unmatched' (new). The dynamic relationship/expression is set per instance by the flow builder.",
+  "position": {
+    "x": 0.0,
+    "y": 200.0
+  },
+  "type": "org.apache.nifi.processors.standard.RouteOnAttribute",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-standard-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "Routing Strategy": "Route to Property name"
+  },
+  "propertyDescriptors": {
+    "Routing Strategy": {
+      "name": "Routing Strategy",
+      "displayName": "Routing Strategy",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "style": {},
+  "schedulingPeriod": "0 sec",
+  "schedulingStrategy": "TIMER_DRIVEN",
+  "executionNode": "ALL",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "autoTerminatedRelationships": [
+    "unmatched"
+  ],
+  "scheduledState": "ENABLED",
+  "retryCount": 10,
+  "retriedRelationships": [],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins",
+  "componentType": "PROCESSOR"
+}

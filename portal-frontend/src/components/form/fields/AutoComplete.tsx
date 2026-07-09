@@ -57,6 +57,7 @@ export const AutoComplete = <T extends FieldValues>(props: AutoCompleteProps<T>)
     disabled = false,
   } = props
   const t = useTranslations('common')
+  const hasValue = inputValue.trim().length > 0
   const error =
     inputValue.trim().length < minLength
       ? t('errors.minChar', { amount: minLength.toString() })
@@ -78,8 +79,8 @@ export const AutoComplete = <T extends FieldValues>(props: AutoCompleteProps<T>)
               <PopoverTrigger asChild>
                 <CommandInput
                   id={id}
-                  placeholder={placeholder}
-                  className="h-9"
+                  className={cn('h-9', hasValue && 'disabled:text-foreground disabled:opacity-100')}
+                  placeholder={disabled ? undefined : placeholder}
                   onValueChange={onInputChange}
                   wrapperProps={{
                     className: cn('border rounded-md', form.formState.errors[name] && 'border-destructive'),

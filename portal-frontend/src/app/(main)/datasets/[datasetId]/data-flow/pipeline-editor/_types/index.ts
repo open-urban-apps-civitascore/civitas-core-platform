@@ -22,16 +22,13 @@ export {
 
 // Node-specific types
 export {
-  type ApiNodeData,
   type BasePipelineNodeData,
   type ControlNodeData,
-  createDefaultNodeData,
   type CronNodeData,
   type DataSourceNodeData,
   ENTITY_TYPES,
   type EntityType,
   type FrostNodeData,
-  isApiNodeData,
   isControlNodeData,
   isCronNodeData,
   isDataSourceNodeData,

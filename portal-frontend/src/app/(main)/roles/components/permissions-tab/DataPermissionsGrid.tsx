@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { type JSX } from 'react'
+import { type JSX, useMemo } from 'react'
 
 import { Checkbox } from '@/components/ui/checkbox'
 import { PermissionItem } from '@/types/permissions'
@@ -12,6 +12,7 @@ const DATA_PERMISSION_ROWS = [
   { key: 'datasetPayload', prefix: 'DATASET_PAYLOAD' },
   { key: 'datasource', prefix: 'DATASOURCE' },
   { key: 'datastructure', prefix: 'DATASTRUCTURE' },
+  { key: 'datapool', prefix: 'DATAPOOL' },
 ] as const
 
 const DATA_PERMISSION_COLUMNS = ['READ', 'CREATE', 'UPDATE', 'DELETE', 'RELEASE'] as const
@@ -27,16 +28,10 @@ export const DataPermissionsGrid = (props: DataPermissionsGridProps): JSX.Elemen
   const { permissions, checkedItems, setCheckedItems, isReadOnly } = props
   const tRoles = useTranslations('roles.permissionsTab')
 
-  // Find a permission by constructing the name from prefix + action
-  const findPermission = (prefix: string, action: string): PermissionItem | undefined => {
-    const permissionName = `${prefix}_${action}`
-    // Permission names are formatted (e.g. "Dataset Read"), so format the constructed name the same way
-    const formattedName = permissionName
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ')
-    return permissions.find(p => p.name === formattedName)
-  }
+  const permissionMap = useMemo(() => new Map(permissions.map(p => [p.rawName, p])), [permissions])
+
+  const findPermission = (prefix: string, action: string): PermissionItem | undefined =>
+    permissionMap.get(`${prefix}_${action}`)
 
   const isChecked = (permission: PermissionItem | undefined): boolean => {
     if (!permission) return false

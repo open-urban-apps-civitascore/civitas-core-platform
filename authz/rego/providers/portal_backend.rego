@@ -45,6 +45,7 @@ path_pattern := restmapper.match_pattern(input.request.path, endpoints)
 #   - DATASET resources: datasets (TENANT scope inherits down)
 #   - DATASOURCE resources: datasources (TENANT scope inherits down)
 #   - DATASTRUCTURE resources: datastructures (TENANT scope inherits down)
+#   - DATAPOOL resources: datapools (TENANT scope inherits down)
 #
 # For resource endpoints (/v1/resource/{id}), the {id} IS the scopeId.
 # TENANT scope cascades to all resource endpoints (Q-005 resolved).
@@ -60,6 +61,7 @@ resource_scope_type := {
 	"datasets": "DATASET",
 	"datasources": "DATASOURCE",
 	"datastructures": "DATASTRUCTURE",
+	"datapools": "DATAPOOL",
 }
 
 # Path parts for internal use (scope extraction, collection detection)
@@ -71,7 +73,7 @@ resource_name := path_parts[1] if {
 }
 
 # Extract resource ID from path (third segment: /v1/resource/{id})
-# Covers both direct resources (/v1/users/{id}) and sub-resources (/v1/datasets/{id}/publish)
+# Covers both direct resources (/v1/users/{id}) and sub-resources (/v1/datasets/{id}/release)
 # Only defined for resource endpoints, not collection endpoints
 resource_id := path_parts[2] if {
 	count(path_parts) >= 3

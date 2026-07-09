@@ -19,6 +19,7 @@ import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   Datastructure,
@@ -65,12 +66,20 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const { handleFormValidationError } = useError()
   const { hasScopedPermission } = usePermissions()
-  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_UPDATE, 'DATASTRUCTURE', datastructureId)
-  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_RELEASE, 'DATASTRUCTURE', datastructureId)
+  const canUpdate = hasScopedPermission(
+    PERMISSION_NAMES.DATASTRUCTURE_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+    datastructureId,
+  )
+  const canRelease = hasScopedPermission(
+    PERMISSION_NAMES.DATASTRUCTURE_RELEASE,
+    ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+    datastructureId,
+  )
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
-  const [canSetAvailable, setCanSetAvailable] = useState(true)
+  const [canStage, setCanSetAvailable] = useState(true)
 
   const isInUse = version?.inUse || false
 
@@ -104,14 +113,14 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     version,
     isCreateMode,
     datastructureId: datastructure.id,
+    dataStructureName: datastructure.name,
     onCreateVersion: redirectAfterVersionCreation,
-    canSetAvailable,
+    canStage,
   })
 
   const formValues = useWatch({ control: form.control })
   const descriptionWatch = form.watch('description')
   const versionWatch = form.watch('version')
-  const modelUriWatch = form.watch('modelAtlasUri')
   const modelNameWatch = form.watch('modelName')
   const sourceWatch = form.watch('dataStructureVersionSource')
 
@@ -121,7 +130,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const completedTabs = useMemo((): DatastructureVersionTab[] => {
     const completed: DatastructureVersionTab[] = []
     if (versionWatch.length > 0 && descriptionWatch.length > 0 && sourceWatch) completed.push('versionInfo')
-    if (nodesWatch.length > 0 && modelUriWatch && modelNameWatch) completed.push('structure')
+    if (nodesWatch.length > 0 && modelNameWatch) completed.push('structure')
     return completed
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues])
@@ -132,15 +141,12 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     setCanSetAvailable(DatastructureVersionFormAvailableSchema.safeParse(formValues).success)
   }, [formValues])
 
-  const handleSave = async () => {
+  const handleSubmit = async () => {
     let isSaved = false
 
     await form.handleSubmit(
       async () => {
         isSaved = await saveDatastructureVersion(datastructure.id)
-        if (isSaved) {
-          setIsExitModalOpen(false)
-        }
       },
       errors => {
         handleFormValidationError(errors)
@@ -151,12 +157,32 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     return isSaved
   }
 
-  useRegisterUnsavedChanges(hasUserChanges, handleSave)
+  useRegisterUnsavedChanges(hasUserChanges, handleSubmit)
+
+  const handleSave = async () => {
+    const isSaved = await handleSubmit()
+    if (isSaved) {
+      setIsExitModalOpen(false)
+    }
+  }
+
+  const exitEditMode = () => {
+    setIsExitModalOpen(false)
+    router.push(`/datastructures/${datastructureId}`)
+  }
+
+  const handleExitWarningSave = async () => {
+    const isSaved = await handleSubmit()
+    if (isSaved) {
+      exitEditMode()
+    } else {
+      setIsExitModalOpen(false)
+    }
+  }
 
   const handleExit = () => {
     resetToInitialState()
-    setIsReadOnly(true)
-    setIsExitModalOpen(false)
+    exitEditMode()
   }
 
   const handleExitButtonClick = () => {
@@ -187,7 +213,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
         status={statusWatch}
         onStatusChange={handleStatusChange}
-        canSetAvailable={canSetAvailable}
+        canStage={canStage}
         canSetDraft={canSetDraft}
         canRelease={canRelease}
         statusHint={statusHint}
@@ -254,7 +280,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         open={isExitModalOpen}
         onOpenChange={() => setIsExitModalOpen(false)}
         onDiscard={handleExit}
-        onConfirm={handleSave}
+        onConfirm={handleExitWarningSave}
         isLoading={isLoading}
       />
     </PageContainer>

@@ -1,7 +1,7 @@
 meta {
   name: 16b. Cleanup - Delete DataStructure
   type: http
-  seq: 34
+  seq: 41
 }
 
 delete {
@@ -17,7 +17,7 @@ params:path {
 tests {
   test("DataStructure deleted or already gone", function() {
     const status = res.getStatus();
-    // 204=deleted, 404=already gone, 400=wrong state (still published), 409=still referenced
+    // 204=deleted, 404=already gone, 400=wrong state (still released), 409=still referenced
     expect(status === 204 || status === 404 || status === 400 || status === 409).to.be.true;
   });
 }
@@ -25,9 +25,9 @@ tests {
 docs {
   **Saga cleanup step 16b of 18** — Teardown phase: remove resources created during the saga.
 
-  Deletes the DataStructure created in step 3b. Must run after the dataset has been deleted (step 13), since published datasets may reference this DataStructure.
+  Deletes the DataStructure created in step 3b. Must run after the dataset has been deleted (step 13), since released datasets may reference this DataStructure.
 
-  **Expected Response:** 204 No Content. 404 if already deleted. 400 if still in a published state (unpublish first).
+  **Expected Response:** 204 No Content. 404 if already deleted. 400 if still in a released state (unrelease first).
 
   **Post-condition:** DataStructure record removed from `portal_backend` DB.
 }

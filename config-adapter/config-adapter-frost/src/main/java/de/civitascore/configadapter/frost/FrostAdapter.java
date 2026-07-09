@@ -23,12 +23,11 @@ import de.civitascore.configadapter.model.ConfigEvent;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.frost.FrostConfigValue;
-import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
@@ -40,34 +39,17 @@ import org.slf4j.LoggerFactory;
  * ObservedProperties, Datastreams, Projects. Supports project-scoped creation paths (e.g. {@code
  * Projects/{id}/Things}).
  *
- * <p>Error handling:
- *
- * <ul>
- *   <li>Network errors (ProcessingException) → RetryableAdapterException (NETWORK_ERROR)
- *   <li>HTTP 5xx errors → RetryableAdapterException (SERVICE_UNAVAILABLE)
- *   <li>HTTP 500 + "Failed to store data." on CREATE → success (idempotent: FROST returns 500
- *       instead of 409 on UNIQUE constraint violations)
- *   <li>HTTP 409 on CREATE → success (idempotent: entity already exists)
- *   <li>HTTP 404 on DELETE → success (idempotent: entity already deleted)
- *   <li>Other HTTP 4xx errors → FatalAdapterException (FROST_ENTITY_ERROR)
- *   <li>Unknown exceptions → FatalAdapterException (FROST_ENTITY_ERROR)
- * </ul>
+ * <p>Error handling (network/5xx retryable, idempotent 409/404/duplicate-500, 4xx fatal) is
+ * classified by {@link FrostHttpExecutor}.
  */
 public class FrostAdapter extends AbstractConfigAdapter {
 
-  private static final Logger logger = LoggerFactory.getLogger(FrostAdapter.class);
+  private static final Logger LOG = LoggerFactory.getLogger(FrostAdapter.class);
   static final String ERROR_FAILED_TO_STORE_DATA = "Failed to store data.";
 
   public static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
   private static final String SERVER_URL_PROPERTY_KEY = "url";
-  private static final String API_KEY_PROPERTY_KEY = "api.key";
-  private static final String API_KEY_HEADER_PROPERTY_KEY = "api.key.header";
-  private static final String DEFAULT_API_KEY_HEADER = "X-API-Key";
-  private static final String BASIC_AUTH_USERNAME_PROPERTY_KEY = "basic.auth.username";
-  private static final String BASIC_AUTH_PASSWORD_PROPERTY_KEY = "basic.auth.password";
-
-  private static final String HTTP_STATUS_PREFIX = "HTTP ";
 
   private Client client;
   private String serverUrl;
@@ -79,23 +61,17 @@ public class FrostAdapter extends AbstractConfigAdapter {
 
     this.serverUrl =
         getAdapterProperty(SERVER_URL_PROPERTY_KEY, DEFAULT_SERVER_URL).replaceAll("/$", "");
-    String apiKey = getAdapterProperty(API_KEY_PROPERTY_KEY);
-    String apiKeyHeader = getAdapterProperty(API_KEY_HEADER_PROPERTY_KEY, DEFAULT_API_KEY_HEADER);
-    String basicAuthUsername = getAdapterProperty(BASIC_AUTH_USERNAME_PROPERTY_KEY);
-    String basicAuthPassword = getAdapterProperty(BASIC_AUTH_PASSWORD_PROPERTY_KEY);
-
-    this.authStrategy =
-        FrostAuthStrategy.create(basicAuthUsername, basicAuthPassword, apiKeyHeader, apiKey);
+    this.authStrategy = FrostAuthStrategy.fromConfig(config, getName());
 
     if (this.client == null) {
       this.client = createClient();
     }
 
-    logger.info(
+    LOG.info(
         "FROST adapter '{}' initialized for: {}",
         Encode.forJava(getName()),
         Encode.forJava(serverUrl));
-    logger.info(
+    LOG.info(
         "Subscribed to {} Kafka topics: {}",
         getSubscribedTopics().size(),
         Encode.forJava(getSubscribedTopics().toString()));
@@ -124,7 +100,7 @@ public class FrostAdapter extends AbstractConfigAdapter {
     String targetResource = event.payload().targetResource();
     String targetComponent = event.payload().targetComponent();
 
-    logger.info(
+    LOG.info(
         "Processing config event - Topic: {}, Operation: {}, TargetComponent: {}, TargetResource: {}",
         Encode.forJava(topic),
         operation,
@@ -135,12 +111,7 @@ public class FrostAdapter extends AbstractConfigAdapter {
 
     switch (operation) {
       case CREATE -> handleCreate(resourceInfo, event);
-      case UPDATE -> handleUpdate(resourceInfo, event);
-      case DELETE -> handleDelete(resourceInfo, event);
-      default -> {
-        logger.warn("Unknown operation: {}", Encode.forJava(String.valueOf(operation)));
-        throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);
-      }
+      case UPDATE, DELETE -> handleModify(operation, resourceInfo, event);
     }
   }
 
@@ -151,182 +122,77 @@ public class FrostAdapter extends AbstractConfigAdapter {
 
   private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event)
       throws FatalAdapterException, RetryableAdapterException {
-    if (resourceInfo.entityType() == null) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.INVALID_RESOURCE_TYPE, event.payload().targetResource());
-    }
-
-    EntityType entityType = resourceInfo.entityType();
+    EntityType entityType = requireEntityType(resourceInfo, event);
     Object entityConfig = extractEntityConfig(event);
     String path = resourceInfo.collectionPath();
 
-    executeFrostOperation(
-        AdapterOperation.FROST_ENTITY_CREATE,
-        event,
-        "FROST " + entityType.name() + " created successfully",
-        null,
-        () ->
-            authStrategy
-                .apply(
-                    client //
-                        .target(serverUrl) //
-                        .path(path) //
-                        .request(MediaType.APPLICATION_JSON))
-                .post(Entity.json(entityConfig)));
+    String resourceId =
+        FrostHttpExecutor.execute(
+            AdapterOperation.FROST_ENTITY_CREATE,
+            null,
+            () ->
+                authStrategy
+                    .apply(
+                        client //
+                            .target(serverUrl) //
+                            .path(path) //
+                            .request(MediaType.APPLICATION_JSON))
+                    .post(Entity.json(entityConfig)));
+    publishOutcome(event, "FROST " + entityType.name() + " created successfully", resourceId);
   }
 
-  private void handleUpdate(ResourceInfo resourceInfo, ConfigEvent event)
+  /** UPDATE and DELETE share target validation and the {@code Collection(id)} path shape. */
+  private void handleModify(Operation operation, ResourceInfo resourceInfo, ConfigEvent event)
       throws RetryableAdapterException, FatalAdapterException {
+    EntityType entityType = requireEntityType(resourceInfo, event);
+    if (!resourceInfo.hasId()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD,
+          "Resource ID is required for "
+              + operation.name().toLowerCase(Locale.ROOT)
+              + " operations");
+    }
+
+    String entityId = resourceInfo.id();
+    String entityPath = resourceInfo.collectionPath() + "(" + entityId + ")";
+
+    if (operation == Operation.UPDATE) {
+      Object entityConfig = extractEntityConfig(event);
+      FrostHttpExecutor.execute(
+          AdapterOperation.FROST_ENTITY_UPDATE,
+          entityId,
+          () ->
+              authStrategy
+                  .apply(
+                      client.target(serverUrl).path(entityPath).request(MediaType.APPLICATION_JSON))
+                  .method("PATCH", Entity.json(entityConfig)));
+      publishOutcome(event, "FROST " + entityType.name() + " updated successfully", entityId);
+    } else {
+      FrostHttpExecutor.execute(
+          AdapterOperation.FROST_ENTITY_DELETE,
+          entityId,
+          () ->
+              authStrategy
+                  .apply(
+                      client.target(serverUrl).path(entityPath).request(MediaType.APPLICATION_JSON))
+                  .delete());
+      publishOutcome(event, "FROST " + entityType.name() + " deleted successfully", entityId);
+    }
+  }
+
+  private static EntityType requireEntityType(ResourceInfo resourceInfo, ConfigEvent event)
+      throws FatalAdapterException {
     if (resourceInfo.entityType() == null) {
       throw new FatalAdapterException(
           AdapterErrorCode.INVALID_RESOURCE_TYPE, event.payload().targetResource());
     }
-
-    if (!resourceInfo.hasId()) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.INVALID_PAYLOAD, "Resource ID is required for update operations");
-    }
-
-    EntityType entityType = resourceInfo.entityType();
-    String entityId = resourceInfo.id();
-    Object entityConfig = extractEntityConfig(event);
-    String basePath = resourceInfo.collectionPath();
-
-    executeFrostOperation(
-        AdapterOperation.FROST_ENTITY_UPDATE,
-        event,
-        "FROST " + entityType.name() + " updated successfully",
-        entityId,
-        () ->
-            authStrategy
-                .apply(
-                    client
-                        .target(serverUrl)
-                        .path(basePath + "(" + entityId + ")")
-                        .request(MediaType.APPLICATION_JSON))
-                .method("PATCH", Entity.json(entityConfig)));
+    return resourceInfo.entityType();
   }
 
-  private void handleDelete(ResourceInfo resourceInfo, ConfigEvent event)
-      throws RetryableAdapterException, FatalAdapterException {
-    if (resourceInfo.entityType() == null) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.INVALID_RESOURCE_TYPE, event.payload().targetResource());
-    }
-
-    if (!resourceInfo.hasId()) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.INVALID_PAYLOAD, "Resource ID is required for delete operations");
-    }
-
-    EntityType entityType = resourceInfo.entityType();
-    String entityId = resourceInfo.id();
-    String basePath = resourceInfo.collectionPath();
-
-    executeFrostOperation(
-        AdapterOperation.FROST_ENTITY_DELETE,
-        event,
-        "FROST " + entityType.name() + " deleted successfully",
-        entityId,
-        () ->
-            authStrategy
-                .apply(
-                    client
-                        .target(serverUrl)
-                        .path(basePath + "(" + entityId + ")")
-                        .request(MediaType.APPLICATION_JSON))
-                .delete());
-  }
-
-  private void handleHttpResponse(Response response, AdapterOperation operation)
-      throws RetryableAdapterException, FatalAdapterException {
-    int status = response.getStatus();
-
-    if (status >= 200 && status < 300) {
-      return;
-    }
-
-    if (status == 409 && operation == AdapterOperation.FROST_ENTITY_CREATE) {
-      logger.info("FROST entity already exists (409), treating create as success (idempotent)");
-      return;
-    }
-
-    if (status == 404 && operation == AdapterOperation.FROST_ENTITY_DELETE) {
-      logger.info(
-          "FROST entity not found (404), treating delete as success (already deleted, idempotent)");
-      return;
-    }
-
-    String body = response.readEntity(String.class);
-
-    if (status >= 500) {
-      // FROST returns 500 with "Failed to store data." on UNIQUE constraint violations instead of
-      // 409 — treat it as idempotent success for CREATE operations, same as a real 409.
-      if (operation == AdapterOperation.FROST_ENTITY_CREATE
-          && body.contains(ERROR_FAILED_TO_STORE_DATA)) {
-        logger.info(
-            "FROST entity already exists (500 'Failed to store data.'), treating create as"
-                + " success (idempotent)");
-        return;
-      }
-      logger.warn(
-          "FROST server error during {}: {} {}",
-          Encode.forJava(operation.getDescription()),
-          status,
-          Encode.forJava(body));
-      throw new RetryableAdapterException(
-          AdapterErrorCode.SERVICE_UNAVAILABLE, null, ADAPTER_NAME, status);
-    }
-
-    logger.error(
-        "FROST client error during {}: {} {}",
-        Encode.forJava(operation.getDescription()),
-        status,
-        Encode.forJava(body));
-    throw new FatalAdapterException(
-        AdapterErrorCode.FROST_ENTITY_ERROR, null, HTTP_STATUS_PREFIX + status + ": " + body);
-  }
-
-  // ============== OPERATION TEMPLATE ==============
-
-  private void executeFrostOperation(
-      AdapterOperation operation,
-      ConfigEvent event,
-      String successMessage,
-      String resourceId,
-      HttpRequestOperation requestOperation)
-      throws RetryableAdapterException, FatalAdapterException {
-    try (Response response = requestOperation.execute()) {
-      handleHttpResponse(response, operation);
-
-      if (operation == AdapterOperation.FROST_ENTITY_CREATE && response.getStatus() == 201) {
-        String locationHeader = response.getHeaderString("Location");
-        resourceId = FrostUtils.extractIdFromLocation(locationHeader);
-      }
-
-      logger.info(Encode.forJava(successMessage));
-      publishSuccessResult(event, successMessage, resourceId);
-    } catch (FatalAdapterException | RetryableAdapterException e) {
-      throw e;
-    } catch (ProcessingException e) {
-      logger.warn(
-          "Network error during {}: {}",
-          Encode.forJava(operation.getDescription()),
-          Encode.forJava(e.getMessage()));
-      throw new RetryableAdapterException(
-          AdapterErrorCode.NETWORK_ERROR, e, ADAPTER_NAME, e.getMessage());
-    } catch (Exception e) {
-      logger.error("Failed to execute {}", Encode.forJava(operation.getDescription()), e);
-      throw new FatalAdapterException(
-          AdapterErrorCode.FROST_ENTITY_ERROR,
-          e,
-          operation.getDescription() + " failed: " + e.getMessage());
-    }
-  }
-
-  @FunctionalInterface
-  private interface HttpRequestOperation {
-    Response execute();
+  private void publishOutcome(ConfigEvent event, String successMessage, String resourceId)
+      throws FatalAdapterException, RetryableAdapterException {
+    LOG.info(Encode.forJava(successMessage));
+    publishSuccessResult(event, successMessage, resourceId);
   }
 
   // ============== HELPERS ==============
@@ -344,6 +210,6 @@ public class FrostAdapter extends AbstractConfigAdapter {
     if (client != null) {
       client.close();
     }
-    logger.info("FROST adapter closed");
+    LOG.info("FROST adapter closed");
   }
 }

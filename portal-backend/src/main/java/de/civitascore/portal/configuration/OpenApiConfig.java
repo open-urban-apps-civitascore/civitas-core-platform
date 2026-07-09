@@ -27,7 +27,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springdoc.core.customizers.OpenApiCustomizer;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -40,15 +39,15 @@ import org.springframework.core.annotation.Order;
 @Configuration
 public class OpenApiConfig {
 
+  private final KeycloakProperties keycloakProperties;
+
+  public OpenApiConfig(final KeycloakProperties keycloakProperties) {
+    this.keycloakProperties = keycloakProperties;
+  }
+
   private static final String APPLICATION_JSON = "application/json";
   private static final String APPLICATION_PROBLEM_JSON = "application/problem+json";
   private static final String EXAMPLE_PATH = "/v1/datasets";
-
-  @Value("${keycloak.auth-server-url:}")
-  private String keycloakUrl;
-
-  @Value("${keycloak.realm:}")
-  private String realm;
 
   /**
    * Creates the base OpenAPI definition with info metadata, license, contact, external docs, and
@@ -79,9 +78,11 @@ public class OpenApiConfig {
                     .description("CIVITAS/CORE Developer Documentation")
                     .url("https://docs.core.civitasconnect.digital/docs_v2/Development/intro"));
 
-    if (!keycloakUrl.isBlank() && !realm.isBlank()) {
-      String authUrl = keycloakUrl + "/realms/" + realm + "/protocol/openid-connect/auth";
-      String tokenUrl = keycloakUrl + "/realms/" + realm + "/protocol/openid-connect/token";
+    String authServerUrl = keycloakProperties.authServerUrl();
+    String realm = keycloakProperties.realm();
+    if (authServerUrl != null && !authServerUrl.isBlank() && realm != null && !realm.isBlank()) {
+      String authUrl = authServerUrl + "/realms/" + realm + "/protocol/openid-connect/auth";
+      String tokenUrl = authServerUrl + "/realms/" + realm + "/protocol/openid-connect/token";
 
       openAPI
           .components(
@@ -555,11 +556,6 @@ public class OpenApiConfig {
                   "foreign_key_violation",
                   problemExample(
                       409, "FOREIGN_KEY_VIOLATION", "Referenced entity does not exist", path)));
-      case "502" ->
-          problemExamples(
-              orderedMap(
-                  "upstream_failure",
-                  problemExample(502, "UPSTREAM_FAILURE", "Model Atlas upload failed", path)));
       default -> null;
     };
   }

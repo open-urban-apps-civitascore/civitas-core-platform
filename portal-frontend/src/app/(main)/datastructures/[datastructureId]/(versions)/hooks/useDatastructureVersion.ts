@@ -1,7 +1,6 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AxiosError } from 'axios'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -12,10 +11,12 @@ import {
   useCreateDatastructureVersion,
   useStatusUpdateDatastructureVersion,
   useUpdateDatastructureVersion,
-  useUpdateDatastructureVersionPublished,
+  useUpdateDatastructureVersionReleased,
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
+import { SchemaExportError } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
+import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
 import { useError } from '@/hooks/use-error'
 import { STATUS_TYPES } from '@/types/common'
 import {
@@ -36,6 +37,7 @@ import {
   parseDatastructureVersionFormData,
 } from '@/utils/datastructures'
 import { pickDirtyValues } from '@/utils/form'
+import { buildDataStructureUrn } from '@/utils/urn'
 
 export const defaultDatastructureVersionFormData: DatastructureVersionFormData = {
   id: '',
@@ -43,7 +45,6 @@ export const defaultDatastructureVersionFormData: DatastructureVersionFormData =
   description: '',
   dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
   dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
-  modelAtlasUri: null,
   modelName: null,
   nodes: [],
   edges: [],
@@ -51,32 +52,34 @@ export const defaultDatastructureVersionFormData: DatastructureVersionFormData =
 
 interface UseDatastructureVersionProps {
   datastructureId: string
+  dataStructureName: string
   version: DatastructureVersion | null
   isCreateMode: boolean
   onCreateVersion?: (data: DatastructureVersion) => void
-  canSetAvailable?: boolean
+  canStage?: boolean
 }
 
 export const useDatastructureVersion = ({
-  datastructureId,
+  dataStructureName,
   version,
   isCreateMode,
   onCreateVersion,
-  canSetAvailable = true,
+  canStage = true,
 }: UseDatastructureVersionProps) => {
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
+  const tUmlModeler = useTranslations('umlModeler')
   const router = useRouter()
   const { handleFormValidationError } = useError()
   const [initialSession, setInitialSession] = useState(() => buildSessionFromVersion(version))
 
   const updateVersion = useUpdateDatastructureVersion()
-  const updatePublishedVersion = useUpdateDatastructureVersionPublished()
+  const updateReleasedVersion = useUpdateDatastructureVersionReleased()
   const createVersion = useCreateDatastructureVersion()
   const updateStatus = useStatusUpdateDatastructureVersion()
 
   const isLoading =
-    updateVersion.isPending || createVersion.isPending || updateStatus.isPending || updatePublishedVersion.isPending
+    updateVersion.isPending || createVersion.isPending || updateStatus.isPending || updateReleasedVersion.isPending
 
   const modelSessionManager = useMultiSessionManager({ initialSession })
   const nodes = modelSessionManager.activeSession?.diagram.nodes
@@ -99,10 +102,8 @@ export const useDatastructureVersion = ({
 
   const statusWatch = form.watch('dataStructureVersionStatus')
   const nodesWatch = form.watch('nodes')
-  const versionWatch = form.watch('version')
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
-  const modelUri = `http://civitas.org/model/${datastructureId}/${versionWatch}`
 
   useEffect(() => {
     form.setValue('modelName', modelName || null, { shouldDirty: shouldMarkModelFieldsDirty })
@@ -113,17 +114,12 @@ export const useDatastructureVersion = ({
   }, [edges, form, shouldMarkModelFieldsDirty])
 
   /**
-   * Set form values nodes and modelAtlasUri depending on the nodes amount in the diagram
-   * If there are no nodes, the diagram is considered not existing, and modelAtlasUri gets set to null
+   * Set form value nodes depending on the nodes amount in the diagram.
+   * When there are no nodes, the diagram is considered not existing.
    */
   useEffect(() => {
     form.setValue('nodes', nodes || [], { shouldDirty: shouldMarkModelFieldsDirty })
-    const hasDiagram = nodes && nodes.length > 0
-    const modelAtlasUriValue = hasDiagram ? modelUri : null
-    form.setValue('modelAtlasUri', modelAtlasUriValue, {
-      shouldDirty: shouldMarkModelFieldsDirty,
-    })
-  }, [nodes, form, modelUri, shouldMarkModelFieldsDirty])
+  }, [nodes, form, shouldMarkModelFieldsDirty])
 
   /**
    * after closing the diagram, a new session gets created. This session is clean.
@@ -132,7 +128,6 @@ export const useDatastructureVersion = ({
    */
   useEffect(() => {
     if (!activeSession?.isDirty && activeSessionId !== initialSession?.id) {
-      form.setValue('modelAtlasUri', null, { shouldDirty: true })
       form.setValue('modelName', null, { shouldDirty: true })
       form.setValue('nodes', [], { shouldDirty: true })
       form.setValue('edges', [], { shouldDirty: true })
@@ -146,7 +141,7 @@ export const useDatastructureVersion = ({
   }
 
   const revalidateDraftMode = () => {
-    if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+    if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canStage) {
       form.setValue('dataStructureVersionStatus', DATASTRUCTURE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
@@ -164,7 +159,7 @@ export const useDatastructureVersion = ({
   useEffect(() => {
     revalidateDraftMode()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSetAvailable, statusWatch])
+  }, [canStage, statusWatch])
 
   const handleStatusChange = (newStatus: DatastructureStatusType) => {
     form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })
@@ -172,7 +167,7 @@ export const useDatastructureVersion = ({
 
   const handleStatusUpdate = async (
     versionId: string,
-    endpoint: 'publish' | 'unpublish',
+    endpoint: 'release' | 'unrelease',
     datastructureId: string,
   ): Promise<DatastructureVersion> => {
     try {
@@ -191,7 +186,7 @@ export const useDatastructureVersion = ({
 
   const handleCreateVersion = async (createData: DatastructureVersionCreateData, datastructureId: string) => {
     const isStatusFieldDirty = form.formState.dirtyFields.dataStructureVersionStatus
-    const shouldPublish = !!isStatusFieldDirty && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+    const shouldRelease = !!isStatusFieldDirty && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
 
     let data: DatastructureVersion
     try {
@@ -207,7 +202,7 @@ export const useDatastructureVersion = ({
 
     toast.success(t('messages.createSuccess'))
 
-    if (shouldPublish) await handleStatusUpdate(data.id, 'publish', datastructureId)
+    if (shouldRelease) await handleStatusUpdate(data.id, 'release', datastructureId)
 
     onCreateVersion?.(data)
   }
@@ -219,9 +214,9 @@ export const useDatastructureVersion = ({
     try {
       let response: { data: DatastructureVersion }
       if (initialFormValues.dataStructureVersionStatus === STATUS_TYPES.AVAILABLE) {
-        response = await updatePublishedVersion.mutateAsync({
+        response = await updateReleasedVersion.mutateAsync({
           data: values,
-          endpoint: `/datastructures/${datastructureId}/versions/${values.id}/published/meta`,
+          endpoint: `/datastructures/${datastructureId}/versions/${values.id}/released/meta`,
         })
       } else {
         response = await updateVersion.mutateAsync({
@@ -247,15 +242,15 @@ export const useDatastructureVersion = ({
     const fieldsToUpdate = pickDirtyValues(formValues, dirtyFields)
 
     const shouldUpdateValues = containsNonStatusField(fieldsToUpdate)
-    const shouldPublish =
+    const shouldRelease =
       !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
-    const shouldUnpublish = !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
+    const shouldUnrelease = !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
     let versionResponse: DatastructureVersion | null = shouldUpdateValues
       ? await handleUpdateValues(parsedPayload, datastructureId)
       : null
-    if (shouldPublish) versionResponse = await handleStatusUpdate(parsedPayload.id, 'publish', datastructureId)
-    if (shouldUnpublish) versionResponse = await handleStatusUpdate(parsedPayload.id, 'unpublish', datastructureId)
+    if (shouldRelease) versionResponse = await handleStatusUpdate(parsedPayload.id, 'release', datastructureId)
+    if (shouldUnrelease) versionResponse = await handleStatusUpdate(parsedPayload.id, 'unrelease', datastructureId)
 
     const updatedFormValues = versionResponse ? mapDatastructureVersionApiToFormData(versionResponse) : parsedFormValues
 
@@ -292,7 +287,26 @@ export const useDatastructureVersion = ({
 
     try {
       const sessionDiagram = nodesWatch.length > 0 ? activeSession?.diagram || null : null
-      const { model } = sessionDiagram ? buildUMLModelPayload(sessionDiagram, modelUri) : { model: null }
+      const modelUri = sessionDiagram
+        ? buildDataStructureUrn(dataStructureName, datastructureId, parsed.data.version)
+        : undefined
+      let model: Record<string, unknown> | null = null
+      if (sessionDiagram) {
+        try {
+          model = buildUMLModelPayload(sessionDiagram, modelUri).model
+        } catch (error) {
+          if (!(error instanceof SchemaExportError)) throw error
+          // A version that is (or becomes) released must not exist without a model — the deploy
+          // engine reads it. Keyed on the target status, not the dirty transition, so a version
+          // already released is refused too. A draft saves silently diagram-only: the model/diagram
+          // distinction is not one the user should have to reason about while still modelling.
+          if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE) {
+            const reason = rootFailureMessage(tUmlModeler, error.failure)
+            toast.error(t('errors.releaseInvalidModel', { reason }))
+            return false
+          }
+        }
+      }
       const payload = mapDatastructureVersionFormToApiData(parsed.data, sessionDiagram, model)
 
       if (isCreateMode) {
@@ -304,7 +318,8 @@ export const useDatastructureVersion = ({
       }
       return true
     } catch (error: unknown) {
-      console.error('An error occurred while submitting datastructure version data.', (error as AxiosError).message)
+      console.error('An error occurred while submitting datastructure version data.', error)
+      toast.error(tCommon('errors.unexpectedError'))
       return false
     }
   }

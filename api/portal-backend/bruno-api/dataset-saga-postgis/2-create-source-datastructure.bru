@@ -1,0 +1,60 @@
+meta {
+  name: 2. Create Source DataStructure
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/datastructures
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "PostGIS Saga Source Structure",
+    "description": "Source schema with scalar lon/lat fields (geoPoint input)",
+    "createdFromDataSource": false,
+    "dataStructureVersionIds": [],
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('pgSourceDataStructureId', res.body.id);
+  }
+}
+
+tests {
+  test("Source DataStructure created", function() {
+    const status = res.getStatus();
+    // 201=created. This collection assumes a clean DB per run (CI uses an ephemeral stack); a 409
+    // would mean a previous run leaked — fail loudly rather than carry a stale id downstream.
+    expect(status).to.equal(201);
+  });
+
+  test("Has id", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.id).to.be.a('string');
+    }
+  });
+}
+
+docs {
+  **PostGIS saga step 2** — Prerequisites: datasource (step 1).
+
+  Creates the source DataStructure ("PostGIS Saga Source Structure"). Its version (step 3) holds a JSON Schema with scalar `lon`/`lat`/`stationid` fields — the raw shape the MQTT messages arrive in and the input the pipeline's `geoPoint` op reads (`$.lon`, `$.lat`). The datasource is patched to this version before release.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if it already exists (idempotent).
+
+  **Post-condition:** Save `pgSourceDataStructureId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataStructure record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

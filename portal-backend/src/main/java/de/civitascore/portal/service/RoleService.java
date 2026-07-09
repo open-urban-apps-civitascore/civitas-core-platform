@@ -12,7 +12,6 @@ import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -46,16 +45,6 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
   @Override
   protected String getEntityName() {
     return Role.class.getSimpleName();
-  }
-
-  /**
-   * Override findById to use EntityGraph for efficient loading of permissions. This fetches the
-   * Role along with all Permissions in a single JOIN query, preventing N+1 query problems.
-   */
-  @Override
-  public Optional<Role> findById(UUID id) {
-    Optional<Role> entity = roleRepository.findByIdWithRelations(id);
-    return postLoad(entity);
   }
 
   private void validatePermissionTypes(RoleType roleType, Set<Permission> permissions) {

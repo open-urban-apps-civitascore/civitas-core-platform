@@ -1,0 +1,41 @@
+meta {
+  name: 03. Create DataStructure
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/datastructures
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Scope Test DataStructure {{scopeRunId}}",
+    "description": "Data structure required to release the scope-test datasource",
+    "createdFromDataSource": false,
+    "dataStructureVersionIds": [],
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('scopeDataStructureId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("scopeDataStructureId is set", function() {
+    expect(bru.getVar('scopeDataStructureId')).to.be.a('string');
+  });
+}
+
+docs {
+  A DataStructure + released version is a precondition for releasing the DataSource (which must be
+  AVAILABLE before the scope rule is even evaluated on a pipeline write).
+}

@@ -41,9 +41,8 @@ export const DatastructureVersionApiResponseSchema = z.object({
   description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
   dataStructureVersionSource: DatastructureVersionSourceEnum,
-  modelAtlasUri: z.string().nullable(),
   modelName: z.string().nullable(),
-  model: z.string().nullable(),
+  model: z.record(z.string(), z.unknown()).nullable(),
   styles: z.custom<UMLDiagram>().nullable(),
   inUse: z.boolean().optional(),
   dataStructure: ItemSchema,
@@ -62,13 +61,22 @@ export const DatastructureVersionSummaryApiResponseSchema = z.object({
   dataStructureId: z.string(),
 })
 
+// Three-segment SemVer, mirroring the URN grammar: the version becomes the trailing
+// segment of the model's $id URN, whose validation rejects any other shape at release.
+export const VERSION_PATTERN = /^\d+\.\d+\.\d+$/
+
+const versionSchema = z
+  .string()
+  .trim()
+  .min(1, 'common.errors.required')
+  .regex(VERSION_PATTERN, 'datastructureVersions.errors.versionFormat')
+
 export const DatastructureVersionFormDraftSchema = z.object({
   id: z.string(),
-  version: z.string().trim().min(1, 'common.errors.required'),
+  version: versionSchema,
   description: z.string().trim(),
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum,
-  modelAtlasUri: z.string().trim().nullable(),
   modelName: z.string().trim().nullable(),
   nodes: z.array(z.custom<UMLNode>()),
   edges: z.array(z.custom<UMLEdge>()),
@@ -76,7 +84,6 @@ export const DatastructureVersionFormDraftSchema = z.object({
 
 export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormDraftSchema.extend({
   description: z.string().trim().min(1, 'common.errors.required'),
-  modelAtlasUri: z.string().trim().min(1, 'common.errors.required'),
   modelName: z.string().trim().min(1, 'common.errors.required'),
   // Available datastructure models must have at least one node
   nodes: z.array(z.custom<UMLNode>()).min(1),
@@ -84,13 +91,12 @@ export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormD
 })
 
 export const DatastructureVersionCreateSchema = z.object({
-  version: z.string().trim().min(1, 'common.errors.required'),
+  version: versionSchema,
   description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum.optional(),
-  modelAtlasUri: z.string().trim().nullable().optional(),
   modelName: z.string().trim().nullable().optional(),
-  model: z.string().trim().nullable().optional(),
+  model: z.record(z.string(), z.unknown()).nullable().optional(),
   styles: z.custom<UMLDiagram>().nullable().optional(),
 })
 

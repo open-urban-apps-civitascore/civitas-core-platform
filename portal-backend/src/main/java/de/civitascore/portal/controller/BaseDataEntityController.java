@@ -12,10 +12,12 @@ import de.civitascore.portal.repository.specification.base.BaseSpec;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.service.AssignmentService;
+import de.civitascore.portal.service.BaseDataEntityService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
@@ -28,6 +30,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 /**
  * Abstract base controller for data-entity resources that support scope-based access control.
@@ -85,8 +90,20 @@ public abstract class BaseDataEntityController<
     if (scopes.isWildcard()) {
       return spec;
     }
-    Specification<E> scopeFilter = ScopeFilteringSpecification.baseEntityById(scopes.getScopeIds());
+    Specification<E> scopeFilter = scopeSpecification(scopes);
     return spec == null ? scopeFilter : spec.and(scopeFilter);
+  }
+
+  /**
+   * Builds the scope-filter specification for this entity type. The default filters by directly
+   * authorized scope IDs; subclasses may widen it (e.g. {@code DataSetController} ORs in datapool
+   * membership for Epic 1 union inheritance). Called only for non-wildcard, scoped requests.
+   *
+   * @param scopes the resolved per-request scope information
+   * @return the specification restricting the collection to authorized entities
+   */
+  protected Specification<E> scopeSpecification(AllowedScopes scopes) {
+    return ScopeFilteringSpecification.baseEntityById(scopes.getScopeIds());
   }
 
   /**
@@ -111,6 +128,44 @@ public abstract class BaseDataEntityController<
         assignmentService.findAllByScopeTypeAndScopeId(getScopeType(), id);
     List<AssignmentOutputDTO> output =
         assignments.stream().map(assignmentAssembler::toOutput).toList();
+    return ResponseEntity.ok(output);
+  }
+
+  @Override
+  protected abstract BaseDataEntityService<E, I> getService();
+
+  @PostMapping("/{id}/release")
+  @Operation(
+      operationId = "release{Entity}",
+      summary = "Release",
+      description = "Transitions the entity from DRAFT to AVAILABLE status.")
+  public ResponseEntity<O> release(@PathVariable UUID id) {
+    E released = getService().release(id);
+    O output = getAssembler().toOutput(released);
+    return ResponseEntity.ok(output);
+  }
+
+  @PostMapping("/{id}/unrelease")
+  @Operation(
+      operationId = "unrelease{Entity}",
+      summary = "Unrelease",
+      description = "Transitions the entity from AVAILABLE back to DRAFT status.")
+  public ResponseEntity<O> unrelease(@PathVariable UUID id) {
+    E unreleased = getService().unrelease(id);
+    O output = getAssembler().toOutput(unreleased);
+    return ResponseEntity.ok(output);
+  }
+
+  @PutMapping("/{id}/released/meta")
+  @Operation(
+      operationId = "updateReleased{Entity}Meta",
+      summary = "Update released metadata",
+      description =
+          "Updates metadata of a released entity. Only works on entities that are not in DRAFT status.")
+  public ResponseEntity<O> updateReleasedMeta(@PathVariable UUID id, @Valid @RequestBody I input) {
+    I preProcessedInput = preProcessInput(input);
+    E updated = getService().updateReleasedMeta(id, preProcessedInput);
+    O output = getAssembler().toOutput(updated);
     return ResponseEntity.ok(output);
   }
 }

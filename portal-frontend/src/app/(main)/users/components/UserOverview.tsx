@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { useCreateUser, useReplaceUserGroups, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
+import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
@@ -230,7 +231,7 @@ export const UserOverview = (props: UserOverviewProps) => {
           />
         )
       case tabValues.roles.value:
-        return <RolesTab userId={userData.id} isReadOnly={isReadOnly} />
+        return <RolesTab userId={userData.id} />
       case tabValues.userData.value:
       default:
         return (
@@ -287,7 +288,7 @@ export const UserOverview = (props: UserOverviewProps) => {
         }}
         customElement={headerCustomElement}
       />
-      {renderTabContent()}
+      <PageBackground hasBackground={!isReadOnly}>{renderTabContent()}</PageBackground>
       <ExitWarningModal
         open={isExitModalOpen}
         onOpenChange={setIsExitModalOpen}

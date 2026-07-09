@@ -1,0 +1,27 @@
+meta {
+  name: Contract SQL — patch partial (3/4 read-back)
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/datasources/{{contractSqlPatchId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Patched description persisted; other fields untouched", function() {
+    expect(res.body.name).to.equal("contract_sql_patch");
+    expect(res.body.description).to.equal("contract — SQL patched");
+    expect(res.body.connectorType).to.equal("SQL");
+    expect(res.body.configuration.password).to.equal("********");
+  });
+}

@@ -4,28 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Catalog;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
-import de.civitascore.portal.model.input.CatalogInputDTO;
-import de.civitascore.portal.model.input.DataSetInputDTO;
-import de.civitascore.portal.model.input.DataSpaceInputDTO;
-import de.civitascore.portal.model.input.DataStructureInputDTO;
-import de.civitascore.portal.model.input.GroupInputDTO;
-import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
-import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.CatalogRepository;
-import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
-import de.civitascore.portal.repository.GroupRepository;
-import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.List;
@@ -37,91 +26,43 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.InvalidDataAccessApiUsageException;
 
 @DisplayName("Assignment Service Integration Tests")
 class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @Autowired private AssignmentService assignmentService;
-  @Autowired private GroupService groupService;
-  @Autowired private RoleService roleService;
-  @Autowired private DataSetService dataSetService;
-  @Autowired private DataSpaceService dataSpaceService;
-  @Autowired private CatalogService catalogService;
-
-  @Autowired private AssignmentRepository assignmentRepository;
-  @Autowired private GroupRepository groupRepository;
-  @Autowired private RoleRepository roleRepository;
-  @Autowired private DataSetRepository dataSetRepository;
-  @Autowired private DataSpaceRepository dataSpaceRepository;
-  @Autowired private CatalogRepository catalogRepository;
-  @Autowired private DataStructureService dataStructureService;
+  @Autowired private PortalTestDataFactory portalData;
 
   private Group testGroup;
   private Role testDataRole;
   private Role testSystemRole;
-  private DataSpace testDataSpace;
   private DataSet testDataSet;
+  private DataPool testDataPool;
   private Catalog testCatalog;
   private DataStructure testDataStructure;
 
   @BeforeEach
   void setUp() {
-    // Create test group
-    GroupInputDTO groupInput = new GroupInputDTO();
-    groupInput.setName("Test Group " + UUID.randomUUID().toString().substring(0, 8));
-    groupInput.setDescription("Test group for assignment testing");
-    testGroup = groupService.create(groupInput);
-
-    // Create test DATA role
-    RoleInputDTO dataRoleInput = new RoleInputDTO();
-    dataRoleInput.setName("test_data_role_" + UUID.randomUUID().toString().substring(0, 8));
-    dataRoleInput.setDescription("Test DATA role for assignment testing");
-    dataRoleInput.setRoleType(RoleType.DATA);
-    testDataRole = roleService.create(dataRoleInput);
-
-    // Create test SYSTEM role
-    RoleInputDTO systemRoleInput = new RoleInputDTO();
-    systemRoleInput.setName("test_system_role_" + UUID.randomUUID().toString().substring(0, 8));
-    systemRoleInput.setDescription("Test SYSTEM role for assignment testing");
-    systemRoleInput.setRoleType(RoleType.SYSTEM);
-    testSystemRole = roleService.create(systemRoleInput);
-
-    // Create test DataSpace
-    DataSpaceInputDTO dataSpaceInput = new DataSpaceInputDTO();
-    dataSpaceInput.setName("Test DataSpace " + UUID.randomUUID().toString().substring(0, 8));
-    dataSpaceInput.setDescription("Test dataspace for assignment testing");
-    testDataSpace = dataSpaceService.create(dataSpaceInput);
-
-    // Create test DataSet
-    DataSetInputDTO dataSetInput = new DataSetInputDTO();
-    dataSetInput.setName("Test DataSet " + UUID.randomUUID().toString().substring(0, 8));
-    dataSetInput.setDescription("Test dataset for assignment testing");
-    dataSetInput.setOpenDataAccess(false);
-    testDataSet = dataSetService.create(dataSetInput);
-
-    // Create test Catalog
-    CatalogInputDTO catalogInput = new CatalogInputDTO();
-    catalogInput.setName("Test Catalog " + UUID.randomUUID().toString().substring(0, 8));
-    catalogInput.setDescription("Test catalog for assignment testing");
-    testCatalog = catalogService.create(catalogInput);
-
-    // Create test dataStructure
-    DataStructureInputDTO dataStructureInput = new DataStructureInputDTO();
-    dataStructureInput.setName("Test DataStructure " + System.currentTimeMillis());
-    dataStructureInput.setDescription("Test datastructure for assignment testing");
-    dataStructureInput.setCreatedFromDataSource(false);
-    testDataStructure = dataStructureService.create(dataStructureInput);
+    testGroup = portalData.group(b -> b.description("Test group for assignment testing"));
+    testDataRole =
+        portalData.role(
+            b -> b.roleType(RoleType.DATA).description("Test DATA role for assignment testing"));
+    testSystemRole =
+        portalData.role(
+            b ->
+                b.roleType(RoleType.SYSTEM).description("Test SYSTEM role for assignment testing"));
+    testDataSet =
+        portalData.dataSet(
+            b -> b.description("Test dataset for assignment testing").openDataAccess(false));
+    testDataPool = portalData.dataPool(b -> b.description("Test datapool for assignment testing"));
+    testCatalog = portalData.catalog(b -> b.description("Test catalog for assignment testing"));
+    testDataStructure =
+        portalData.dataStructure(b -> b.description("Test datastructure for assignment testing"));
   }
 
   @AfterEach
   void cleanup() {
-    assignmentRepository.deleteAll();
-    dataSetRepository.deleteAll();
-    dataSpaceRepository.deleteAll();
-    catalogRepository.deleteAll();
-    roleRepository.deleteAll();
-    groupRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   @Nested
@@ -194,20 +135,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(assignment.getScopeType()).isEqualTo(ScopeType.DATASET);
     }
 
-    // TODO v2.1: re-enable when DATASPACE scope is available
-    @Test
-    @DisplayName("Should reject DATASPACE scope (not available in this release)")
-    void shouldSetDataspaceWhenScopeTypeIsDataspace() {
-      AssignmentInputDTO input = new AssignmentInputDTO();
-      input.setGroupId(testGroup.getId());
-      input.setRoleId(testDataRole.getId());
-      input.setScopeType(ScopeType.DATASPACE);
-      input.setScopeId(testDataSpace.getId());
-
-      assertThatThrownBy(() -> assignmentService.create(input))
-          .isInstanceOf(InvalidInputException.class);
-    }
-
     // TODO v2.1: re-enable when CATALOG scope is available
     @Test
     @DisplayName("Should reject CATALOG scope (not available in this release)")
@@ -220,6 +147,36 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       assertThatThrownBy(() -> assignmentService.create(input))
           .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
+    @DisplayName("Should set datapool when scopeType is DATAPOOL")
+    void shouldSetDatapoolWhenScopeTypeIsDatapool() {
+      AssignmentInputDTO input = new AssignmentInputDTO();
+      input.setGroupId(testGroup.getId());
+      input.setRoleId(testDataRole.getId());
+      input.setScopeType(ScopeType.DATAPOOL);
+      input.setScopeId(testDataPool.getId());
+
+      Assignment assignment = assignmentService.create(input);
+
+      assertThat(assignment.getDataPool()).isNotNull();
+      assertThat(assignment.getDataPool().getId()).isEqualTo(testDataPool.getId());
+      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.DATAPOOL);
+    }
+
+    @Test
+    @DisplayName("Should throw ResourceNotFoundException for non-existent datapool")
+    void shouldThrowExceptionForNonExistentDatapool() {
+      AssignmentInputDTO input = new AssignmentInputDTO();
+      input.setGroupId(testGroup.getId());
+      input.setRoleId(testDataRole.getId());
+      input.setScopeType(ScopeType.DATAPOOL);
+      input.setScopeId(UUID.randomUUID());
+
+      assertThatThrownBy(() -> assignmentService.create(input))
+          .isInstanceOf(ResourceNotFoundException.class)
+          .hasMessageContaining("DataPool");
     }
 
     @Test
@@ -266,21 +223,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
           .hasMessageContaining("DataSet");
     }
 
-    // TODO v2.1: expect ResourceNotFoundException("DataSpace") once DATASPACE scope is re-enabled
-    @Test
-    @DisplayName(
-        "Should throw InvalidInputException for DATASPACE scope (not available in this release)")
-    void shouldThrowExceptionForNonExistentDataspace() {
-      AssignmentInputDTO input = new AssignmentInputDTO();
-      input.setGroupId(testGroup.getId());
-      input.setRoleId(testDataRole.getId());
-      input.setScopeType(ScopeType.DATASPACE);
-      input.setScopeId(UUID.randomUUID());
-
-      assertThatThrownBy(() -> assignmentService.create(input))
-          .isInstanceOf(InvalidInputException.class);
-    }
-
     // TODO v2.1: expect ResourceNotFoundException("Catalog") once CATALOG scope is re-enabled
     @Test
     @DisplayName(
@@ -308,7 +250,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       Assignment assignment = assignmentService.create(input);
 
       assertThat(assignment.getDataset()).isNull();
-      assertThat(assignment.getDataSpace()).isNull();
       assertThat(assignment.getCatalog()).isNull();
       assertThat(assignment.getScopeType()).isEqualTo(ScopeType.TENANT);
     }
@@ -331,7 +272,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(assignment).isNotNull();
       assertThat(assignment.getScopeType()).isNull();
       assertThat(assignment.getDataset()).isNull();
-      assertThat(assignment.getDataSpace()).isNull();
       assertThat(assignment.getCatalog()).isNull();
     }
 
@@ -348,7 +288,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(assignment).isNotNull();
       assertThat(assignment.getScopeType()).isEqualTo(ScopeType.TENANT);
       assertThat(assignment.getDataset()).isNull();
-      assertThat(assignment.getDataSpace()).isNull();
       assertThat(assignment.getCatalog()).isNull();
     }
 
@@ -366,22 +305,25 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(assignment).isNotNull();
       assertThat(assignment.getScopeType()).isEqualTo(ScopeType.DATASET);
       assertThat(assignment.getDataset()).isNotNull();
-      assertThat(assignment.getDataSpace()).isNull();
       assertThat(assignment.getCatalog()).isNull();
     }
 
-    // TODO v2.1: re-enable when DATASPACE scope is available
     @Test
-    @DisplayName("Should reject DATASPACE scope (not available in this release)")
-    void shouldSucceedWhenScopeTypeIsDataspaceAndDataspaceIsSet() {
+    @DisplayName("Should succeed when scopeType is DATAPOOL and datapool is set")
+    void shouldSucceedWhenScopeTypeIsDatapoolAndDatapoolIsSet() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
-      input.setScopeType(ScopeType.DATASPACE);
-      input.setScopeId(testDataSpace.getId());
+      input.setScopeType(ScopeType.DATAPOOL);
+      input.setScopeId(testDataPool.getId());
 
-      assertThatThrownBy(() -> assignmentService.create(input))
-          .isInstanceOf(InvalidInputException.class);
+      Assignment assignment = assignmentService.create(input);
+
+      assertThat(assignment).isNotNull();
+      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.DATAPOOL);
+      assertThat(assignment.getDataPool()).isNotNull();
+      assertThat(assignment.getDataset()).isNull();
+      assertThat(assignment.getCatalog()).isNull();
     }
 
     // TODO v2.1: re-enable when CATALOG scope is available
@@ -447,7 +389,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should fail when DATA role has null scopeType")
+    @DisplayName("Should reject DATA role with null scopeType at the API layer (400, not a DB 500)")
     void shouldFailWhenDataRoleHasNullScope() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
@@ -455,8 +397,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeType(null);
 
       assertThatThrownBy(() -> assignmentService.create(input))
-          .isInstanceOf(InvalidDataAccessApiUsageException.class)
-          .hasMessageContaining("Only SYSTEM roles can have null scope");
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DATA roles must be scoped");
     }
   }
 
@@ -502,6 +444,26 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
+    @DisplayName("Should create valid DATA assignment with DATAPOOL scope")
+    void shouldCreateValidDataAssignmentWithDatapoolScope() {
+      AssignmentInputDTO input = new AssignmentInputDTO();
+      input.setGroupId(testGroup.getId());
+      input.setRoleId(testDataRole.getId());
+      input.setScopeType(ScopeType.DATAPOOL);
+      input.setScopeId(testDataPool.getId());
+
+      Assignment assignment = assignmentService.create(input);
+
+      assertThat(assignment).isNotNull();
+      assertThat(assignment.getId()).isNotNull();
+      assertThat(assignment.getGroup()).isNotNull();
+      assertThat(assignment.getRole()).isNotNull();
+      assertThat(assignment.getRole().getRoleType()).isEqualTo(RoleType.DATA);
+      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.DATAPOOL);
+      assertThat(assignment.getDataPool()).isNotNull();
+    }
+
+    @Test
     @DisplayName("Should create valid DATA assignment with TENANT scope")
     void shouldCreateValidDataAssignmentWithTenantScope() {
       AssignmentInputDTO input = new AssignmentInputDTO();
@@ -516,7 +478,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(assignment.getRole().getRoleType()).isEqualTo(RoleType.DATA);
       assertThat(assignment.getScopeType()).isEqualTo(ScopeType.TENANT);
       assertThat(assignment.getDataset()).isNull();
-      assertThat(assignment.getDataSpace()).isNull();
       assertThat(assignment.getCatalog()).isNull();
     }
 
@@ -547,12 +508,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       Assignment assignment1 = assignmentService.create(input1);
 
-      // TODO v2.1: switch back to DATASPACE scope
-      // AssignmentInputDTO input2 = new AssignmentInputDTO();
-      // input2.setGroupId(testGroup.getId());
-      // input2.setRoleId(testDataRole.getId());
-      // input2.setScopeType(ScopeType.DATASPACE);
-      // input2.setScopeId(testDataSpace.getId());
       AssignmentInputDTO input2 = new AssignmentInputDTO();
       input2.setGroupId(testGroup.getId());
       input2.setRoleId(testDataRole.getId());
@@ -587,18 +542,41 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(assignment.getDataset().getId()).isEqualTo(testDataSet.getId());
     }
 
-    // TODO v2.1: re-enable when DATASPACE scope is available
     @Test
-    @DisplayName("Should reject DATASPACE scope (not available in this release)")
-    void shouldMapScopeToDataspace() {
+    @DisplayName("Should map scope to datapool when scopeType is DATAPOOL")
+    void shouldMapScopeToDatapool() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
-      input.setScopeType(ScopeType.DATASPACE);
-      input.setScopeId(testDataSpace.getId());
+      input.setScopeType(ScopeType.DATAPOOL);
+      input.setScopeId(testDataPool.getId());
 
-      assertThatThrownBy(() -> assignmentService.create(input))
-          .isInstanceOf(InvalidInputException.class);
+      Assignment assignment = assignmentService.create(input);
+
+      assertThat(assignment.getScope()).isNotNull();
+      assertThat(assignment.getScope().getId()).isEqualTo(testDataPool.getId());
+      assertThat(assignment.getDataPool()).isNotNull();
+      assertThat(assignment.getDataPool().getId()).isEqualTo(testDataPool.getId());
+    }
+
+    @Test
+    @DisplayName("Should retrieve datapool scope correctly after persisting and reloading")
+    void shouldRetrieveDatapoolScopeAfterPersist() {
+      AssignmentInputDTO input = new AssignmentInputDTO();
+      input.setGroupId(testGroup.getId());
+      input.setRoleId(testDataRole.getId());
+      input.setScopeType(ScopeType.DATAPOOL);
+      input.setScopeId(testDataPool.getId());
+
+      Assignment created = assignmentService.create(input);
+      UUID assignmentId = created.getId();
+
+      Assignment retrieved = assignmentService.findByIdOrThrow(assignmentId);
+
+      assertThat(retrieved.getScope()).isNotNull();
+      assertThat(retrieved.getScope().getId()).isEqualTo(testDataPool.getId());
+      assertThat(retrieved.getDataPool()).isNotNull();
+      assertThat(retrieved.getDataPool().getId()).isEqualTo(testDataPool.getId());
     }
 
     // TODO v2.1: re-enable when CATALOG scope is available
@@ -627,7 +605,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       assertThat(assignment.getScope()).isNull();
       assertThat(assignment.getDataset()).isNull();
-      assertThat(assignment.getDataSpace()).isNull();
       assertThat(assignment.getCatalog()).isNull();
     }
 
@@ -644,7 +621,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(assignment.getScope()).isNull();
       assertThat(assignment.getScopeType()).isNull();
       assertThat(assignment.getDataset()).isNull();
-      assertThat(assignment.getDataSpace()).isNull();
       assertThat(assignment.getCatalog()).isNull();
     }
 
@@ -692,23 +668,76 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(results.getFirst().getDataset().getId()).isEqualTo(testDataSet.getId());
     }
 
-    // TODO v2.1: re-enable when DATASPACE scope is available
     @Test
-    @DisplayName("Should return empty list for DATASPACE scope (not available in this release)")
-    void shouldReturnAssignmentsMatchingDataspaceScope() {
+    @DisplayName("Should return assignments matching DATAPOOL scope type and scope ID")
+    void shouldReturnAssignmentsMatchingDatapoolScope() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
-      input.setScopeType(ScopeType.DATASPACE);
-      input.setScopeId(testDataSpace.getId());
-
-      assertThatThrownBy(() -> assignmentService.create(input))
-          .isInstanceOf(InvalidInputException.class);
+      input.setScopeType(ScopeType.DATAPOOL);
+      input.setScopeId(testDataPool.getId());
+      assignmentService.create(input);
 
       List<Assignment> results =
-          assignmentService.findAllByScopeTypeAndScopeId(
-              ScopeType.DATASPACE, testDataSpace.getId());
-      assertThat(results).isEmpty();
+          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATAPOOL, testDataPool.getId());
+
+      assertThat(results).hasSize(1);
+      assertThat(results.getFirst().getScopeType()).isEqualTo(ScopeType.DATAPOOL);
+      assertThat(results.getFirst().getDataPool().getId()).isEqualTo(testDataPool.getId());
+    }
+
+    @Test
+    @DisplayName("Should return multiple assignments for the same datapool scope")
+    void shouldReturnMultipleAssignmentsForSameDatapoolScope() {
+      Group secondGroup = portalData.group(b -> b.description("Second test group for datapool"));
+
+      AssignmentInputDTO input1 = new AssignmentInputDTO();
+      input1.setGroupId(testGroup.getId());
+      input1.setRoleId(testDataRole.getId());
+      input1.setScopeType(ScopeType.DATAPOOL);
+      input1.setScopeId(testDataPool.getId());
+      assignmentService.create(input1);
+
+      AssignmentInputDTO input2 = new AssignmentInputDTO();
+      input2.setGroupId(secondGroup.getId());
+      input2.setRoleId(testDataRole.getId());
+      input2.setScopeType(ScopeType.DATAPOOL);
+      input2.setScopeId(testDataPool.getId());
+      assignmentService.create(input2);
+
+      List<Assignment> results =
+          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATAPOOL, testDataPool.getId());
+
+      assertThat(results).hasSize(2);
+      assertThat(results)
+          .allSatisfy(
+              a -> {
+                assertThat(a.getScopeType()).isEqualTo(ScopeType.DATAPOOL);
+                assertThat(a.getDataPool().getId()).isEqualTo(testDataPool.getId());
+              });
+    }
+
+    @Test
+    @DisplayName("Should eagerly load group and role relationships for DATAPOOL scope")
+    void shouldEagerlyLoadRelationshipsForDatapool() {
+      AssignmentInputDTO input = new AssignmentInputDTO();
+      input.setGroupId(testGroup.getId());
+      input.setRoleId(testDataRole.getId());
+      input.setScopeType(ScopeType.DATAPOOL);
+      input.setScopeId(testDataPool.getId());
+      assignmentService.create(input);
+
+      List<Assignment> results =
+          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATAPOOL, testDataPool.getId());
+
+      assertThat(results).hasSize(1);
+      Assignment result = results.getFirst();
+      assertThat(result.getGroup()).isNotNull();
+      assertThat(result.getGroup().getId()).isEqualTo(testGroup.getId());
+      assertThat(result.getRole()).isNotNull();
+      assertThat(result.getRole().getId()).isEqualTo(testDataRole.getId());
+      assertThat(result.getDataPool()).isNotNull();
+      assertThat(result.getDataPool().getId()).isEqualTo(testDataPool.getId());
     }
 
     // TODO v2.1: re-enable when CATALOG scope is available
@@ -742,10 +771,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     @DisplayName("Should return multiple assignments for the same scope")
     void shouldReturnMultipleAssignmentsForSameScope() {
       // Create second group
-      GroupInputDTO groupInput = new GroupInputDTO();
-      groupInput.setName("Second Group " + UUID.randomUUID().toString().substring(0, 8));
-      groupInput.setDescription("Second test group");
-      Group secondGroup = groupService.create(groupInput);
+      Group secondGroup = portalData.group(b -> b.description("Second test group"));
 
       // Create first assignment
       AssignmentInputDTO input1 = new AssignmentInputDTO();
@@ -786,7 +812,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeId(testDataSet.getId());
       assignmentService.create(input);
 
-      // TODO v2.1: switch back to DATASPACE scope query
       // Query with DATASTRUCTURE scope type using the dataset's ID — should find nothing
       List<Assignment> results =
           assignmentService.findAllByScopeTypeAndScopeId(
@@ -824,12 +849,12 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @DisplayName("Edge Cases and Error Handling")
   class EdgeCasesTests {
 
-    // TODO v2.1: add DATASPACE and CATALOG back to scope types array
     @Test
     @DisplayName("Should handle creation with all available scope types")
     void shouldHandleCreationWithAllScopeTypes() {
-      // Test with each valid scope type (DATASPACE and CATALOG excluded until v2.1)
-      ScopeType[] scopeTypes = new ScopeType[] {ScopeType.TENANT, ScopeType.DATASET};
+      // Test with each valid scope type (CATALOG excluded until v2.1)
+      ScopeType[] scopeTypes =
+          new ScopeType[] {ScopeType.TENANT, ScopeType.DATASET, ScopeType.DATAPOOL};
 
       for (ScopeType scopeType : scopeTypes) {
         AssignmentInputDTO input = new AssignmentInputDTO();
@@ -839,6 +864,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
         if (scopeType == ScopeType.DATASET) {
           input.setScopeId(testDataSet.getId());
+        } else if (scopeType == ScopeType.DATAPOOL) {
+          input.setScopeId(testDataPool.getId());
         }
 
         Assignment assignment = assignmentService.create(input);
@@ -875,11 +902,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     @DisplayName("Should handle multiple assignments for same group with different roles")
     void shouldHandleMultipleAssignmentsForSameGroupWithDifferentRoles() {
       // Create second DATA role
-      RoleInputDTO roleInput = new RoleInputDTO();
-      roleInput.setName("test_data_role_2_" + UUID.randomUUID().toString().substring(0, 8));
-      roleInput.setDescription("Second test DATA role");
-      roleInput.setRoleType(RoleType.DATA);
-      Role secondDataRole = roleService.create(roleInput);
+      Role secondDataRole =
+          portalData.role(b -> b.roleType(RoleType.DATA).description("Second test DATA role"));
 
       // Create assignment with first role
       AssignmentInputDTO input1 = new AssignmentInputDTO();

@@ -1,0 +1,35 @@
+meta {
+  name: 06 Enable All Controller Services
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{nifiBaseUrl}}/nifi-api/flow/process-groups/{{demoPgId}}/controller-services
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "id": "{{demoPgId}}",
+    "state": "ENABLED",
+    "disconnectedNodeAcknowledged": false
+  }
+}
+
+tests {
+  test("Status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  test("State ENABLED", function() {
+    expect(res.body.state).to.equal('ENABLED');
+  });
+}
+
+docs {
+  Bulk-enables all three controller services in the demo PG
+  (JsonTreeReader, JsonRecordSetWriter, PostGISConnectionPool). NiFi
+  initiates each service async — they typically reach `ENABLED` within ~2s.
+}

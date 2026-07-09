@@ -19,26 +19,50 @@ body:json {
     "name": "Saga Test Pipeline",
     "description": "Pipeline for saga workflow test",
     "dataSourceIds": ["{{sagaDataSourceId}}"],
-    "apis": ["/v1.1/Things"],
-    "persistences": [],
-    "styles": {},
+    "dataSinkIds": ["{{sagaDataSinkId}}"],
     "model": {
-      "input": {
-        "generate": {
-          "interval": "1s",
-          "count": 1,
-          "mapping": "root = {\"name\": \"Test Sensor\", \"description\": \"test\"}"
-        }
+      "viewport": { "x": 0, "y": 0, "zoom": 1 },
+      "nodePositions": {
+        "22222222-2222-4000-8000-000000000001": { "x": 360, "y": -40 },
+        "22222222-2222-4000-8000-000000000005": { "x": 320, "y": 80 },
+        "22222222-2222-4000-8000-000000000006": { "x": 540, "y": 80 },
+        "22222222-2222-4000-8000-000000000003": { "x": 740, "y": 80 }
       },
-      "output": {
-        "http_client": {
-          "url": "${FROST_BASE}/Things",
-          "verb": "POST",
-          "headers": {
-            "Content-Type": "application/json"
-          }
+      "nodes": [
+        {
+          "id": "22222222-2222-4000-8000-000000000001",
+          "type": "start",
+          "position": { "x": 360, "y": -40 },
+          "data": { "nodeType": "start", "label": "Start", "configured": true, "description": "Entry point of the pipeline. Execution begins here." },
+          "measured": { "width": 32, "height": 32 }
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000005",
+          "type": "dataSource",
+          "position": { "x": 320, "y": 80 },
+          "data": { "label": "MQTT Source", "configured": true, "entityType": "datasource", "entityId": "{{sagaDataSourceId}}", "entityMetadata": { "connector": "MQTT" } },
+          "measured": { "width": 160, "height": 48 }
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000006",
+          "type": "frost",
+          "position": { "x": 540, "y": 80 },
+          "data": { "label": "Sensor Data Storage", "configured": true, "entityType": "frost", "entityId": "{{sagaDataSinkId}}", "serverName": "Sensor Data Storage", "serverUrl": "", "version": "1.1" },
+          "measured": { "width": 160, "height": 48 }
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000003",
+          "type": "end",
+          "position": { "x": 740, "y": 80 },
+          "data": { "nodeType": "end", "label": "End", "configured": true, "description": "Exit point of the pipeline. Execution completes here." },
+          "measured": { "width": 32, "height": 32 }
         }
-      }
+      ],
+      "edges": [
+        { "id": "22222222-2222-4000-8000-0000000000e1", "source": "22222222-2222-4000-8000-000000000001", "target": "22222222-2222-4000-8000-000000000005", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "22222222-2222-4000-8000-0000000000e2", "source": "22222222-2222-4000-8000-000000000005", "target": "22222222-2222-4000-8000-000000000006", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "22222222-2222-4000-8000-0000000000e3", "source": "22222222-2222-4000-8000-000000000006", "target": "22222222-2222-4000-8000-000000000003", "type": "smoothstep", "data": { "label": "" } }
+      ]
     }
   }
 }
@@ -58,9 +82,11 @@ tests {
 }
 
 docs {
-  **Saga step 5 of 20** — Prerequisites: DataSource published (step 4b), DataSet created (step 4).
+  **Saga step 5 of 20** — Prerequisites: DataSource released (step 4b), DataSet created (step 4), FROST DataSink created (step 4c).
 
-  Creates a Redpanda Connect pipeline ("Saga Test Pipeline") attached to the dataset. The pipeline consumes from the MQTT datasource (`sagaDataSourceId`) and posts to FROST. The datasource must be in AVAILABLE status (published in step 4b) before it can be linked. When the dataset is released, the saga deploys this pipeline to Redpanda Connect.
+  Creates a pipeline ("Saga Test Pipeline") attached to the dataset, modelled as a CORE intermediate-representation document (`model`). The graph is the mandatory linear data flow `start → dataSource → frost → end`: the wired MQTT source node (`entityId` = `sagaDataSourceId`) feeds the wired FROST sink node (`entityId` = `sagaDataSinkId`) as a passthrough (no mapping — the source delivers the SensorThings envelope). The adapter derives source and sink per pipeline from the graph's `entityId`s, which must also appear in `dataSourceIds`/`dataSinkIds`; a graph without a wired source or sink node is rejected at deploy.
+
+  The datasource must be in AVAILABLE status (released in step 4b) before it can be linked. When the dataset is released, the saga deploys this pipeline to the pipeline engine.
 
   **Expected Response:** 201 Created, body contains `id`. 409 if the pipeline already existed (idempotent).
 
@@ -72,5 +98,5 @@ docs {
   |---|---|
   | Backend | Pipeline record created in `portal_backend` DB linked to the dataset |
   | Config Adapter | — |
-  | Redpanda Connect | Pipeline is deployed only after the DATASET_CREATE saga runs (step 8) |
+  | Pipeline engine | Pipeline is deployed only after the DATASET_CREATE saga runs (step 8) |
 }

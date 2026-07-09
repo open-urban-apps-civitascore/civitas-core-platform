@@ -44,6 +44,7 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
   private String adapterName;
   private final List<String> subscribedTopics = new LinkedList<>();
 
+  @Override
   public void initialize(AdapterConfig config) {
     if (config == null) {
       throw new IllegalArgumentException("AdapterConfig cannot be null");

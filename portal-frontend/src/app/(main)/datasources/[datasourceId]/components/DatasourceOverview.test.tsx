@@ -3,11 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
+import { DATAPOOL_SCOPE_TYPES } from '@/types/datasources'
 
 import { DatasourceOverview } from './DatasourceOverview'
 
 vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
+}))
+
+vi.mock('@/app/services/api/datapools/clientRequests', () => ({
+  useGetDatapools: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
 }))
 
 const mockCurrentUser = (permissions: PermissionName[]) => {
@@ -85,11 +90,13 @@ vi.mock('../hooks/useDatasourceForm', () => ({
     dataSourceStatus: 'DRAFT',
     hasStatusChanged: false,
     handleStatusChange: vi.fn(),
-    canSetAvailable: false,
+    canStage: false,
     completedTabs: [],
     submitDatasource: mockSubmitDatasource,
     resetToInitialState: vi.fn(),
     isLoading: false,
+    areAssignmentsDirty: false,
+    areDatapoolsDirty: false,
   }),
 }))
 
@@ -115,6 +122,16 @@ vi.mock('./datastructure-tab/DatastructureTab', () => ({
   DatastructureTab: ({ isReadOnly }: { isReadOnly: boolean }) => (
     <div data-testid="datastructureTab" data-readonly={isReadOnly} />
   ),
+}))
+
+vi.mock('./datapools-tab/DatapoolsTab', () => ({
+  DatapoolsTab: ({ isReadOnly }: { isReadOnly: boolean }) => (
+    <div data-testid="datapoolsTab" data-readonly={isReadOnly} />
+  ),
+}))
+
+vi.mock('./datapools-tab/AddDatapoolModal', () => ({
+  AddDatapoolModal: () => null,
 }))
 
 vi.mock('@/components/ui/form', () => ({
@@ -198,6 +215,7 @@ const datasource = {
   modifiedAt: '2024-01-01',
   dataStructureVersion: null,
   inUse: false,
+  datapoolScope: { type: DATAPOOL_SCOPE_TYPES.NONE },
 }
 
 const defaultProps = {
@@ -322,6 +340,14 @@ describe('DatasourceOverview', () => {
       fireEvent.click(screen.getByTestId('tab-connector'))
 
       expect(screen.getByTestId('connectorTab')).toBeInTheDocument()
+      expect(screen.queryByTestId('basicInfoTab')).not.toBeInTheDocument()
+    })
+
+    it('switches to datapool tab when clicked', () => {
+      render(<DatasourceOverview {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('tab-datapools'))
+
+      expect(screen.getByTestId('tab-datapools')).toBeInTheDocument()
       expect(screen.queryByTestId('basicInfoTab')).not.toBeInTheDocument()
     })
 

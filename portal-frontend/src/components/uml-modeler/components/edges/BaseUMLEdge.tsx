@@ -48,6 +48,16 @@ export const BaseUMLEdge: React.FC<BaseUMLEdgeProps> = ({
 
   return (
     <>
+      {/* Invisible wider path for easier selection */}
+      <path
+        id={`${id}-selector`}
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={20}
+        className="react-flow__edge-interaction"
+      />
+      {/* Visible edge path */}
       <path
         id={id}
         style={{

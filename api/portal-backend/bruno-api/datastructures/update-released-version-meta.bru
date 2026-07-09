@@ -1,0 +1,54 @@
+meta {
+  name: Update Released Version Meta
+  type: http
+  seq: 14
+}
+
+put {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/released/meta
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  versionId: {{dataStructureVersionId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "1.0.1",
+    "description": "Updated version description",
+    "modelName": "UpdatedModelName",
+    "model": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "UpdatedModel",
+      "type": "object",
+      "properties": {}
+    },
+    "styles": {}
+  }
+}
+
+tests {
+  test("Updated or not released", function() {
+    const status = res.getStatus();
+    // 200=updated, 400=version not in released state
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in released state.
+
+  **Expected Response:** 200 OK, released version metadata is updated.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Released version metadata updated |
+  | Config Adapter | -- |
+  | External System | -- |
+}

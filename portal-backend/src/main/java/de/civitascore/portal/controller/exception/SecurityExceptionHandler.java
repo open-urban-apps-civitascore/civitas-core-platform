@@ -1,11 +1,11 @@
 package de.civitascore.portal.controller.exception;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -17,6 +17,8 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Security exception handler that produces RFC 9457 Problem Detail responses for authentication and
@@ -30,7 +32,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 public class SecurityExceptionHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
 
   private static final String ERROR_URN_PREFIX = "urn:civitas:error:";
-  private final ObjectMapper mapper = new ObjectMapper();
+  private final ObjectMapper mapper = new JsonMapper();
 
   /**
    * Handles unauthenticated requests by writing a 401 Problem Detail response.
@@ -44,7 +46,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
   public void commence(
       HttpServletRequest request, HttpServletResponse response, AuthenticationException ex)
       throws IOException {
-    log.warn("Authentication failed: {}", ex.getMessage());
+    log.warn("Authentication failed: {}", Encode.forJava(ex.getMessage()));
     writeProblemDetailResponse(
         request, response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required");
   }
@@ -61,7 +63,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
   public void handle(
       HttpServletRequest request, HttpServletResponse response, AccessDeniedException ex)
       throws IOException {
-    log.warn("Access denied: {}", ex.getMessage());
+    log.warn("Access denied: {}", Encode.forJava(ex.getMessage()));
     writeProblemDetailResponse(
         request, response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Insufficient privileges");
   }
@@ -76,7 +78,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
   @ExceptionHandler(JwtException.class)
   @ResponseStatus(HttpStatus.UNAUTHORIZED)
   public ProblemDetail handleJwtException(JwtException ex, HttpServletRequest request) {
-    log.warn("JWT validation failed: {}", ex.getMessage());
+    log.warn("JWT validation failed: {}", Encode.forJava(ex.getMessage()));
     ProblemDetail problemDetail =
         ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "JWT validation failed");
     problemDetail.setType(URI.create(ERROR_URN_PREFIX + "INVALID_TOKEN"));

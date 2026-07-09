@@ -1,12 +1,5 @@
 export type Visibility = 'public' | 'private' | 'protected' | 'package'
 
-export const VISIBILITY_SYMBOLS: Record<Visibility, string> = {
-  public: '+',
-  private: '-',
-  protected: '#',
-  package: '~',
-}
-
 export type UMLPrimitiveType =
   | 'String'
   | 'Integer'
@@ -18,7 +11,17 @@ export type UMLPrimitiveType =
   | 'Byte'
   | 'Character'
   | 'Date'
+  | 'Uuid'
   | 'void'
+
+export type UMLGeometryType =
+  | 'Point'
+  | 'LineString'
+  | 'Polygon'
+  | 'MultiPoint'
+  | 'MultiLineString'
+  | 'MultiPolygon'
+  | 'GeometryCollection'
 
 export interface UMLTypeReference {
   id: string
@@ -27,7 +30,7 @@ export interface UMLTypeReference {
   href?: string // For XMI external references
 }
 
-export type UMLType = UMLPrimitiveType | UMLTypeReference
+export type UMLType = UMLPrimitiveType | UMLGeometryType | UMLTypeReference
 
 export interface UMLParameter {
   id: string
@@ -37,22 +40,29 @@ export interface UMLParameter {
   multiplicity?: string // e.g., "0..1", "1..*", "*"
 }
 
+export type AttributeMeta = {
+  gisInfo?: {
+    crs: string
+  }
+}
 export interface UMLAttribute {
   id: string
   name: string
   type: UMLType
-  visibility: Visibility
+  visibility?: Visibility
   isStatic?: boolean
+  isId?: boolean
   isReadonly?: boolean
   multiplicity?: string
   defaultValue?: string
+  meta?: AttributeMeta
 }
 
 export interface UMLOperation {
   id: string
   name: string
   returnType?: UMLType
-  visibility: Visibility
+  visibility?: Visibility
   isStatic?: boolean
   isAbstract?: boolean
   parameters: UMLParameter[]
@@ -73,6 +83,12 @@ export interface BaseUMLElement {
   stereotype?: string
   documentation?: string
   package?: string
+  /**
+   * Marks this element as the designated document root of the diagram. At most one element may
+   * carry the flag (the editor enforces radio semantics); when set it overrides the containment
+   * derivation in `resolveRootElement`.
+   */
+  isRoot?: boolean
 }
 
 export interface UMLClass extends BaseUMLElement {
@@ -100,7 +116,9 @@ export interface UMLEnumeration extends BaseUMLElement {
 
 export type UMLElement = UMLClass | UMLInterface | UMLAbstractClass | UMLEnumeration
 
-// Relationship types
+// Relationship types. The full historical vocabulary; the supported subset a user may actually draw
+// or pick is defined once as RELATIONSHIP_PALETTE_ITEMS in constants/paletteItems.ts. Out-of-scope
+// types are not rejected — legacy models keep them — but carry no semantics and are ignored on export.
 export type UMLRelationshipType =
   | 'association'
   | 'aggregation'

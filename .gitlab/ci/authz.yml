@@ -5,6 +5,8 @@
 # All authz jobs should extend this
 .only-authz-changes:
   rules:
+    # Always run on the nightly scheduled pipeline so the full build/scan runs
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
     # Always run on main and develop branch
@@ -17,6 +19,7 @@
         - portal-model/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/authz.yml
+
 
 # Common OPA configuration for CI jobs (lint, test, qa, bundle)
 # which GitLab CI requires to execute script commands.
@@ -116,11 +119,14 @@ bundle-authz-rego:
 # This must always run (needs: []) to ensure dependency scanning has the graph
 # even when the build job is skipped due to no changes
 generate-graph-authz:
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   rules:
+    # Always run on the nightly scheduled pipeline
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
+
     # Always run on main and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "develop"
@@ -147,7 +153,7 @@ generate-graph-authz:
 
 lint-authz:
   extends: .only-authz-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -165,7 +171,7 @@ lint-authz:
 
 dependency-prune-authz:
   extends: .only-authz-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -185,7 +191,7 @@ dependency-prune-authz:
 
 test-authz:
   extends: .only-authz-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: test
   needs:
     - job: build-authz
@@ -226,7 +232,7 @@ test-authz:
 
 build-authz:
   extends: .only-authz-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: build
   needs:
     - job: setup-version
@@ -421,6 +427,12 @@ deploy-opa:
       if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
         docker buildx imagetools create $CI_REGISTRY_IMAGE/opa:$REVISION --tag $CI_REGISTRY_IMAGE/opa:$CI_COMMIT_BRANCH
       fi
+    # Nightly build: additionally tag with <branch>-nightly-<YYYYMMDD>
+    - |
+      if [ "$IS_NIGHTLY" = "true" ] && [ -n "$NIGHTLY_IMAGE_TAG" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/opa:$REVISION --tag $CI_REGISTRY_IMAGE/opa:$NIGHTLY_IMAGE_TAG
+      fi
+
 
 deploy-authz:
   extends: .only-authz-changes
@@ -446,6 +458,12 @@ deploy-authz:
       if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
         docker buildx imagetools create $CI_REGISTRY_IMAGE/authz-repo-service:$REVISION --tag $CI_REGISTRY_IMAGE/authz-repo-service:$CI_COMMIT_BRANCH
       fi
+    # Nightly build: additionally tag with <branch>-nightly-<YYYYMMDD>
+    - |
+      if [ "$IS_NIGHTLY" = "true" ] && [ -n "$NIGHTLY_IMAGE_TAG" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/authz-repo-service:$REVISION --tag $CI_REGISTRY_IMAGE/authz-repo-service:$NIGHTLY_IMAGE_TAG
+      fi
+
 
 sbom-opa-image:
   extends: .only-authz-changes

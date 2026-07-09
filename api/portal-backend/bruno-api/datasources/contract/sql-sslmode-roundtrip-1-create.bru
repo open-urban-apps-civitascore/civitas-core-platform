@@ -1,0 +1,57 @@
+meta {
+  name: Contract SQL — sslmode round-trip (1/2 create)
+  type: http
+  seq: 90
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "name": "contract_sql_sslmode",
+    "description": "contract — SQL sslmode",
+    "connectorType": "SQL",
+    "configuration": {
+      "driver": "postgres",
+      "dsn": "postgres://reader:secret@db:5432/in?sslmode=require",
+      "user": "reader",
+      "password": "s3cret",
+      "table": "events",
+      "columns": ["*"]
+    },
+    "dataStructureVersionId": null
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('contractSqlSslId', res.body.id);
+  }
+}
+
+tests {
+  test("Status is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("sslmode is preserved in the dsn while embedded credentials are stripped", function() {
+    // SSL to the source DB rides in the dsn's sslmode; the credential-stripping URI round-trip
+    // must keep the query so it survives to the deployed JDBC connection
+    expect(res.body.configuration.dsn).to.equal("postgres://db:5432/in?sslmode=require");
+  });
+}
+
+docs {
+  Pins that `sslmode` in the SQL `dsn` is preserved through the credential-stripping URI
+  normalization, so TLS to the source DB remains configurable end to end (embedded credentials are
+  stripped, the query string is kept).
+
+  Paired cleanup: `sql-sslmode-roundtrip-2-cleanup.bru`.
+}

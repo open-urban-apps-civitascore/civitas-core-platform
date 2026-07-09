@@ -1,5 +1,10 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.configadapter.Topics;
+import de.civitascore.configadapter.model.ConfigValue;
+import de.civitascore.configadapter.model.idm.GroupConfig;
+import de.civitascore.portal.configuration.EventProperties;
+import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
@@ -9,52 +14,45 @@ import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashSet;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Service for managing {@link Group} entities. Handles contact user and member resolution, and
- * supports bulk replacement of group assignments.
- */
 @Service
-@RequiredArgsConstructor
-public class GroupService extends BaseService<Group, GroupInputDTO> {
+public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
 
   private final GroupRepository groupRepository;
   private final GroupMapper groupMapper;
   private final UserService userService;
   private final AssignmentFactory assignmentFactory;
+  private final KeycloakProperties keycloakProperties;
 
-  /**
-   * Resolves contact user and member references after DTO-to-entity conversion. Sets the contact
-   * user, and batch-loads group members by their IDs.
-   *
-   * @param entity the group entity
-   * @param input the group input DTO containing contact user and member IDs
-   * @return the entity with resolved relationships
-   */
+  public GroupService(
+      ConfigEventPublisherService configEventPublisher,
+      GroupRepository groupRepository,
+      GroupMapper groupMapper,
+      UserService userService,
+      AssignmentFactory assignmentFactory,
+      KeycloakProperties keycloakProperties,
+      EventProperties eventProperties) {
+    super(configEventPublisher, eventProperties);
+    this.groupRepository = groupRepository;
+    this.groupMapper = groupMapper;
+    this.userService = userService;
+    this.assignmentFactory = assignmentFactory;
+    this.keycloakProperties = keycloakProperties;
+  }
+
   @Override
   protected Group postConvertToEntity(Group entity, GroupInputDTO input) {
-    // Use getReferenceById for ManyToOne relationships to avoid unnecessary SELECT queries
     if (input.getContactUserId() != null) {
       entity.setContactUser(userService.findByIdOrThrow(input.getContactUserId()));
     } else {
       entity.setContactUser(null);
     }
 
-    // TODO: implement in V2.1
-    // if (input.getParentGroupId() != null) {
-    //   entity.setParentGroup(findByIdOrThrow(input.getParentGroupId()));
-    // } else {
-    //   entity.setParentGroup(null);
-    // }
-
-    // For collections, use findAllById for efficient batch loading
     if (Objects.nonNull(input.getMemberIds())) {
       entity.setMembers(new HashSet<>());
       if (!input.getMemberIds().isEmpty()) {
@@ -66,14 +64,6 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
     return super.postConvertToEntity(entity, input);
   }
 
-  /**
-   * Replaces all assignments of a group with a new set built from the provided input DTOs.
-   *
-   * @param groupId the group ID
-   * @param assignmentInputs the new set of assignment definitions
-   * @return the updated group entity
-   * @throws de.civitascore.portal.util.ResourceNotFoundException if the group does not exist
-   */
   @Transactional
   public Group replaceAssignments(UUID groupId, Set<AssignmentGroupInputDTO> assignmentInputs) {
     Group group = findByIdOrThrow(groupId);
@@ -86,8 +76,14 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
     return save(group);
   }
 
+  /**
+   * Override deleteById to validate child groups before publishing to Keycloak.
+   * EventPublishingService.deleteById does not call preProcessDelete, so we perform the validation
+   * here.
+   */
   @Override
-  protected Group preProcessDelete(UUID id) {
+  @Transactional
+  public void deleteById(UUID id) {
     Group group = findByIdOrThrow(id);
     if (!group.getChildGroups().isEmpty()) {
       throw new ResourceInUseException(
@@ -95,7 +91,81 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
           group.getId(),
           "Cannot delete Group because it has child groups. Remove or reassign child groups first.");
     }
-    return group;
+    super.deleteById(id);
+  }
+
+  @Override
+  protected ConfigValue toConfigValuePostSave(
+      Group entity, GroupInputDTO input, ConfigValue preSaveConfigValue) {
+    return buildGroupConfig(entity);
+  }
+
+  /**
+   * Builds a {@link GroupConfig} from a Group entity. Used by both CRUD events and catch-up sync.
+   *
+   * @throws IllegalStateException if {@code entity.getName()} is null or blank — name is enforced
+   *     non-blank at API ingress, so a null here means a corrupt DB row, and we fail loudly rather
+   *     than silently NPE-ing into a permanent unsynced state.
+   */
+  public static GroupConfig buildGroupConfig(Group entity) {
+    if (entity.getName() == null || entity.getName().isBlank()) {
+      throw new IllegalStateException(
+          "Cannot build GroupConfig for group id="
+              + entity.getId()
+              + ": name is null or blank. This indicates a corrupt DB row; "
+              + "the API enforces non-blank names on create/update.");
+    }
+
+    GroupConfig groupConfig = new GroupConfig();
+
+    if (entity.getExternalId() != null && !entity.getExternalId().isBlank()) {
+      groupConfig.setId(entity.getExternalId());
+    }
+
+    groupConfig.setName(entity.getName());
+
+    if (entity.getParentGroup() != null && entity.getParentGroup().getExternalId() != null) {
+      groupConfig.setParentId(entity.getParentGroup().getExternalId());
+    }
+
+    return groupConfig;
+  }
+
+  @Override
+  protected void updateExternalId(Group entity, String externalId) {
+    if (externalId != null && !externalId.isBlank()) {
+      entity.setExternalId(externalId);
+    }
+  }
+
+  @Override
+  protected Topics resolveTopic(String operation) {
+    return switch (operation.toLowerCase()) {
+      case "create" -> Topics.GROUP_CREATED;
+      case "update" -> Topics.GROUP_UPDATED;
+      case "delete" -> Topics.GROUP_DELETED;
+      default -> throw new IllegalArgumentException("Unknown operation for Group: " + operation);
+    };
+  }
+
+  @Override
+  protected String getTargetComponent() {
+    return "group";
+  }
+
+  @Override
+  protected String getRealm(Group entity) {
+    return keycloakProperties.targetRealm();
+  }
+
+  @Override
+  protected String getConfigPath() {
+    return "/groups";
+  }
+
+  @Override
+  protected UUID getEntityId(Group entity) {
+    return entity.getId();
   }
 
   @Override
@@ -111,15 +181,5 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
   @Override
   protected String getEntityName() {
     return Group.class.getSimpleName();
-  }
-
-  /**
-   * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
-   * Group along with contactUser, parentGroup, members and roles in a single JOIN query
-   */
-  @Override
-  public Optional<Group> findById(UUID id) {
-    Optional<Group> entity = groupRepository.findByIdWithRelations(id);
-    return postLoad(entity);
   }
 }

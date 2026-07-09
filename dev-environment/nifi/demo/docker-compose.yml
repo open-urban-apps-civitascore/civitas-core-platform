@@ -1,0 +1,53 @@
+# NiFi MVP demo — Mosquitto MQTT broker + PostGIS sink.
+#
+# Spun up manually (NOT wired into start-portal-dev.sh):
+#   cd dev-environment/nifi/demo && docker compose up -d
+#
+# Both containers join civitas-network so the existing civitas-nifi container
+# can reach mosquitto:1883 and postgis-demo:5432.
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: civitas-nifi-demo-mosquitto
+    restart: unless-stopped
+    # Host port only serves external MQTT clients; NiFi reaches the broker via
+    # civitas-network. Override when 1883 is taken (FROST publishes its own MQTT there).
+    ports:
+      - "${MOSQUITTO_HOST_PORT:-1883}:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    networks:
+      - civitas-network
+
+  postgis-demo:
+    image: postgis/postgis:17-3.5-alpine
+    container_name: civitas-nifi-demo-postgis
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nifi_demo
+      POSTGRES_USER: nifi
+      POSTGRES_PASSWORD: nifi-demo-password
+      POSTGRES_HOST_AUTH_METHOD: md5
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+    # 5434 is taken by dev-environment/geoserver's PostGIS (civitas-geoserver-db).
+    ports:
+      - "5435:5432"
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d:ro
+      - postgis_demo_data:/var/lib/postgresql/data
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nifi -d nifi_demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgis_demo_data:
+
+networks:
+  civitas-network:
+    name: civitas-network
+    external: true

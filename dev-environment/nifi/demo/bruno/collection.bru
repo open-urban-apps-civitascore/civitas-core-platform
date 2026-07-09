@@ -1,0 +1,14 @@
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{nifiToken}}
+}
+
+script:pre-request {
+  // The token is a Keycloak OIDC access token (client-credentials); it is sent only via the
+  // Authorization header. Clear the cookie jar before every request so a stray NiFi bearer cookie
+  // can never trigger NiFi's CSRF filter on state-changing requests (403, logged as anonymous).
+  bru.cookies.jar().clear();
+}

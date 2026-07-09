@@ -3,6 +3,8 @@ package de.civitascore.portal.service;
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.idm.UserConfig;
+import de.civitascore.portal.configuration.EventProperties;
+import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
@@ -19,7 +21,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -35,19 +36,20 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   private final UserRepository userRepository;
   private final UserMapper userMapper;
   private final GroupRepository groupRepository;
-  private final String targetRealm;
+  private final KeycloakProperties keycloakProperties;
 
   public UserService(
       ConfigEventPublisherService configEventPublisher,
       UserRepository userRepository,
       UserMapper userMapper,
       GroupRepository groupRepository,
-      @Value("${keycloak.target-realm}") String targetRealm) {
-    super(configEventPublisher);
+      KeycloakProperties keycloakProperties,
+      EventProperties eventProperties) {
+    super(configEventPublisher, eventProperties);
     this.userRepository = userRepository;
     this.userMapper = userMapper;
     this.groupRepository = groupRepository;
-    this.targetRealm = targetRealm;
+    this.keycloakProperties = keycloakProperties;
   }
 
   @Override
@@ -82,6 +84,11 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   public User replaceGroups(UUID userId, List<UUID> groupIds) {
     User user = findByIdOrThrow(userId);
 
+    if (user.getExternalId() == null || user.getExternalId().isBlank()) {
+      throw new InvalidInputException(
+          "user", "not synced", "User has not been synced to Keycloak yet; retry shortly.");
+    }
+
     if (groupIds.isEmpty()) {
       user.setGroups(new HashSet<>());
     } else {
@@ -95,7 +102,9 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
       user.setGroups(new HashSet<>(groups));
     }
 
-    return save(user);
+    user = getRepository().saveAndFlush(user);
+    preValidateWithExternalSystem(user, null, "update", null);
+    return user;
   }
 
   @Override
@@ -129,10 +138,7 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   protected ConfigValue toConfigValuePostSave(
       User entity, UserInputDTO input, ConfigValue preSaveConfigValue) {
 
-    UserConfig userConfig =
-        preSaveConfigValue instanceof UserConfig
-            ? (UserConfig) preSaveConfigValue
-            : new UserConfig();
+    UserConfig userConfig = preSaveConfigValue instanceof UserConfig uc ? uc : new UserConfig();
 
     // Set Keycloak user ID if it exists (required for UPDATE/DELETE operations)
     if (entity.getExternalId() != null && !entity.getExternalId().isBlank()) {
@@ -144,6 +150,17 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     userConfig.setFirstName(entity.getFirstName());
     userConfig.setLastName(entity.getLastName());
     userConfig.setEnabled(true);
+    // Use externalId (Keycloak group UUID) — stable across portal-side group renames.
+    // Groups not yet synced to Keycloak (externalId == null) are excluded; the adapter cannot
+    // assign a membership to a group that does not yet exist on the Keycloak side. The missing
+    // memberships are re-attempted on the next user update after the catch-up sync runs.
+    userConfig.setGroups(
+        entity.getGroups().stream()
+            .map(Group::getExternalId)
+            .filter(Objects::nonNull)
+            .filter(id -> !id.isBlank())
+            .sorted()
+            .toList());
 
     return userConfig;
   }
@@ -202,7 +219,7 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
    */
   @Override
   protected String getRealm(User entity) {
-    return targetRealm;
+    return keycloakProperties.targetRealm();
   }
 
   @Override

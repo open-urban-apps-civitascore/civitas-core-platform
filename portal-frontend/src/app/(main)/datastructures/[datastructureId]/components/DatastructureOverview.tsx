@@ -15,6 +15,7 @@ import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Form } from '@/components/ui/form'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   Datastructure,
@@ -58,8 +59,16 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
   const tCommon = useTranslations('common')
   const { hasScopedPermission } = usePermissions()
-  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_UPDATE, 'DATASTRUCTURE', datastructure.id)
-  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_RELEASE, 'DATASTRUCTURE', datastructure.id)
+  const canUpdate = hasScopedPermission(
+    PERMISSION_NAMES.DATASTRUCTURE_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+    datastructure.id,
+  )
+  const canRelease = hasScopedPermission(
+    PERMISSION_NAMES.DATASTRUCTURE_RELEASE,
+    ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+    datastructure.id,
+  )
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')
@@ -86,7 +95,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
   const {
     areAssignmentsDirty,
-    canSetAvailable,
+    canStage,
     completedTabs,
     form: datastructureForm,
     handleStatusChange,
@@ -117,8 +126,15 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const handleSave = async (): Promise<boolean> => {
     const isSaved = await saveDatastructure()
     if (isSaved) {
-      setIsExitModalOpen(false)
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+    }
+    return isSaved
+  }
+
+  const handleSaveAndExit = async (): Promise<boolean> => {
+    const isSaved = await handleSave()
+    if (isSaved) {
+      setIsExitModalOpen(false)
       updateMode(false)
     }
     return isSaved
@@ -177,7 +193,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             status={datastructureStatus}
             onStatusChange={handleStatusChange}
             statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
-            canSetAvailable={canSetAvailable}
+            canStage={canStage}
             canRelease={canRelease}
             statusHint={statusHint}
             confirmButtonType="button"
@@ -216,7 +232,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
         isLoading={isLoading}
         onOpenChange={setIsExitModalOpen}
         onDiscard={handleDiscardAndExit}
-        onConfirm={handleSave}
+        onConfirm={handleSaveAndExit}
       />
     </PageContainer>
   )

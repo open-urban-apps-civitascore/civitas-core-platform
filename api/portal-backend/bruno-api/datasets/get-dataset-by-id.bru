@@ -21,10 +21,17 @@ tests {
   test("Has correct id", function() {
     expect(res.body.id).to.be.a('string');
   });
+  test("datapool is null or a valid reference", function() {
+    if (res.body.datapool !== null) {
+      expect(res.body.datapool).to.be.an('object');
+      expect(res.body.datapool.id).to.be.a('string');
+      expect(res.body.datapool.name).to.be.a('string');
+    }
+  });
 }
 
 docs {
   **Precondition:** `dataSetId` is set.
-
+  
   **Expected Response:** 200 OK, body contains data set with matching `id`
 }

@@ -2,11 +2,15 @@
 
 import { ChangeEvent, useCallback } from 'react'
 
+import { RELATIONSHIP_PALETTE_ITEMS } from '../../constants/paletteItems'
 import { MULTIPLICITY_VALUES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
 import type { UMLEdge } from '../../types/diagram'
 import type { UMLRelationshipType } from '../../types/uml'
+
+// Same supported scope the palette offers, so retyping an edge can never leave it.
+const RELATIONSHIP_TYPE_OPTIONS = RELATIONSHIP_PALETTE_ITEMS.map(item => ({ value: item.type, label: item.label }))
 
 interface EdgePropertyEditorProps {
   edge: UMLEdge
@@ -80,15 +84,6 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
     [edge.id, updateEdge],
   )
 
-  const relationshipTypes: { value: UMLRelationshipType; label: string }[] = [
-    { value: 'association', label: 'Association' },
-    { value: 'aggregation', label: 'Aggregation' },
-    { value: 'composition', label: 'Composition' },
-    { value: 'inheritance', label: 'Inheritance' },
-    { value: 'realization', label: 'Realization' },
-    { value: 'dependency', label: 'Dependency' },
-  ]
-
   return (
     <div className="space-y-4">
       {/* Relationship Type */}
@@ -100,7 +95,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           disabled={isReadOnly}
         >
-          {relationshipTypes.map(type => (
+          {RELATIONSHIP_TYPE_OPTIONS.map(type => (
             <option key={type.value} value={type.value}>
               {type.label}
             </option>
@@ -121,10 +116,10 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
         />
       </div>
 
-      {/* Multiplicities */}
+      {/* Cardinalities */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Source Multiplicity</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Source Cardinality</label>
           <select
             value={relationship.sourceMultiplicity || ''}
             onChange={handleSourceMultiplicityChange}
@@ -140,7 +135,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Target Multiplicity</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Target Cardinality</label>
           <select
             value={relationship.targetMultiplicity || ''}
             onChange={handleTargetMultiplicityChange}
@@ -238,12 +233,12 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
           )}
           {relationship.sourceMultiplicity && (
             <p>
-              <strong>Source Multiplicity:</strong> {relationship.sourceMultiplicity}
+              <strong>Source Cardinality:</strong> {relationship.sourceMultiplicity}
             </p>
           )}
           {relationship.targetMultiplicity && (
             <p>
-              <strong>Target Multiplicity:</strong> {relationship.targetMultiplicity}
+              <strong>Target Cardinality:</strong> {relationship.targetMultiplicity}
             </p>
           )}
           {relationship.sourceRole && (

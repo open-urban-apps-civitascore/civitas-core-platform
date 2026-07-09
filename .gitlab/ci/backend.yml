@@ -2,6 +2,8 @@
 # All backend jobs should extend this
 .only-backend-changes:
   rules:
+    # Always run on the nightly scheduled pipeline so the full build/scan runs
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
     # Always run on main and develop branch
@@ -16,14 +18,17 @@
         - .gitlab/ci/backend.yml
         - .gitlab/ci/portal-model.yml # Also run when portal-model changes since backend depends on it
 
+
 # Generate maven dependency graph JSON for license scanning
 # This must always run (needs: []) to ensure dependency scanning has the graph
 # even when the build job is skipped due to no changes
 generate-graph-backend:
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs: []
   rules:
+    # Always run on the nightly scheduled pipeline
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
     # Always run on main and develop branch
@@ -31,6 +36,7 @@ generate-graph-backend:
     - if: $CI_COMMIT_BRANCH == "develop"
     # Always run on MR pipelines
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -52,7 +58,7 @@ generate-graph-backend:
 
 lint-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs: []
   variables:
@@ -70,9 +76,13 @@ lint-backend:
 
 dependency-prune-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
-  stage: lint
-  needs: []
+  image: maven:3.9-eclipse-temurin-25-alpine
+  stage: test
+  needs:
+    - job: setup-version-portal-model
+      artifacts: true
+    - job: publish-portal-model
+      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -84,14 +94,11 @@ dependency-prune-backend:
       - .m2/repository
   script:
     - cd portal-backend
-    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -DfailOnWarning=true -DignoreNonCompile=false -s ci_settings.xml
-  allow_failure:
-    exit_codes:
-      - 1
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Dportal-model.version=$PORTAL_MODEL_VERSION -DfailOnWarning=true -DignoreNonCompile=false -s ci_settings.xml
 
 test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: test
   needs:
     - job: build-backend
@@ -113,7 +120,7 @@ test-backend:
     paths:
       - .m2/repository
   before_script:
-    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
     # Compile test sources, then run unit tests
@@ -131,7 +138,7 @@ test-backend:
 
 integration-test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21
+  image: maven:3.9-eclipse-temurin-25
   stage: test
   needs:
     - job: build-backend
@@ -145,7 +152,6 @@ integration-test-backend:
     - job: publish-portal-model
   services:
     - name: docker:27-dind
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_DRIVER: overlay2
@@ -159,7 +165,7 @@ integration-test-backend:
     paths:
       - .m2/repository
   before_script:
-    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
     # Compile test sources, then run integration tests only. Saga-tagged tests are excluded via pom.xml (run in saga-e2e-test-backend)
@@ -175,10 +181,11 @@ integration-test-backend:
       junit: portal-backend/target/failsafe-reports/TEST-*.xml
 
 # Saga E2E integration tests — cross-module tests validating the full dataset saga workflow
-# (portal-backend + config-adapter orchestrator in-process, with real FROST, Kafka, Redpanda Connect).
+# (portal-backend + Flowable saga engine in-process, with real FROST, Kafka, Redpanda Connect —
+#  pipeline-engine migration to NiFi still pending, see WI 1622).
 # Auto-runs on main/develop, manual trigger on MRs (heavy: ~2 min, 6+ containers).
 saga-e2e-test-backend:
-  image: maven:3.9-eclipse-temurin-21
+  image: maven:3.9-eclipse-temurin-25
   stage: test
   needs:
     - job: build-backend
@@ -191,6 +198,7 @@ saga-e2e-test-backend:
       optional: true
     - job: publish-portal-model
   rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "develop"
@@ -202,12 +210,12 @@ saga-e2e-test-backend:
         - .gitlab/ci/backend.yml
   services:
     - name: docker:27-dind
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_DRIVER: overlay2
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ''
+
   cache:
     key:
       prefix: backend-maven
@@ -216,7 +224,7 @@ saga-e2e-test-backend:
     paths:
       - .m2/repository
   before_script:
-    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
     - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION -Psaga -Dfailsafe.rerunFailingTestsCount=1
@@ -247,6 +255,7 @@ api-test-backend:
       artifacts: true
       optional: true
   rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "develop"
@@ -260,9 +269,9 @@ api-test-backend:
         - dev-environment/apisix/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/backend.yml
+
   services:
     - name: docker:27-dind
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_HOST: tcp://docker:2375
@@ -312,6 +321,8 @@ api-test-backend:
     # Run Bruno API tests from a container on the same Compose network
     - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
     - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/
+    # The NiFi + GeoServer adapters are wired into the CI stack, so the dataset-saga Bruno
+    # lifecycles run as the end-to-end acceptance gate.
     - |
       docker exec bruno-runner sh -c '
         npm install -g @usebruno/cli 2>/dev/null
@@ -333,7 +344,7 @@ api-test-backend:
 
 report-test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21
+  image: maven:3.9-eclipse-temurin-25
   stage: test
   dependencies:
     - build-backend
@@ -358,7 +369,7 @@ report-test-backend:
 
 build-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: build
   needs:
     - job: setup-version
@@ -366,7 +377,6 @@ build-backend:
     - job: setup-version-portal-model
       artifacts: true
     - lint-backend
-    - dependency-prune-backend
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
@@ -380,7 +390,7 @@ build-backend:
     paths:
       - .m2/repository
   before_script:
-    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
     # Use GitLab Maven repository for config-adapter and portal-model dependencies
@@ -407,13 +417,18 @@ build-backend-image:
       optional: true
   services:
     - name: docker:27-dind
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
     DOCKER_BUILDKIT: 1
   before_script:
     - docker info
+    # Register QEMU emulators so the linux/arm64 cross-build runs on the amd64 runner.
+    # The runner host's binfmt registration is not dependable — when arm64 drops off it,
+    # buildx silently loses the platform and the emulated `apk add` dies with
+    # "Invalid ELF image for this architecture". Registering here makes the job
+    # self-contained. Image is pinned (tag + digest) so the privileged run is auditable.
+    - docker run --privileged --rm tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0 --install all
     - |
       cat > /tmp/buildkitd.toml <<'EOF'
       [registry."docker.io"]
@@ -483,6 +498,12 @@ deploy-backend:
       if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
         docker buildx imagetools create $CI_REGISTRY_IMAGE/backend-portal:$REVISION --tag $CI_REGISTRY_IMAGE/backend-portal:$CI_COMMIT_BRANCH
       fi
+    # Nightly build: additionally tag with <branch>-nightly-<YYYYMMDD>
+    - |
+      if [ "$IS_NIGHTLY" = "true" ] && [ -n "$NIGHTLY_IMAGE_TAG" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/backend-portal:$REVISION --tag $CI_REGISTRY_IMAGE/backend-portal:$NIGHTLY_IMAGE_TAG
+      fi
+
 
 sbom-backend-image:
   extends: .only-backend-changes

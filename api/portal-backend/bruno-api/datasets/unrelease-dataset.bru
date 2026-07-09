@@ -28,7 +28,7 @@ docs {
   Triggers the **DATASET_DELETE** saga to tear down infrastructure in reverse order:
 
   1. **Redpanda Connect** — deletes data pipelines (best-effort)
-  2. **APISIX Gateway** — deletes route + upstream (best-effort)
+  2. **APISIX Gateway** — deletes all named-API routes + the dataset's upstream (best-effort)
   3. **FROST Server** — deletes project (best-effort)
 
   The DELETE saga is best-effort (no compensation) — it continues even if individual steps fail.

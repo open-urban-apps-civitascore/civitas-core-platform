@@ -1,0 +1,51 @@
+meta {
+  name: Update Layer
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/datasets/:dataSetId/layers/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{layerId}}
+}
+
+body:json {
+  {
+    "dataSinkId": "{{postgisDataSinkId}}",
+    "layerName": "sensor_observations_layer",
+    "title": "Sensor Observations (updated)",
+    "description": "Updated layer description",
+    "crs": "EPSG:25832",
+    "bboxAutoCalculate": true,
+    "defaultStyleId": "{{defaultStyleId}}",
+    "alternativeStyleIds": ["{{alternativeStyleId}}"]
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('layerId', res.body.id);
+  }
+}
+
+docs {
+  **Precondition:** `dataSetId`, `layerId`, `postgisDataSinkId`, `defaultStyleId`, and `alternativeStyleId` are set.
+
+  **Expected Response:** 200 OK, body reflects updated values.
+
+  **Note:** PATCH is not supported on Layers — the controller returns 405. Use this PUT for any modification.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Layer record updated in `portal_backend` DB |
+  | Config Adapter | — (GeoServer feature type reflects the new state only after the DataSet is re-released) |
+  | External System | — |
+}

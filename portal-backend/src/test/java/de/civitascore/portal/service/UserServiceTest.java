@@ -7,6 +7,8 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.idm.UserConfig;
+import de.civitascore.portal.configuration.EventProperties;
+import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
@@ -35,10 +37,19 @@ class UserServiceTest {
   @Mock private GroupRepository groupRepository;
 
   private static final String TARGET_REALM = "test-realm";
+  private static final String AUTH_SERVER_URL = "http://keycloak:8080";
+  private static final KeycloakProperties KEYCLOAK_PROPERTIES =
+      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM);
+  private static final int CONFIG_ADAPTER_TIMEOUT_SECONDS = 10;
 
   private UserService createService() {
     return new UserService(
-        configEventPublisher, userRepository, userMapper, groupRepository, TARGET_REALM);
+        configEventPublisher,
+        userRepository,
+        userMapper,
+        groupRepository,
+        KEYCLOAK_PROPERTIES,
+        new EventProperties(CONFIG_ADAPTER_TIMEOUT_SECONDS));
   }
 
   private User userWithId(UUID id) {
@@ -245,6 +256,65 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("Should populate groups with Keycloak externalIds (not names)")
+    void shouldPopulateGroupExternalIds() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+
+      Group group1 = new Group();
+      group1.setName("Editors");
+      group1.setExternalId("kc-uuid-editors");
+      Group group2 = new Group();
+      group2.setName("Viewers");
+      group2.setExternalId("kc-uuid-viewers");
+      user.addGroup(group1);
+      user.addGroup(group2);
+
+      UserConfig config =
+          (UserConfig) service.toConfigValuePostSave(user, new UserInputDTO(), null);
+
+      assertThat(config.getGroups())
+          .containsExactlyInAnyOrder("kc-uuid-editors", "kc-uuid-viewers");
+    }
+
+    @Test
+    @DisplayName("Should skip groups without externalId (not yet synced to Keycloak)")
+    void shouldSkipGroupsWithoutExternalId() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+
+      Group synced = new Group();
+      synced.setName("Synced");
+      synced.setExternalId("kc-uuid-synced");
+      Group unsynced = new Group();
+      unsynced.setName("Unsynced");
+      unsynced.setExternalId(null);
+      Group blank = new Group();
+      blank.setName("Blank");
+      blank.setExternalId("   ");
+      user.addGroup(synced);
+      user.addGroup(unsynced);
+      user.addGroup(blank);
+
+      UserConfig config =
+          (UserConfig) service.toConfigValuePostSave(user, new UserInputDTO(), null);
+
+      assertThat(config.getGroups()).containsExactly("kc-uuid-synced");
+    }
+
+    @Test
+    @DisplayName("Should set empty groups list when user has no groups")
+    void shouldSetEmptyGroupsWhenNoMemberships() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+
+      UserConfig config =
+          (UserConfig) service.toConfigValuePostSave(user, new UserInputDTO(), null);
+
+      assertThat(config.getGroups()).isEmpty();
+    }
+
+    @Test
     @DisplayName("Should carry over requiredActions and emailVerified from preSaveConfigValue")
     void shouldCarryOverPreSaveFields() {
       UserService service = createService();
@@ -321,6 +391,7 @@ class UserServiceTest {
       UserService service = createService();
       UUID userId = UUID.randomUUID();
       User user = userWithId(userId);
+      user.setExternalId("keycloak-uuid-123");
       when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
       List<UUID> groupIds = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
@@ -329,6 +400,34 @@ class UserServiceTest {
       assertThatThrownBy(() -> service.replaceGroups(userId, groupIds))
           .isInstanceOf(InvalidInputException.class)
           .hasMessage("One or more groups do not exist.");
+    }
+
+    @Test
+    @DisplayName("Should reject when user has not been synced to Keycloak yet")
+    void shouldRejectWhenExternalIdMissing() {
+      UserService service = createService();
+      UUID userId = UUID.randomUUID();
+      User user = userWithId(userId);
+      user.setExternalId(null);
+      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+      assertThatThrownBy(() -> service.replaceGroups(userId, List.of(UUID.randomUUID())))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("not been synced to Keycloak");
+    }
+
+    @Test
+    @DisplayName("Should reject when externalId is blank")
+    void shouldRejectWhenExternalIdBlank() {
+      UserService service = createService();
+      UUID userId = UUID.randomUUID();
+      User user = userWithId(userId);
+      user.setExternalId("   ");
+      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+      assertThatThrownBy(() -> service.replaceGroups(userId, List.of(UUID.randomUUID())))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("not been synced to Keycloak");
     }
   }
 

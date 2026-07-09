@@ -139,6 +139,21 @@ class AssignmentFactoryTest {
     }
 
     @Test
+    @DisplayName("Should reject DATA role with null scopeType via AssignmentGroupInputDTO")
+    void shouldRejectDataRoleWithNullScopeType() {
+      UUID roleId = UUID.randomUUID();
+      Role role = createRole(roleId, RoleType.DATA);
+      when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+
+      AssignmentGroupInputDTO dto = new AssignmentGroupInputDTO();
+      dto.setRoleId(roleId);
+
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DATA roles must be scoped");
+    }
+
+    @Test
     @DisplayName("Should throw when roleId is null")
     void shouldThrowWhenRoleIdIsNull() {
       AssignmentGroupInputDTO dto = new AssignmentGroupInputDTO();
@@ -244,6 +259,26 @@ class AssignmentFactoryTest {
       assertThat(result.getRole()).isEqualTo(role);
       assertThat(result.getScopeType()).isNull();
     }
+
+    @Test
+    @DisplayName("Should reject DATA role with null scopeType via AssignmentInputDTO")
+    void shouldRejectDataRoleWithNullScopeType() {
+      UUID groupId = UUID.randomUUID();
+      UUID roleId = UUID.randomUUID();
+      Group group = createGroup(groupId);
+      Role role = createRole(roleId, RoleType.DATA);
+
+      when(groupRepository.findById(groupId)).thenReturn(Optional.of(group));
+      when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+
+      AssignmentInputDTO dto = new AssignmentInputDTO();
+      dto.setGroupId(groupId);
+      dto.setRoleId(roleId);
+
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DATA roles must be scoped");
+    }
   }
 
   @Nested
@@ -338,24 +373,6 @@ class AssignmentFactoryTest {
       assertThatThrownBy(() -> assignmentFactory.build(dto))
           .isInstanceOf(ResourceNotFoundException.class)
           .hasMessageContaining("DataSet");
-    }
-
-    @Test
-    @DisplayName("Should reject DATASPACE scope as not available")
-    void shouldRejectDataspaceScope() {
-      UUID roleId = UUID.randomUUID();
-      Role role = createRole(roleId, RoleType.DATA);
-
-      when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
-
-      AssignmentGroupInputDTO dto = new AssignmentGroupInputDTO();
-      dto.setRoleId(roleId);
-      dto.setScopeType(ScopeType.DATASPACE);
-      dto.setScopeId(UUID.randomUUID());
-
-      assertThatThrownBy(() -> assignmentFactory.build(dto))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("not available in this release");
     }
 
     @Test

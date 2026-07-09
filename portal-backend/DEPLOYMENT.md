@@ -8,7 +8,9 @@
    - [Database (PostgreSQL)](#11-database-postgresql)
    - [Keycloak / Security](#12-keycloak--security)
    - [Kafka](#13-kafka)
-   - [Model Atlas](#14-model-atlas)
+   - [Data-Plane Base URL](#15-data-plane-base-url)
+   - [Gateway Trust Model (APISIX / OPA)](#16-gateway-trust-model-apisix--opa)
+   - [Open Data Access (anonymous pass-through)](#17-open-data-access-anonymous-pass-through)
 2. [Optional / Tuning](#2-optional--tuning)
    - [Server](#21-server)
    - [Event Publishing & Config-Adapter](#22-event-publishing--config-adapter)
@@ -62,13 +64,115 @@
 
 ---
 
-### 1.4 Model Atlas
+### 1.5 Data-Plane Base URL
 
-| Property / Env Var | Default                   | Description |
-|---|---------------------------|---|
-| `MODEL_ATLAS_BASEURL` | `http://model-atlas:8080` | Model Atlas base URL |
-| `MODEL_ATLAS_SCOPE` | `civitas`                 | Scope for requests |
-| `MODEL_ATLAS_STAGE` | `draft`                   | Stage for requests |
+| Property / Env Var | Example Value | Description |
+|---|---|---|
+| `CIVITAS_API_BASE_URL` | `https://api.core.civitasconnect.digital` | Public data-plane base URL used to build the per-named-API `previewUrl` returned on GET `/datasets/{id}`. MUST point at the data-plane host (the host APISIX exposes for `/v1/datasets/{id}/{slug}`), not the management host. Fully-qualified HTTPS URL with no path and no trailing slash. No default — startup fails with a `ConstraintViolationException` if missing or malformed. |
+
+> Validation rejects: missing/empty value, non-`https` scheme, paths, trailing slashes (e.g. `https://api.example.com/` or `https://api.example.com/v1`).
+
+---
+
+### 1.6 Gateway Trust Model (APISIX / OPA)
+
+The backend has **no authorization logic of its own** — it *trusts* two HTTP headers that OPA
+sets at the APISIX gateway and that decide which datasets a request may see:
+
+| Header | Meaning |
+|---|---|
+| `X-Allowed-Scope-Ids` | dataset ids the caller may see (`*` = tenant-wide / unscoped) |
+| `X-Allowed-Pool-Ids`  | datapool ids whose datasets the caller may see (datapool-union) |
+
+Because these headers grant data visibility, the deployment **MUST** guarantee they can only ever
+originate from OPA — never from a client. That guarantee rests on three infrastructure properties
+that live in the **`civitas-core-deployment`** repo (owned by Team 3), **not** in this backend's
+container config. They are listed here so the backend's trust assumptions are documented in one
+place; the dev-environment equivalents are in `dev-environment/apisix/apisix_conf/apisix.yaml`.
+
+1. **TLS to Keycloak** — the prod `openid-connect` plugin MUST set `ssl_verify: true`
+   (the dev config disables it for local HTTP Keycloak only).
+
+2. **Header forward + strip at the gateway (review finding F1).** In the prod APISIX config
+   (`components/portal/apisix-plugins.yaml`):
+   - `opa.send_headers_upstream` MUST list **both** `X-Allowed-Scope-Ids` and `X-Allowed-Pool-Ids`,
+     otherwise OPA's decision is dropped and scope/pool filtering silently does nothing.
+   - `proxy-rewrite.headers.remove` MUST strip both client-supplied copies, otherwise a spoofed
+     header is trusted (authorization bypass). The strip list and the saga-route caveat (route-level
+     `proxy-rewrite` overrides the shared one, so the list must be mirrored via
+     `APISIX_PROXY_REWRITE_HEADERS_REMOVE`) are documented in
+     `config-adapter/config-adapter-apisix/README.md`.
+   - The dev side of this contract is guarded by the automated test
+     `TrustedHeaderGatewayContractTest`; there is **no in-repo guard for the prod config** — keep it
+     in sync by hand.
+
+3. **Backend network isolation (review finding F2).** The backend `NetworkPolicy` MUST allow
+   ingress **only from the APISIX gateway**, not directly from the frontend. The frontend reaches the
+   backend exclusively through APISIX (see `portal-frontend/.env.local.template`); a direct
+   frontend→backend path would bypass the header strip in (2) and let the frontend spoof the trusted
+   headers.
+
+> **Deploy F1 and F2 together.** Tightening the `NetworkPolicy` (F2) before the gateway forwards the
+> headers (F1), or vice versa, either locks out the frontend or opens the spoofing window. Roll them
+> out as one coordinated change.
+
+---
+
+### 1.7 Open Data Access (anonymous pass-through)
+
+"Open data" datasets (`Dataset.openDataAccess = true`) allow **anonymous** read access to their
+**payload** (e.g. STA/FROST, OWS/GeoServer). This is decided **centrally by OPA at request time** —
+there is no per-route bypass and the FROST project is never made public. For OPA to make that
+decision, anonymous requests must *reach* OPA instead of being rejected at the gateway, which changes
+the prod APISIX `openid-connect` configuration.
+
+> **No portal-backend change is required for this feature.** The backend has no role here:
+> `openDataAccess` is persisted on the dataset and read by **OPA** from the AuthZ Repository. There is
+> **no new env var** on this service. The work below lives entirely in the **`civitas-core-deployment`**
+> repo (prod APISIX config, owned by Team 3); the dev equivalents are in
+> `dev-environment/apisix/apisix_conf/apisix.yaml` and `dev-environment/apisix/seed-routes.sh`.
+
+The shared dataset-route plugin config (OIDC + OPA) MUST be set up as follows:
+
+1. **Let anonymous requests pass to OPA.** The `openid-connect` plugin MUST run with:
+
+   | Setting | Value | Why |
+   |---|---|---|
+   | `unauth_action` | `"pass"` | An unauthenticated request continues to OPA instead of a 401 at the gateway. OPA then grants or denies per the dataset's `openDataAccess` flag. |
+   | `bearer_only` | `false` | Required by APISIX once `unauth_action: pass` is used. A present bearer token is still validated and its claims still forwarded as `X-Userinfo`. |
+   | `access_token_in_authorization_header` | `true` | Keeps bearer-token auth working for authenticated callers under `bearer_only: false`. |
+
+2. **`session.secret` is now a real credential — inject a strong one.** With `bearer_only: false`,
+   `openid-connect` processes session cookies, so `session.secret` is an **authentication secret**, not
+   an inert schema value: anyone who knows it can mint session state the gateway trusts. It MUST be a
+   strong, **injected** value (e.g. from a Kubernetes Secret) and MUST NOT be a known, shared, or
+   committed constant. (The dev seeding script generates a fresh **random** secret per run for exactly
+   this reason; never copy a dev value into prod.)
+
+3. **Strip client-supplied identity headers at the gateway.** Because anonymous requests now reach
+   OPA, and OPA derives identity from `X-Userinfo`, a `serverless-pre-function` MUST run in the
+   **rewrite phase, before `openid-connect`**, and clear any client-supplied `X-Userinfo`,
+   `X-Access-Token`, and `X-Id-Token`. Without it a client can forge an identity (authorization
+   bypass). The `serverless-pre-function` plugin MUST also be present in the APISIX `plugins`
+   allowlist. This is the identity-header analogue of the `X-Allowed-Scope-Ids`/`X-Allowed-Pool-Ids`
+   strip in [§1.6](#16-gateway-trust-model-apisix--opa) point 2, and the same saga-route caveat applies
+   (a route-level `proxy-rewrite` overrides the shared one), so the strip must hold on the
+   saga-created `/v1/datasets/{id}/{slug}` routes as well — keep it on the shared plugin config that
+   every route references.
+
+> **Deploy points 1–3 together.** Enabling `unauth_action: pass` (point 1) without the identity-header
+> strip (point 3) opens an identity-spoofing window the moment anonymous requests can reach OPA. Roll
+> them out as one coordinated change.
+
+> **Scope:** open data is **payload-only**. Management/discovery endpoints
+> (`GET /v1/datasets/{id}`, `GET /v1/datasets/{id}/apis`) stay authenticated at both OPA and this
+> backend — do not add them to any anonymous allowlist.
+
+The dev side of this contract is guarded by the Bruno API tests `9c2`/`9c3`/`9c4` (forged
+`X-Userinfo` and forged session cookie → 401), `9g`/`9g2`/`9g3` (anonymous STA payload → 200, anonymous
+write/discovery → 401), and `9g4` (anonymous OWS/GeoServer payload → 200, proving open data is
+universal across routable backends); there is **no in-repo guard for the prod APISIX config** — keep
+it in sync by hand.
 
 ---
 
@@ -156,7 +260,7 @@ Production defaults to actuator endpoints only. The `local` profile adds Swagger
 
 To add paths in a deployed environment, override with a comma-separated env var:
 
-```
+```bash
 SECURITY_PERMIT_PATHS_0=/actuator/health/**
 SECURITY_PERMIT_PATHS_1=/actuator/info
 SECURITY_PERMIT_PATHS_2=/api-docs/**
@@ -246,6 +350,9 @@ environment:
   # Credential Encryption (shared with config-adapter)
   CIVITAS_MASTER_KEY: <hex-encoded 256-bit key>
 
+  # Data-Plane Base URL (used to build per-named-API previewUrl)
+  CIVITAS_API_BASE_URL: https://api.core.civitasconnect.digital
+
   # Keycloak
   KEYCLOAK_AUTH_SERVER_URL: https://keycloak.example.com
   KEYCLOAK_ISSUER_URI: https://keycloak.example.com
@@ -255,11 +362,6 @@ environment:
   # Kafka
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   KAFKA_ENABLED: "true"
-
-  # Model Atlas
-  MODEL_ATLAS_BASE_URL: http://model-atlas:8080
-  MODEL_ATLAS_SCOPE: default
-  MODEL_ATLAS_STAGE: draft
 
   # Optional
   APP_URL: https://api.example.com

@@ -10,6 +10,7 @@ import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -34,16 +35,17 @@ class DataStructureServiceTest {
   @Mock private AssignmentRepository assignmentRepository;
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private DataSourceRepository dataSourceRepository;
+  @Mock private DataSinkRepository dataSinkRepository;
 
   @InjectMocks private DataStructureService dataStructureService;
 
   @Nested
-  @DisplayName("Unpublish inUse guard")
-  class UnpublishInUseTests {
+  @DisplayName("Unrelease inUse guard")
+  class UnreleaseInUseTests {
 
     @Test
-    @DisplayName("Should block unpublish when any version is in use")
-    void shouldBlockUnpublishWhenVersionInUse() {
+    @DisplayName("Should block unrelease when any version is in use")
+    void shouldBlockUnreleaseWhenVersionInUse() {
       UUID dsId = UUID.randomUUID();
       UUID versionId = UUID.randomUUID();
 
@@ -56,17 +58,17 @@ class DataStructureServiceTest {
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       ds.setDataStructureVersions(Set.of(version));
 
-      when(dataStructureRepository.findByIdWithRelations(dsId)).thenReturn(Optional.of(ds));
+      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(true);
 
-      assertThatThrownBy(() -> dataStructureService.unpublish(dsId))
+      assertThatThrownBy(() -> dataStructureService.unrelease(dsId))
           .isInstanceOf(ResourceInUseException.class);
     }
 
     @Test
-    @DisplayName("Should allow unpublish when no version is in use")
-    void shouldAllowUnpublishWhenNoVersionInUse() {
+    @DisplayName("Should block unrelease when a version is referenced by a DataSink")
+    void shouldBlockUnreleaseWhenVersionReferencedByDataSink() {
       UUID dsId = UUID.randomUUID();
       UUID versionId = UUID.randomUUID();
 
@@ -79,12 +81,36 @@ class DataStructureServiceTest {
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       ds.setDataStructureVersions(Set.of(version));
 
-      when(dataStructureRepository.findByIdWithRelations(dsId)).thenReturn(Optional.of(ds));
+      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
+      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
+          .thenReturn(false);
+      when(dataSinkRepository.existsByDataStructureVersionIdIn(Set.of(versionId))).thenReturn(true);
+
+      assertThatThrownBy(() -> dataStructureService.unrelease(dsId))
+          .isInstanceOf(ResourceInUseException.class);
+    }
+
+    @Test
+    @DisplayName("Should allow unrelease when no version is in use")
+    void shouldAllowUnreleaseWhenNoVersionInUse() {
+      UUID dsId = UUID.randomUUID();
+      UUID versionId = UUID.randomUUID();
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+
+      DataStructure ds = new DataStructure();
+      ds.setId(dsId);
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      ds.setDataStructureVersions(Set.of(version));
+
+      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(false);
       when(dataStructureRepository.save(ds)).thenReturn(ds);
 
-      dataStructureService.unpublish(dsId);
+      dataStructureService.unrelease(dsId);
 
       verify(dataStructureRepository).save(ds);
     }
@@ -108,9 +134,32 @@ class DataStructureServiceTest {
       ds.setDataStructureVersions(Set.of(version));
 
       when(dataStructureRepository.existsById(dsId)).thenReturn(true);
-      when(dataStructureRepository.findByIdWithRelations(dsId)).thenReturn(Optional.of(ds));
+      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(true);
+
+      assertThatThrownBy(() -> dataStructureService.deleteById(dsId))
+          .isInstanceOf(ResourceInUseException.class);
+    }
+
+    @Test
+    @DisplayName("Should block delete when a version is referenced by a DataSink")
+    void shouldBlockDeleteWhenVersionReferencedByDataSink() {
+      UUID dsId = UUID.randomUUID();
+      UUID versionId = UUID.randomUUID();
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+
+      DataStructure ds = new DataStructure();
+      ds.setId(dsId);
+      ds.setDataStructureVersions(Set.of(version));
+
+      when(dataStructureRepository.existsById(dsId)).thenReturn(true);
+      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
+      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
+          .thenReturn(false);
+      when(dataSinkRepository.existsByDataStructureVersionIdIn(Set.of(versionId))).thenReturn(true);
 
       assertThatThrownBy(() -> dataStructureService.deleteById(dsId))
           .isInstanceOf(ResourceInUseException.class);
@@ -130,7 +179,7 @@ class DataStructureServiceTest {
       ds.setDataStructureVersions(Set.of(version));
 
       when(dataStructureRepository.existsById(dsId)).thenReturn(true);
-      when(dataStructureRepository.findByIdWithRelations(dsId)).thenReturn(Optional.of(ds));
+      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(false);
 

@@ -1,0 +1,40 @@
+meta {
+  name: 02. Create DataPool B (datasource scope)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/datapools
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Scope Test Pool B {{scopeRunId}}",
+    "description": "DataPool the SPECIFIC DataSource is scoped to (NOT the dataset's pool)",
+    "contactPersonId": "{{userId}}",
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('scopePoolBId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("scopePoolBId is set", function() {
+    expect(bru.getVar('scopePoolBId')).to.be.a('string');
+  });
+}
+
+docs {
+  **Post-condition:** saves `scopePoolBId`. This is the pool the DataSource will be scoped to —
+  deliberately different from `scopePoolAId` to trigger the mismatch.
+}

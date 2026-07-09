@@ -2,8 +2,6 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jwt.JWTParser;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.model.embedded.RoleType;
@@ -32,6 +30,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("/users/me Integration Tests")
 class UserMeIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -129,15 +129,15 @@ class UserMeIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(assignments.size()).isEqualTo(1);
 
     JsonNode assignment0 = assignments.get(0);
-    assertThat(assignment0.path("scopeType").asText()).isEqualTo("DATASET");
-    assertThat(assignment0.path("scopeId").asText()).isEqualTo(dataSet.getId().toString());
+    assertThat(assignment0.path("scopeType").asString()).isEqualTo("DATASET");
+    assertThat(assignment0.path("scopeId").asString()).isEqualTo(dataSet.getId().toString());
 
     JsonNode permissions = assignment0.path("permissions");
     assertThat(permissions.isArray()).isTrue();
     assertThat(permissions.size()).isGreaterThanOrEqualTo(1);
     boolean hasDatasetRead = false;
     for (JsonNode perm : permissions) {
-      if ("DATASET_READ".equals(perm.asText())) {
+      if ("DATASET_READ".equals(perm.asString())) {
         hasDatasetRead = true;
         break;
       }

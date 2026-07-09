@@ -1,56 +1,90 @@
-import type { UMLPrimitiveType, UMLTypeReference } from '../types/uml'
+import type { UMLGeometryType, UMLPrimitiveType, UMLTypeReference } from '../types/uml'
 
 // UML 2.5 Primitive Types with their official URIs
 export const UML_PRIMITIVE_TYPES: Record<UMLPrimitiveType, { name: string; uri: string }> = {
   String: {
     name: 'String',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#String',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
   },
   Integer: {
     name: 'Integer',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Integer',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   },
   Boolean: {
     name: 'Boolean',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Boolean',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Boolean',
   },
   Float: {
     name: 'Float',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Real',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
   },
   Double: {
     name: 'Double',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Real',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
   },
   Long: {
     name: 'Long',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Integer',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   },
   Short: {
     name: 'Short',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Integer',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   },
   Byte: {
     name: 'Byte',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Integer',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   },
   Character: {
     name: 'Character',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#String',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
   },
   Date: {
     name: 'Date',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#String',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
+  },
+  Uuid: {
+    name: 'Uuid',
+    uri: 'http://models.civitasconnect.org/Types/1.0#//Uuid',
   },
   void: {
     name: 'void',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#void',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
+  },
+}
+export const UML_GEOMETRY_TYPES: Record<UMLGeometryType, { name: string; uri: string }> = {
+  Point: {
+    name: 'Point',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//Point',
+  },
+  LineString: {
+    name: 'LineString',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//LineString',
+  },
+  Polygon: {
+    name: 'Polygon',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//Polygon',
+  },
+  MultiPoint: {
+    name: 'MultiPoint',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//MultiPoint',
+  },
+  MultiLineString: {
+    name: 'MultiLineString',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//MultiLineString',
+  },
+  MultiPolygon: {
+    name: 'MultiPolygon',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//MultiPolygon',
+  },
+  GeometryCollection: {
+    name: 'GeometryCollection',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//GeometryCollection',
   },
 }
 
 // Categorized primitive types for UI dropdowns
 export const PRIMITIVE_TYPE_CATEGORIES = {
-  Text: ['String', 'Character'] as UMLPrimitiveType[],
+  Text: ['String', 'Character', 'Uuid'] as UMLPrimitiveType[],
   Numbers: ['Integer', 'Long', 'Short', 'Byte', 'Float', 'Double'] as UMLPrimitiveType[],
   Other: ['Boolean', 'Date', 'void'] as UMLPrimitiveType[],
 }
@@ -89,6 +123,30 @@ export const MULTIPLICITY_VALUES = [
   '0..*', // Zero or more
   '*', // Many (shorthand for 0..*)
 ]
+
+// Cardinalities offered by the per-property dropdown (issue #1707). These drive
+// the JSON Schema mapping: `..1` values stay scalar, `..*` values become arrays;
+// a lower bound of 1 marks the property as `required`. Deliberately omits the
+// `*` shorthand that MULTIPLICITY_VALUES carries for relationship edges, since
+// it would be redundant with `0..*` here.
+export const PROPERTY_CARDINALITY_VALUES = ['0..1', '1', '0..*', '1..*'] as const
+
+export type PropertyCardinality = (typeof PROPERTY_CARDINALITY_VALUES)[number]
+
+/**
+ * Maps a stored `multiplicity` value to the cardinality the dropdown should
+ * display. An unset multiplicity is treated as `1` (exactly one) everywhere
+ * downstream (see {@link parseMultiplicity}), so it surfaces as `1`.
+ */
+export const cardinalityForDisplay = (multiplicity?: string): string => multiplicity || '1'
+
+/**
+ * Maps a dropdown selection back to the value to persist on the attribute.
+ * Selecting `1` clears the field (writes `undefined`) because unset already
+ * means exactly-one downstream; persisting a literal `"1"` would needlessly
+ * mutate models that previously had no multiplicity set.
+ */
+export const cardinalityForStorage = (value: string): string | undefined => (value === '1' ? undefined : value)
 
 // UML Stereotypes
 export const UML_STEREOTYPES = {

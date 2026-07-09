@@ -7,6 +7,7 @@ import de.civitascore.portal.model.entity.Role;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,9 +18,8 @@ import org.springframework.stereotype.Repository;
 public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
 
   /**
-   * Find an assignment by ID with all related entities eagerly fetched in a single JOIN query. This
-   * prevents N+1 query problems when loading assignments with their relationships. Use this for
-   * read operations (GET/UPDATE) instead of regular findById.
+   * Find an assignment by ID with all related entities eagerly fetched. This prevents N+1 query
+   * problems when loading assignments with their relationships.
    *
    * @param id the assignment ID
    * @return the assignment with eagerly fetched group, role, and scope entities
@@ -28,14 +28,14 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
       attributePaths = {
         "group",
         "role",
-        "dataSpace",
         "dataset",
         "catalog",
         "dataSource",
-        "dataStructure"
+        "dataStructure",
+        "dataPool"
       })
-  @Query("SELECT a FROM Assignment a WHERE a.id = :id")
-  Optional<Assignment> findByIdWithRelations(@Param("id") UUID id);
+  @Override
+  @NonNull Optional<Assignment> findById(@NonNull UUID id);
 
   /**
    * Find all assignments for the given role ID with groups eagerly fetched. This prevents N+1 query
@@ -80,16 +80,6 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
   List<Assignment> findAllByScopeTypeAndDatasetId(ScopeType scopeType, UUID datasetId);
 
   /**
-   * Find all assignments for a data space with the given scope type.
-   *
-   * @param scopeType the scope type to filter by
-   * @param dataSpaceId the data space ID
-   * @return assignments with eagerly fetched group, role, and dataSpace
-   */
-  @EntityGraph(attributePaths = {"group", "role", "dataSpace"})
-  List<Assignment> findAllByScopeTypeAndDataSpaceId(ScopeType scopeType, UUID dataSpaceId);
-
-  /**
    * Find all assignments for a catalog with the given scope type.
    *
    * @param scopeType the scope type to filter by
@@ -108,6 +98,16 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
    */
   @EntityGraph(attributePaths = {"group", "role", "dataStructure"})
   List<Assignment> findAllByScopeTypeAndDataStructureId(ScopeType scopeType, UUID dataStructureId);
+
+  /**
+   * Find all assignments for a datapool with the given scope type.
+   *
+   * @param scopeType the scope type to filter by
+   * @param dataPoolId the datapool ID
+   * @return assignments with eagerly fetched group, role, and dataPool
+   */
+  @EntityGraph(attributePaths = {"group", "role", "dataPool"})
+  List<Assignment> findAllByScopeTypeAndDataPoolId(ScopeType scopeType, UUID dataPoolId);
 
   /**
    * Check if an unscoped assignment exists for the given group and role.
@@ -143,12 +143,82 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
         "dataStructure",
         "dataSource",
         "dataset",
-        "dataSpace",
-        "catalog"
+        "catalog",
+        "dataPool"
       })
   @Query(
       "SELECT a FROM Assignment a"
           + " WHERE a.group IN (SELECT ug FROM User u JOIN u.groups ug"
           + " WHERE u.externalId = :externalId)")
   List<Assignment> findAllByUserExternalId(@Param("externalId") String externalId);
+
+  /**
+   * Finds all assignments with the given scope type that apply to a user via their group
+   * memberships.
+   *
+   * @param userId the user ID
+   * @param scopeType the scope type to filter by
+   * @return assignments with eagerly fetched group, role, and scope entities
+   */
+  @EntityGraph(
+      attributePaths = {
+        "group",
+        "role",
+        "role.permissions",
+        "dataStructure",
+        "dataSource",
+        "dataset",
+        "catalog",
+        "dataPool"
+      })
+  @Query(
+      "SELECT a FROM Assignment a"
+          + " WHERE a.scopeType = :scopeType"
+          + " AND a.group IN (SELECT ug FROM User u JOIN u.groups ug WHERE u.id = :userId)")
+  List<Assignment> findAllByUserIdAndScopeType(
+      @Param("userId") UUID userId, @Param("scopeType") ScopeType scopeType);
+
+  /**
+   * Finds all assignments with the given scope type for a specific group.
+   *
+   * @param groupId the group ID
+   * @param scopeType the scope type to filter by
+   * @return assignments with eagerly fetched group, role, and scope entities
+   */
+  @EntityGraph(
+      attributePaths = {
+        "group",
+        "role",
+        "role.permissions",
+        "dataStructure",
+        "dataSource",
+        "dataset",
+        "catalog",
+        "dataPool"
+      })
+  @Query("SELECT a FROM Assignment a WHERE a.group.id = :groupId AND a.scopeType = :scopeType")
+  List<Assignment> findAllByGroupIdAndScopeType(
+      @Param("groupId") UUID groupId, @Param("scopeType") ScopeType scopeType);
+
+  /**
+   * Finds all assignments with the given scope type that reference a specific role.
+   *
+   * @param roleId the role ID
+   * @param scopeType the scope type to filter by
+   * @return assignments with eagerly fetched group, role, and scope entities
+   */
+  @EntityGraph(
+      attributePaths = {
+        "group",
+        "role",
+        "role.permissions",
+        "dataStructure",
+        "dataSource",
+        "dataset",
+        "catalog",
+        "dataPool"
+      })
+  @Query("SELECT a FROM Assignment a WHERE a.role.id = :roleId AND a.scopeType = :scopeType")
+  List<Assignment> findAllByRoleIdAndScopeType(
+      @Param("roleId") UUID roleId, @Param("scopeType") ScopeType scopeType);
 }

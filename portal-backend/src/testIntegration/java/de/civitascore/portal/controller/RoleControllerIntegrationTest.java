@@ -2,19 +2,13 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.PermissionType;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.model.output.RoleOutputDTO;
-import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.PermissionRepository;
-import de.civitascore.portal.repository.RoleRepository;
-import de.civitascore.portal.repository.UserRepository;
-import de.civitascore.portal.service.AssignmentService;
-import de.civitascore.portal.service.GroupService;
-import de.civitascore.portal.service.UserService;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,17 +29,7 @@ class RoleControllerIntegrationTest
 
   private final String ROLES_ENDPOINT = "/roles";
 
-  @Autowired private RoleRepository roleRepository;
-
-  @Autowired private GroupService groupService;
-  @Autowired private GroupRepository groupRepository;
-
-  @Autowired private AssignmentService assignmentService;
-  @Autowired private AssignmentRepository assignmentRepository;
-
-  @Autowired private UserService userService;
-  @Autowired private UserRepository userRepository;
-
+  @Autowired protected PortalTestDataFactory portalData;
   @Autowired private PermissionRepository permissionRepository;
 
   @Override
@@ -55,10 +39,7 @@ class RoleControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
-    assignmentRepository.deleteAll();
-    roleRepository.deleteAll();
-    groupRepository.deleteAll();
-    userRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   @Override
@@ -80,7 +61,6 @@ class RoleControllerIntegrationTest
   @Override
   protected RoleInputDTO createUpdateInput() {
     RoleInputDTO input = new RoleInputDTO();
-    input.setName("updated_role");
     input.setName("Updated Role");
     input.setDescription("Updated description");
     input.setRoleType(RoleType.DATA);
@@ -167,11 +147,6 @@ class RoleControllerIntegrationTest
     void shouldCreateRoleWithDifferentRoleTypes() {
       for (RoleType type : RoleType.values()) {
         RoleInputDTO input = createValidInput();
-        input.setName(
-            "role_"
-                + type.name().toLowerCase()
-                + "_"
-                + UUID.randomUUID().toString().substring(0, 8));
         input.setName("Role " + type.name());
         input.setRoleType(type);
 
@@ -718,7 +693,6 @@ class RoleControllerIntegrationTest
     @DisplayName("Should handle special characters in name")
     void shouldHandleSpecialCharactersInName() {
       RoleInputDTO input = createValidInput();
-      input.setName("role_with_special_chars_äöü");
       input.setName("Role with special chars: äöü ß @#$%");
 
       ResponseEntity<RoleOutputDTO> response = performCreate(input);

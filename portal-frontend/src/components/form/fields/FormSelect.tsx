@@ -73,12 +73,12 @@ export const FormSelect = <T extends FieldValues>(props: AccessibleSelectProps<T
                 data-test-element="formField"
                 aria-label={label}
                 className={cn(
-                  'w-full disabled:opacity-100 disabled:text-muted-foreground disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0 disabled:pointer-events-none',
+                  'w-full disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0 disabled:pointer-events-none',
                   selectTriggerProps?.className,
                 )}
                 disabled={disabled}
               >
-                <SelectValue placeholder={placeholder} />
+                <SelectValue placeholder={disabled ? undefined : placeholder} />
               </SelectTrigger>
               <SelectContent data-testid={`${name}SelectContent`}>
                 {placeholder && (

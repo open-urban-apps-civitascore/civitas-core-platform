@@ -12,17 +12,18 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.context.ActiveProfiles;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
  * Integration tests for the UserContext API endpoint.
@@ -32,12 +33,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
 @ActiveProfiles("test")
+@AutoConfigureTestRestTemplate
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UserContextControllerIT {
 
   @Container @ServiceConnection
-  static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>("postgres:16-alpine")
+  static PostgreSQLContainer postgres =
+      new PostgreSQLContainer("postgres:16-alpine")
           .withDatabaseName("testdb")
           .withUsername("test")
           .withPassword("test");
@@ -242,7 +244,7 @@ class UserContextControllerIT {
     // Different scope types
     List<String> scopeTypes =
         group.getAssignments().stream().map(AssignmentContext::getScopeType).toList();
-    assertThat(scopeTypes).containsExactlyInAnyOrder("TENANT", "DATASPACE");
+    assertThat(scopeTypes).containsExactlyInAnyOrder("TENANT", "DATAPOOL");
 
     // TENANT assignment has no scope entity (scopeId is null)
     AssignmentContext tenantAssignment =
@@ -252,13 +254,13 @@ class UserContextControllerIT {
             .orElseThrow();
     assertThat(tenantAssignment.getScopeId()).isNull();
 
-    // DATASPACE assignment has scopeId from data_space_id FK column
-    AssignmentContext dataspaceAssignment =
+    // DATAPOOL assignment has scopeId from datapool_id FK column
+    AssignmentContext datapoolAssignment =
         group.getAssignments().stream()
-            .filter(a -> "DATASPACE".equals(a.getScopeType()))
+            .filter(a -> "DATAPOOL".equals(a.getScopeType()))
             .findFirst()
             .orElseThrow();
-    assertThat(dataspaceAssignment.getScopeId())
+    assertThat(datapoolAssignment.getScopeId())
         .isEqualTo("f7777777-7777-7777-7777-777777777777");
   }
 }

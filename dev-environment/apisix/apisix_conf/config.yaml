@@ -38,6 +38,10 @@ deployment:
 
 # Enabled plugins
 plugins:
+  # Runs in the rewrite phase BEFORE openid-connect to clear client-supplied identity headers
+  # (X-Userinfo/X-Access-Token/X-Id-Token), preventing identity spoofing now that anonymous
+  # requests reach OPA (unauth_action: pass). See the plugin_config in seed-routes.sh / apisix.yaml.
+  - serverless-pre-function
   - proxy-rewrite
   - openid-connect
   - opa

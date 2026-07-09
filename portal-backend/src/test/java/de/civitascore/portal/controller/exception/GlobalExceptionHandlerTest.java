@@ -239,7 +239,7 @@ class GlobalExceptionHandlerTest {
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       assertThat(response.getBody().getType())
           .hasToString("urn:civitas:error:ENTITY_VALIDATION_FAILED");
-      assertThat(response.getBody().getDetail()).isEqualTo("scopeType requires scopeId");
+      assertThat(response.getBody().getDetail()).isEqualTo("Entity validation failed");
       assertThat(response.getBody().getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 

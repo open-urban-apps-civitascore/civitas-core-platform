@@ -37,7 +37,7 @@ export const stringifyStringArray = (v: unknown): string | undefined => {
 
 export const MqttApiResponseSchema = z.object({
   urls: z.array(z.string()).nullable().optional(),
-  topics: z.array(z.string()).nullable().optional(),
+  topics: z.array(z.string()).max(1).nullable().optional(),
   client_id: z.string().nullable().optional(),
   qos: QosSchema.nullable().optional(),
   connect_timeout: z.string().nullable().optional(),
@@ -48,9 +48,11 @@ export const MqttApiResponseSchema = z.object({
 })
 
 /* Form schemas for edit */
+const singleTopic = z.string().regex(/^[^,;\s]*$/, 'datasources.errors.topicInvalidChars')
+
 const MqttBaseSchema = z.object({
   urls: z.string().trim(),
-  topics: z.string().trim(),
+  topics: singleTopic,
   client_id: z.string().trim(),
   qos: QosSchema,
   connect_timeout: z.string().trim(),
@@ -84,14 +86,19 @@ const brokerUrlArray = (inner: z.ZodTypeAny) =>
 
 export const MqttLooseSchema = MqttBaseSchema.partial().extend({
   urls: brokerUrlArray(z.array(z.string()).optional()),
-  topics: z.preprocess(parseStringArray, z.array(z.string()).optional()),
+  topics: singleTopic
+    .optional()
+    .transform(parseStringArray)
+    .pipe(z.array(z.string()).max(1, 'datasources.errors.topicSingle').optional()),
 })
 
 export const MqttStrictSchema = MqttBaseSchema.partial()
   .required({ qos: true })
   .extend({
     urls: brokerUrlArray(z.array(z.string()).min(1, 'common.errors.required')),
-    topics: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'common.errors.required')),
+    topics: singleTopic
+      .transform(v => parseStringArray(v) ?? [])
+      .pipe(z.array(z.string()).min(1, 'common.errors.required').max(1, 'datasources.errors.topicSingle')),
   })
 
 export const MqttApiToFormSchema = MqttApiResponseSchema.transform(({ urls, topics, tls, qos, ...rest }) => ({
@@ -124,35 +131,19 @@ export const SqlApiResponseSchema = z.object({
 })
 
 const SqlBaseSchema = z.object({
-  driver: z.enum([
-    'postgres',
-    'mysql',
-    'clickhouse',
-    'mssql',
-    'sqlite',
-    'oracle',
-    'snowflake',
-    'trino',
-    'gocosmos',
-    'spanner',
-  ]),
+  // Only PostgreSQL is wired in the NiFi pipeline engine, so the form offers no other driver. The
+  // wide driver list stays in SqlApiResponseSchema so loading a legacy datasource that still names
+  // another driver does not fail.
+  driver: z.literal('postgres'),
   dsn: z.string().trim(),
   table: z.string().trim(),
   columns: z.string().trim(),
   where: z.string().trim(),
-  prefix: z.string().trim(),
-  suffix: z.string().trim(),
-  init_statement: z.string().trim(),
-  conn_max_idle_time: z.string().trim(),
-  conn_max_life_time: z.string().trim(),
-  conn_max_idle: z.preprocess(
-    v => (v === '' || v === undefined ? undefined : Number(v)),
-    z.number().int().nonnegative(),
-  ),
-  conn_max_open: z.preprocess(
-    v => (v === '' || v === undefined ? undefined : Number(v)),
-    z.number().int().nonnegative(),
-  ),
+  // prefix/suffix/init_statement are Redpanda-Connect query fields the NiFi engine does not honor;
+  // conn_max_* are its pool-tuning fields. The adapter rejects prefix/suffix/init_statement and
+  // ignores conn_max_*, and the form no longer offers any of them, so they are not part of the form
+  // schema. They remain in SqlApiResponseSchema so loading a legacy datasource that still carries
+  // them does not fail (unknown keys are stripped on save).
   user: z.string().trim(),
   password: z.string().trim(),
 })
@@ -160,14 +151,6 @@ const SqlBaseSchema = z.object({
 export const SqlLooseSchema = SqlBaseSchema.partial().extend({
   dsn: URISchema.optional(),
   columns: z.preprocess(parseStringArray, z.array(z.string()).optional()),
-  conn_max_idle: z.preprocess(
-    v => (v === '' || v === undefined ? undefined : Number(v)),
-    z.number().int().nonnegative().optional(),
-  ),
-  conn_max_open: z.preprocess(
-    v => (v === '' || v === undefined ? undefined : Number(v)),
-    z.number().int().nonnegative().optional(),
-  ),
 })
 
 export const SqlStrictSchema = SqlBaseSchema.partial()
@@ -181,14 +164,6 @@ export const SqlStrictSchema = SqlBaseSchema.partial()
     dsn: z.string().min(1, 'common.errors.required').pipe(URISchema),
     table: z.string().trim().min(1, 'common.errors.descriptionRequired'),
     columns: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'required')),
-    conn_max_idle: z.preprocess(
-      v => (v === '' || v === undefined ? undefined : Number(v)),
-      z.number().int().nonnegative().optional(),
-    ),
-    conn_max_open: z.preprocess(
-      v => (v === '' || v === undefined ? undefined : Number(v)),
-      z.number().int().nonnegative().optional(),
-    ),
   })
 
 export const SqlApiToFormSchema = SqlApiResponseSchema.transform(({ columns, ...rest }) => ({

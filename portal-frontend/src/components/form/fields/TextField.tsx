@@ -30,6 +30,7 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
     disabled,
     shouldShowErrors = true,
     manualError,
+    type,
   } = props
   const isMobile = useIsMobile()
   return (
@@ -52,8 +53,10 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
               <Input
                 data-testid={`${name}TextField`}
                 data-test-element="formField"
-                className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
-                placeholder={placeholder}
+                type={type}
+                autoComplete={type === 'password' ? 'new-password' : undefined}
+                className="disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
+                placeholder={disabled ? undefined : placeholder}
                 {...field}
                 disabled={disabled}
                 aria-invalid={!!manualError || !!form.formState.errors[name]}

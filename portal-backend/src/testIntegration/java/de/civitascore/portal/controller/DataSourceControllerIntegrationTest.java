@@ -2,28 +2,27 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
-import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
-import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
-import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
-import de.civitascore.portal.repository.DataStructureRepository;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,13 +39,12 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("DataSource Controller Integration Tests")
 class DataSourceControllerIntegrationTest
-    extends BaseControllerIntegrationTest<DataSourceInputDTO, DataSourceOutputDTO> {
+    extends BaseDataEntityControllerIntegrationTest<DataSourceInputDTO, DataSourceOutputDTO> {
 
   private static final String DATASOURCES_ENDPOINT = "/datasources";
 
+  @Autowired protected PortalTestDataFactory portalData;
   @Autowired private DataSourceRepository dataSourceRepository;
-  @Autowired private DataStructureRepository dataStructureRepository;
-  @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private PipelineRepository pipelineRepository;
 
@@ -57,25 +55,14 @@ class DataSourceControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
-    pipelineRepository.deleteAll();
-    dataSetRepository.deleteAll();
-    dataSourceRepository.deleteAll();
-    dataStructureVersionRepository.deleteAll();
-    dataStructureRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   private UUID createAvailableDataStructureVersionId() {
-    DataStructure ds = new DataStructure();
-    ds.setName("ds_" + UUID.randomUUID().toString().substring(0, 8));
-    ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-    ds = dataStructureRepository.save(ds);
-
-    DataStructureVersion dsv = new DataStructureVersion();
-    dsv.setVersion("1.0.0");
-    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-    dsv.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-    dsv.setDataStructure(ds);
-    dsv = dataStructureVersionRepository.save(dsv);
+    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+    DataStructureVersion dsv =
+        portalData.dataStructureVersion(
+            ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
     return dsv.getId();
   }
 
@@ -121,7 +108,7 @@ class DataSourceControllerIntegrationTest
     return output.getId();
   }
 
-  private UUID createPublishableTestEntity() {
+  private UUID createReleasableTestEntity() {
     UUID dsvId = createAvailableDataStructureVersionId();
     DataSourceInputDTO input = createValidInput();
     input.setDataStructureVersionId(dsvId);
@@ -129,7 +116,7 @@ class DataSourceControllerIntegrationTest
     return response.getBody().getId();
   }
 
-  private UUID createPublishableSqlTestEntity() {
+  private UUID createReleasableSqlTestEntity() {
     UUID dsvId = createAvailableDataStructureVersionId();
     DataSourceInputDTO input = createValidSqlInput();
     input.setDataStructureVersionId(dsvId);
@@ -137,44 +124,35 @@ class DataSourceControllerIntegrationTest
     return response.getBody().getId();
   }
 
-  private ResponseEntity<DataSourceOutputDTO> performPublish(UUID id) {
-    String url = DATASOURCES_ENDPOINT + "/" + id + "/publish";
+  private ResponseEntity<DataSourceOutputDTO> performRelease(UUID id) {
+    String url = DATASOURCES_ENDPOINT + "/" + id + "/release";
     return exchange(url, HttpMethod.POST, createAuthHeaders(), null, getOutputTypeReference());
   }
 
-  private ResponseEntity<DataSourceOutputDTO> performUnpublish(UUID id) {
-    String url = DATASOURCES_ENDPOINT + "/" + id + "/unpublish";
+  private ResponseEntity<DataSourceOutputDTO> performUnrelease(UUID id) {
+    String url = DATASOURCES_ENDPOINT + "/" + id + "/unrelease";
     return exchange(url, HttpMethod.POST, createAuthHeaders(), null, getOutputTypeReference());
   }
 
-  private ResponseEntity<String> performUnpublishExpectingError(UUID id) {
-    String url = DATASOURCES_ENDPOINT + "/" + id + "/unpublish";
+  private ResponseEntity<String> performUnreleaseExpectingError(UUID id) {
+    String url = DATASOURCES_ENDPOINT + "/" + id + "/unrelease";
     return restTemplate.exchange(
         url, HttpMethod.POST, new HttpEntity<>(createAuthHeaders()), String.class);
   }
 
   private DataSource createAvailableDataSource() {
-    UUID id = createPublishableTestEntity();
-    performPublish(id);
+    UUID id = createReleasableTestEntity();
+    performRelease(id);
     return dataSourceRepository.findById(id).orElseThrow();
   }
 
   private void linkDataSourceToDataSetViaStatus(DataSource dataSource, DataSetStatus status) {
-    DataSet dataSet = new DataSet();
-    dataSet.setName("ds_for_inuse_" + UUID.randomUUID().toString().substring(0, 8));
-    dataSet.setDataSetStatus(status);
-    dataSet.setOpenDataAccess(false);
-    dataSet = dataSetRepository.save(dataSet);
-
-    Pipeline pipeline = new Pipeline();
-    pipeline.setName("pipeline_" + UUID.randomUUID().toString().substring(0, 8));
-    pipeline.setDataSet(dataSet);
-    pipeline.setDataSources(Set.of(dataSource));
-    pipelineRepository.save(pipeline);
+    DataSet dataSet = portalData.dataSet(b -> b.dataSetStatus(status));
+    portalData.pipeline(dataSet, b -> b.dataSources(Set.of(dataSource)));
   }
 
-  private ResponseEntity<String> performPublishExpectingError(UUID id) {
-    String url = DATASOURCES_ENDPOINT + "/" + id + "/publish";
+  private ResponseEntity<String> performReleaseExpectingError(UUID id) {
+    String url = DATASOURCES_ENDPOINT + "/" + id + "/release";
     return restTemplate.exchange(
         url, HttpMethod.POST, new HttpEntity<>(createAuthHeaders()), String.class);
   }
@@ -186,32 +164,18 @@ class DataSourceControllerIntegrationTest
   }
 
   private UUID createDraftDataStructureVersionId() {
-    DataStructure ds = new DataStructure();
-    ds.setName("ds_" + UUID.randomUUID().toString().substring(0, 8));
-    ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-    ds = dataStructureRepository.save(ds);
-
-    DataStructureVersion dsv = new DataStructureVersion();
-    dsv.setVersion("1.0.0");
-    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-    dsv.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-    dsv.setDataStructure(ds);
-    dsv = dataStructureVersionRepository.save(dsv);
+    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+    DataStructureVersion dsv =
+        portalData.dataStructureVersion(
+            ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.DRAFT));
     return dsv.getId();
   }
 
   private UUID createDsvWithDraftParentDataStructure() {
-    DataStructure ds = new DataStructure();
-    ds.setName("ds_" + UUID.randomUUID().toString().substring(0, 8));
-    ds.setDataStructureStatus(DataStructureStatus.DRAFT);
-    ds = dataStructureRepository.save(ds);
-
-    DataStructureVersion dsv = new DataStructureVersion();
-    dsv.setVersion("1.0.0");
-    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-    dsv.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-    dsv.setDataStructure(ds);
-    dsv = dataStructureVersionRepository.save(dsv);
+    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.DRAFT));
+    DataStructureVersion dsv =
+        portalData.dataStructureVersion(
+            ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
     return dsv.getId();
   }
 
@@ -458,15 +422,15 @@ class DataSourceControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Publish DataSource Tests")
-  class PublishTests {
+  @DisplayName("Release DataSource Tests")
+  class ReleaseTests {
 
     @Test
-    @DisplayName("Should publish valid MQTT data source")
-    void shouldPublishValidMqttDataSource() {
-      UUID id = createPublishableTestEntity();
+    @DisplayName("Should release valid MQTT data source")
+    void shouldReleaseValidMqttDataSource() {
+      UUID id = createReleasableTestEntity();
 
-      ResponseEntity<DataSourceOutputDTO> response = performPublish(id);
+      ResponseEntity<DataSourceOutputDTO> response = performRelease(id);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
@@ -474,30 +438,30 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should publish valid SQL data source")
-    void shouldPublishValidSqlDataSource() {
-      UUID id = createPublishableSqlTestEntity();
+    @DisplayName("Should release valid SQL data source")
+    void shouldReleaseSqlDataSource() {
+      UUID id = createReleasableSqlTestEntity();
 
-      ResponseEntity<DataSourceOutputDTO> response = performPublish(id);
+      ResponseEntity<DataSourceOutputDTO> response = performRelease(id);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().getDataSourceStatus()).isEqualTo(DataSourceStatus.AVAILABLE);
     }
 
     @Test
-    @DisplayName("Should fail to publish already AVAILABLE data source")
-    void shouldFailToPublishAvailableDataSource() {
-      UUID id = createPublishableTestEntity();
-      performPublish(id);
+    @DisplayName("Should fail to release already AVAILABLE data source")
+    void shouldFailToReleaseAvailableDataSource() {
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
 
-      ResponseEntity<String> response = performPublishExpectingError(id);
+      ResponseEntity<String> response = performReleaseExpectingError(id);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
-    @DisplayName("Should fail to publish data source without configuration")
-    void shouldFailToPublishWithoutConfiguration() {
+    @DisplayName("Should fail to release data source without configuration")
+    void shouldFailToReleaseWithoutConfiguration() {
       DataSourceInputDTO input = new DataSourceInputDTO();
       input.setName("bare_source_" + UUID.randomUUID().toString().substring(0, 8));
       input.setConnectorType(ConnectorType.MQTT);
@@ -505,15 +469,15 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> createResponse = performCreate(input);
       UUID id = createResponse.getBody().getId();
 
-      ResponseEntity<String> response = performPublishExpectingError(id);
+      ResponseEntity<String> response = performReleaseExpectingError(id);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
-    @DisplayName("Should fail to publish non-existent data source")
-    void shouldFailToPublishNonExistent() {
-      ResponseEntity<String> response = performPublishExpectingError(UUID.randomUUID());
+    @DisplayName("Should fail to release non-existent data source")
+    void shouldFailToReleaseNonExistent() {
+      ResponseEntity<String> response = performReleaseExpectingError(UUID.randomUUID());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
@@ -539,8 +503,8 @@ class DataSourceControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete AVAILABLE data source")
     void shouldFailToDeleteAvailableDataSource() {
-      UUID id = createPublishableTestEntity();
-      performPublish(id);
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
 
       ResponseEntity<Void> response = performDelete(id);
 
@@ -687,32 +651,36 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("PATCH then publish should work")
-    void patchThenPublishShouldWork() {
-      UUID id = createPublishableSqlTestEntity();
+    @DisplayName("PATCH then release should work")
+    void patchThenReleaseShouldWork() {
+      UUID id = createReleasableSqlTestEntity();
 
-      Map<String, Object> patch = Map.of("description", "Published via patch");
+      Map<String, Object> patch = Map.of("description", "Released via patch");
       ResponseEntity<DataSourceOutputDTO> patchResponse = performPatch(id, patch);
 
       assertThat(patchResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(patchResponse.getBody().getDescription()).isEqualTo("Published via patch");
+      assertThat(patchResponse.getBody().getDescription()).isEqualTo("Released via patch");
 
-      ResponseEntity<DataSourceOutputDTO> publishResponse = performPublish(id);
+      ResponseEntity<DataSourceOutputDTO> releaseResponse = performRelease(id);
 
-      assertThat(publishResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(publishResponse.getBody().getDataSourceStatus())
+      assertThat(releaseResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(releaseResponse.getBody().getDataSourceStatus())
           .isEqualTo(DataSourceStatus.AVAILABLE);
-      assertThat(publishResponse.getBody().getDescription()).isEqualTo("Published via patch");
+      assertThat(releaseResponse.getBody().getDescription()).isEqualTo("Released via patch");
     }
   }
 
   @Nested
-  @DisplayName("Unique Name Constraint Tests")
-  class UniqueNameTests {
+  @DisplayName("Duplicate Name Tests")
+  class DuplicateNameTests {
+
+    // Name uniqueness on DataSource was removed (#1453) to close a create-oracle: read access
+    // is scope-restricted but create access is global, so a uniqueness violation leaked the
+    // existence of records the caller had no permission to read. Duplicate names must succeed.
 
     @Test
-    @DisplayName("Should reject create with duplicate name")
-    void shouldRejectCreateWithDuplicateName() {
+    @DisplayName("Should allow create with duplicate name")
+    void shouldAllowCreateWithDuplicateName() {
       DataSourceInputDTO input = createValidInput();
       String name = input.getName();
       performCreate(input);
@@ -720,19 +688,15 @@ class DataSourceControllerIntegrationTest
       DataSourceInputDTO duplicate = createValidInput();
       duplicate.setName(name);
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath(),
-              HttpMethod.POST,
-              new HttpEntity<>(duplicate, createAuthHeaders()),
-              String.class);
+      ResponseEntity<DataSourceOutputDTO> response = performCreate(duplicate);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody().getName()).isEqualTo(name);
     }
 
     @Test
-    @DisplayName("Should reject update with duplicate name")
-    void shouldRejectUpdateWithDuplicateName() {
+    @DisplayName("Should allow update with duplicate name")
+    void shouldAllowUpdateWithDuplicateName() {
       DataSourceInputDTO first = createValidInput();
       String existingName = first.getName();
       performCreate(first);
@@ -744,19 +708,15 @@ class DataSourceControllerIntegrationTest
       DataSourceInputDTO update = createUpdateInput();
       update.setName(existingName);
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath() + "/" + secondId,
-              HttpMethod.PUT,
-              new HttpEntity<>(update, createAuthHeaders()),
-              String.class);
+      ResponseEntity<DataSourceOutputDTO> response = performUpdate(secondId, update);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getName()).isEqualTo(existingName);
     }
 
     @Test
-    @DisplayName("Should reject patch with duplicate name")
-    void shouldRejectPatchWithDuplicateName() {
+    @DisplayName("Should allow patch with duplicate name")
+    void shouldAllowPatchWithDuplicateName() {
       DataSourceInputDTO first = createValidInput();
       String existingName = first.getName();
       performCreate(first);
@@ -765,36 +725,38 @@ class DataSourceControllerIntegrationTest
 
       Map<String, Object> patch = Map.of("name", existingName);
 
-      ResponseEntity<String> response =
+      ResponseEntity<DataSourceOutputDTO> response =
           restTemplate.exchange(
               getEndpointPath() + "/" + secondId,
               HttpMethod.PATCH,
               new HttpEntity<>(patch, createAuthHeaders()),
-              String.class);
+              DataSourceOutputDTO.class);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getName()).isEqualTo(existingName);
     }
 
     @Test
-    @DisplayName("Should reject published meta update with duplicate name")
-    void shouldRejectPublishedMetaUpdateWithDuplicateName() {
+    @DisplayName("Should allow released meta update with duplicate name")
+    void shouldAllowPublishedMetaUpdateWithDuplicateName() {
       DataSourceInputDTO first = createValidInput();
       String existingName = first.getName();
       performCreate(first);
 
-      UUID secondId = createPublishableTestEntity();
-      performPublish(secondId);
+      UUID secondId = createReleasableTestEntity();
+      performRelease(secondId);
 
       Map<String, Object> metaUpdate = Map.of("name", existingName);
 
-      ResponseEntity<String> response =
+      ResponseEntity<DataSourceOutputDTO> response =
           restTemplate.exchange(
-              getEndpointPath() + "/" + secondId + "/published/meta",
+              getEndpointPath() + "/" + secondId + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
-              String.class);
+              DataSourceOutputDTO.class);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getName()).isEqualTo(existingName);
     }
 
     @Test
@@ -865,10 +827,10 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject changing DSV on published data source via PUT")
+    @DisplayName("Should reject changing DSV on released data source via PUT")
     void shouldRejectChangingDsvWhenPublished() {
-      UUID id = createPublishableTestEntity();
-      performPublish(id);
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
 
       UUID newDsvId = createAvailableDataStructureVersionId();
       DataSourceInputDTO update = createUpdateInput();
@@ -885,10 +847,10 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject removing DSV from published data source via PUT")
+    @DisplayName("Should reject removing DSV from released data source via PUT")
     void shouldRejectRemovingDsvWhenPublished() {
-      UUID id = createPublishableTestEntity();
-      performPublish(id);
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
 
       DataSourceInputDTO update = createUpdateInput();
       update.setDataStructureVersionId(null);
@@ -904,11 +866,11 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should fail to publish without DataStructureVersion")
-    void shouldFailToPublishWithoutDataStructureVersion() {
+    @DisplayName("Should fail to release without DataStructureVersion")
+    void shouldFailToReleaseWithoutDataStructureVersion() {
       UUID id = createTestEntity();
 
-      ResponseEntity<String> response = performPublishExpectingError(id);
+      ResponseEntity<String> response = performReleaseExpectingError(id);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -977,8 +939,8 @@ class DataSourceControllerIntegrationTest
     @Test
     @DisplayName("Should return inUse=false when DataSource is not referenced by any DataSet")
     void shouldReturnInUseFalseWhenNotReferenced() {
-      UUID id = createPublishableTestEntity();
-      performPublish(id);
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
 
       ResponseEntity<DataSourceOutputDTO> response = performGetById(id);
 
@@ -1025,21 +987,21 @@ class DataSourceControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Published Meta Update Tests")
-  class PublishedMetaTests {
+  @DisplayName("Released Meta Update Tests")
+  class ReleasedMetaTests {
 
     @Test
     @DisplayName("Should update name and description of AVAILABLE data source")
     void shouldUpdateNameAndDescription() {
-      UUID id = createPublishableTestEntity();
-      performPublish(id);
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
 
       Map<String, Object> metaUpdate =
           Map.of("name", "updated-name", "description", "updated-desc");
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + id + "/published/meta",
+              getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               metaUpdate,
@@ -1051,10 +1013,10 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should update configuration of AVAILABLE data source via published/meta")
+    @DisplayName("Should update configuration of AVAILABLE data source via released/meta")
     void shouldUpdateConfiguration() {
-      UUID id = createPublishableTestEntity();
-      performPublish(id);
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
 
       Map<String, Object> newConfig =
           Map.of(
@@ -1065,7 +1027,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + id + "/published/meta",
+              getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               metaUpdate,
@@ -1079,10 +1041,10 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should preserve masked password when updating configuration via published/meta")
+    @DisplayName("Should preserve masked password when updating configuration via released/meta")
     void shouldPreserveMaskedPassword() {
-      UUID id = createPublishableSqlTestEntity();
-      performPublish(id);
+      UUID id = createReleasableSqlTestEntity();
+      performRelease(id);
 
       Map<String, Object> newConfig =
           new HashMap<>(
@@ -1097,7 +1059,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + id + "/published/meta",
+              getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               metaUpdate,
@@ -1110,10 +1072,10 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should not change configuration when not provided in published/meta update")
+    @DisplayName("Should not change configuration when not provided in released/meta update")
     void shouldNotChangeConfigurationWhenNotProvided() {
-      UUID id = createPublishableTestEntity();
-      performPublish(id);
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
 
       ResponseEntity<DataSourceOutputDTO> before =
           exchange(
@@ -1128,7 +1090,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + id + "/published/meta",
+              getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               metaUpdate,
@@ -1139,15 +1101,15 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject published/meta update on DRAFT data source")
+    @DisplayName("Should reject released/meta update on DRAFT data source")
     void shouldRejectUpdateOnDraftDataSource() {
-      UUID id = createPublishableTestEntity();
+      UUID id = createReleasableTestEntity();
 
       Map<String, Object> metaUpdate = Map.of("name", "updated-name");
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpointPath() + "/" + id + "/published/meta",
+              getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               String.class);
@@ -1166,7 +1128,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSource.getId() + "/published/meta",
+              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               metaUpdate,
@@ -1192,7 +1154,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpointPath() + "/" + dataSource.getId() + "/published/meta",
+              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               String.class);
@@ -1210,7 +1172,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpointPath() + "/" + dataSource.getId() + "/published/meta",
+              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               String.class);
@@ -1221,8 +1183,8 @@ class DataSourceControllerIntegrationTest
     @Test
     @DisplayName("Should allow full update when not in use")
     void shouldAllowFullUpdateWhenNotInUse() {
-      UUID id = createPublishableTestEntity();
-      performPublish(id);
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
 
       Map<String, Object> newConfig =
           Map.of(
@@ -1233,7 +1195,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + id + "/published/meta",
+              getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               fullUpdate,
@@ -1247,53 +1209,161 @@ class DataSourceControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Unpublish DataSource Tests")
-  class UnpublishTests {
+  @DisplayName("Unrelease DataSource Tests")
+  class UnreleaseTests {
 
     @Test
-    @DisplayName("Should unpublish DataSource when not in use")
-    void shouldUnpublishWhenNotInUse() {
-      UUID id = createPublishableTestEntity();
-      performPublish(id);
+    @DisplayName("Should unrelease DataSource when not in use")
+    void shouldUnreleaseWhenNotInUse() {
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
 
-      ResponseEntity<DataSourceOutputDTO> response = performUnpublish(id);
+      ResponseEntity<DataSourceOutputDTO> response = performUnrelease(id);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().getDataSourceStatus()).isEqualTo(DataSourceStatus.DRAFT);
     }
 
     @Test
-    @DisplayName("Should return 409 when unpublishing a DataSource in use by a READY DataSet")
+    @DisplayName("Should return 409 when unreleasing a DataSource in use by a READY DataSet")
     void shouldReturn409WhenInUseByReadyDataSet() {
       DataSource dataSource = createAvailableDataSource();
       linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.READY);
 
-      ResponseEntity<String> response = performUnpublishExpectingError(dataSource.getId());
+      ResponseEntity<String> response = performUnreleaseExpectingError(dataSource.getId());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
-    @DisplayName("Should return 409 when unpublishing a DataSource in use by an AVAILABLE DataSet")
+    @DisplayName("Should return 409 when unreleasing a DataSource in use by an AVAILABLE DataSet")
     void shouldReturn409WhenInUseByAvailableDataSet() {
       DataSource dataSource = createAvailableDataSource();
       linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
 
-      ResponseEntity<String> response = performUnpublishExpectingError(dataSource.getId());
+      ResponseEntity<String> response = performUnreleaseExpectingError(dataSource.getId());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
     @DisplayName(
-        "Should return 409 when unpublishing a DataSource referenced by a Pipeline in a DRAFT DataSet")
+        "Should return 409 when unreleasing a DataSource referenced by a Pipeline in a DRAFT DataSet")
     void shouldReturn409WhenInUseByDraftDataSet() {
       DataSource dataSource = createAvailableDataSource();
       linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.DRAFT);
 
-      ResponseEntity<String> response = performUnpublishExpectingError(dataSource.getId());
+      ResponseEntity<String> response = performUnreleaseExpectingError(dataSource.getId());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+  }
+
+  @Nested
+  @DisplayName("DataPool ID Filter Tests")
+  class DatapoolIdFilterTests {
+
+    @Test
+    @DisplayName("No datapoolId param returns all DataSources")
+    void noFilterReturnsAll() {
+      DataSource dsAll = portalData.dataSource(b -> b.datapoolScopeType(DatapoolScopeType.ALL));
+      DataSource dsNone = portalData.dataSource(b -> b.datapoolScopeType(DatapoolScopeType.NONE));
+
+      RestPage<DataSourceOutputDTO> page = getAllWithDatapoolId(null);
+
+      assertThat(page.getTotalElements()).isEqualTo(2);
+      assertThat(page.getContent())
+          .extracting(DataSourceOutputDTO::getId)
+          .containsExactlyInAnyOrder(dsAll.getId(), dsNone.getId());
+      assertThat(page.getContent())
+          .extracting(dto -> dto.getDatapoolScope().getType())
+          .containsExactlyInAnyOrder(DatapoolScopeType.ALL, DatapoolScopeType.NONE);
+    }
+
+    @Test
+    @DisplayName("scope=ALL is always included")
+    void scopeAllIsAlwaysIncluded() {
+      DataPool pool = portalData.dataPool();
+      DataSource dsAll = portalData.dataSource(b -> b.datapoolScopeType(DatapoolScopeType.ALL));
+
+      RestPage<DataSourceOutputDTO> page = getAllWithDatapoolId(pool.getId());
+
+      assertThat(page.getContent()).extracting(DataSourceOutputDTO::getId).contains(dsAll.getId());
+    }
+
+    @Test
+    @DisplayName("scope=SPECIFIC with matching pool is included")
+    void scopeSpecificMatchingPoolIsIncluded() {
+      DataPool pool = portalData.dataPool();
+      DataSource dsSpecific =
+          portalData.dataSource(
+              b ->
+                  b.datapoolScopeType(DatapoolScopeType.SPECIFIC)
+                      .scopedDataPools(new HashSet<>(Set.of(pool))));
+
+      RestPage<DataSourceOutputDTO> page = getAllWithDatapoolId(pool.getId());
+
+      assertThat(page.getContent())
+          .extracting(DataSourceOutputDTO::getId)
+          .contains(dsSpecific.getId());
+    }
+
+    @Test
+    @DisplayName("scope=SPECIFIC with non-matching pool is excluded")
+    void scopeSpecificNonMatchingPoolIsExcluded() {
+      DataPool poolA = portalData.dataPool();
+      DataPool poolB = portalData.dataPool();
+      DataSource dsSpecificB =
+          portalData.dataSource(
+              b ->
+                  b.datapoolScopeType(DatapoolScopeType.SPECIFIC)
+                      .scopedDataPools(new HashSet<>(Set.of(poolB))));
+
+      RestPage<DataSourceOutputDTO> page = getAllWithDatapoolId(poolA.getId());
+
+      assertThat(page.getContent())
+          .extracting(DataSourceOutputDTO::getId)
+          .doesNotContain(dsSpecificB.getId());
+    }
+
+    @Test
+    @DisplayName("scope=NONE is always excluded")
+    void scopeNoneIsAlwaysExcluded() {
+      DataPool pool = portalData.dataPool();
+      DataSource dsNone = portalData.dataSource(b -> b.datapoolScopeType(DatapoolScopeType.NONE));
+
+      RestPage<DataSourceOutputDTO> page = getAllWithDatapoolId(pool.getId());
+
+      assertThat(page.getContent())
+          .extracting(DataSourceOutputDTO::getId)
+          .doesNotContain(dsNone.getId());
+    }
+
+    @Test
+    @DisplayName("Multiple SPECIFIC DataSources scoped to same pool produce no duplicate rows")
+    void noDuplicatesWithMultipleScopedDataSources() {
+      DataPool pool = portalData.dataPool();
+      for (int i = 0; i < 3; i++) {
+        portalData.dataSource(
+            b ->
+                b.datapoolScopeType(DatapoolScopeType.SPECIFIC)
+                    .scopedDataPools(new HashSet<>(Set.of(pool))));
+      }
+
+      RestPage<DataSourceOutputDTO> page = getAllWithDatapoolId(pool.getId());
+
+      long distinctIds =
+          page.getContent().stream().map(DataSourceOutputDTO::getId).distinct().count();
+      assertThat(distinctIds).isEqualTo(page.getContent().size());
+    }
+
+    private RestPage<DataSourceOutputDTO> getAllWithDatapoolId(UUID datapoolId) {
+      Map<String, String> params =
+          datapoolId != null ? Map.of("datapoolId", datapoolId.toString()) : Map.of();
+      ResponseEntity<RestPage<DataSourceOutputDTO>> response = performGetAll(params);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      return response.getBody();
     }
   }
 }

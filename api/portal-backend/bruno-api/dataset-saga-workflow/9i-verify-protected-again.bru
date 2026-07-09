@@ -1,0 +1,45 @@
+meta {
+  name: 9i. Verify Re-Protected (no token → 401)
+  type: http
+  seq: 30
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/{{sagaSlug}}
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  // After 9h flipped the flag to false, OPA stops granting anonymous access once its attribute
+  // cache re-reads the flag. Poll the data-plane WITHOUT a token until it returns 401 again
+  // (anonymous re-denied), max ~50s (25 attempts × 2s).
+  // Bruno's QuickJS axios does not honour a validateStatus function, so it throws on non-2xx;
+  // catch the 401 (re-protected) state — that is exactly the status we are polling for.
+  const axios = require('axios');
+  const slug = bru.getVar('sagaSlug') || 'things';
+  const url = `${bru.getEnvVar('apisixApiUrl')}/v1/datasets/${bru.getVar('sagaDataSetId')}/${slug}`;
+  for (let i = 0; i < 25; i++) {
+    let status = 0;
+    try { status = (await axios.get(url)).status; }
+    catch (e) { status = e.response ? e.response.status : 0; }
+    if (status === 401) break;
+    await new Promise(res => setTimeout(res, 2000));
+  }
+}
+
+tests {
+  test("Re-protected dataset rejects the unauthenticated request (401)", function() {
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  **Saga step 9i of 18** — Confirm the toggle is fully reversible (issue #1368, journey J3).
+
+  After 9h flipped `openDataAccess` back to false, an unauthenticated GET must again be rejected with 401 — proving OPA stopped granting anonymous access once it re-read the flag (the route was protected the whole time). Together, 9c/9g/9i pin the complete state machine: protected → open → protected.
+
+  **Precondition:** 9h accepted; pre-request polled the data-plane until 401 (OPA re-read the flag and re-denied anonymous access).
+
+  **Expected Response:** 401 Unauthorized (no bearer token).
+}

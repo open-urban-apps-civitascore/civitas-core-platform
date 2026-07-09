@@ -1,0 +1,55 @@
+meta {
+  name: Contract MQTT — update changes arrays (2/4 update)
+  type: http
+  seq: 22
+}
+
+put {
+  url: {{baseUrl}}/datasources/{{contractMqttUpdateId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "name": "contract_mqtt_update",
+    "description": "contract — MQTT updated",
+    "connectorType": "MQTT",
+    "configuration": {
+      "urls": ["tcp://broker:1883"],
+      "topics": ["sensor/data", "sensor/heartbeat"],
+      "qos": 1
+    },
+    "dataStructureVersionId": null
+  }
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Description updated; other top-level fields preserved", function() {
+    expect(res.body.name).to.equal("contract_mqtt_update");
+    expect(res.body.description).to.equal("contract — MQTT updated");
+    expect(res.body.connectorType).to.equal("MQTT");
+    expect(res.body.dataSourceStatus).to.equal("DRAFT");
+    expect(res.body.inUse).to.equal(false);
+  });
+  test("Topics array now has both elements; urls and qos unchanged", function() {
+    expect(res.body.configuration.urls).to.deep.equal(["tcp://broker:1883"]);
+    expect(res.body.configuration.topics).to.deep.equal(["sensor/data", "sensor/heartbeat"]);
+    expect(res.body.configuration.qos).to.equal(1);
+  });
+  test("Defaults still null / tls.enabled=false", function() {
+    expect(res.body.configuration).to.have.property('user', null);
+    expect(res.body.configuration).to.have.property('password', null);
+    expect(res.body.configuration).to.have.property('client_id', null);
+    expect(res.body.configuration).to.have.property('keepalive', null);
+    expect(res.body.configuration).to.have.property('connect_timeout', null);
+    expect(res.body.configuration.tls).to.deep.equal({ enabled: false });
+  });
+}

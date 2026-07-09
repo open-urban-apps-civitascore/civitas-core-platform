@@ -1,5 +1,6 @@
 import { assert, describe, expect, it } from 'vitest'
 
+import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import type {
   Datastructure,
   DatastructuresListData,
@@ -7,6 +8,7 @@ import type {
   DatastructureVersionFormData,
   DatastructureVersionSummary,
 } from '@/types/datastructures'
+import { DATASTRUCTURE_STATUS_TYPES, DATASTRUCTURE_VERSION_SOURCE } from '@/types/datastructures'
 
 import {
   buildSessionFromVersion,
@@ -61,9 +63,8 @@ const createVersionDetail = (overrides?: Partial<DatastructureVersion>): Datastr
   description: 'Version Description',
   dataStructureVersionStatus: 'DRAFT',
   dataStructureVersionSource: 'OWN',
-  modelAtlasUri: 'atlas://model',
   modelName: 'Test Model',
-  model: '<xmi/>',
+  model: { $id: 'http://civitas.org/model/test', type: 'object', properties: {} },
   styles: {
     id: 'diagram-id',
     name: 'Diagram Name',
@@ -83,11 +84,10 @@ const createVersionDetail = (overrides?: Partial<DatastructureVersion>): Datastr
 
 const createVersionFormData = (overrides?: Partial<DatastructureVersionFormData>): DatastructureVersionFormData => ({
   id: 'version-id',
-  version: '1.0',
+  version: '1.0.0',
   description: 'Version Description',
   dataStructureVersionStatus: 'DRAFT',
   dataStructureVersionSource: 'OWN',
-  modelAtlasUri: 'atlas://model',
   modelName: 'Test Model',
   nodes: [],
   edges: [],
@@ -228,7 +228,6 @@ describe('mapDatastructureVersionApiToFormData', () => {
       description: version.description,
       dataStructureVersionStatus: version.dataStructureVersionStatus,
       dataStructureVersionSource: version.dataStructureVersionSource,
-      modelAtlasUri: version.modelAtlasUri,
       modelName: version.modelName,
       nodes: version.styles?.nodes ?? [],
       edges: version.styles?.edges ?? [],
@@ -250,7 +249,7 @@ describe('mapDatastructureVersionFormToApiData', () => {
   it('maps form data and diagram/model payload to put data', () => {
     const formData = createVersionFormData()
     const diagram = createVersionDetail().styles
-    const model = '<uml-model/>'
+    const model = { $id: 'http://civitas.org/model/test', type: 'object', properties: {} }
 
     const result = mapDatastructureVersionFormToApiData(formData, diagram, model)
 
@@ -260,7 +259,6 @@ describe('mapDatastructureVersionFormToApiData', () => {
       description: formData.description,
       dataStructureVersionSource: formData.dataStructureVersionSource,
       dataStructureVersionStatus: formData.dataStructureVersionStatus,
-      modelAtlasUri: formData.modelAtlasUri,
       modelName: formData.modelName,
       model,
       styles: diagram,
@@ -272,7 +270,6 @@ describe('parseDatastructureVersionFormData', () => {
   it('uses draft schema in draft mode and returns success with data', () => {
     const values = createVersionFormData({
       description: '',
-      modelAtlasUri: null,
       modelName: null,
       nodes: [],
     })
@@ -287,7 +284,6 @@ describe('parseDatastructureVersionFormData', () => {
   it('uses available schema in non-draft mode and returns success with data', () => {
     const values = createVersionFormData({
       description: 'valid description',
-      modelAtlasUri: 'atlas://valid-model',
       modelName: 'Valid Model',
       nodes: [
         {
@@ -318,7 +314,6 @@ describe('parseDatastructureVersionFormData', () => {
   it('returns error when available schema validation fails', () => {
     const values = createVersionFormData({
       description: '',
-      modelAtlasUri: null,
       modelName: null,
       nodes: [],
     })
@@ -392,5 +387,58 @@ describe('buildSessionFromVersion', () => {
     expect(result.dirtyFields).toEqual(new Set())
     expect(result.lastModified).toBeInstanceOf(Date)
     expect(result.created).toBeInstanceOf(Date)
+  })
+})
+
+describe('root designation round-trip through persisted styles', () => {
+  it('keeps the isRoot flag across save payload and session rebuild', () => {
+    const flagged = {
+      id: 'node-a',
+      type: 'class',
+      position: { x: 0, y: 0 },
+      data: {
+        element: { id: 'a', name: 'Alpha', type: 'class', isRoot: true, attributes: [], operations: [] },
+        label: 'Alpha',
+      },
+    }
+    const other = {
+      id: 'node-b',
+      type: 'class',
+      position: { x: 0, y: 0 },
+      data: {
+        element: { id: 'b', name: 'Beta', type: 'class', attributes: [], operations: [] },
+        label: 'Beta',
+      },
+    }
+    const diagram = {
+      id: 'diagram-1',
+      name: 'Struct',
+      nodes: [flagged, other],
+      edges: [],
+      lastModified: new Date(0),
+      isDirty: false,
+    } as unknown as UMLDiagram
+
+    const payload = mapDatastructureVersionFormToApiData(
+      {
+        id: 'v1',
+        version: '1.0.0',
+        description: '',
+        dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
+        dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
+        modelName: 'Struct',
+        nodes: diagram.nodes,
+        edges: diagram.edges,
+      },
+      diagram,
+      null,
+    )
+    // Serialize/deserialize like the persistence boundary does — a designation dropped by a
+    // structured clone or JSON round-trip would silently degrade the diagram to ambiguous.
+    const persisted = JSON.parse(JSON.stringify(payload)) as { styles: UMLDiagram }
+    const session = buildSessionFromVersion({ styles: persisted.styles, modelName: 'Struct' } as DatastructureVersion)
+
+    const rebuilt = session.diagram.nodes.map(node => node.data.element)
+    expect(rebuilt.map(element => element.isRoot)).toEqual([true, undefined])
   })
 })

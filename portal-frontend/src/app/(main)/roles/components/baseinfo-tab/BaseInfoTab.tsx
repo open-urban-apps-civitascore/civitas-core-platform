@@ -6,7 +6,7 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form, FormItem, FormLabel } from '@/components/ui/form'
@@ -41,7 +41,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   return (
     <Form {...form}>
-      <form onSubmit={e => e.preventDefault()} className="flex flex-col gap-5 h-full">
+      <form data-testid="baseInfoForm" onSubmit={e => e.preventDefault()} className="flex flex-col gap-5 h-full">
         <ContentCard>
           <DetailsFieldContainer className="pt-0 pb-3 text-xl">
             <SubHeader title={tRolesBaseInfo('heading')} />

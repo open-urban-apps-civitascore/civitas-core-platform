@@ -160,53 +160,134 @@ apisix.topics=de.civitascore.api.backend.created,de.civitascore.api.backend.upda
 
 **Documentation:** For detailed documentation including event formats, error handling, and integration examples, see [APISIX Adapter Documentation](config-adapter-apisix/README.md).
 
-### 7. config-adapter-redpanda
-Production implementation of RedPanda Connect adapter for managing data pipelines.
+### 7. config-adapter-nifi
+Apache NiFi adapter: transforms the engine-neutral pipeline graph into a curated NiFi flow and deploys it via the NiFi REST API. Integrated as a saga step handler (not a standalone Kafka consumer).
 
 **Key Components:**
-- `RedpandaAdapter` - Manages RedPanda Connect data pipelines via Streams API
-- `RedpandaSagaHandler` - Saga orchestration for multi-pipeline dataset operations
+- `NifiSagaHandler` - `SagaCommandHandler` (`adapter() = "nifi"`); dispatches DEPLOY/UPDATE/DELETE/RESTORE per pipeline
+- `FlowDeploymentPlanner` / `NifiFlowBuilder` - programmatically compose a NiFi flow-snapshot from curated per-component fragments (the single place that knows NiFi specifics)
+- `NifiRestClient` - the verified deploy sequence over the NiFi REST API
 
-**Supported Operations:**
-- CREATE - Create new data pipelines (idempotent: HTTP 409 → success)
-- UPDATE - Update existing pipelines or create if absent (upsert)
-- DELETE - Delete pipelines (idempotent: HTTP 404 → success)
+**Supported Operations (saga):**
+- `DEPLOY_PIPELINES` / `UPDATE_PIPELINES` / `DELETE_PIPELINES` / `RESTORE_PIPELINES` (idempotent: redeploy = stop-and-delete + upload; delete 404 → success)
 
-**Subscribed Topics:**
-- `de.civitascore.data.pipeline.created`
-- `de.civitascore.data.pipeline.updated`
-- `de.civitascore.data.pipeline.deleted`
-
-**Saga Topics:**
-- `de.civitascore.dataset.redpanda.execute`
-- `de.civitascore.dataset.redpanda.compensate`
+**Security model:**
+- RecordPath-only mapping — never Jolt or scripting, so a constrained graph cannot smuggle arbitrary processors in
+- The uploaded snapshot carries no secrets; sensitive controller-service/processor properties are pushed post-upload via a separate REST call
+- Records that fail conversion/mapping are routed to a LogMessage error sink instead of being dropped silently
 
 **Configuration Properties:**
 ```properties
-# RedPanda Connect Streams API URL (default: http://localhost:4195)
-redpanda.url=http://localhost:4195
-
-# Topics to subscribe to
-redpanda.topics=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
-
-# Master key for encrypted credentials (optional, only needed for ENC(...) values)
+# NiFi REST API base URL (default: https://localhost:8443)
+nifi.url=https://localhost:8443
+# NiFi is secured with OIDC; authenticate via the client-credentials grant (Keycloak).
+nifi.oidc.token-uri=http://localhost:8080/realms/civitas-core/protocol/openid-connect/token
+nifi.oidc.client-id=nifi
+nifi.oidc.client-secret=<client secret, via NIFI_OIDC_CLIENT_SECRET>
+# nifi.oidc.scope=<optional space-delimited scope>
+# Disable TLS verification for dev self-signed certs (set false in non-dev)
+nifi.tls.insecure=true
+# Platform sink endpoints the flow binds to
+nifi.frost.url=http://frost:8080/FROST-Server/v1.1
+nifi.postgis.url=jdbc:postgresql://db:5432/civitas
+nifi.postgis.user=nifi
+nifi.postgis.password=<db password>
+# Master key for encrypted datasource credentials (only needed for ENC(...) values)
 # CIVITAS_MASTER_KEY=<256-bit hex-encoded key>
 ```
 
-**Features:**
-- Full CRUD operations for RedPanda Connect data pipelines
-- Automatic JSON-to-YAML conversion for pipeline definitions
-- AES-256-GCM credential decryption for sensitive pipeline configuration
-- Idempotent operations with automatic conflict and not-found handling
-- Saga orchestration with forward execution and compensation (rollback)
-- Datasource injection and placeholder resolution for reusable pipeline templates
-- Comprehensive error handling with HTTP status-based categorization
+**Usage:** Replaces the former RedPanda Connect adapter as the pipeline engine; discovered via `ServiceLoader` and driven in-process by the Flowable saga engine.
 
-**Usage:** Production-ready adapter that integrates with RedPanda Connect for streaming data pipeline management.
+**Documentation:** See the module's package docs and the NiFi deploy sequence in `dev-environment/nifi/`.
 
-**Documentation:** For detailed documentation including event formats, credential encryption, error handling, and integration examples, see [RedPanda Adapter Documentation](config-adapter-redpanda/README.md).
+### 8. config-adapter-geoserver
+Production implementation of GeoServer adapter for managing OGC geo service configuration.
 
-### 8. config-adapter-examples
+**Key Components:**
+- `GeoServerAdapter` — Manages GeoServer resources via REST API (workspaces, datastores, feature types, layers, styles)
+- `GeoServerSagaHandler` — Minimal saga handler for atomic workspace provisioning
+
+**Supported Operations:**
+- CREATE — Create GeoServer resources (idempotent: HTTP 409 → success)
+- UPDATE — Update existing resources
+- DELETE — Delete resources (idempotent: HTTP 404 → success; workspace/datastore deletes use `?recurse=true`)
+
+**Subscribed Topics:**
+- `de.civitascore.geo.workspace.{created,updated,deleted}`
+- `de.civitascore.geo.datastore.{created,updated,deleted}`
+- `de.civitascore.geo.featuretype.{created,updated,deleted}`
+- `de.civitascore.geo.layer.{updated,deleted}`
+- `de.civitascore.geo.style.{created,updated,deleted}`
+
+**Saga Topics:**
+- `de.civitascore.dataset.geoserver.execute`
+- `de.civitascore.dataset.geoserver.compensate`
+
+**Configuration Properties:**
+```properties
+# GeoServer REST API URL (default: http://localhost:8080/geoserver)
+geoserver.url=http://localhost:8080/geoserver
+
+# Admin credentials for GeoServer REST API (required)
+geoserver.admin.user=admin
+geoserver.admin.password=geoserver
+
+# Topics to subscribe to
+geoserver.topics=de.civitascore.geo.workspace.created,...
+
+# PostGIS connection for saga handler (required for PROVISION_WORKSPACE)
+geoserver.postgis.host=localhost
+geoserver.postgis.port=5432
+geoserver.postgis.database=civitas_geo
+geoserver.postgis.user=geo_user
+geoserver.postgis.password=secret
+```
+
+**Authentication note:** Basic Auth protects the GeoServer management REST API. Data access (WFS/WMS) is secured upstream by APISIX and OPA.
+
+**Documentation:** For detailed documentation including event formats, typed configuration models, error handling, and saga operations, see [GeoServer Adapter Documentation](config-adapter-geoserver/README.md).
+
+### 9. config-adapter-postgis
+Adapter for managing PostgreSQL/PostGIS table configuration via DDL.
+
+**Key Components:**
+- `PostgisAdapter` - Routes by payload type and applies DDL via JDBC against a Postgres/PostGIS database
+- `PostgisDialect` - Renders DDL (tables, schemas, roles, grants) and classifies `SQLException`s (duplicate / missing / connectivity)
+- `GrantReconciler` - Diffs a role's desired vs. current schema grants (used on role UPDATE)
+- `ConnectionProvider` - HikariCP-backed `DataSource` wrapper
+
+**Supported Operations:**
+- Table: CREATE / DELETE (idempotent on SQLState `42P07`/`42P06`/`42P01`/`3F000`); UPDATE not yet implemented (`UNSUPPORTED_OPERATION`)
+- Schema: CREATE (optional `AUTHORIZATION` owner) / UPDATE (owner change) / DELETE (`RESTRICT` default, `CASCADE` when `cascade=true`)
+- Role: CREATE / UPDATE / DELETE — login flag, optional `ENC(...)` password (decrypted with `CIVITAS_MASTER_KEY`), embedded schema grants reconciled on UPDATE (idempotent on `42710`/`42704`)
+
+**Subscribed Topics:**
+- `de.civitascore.data.sql.table.created` / `.updated` / `.deleted`
+- `de.civitascore.data.sql.schema.created` / `.updated` / `.deleted`
+- `de.civitascore.data.sql.role.created` / `.updated` / `.deleted`
+
+**Configuration Properties:**
+```properties
+# Topics to subscribe to (tables, schemas, roles)
+postgis.topics=de.civitascore.data.sql.table.created,de.civitascore.data.sql.table.updated,de.civitascore.data.sql.table.deleted,\
+  de.civitascore.data.sql.schema.created,de.civitascore.data.sql.schema.updated,de.civitascore.data.sql.schema.deleted,\
+  de.civitascore.data.sql.role.created,de.civitascore.data.sql.role.updated,de.civitascore.data.sql.role.deleted
+
+# JDBC connection settings (required)
+postgis.jdbc.url=jdbc:postgresql://localhost:5432/civitas
+postgis.jdbc.user=civitas
+postgis.jdbc.password=civitas
+
+# Optional pool tuning (defaults shown)
+postgis.jdbc.maxPoolSize=5
+postgis.jdbc.connectionTimeoutMs=5000
+
+# CIVITAS_MASTER_KEY (env var) — required only to decrypt ENC(...) role passwords
+```
+
+**Documentation:** For the design rationale (dialect seam, idempotency policy, credential handling, why no migration tool), see [PostGIS Adapter Design](docs/postgis-adapter-design.md).
+
+### 10. config-adapter-examples
 Example adapter implementations for reference and testing.
 
 **Key Components:**
@@ -237,7 +318,7 @@ The framework supports configuring multiple adapters to run independently. Each 
 
 **Multiple Adapters (comma-separated short names)**
 ```properties
-adapters=keycloak,apisix,redpanda,dummylog
+adapters=keycloak,apisix,dummylog
 eventhandler.name=kafka
 ```
 
@@ -978,7 +1059,7 @@ When an event fails all retry attempts or encounters a fatal error, it is sent t
 
 #### Saga Consumer Retry Behavior
 
-The saga consumers (`SagaResultConsumer`, `SagaTriggerConsumer`, `KafkaSagaCommandConsumer`) use the same retry algorithm via `ConsumerRecordRetry`. Permanent errors (e.g., malformed JSON → `IOException`) are skipped immediately. Transient errors (e.g., engine/publish failures → `RuntimeException`) are retried with exponential backoff up to 3 attempts. After max retries, the record is skipped and committed. All saga consumers use **per-record commits** (not batch commits) to ensure a single poison-pill record cannot block the consumer. The saga timeout mechanism handles recovery by triggering compensation. No DLQ is used for saga consumers.
+The saga consumers (`SagaResultConsumer`, `SagaTriggerConsumer`) use the same retry algorithm via `ConsumerRecordRetry`. (The legacy custom-orchestrator `KafkaSagaCommandConsumer` has been removed — Flowable is now the sole saga engine.) Permanent errors (e.g., malformed JSON → `IOException`) are skipped immediately. Transient errors (e.g., engine/publish failures → `RuntimeException`) are retried with exponential backoff up to 3 attempts. After max retries, the record is skipped and committed. All saga consumers use **per-record commits** (not batch commits) to ensure a single poison-pill record cannot block the consumer. The saga timeout mechanism handles recovery by triggering compensation. No DLQ is used for saga consumers.
 
 #### Failure Result Event
 
@@ -1044,6 +1125,27 @@ Error codes are categorized by type and severity:
 | 3101 | `APISIX_ERROR` | No | APISIX error: %s | Gateway error |
 | 3102 | `APISIX_ROUTE_ERROR` | No | APISIX route error: %s | Route operation failed |
 | 3103 | `APISIX_UPSTREAM_ERROR` | No | APISIX upstream error: %s | Upstream operation failed |
+
+**FROST Adapter (3201):**
+
+| Code | Name | Retryable | Internal Log Template | External Message |
+|------|------|-----------|----------------------|------------------|
+| 3201 | `FROST_ENTITY_ERROR` | No | FROST entity error: %s | Entity operation failed |
+
+**GeoServer Adapter (3401-3402):**
+
+| Code | Name | Retryable | Internal Log Template | External Message |
+|------|------|-----------|----------------------|------------------|
+| 3401 | `GEOSERVER_ERROR` | Yes | GeoServer error: %s | Geo service error |
+| 3402 | `GEOSERVER_RESOURCE_ERROR` | No | GeoServer resource error: %s | Geo resource operation failed |
+
+**PostGIS Adapter (3501-3503):**
+
+| Code | Name | Retryable | Internal Log Template | External Message |
+|------|------|-----------|----------------------|------------------|
+| 3501 | `POSTGIS_ERROR` | No | PostGIS error: %s | Database error |
+| 3502 | `POSTGIS_DDL_ERROR` | No | PostGIS DDL error: %s | Table operation failed |
+| 3503 | `POSTGIS_CONNECTION_ERROR` | Yes | PostGIS connection error: %s | Database temporarily unavailable |
 
 #### 9xxx - Unknown/Unexpected Errors
 
@@ -1117,6 +1219,50 @@ All topics are defined in `de.civitascore.configadapter.Topics` and validated at
 | `ROUTE_UPDATED` | `de.civitascore.api.route.updated` |
 | `ROUTE_DELETED` | `de.civitascore.api.route.deleted` |
 
+#### GeoServer Events
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `GEO_WORKSPACE_CREATED` | `de.civitascore.geo.workspace.created` |
+| `GEO_WORKSPACE_UPDATED` | `de.civitascore.geo.workspace.updated` |
+| `GEO_WORKSPACE_DELETED` | `de.civitascore.geo.workspace.deleted` |
+| `GEO_DATASTORE_CREATED` | `de.civitascore.geo.datastore.created` |
+| `GEO_DATASTORE_UPDATED` | `de.civitascore.geo.datastore.updated` |
+| `GEO_DATASTORE_DELETED` | `de.civitascore.geo.datastore.deleted` |
+| `GEO_FEATURE_TYPE_CREATED` | `de.civitascore.geo.featuretype.created` |
+| `GEO_FEATURE_TYPE_UPDATED` | `de.civitascore.geo.featuretype.updated` |
+| `GEO_FEATURE_TYPE_DELETED` | `de.civitascore.geo.featuretype.deleted` |
+| `GEO_LAYER_UPDATED` | `de.civitascore.geo.layer.updated` |
+| `GEO_LAYER_DELETED` | `de.civitascore.geo.layer.deleted` |
+| `GEO_STYLE_CREATED` | `de.civitascore.geo.style.created` |
+| `GEO_STYLE_UPDATED` | `de.civitascore.geo.style.updated` |
+| `GEO_STYLE_DELETED` | `de.civitascore.geo.style.deleted` |
+
+#### FROST SensorThings Events
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `THING_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.thing.{created,updated,deleted}` |
+| `LOCATION_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.location.{created,updated,deleted}` |
+| `SENSOR_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.sensor.{created,updated,deleted}` |
+| `OBSERVED_PROPERTY_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.observedproperty.{created,updated,deleted}` |
+| `DATASTREAM_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.datastream.{created,updated,deleted}` |
+| `FROST_PROJECT_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.project.{created,updated,deleted}` |
+
+#### Table / Schema / Role Events (PostGIS)
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `SQL_TABLE_CREATED` | `de.civitascore.data.sql.table.created` |
+| `SQL_TABLE_UPDATED` | `de.civitascore.data.sql.table.updated` |
+| `SQL_TABLE_DELETED` | `de.civitascore.data.sql.table.deleted` |
+| `SQL_SCHEMA_CREATED` | `de.civitascore.data.sql.schema.created` |
+| `SQL_SCHEMA_UPDATED` | `de.civitascore.data.sql.schema.updated` |
+| `SQL_SCHEMA_DELETED` | `de.civitascore.data.sql.schema.deleted` |
+| `SQL_ROLE_CREATED` | `de.civitascore.data.sql.role.created` |
+| `SQL_ROLE_UPDATED` | `de.civitascore.data.sql.role.updated` |
+| `SQL_ROLE_DELETED` | `de.civitascore.data.sql.role.deleted` |
+
 **Topic Validation:**
 - Topics are validated using `Topics.isValidTopic(String)` method
 - Whitespace is trimmed automatically
@@ -1180,7 +1326,7 @@ mvn test
 mvn verify
 ```
 
-Integration tests use Testcontainers for Kafka and Keycloak.
+Integration tests use Testcontainers for Kafka, Keycloak, FROST/PostGIS (used by FROST IT and saga IT), and a dedicated PostgreSQL/PostGIS container for the PostGIS adapter IT (`PostgisAdapterIT`) and end-to-end pipeline test (`PostgisEndToEndIT`).
 
 ### Parallel Test Execution
 
@@ -1194,7 +1340,7 @@ This works because the module tests are independent and Testcontainers uses rand
 
 ### Building the Fat JAR
 
-Adapter plugins (APISIX, FROST, RedPanda, Examples) are only included in the fat JAR via the `dist` profile:
+Adapter plugins (APISIX, FROST, NiFi, GeoServer, PostGIS, Examples) are only included in the fat JAR via the `dist` profile:
 
 ```bash
 mvn package -Pdist

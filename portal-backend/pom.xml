@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.11</version>
+        <version>4.1.0</version>
         <relativePath/>
     </parent>
 
@@ -25,45 +25,27 @@
 
     <!--  mvn versions:display-property-updates -->
     <properties>
-        <java.version>21</java.version>
-        <springdoc-openapi.version>2.8.16</springdoc-openapi.version>
+        <java.version>25</java.version>
+        <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
         <testcontainers.version>2.0.4</testcontainers.version>
         <testcontainers-keycloak.version>4.1.1</testcontainers-keycloak.version>
-        <specification-arg-resolver.version>3.3.0</specification-arg-resolver.version>
-        <hibernate-processor.version>7.3.0.Final</hibernate-processor.version>
-        <spotless.version>2.46.1</spotless.version>
-        <surefire.version>3.5.5</surefire.version>
-        <failsafe.version>3.5.5</failsafe.version>
+        <specification-arg-resolver.version>4.0.0</specification-arg-resolver.version>
+        <hibernate-processor.version>${hibernate.version}</hibernate-processor.version>
+        <spotless.version>3.4.0</spotless.version>
         <skipUnitTests>false</skipUnitTests>
-        <jacoco.version>0.8.14</jacoco.version>
+        <jacoco.version>0.8.15</jacoco.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <lombok.version>1.18.44</lombok.version>
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
         <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
-        <tomcat.version>11.0.14</tomcat.version>
-        <lz4-java.version>1.8.1</lz4-java.version>
         <commons-io.version>2.21.0</commons-io.version>
-        <!-- Override Spring Boot 3.5.11 default (3.17.0) to fix CVE-2025-48924 -->
-        <commons-lang3.version>3.18.0</commons-lang3.version>
-        <spring-kafka.version>3.3.13</spring-kafka.version>
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
-        <config-adapter.version>1.0.2-MR-410</config-adapter.version>
+        <config-adapter.version>1.0.2-MR-660-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
     </properties>
-
-    <dependencyManagement>
-        <dependencies>
-            <!-- Override lz4-java to fix CVE-2025-12183 / CVE-2025-66566 -->
-            <dependency>
-                <groupId>org.lz4</groupId>
-                <artifactId>lz4-java</artifactId>
-                <version>${lz4-java.version}</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
 
     <dependencies>
         <!-- Shared JPA entities -->
@@ -76,7 +58,7 @@
         <!-- Web, Data, Validation -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -94,8 +76,13 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
+        </dependency>
+
         <!-- DB + Migrations -->
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -109,17 +96,15 @@
             <artifactId>encoder</artifactId>
             <version>${owasp.encoder.version}</version>
         </dependency>
-
         <!-- Kafka -->
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
-            <version>${spring-kafka.version}</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
 
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
 
         <dependency>
@@ -149,8 +134,8 @@
 
         <!-- Test -->
         <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-test</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -159,9 +144,13 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-junit-jupiter</artifactId>
-            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -183,15 +172,8 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.rest-assured</groupId>
-            <artifactId>rest-assured</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-postgresql</artifactId>
-            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <!-- Kafka TestContainers for integration testing -->
@@ -207,14 +189,11 @@
                     <groupId>com.fasterxml.jackson.module</groupId>
                     <artifactId>jackson-module-scala_2.13</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>tools.jackson.module</groupId>
+                    <artifactId>jackson-module-scala_2.13</artifactId>
+                </exclusion>
             </exclusions>
-        </dependency>
-        <!-- WireMock for mocking external HTTP services -->
-        <dependency>
-            <groupId>org.wiremock.integrations</groupId>
-            <artifactId>wiremock-spring-boot</artifactId>
-            <version>4.2.1</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -268,13 +247,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Config adapter - Saga orchestrator + adapters for E2E saga integration tests -->
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-orchestrator</artifactId>
-            <version>${config-adapter.version}</version>
-            <scope>test</scope>
-        </dependency>
+        <!-- Config adapter - saga handlers for the Flowable-based E2E saga integration tests -->
         <dependency>
             <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-frost</artifactId>
@@ -289,7 +262,13 @@
         </dependency>
         <dependency>
             <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-redpanda</artifactId>
+            <artifactId>config-adapter-flowable</artifactId>
+            <version>${config-adapter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-postgis</artifactId>
             <version>${config-adapter.version}</version>
             <scope>test</scope>
         </dependency>
@@ -298,7 +277,6 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-kafka</artifactId>
-            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -318,13 +296,31 @@
                         <ignoredUnusedDeclaredDependency>org.apache.jena:apache-jena-libs</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.springdoc:*</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>commons-io:commons-io</ignoredUnusedDeclaredDependency>
-                        <ignoredUnusedDeclaredDependency>io.rest-assured:rest-assured</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.hibernate.orm:hibernate-processor</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>de.civitas-core:event-handler-kafka</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
+                        <!-- portal-model is heavily used but analyzer can't detect it
+                             through the ${revision}/flatten-plugin indirection -->
+                        <ignoredUnusedDeclaredDependency>de.civitascore:portal-model</ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
                     <ignoredNonTestScopedDependencies>
                         <ignoredNonTestScopedDependency>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</ignoredNonTestScopedDependency>
+                        <!-- Used at runtime by Spring Security autoconfig; main code uses
+                             only the .oauth2ResourceServer().jwt() DSL, no direct imports -->
+                        <ignoredNonTestScopedDependency>org.springframework.boot:spring-boot-security-oauth2-resource-server</ignoredNonTestScopedDependency>
+                        <!-- event-handler-kafka declared for transitive cloudevents-kafka serialization; no direct main-code usage -->
+                        <ignoredNonTestScopedDependency>de.civitas-core:event-handler-kafka</ignoredNonTestScopedDependency>
+                        <!-- Transitively pulled compile-scope by oauth2-resource-server;
+                             only direct use is JWTParser in UserMeIntegrationTest -->
+                        <ignoredNonTestScopedDependency>com.nimbusds:nimbus-jose-jwt</ignoredNonTestScopedDependency>
+                        <!-- Transitively pulled compile-scope by spring-boot-starter-data-jpa;
+                             only direct use is JdbcTemplate in DataSourceContractIntegrationTest -->
+                        <ignoredNonTestScopedDependency>org.springframework:spring-jdbc</ignoredNonTestScopedDependency>
+                        <!-- Compile-scope for app boot (auto-migration on startup);
+                             additionally used directly only by DiscriminatorBackfillMigrationIntegrationTest -->
+                        <ignoredNonTestScopedDependency>org.flywaydb:flyway-core</ignoredNonTestScopedDependency>
+                        <!-- Transitively pulled test-only -->
+                        <ignoredUsedUndeclaredDependency>ch.qos.logback:*</ignoredUsedUndeclaredDependency>
                     </ignoredNonTestScopedDependencies>
                     <ignoredUsedUndeclaredDependencies>
                         <ignoredUsedUndeclaredDependency>org.springframework.boot:*</ignoredUsedUndeclaredDependency>
@@ -335,6 +331,9 @@
                         <ignoredUsedUndeclaredDependency>org.springdoc:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.slf4j:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>com.fasterxml.jackson.*:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>tools.jackson.*:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>org.hibernate.*:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>org.springframework.kafka:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.apache.commons:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.assertj:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.jspecify:*</ignoredUsedUndeclaredDependency>
@@ -348,9 +347,23 @@
                         <ignoredUsedUndeclaredDependency>org.apache.tomcat.embed:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>io.swagger.core.v3:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.awaitility:*</ignoredUsedUndeclaredDependency>
-                        <ignoredUsedUndeclaredDependency>org.wiremock:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.apache.logging.log4j:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.postgresql:*</ignoredUsedUndeclaredDependency>
+                        <!-- Transitively pulled, used directly only in tests; versions
+                             managed by upstream BOMs (testcontainers, oauth2-resource-server) -->
+                        <ignoredUsedUndeclaredDependency>com.github.docker-java:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>com.nimbusds:*</ignoredUsedUndeclaredDependency>
+                        <!-- Transitively pulled, used directly only in tests; versions
+                             managed by upstream BOMs (springframework) -->
+                        <ignoredUsedUndeclaredDependency>ch.qos.logback:*</ignoredUsedUndeclaredDependency>
+                        <!-- Transitively pulled by spring-boot-starter-test;
+                             used directly only by Phase 1 contract tests (#1391) -->
+                        <ignoredUsedUndeclaredDependency>com.jayway.jsonpath:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>org.skyscreamer:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>com.vaadin.external.google:*</ignoredUsedUndeclaredDependency>
+                        <!-- Pulled compile-scope for app boot; additionally used directly
+                             only by DiscriminatorBackfillMigrationIntegrationTest (Phase 1 of #1391) -->
+                        <ignoredUsedUndeclaredDependency>org.flywaydb:flyway-core</ignoredUsedUndeclaredDependency>
                     </ignoredUsedUndeclaredDependencies>
                 </configuration>
                 <executions>
@@ -372,10 +385,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven-compiler-plugin.version}</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.mapstruct</groupId>
@@ -398,13 +408,13 @@
                             <version>${hibernate-processor.version}</version>
                         </path>
                     </annotationProcessorPaths>
+                    <release>${java.version}</release>
                 </configuration>
             </plugin>
             <!-- Build Helper for testIntegration directory -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
-                <version>${build-helper-maven-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>add-integration-test-sources</id>
@@ -449,10 +459,8 @@
                             <include>src/test/java/**/*.java</include>
                             <include>src/testIntegration/java/**/*.java</include>
                         </includes>
-                        <googleJavaFormat>
-                            <version>1.28.0</version>
-                        </googleJavaFormat>
-                        <removeWildcardImports/>
+                        <googleJavaFormat/>
+                        <forbidWildcardImports/>
                         <removeUnusedImports/>
                         <importOrder/>
                         <formatAnnotations/>
@@ -471,7 +479,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>${surefire.version}</version>
                 <configuration>
                     <skipTests>${skipTests}</skipTests>
                     <skip>${skipUnitTests}</skip>
@@ -488,7 +495,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <version>${failsafe.version}</version>
                 <executions>
                     <execution>
                         <goals>
@@ -552,7 +558,6 @@
             <plugin>
                 <groupId>org.cyclonedx</groupId>
                 <artifactId>cyclonedx-maven-plugin</artifactId>
-                <version>${cyclonedx-maven-plugin.version}</version>
                 <configuration>
                     <outputFormat>json</outputFormat>
                     <schemaVersion>1.5</schemaVersion>

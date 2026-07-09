@@ -9,10 +9,10 @@ import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
-  usePublishDatastructure,
-  useUnpublishDatastructure,
+  useReleaseDatastructure,
+  useUnreleaseDatastructure,
   useUpdateDatastructure,
-  useUpdateDatastructurePublished,
+  useUpdateDatastructureReleased,
 } from '@/app/services/api/datastructures/clientRequests'
 import { ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
@@ -29,7 +29,6 @@ import {
 } from '@/types/datastructures'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { containsNonStatusField, mapDatastructureApiToFormData } from '@/utils/datastructures'
-import { isNameConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { tabs } from '../components/DatastructureOverview'
@@ -44,7 +43,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
   const router = useRouter()
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
-  const { handleFormValidationError, handleNameError } = useError()
+  const { handleFormValidationError } = useError()
   const [selectedTab, setSelectedTab] = useState(tabs[0].value)
 
   const defaultValues = useMemo<DatastructureFormDraft>(
@@ -53,14 +52,14 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
   )
 
   const updateDatastructure = useUpdateDatastructure()
-  const updatePublishedDatastructure = useUpdateDatastructurePublished()
-  const publishDatastructure = usePublishDatastructure()
-  const unpublishDatastructure = useUnpublishDatastructure()
+  const updateReleasedDatastructure = useUpdateDatastructureReleased()
+  const releaseDatastructure = useReleaseDatastructure()
+  const unreleaseDatastructure = useUnreleaseDatastructure()
   const isLoading =
     updateDatastructure.isPending ||
-    updatePublishedDatastructure.isPending ||
-    publishDatastructure.isPending ||
-    unpublishDatastructure.isPending
+    updateReleasedDatastructure.isPending ||
+    releaseDatastructure.isPending ||
+    unreleaseDatastructure.isPending
 
   const form = useForm<DatastructureFormDraft>({
     resolver: zodResolver(DatastructureFormDraftSchema),
@@ -85,7 +84,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     [datastructure.dataStructureVersions],
   )
 
-  const canSetAvailable = useMemo(
+  const canStage = useMemo(
     () => DatastructureFormAvailableSchema.safeParse(formValues).success && hasAvailableVersion,
     [formValues, hasAvailableVersion],
   )
@@ -104,11 +103,11 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
   }, [form, isDraftMode])
 
   useEffect(() => {
-    if (datastructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+    if (datastructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canStage) {
       form.setValue('dataStructureStatus', DATASTRUCTURE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
-  }, [canSetAvailable, form, datastructureStatus, tCommon])
+  }, [canStage, form, datastructureStatus, tCommon])
 
   const completedTabs = useMemo((): DatastructureTab[] => {
     const completed: DatastructureTab[] = []
@@ -148,7 +147,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
 
       let response: { data: Datastructure }
       if (datastructure.dataStructureStatus === STATUS_TYPES.AVAILABLE)
-        response = await updatePublishedDatastructure.mutateAsync({
+        response = await updateReleasedDatastructure.mutateAsync({
           ...values,
           createdFromDataSource: datastructure.createdFromDataSource,
           ...assignmentsPatch,
@@ -174,16 +173,16 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
 
     const fieldsToUpdate = pickDirtyValues(parsedValues, dirtyFields)
     const shouldUpdateValue = containsNonStatusField(fieldsToUpdate) || areAssignmentsDirty
-    const shouldPublish =
+    const shouldRelease =
       !!dirtyFields.dataStructureStatus && datastructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
-    const shouldUnpublish =
+    const shouldUnrelease =
       !!dirtyFields.dataStructureStatus && datastructureStatus === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
     let datastructureResponse: Datastructure | null = shouldUpdateValue ? await handleUpdateValues(parsedValues) : null
-    if (shouldPublish)
-      datastructureResponse = await handleStatusUpdate(parsedValues.id, publishDatastructure.mutateAsync)
-    if (shouldUnpublish)
-      datastructureResponse = await handleStatusUpdate(parsedValues.id, unpublishDatastructure.mutateAsync)
+    if (shouldRelease)
+      datastructureResponse = await handleStatusUpdate(parsedValues.id, releaseDatastructure.mutateAsync)
+    if (shouldUnrelease)
+      datastructureResponse = await handleStatusUpdate(parsedValues.id, unreleaseDatastructure.mutateAsync)
 
     const updatedFormValues = datastructureResponse
       ? mapDatastructureApiToFormData(datastructureResponse)
@@ -207,11 +206,8 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
       await handleUpdateDatastructure(parsed.data)
       return true
     } catch (error) {
-      if (isNameConflictError(error as AxiosError)) {
-        handleNameError(form, form.getValues('name'))
-      } else {
-        console.error('An error occurred while submitting datastructure data.', (error as AxiosError).message)
-      }
+      console.error('An error occurred while submitting datastructure data.', (error as AxiosError).message)
+      toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructure') }))
       return false
     }
   }
@@ -233,7 +229,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
 
   return {
     areAssignmentsDirty,
-    canSetAvailable,
+    canStage,
     canSetDraft,
     completedTabs,
     form,

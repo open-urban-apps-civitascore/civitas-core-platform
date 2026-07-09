@@ -3,10 +3,22 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { useCallback } from 'react'
 
-import { UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
+import { BasicSelect } from '@/components/select/basicSelect/BasicSelect'
+import { GroupedOption, GroupedSelect } from '@/components/select/grouped-select/GroupedSelect'
+import { cn } from '@/lib/utils'
+import { SelectOption } from '@/types/common'
+
+import {
+  cardinalityForDisplay,
+  cardinalityForStorage,
+  PROPERTY_CARDINALITY_VALUES,
+  UML_GEOMETRY_TYPES,
+  UML_PRIMITIVE_TYPES,
+} from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
-import type { UMLAttribute, UMLElement, UMLPrimitiveType, Visibility } from '../../types/uml'
+import { canMultiplicityBePrimaryKey } from '../../services/jsonSchemaExportService'
+import { type UMLAttribute, type UMLElement, type UMLGeometryType, type UMLPrimitiveType } from '../../types/uml'
 
 interface AttributeManagerProps {
   nodeId: string
@@ -25,7 +37,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
         id: crypto.randomUUID(),
         name: 'neuesAttribut',
         type: 'String',
-        visibility: 'private',
+        isId: false,
       }
       updateNode(nodeId, {
         attributes: [...element.attributes, newAttribute],
@@ -59,8 +71,83 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     return null
   }
 
-  const visibilityOptions: Visibility[] = ['public', 'private', 'protected', 'package']
-  const typeOptions = Object.keys(UML_PRIMITIVE_TYPES) as UMLPrimitiveType[]
+  // Options for the cardinality dropdown of a single attribute. Imported or
+  // edge-authored models may carry a multiplicity outside the dropdown's four
+  // values (e.g. `*` or a range like `1..5`); we surface that value as an extra
+  // option so it stays visible and isn't silently discarded on the next edit.
+  const getMultiplicityOptions = (multiplicity?: string): SelectOption<string>[] => {
+    const displayed = cardinalityForDisplay(multiplicity)
+    const options: SelectOption<string>[] = PROPERTY_CARDINALITY_VALUES.map(value => ({ value, label: value }))
+    if (!options.some(option => option.value === displayed)) {
+      options.push({ value: displayed, label: displayed })
+    }
+    return options
+  }
+
+  const primitiveTypeOptions = Object.keys(UML_PRIMITIVE_TYPES) as UMLPrimitiveType[]
+  const geometryTypeOptions = Object.keys(UML_GEOMETRY_TYPES) as UMLGeometryType[]
+
+  const typeOptions: GroupedOption[] = [
+    { label: 'Primitive Types', options: primitiveTypeOptions.map(type => ({ label: type, value: type })) },
+    { label: 'Geometry Types', options: geometryTypeOptions.map(type => ({ label: type, value: type })) },
+  ]
+
+  const crsOptions = [
+    {
+      label: 'EPSG:4326  – WGS84 (Standard)',
+      value: 'EPSG:4326',
+    },
+    {
+      label: 'EPSG:3857  – Web Mercator',
+      value: 'EPSG:3857',
+    },
+    {
+      label: 'EPSG:25832 – UTM Zone 32N',
+      value: 'EPSG:25832',
+    },
+    {
+      label: 'EPSG:25833 – UTM Zone 33N',
+      value: 'EPSG:25833',
+    },
+    {
+      label: 'EPSG:4258  – ETRS89',
+      value: 'EPSG:4258',
+    },
+  ]
+
+  const isGeometryType = (type: string) => !!UML_GEOMETRY_TYPES[type as UMLGeometryType]
+
+  const allGeomAttributes = element.attributes.filter(attr => isGeometryType(attr.type as string))
+
+  const firstGeomAttr = allGeomAttributes[0]
+
+  const isFirstGeomAttr = (attributeId: string) => firstGeomAttr?.id === attributeId
+
+  const getMetaForTypeChange = (attribute: UMLAttribute, newType: string): UMLAttribute['meta'] => {
+    if (!isGeometryType(newType)) {
+      if (!attribute.meta?.gisInfo) return attribute.meta
+      const { gisInfo: _, ...metaWithoutGisinfo } = attribute.meta
+      return metaWithoutGisinfo
+    }
+    const crs = firstGeomAttr?.meta?.gisInfo?.crs ?? crsOptions[0].value
+    return { ...attribute.meta, gisInfo: { ...attribute.meta?.gisInfo, crs } }
+  }
+
+  const handleTypeChange = (e: string, attribute: UMLAttribute) =>
+    updateAttribute(attribute.id, {
+      type: e as UMLPrimitiveType | UMLGeometryType,
+      meta: getMetaForTypeChange(attribute, e),
+    })
+
+  const handleCrsChange = (e: string, attributeId: string) => {
+    if (!isFirstGeomAttr(attributeId)) return
+    const updatedAttributes = element.attributes.map(attr =>
+      isGeometryType(attr.type as string)
+        ? { ...attr, meta: { ...attr.meta, gisInfo: { ...attr.meta?.gisInfo, crs: e } } }
+        : attr,
+    )
+    updateNode(nodeId, { attributes: updatedAttributes })
+  }
 
   return (
     <div className="space-y-3">
@@ -109,43 +196,46 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
             {/* Type */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
-              <select
-                value={typeof attribute.type === 'string' ? attribute.type : attribute.type.name}
-                onChange={e => updateAttribute(attribute.id, { type: e.target.value as UMLPrimitiveType })}
-                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              <GroupedSelect
+                groupedOptions={typeOptions}
+                onValueChange={e => handleTypeChange(e, attribute)}
                 disabled={isReadOnly}
-              >
-                {typeOptions.map(type => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
+                value={typeof attribute.type === 'string' ? attribute.type : attribute.type.name}
+                size="sm"
+                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
             </div>
 
-            {/* Visibility */}
+            {/* Cardinality / multiplicity */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Visibility</label>
-              <select
-                value={attribute.visibility}
-                onChange={e => updateAttribute(attribute.id, { visibility: e.target.value as Visibility })}
-                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              <label className="block text-xs font-medium text-gray-600 mb-1">Cardinality</label>
+              <BasicSelect
+                options={getMultiplicityOptions(attribute.multiplicity)}
+                onValueChange={e => {
+                  const multiplicity = cardinalityForStorage(e)
+                  updateAttribute(attribute.id, {
+                    multiplicity,
+                    ...(canMultiplicityBePrimaryKey(multiplicity) ? {} : { isId: false }),
+                  })
+                }}
+                value={cardinalityForDisplay(attribute.multiplicity)}
+                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                size="sm"
                 disabled={isReadOnly}
-              >
-                {visibilityOptions.map(visibility => (
-                  <option key={visibility} value={visibility}>
-                    {visibility} (
-                    {visibility === 'public'
-                      ? '+'
-                      : visibility === 'private'
-                        ? '-'
-                        : visibility === 'protected'
-                          ? '#'
-                          : '~'}
-                    )
-                  </option>
-                ))}
-              </select>
+              />
+            </div>
+
+            {/* meta info - CRS */}
+            <div className={cn(!isGeometryType(attribute.type as string) && 'hidden')}>
+              <label className="block text-xs font-medium text-gray-600 mb-1">CRS</label>
+              <BasicSelect
+                options={crsOptions}
+                onValueChange={e => handleCrsChange(e, attribute.id)}
+                value={attribute.meta?.gisInfo?.crs}
+                disabled={!isFirstGeomAttr(attribute.id)}
+                size="sm"
+                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
             </div>
 
             {/* Default Value */}
@@ -175,6 +265,22 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
                 Static (underlined)
               </label>
             </div>
+
+            {canMultiplicityBePrimaryKey(attribute.multiplicity) && (
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={`primary-key-${attribute.id}`}
+                  checked={attribute.isId || false}
+                  onChange={e => updateAttribute(attribute.id, { isId: e.target.checked })}
+                  className="mr-2"
+                  disabled={isReadOnly}
+                />
+                <label htmlFor={`primary-key-${attribute.id}`} className="text-xs text-gray-600">
+                  Primary Key {'{id}'}
+                </label>
+              </div>
+            )}
           </div>
         ))}
 

@@ -4,6 +4,7 @@ import de.civitascore.portal.model.entity.Distribution;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -21,8 +22,8 @@ public interface DistributionRepository extends BaseRepository<Distribution, UUI
    * @return the distribution with eagerly fetched dataSet
    */
   @EntityGraph(attributePaths = {"dataSet"})
-  @Query("SELECT d FROM Distribution d WHERE d.id = :id")
-  Optional<Distribution> findByIdWithRelations(@Param("id") UUID id);
+  @Override
+  @NonNull Optional<Distribution> findById(@NonNull UUID id);
 
   /**
    * Find all distributions for a specific dataset.

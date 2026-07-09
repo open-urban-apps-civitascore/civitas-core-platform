@@ -2,27 +2,41 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.Distribution;
+import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -31,6 +45,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataSetService Tests")
@@ -38,21 +55,47 @@ class DataSetServiceTest {
 
   @Mock private DataSetRepository dataSetRepository;
   @Mock private DataSetMapper dataSetMapper;
+  @Mock private DataPoolRepository dataPoolRepository;
   @Mock private AssignmentFactory assignmentFactory;
-  @Mock private DistributionService distributionService;
   @Mock private DataSetSagaPublisher sagaPublisher;
+  @Mock private ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   private DataSetService createService() {
+    // Default to TENANT wildcard so the F4 target-pool check passes for existing pool-setting
+    // tests;
+    // F4-specific tests override allowedScopesProvider.getObject() after calling createService().
+    lenient().when(allowedScopesProvider.getObject()).thenReturn(wildcardScopes());
     return new DataSetService(
-        dataSetRepository, dataSetMapper, assignmentFactory, distributionService, sagaPublisher);
+        dataSetRepository,
+        dataSetMapper,
+        dataPoolRepository,
+        assignmentFactory,
+        sagaPublisher,
+        allowedScopesProvider);
+  }
+
+  private static AllowedScopes wildcardScopes() {
+    AllowedScopes scopes = new AllowedScopes();
+    scopes.setWildcard();
+    return scopes;
+  }
+
+  private static AllowedScopes poolScopes(UUID... poolIds) {
+    AllowedScopes scopes = new AllowedScopes();
+    scopes.setPoolIds(Set.of(poolIds));
+    return scopes;
   }
 
   private DataSet readyDataSet(UUID id) {
     DataSet ds = new DataSet();
     ds.setId(id);
     ds.setDataSetStatus(DataSetStatus.READY);
-    ds.setPipelines(new java.util.HashSet<>());
-    ds.setDistributions(new HashSet<>());
+    ds.setPipelines(new HashSet<>());
+    NamedApi api = new NamedApi();
+    api.setName("Traffic Sensor Readings");
+    api.setSlug("traffic");
+    api.setStandard(ApiStandard.STA);
+    ds.setNamedApis(new HashSet<>(Set.of(api)));
     return ds;
   }
 
@@ -60,7 +103,7 @@ class DataSetServiceTest {
     DataSet ds = readyDataSet(id);
     ds.setDataSetStatus(DataSetStatus.AVAILABLE);
     ds.setProjectId("proj-1");
-    ds.setRouteId("route-1");
+    ds.getNamedApis().forEach(api -> api.setRouteId("route-1"));
     ds.setServiceId("svc-1");
     ds.setPublicUrl("https://example.com");
     ds.setPipelineIds(List.of("pipe-1"));
@@ -74,60 +117,41 @@ class DataSetServiceTest {
     ds.setDescription("test description");
     ds.setDataSetStatus(DataSetStatus.DRAFT);
     ds.setPipelines(new HashSet<>());
-    ds.setDistributions(new HashSet<>());
     return ds;
   }
 
   @Nested
-  @DisplayName("publish()")
-  class PublishTests {
+  @DisplayName("stage()")
+  class StageTests {
 
     @Test
-    @DisplayName("publishes dataset with feed-in pipeline (has datasources)")
-    void publishesWithDatasources() {
+    @DisplayName("stages dataset with feed-in pipeline (has datasources)")
+    void stagesWithDatasources() {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
-      p.setDataSources(new HashSet<>(List.of(new de.civitascore.portal.model.entity.DataSource())));
+      p.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(p);
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      DataSet result = createService().publish(id);
+      DataSet result = createService().stage(id);
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     }
 
     @Test
-    @DisplayName("publishes dataset with provide pipeline (has APIs, no datasources)")
-    void publishesWithApisOnly() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = draftDataSet(id);
-      Pipeline p = new Pipeline();
-      p.setApis(List.of("/v1.1/Things"));
-      ds.getPipelines().add(p);
-
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
-      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-      when(distributionService.createFromApiUrlAndDataSet(any(), any()))
-          .thenReturn(new Distribution());
-
-      DataSet result = createService().publish(id);
-      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
-    }
-
-    @Test
-    @DisplayName("rejects pipeline with neither datasources nor APIs")
+    @DisplayName("rejects pipeline without datasources")
     void rejectsEmptyPipeline() {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       ds.getPipelines().add(new Pipeline());
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
-      assertThatThrownBy(() -> createService().publish(id))
+      assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("DataSources or APIs");
+          .hasMessageContaining("DataSources");
     }
 
     @Test
@@ -136,11 +160,38 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
-      assertThatThrownBy(() -> createService().publish(id))
+      assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Pipeline");
+    }
+
+    @Test
+    @DisplayName("stages dataset with valid named APIs")
+    void stagesWithValidNamedApis() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSetWithPipeline(id);
+      NamedApi api = new NamedApi();
+      api.setName("Traffic");
+      api.setSlug("traffic");
+      api.setStandard(ApiStandard.STA);
+      ds.setNamedApis(new HashSet<>(Set.of(api)));
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet result = createService().stage(id);
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+    }
+
+    /** A DRAFT dataset that passes the pipeline precondition of {@code stage()}. */
+    private DataSet draftDataSetWithPipeline(UUID id) {
+      DataSet ds = draftDataSet(id);
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(List.of(new DataSource())));
+      ds.getPipelines().add(p);
+      return ds;
     }
   }
 
@@ -196,7 +247,7 @@ class DataSetServiceTest {
     void throwsWhenNotAvailable() {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().unrelease(id))
           .isInstanceOf(InvalidInputException.class)
@@ -209,7 +260,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.CREATE);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().unrelease(id))
           .isInstanceOf(ResourceInUseException.class)
@@ -221,7 +272,7 @@ class DataSetServiceTest {
     void setsPendingDeleteAndPublishes() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSetService service = createService();
@@ -233,8 +284,8 @@ class DataSetServiceTest {
   }
 
   @Nested
-  @DisplayName("updatePublishedMeta()")
-  class UpdatePublishedMetaTests {
+  @DisplayName("updateReleasedMeta()")
+  class UpdateReleasedMetaTests {
 
     @Test
     @DisplayName("throws ResourceInUseException when CREATE saga is in-flight")
@@ -242,12 +293,12 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.CREATE);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
 
-      assertThatThrownBy(() -> createService().updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
           .isInstanceOf(ResourceInUseException.class)
           .hasMessageContaining("saga is in-flight")
           .hasMessageContaining("CREATE");
@@ -259,12 +310,12 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.UPDATE);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
 
-      assertThatThrownBy(() -> createService().updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
           .isInstanceOf(ResourceInUseException.class)
           .hasMessageContaining("saga is in-flight")
           .hasMessageContaining("UPDATE");
@@ -276,12 +327,12 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.DELETE);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
 
-      assertThatThrownBy(() -> createService().updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
           .isInstanceOf(ResourceInUseException.class)
           .hasMessageContaining("saga is in-flight")
           .hasMessageContaining("DELETE");
@@ -291,16 +342,110 @@ class DataSetServiceTest {
     @DisplayName("allows update when no saga is pending")
     void allowsUpdateWhenNoSagaPending() {
       UUID id = UUID.randomUUID();
+      UUID poolId = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataPoolRepository.findById(poolId)).thenReturn(Optional.of(pool));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+      input.setDatapoolId(poolId);
+
+      DataSet result = createService().updateReleasedMeta(id, input);
+      assertThat(result).isNotNull();
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+
+    @Test
+    @DisplayName(
+        "rejects any non-null namedApis on /released/meta (concept #1379/#1384 immutability)")
+    void rejectsAnyNamedApisOnReleased() {
+      // The contract is that namedApis cannot appear at all on this endpoint — even a no-op
+      // round-trip of the existing list is rejected, not just diffs.
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+      NamedApiInputDTO roundTripped = new NamedApiInputDTO();
+      roundTripped.setName("Traffic Sensor Readings");
+      roundTripped.setSlug("traffic");
+      roundTripped.setStandard(ApiStandard.STA);
+      input.setNamedApis(List.of(roundTripped));
+
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("cannot be changed")
+          .hasMessageContaining("AVAILABLE");
+
+      // Pins the ordering contract: the namedApis guard fires BEFORE the saga trigger. Without
+      // this, a regression that placed the check after publishUpdateRequested would leak an
+      // UPDATE event for invalid input.
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+
+    @Test
+    @DisplayName("rejects duplicate named-API slugs with a business 400 (not a DB 500)")
+    void rejectsDuplicateNamedApiSlugs() {
+      // Two named APIs sharing a slug must be rejected up front; otherwise both reach the DB unique
+      // constraint as an opaque 500 (and the slug is the per-named-API route key).
+      DataSet entity = new DataSet();
+      NamedApiInputDTO first = new NamedApiInputDTO();
+      first.setName("Traffic A");
+      first.setSlug("traffic");
+      first.setStandard(ApiStandard.STA);
+      NamedApiInputDTO duplicate = new NamedApiInputDTO();
+      duplicate.setName("Traffic B");
+      duplicate.setSlug("traffic");
+      duplicate.setStandard(ApiStandard.STA);
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(List.of(first, duplicate));
+
+      assertThatThrownBy(() -> createService().postConvertToEntity(entity, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Duplicate named-API slug")
+          .hasMessageContaining("traffic");
+    }
+
+    @Test
+    @DisplayName("rejects an empty namedApis list too (the field is forbidden, not just changes)")
+    void rejectsEmptyNamedApisListOnReleased() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+      input.setNamedApis(List.of());
+
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("cannot be changed")
+          .hasMessageContaining("READY");
+
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+
+    @Test
+    @DisplayName("allows updateReleasedMeta with namedApis omitted (PATCH semantics)")
+    void allowsOmittedNamedApis() {
+      UUID id = UUID.randomUUID();
+      // availableDataSet seeds a NamedApi with slug "traffic"; the omit-means-unchanged
+      // contract must leave that collection untouched.
+      DataSet ds = availableDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
+      // input.getNamedApis() stays null
 
-      DataSet result = createService().updatePublishedMeta(id, input);
-      assertThat(result).isNotNull();
-      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+      DataSet result = createService().updateReleasedMeta(id, input);
+      assertThat(result.getNamedApis()).extracting(NamedApi::getSlug).containsExactly("traffic");
     }
   }
 
@@ -315,7 +460,7 @@ class DataSetServiceTest {
       DataSet ds = readyDataSet(id);
       ds.setDataSetStatus(DataSetStatus.AVAILABLE);
       ds.setPendingSagaType(PendingSagaType.CREATE);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       SagaResultPayload result =
@@ -323,7 +468,7 @@ class DataSetServiceTest {
               id.toString(),
               "proj-1",
               "https://frost.example.com",
-              "route-1",
+              Map.of("traffic", "route-1"),
               "svc-1",
               "https://public.example.com",
               List.of("pipe-1"),
@@ -338,11 +483,250 @@ class DataSetServiceTest {
       DataSet persisted = saved.getValue();
       assertThat(persisted.getProjectId()).isEqualTo("proj-1");
       assertThat(persisted.getFrostBaseUrl()).isEqualTo("https://frost.example.com");
-      assertThat(persisted.getRouteId()).isEqualTo("route-1");
+      assertThat(persisted.getNamedApis())
+          .extracting(NamedApi::getSlug, NamedApi::getRouteId)
+          .containsExactly(tuple("traffic", "route-1"));
       assertThat(persisted.getServiceId()).isEqualTo("svc-1");
       assertThat(persisted.getPublicUrl()).isEqualTo("https://public.example.com");
       assertThat(persisted.getPipelineIds()).containsExactly("pipe-1");
       assertThat(persisted.getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("CREATE: writes per-slug routeIds across multiple named APIs")
+    void createWritesMultipleRouteIds() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      ds.setPipelines(new HashSet<>());
+      NamedApi traffic = new NamedApi();
+      traffic.setName("Traffic");
+      traffic.setSlug("traffic");
+      traffic.setStandard(ApiStandard.STA);
+      NamedApi weather = new NamedApi();
+      weather.setName("Weather");
+      weather.setSlug("weather");
+      weather.setStandard(ApiStandard.STA);
+      ds.setNamedApis(new HashSet<>(Set.of(traffic, weather)));
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1", "weather", "route-2"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getNamedApis())
+          .extracting(NamedApi::getSlug, NamedApi::getRouteId)
+          .containsExactlyInAnyOrder(tuple("traffic", "route-1"), tuple("weather", "route-2"));
+    }
+
+    @Test
+    @DisplayName("CREATE: partial routeIds map leaves unmatched entries with null routeId")
+    void createPartialRouteIdsLeavesEntriesUnchanged() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      ds.setPipelines(new HashSet<>());
+      NamedApi traffic = new NamedApi();
+      traffic.setName("Traffic");
+      traffic.setSlug("traffic");
+      traffic.setStandard(ApiStandard.STA);
+      NamedApi weather = new NamedApi();
+      weather.setName("Weather");
+      weather.setSlug("weather");
+      weather.setStandard(ApiStandard.STA);
+      ds.setNamedApis(new HashSet<>(Set.of(traffic, weather)));
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      // Saga returned only one of the two slugs
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getNamedApis())
+          .extracting(NamedApi::getSlug, NamedApi::getRouteId)
+          .containsExactlyInAnyOrder(tuple("traffic", "route-1"), tuple("weather", null));
+    }
+
+    @Test
+    @DisplayName("CREATE: empty routeIds map leaves entity routeIds untouched")
+    void createEmptyRouteIdsMapIsNoOp() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id); // routeId already "route-1" via helper
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      // routeIds present but empty — distinct from null (which means "no infrastructure step
+      // ran"). The branch must skip without overwriting anything.
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(), null, null, Map.of(), null, null, null, null, null, null);
+
+      createService().handleSagaCompleted(id, result);
+
+      assertThat(ds.getNamedApis()).extracting(NamedApi::getRouteId).containsExactly("route-1");
+    }
+
+    @Test
+    @DisplayName("CREATE: incoming routeId replaces a previously-set routeId for the same slug")
+    void createIncomingRouteIdReplacesExisting() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      // Simulate: entity already has a routeId from a previous saga response.
+      ds.getNamedApis().forEach(api -> api.setRouteId("route-old"));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-NEW"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      Logger serviceLogger = (Logger) LoggerFactory.getLogger(DataSetService.class);
+      ListAppender<ILoggingEvent> appender = new ListAppender<>();
+      appender.start();
+      serviceLogger.addAppender(appender);
+      try {
+        createService().handleSagaCompleted(id, result);
+      } finally {
+        serviceLogger.detachAppender(appender);
+      }
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getNamedApis())
+          .extracting(NamedApi::getSlug, NamedApi::getRouteId)
+          .containsExactly(tuple("traffic", "route-NEW"));
+      assertThat(appender.list)
+          .anyMatch(
+              event ->
+                  event.getLevel() == Level.ERROR
+                      && event.getFormattedMessage().contains("drift=replaced-routeid")
+                      && event.getFormattedMessage().contains("traffic")
+                      && event.getFormattedMessage().contains("route-old")
+                      && event.getFormattedMessage().contains("route-NEW"));
+    }
+
+    @Test
+    @DisplayName("CREATE: orphan slug in saga result is logged as drift but does not throw")
+    void createOrphanSlugSilentlySkipped() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      // Saga returned a slug that doesn't exist on the entity (drift)
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1", "ghost", "route-orphan"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      // The matching slug still gets its routeId; orphan is ignored without throwing.
+      assertThat(saved.getValue().getNamedApis())
+          .extracting(NamedApi::getSlug, NamedApi::getRouteId)
+          .containsExactly(tuple("traffic", "route-1"));
+    }
+
+    @Test
+    @DisplayName(
+        "CREATE: routeIds returned for entity without namedApis is logged as drift but does not"
+            + " throw")
+    void createUnexpectedRouteIdsLoggedAsDrift() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      ds.setNamedApis(new HashSet<>());
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("ghost", "route-orphan"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      Logger serviceLogger = (Logger) LoggerFactory.getLogger(DataSetService.class);
+      ListAppender<ILoggingEvent> appender = new ListAppender<>();
+      appender.start();
+      serviceLogger.addAppender(appender);
+      try {
+        createService().handleSagaCompleted(id, result);
+      } finally {
+        serviceLogger.detachAppender(appender);
+      }
+
+      assertThat(appender.list)
+          .anyMatch(
+              event ->
+                  event.getLevel() == Level.ERROR
+                      && event.getFormattedMessage().contains("drift=unexpected-routeids")
+                      && event.getFormattedMessage().contains("ghost"));
     }
 
     @Test
@@ -351,10 +735,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.DELETE);
-      Distribution autoDist = new Distribution();
-      autoDist.setAutoGenerated(true);
-      ds.getDistributions().add(autoDist);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       createService()
@@ -367,113 +748,12 @@ class DataSetServiceTest {
       verify(dataSetRepository).save(saved.capture());
       DataSet persisted = saved.getValue();
       assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
-      assertThat(persisted.getDistributions()).isEmpty();
       assertThat(persisted.getPendingSagaType()).isNull();
-    }
-
-    @Test
-    @DisplayName("CREATE: regenerates distributions when removed by prior DELETE saga")
-    void createRegeneratesDistributionsWhenMissing() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = readyDataSet(id);
-      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
-      ds.setPendingSagaType(PendingSagaType.CREATE);
-
-      Pipeline pipeline = new Pipeline();
-      pipeline.setApis(List.of("/v1.1/Things", "/v1.1/Observations"));
-      ds.getPipelines().add(pipeline);
-
-      Distribution createdDist1 = new Distribution();
-      createdDist1.setAutoGenerated(true);
-      createdDist1.setAccessUrl("/Things");
-      Distribution createdDist2 = new Distribution();
-      createdDist2.setAutoGenerated(true);
-      createdDist2.setAccessUrl("/Observations");
-
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
-      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-      when(distributionService.createFromApiUrlAndDataSet("/v1.1/Things", ds))
-          .thenReturn(createdDist1);
-      when(distributionService.createFromApiUrlAndDataSet("/v1.1/Observations", ds))
-          .thenReturn(createdDist2);
-
-      SagaResultPayload result =
-          new SagaResultPayload(
-              id.toString(),
-              "proj-1",
-              "https://frost.example.com",
-              "route-1",
-              "svc-1",
-              "https://public.example.com/datasets/" + id,
-              List.of("pipe-1"),
-              null,
-              null,
-              null);
-
-      createService().handleSagaCompleted(id, result);
-
-      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
-      verify(dataSetRepository).save(saved.capture());
-      DataSet persisted = saved.getValue();
-      assertThat(persisted.getDistributions()).hasSize(2);
-      assertThat(persisted.getDistributions())
-          .extracting(Distribution::getAccessUrl)
-          .containsExactlyInAnyOrder(
-              "https://public.example.com/datasets/" + id + "/Things",
-              "https://public.example.com/datasets/" + id + "/Observations");
-    }
-
-    @Test
-    @DisplayName(
-        "CREATE: regenerates auto-generated distributions even when manual distributions exist")
-    void createRegeneratesWhenOnlyManualDistributionsRemain() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = readyDataSet(id);
-      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
-      ds.setPendingSagaType(PendingSagaType.CREATE);
-
-      Pipeline pipeline = new Pipeline();
-      pipeline.setApis(List.of("/v1.1/Things"));
-      ds.getPipelines().add(pipeline);
-
-      Distribution manualDist = new Distribution();
-      manualDist.setAutoGenerated(false);
-      manualDist.setAccessUrl("https://manual.example.com/data");
-      ds.getDistributions().add(manualDist);
-
-      Distribution createdDist = new Distribution();
-      createdDist.setAutoGenerated(true);
-      createdDist.setAccessUrl("/Things");
-
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
-      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-      when(distributionService.createFromApiUrlAndDataSet("/v1.1/Things", ds))
-          .thenReturn(createdDist);
-
-      SagaResultPayload result =
-          new SagaResultPayload(
-              id.toString(),
-              "proj-1",
-              "https://frost.example.com",
-              "route-1",
-              "svc-1",
-              "https://public.example.com/datasets/" + id,
-              List.of("pipe-1"),
-              null,
-              null,
-              null);
-
-      createService().handleSagaCompleted(id, result);
-
-      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
-      verify(dataSetRepository).save(saved.capture());
-      DataSet persisted = saved.getValue();
-      assertThat(persisted.getDistributions()).hasSize(2);
-      assertThat(persisted.getDistributions())
-          .extracting(Distribution::getAccessUrl)
-          .containsExactlyInAnyOrder(
-              "https://manual.example.com/data",
-              "https://public.example.com/datasets/" + id + "/Things");
+      assertThat(persisted.getProjectId()).isNull();
+      assertThat(persisted.getServiceId()).isNull();
+      assertThat(persisted.getPublicUrl()).isNull();
+      assertThat(persisted.getPipelineIds()).isNull();
+      assertThat(persisted.getNamedApis()).allMatch(api -> api.getRouteId() == null);
     }
 
     @Test
@@ -482,7 +762,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(null);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       createService()
           .handleSagaCompleted(
@@ -504,7 +784,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.CREATE);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       createService().handleSagaFailed(id, "FROST", "timeout", true);
@@ -517,83 +797,102 @@ class DataSetServiceTest {
   }
 
   @Nested
-  @DisplayName("updateDistributionUrls()")
-  class UpdateDistributionUrlsTests {
+  @DisplayName("datapool resolution")
+  class DataPoolResolutionTests {
 
     @Test
-    @DisplayName("prepends publicUrl to distribution accessUrl")
-    void prependsPublicUrlToAccessUrl() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = readyDataSet(id);
-      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
-      ds.setPendingSagaType(PendingSagaType.CREATE);
+    @DisplayName("create throws ResourceNotFoundException when datapoolId points to unknown pool")
+    void createRejectsUnknownDatapoolId() {
+      UUID poolId = UUID.randomUUID();
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("ds");
+      input.setDatapoolId(poolId);
 
-      Distribution dist = new Distribution();
-      dist.setAutoGenerated(true);
-      // accessUrl already has version prefix stripped by DistributionService
-      dist.setAccessUrl("/Things");
-      ds.getDistributions().add(dist);
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      when(dataSetMapper.toEntity(any())).thenReturn(entity);
+      when(dataPoolRepository.findById(poolId)).thenReturn(Optional.empty());
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
-      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-      SagaResultPayload result =
-          new SagaResultPayload(
-              id.toString(),
-              "proj-1",
-              "https://frost.example.com",
-              "route-1",
-              "svc-1",
-              "https://public.example.com/datasets/" + id,
-              List.of(),
-              null,
-              null,
-              null);
-
-      createService().handleSagaCompleted(id, result);
-
-      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
-      verify(dataSetRepository).save(saved.capture());
-      String accessUrl = saved.getValue().getDistributions().iterator().next().getAccessUrl();
-      assertThat(accessUrl).isEqualTo("https://public.example.com/datasets/" + id + "/Things");
+      assertThatThrownBy(() -> createService().create(input))
+          .isInstanceOf(ResourceNotFoundException.class);
+      verify(dataSetRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("prepends publicUrl to bare root accessUrl")
-    void prependsPublicUrlToRootAccessUrl() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = readyDataSet(id);
-      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
-      ds.setPendingSagaType(PendingSagaType.CREATE);
+    @DisplayName("create resolves datapoolId and assigns the DataPool to the entity")
+    void createAssignsResolvedDataPool() {
+      UUID poolId = UUID.randomUUID();
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("ds");
+      input.setDatapoolId(poolId);
 
-      Distribution dist = new Distribution();
-      dist.setAutoGenerated(true);
-      // Bare base URL (e.g. "http://frost:8080/FROST-Server/v1.1") stripped to "/"
-      dist.setAccessUrl("/");
-      ds.getDistributions().add(dist);
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetMapper.toEntity(any())).thenReturn(entity);
+      when(dataPoolRepository.findById(poolId)).thenReturn(Optional.of(pool));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      SagaResultPayload result =
-          new SagaResultPayload(
-              id.toString(),
-              "proj-1",
-              "https://frost.example.com",
-              "route-1",
-              "svc-1",
-              "https://public.example.com/datasets/" + id,
-              List.of(),
-              null,
-              null,
-              null);
+      DataSet saved = createService().create(input);
+      assertThat(saved.getDataPool()).isSameAs(pool);
+    }
 
-      createService().handleSagaCompleted(id, result);
+    @Test
+    @DisplayName("create rejects a target datapool the caller is not authorized for (F4)")
+    void createRejectsUnauthorizedTargetPool() {
+      UUID poolId = UUID.randomUUID();
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("ds");
+      input.setDatapoolId(poolId);
 
-      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
-      verify(dataSetRepository).save(saved.capture());
-      String accessUrl = saved.getValue().getDistributions().iterator().next().getAccessUrl();
-      assertThat(accessUrl).isEqualTo("https://public.example.com/datasets/" + id + "/");
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+
+      DataSetService service = createService();
+      when(dataSetMapper.toEntity(any())).thenReturn(entity);
+      when(dataPoolRepository.findById(poolId)).thenReturn(Optional.of(pool));
+      // Caller is authorized only for a DIFFERENT pool → the target pool is off-limits.
+      when(allowedScopesProvider.getObject()).thenReturn(poolScopes(UUID.randomUUID()));
+
+      assertThatThrownBy(() -> service.create(input)).isInstanceOf(AccessDeniedException.class);
+      verify(dataSetRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName(
+        "create with null datapoolId creates dataset without pool (datapoolId is optional)")
+    void createWithNullDatapoolIdLeavesDataPoolNull() {
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("ds");
+
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      when(dataSetMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet saved = createService().create(input);
+      assertThat(saved.getDataPool()).isNull();
+      verify(dataPoolRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("update with null datapoolId unassigns the DataPool from the entity")
+    void updateWithNullDatapoolIdUnassignsDataPool() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSet(id);
+      DataPool existingPool = new DataPool();
+      existingPool.setId(UUID.randomUUID());
+      ds.setDataPool(existingPool);
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      DataSet result = createService().update(id, input);
+      assertThat(result.getDataPool()).isNull();
+      verify(dataPoolRepository, never()).findById(any());
     }
   }
 }

@@ -1,0 +1,41 @@
+meta {
+  name: 7. Stage DataSet
+  type: http
+  seq: 20
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/stage
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+tests {
+  test("Staged or already staged", function() {
+    const status = res.getStatus();
+    // 200=staged, 400=not in DRAFT state (already staged or released)
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Saga step 7 of 18** — Stage the dataset before releasing it.
+
+  Transitions the dataset from `DRAFT` to `READY`. Staging makes the dataset visible and prepares it for the release step. No saga is triggered here.
+
+  **Precondition:** `sagaDataSetId` is set; dataset is in `DRAFT` state.
+
+  **Expected Response:** 200 OK, body reflects dataset with status `READY`. 400 if the dataset is not in `DRAFT` state (e.g., already staged or released).
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet status → `READY` |
+  | Config Adapter | — |
+  | External System | — |
+}

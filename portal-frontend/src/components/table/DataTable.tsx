@@ -1,12 +1,12 @@
-import { ScrollArea } from '@radix-ui/react-scroll-area'
 import { flexRender, Row, SortDirection, Table } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { ComponentProps, ReactNode, useRef } from 'react'
 
+import { ContentCard } from '@/components/content-card/ContentCard'
 import { useIsTruncated } from '@/hooks/use-is-truncated'
 import { cn } from '@/lib/utils'
 
-import { ScrollBar } from '../ui/scroll-area'
+import { ScrollArea, ScrollBar } from '../ui/scroll-area'
 import { Skeleton } from '../ui/skeleton'
 import { Table as ShadCnTable, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
@@ -34,6 +34,9 @@ export interface DataTableProps<T> extends ComponentProps<'table'> {
   testId?: string
   isRowClickable?: (row: Row<T>) => boolean
   onRowClick?: (row: Row<T>) => void
+  tableTitle?: string
+  tableSubtitle?: string
+  tableAction?: ReactNode
 }
 
 const TruncatedCell = ({ children }: { children: ReactNode }) => {
@@ -73,28 +76,31 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
     onRowClick,
     isRowClickable = () => true,
     testId,
+    tableTitle,
+    tableSubtitle,
+    tableAction,
     ...tableProps
   } = props
 
   const t = useTranslations('common')
 
-  return (
+  const tableContent = (
     <div className={cn('@container w-full', !isPaginationHidden && 'h-full')} data-testid={testId}>
       <div
         className={cn(
           !isPaginationHidden &&
-            'h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]',
+            'flex h-full flex-col [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))] [--pagination-padding:calc(--spacing(4))]',
         )}
       >
         <ScrollArea
           data-testid="dataTableScrollArea"
           className={cn(
             'w-full bg-white',
-            hasCard && 'rounded-md border-1',
-            !isPaginationHidden && 'h-[calc(100%-var(--pagination-height))]',
+            hasCard && !tableTitle && 'rounded-md border-1',
+            !isPaginationHidden && 'max-h-[calc(100%-var(--pagination-height))]',
           )}
         >
-          <ShadCnTable aria-labelledby="subheading" tableContainerProps={{ className: '' }} {...tableProps}>
+          <ShadCnTable aria-labelledby="subheading" {...tableProps}>
             <TableHeader>
               {table.getHeaderGroups().map(group => (
                 <TableRow key={group.id}>
@@ -164,5 +170,28 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
         )}
       </div>
     </div>
+  )
+
+  if (tableTitle) {
+    return (
+      <ContentCard>
+        <div className="flex items-start justify-between pt-2 pb-6">
+          <div className="max-w-2xl">
+            <h2 className="text-2xl leading-none font-bold">{tableTitle}</h2>
+            {tableSubtitle && <p className="text-sm text-muted-foreground mt-1">{tableSubtitle}</p>}
+          </div>
+          {tableAction}
+        </div>
+        <hr className="border-border mb-4" />
+        {tableContent}
+      </ContentCard>
+    )
+  }
+
+  return (
+    <>
+      {tableAction && <div className="flex justify-end mb-4">{tableAction}</div>}
+      {tableContent}
+    </>
   )
 }

@@ -48,6 +48,7 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
 
   const { modelSessionManager, resetFormAndSession } = useDatastructureVersion({
     datastructureId: selectedDatastructureId || '',
+    dataStructureName: datastructureVersion?.dataStructure?.name ?? '',
     version: datastructureVersion,
     isCreateMode: false,
   })
@@ -94,8 +95,7 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
         isReadOnly={true}
         modelSessionManager={modelSessionManager}
         isMultiSessionMode={false}
-        canExportXmi={false}
-        canImportXmi={false}
+        canExportModel={false}
         placeHolder={UmlCanvasPlaceholder}
         onImportFromDatastructure={!isDatasourceInUse && !isReadOnly ? handleImportFromDatastructure : undefined}
       />

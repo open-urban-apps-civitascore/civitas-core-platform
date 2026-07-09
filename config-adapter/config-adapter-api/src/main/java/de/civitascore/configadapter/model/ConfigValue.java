@@ -14,12 +14,19 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import de.civitascore.configadapter.model.apisix.ApisixConfigValue;
 import de.civitascore.configadapter.model.apisix.RouteConfigValue;
 import de.civitascore.configadapter.model.frost.FrostConfigValue;
+import de.civitascore.configadapter.model.geoserver.DataStoreConfig;
+import de.civitascore.configadapter.model.geoserver.FeatureTypeConfig;
+import de.civitascore.configadapter.model.geoserver.LayerConfig;
+import de.civitascore.configadapter.model.geoserver.StyleConfig;
+import de.civitascore.configadapter.model.geoserver.WorkspaceConfig;
 import de.civitascore.configadapter.model.idm.ClientConfig;
 import de.civitascore.configadapter.model.idm.GroupConfig;
 import de.civitascore.configadapter.model.idm.RealmConfig;
 import de.civitascore.configadapter.model.idm.RoleConfig;
 import de.civitascore.configadapter.model.idm.UserConfig;
-import de.civitascore.configadapter.model.redpanda.PipelineConfigValue;
+import de.civitascore.configadapter.model.postgis.DbRoleConfig;
+import de.civitascore.configadapter.model.postgis.SchemaConfig;
+import de.civitascore.configadapter.model.postgis.TableConfig;
 
 /**
  * Base interface for typed configuration values. Each adapter domain (IDM, APISIX, etc.) provides
@@ -48,6 +55,13 @@ import de.civitascore.configadapter.model.redpanda.PipelineConfigValue;
   @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-observedproperty"),
   @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-datastream"),
   @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-project"),
-  @JsonSubTypes.Type(value = PipelineConfigValue.class, name = "redpanda-pipeline"),
+  @JsonSubTypes.Type(value = WorkspaceConfig.class, name = "geoserver-workspace"),
+  @JsonSubTypes.Type(value = DataStoreConfig.class, name = "geoserver-datastore"),
+  @JsonSubTypes.Type(value = FeatureTypeConfig.class, name = "geoserver-featuretype"),
+  @JsonSubTypes.Type(value = LayerConfig.class, name = "geoserver-layer"),
+  @JsonSubTypes.Type(value = StyleConfig.class, name = "geoserver-style"),
+  @JsonSubTypes.Type(value = TableConfig.class, name = "sql-table"),
+  @JsonSubTypes.Type(value = SchemaConfig.class, name = "sql-schema"),
+  @JsonSubTypes.Type(value = DbRoleConfig.class, name = "sql-role"),
 })
 public interface ConfigValue {}
