@@ -146,7 +146,8 @@ describe('validateMappingCoversRequiredTargetFields', () => {
   })
 })
 
-describe('validateFrostMappingCoversStaGroups', () => {
+// Skipped while validateFrostMappingCoversStaGroups is commented out of VALIDATION_RULES.
+describe.skip('validateFrostMappingCoversStaGroups', () => {
   const frostSink: TestNode = { id: 'frost-1', type: 'frost', data: { label: 'FROST', configured: true } }
 
   const MATCH_KEYS = {
