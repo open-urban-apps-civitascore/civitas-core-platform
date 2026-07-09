@@ -1,12 +1,5 @@
 export type Visibility = 'public' | 'private' | 'protected' | 'package'
 
-export const VISIBILITY_SYMBOLS: Record<Visibility, string> = {
-  public: '+',
-  private: '-',
-  protected: '#',
-  package: '~',
-}
-
 export type UMLPrimitiveType =
   | 'String'
   | 'Integer'
@@ -56,7 +49,7 @@ export interface UMLAttribute {
   id: string
   name: string
   type: UMLType
-  visibility: Visibility
+  visibility?: Visibility
   isStatic?: boolean
   isId?: boolean
   isReadonly?: boolean
@@ -69,7 +62,7 @@ export interface UMLOperation {
   id: string
   name: string
   returnType?: UMLType
-  visibility: Visibility
+  visibility?: Visibility
   isStatic?: boolean
   isAbstract?: boolean
   parameters: UMLParameter[]

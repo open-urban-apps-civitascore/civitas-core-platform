@@ -6,7 +6,7 @@ import { useCallback, useState } from 'react'
 import { UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
-import type { UMLElement, UMLOperation, UMLParameter, UMLPrimitiveType, Visibility } from '../../types/uml'
+import type { UMLElement, UMLOperation, UMLParameter, UMLPrimitiveType } from '../../types/uml'
 
 interface OperationManagerProps {
   nodeId: string
@@ -23,7 +23,6 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
       const newOperation: UMLOperation = {
         id: crypto.randomUUID(),
         name: 'neueOperation',
-        visibility: 'public',
         parameters: [],
         returnType: 'void',
       }
@@ -117,7 +116,6 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
     return null
   }
 
-  const visibilityOptions: Visibility[] = ['public', 'private', 'protected', 'package']
   const typeOptions = Object.keys(UML_PRIMITIVE_TYPES) as UMLPrimitiveType[]
   const returnTypeOptions = [...typeOptions]
 
@@ -207,60 +205,35 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
               {/* Expanded Operation Details */}
               {isExpanded && (
                 <div className="p-3 space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Visibility</label>
-                      <select
-                        value={operation.visibility}
-                        onChange={e => updateOperation(operation.id, { visibility: e.target.value as Visibility })}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`static-${operation.id}`}
+                        checked={operation.isStatic || false}
+                        onChange={e => updateOperation(operation.id, { isStatic: e.target.checked })}
+                        className="mr-2"
                         disabled={isReadOnly}
-                      >
-                        {visibilityOptions.map(visibility => (
-                          <option key={visibility} value={visibility}>
-                            {visibility} (
-                            {visibility === 'public'
-                              ? '+'
-                              : visibility === 'private'
-                                ? '-'
-                                : visibility === 'protected'
-                                  ? '#'
-                                  : '~'}
-                            )
-                          </option>
-                        ))}
-                      </select>
+                      />
+                      <label htmlFor={`static-${operation.id}`} className="text-xs text-gray-600">
+                        Static
+                      </label>
                     </div>
-                    <div className="space-y-2">
+                    {element.type !== 'interface' && (
                       <div className="flex items-center">
                         <input
                           type="checkbox"
-                          id={`static-${operation.id}`}
-                          checked={operation.isStatic || false}
-                          onChange={e => updateOperation(operation.id, { isStatic: e.target.checked })}
+                          id={`abstract-${operation.id}`}
+                          checked={operation.isAbstract || false}
+                          onChange={e => updateOperation(operation.id, { isAbstract: e.target.checked })}
                           className="mr-2"
                           disabled={isReadOnly}
                         />
-                        <label htmlFor={`static-${operation.id}`} className="text-xs text-gray-600">
-                          Static
+                        <label htmlFor={`abstract-${operation.id}`} className="text-xs text-gray-600">
+                          Abstract
                         </label>
                       </div>
-                      {element.type !== 'interface' && (
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`abstract-${operation.id}`}
-                            checked={operation.isAbstract || false}
-                            onChange={e => updateOperation(operation.id, { isAbstract: e.target.checked })}
-                            className="mr-2"
-                            disabled={isReadOnly}
-                          />
-                          <label htmlFor={`abstract-${operation.id}`} className="text-xs text-gray-600">
-                            Abstract
-                          </label>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
 
                   {/* Parameters */}

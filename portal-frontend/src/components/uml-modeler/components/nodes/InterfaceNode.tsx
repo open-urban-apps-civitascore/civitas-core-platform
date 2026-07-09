@@ -4,7 +4,6 @@ import type { NodeProps } from '@xyflow/react'
 
 import type { UMLNodeData } from '../../types/diagram'
 import type { UMLInterface, UMLParameter, UMLType } from '../../types/uml'
-import { VISIBILITY_SYMBOLS } from '../../types/uml'
 import { BaseUMLNode, NodeLine, NodeSection } from './BaseUMLNode'
 
 // Helper to format UML type names
@@ -37,7 +36,7 @@ export const InterfaceNode: React.FC<NodeProps> = ({ data, selected: isSelected 
       <NodeSection isEmpty={!element.operations || element.operations.length === 0}>
         {element.operations?.map(operation => (
           <NodeLine key={operation.id} isAbstract={true}>
-            {VISIBILITY_SYMBOLS[operation.visibility]} {operation.name}({formatParameters(operation.parameters)})
+            {operation.name}({formatParameters(operation.parameters)})
             {operation.returnType && `: ${formatTypeName(operation.returnType)}`}
             {operation.isStatic && ' {static}'}
           </NodeLine>
