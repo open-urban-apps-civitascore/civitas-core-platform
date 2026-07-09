@@ -32,7 +32,7 @@ class FrostSinkStageTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private final FrostSinkStage stage = new FrostSinkStage("http://frost:8080/v1.1");
-  private final SinkResolutionContext ctx = new SinkResolutionContext("7");
+  private final SinkResolutionContext ctx = new SinkResolutionContext("7", null);
 
   private static Map<String, Object> json(String json) {
     try {
