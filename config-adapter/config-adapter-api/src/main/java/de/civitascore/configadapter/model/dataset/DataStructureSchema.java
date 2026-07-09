@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.model.dataset;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -44,7 +45,14 @@ public final class DataStructureSchema {
   private DataStructureSchema() {}
 
   /** The merged {@code properties} (column name → spec) and unioned {@code required} of a table. */
-  public record ResolvedDefinition(Map<String, Object> properties, Set<String> required) {}
+  public record ResolvedDefinition(Map<String, Object> properties, Set<String> required) {
+    public ResolvedDefinition {
+      // Order-preserving unmodifiable views — declaration order drives column and key order, so
+      // Map.copyOf (unspecified iteration order) is not an option.
+      properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
+      required = Collections.unmodifiableSet(new LinkedHashSet<>(required));
+    }
+  }
 
   /**
    * Resolves the table definition into merged properties/required, following {@code allOf}
@@ -124,7 +132,6 @@ public final class DataStructureSchema {
    * i.e. a geometry or JSONB column downstream) cannot back a B-tree primary key, so it is dropped
    * with a warning rather than yielding a key both adapters would fail to create.
    */
-  @SuppressWarnings("unchecked")
   public static List<String> primaryKeyColumns(Map<String, Object> schema) {
     if (schema == null) {
       return List.of();
@@ -141,6 +148,59 @@ public final class DataStructureSchema {
           Encode.forJava(String.valueOf(unresolvable.getMessage())));
       return List.of();
     }
+    return markerColumns(properties);
+  }
+
+  /**
+   * The class definition reached by walking {@code propertyPath} from the resolved root definition.
+   * Each segment names a property of the current class; an {@code array} property is followed
+   * through its {@code items}, and a bare or {@code allOf}-composed local {@code $ref} is merged
+   * like any parent. Unlike {@link #primaryKeyColumns(Map)} this is strict: an unknown segment, an
+   * item-less array, or a target without object properties (e.g. an external geometry ref) throws —
+   * the caller asked for a specific class and a silent empty result would hide a mis-shaped schema.
+   *
+   * @throws IllegalArgumentException if the path does not resolve to an object definition
+   */
+  public static ResolvedDefinition resolveDefinitionAt(
+      Map<String, Object> schema, List<String> propertyPath) {
+    Map<String, Object> definitions = definitions(schema);
+    ResolvedDefinition current = resolveDefinition(schema);
+    for (String segment : propertyPath) {
+      Map<String, Object> spec = mapValue(current.properties().get(segment));
+      if (spec.isEmpty()) {
+        throw new IllegalArgumentException(
+            "dataStructure JSON Schema has no property '" + segment + "' on the resolved class");
+      }
+      if ("array".equals(stringValue(spec.get("type")))) {
+        spec = mapValue(spec.get("items"));
+        if (spec.isEmpty()) {
+          throw new IllegalArgumentException(
+              "dataStructure JSON Schema array property '" + segment + "' declares no items");
+        }
+      }
+      current = mergeDefinition(spec, definitions);
+      if (current.properties().isEmpty()) {
+        throw new IllegalArgumentException(
+            "dataStructure JSON Schema property '"
+                + segment
+                + "' does not resolve to an object definition");
+      }
+    }
+    return current;
+  }
+
+  /**
+   * The properties marked {@code x-core-primaryKey} on the class at {@code propertyPath} (see
+   * {@link #resolveDefinitionAt(Map, List)}), in declaration order. Strict like the resolution it
+   * builds on; an empty result only means the class marks no key.
+   */
+  public static List<String> primaryKeyColumnsAt(
+      Map<String, Object> schema, List<String> propertyPath) {
+    return markerColumns(resolveDefinitionAt(schema, propertyPath).properties());
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<String> markerColumns(Map<String, Object> properties) {
     List<String> keys = new ArrayList<>();
     for (Map.Entry<String, Object> entry : properties.entrySet()) {
       if (!(entry.getValue() instanceof Map<?, ?> map)

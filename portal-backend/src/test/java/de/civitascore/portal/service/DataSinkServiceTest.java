@@ -131,8 +131,8 @@ class DataSinkServiceTest {
   class FrostValidation {
 
     @Test
-    @DisplayName("Should throw InvalidInputException when FROST config is non-empty")
-    void shouldThrowWhenFrostConfigNonEmpty() {
+    @DisplayName("Should throw InvalidInputException when FROST config carries an unknown key")
+    void shouldThrowWhenFrostConfigHasUnknownKey() {
       UUID dataSetId = UUID.randomUUID();
 
       DataSinkInputDTO input = new DataSinkInputDTO();
@@ -143,6 +143,46 @@ class DataSinkServiceTest {
       DataSink entity = new DataSink();
       when(dataSinkMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+
+      assertThatThrownBy(() -> dataSinkService.create(input))
+          .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
+    @DisplayName("Should accept a FROST config referencing an existing DataStructureVersion")
+    void shouldAcceptFrostConfigWithExistingDataStructureVersion() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSinkType(DataSinkType.FROST);
+      input.setConfiguration(Map.of("dataStructureVersionId", dsvId.toString()));
+
+      DataSink entity = new DataSink();
+      when(dataSinkMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      when(dataStructureVersionRepository.existsById(dsvId)).thenReturn(true);
+      when(dataSinkRepository.save(any())).thenReturn(entity);
+
+      assertThat(dataSinkService.create(input)).isSameAs(entity);
+    }
+
+    @Test
+    @DisplayName("Should throw InvalidInputException when the referenced version does not exist")
+    void shouldThrowWhenFrostDataStructureVersionMissing() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSinkType(DataSinkType.FROST);
+      input.setConfiguration(Map.of("dataStructureVersionId", dsvId.toString()));
+
+      DataSink entity = new DataSink();
+      when(dataSinkMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      when(dataStructureVersionRepository.existsById(dsvId)).thenReturn(false);
 
       assertThatThrownBy(() -> dataSinkService.create(input))
           .isInstanceOf(InvalidInputException.class);

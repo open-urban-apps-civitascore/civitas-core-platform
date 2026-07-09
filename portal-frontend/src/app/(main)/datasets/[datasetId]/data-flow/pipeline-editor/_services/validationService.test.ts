@@ -149,7 +149,14 @@ describe('validateMappingCoversRequiredTargetFields', () => {
 describe('validateFrostMappingCoversStaGroups', () => {
   const frostSink: TestNode = { id: 'frost-1', type: 'frost', data: { label: 'FROST', configured: true } }
 
-  const staMapping = (fields: Record<string, unknown>): TestNode => ({
+  const MATCH_KEYS = {
+    thing: ['$.reference'],
+    datastream: ['$.Datastreams[].reference'],
+    isFallback: false,
+  }
+
+  // 'omit' drops the snapshot entirely — an explicit undefined would just re-trigger the default.
+  const staMapping = (fields: Record<string, unknown>, staMatchKeys: unknown = MATCH_KEYS): TestNode => ({
     id: 'map-1',
     type: 'mapping',
     data: {
@@ -157,131 +164,298 @@ describe('validateFrostMappingCoversStaGroups', () => {
       configured: true,
       mappingConfig: { fields, positions: {} },
       targetRequiredFields: [],
+      ...(staMatchKeys === 'omit' ? {} : { staMatchKeys }),
     },
   })
 
-  const fullThingsFields = {
-    '$.things[].name': '$.station',
-    '$.things[].description': '$.desc',
-    '$.things[].properties.reference': '$.ref',
+  const creatableThingFields = {
+    '$.reference': '$.ref',
+    '$.name': '$.station',
+    '$.description': '$.desc',
   }
 
   const has = (pipeline: Pipeline, key: string): boolean =>
     validatePipeline(pipeline).errors.some(error => error.messageKey === key)
 
-  describe('STA group coverage', () => {
-    const NO_ELEMENT_KEY = 'validation.messages.frostMappingNoStaElement'
-    const GROUP_KEY = 'validation.messages.frostMappingGroupIncomplete'
+  const MATCH_KEYS_KEY = 'validation.messages.frostMappingMissingMatchKeys'
+  const NO_KEY_IN_STRUCTURE_KEY = 'validation.messages.frostMappingNoMatchKeyInStructure'
+  const CREATE_SET_KEY = 'validation.messages.frostMappingCreateSetIncomplete'
+  const UNKNOWN_KEY = 'validation.messages.frostMappingUnknownStaTarget'
+  const LOCATION_KEY = 'validation.messages.frostMappingLocationNeedsCreatableThing'
+  const RESULT_KEY = 'validation.messages.frostMappingObservationNeedsResult'
+  const FALLBACK_KEY = 'validation.messages.frostMappingFallbackMatchKey'
 
-    /** The mapping node wired into the FROST sink — the condition under which the rule applies. */
-    const wiredToFrost = (mapping: TestNode): Pipeline => ({
-      ...pipelineWith([frostSink, mapping]),
-      edges: [{ id: 'e1', source: mapping.id, target: frostSink.id }] as Pipeline['edges'],
-    })
+  /** The mapping node wired into the FROST sink — the condition under which the rule applies. */
+  const wiredToFrost = (mapping: TestNode): Pipeline => ({
+    ...pipelineWith([frostSink, mapping]),
+    edges: [{ id: 'e1', source: mapping.id, target: frostSink.id }] as Pipeline['edges'],
+  })
 
-    it('rejects a FROST mapping that maps no STA element at all', () => {
-      expect(has(wiredToFrost(staMapping({})), NO_ELEMENT_KEY)).toBe(true)
-    })
+  it('rejects a FROST mapping that misses the Thing match key, naming it', () => {
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.name': '$.station', '$.description': '$.d' })))
+    const errors = result.errors.filter(e => e.messageKey === MATCH_KEYS_KEY)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('map-1')
+    expect(errors[0].messageParams?.entity).toBe('thing')
+    expect(errors[0].messageParams?.fields).toBe('$.reference')
+  })
 
-    it('accepts a mapping fully covering the touched group and leaving the other unmapped', () => {
-      const result = validatePipeline(wiredToFrost(staMapping(fullThingsFields)))
-      expect(result.errors.some(e => e.messageKey === NO_ELEMENT_KEY || e.messageKey === GROUP_KEY)).toBe(false)
-    })
+  it('accepts a lookup-only Thing mapping (key only, no create fields)', () => {
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.reference': '$.ref' })))
+    expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
+  })
 
-    it('rejects a touched group missing its required lookup keys, naming them', () => {
-      const result = validatePipeline(wiredToFrost(staMapping({ '$.things[].name': '$.station' })))
-      const errors = result.errors.filter(e => e.messageKey === GROUP_KEY)
-      expect(errors).toHaveLength(1)
-      expect(errors[0].elementId).toBe('map-1')
-      expect(errors[0].messageParams?.group).toBe('$.things')
-      expect(errors[0].messageParams?.fields).toBe('$.things[].description, $.things[].properties.reference')
-    })
+  it('rejects a partially mapped create set, naming the missing fields', () => {
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.reference': '$.ref', '$.name': '$.station' })))
+    const errors = result.errors.filter(e => e.messageKey === CREATE_SET_KEY)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].messageParams?.entity).toBe('thing')
+    expect(errors[0].messageParams?.fields).toBe('$.description')
+  })
 
-    it('checks every touched group independently', () => {
-      const result = validatePipeline(
-        wiredToFrost(
-          staMapping({ ...fullThingsFields, '$.observations[].result': { op: 'toFloat', input: '$.temp' } }),
-        ),
-      )
-      const errors = result.errors.filter(e => e.messageKey === GROUP_KEY)
-      expect(errors).toHaveLength(1)
-      expect(errors[0].messageParams?.group).toBe('$.observations')
-      expect(errors[0].messageParams?.fields).toBe(
-        '$.observations[].parameters.reference, $.observations[].parameters.name',
-      )
-    })
+  it('requires the datastream match key once any Datastreams path is touched', () => {
+    const result = validatePipeline(
+      wiredToFrost(
+        staMapping({
+          '$.reference': '$.ref',
+          '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+        }),
+      ),
+    )
+    const errors = result.errors.filter(e => e.messageKey === MATCH_KEYS_KEY)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].messageParams?.entity).toBe('datastream')
+    expect(errors[0].messageParams?.fields).toBe('$.Datastreams[].reference')
+  })
 
-    it('rejects a target path outside the STA catalog, naming it (the deploy compiler accepts exactly the catalog)', () => {
-      const UNKNOWN_KEY = 'validation.messages.frostMappingUnknownStaTarget'
-      const result = validatePipeline(
-        wiredToFrost(staMapping({ ...fullThingsFields, '$.things[].properties.custom': '$.x' })),
-      )
-      const errors = result.errors.filter(e => e.messageKey === UNKNOWN_KEY)
-      expect(errors).toHaveLength(1)
-      expect(errors[0].elementId).toBe('map-1')
-      expect(errors[0].messageParams?.path).toBe('$.things[].properties.custom')
-    })
+  it('reports a structure without a datastream match key only when the entity is touched', () => {
+    const noDsKey = { ...MATCH_KEYS, datastream: [] }
+    expect(has(wiredToFrost(staMapping({ '$.reference': '$.ref' }, noDsKey)), NO_KEY_IN_STRUCTURE_KEY)).toBe(false)
+    expect(
+      has(
+        wiredToFrost(staMapping({ '$.reference': '$.ref', '$.Datastreams[].Observations[].result': '$.v' }, noDsKey)),
+        NO_KEY_IN_STRUCTURE_KEY,
+      ),
+    ).toBe(true)
+  })
 
-    it('accepts the optional catalog paths (phenomenonTime/resultTime)', () => {
-      const result = validatePipeline(
+  it('rejects a Location without a creatable Thing (deep insert only)', () => {
+    const result = validatePipeline(
+      wiredToFrost(
+        staMapping({
+          '$.reference': '$.ref',
+          '$.Locations[].name': '$.loc',
+          '$.Locations[].description': '$.d',
+          '$.Locations[].encodingType': '$.e',
+          '$.Locations[].location': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
+        }),
+      ),
+    )
+    expect(result.errors.some(e => e.messageKey === LOCATION_KEY)).toBe(true)
+  })
+
+  it('rejects an Observation without result', () => {
+    expect(
+      has(
         wiredToFrost(
           staMapping({
-            ...fullThingsFields,
-            '$.observations[].result': '$.value',
-            '$.observations[].parameters.reference': '$.ref',
-            '$.observations[].parameters.name': '$.name',
-            '$.observations[].phenomenonTime': '$.time',
-            '$.observations[].resultTime': '$.time',
+            '$.reference': '$.ref',
+            '$.Datastreams[].reference': '$.ref',
+            '$.Datastreams[].Observations[].phenomenonTime': '$.ts',
           }),
         ),
-      )
-      expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
-    })
+        RESULT_KEY,
+      ),
+    ).toBe(true)
+  })
 
-    it('finds the FROST sink transitively downstream, not only via a direct edge', () => {
-      const mapping = staMapping({})
-      const between: TestNode = { id: 'geo-1', type: 'geoPersistence', data: { label: 'Geo', configured: true } }
-      const pipeline: Pipeline = {
-        ...pipelineWith([frostSink, mapping, between]),
-        edges: [
-          { id: 'e1', source: mapping.id, target: between.id },
-          { id: 'e2', source: between.id, target: frostSink.id },
-        ] as Pipeline['edges'],
-      }
-      expect(has(pipeline, NO_ELEMENT_KEY)).toBe(true)
-    })
+  it('rejects a target path outside the catalog and match keys, naming it', () => {
+    const result = validatePipeline(wiredToFrost(staMapping({ ...creatableThingFields, '$.serialNumber': '$.sn' })))
+    const errors = result.errors.filter(e => e.messageKey === UNKNOWN_KEY)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].messageParams?.path).toBe('$.serialNumber')
+  })
 
-    it('ignores a mapping that does not feed the FROST sink (unconnected FROST node on the canvas)', () => {
-      expect(has(pipelineWith([frostSink, staMapping({})]), NO_ELEMENT_KEY)).toBe(false)
-    })
+  it('accepts a full creatable chain including optional observation paths', () => {
+    const result = validatePipeline(
+      wiredToFrost(
+        staMapping({
+          ...creatableThingFields,
+          '$.Datastreams[].reference': '$.ref',
+          '$.Datastreams[].name': '$.dsName',
+          '$.Datastreams[].description': '$.d',
+          '$.Datastreams[].observationType': '$.t',
+          '$.Datastreams[].unitOfMeasurement.name': '$.u',
+          '$.Datastreams[].unitOfMeasurement.symbol': '$.u',
+          '$.Datastreams[].unitOfMeasurement.definition': '$.u',
+          '$.Datastreams[].Sensor.name': '$.s',
+          '$.Datastreams[].Sensor.description': '$.s',
+          '$.Datastreams[].Sensor.encodingType': '$.s',
+          '$.Datastreams[].Sensor.metadata': '$.s',
+          '$.Datastreams[].ObservedProperty.name': '$.o',
+          '$.Datastreams[].ObservedProperty.definition': '$.o',
+          '$.Datastreams[].ObservedProperty.description': '$.o',
+          '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+          '$.Datastreams[].Observations[].phenomenonTime': '$.ts',
+          '$.Datastreams[].Observations[].resultTime': '$.ts',
+        }),
+      ),
+    )
+    expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
+  })
 
-    it('does not run without a FROST sink (regular datastructure targets have their own rule)', () => {
-      expect(has(pipelineWith([staMapping({})]), NO_ELEMENT_KEY)).toBe(false)
-    })
+  it('accepts the optional properties bags and extra observation fields', () => {
+    const result = validatePipeline(
+      wiredToFrost(
+        staMapping({
+          ...creatableThingFields,
+          '$.Locations[].name': '$.loc',
+          '$.Locations[].description': '$.d',
+          '$.Locations[].encodingType': '$.e',
+          '$.Locations[].location': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
+          '$.Locations[].properties': '$.meta',
+          '$.Datastreams[].reference': '$.ref',
+          '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+          '$.Datastreams[].Observations[].resultQuality': '$.q',
+          '$.Datastreams[].Observations[].validTime': '$.valid',
+        }),
+      ),
+    )
+    expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
+  })
 
-    it('leaves unsaved/unconfigured mapping nodes to the other rules', () => {
-      const unsaved: TestNode = {
-        id: 'map-1',
-        type: 'mapping',
-        data: { label: 'Mapping', configured: true, mappingConfig: { fields: {}, positions: {} } },
-      }
-      expect(has(wiredToFrost(unsaved), NO_ELEMENT_KEY)).toBe(false)
-    })
+  const FEATURE_OF_INTEREST_KEY = 'validation.messages.frostMappingFeatureOfInterestNeedsObservation'
 
-    it('binds only to the last mapping of a chain before the FROST sink', () => {
-      const first = staMapping({})
-      const last: TestNode = { ...staMapping({}), id: 'map-2' }
-      const pipeline: Pipeline = {
-        ...pipelineWith([frostSink, first, last]),
-        edges: [
-          { id: 'e1', source: first.id, target: last.id },
-          { id: 'e2', source: last.id, target: frostSink.id },
-        ] as Pipeline['edges'],
-      }
-      const errors = validatePipeline(pipeline).errors.filter(error => error.messageKey === NO_ELEMENT_KEY)
-      expect(errors).toHaveLength(1)
-      expect(errors[0].elementId).toBe('map-2')
-    })
+  it('rejects a FeatureOfInterest without a mapped Observation', () => {
+    expect(
+      has(
+        wiredToFrost(
+          staMapping({
+            '$.reference': '$.ref',
+            '$.Datastreams[].reference': '$.ref',
+            '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
+            '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
+            '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
+            '$.Datastreams[].Observations[].FeatureOfInterest.feature': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
+          }),
+        ),
+        FEATURE_OF_INTEREST_KEY,
+      ),
+    ).toBe(true)
+  })
+
+  it('rejects a partially mapped FeatureOfInterest create set', () => {
+    expect(
+      has(
+        wiredToFrost(
+          staMapping({
+            '$.reference': '$.ref',
+            '$.Datastreams[].reference': '$.ref',
+            '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+            '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
+          }),
+        ),
+        CREATE_SET_KEY,
+      ),
+    ).toBe(true)
+  })
+
+  it('accepts an Observation with a fully mapped FeatureOfInterest', () => {
+    const result = validatePipeline(
+      wiredToFrost(
+        staMapping({
+          '$.reference': '$.ref',
+          '$.Datastreams[].reference': '$.ref',
+          '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+          '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
+          '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
+          '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
+          '$.Datastreams[].Observations[].FeatureOfInterest.feature': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
+        }),
+      ),
+    )
+    expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
+  })
+
+  it('exempts the FROST-final mapping from the unconditional required-fields rule', () => {
+    // A lookup-only mapping deliberately leaves required create fields (e.g. $.name) unmapped —
+    // the catalog's conditional requiredness owns this node, not the generic snapshot rule.
+    const REQUIRED_KEY = 'validation.messages.mappingRequiredFieldsMissing'
+    const node: TestNode = {
+      id: 'map-1',
+      type: 'mapping',
+      data: {
+        label: 'Mapping',
+        configured: true,
+        mappingConfig: { fields: { '$.reference': '$.ref' }, positions: {} },
+        targetRequiredFields: ['$.name'],
+        staMatchKeys: MATCH_KEYS,
+      },
+    }
+    expect(has(wiredToFrost(node), REQUIRED_KEY)).toBe(false)
+    // the same node NOT feeding a FROST sink stays subject to the rule
+    expect(has(pipelineWith([node]), REQUIRED_KEY)).toBe(true)
+  })
+
+  it('rejects an unsafe match-key name at edit time (mirrors the deploy whitelist)', () => {
+    const UNSAFE_KEY = 'validation.messages.frostMappingUnsafeMatchKeyName'
+    const umlaut = { ...MATCH_KEYS, thing: ['$.größe'] }
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.größe': '$.ref' }, umlaut)))
+    const errors = result.errors.filter(e => e.messageKey === UNSAFE_KEY)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].messageParams?.keyName).toBe('größe')
+  })
+
+  it('rejects a match key shadowing a standard SensorThings field', () => {
+    const RESERVED_KEY = 'validation.messages.frostMappingReservedMatchKeyName'
+    const reserved = { ...MATCH_KEYS, thing: ['$.name'] }
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.name': '$.n' }, reserved)))
+    expect(result.errors.some(e => e.messageKey === RESERVED_KEY)).toBe(true)
+  })
+
+  it('warns when the match key came from the reference fallback', () => {
+    const fallback = { ...MATCH_KEYS, isFallback: true }
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.reference': '$.ref' }, fallback)))
+    expect(result.warnings.some(w => w.messageKey === FALLBACK_KEY)).toBe(true)
+  })
+
+  it('treats a configured node without a match-key snapshot as never saved', () => {
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.reference': '$.ref' }, 'omit')))
+    expect(result.errors.some(e => e.messageKey === 'validation.messages.mappingNotSaved')).toBe(true)
+  })
+
+  it('finds the FROST sink transitively downstream, not only via a direct edge', () => {
+    const mapping = staMapping({ '$.name': '$.station', '$.description': '$.d' })
+    const between: TestNode = { id: 'geo-1', type: 'geoPersistence', data: { label: 'Geo', configured: true } }
+    const pipeline: Pipeline = {
+      ...pipelineWith([frostSink, mapping, between]),
+      edges: [
+        { id: 'e1', source: mapping.id, target: between.id },
+        { id: 'e2', source: between.id, target: frostSink.id },
+      ] as Pipeline['edges'],
+    }
+    expect(has(pipeline, MATCH_KEYS_KEY)).toBe(true)
+  })
+
+  it('ignores a mapping that does not feed the FROST sink (unconnected FROST node on the canvas)', () => {
+    expect(
+      has(pipelineWith([frostSink, staMapping({ '$.name': '$.x', '$.description': '$.d' })]), MATCH_KEYS_KEY),
+    ).toBe(false)
+  })
+
+  it('binds only to the last mapping of a chain before the FROST sink', () => {
+    const first = staMapping({ '$.name': '$.x', '$.description': '$.d' })
+    const last: TestNode = { ...staMapping({ '$.name': '$.x', '$.description': '$.d' }), id: 'map-2' }
+    const pipeline: Pipeline = {
+      ...pipelineWith([frostSink, first, last]),
+      edges: [
+        { id: 'e1', source: first.id, target: last.id },
+        { id: 'e2', source: last.id, target: frostSink.id },
+      ] as Pipeline['edges'],
+    }
+    const errors = validatePipeline(pipeline).errors.filter(error => error.messageKey === MATCH_KEYS_KEY)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('map-2')
   })
 })
 

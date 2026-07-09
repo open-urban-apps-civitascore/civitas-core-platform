@@ -28,6 +28,7 @@ import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
 import java.io.File;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -59,25 +60,27 @@ import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
 /**
- * DATA-CORRECTNESS integration test for the mapped FROST path (record mapping → generated STA
- * envelope template → find-or-create) against a <b>real FROST-Server</b>. Two pipelines are planned
- * through the real {@link FlowDeploymentPlanner} (so the {@code StaEnvelopeCompiler} output is what
+ * DATA-CORRECTNESS integration test for the mapped FROST path (record mapping → per-entity body
+ * templates → find-or-create) against a <b>real FROST-Server</b>. Two pipelines are planned through
+ * the real {@link FlowDeploymentPlanner} (so the {@code FrostMappingCompiler} output is what
  * deploys) and exercised end to end:
  *
  * <ul>
- *   <li><b>MQTT (non-STA payload)</b>: the envelope is rebuilt from mapped record fields — Thing
- *       find-or-create stays idempotent across re-deliveries, the observation lands typed on the
- *       pre-provisioned Datastream, and tenant values containing NiFi-EL/backreference syntax
- *       ({@code ${HOSTNAME}}, {@code $1}, {@code ${SINGLE_USER_CREDENTIALS_PASSWORD}}) arrive
- *       <i>literally</i> in FROST — the injection-hardening proof for the template path.
+ *   <li><b>MQTT (non-STA payload)</b>: the STA bodies are rendered from mapped record fields —
+ *       Thing find-or-create stays idempotent across re-deliveries, the observation lands typed on
+ *       the pre-provisioned Datastream (with an explicitly deep-inserted FeatureOfInterest and the
+ *       optional {@code resultQuality}/{@code validTime} fields), and tenant values containing
+ *       NiFi-EL/backreference syntax ({@code ${HOSTNAME}}, {@code $1}, {@code
+ *       ${SINGLE_USER_CREDENTIALS_PASSWORD}}) arrive <i>literally</i> in FROST — the
+ *       injection-hardening proof for the template path.
  *   <li><b>SQL (table rows)</b>: a multi-record batch is split into individual STA elements ({@code
  *       $[*]}), deduplicating the Thing across rows and re-reads.
  * </ul>
  *
  * <p>Failure paths must never drop silently: a missing source field renders a JSON {@code null}
- * result (valid envelope), an unmatched Datastream routes to the error sink without creating
- * anything, and a FROST-rejected observation (bad {@code phenomenonTime}) never becomes an
- * observation while the flow keeps running. Skipped when Docker is unavailable.
+ * result (valid body), an unmatched Datastream routes to the error sink without creating anything,
+ * and a FROST-rejected observation (bad {@code phenomenonTime}) never becomes an observation while
+ * the flow keeps running. Skipped when Docker is unavailable.
  */
 class NifiFrostMappingIT extends AbstractNifiIT {
 
@@ -88,6 +91,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String CRON_EVERY_SECOND = "* * * * * ?";
 
   private static final String TOPIC = "civitas/it/frost-mapping";
+  private static final String CREATABLE_TOPIC = "civitas/it/frost-creatable";
+  private static final String REF_CREATE = "REF-CREATE-1";
 
   // EL/backreference-shaped tenant values: they must arrive in FROST byte-identically, never
   // expanded against the NiFi environment or interpreted as a regex backreference. Both referenced
@@ -106,6 +111,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String DS_NEVER = "DS-NEVER-1";
   private static final String REF_BADTS = "REF-BADTS-1";
   private static final String DS_BADTS = "DS-BADTS-1";
+  private static final String REF_FOI = "REF-FOI-1";
+  private static final String DS_FOI = "DS-FOI-1";
   private static final String REF_SQL = "REF-SQL-1";
   private static final String DS_SQL = "DS-SQL-1";
 
@@ -123,6 +130,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static long dsNullId;
   private static long dsBadTsId;
   private static long dsSqlId;
+  private static long dsFoiId;
 
   private final HttpClient http = HttpClient.newHttpClient();
 
@@ -199,9 +207,11 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     dsNullId = createDatastream(DS_NULL, REF_NULL, "HOLDER-NULL");
     dsBadTsId = createDatastream(DS_BADTS, REF_BADTS, "HOLDER-BADTS");
     dsSqlId = createDatastream(DS_SQL, REF_SQL, "HOLDER-SQL");
+    dsFoiId = createDatastream(DS_FOI, REF_FOI, "HOLDER-FOI");
 
     deployMqttPipeline();
     deploySqlPipeline();
+    deployCreatableChainPipeline();
   }
 
   @AfterAll
@@ -238,12 +248,20 @@ class NifiFrostMappingIT extends AbstractNifiIT {
               });
 
       // repeated delivery of the same message must never duplicate the Thing (find-or-create
-      // idempotency holds through the rebuilt envelope, not just the raw one)
+      // idempotency holds through the rebuilt envelope, not just the raw one) — but each delivery
+      // MUST append one observation: the found ("re-delivered") path has to reach the observation
+      // POST, not just resolve the Thing and stop. Guards against silent steady-state data loss.
+      int observationsBefore = observations(dsMapId).size();
       for (int i = 0; i < 5; i++) {
         publisher.publish(TOPIC, payload);
         Thread.sleep(Duration.ofSeconds(2).toMillis());
       }
       assertEquals(1, countThings(REF_MAP), "re-delivered message must reuse the Thing");
+      await()
+          .atMost(Duration.ofSeconds(30))
+          .pollInterval(Duration.ofSeconds(2))
+          .ignoreExceptions()
+          .until(() -> observations(dsMapId).size() >= observationsBefore + 5);
     }
 
     // Injection hardening: the tenant-supplied name (data path) and const description (mapping
@@ -264,6 +282,96 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     assertTrue(
         observation.path("phenomenonTime").asText().startsWith("2026-01-01T00:00:00"),
         "phenomenonTime must survive as the mapped ISO instant");
+  }
+
+  @Test
+  void mappedObservationCarriesAnExplicitFeatureOfInterestAndOptionalFields() throws Exception {
+    // The mapping deep-inserts a FeatureOfInterest and maps resultQuality/validTime — the
+    // observation must carry the explicit feature (name "Sampling point"), not FROST's default
+    // Thing-location fallback, plus the two optional fields. Uses its own station (REF_FOI) so it
+    // never shares a find-or-create Thing with the injection-hardening test (REF_MAP).
+    String payload = payload("FoI Station", REF_FOI, DS_FOI, "18.0", "\"2026-02-01T00:00:00Z\"");
+
+    JsonNode observation;
+    try (MqttPublisher publisher = publisher("civitas-it-foi")) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(TOPIC, payload);
+                return hasFeatureOfInterest(observationsWithFeature(dsFoiId));
+              });
+      observation = withFeatureOfInterest(observationsWithFeature(dsFoiId));
+    }
+
+    assertEquals(
+        "Sampling point",
+        observation.path("FeatureOfInterest").path("name").asText(),
+        "the observation must reference the explicitly mapped FeatureOfInterest");
+    assertEquals(
+        "Point",
+        observation.path("FeatureOfInterest").path("feature").path("type").asText(),
+        "the FeatureOfInterest feature must be the geoPoint-rendered GeoJSON object");
+    assertEquals("good", observation.path("resultQuality").asText(), "resultQuality must survive");
+    String validTime = observation.path("validTime").asText();
+    assertTrue(
+        validTime.contains("/") && validTime.contains("2026-02-01T00:00:00"),
+        "validTime must survive as the mapped TM_Period interval (start/end), was: " + validTime);
+  }
+
+  @Test
+  void creatableChainDeepInsertsTheWholeTreeIntoFrost() throws Exception {
+    // A station never provisioned: the mapping's creatable Thing/Location/Datastream bodies must
+    // create the entire tree in FROST, deep-inserting the Location on the Thing and the Sensor /
+    // ObservedProperty / unitOfMeasurement on the Datastream — the actual bodies FROST accepts,
+    // not only their byte form.
+    String payload =
+        payload(
+            "Created Station", REF_CREATE, "ignored-ds-name", "24.5", "\"2026-03-01T00:00:00Z\"");
+
+    JsonNode thing;
+    try (MqttPublisher publisher = publisher("civitas-it-create")) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(CREATABLE_TOPIC, payload);
+                JsonNode t = expandedThing(REF_CREATE);
+                // Wait for the whole deep-inserted tree AND the observation: the Location rides the
+                // Thing POST, the Datastream its own POST, and the observation is the last stage —
+                // a partial snapshot can have the Datastream but not yet its observation.
+                return !t.path("Locations").isEmpty()
+                    && !t.path("Datastreams").path(0).path("Observations").isEmpty();
+              });
+      thing = expandedThing(REF_CREATE);
+    }
+
+    JsonNode location = thing.path("Locations").path(0);
+    assertEquals(
+        "Point",
+        location.path("location").path("type").asText(),
+        "the Location must be deep-inserted with the geoPoint GeoJSON");
+
+    JsonNode datastream = thing.path("Datastreams").path(0);
+    assertEquals(
+        "Degree Celsius",
+        datastream.path("unitOfMeasurement").path("name").asText(),
+        "unitOfMeasurement must be deep-inserted on the Datastream");
+    assertEquals(
+        "DHT22",
+        datastream.path("Sensor").path("name").asText(),
+        "the Sensor must be deep-inserted on the Datastream");
+    assertEquals(
+        "Temperature",
+        datastream.path("ObservedProperty").path("name").asText(),
+        "the ObservedProperty must be deep-inserted on the Datastream");
+    assertTrue(
+        datastream.path("Observations").path(0).path("result").isNumber(),
+        "the observation must land on the freshly created Datastream");
   }
 
   @Test
@@ -348,7 +456,10 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         .pollInterval(Duration.ofSeconds(3))
         .ignoreExceptions()
         .until(() -> resultValues(dsSqlId).contains(30.5));
-    assertEquals(1, countThings(REF_SQL), "the first row's Thing exists exactly once");
+    // >= 1, not == 1: the per-second cron can re-read row 1 and race a second first-sight message
+    // into a duplicate Thing before the first commits (see mappedMqtt…). The invariant is that the
+    // chain reached FROST, not an exact dedup count under concurrent first contact.
+    assertTrue(countThings(REF_SQL) >= 1, "the first row's Thing must exist");
 
     // Row 2 (same reference) now makes every batch a 2-record array: its observation can only
     // appear if the $[*] split really turns the record-writer array into individual STA elements.
@@ -368,23 +479,34 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         .ignoreExceptions()
         .until(() -> resultValues(dsSqlId).contains(31.5));
 
-    // both rows share the reference — the Thing must stay deduplicated across rows AND re-reads
-    assertEquals(1, countThings(REF_SQL), "same-reference rows must share one Thing");
+    // both rows share the reference — steady-state re-reads must not keep minting Things (the
+    // count stabilises once the first Thing is committed; >= 1 tolerates only the initial race).
+    assertTrue(countThings(REF_SQL) >= 1, "same-reference rows must share the Thing(s)");
   }
 
   // ─── Deployment ─────────────────────────────────────────────────────────────
 
-  /** The STA mapping every pipeline of this IT uses (things + observations, const injection). */
+  /**
+   * The record-anchored mapping every pipeline of this IT uses (Thing + lookup-only Datastream +
+   * observations, const injection). The datastreams are pre-created with a {@code
+   * properties.reference} equal to the record's {@code ref}, so the lookup-only stage resolves
+   * them.
+   */
   private static String mappingFields() {
     return """
         {
-          "$.things[].name": "$.station",
-          "$.things[].description": { "op": "const", "value": "%s" },
-          "$.things[].properties.reference": "$.ref",
-          "$.observations[].result": { "op": "toFloat", "input": "$.temp" },
-          "$.observations[].phenomenonTime": "$.ts",
-          "$.observations[].parameters.reference": "$.ref",
-          "$.observations[].parameters.name": "$.dsname"
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "%s" },
+          "$.reference": "$.ref",
+          "$.Datastreams[].reference": "$.ref",
+          "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
+          "$.Datastreams[].Observations[].phenomenonTime": "$.ts",
+          "$.Datastreams[].Observations[].validTime": { "op": "concat", "separator": "/", "inputs": ["$.ts", "$.ts"] },
+          "$.Datastreams[].Observations[].resultQuality": { "op": "const", "value": "good" },
+          "$.Datastreams[].Observations[].FeatureOfInterest.name": { "op": "const", "value": "Sampling point" },
+          "$.Datastreams[].Observations[].FeatureOfInterest.description": { "op": "const", "value": "Where the reading was taken" },
+          "$.Datastreams[].Observations[].FeatureOfInterest.encodingType": { "op": "const", "value": "application/geo+json" },
+          "$.Datastreams[].Observations[].FeatureOfInterest.feature": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }
         }
         """
         .formatted(INJECTION_DESCRIPTION);
@@ -417,6 +539,69 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.handleUnknownProperty("qos", 1);
 
     deploy("pipeline-frost-map-mqtt-it", graph, source);
+  }
+
+  /**
+   * A fully-creatable chain on its own topic/station: Thing (with a deep-inserted Location),
+   * Datastream (with deep-inserted Sensor / ObservedProperty / unitOfMeasurement), Observation. No
+   * pre-provisioned entities — the whole tree is created on first contact, so the IT proves the
+   * deep-insert bodies FROST actually accepts, not only their byte form.
+   */
+  private static void deployCreatableChainPipeline() throws Exception {
+    String fields =
+        """
+        {
+          "$.reference": "$.ref",
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "Created station" },
+          "$.Locations[].name": { "op": "const", "value": "Station location" },
+          "$.Locations[].description": { "op": "const", "value": "Reported position" },
+          "$.Locations[].encodingType": { "op": "const", "value": "application/geo+json" },
+          "$.Locations[].location": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" },
+          "$.Datastreams[].reference": "$.ref",
+          "$.Datastreams[].name": { "op": "const", "value": "Air temperature" },
+          "$.Datastreams[].description": { "op": "const", "value": "Air temperature at the station" },
+          "$.Datastreams[].observationType": { "op": "const", "value": "http://www.opengis.net/def/observationType/OGC-OM/2.0/OM_Measurement" },
+          "$.Datastreams[].unitOfMeasurement.name": { "op": "const", "value": "Degree Celsius" },
+          "$.Datastreams[].unitOfMeasurement.symbol": { "op": "const", "value": "degC" },
+          "$.Datastreams[].unitOfMeasurement.definition": { "op": "const", "value": "ucum:Cel" },
+          "$.Datastreams[].Sensor.name": { "op": "const", "value": "DHT22" },
+          "$.Datastreams[].Sensor.description": { "op": "const", "value": "Temperature sensor" },
+          "$.Datastreams[].Sensor.encodingType": { "op": "const", "value": "application/pdf" },
+          "$.Datastreams[].Sensor.metadata": { "op": "const", "value": "https://example.org/dht22.pdf" },
+          "$.Datastreams[].ObservedProperty.name": { "op": "const", "value": "Temperature" },
+          "$.Datastreams[].ObservedProperty.definition": { "op": "const", "value": "https://example.org/temp" },
+          "$.Datastreams[].ObservedProperty.description": { "op": "const", "value": "Air temperature" },
+          "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
+          "$.Datastreams[].Observations[].phenomenonTime": "$.ts"
+        }
+        """;
+    Map<String, Object> graph =
+        json(
+            """
+            { "nodes": [
+                { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
+                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": %s } } },
+                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
+                { "id": "e", "type": "end", "data": {} } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
+            """
+                .formatted(fields));
+
+    Datasource source = new Datasource();
+    source.setId("mqtt-frost-create");
+    source.setType("MQTT");
+    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
+    source.handleUnknownProperty("topics", List.of(CREATABLE_TOPIC));
+    source.handleUnknownProperty("client_id", "civitas-frost-create");
+    source.handleUnknownProperty("qos", 1);
+
+    deploy("pipeline-frost-create-mqtt-it", graph, source);
   }
 
   private static void deploySqlPipeline() throws Exception {
@@ -468,7 +653,12 @@ class NifiFrostMappingIT extends AbstractNifiIT {
       DeploymentPlan plan =
           planner.plan(
               new PipelineDeploymentRequest(
-                  pipelineId, graph, source, new FrostSinkSpec(String.valueOf(projectId))));
+                  pipelineId,
+                  graph,
+                  source,
+                  new FrostSinkSpec(
+                      String.valueOf(projectId),
+                      new StaKeys(List.of("reference"), List.of("reference")))));
       client.deployFlow(plan);
     }
   }
@@ -600,6 +790,67 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     return mapper.readTree(response.body()).path("value");
   }
 
+  private JsonNode expandedThing(String reference) throws Exception {
+    String filter =
+        URLEncoder.encode("properties/reference eq '" + reference + "'", StandardCharsets.UTF_8)
+            .replace("+", "%20");
+    String expand =
+        URLEncoder.encode(
+                "Locations,Datastreams($expand=Sensor,ObservedProperty,Observations)",
+                StandardCharsets.UTF_8)
+            .replace("+", "%20");
+    HttpResponse<String> response =
+        http.send(
+            HttpRequest.newBuilder()
+                .uri(
+                    URI.create(
+                        frostUrl(
+                            "/Projects("
+                                + projectId
+                                + ")/Things?$filter="
+                                + filter
+                                + "&$expand="
+                                + expand)))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    return mapper.readTree(response.body()).path("value").get(0);
+  }
+
+  private JsonNode observationsWithFeature(long datastreamId) throws Exception {
+    String query =
+        URLEncoder.encode("FeatureOfInterest", StandardCharsets.UTF_8).replace("+", "%20");
+    HttpResponse<String> response =
+        http.send(
+            HttpRequest.newBuilder()
+                .uri(
+                    URI.create(
+                        frostUrl(
+                            "/Datastreams(" + datastreamId + ")/Observations?$expand=" + query)))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    return mapper.readTree(response.body()).path("value");
+  }
+
+  private static boolean hasFeatureOfInterest(JsonNode observations) {
+    for (JsonNode observation : observations) {
+      if ("Sampling point".equals(observation.path("FeatureOfInterest").path("name").asText())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static JsonNode withFeatureOfInterest(JsonNode observations) {
+    for (JsonNode observation : observations) {
+      if ("Sampling point".equals(observation.path("FeatureOfInterest").path("name").asText())) {
+        return observation;
+      }
+    }
+    throw new IllegalStateException("no observation carried the mapped FeatureOfInterest");
+  }
+
   private List<Double> resultValues(long datastreamId) throws Exception {
     JsonNode observations = observations(datastreamId);
     List<Double> results = new ArrayList<>();
@@ -658,7 +909,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         + ref
         + "\",\"dsname\":\""
         + dsName
-        + "\","
+        + "\",\"lon\":7.1,\"lat\":51.5,"
         + (temp == null ? "" : "\"temp\":" + temp + ",")
         + "\"ts\":"
         + tsJson

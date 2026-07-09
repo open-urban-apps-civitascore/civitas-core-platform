@@ -17,5 +17,10 @@ export const rootFailureMessage = (t: Translate, failure: RootResolutionFailure)
         root: failure.rootName,
         names: failure.unreachableNames.join(', '),
       })
+    default: {
+      // A new RootResolutionFailure variant must fail the build here, not silently return undefined.
+      const exhaustive: never = failure
+      return exhaustive
+    }
   }
 }

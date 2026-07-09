@@ -848,6 +848,9 @@ export NIFI_URL=https://localhost:8443
 export NIFI_OIDC_TOKEN_URI=http://localhost:8080/realms/civitas-core/protocol/openid-connect/token
 export NIFI_OIDC_CLIENT_ID=nifi
 export NIFI_OIDC_CLIENT_SECRET=${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}
+# FROST as seen from inside the NiFi container (the flow's HTTP legs run there),
+# not the host-mapped localhost:8085.
+export NIFI_FROST_URL=http://civitas-frost:8080/FROST-Server/v1.1
 export NIFI_TOPICS=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
 export GEOSERVER_URL=http://localhost:8082/geoserver
 export GEOSERVER_ADMIN_USER=admin

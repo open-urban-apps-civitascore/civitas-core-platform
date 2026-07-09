@@ -17,6 +17,7 @@ import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import de.civitascore.configadapter.nifi.graph.NodeKind;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
@@ -36,7 +37,7 @@ class StageRegistryTest {
       }
 
       @Override
-      public Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink) {
+      public Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink, SinkSpec sinkSpec) {
         throw new UnsupportedOperationException();
       }
     };

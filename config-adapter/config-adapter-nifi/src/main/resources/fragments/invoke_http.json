@@ -34,7 +34,7 @@
     "Request Header Attributes Pattern": null,
     "Request User-Agent": null,
     "Response Body Attribute Name": null,
-    "Response Body Attribute Size": "256",
+    "Response Body Attribute Size": "1024",
     "Response Body Ignored": "false",
     "Response Cache Enabled": "false",
     "Response Cache Size": "10MB",

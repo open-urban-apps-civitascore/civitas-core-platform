@@ -38,6 +38,8 @@ export class ModelResolutionError extends Error {
  */
 interface SchemaNode {
   readonly $ref?: unknown
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- JSON Schema platform extension keyword
+  readonly 'x-core-primaryKey'?: unknown
   readonly properties?: unknown
   readonly allOf?: unknown
   readonly required?: unknown
@@ -273,7 +275,9 @@ const fieldFor = (
     return field(path, name, 'object', required, children)
   }
 
-  return field(path, name, scalarTypeOf(node), required)
+  const scalar = field(path, name, scalarTypeOf(node), required)
+  // Only a scalar can carry the conceptual primary key — mirrors the engine's isScalar rule.
+  return node['x-core-primaryKey'] === true ? { ...scalar, primaryKey: true } : scalar
 }
 
 /**

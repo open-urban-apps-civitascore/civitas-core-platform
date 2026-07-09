@@ -261,6 +261,24 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
+    @DisplayName("fails the publish with a controlled error when the DSV reference is not a UUID")
+    void failsWhenReferencedVersionIsMalformed() {
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = new DataSink();
+      sink.setId(UUID.randomUUID());
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      Map<String, Object> cfg = new HashMap<>();
+      cfg.put("tableName", "sensor_observations");
+      cfg.put("dataStructureVersionId", "not-a-uuid");
+      sink.setConfiguration(cfg);
+      DataSet dataSet = datasetWithPipeline(pipeline);
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
     @DisplayName("FROST sink without a DSV reference carries a null dataStructure, no failure")
     void frostSinkHasNoSchema() {
       UUID sinkId = UUID.randomUUID();
@@ -286,6 +304,40 @@ class DataSetSagaPublisherTest {
       assertThat(ds.get("dataStructure").isNull())
           .as("FROST sink carries a null dataStructure")
           .isTrue();
+    }
+
+    @Test
+    @DisplayName("FROST sink referencing its mapping target embeds the version's model")
+    void frostSinkWithReferenceEmbedsSchema() {
+      UUID dsvId = UUID.randomUUID();
+      UUID sinkId = UUID.randomUUID();
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = new DataSink();
+      sink.setId(sinkId);
+      sink.setDataSinkType(DataSinkType.FROST);
+      sink.setConfiguration(Map.of("dataStructureVersionId", dsvId.toString()));
+      DataSet dataSet = datasetWithPipeline(pipeline);
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setModel(Map.of("title", "SensorThingsDataModel"));
+
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
+
+      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
+          .thenReturn(
+              CompletableFuture.completedFuture(
+                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var ds = payload.get("datasinks").get(0);
+      assertThat(ds.get("type").asString()).isEqualTo("FROST");
+      assertThat(ds.get("dataStructure").get("title").asString())
+          .as("the mapping target's model rides on the FROST sink")
+          .isEqualTo("SensorThingsDataModel");
     }
 
     @Test

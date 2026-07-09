@@ -39,7 +39,7 @@ class PipelineDeploymentRequestTest {
 
   @Test
   void frostSinkCarriesItsProjectId() {
-    FrostSinkSpec sink = new FrostSinkSpec("42");
+    FrostSinkSpec sink = new FrostSinkSpec("42", null);
     assertEquals(SinkType.FROST, sink.type());
     assertEquals("42", sink.projectId());
   }
@@ -48,9 +48,9 @@ class PipelineDeploymentRequestTest {
   void frostSinkRequiresANumericProjectId() {
     // The id scopes the flow to the dataset's FROST project and is interpolated into processor
     // URLs/$filters — missing or non-numeric values must be unrepresentable.
-    assertThrows(IllegalArgumentException.class, () -> new FrostSinkSpec(null));
-    assertThrows(IllegalArgumentException.class, () -> new FrostSinkSpec(" "));
-    assertThrows(IllegalArgumentException.class, () -> new FrostSinkSpec("1) or true"));
+    assertThrows(IllegalArgumentException.class, () -> new FrostSinkSpec(null, null));
+    assertThrows(IllegalArgumentException.class, () -> new FrostSinkSpec(" ", null));
+    assertThrows(IllegalArgumentException.class, () -> new FrostSinkSpec("1) or true", null));
   }
 
   @Test
@@ -71,7 +71,8 @@ class PipelineDeploymentRequestTest {
     assertThrows(
         IllegalArgumentException.class,
         () ->
-            new PipelineDeploymentRequest(" ", Map.of(), new Datasource(), new FrostSinkSpec("1")));
+            new PipelineDeploymentRequest(
+                " ", Map.of(), new Datasource(), new FrostSinkSpec("1", null)));
   }
 
   @Test
@@ -80,7 +81,8 @@ class PipelineDeploymentRequestTest {
     mutable.put("nodes", new ArrayList<>());
 
     PipelineDeploymentRequest request =
-        new PipelineDeploymentRequest("p-1", mutable, new Datasource(), new FrostSinkSpec("1"));
+        new PipelineDeploymentRequest(
+            "p-1", mutable, new Datasource(), new FrostSinkSpec("1", null));
 
     // mutating the caller's map after construction must not leak into the record
     mutable.put("edges", new ArrayList<>());
@@ -91,7 +93,7 @@ class PipelineDeploymentRequestTest {
   @Test
   void nullGraphDataBecomesEmptyMap() {
     PipelineDeploymentRequest request =
-        new PipelineDeploymentRequest("p-1", null, new Datasource(), new FrostSinkSpec("1"));
+        new PipelineDeploymentRequest("p-1", null, new Datasource(), new FrostSinkSpec("1", null));
     assertTrue(request.graphData().isEmpty());
   }
 }

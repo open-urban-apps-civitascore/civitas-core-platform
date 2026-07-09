@@ -273,20 +273,33 @@ public class DataSetSagaPublisher {
 
   /**
    * Resolves the sink's referenced data-structure model (JSON Schema) persisted on the {@code
-   * DataStructureVersion}. {@code null} when no version is referenced (e.g. FROST); throws {@link
-   * InvalidInputException} if a referenced version is missing or carries no model, failing the
-   * publish. The id is already validated at sink save time.
+   * DataStructureVersion}: the table schema for PostGIS, the mapping's Thing-shaped target for a
+   * mapped FROST sink. {@code null} when no version is referenced (FROST passthrough); throws
+   * {@link InvalidInputException} if a referenced version is missing or carries no model, failing
+   * the publish. The id is already validated at sink save time.
    */
   private Map<String, Object> resolveDataStructure(DataSink sink) {
     if (sink.getConfiguration() == null) {
       return null;
     }
-    UUID dsvId =
-        objectMapper
-            .convertValue(sink.getConfiguration(), PostgisConfiguration.class)
-            .getDataStructureVersionId();
-    if (dsvId == null) {
-      return null; // e.g. FROST sink — no data-structure version
+    // Read the shared key from the raw map: every sink type that references a structure names it
+    // 'dataStructureVersionId', and a typed detour through one sink's config class would couple
+    // the others to its shape.
+    Object dsvIdRaw = sink.getConfiguration().get("dataStructureVersionId");
+    if (dsvIdRaw == null) {
+      return null; // e.g. FROST passthrough sink — no data-structure version
+    }
+    UUID dsvId;
+    try {
+      dsvId = UUID.fromString(String.valueOf(dsvIdRaw));
+    } catch (IllegalArgumentException e) {
+      // Validated at sink save time, so this is unreachable in practice — but a corrupt raw value
+      // must still fail like its sibling checks (a controlled 400) rather than escaping as an
+      // unhandled 500 that echoes the malformed value.
+      throw new InvalidInputException(
+          "DataSink",
+          "configuration.dataStructureVersionId",
+          "dataStructureVersionId on sink " + sink.getId() + " is not a valid UUID");
     }
     var version =
         dataStructureVersionRepository

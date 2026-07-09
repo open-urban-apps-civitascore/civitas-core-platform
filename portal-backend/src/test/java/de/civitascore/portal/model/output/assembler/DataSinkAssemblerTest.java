@@ -1,6 +1,7 @@
 package de.civitascore.portal.model.output.assembler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -17,6 +18,7 @@ import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -91,6 +93,35 @@ class DataSinkAssemblerTest {
 
       assertThat(result.getConfiguration()).isInstanceOf(FrostConfigurationOutput.class);
       verifyNoInteractions(dataStructureVersionRepository);
+    }
+
+    @Test
+    @DisplayName("Should echo the referenced dataStructureVersionId back onto the output")
+    void shouldEchoDataStructureVersionId() {
+      UUID dsvId = UUID.randomUUID();
+      DataSink entity =
+          sinkWithPipeline(DataSinkType.FROST, Map.of("dataStructureVersionId", dsvId.toString()));
+
+      DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
+
+      assertThat(result.getConfiguration()).isInstanceOf(FrostConfigurationOutput.class);
+      FrostConfigurationOutput config = (FrostConfigurationOutput) result.getConfiguration();
+      assertThat(config.getDataStructureVersionId()).isEqualTo(dsvId);
+      verifyNoInteractions(dataStructureVersionRepository);
+    }
+
+    @Test
+    @DisplayName("Should reject a malformed persisted dataStructureVersionId, naming the sink")
+    void shouldRejectMalformedDataStructureVersionId() {
+      DataSink entity =
+          sinkWithPipeline(DataSinkType.FROST, Map.of("dataStructureVersionId", "not-a-uuid"));
+      UUID sinkId = UUID.randomUUID();
+      entity.setId(sinkId);
+
+      DataSinkOutputDTO dto = new DataSinkOutputDTO();
+      assertThatThrownBy(() -> assembler.enrichDto(dto, entity))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining(sinkId.toString());
     }
   }
 

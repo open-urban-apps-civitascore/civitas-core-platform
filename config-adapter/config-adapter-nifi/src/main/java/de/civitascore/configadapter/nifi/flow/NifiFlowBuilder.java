@@ -74,8 +74,8 @@ public class NifiFlowBuilder {
    * @param sourceCron the cron (Quartz) schedule for the source processor, or {@code null} to keep
    *     the source fragment's built-in schedule
    * @param sinkPreRegion the transform compilation's handoff to the sink's build region (today: the
-   *     STA envelope rebuild plan for a mapped FROST sink), or {@code null}; the sink validates in
-   *     its build half that it can consume it
+   *     FROST entity plan for a mapped FROST sink), or {@code null}; the sink validates in its
+   *     build half that it can consume it
    */
   public record FlowBuildSpec(
       String processGroupName,
@@ -229,8 +229,8 @@ public class NifiFlowBuilder {
    * The transforms between source and sink, derived structurally. The record chain (ConvertRecord
    * when the source does not already emit records, then the mapping) runs whenever the sink
    * consumes {@link PayloadForm#RECORDS} for this flow — which for an {@link
-   * MappingSupport#ENVELOPE} sink is exactly the mapped case, whose sink-owned pre-region rebuilds
-   * the mapped records into its envelope.
+   * MappingSupport#ENVELOPE} sink is exactly the mapped case, whose sink-owned region consumes the
+   * mapped records through its entity plan.
    */
   private List<TransformStage> transformsFor(
       SourceStage source, SinkStage<?> sink, FlowBuildSpec spec) throws FatalAdapterException {

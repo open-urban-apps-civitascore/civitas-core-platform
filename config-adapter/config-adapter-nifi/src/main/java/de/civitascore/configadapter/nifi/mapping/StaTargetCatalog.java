@@ -11,57 +11,209 @@ package de.civitascore.configadapter.nifi.mapping;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 /**
- * The closed catalog of SensorThings envelope paths a FROST mapping may target. The envelope is a
- * fixed adapter interface — the find-or-create legs consume exactly this shape — not a
- * tenant-modelled structure, so the target vocabulary is a reviewable constant like the fragment
- * whitelist: every JSON key of the generated envelope template comes from here, never from tenant
- * input. The list order is the byte-deterministic key order of the generated template.
+ * The catalog of paths a FROST mapping may target, anchored at the mapped record: the target data
+ * structure is a normal, tenant-modelled Thing-shaped class (one record = one Thing with its
+ * Locations, Datastreams and their Observations), so the paths here are exactly what the mapping
+ * editor emits against that structure. The fixed vocabulary below is a reviewable constant — every
+ * generated JSON key and FROST path of an entity body comes from here — with one schema-derived
+ * extension: each entity's match key (its {@code x-core-primaryKey} attribute, fallback {@code
+ * reference}) contributes {@code $.<key>} / {@code $.Datastreams[].<key>} paths whose names pass
+ * {@link #isSafeKeyName(String)} before they may appear in a {@code $filter} or template.
  */
 public final class StaTargetCatalog {
 
+  /**
+   * The shape a schema-derived key name must have before it is interpolated into an OData {@code
+   * $filter} or a generated JSON template. Everything else is rejected at plan time — a key name is
+   * tenant input, unlike the fixed vocabulary.
+   */
+  private static final Pattern SAFE_KEY_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
   private static final List<StaTarget> TARGETS =
       List.of(
-          new StaTarget("$.things[].name", StaGroup.THINGS, StaJsonType.STRING, true),
-          new StaTarget("$.things[].description", StaGroup.THINGS, StaJsonType.STRING, true),
+          new StaTarget("$.name", StaEntity.THING, StaJsonType.STRING, TargetKind.CREATE),
+          new StaTarget("$.description", StaEntity.THING, StaJsonType.STRING, TargetKind.CREATE),
           new StaTarget(
-              "$.things[].properties.reference", StaGroup.THINGS, StaJsonType.STRING, true),
-          new StaTarget("$.observations[].result", StaGroup.OBSERVATIONS, StaJsonType.ANY, true),
+              "$.Locations[].name", StaEntity.LOCATION, StaJsonType.STRING, TargetKind.CREATE),
           new StaTarget(
-              "$.observations[].phenomenonTime", StaGroup.OBSERVATIONS, StaJsonType.STRING, false),
-          new StaTarget(
-              "$.observations[].resultTime", StaGroup.OBSERVATIONS, StaJsonType.STRING, false),
-          new StaTarget(
-              "$.observations[].parameters.reference",
-              StaGroup.OBSERVATIONS,
+              "$.Locations[].description",
+              StaEntity.LOCATION,
               StaJsonType.STRING,
-              true),
+              TargetKind.CREATE),
           new StaTarget(
-              "$.observations[].parameters.name", StaGroup.OBSERVATIONS, StaJsonType.STRING, true));
+              "$.Locations[].encodingType",
+              StaEntity.LOCATION,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Locations[].location",
+              StaEntity.LOCATION,
+              StaJsonType.RAW_JSON,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Locations[].properties",
+              StaEntity.LOCATION,
+              StaJsonType.RAW_JSON,
+              TargetKind.OPTIONAL),
+          new StaTarget(
+              "$.Datastreams[].name", StaEntity.DATASTREAM, StaJsonType.STRING, TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].description",
+              StaEntity.DATASTREAM,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].observationType",
+              StaEntity.DATASTREAM,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].unitOfMeasurement.name",
+              StaEntity.DATASTREAM,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].unitOfMeasurement.symbol",
+              StaEntity.DATASTREAM,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].unitOfMeasurement.definition",
+              StaEntity.DATASTREAM,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Sensor.name",
+              StaEntity.DATASTREAM,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Sensor.description",
+              StaEntity.DATASTREAM,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Sensor.encodingType",
+              StaEntity.DATASTREAM,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Sensor.metadata",
+              StaEntity.DATASTREAM,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Sensor.properties",
+              StaEntity.DATASTREAM,
+              StaJsonType.RAW_JSON,
+              TargetKind.OPTIONAL),
+          new StaTarget(
+              "$.Datastreams[].ObservedProperty.name",
+              StaEntity.DATASTREAM,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].ObservedProperty.definition",
+              StaEntity.DATASTREAM,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].ObservedProperty.description",
+              StaEntity.DATASTREAM,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].ObservedProperty.properties",
+              StaEntity.DATASTREAM,
+              StaJsonType.RAW_JSON,
+              TargetKind.OPTIONAL),
+          new StaTarget(
+              "$.Datastreams[].Observations[].result",
+              StaEntity.OBSERVATION,
+              StaJsonType.ANY,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Observations[].phenomenonTime",
+              StaEntity.OBSERVATION,
+              StaJsonType.STRING,
+              TargetKind.OPTIONAL),
+          new StaTarget(
+              "$.Datastreams[].Observations[].resultTime",
+              StaEntity.OBSERVATION,
+              StaJsonType.STRING,
+              TargetKind.OPTIONAL),
+          new StaTarget(
+              "$.Datastreams[].Observations[].resultQuality",
+              StaEntity.OBSERVATION,
+              StaJsonType.ANY,
+              TargetKind.OPTIONAL),
+          new StaTarget(
+              "$.Datastreams[].Observations[].validTime",
+              StaEntity.OBSERVATION,
+              StaJsonType.STRING,
+              TargetKind.OPTIONAL),
+          new StaTarget(
+              "$.Datastreams[].Observations[].FeatureOfInterest.name",
+              StaEntity.FEATURE_OF_INTEREST,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Observations[].FeatureOfInterest.description",
+              StaEntity.FEATURE_OF_INTEREST,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Observations[].FeatureOfInterest.encodingType",
+              StaEntity.FEATURE_OF_INTEREST,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Observations[].FeatureOfInterest.feature",
+              StaEntity.FEATURE_OF_INTEREST,
+              StaJsonType.RAW_JSON,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Observations[].FeatureOfInterest.properties",
+              StaEntity.FEATURE_OF_INTEREST,
+              StaJsonType.RAW_JSON,
+              TargetKind.OPTIONAL));
 
-  /** The two envelope groups; each mapped record contributes one element per mapped group. */
-  public enum StaGroup {
-    THINGS("$.things[]", "things"),
-    OBSERVATIONS("$.observations[]", "observations");
+  /**
+   * The entities of the Thing-shaped record. Declaration order is the find-or-create order of the
+   * deployed chain and the byte-deterministic template order.
+   */
+  public enum StaEntity {
+    /** The record root — the Thing itself. Its paths anchor directly at {@code $}. */
+    THING("$"),
+    /** Nested locations, created only via the Thing's deep insert. */
+    LOCATION("$.Locations[]"),
+    /** Nested datastreams (with Sensor/ObservedProperty/unitOfMeasurement deep-inserted). */
+    DATASTREAM("$.Datastreams[]"),
+    /** Observations of the record's datastream; always appended, never deduplicated. */
+    OBSERVATION("$.Datastreams[].Observations[]"),
+    /**
+     * The observation's feature of interest, deep-inserted into the observation body. Optional: a
+     * mapping that omits it lets FROST default the FoI to the Thing's location.
+     */
+    FEATURE_OF_INTEREST("$.Datastreams[].Observations[].FeatureOfInterest");
 
     private final String pathPrefix;
-    private final String envelopeKey;
 
-    StaGroup(String pathPrefix, String envelopeKey) {
+    StaEntity(String pathPrefix) {
       this.pathPrefix = pathPrefix;
-      this.envelopeKey = envelopeKey;
     }
 
-    /** The target-path prefix of this group ({@code $.things[]} / {@code $.observations[]}). */
+    /** The record path this entity's fields live under ({@code $} for the Thing itself). */
     public String pathPrefix() {
       return pathPrefix;
     }
 
-    /** The top-level envelope key of this group. */
-    public String envelopeKey() {
-      return envelopeKey;
+    /** The full record path of a field of this entity. */
+    public String pathOf(String fieldName) {
+      return "$".equals(pathPrefix) ? "$." + fieldName : pathPrefix + "." + fieldName;
     }
   }
 
@@ -73,40 +225,86 @@ public final class StaTargetCatalog {
      * SensorThings {@code any}: the JSON type is inferred from the mapped value expression
      * (number/boolean render unquoted, everything else as a string).
      */
-    ANY
+    ANY,
+    /** Embedded verbatim (a GeoJSON object produced by a geometry transform). */
+    RAW_JSON
   }
 
   /**
-   * One targetable envelope path.
+   * How a target participates in the entity's rules: {@code CREATE} paths are the all-or-nothing
+   * create set, {@code KEY} marks a schema-derived match-key path (always required once the entity
+   * is touched), {@code OPTIONAL} paths never gate anything.
+   */
+  public enum TargetKind {
+    CREATE,
+    KEY,
+    OPTIONAL
+  }
+
+  /**
+   * One fixed targetable record path.
    *
    * @param path the target path exactly as the mapping editor emits it
-   * @param group the envelope group the path belongs to
+   * @param entity the entity the path belongs to
    * @param type the JSON type of the serialized value
-   * @param required whether the path must be mapped once its group is mapped at all (the {@code
-   *     reference}/{@code name} paths are the find-or-create lookup keys)
+   * @param kind how the path participates in the entity's rules (fixed catalog entries are {@code
+   *     CREATE} or {@code OPTIONAL}; {@code KEY} targets are synthesized from the schema)
    */
-  public record StaTarget(String path, StaGroup group, StaJsonType type, boolean required) {
+  public record StaTarget(String path, StaEntity entity, StaJsonType type, TargetKind kind) {
 
-    /** The path segments below the group prefix (e.g. {@code properties.reference}). */
+    public StaTarget {
+      // A path outside its entity's prefix would silently render under the wrong body anchor.
+      if (!path.startsWith(prefixOf(entity))) {
+        throw new IllegalArgumentException(
+            "target path '" + path + "' does not start with the " + entity + " prefix");
+      }
+    }
+
+    /** The path segments below the entity prefix (e.g. {@code unitOfMeasurement.name}). */
     public String relativePath() {
-      return path.substring(group.pathPrefix().length() + 1);
+      return path.substring(prefixOf(entity).length());
+    }
+
+    private static String prefixOf(StaEntity entity) {
+      return "$".equals(entity.pathPrefix()) ? "$." : entity.pathPrefix() + ".";
+    }
+  }
+
+  static {
+    // KEY targets exist only synthesized from a schema — a fixed KEY entry would claim a
+    // reviewable constant is tenant-derived.
+    for (StaTarget target : TARGETS) {
+      if (target.kind() == TargetKind.KEY) {
+        throw new IllegalStateException("the fixed catalog must not contain KEY targets");
+      }
     }
   }
 
   private StaTargetCatalog() {}
 
-  /** All targetable paths in template key order. */
-  public static List<StaTarget> targets() {
-    return TARGETS;
-  }
-
-  /** The catalog entry for a target path, or empty if the path is not targetable. */
+  /** The fixed catalog entry for a target path, or empty if the path is not a fixed target. */
   public static Optional<StaTarget> byPath(String path) {
     return TARGETS.stream().filter(target -> target.path().equals(path)).findFirst();
   }
 
-  /** The supported paths as a comma-separated list (for rejection messages). */
-  public static String supportedPaths() {
-    return TARGETS.stream().map(StaTarget::path).collect(Collectors.joining(", "));
+  /** The fixed paths of one entity, in template key order. */
+  public static List<StaTarget> targetsOf(StaEntity entity) {
+    return TARGETS.stream().filter(target -> target.entity() == entity).toList();
+  }
+
+  /**
+   * The record path of an entity's schema-derived match-key attribute ({@code $.<key>} for the
+   * Thing, {@code $.Datastreams[].<key>} for the datastream).
+   */
+  public static String keyPath(StaEntity entity, String keyName) {
+    return entity.pathOf(keyName);
+  }
+
+  /**
+   * Whether a schema-derived key name is safe to interpolate into a {@code $filter} expression and
+   * a generated JSON template.
+   */
+  public static boolean isSafeKeyName(String keyName) {
+    return keyName != null && SAFE_KEY_NAME.matcher(keyName).matches();
   }
 }

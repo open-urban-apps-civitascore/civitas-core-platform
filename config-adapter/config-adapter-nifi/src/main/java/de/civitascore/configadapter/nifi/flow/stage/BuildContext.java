@@ -137,6 +137,21 @@ public final class BuildContext {
   }
 
   /**
+   * Marks a relationship as auto-terminated (idempotent). A terminal processor's unconnected
+   * relationship would otherwise leave the processor invalid — NiFi silently skips invalid
+   * processors on process-group start, so FlowFiles queue in front of them forever.
+   */
+  public static void addAutoTerminated(Processor processor, String relationship) {
+    ArrayNode terminated = processor.node().withArray("autoTerminatedRelationships");
+    for (JsonNode existing : terminated) {
+      if (relationship.equals(existing.asText())) {
+        return;
+      }
+    }
+    terminated.add(relationship);
+  }
+
+  /**
    * Removes a relationship from a processor's {@code autoTerminatedRelationships}, if present —
    * NiFi forbids a relationship being both auto-terminated and connected.
    */

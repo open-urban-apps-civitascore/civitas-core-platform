@@ -424,7 +424,7 @@ class FlowDeploymentPlannerTest {
                               "p-frost-map",
                               graphWithMapping(),
                               mqttSource(null),
-                              new FrostSinkSpec("1"))));
+                              new FrostSinkSpec("1", NifiTestFixtures.STA_KEYS))));
       assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
       assertTrue(ex.getMessage().contains("unsupported FROST mapping target path"));
     }
@@ -445,13 +445,9 @@ class FlowDeploymentPlannerTest {
                               "p-frost-incomplete",
                               NifiTestFixtures.graphWithIncompleteFrostMapping(),
                               mqttSource(null),
-                              new FrostSinkSpec("1"))));
+                              new FrostSinkSpec("1", NifiTestFixtures.STA_KEYS))));
       assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
-      assertTrue(
-          ex.getMessage()
-              .contains(
-                  "a FROST mapping targeting $.things[] must also map: $.things[].description,"
-                      + " $.things[].properties.reference"));
+      assertTrue(ex.getMessage().contains("must map the thing match key(s): $.reference"));
     }
   }
 
@@ -470,7 +466,7 @@ class FlowDeploymentPlannerTest {
                               "p-sql-frost-nomap",
                               graphWithoutMapping(),
                               sqlSource(null),
-                              new FrostSinkSpec("1"))));
+                              new FrostSinkSpec("1", null))));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       assertTrue(
           ex.getMessage()
@@ -492,7 +488,7 @@ class FlowDeploymentPlannerTest {
                       "p-mqtt-frost-map",
                       NifiTestFixtures.graphWithFrostMapping(),
                       mqttSource(null),
-                      new FrostSinkSpec("7")))
+                      new FrostSinkSpec("7", NifiTestFixtures.STA_KEYS)))
               .snapshotJson();
       processorOfType(snapshot, "ConvertRecord");
       assertEquals(
@@ -505,7 +501,7 @@ class FlowDeploymentPlannerTest {
       assertTrue(snapshot.contains("/sta_0_name"), "flat mapping fields are bound");
       assertTrue(
           snapshot.contains("${sta_2_reference:escapeJson()}"),
-          "the envelope template references the captured attributes");
+          "the entity bodies reference the captured attributes");
     }
   }
 
@@ -521,14 +517,13 @@ class FlowDeploymentPlannerTest {
                       "p-sql-frost-map",
                       NifiTestFixtures.graphWithFrostMapping(),
                       sqlSource(null),
-                      new FrostSinkSpec("7")))
+                      new FrostSinkSpec("7", NifiTestFixtures.STA_KEYS)))
               .snapshotJson();
       processorOfType(snapshot, "QueryDatabaseTableRecord");
       assertFalse(snapshot.contains("ConvertRecord"), "SQL records need no convert step");
       // quotes inside the bound template are JSON-escaped in the snapshot, so match a quote-free
       // placeholder instead of the raw template bytes
-      assertTrue(
-          snapshot.contains("${sta_2_reference:escapeJson()}"), "envelope template is bound");
+      assertTrue(snapshot.contains("${sta_2_reference:escapeJson()}"), "entity bodies are bound");
     }
   }
 
@@ -545,7 +540,7 @@ class FlowDeploymentPlannerTest {
                       "p-frost-scoped",
                       graphWithoutMapping(),
                       mqttSource(null),
-                      new FrostSinkSpec("7")));
+                      new FrostSinkSpec("7", null)));
       String snapshot = plan.snapshotJson();
       assertTrue(
           snapshot.contains("/Projects(7)/Things"),
@@ -776,7 +771,7 @@ class FlowDeploymentPlannerTest {
                         "p-nofrost",
                         graphWithoutMapping(),
                         mqttSource(null),
-                        new FrostSinkSpec("1"))));
+                        new FrostSinkSpec("1", null))));
     assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 

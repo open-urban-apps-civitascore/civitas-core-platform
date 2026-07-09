@@ -43,6 +43,8 @@ export interface FieldNode {
   portType: PortType
   /** Whether the field is required (UML {id} or multiplicity lower bound >= 1); absent = optional. */
   required?: boolean
+  /** Whether the field carries the x-core-primaryKey marker (UML {id}); absent = no. */
+  primaryKey?: boolean
   children?: FieldNode[]
 }
 

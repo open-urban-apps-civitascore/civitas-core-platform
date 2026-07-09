@@ -14,6 +14,7 @@ import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -161,14 +162,26 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
 
   private void validateConfiguration(DataSinkType type, Map<String, Object> config) {
     switch (type) {
-      case FROST -> {
-        if (config != null && !config.isEmpty()) {
-          throw new InvalidInputException(
-              "DataSink", "configuration", "FROST sinks require an absent or empty configuration");
-        }
-      }
+      case FROST -> validateFrostConfiguration(config);
       case POSTGIS -> validatePostgisConfiguration(config);
     }
+  }
+
+  /**
+   * A FROST configuration is empty (passthrough) or references exactly the mapping's Thing-shaped
+   * target structure — any other key would silently be dropped by the deploy engine.
+   */
+  private void validateFrostConfiguration(Map<String, Object> config) {
+    if (config == null || config.isEmpty()) {
+      return;
+    }
+    if (!config.keySet().equals(Set.of("dataStructureVersionId"))) {
+      throw new InvalidInputException(
+          "DataSink",
+          "configuration",
+          "FROST sinks accept only an optional dataStructureVersionId");
+    }
+    requireExistingDataStructureVersion(config.get("dataStructureVersionId"));
   }
 
   private void validatePostgisConfiguration(Map<String, Object> config) {
@@ -190,10 +203,13 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
           "configuration.dataStructureVersionId",
           "dataStructureVersionId is required for POSTGIS sinks");
     }
+    requireExistingDataStructureVersion(dsvIdRaw);
+  }
 
+  private void requireExistingDataStructureVersion(Object dsvIdRaw) {
     UUID dsvId;
     try {
-      dsvId = UUID.fromString(dsvIdRaw.toString());
+      dsvId = UUID.fromString(String.valueOf(dsvIdRaw));
     } catch (IllegalArgumentException e) {
       throw new InvalidInputException(
           "DataSink",
