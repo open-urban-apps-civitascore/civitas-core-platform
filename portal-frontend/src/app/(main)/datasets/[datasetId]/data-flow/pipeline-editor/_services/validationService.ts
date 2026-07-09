@@ -464,6 +464,8 @@ const lastMappingsBeforeFrostSinks = (pipeline: Pick<Pipeline, 'nodes' | 'edges'
  * Earlier mappings of a chain are ordinary record transformations covered by the
  * required-target-fields rule.
  */
+// Kept for easy re-enable; currently commented out of VALIDATION_RULES.
+// eslint-disable-next-line unused-imports/no-unused-vars
 const validateFrostMappingCoversStaGroups: ValidationRule = {
   id: 'frost-mapping-sta-group-coverage',
   name: 'FROST Mapping Covers STA Entities',
@@ -1061,7 +1063,8 @@ export const VALIDATION_RULES: ValidationRule[] = [
   validateEdgeCompatibility,
   validateMappingChainStructure,
   validateSqlSourceHasExplicitSchedule,
-  validateFrostMappingCoversStaGroups,
+  // FROST mapping/STA-catalog validation temporarily disabled; re-add to re-enable.
+  // validateFrostMappingCoversStaGroups,
   validateCronAndMappingWired,
   validateEdgeEndpoints,
   validateMappingDataShape,
