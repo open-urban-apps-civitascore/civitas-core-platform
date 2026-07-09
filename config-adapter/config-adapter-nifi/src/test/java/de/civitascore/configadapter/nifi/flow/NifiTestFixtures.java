@@ -28,7 +28,7 @@ import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
 import de.civitascore.configadapter.nifi.mapping.ConversionOp;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler;
-import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
@@ -423,7 +423,8 @@ public final class NifiTestFixtures {
   }
 
   /** The Thing/Datastream match keys of the mapped-FROST fixtures. */
-  static final StaKeys STA_KEYS = new StaKeys(List.of("reference"), List.of("reference"));
+  static final StaProperties STA_KEYS =
+      StaProperties.ofKeys(List.of("reference"), List.of("reference"));
 
   /**
    * A metadata-only mapped MQTT→FROST flow: a creatable Thing and nothing else — the chain must

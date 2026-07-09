@@ -17,7 +17,7 @@ import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
-import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import java.util.List;
@@ -60,7 +60,7 @@ class MappingNodeTypeTest {
         mappingNodeType.compile(
             List.of(first, last),
             envelopeSink,
-            new FrostSinkSpec("1", new StaKeys(List.of("reference"), List.of())));
+            new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())));
 
     assertEquals(2, compilation.units().size());
   }

@@ -28,7 +28,7 @@ import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
-import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import java.io.File;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -658,7 +658,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
                   source,
                   new FrostSinkSpec(
                       String.valueOf(projectId),
-                      new StaKeys(List.of("reference"), List.of("reference")))));
+                      StaProperties.ofKeys(List.of("reference"), List.of("reference")))));
       client.deployFlow(plan);
     }
   }

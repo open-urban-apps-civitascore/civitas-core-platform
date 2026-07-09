@@ -221,10 +221,10 @@ public final class DataStructureSchema {
   }
 
   /**
-   * Whether a property spec maps to a scalar column. A {@code $ref} (a GeoJSON geometry or a nested
+   * Whether a property spec maps to a scalar value. A {@code $ref} (a GeoJSON geometry or a nested
    * object) and an {@code object}/{@code array} type are non-scalar; everything else is scalar.
    */
-  private static boolean isScalar(Map<String, Object> spec) {
+  public static boolean isScalar(Map<String, Object> spec) {
     if (spec.containsKey("$ref")) {
       return false;
     }

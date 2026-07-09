@@ -18,6 +18,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.FreeAttribute;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.KeyAttribute;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaJsonType;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -73,8 +76,8 @@ class FrostSinkStageTest {
                 "\"dsId\": { \"type\": \"string\", \"x-core-primaryKey\": true }"),
             ctx);
 
-    assertEquals(List.of("stationId"), spec.staKeys().thingKeys());
-    assertEquals(List.of("dsId"), spec.staKeys().datastreamKeys());
+    assertEquals(List.of("stationId"), spec.staProperties().thingKeys());
+    assertEquals(List.of("dsId"), spec.staProperties().datastreamKeys());
   }
 
   @Test
@@ -86,16 +89,16 @@ class FrostSinkStageTest {
                 "\"reference\": { \"type\": \"string\" }"),
             ctx);
 
-    assertEquals(List.of("reference"), spec.staKeys().thingKeys());
-    assertEquals(List.of("reference"), spec.staKeys().datastreamKeys());
+    assertEquals(List.of("reference"), spec.staProperties().thingKeys());
+    assertEquals(List.of("reference"), spec.staProperties().datastreamKeys());
   }
 
   @Test
   void yieldsEmptyKeysWhenNeitherMarkerNorReferenceExists() throws Exception {
     FrostSinkSpec spec = stage.parseSpec(datasinkWith("", ""), ctx);
 
-    assertTrue(spec.staKeys().thingKeys().isEmpty());
-    assertTrue(spec.staKeys().datastreamKeys().isEmpty());
+    assertTrue(spec.staProperties().thingKeys().isEmpty());
+    assertTrue(spec.staProperties().datastreamKeys().isEmpty());
   }
 
   @Test
@@ -136,8 +139,127 @@ class FrostSinkStageTest {
 
     FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
 
-    assertEquals(List.of("reference"), spec.staKeys().thingKeys());
-    assertEquals(List.of("reference"), spec.staKeys().datastreamKeys());
+    assertEquals(List.of("reference"), spec.staProperties().thingKeys());
+    assertEquals(List.of("reference"), spec.staProperties().datastreamKeys());
+  }
+
+  @Test
+  void derivesFreeBagAttributesWithTypesAndTheMatchKeyFlag() throws Exception {
+    // A bag with the match key + a free scalar + a free object: scalar → ANY, object → RAW_JSON,
+    // only the marked attribute is the key. Declaration order is preserved.
+    Map<String, Object> datasink =
+        json(
+            """
+            { "dataStructure": {
+                "properties": { "thing": { "$ref": "#/$defs/Thing" } },
+                "$defs": {
+                  "Thing": {
+                    "properties": {
+                      "properties": {
+                        "type": "object",
+                        "properties": {
+                          "reference": { "type": "string", "x-core-primaryKey": true },
+                          "owner": { "type": "string" },
+                          "meta": { "type": "object" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """);
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertEquals(
+        List.of(
+            new KeyAttribute("reference"),
+            new FreeAttribute("owner", StaJsonType.ANY),
+            new FreeAttribute("meta", StaJsonType.RAW_JSON)),
+        spec.staProperties().thing());
+  }
+
+  @Test
+  void aNonScalarMarkedAttributeIsNotTheKeyAndStaysRawJson() throws Exception {
+    // A {id} marker on a non-scalar (array/$ref) cannot back a match key — it must fall through to
+    // the scalar 'reference' fallback for the key, while the marked non-scalar stays a free
+    // RAW_JSON attribute (a marked object never quietly becomes a STRING key). array and $ref
+    // attributes both render RAW_JSON.
+    Map<String, Object> datasink =
+        json(
+            """
+            { "dataStructure": {
+                "properties": { "thing": { "$ref": "#/$defs/Thing" } },
+                "$defs": {
+                  "Geo": { "type": "object", "properties": { "lat": { "type": "number" } } },
+                  "Thing": {
+                    "properties": {
+                      "properties": {
+                        "type": "object",
+                        "properties": {
+                          "tags": { "type": "array", "x-core-primaryKey": true },
+                          "reference": { "type": "string" },
+                          "region": { "$ref": "#/$defs/Geo" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """);
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertEquals(
+        List.of(
+            new FreeAttribute("tags", StaJsonType.RAW_JSON),
+            new KeyAttribute("reference"),
+            new FreeAttribute("region", StaJsonType.RAW_JSON)),
+        spec.staProperties().thing());
+  }
+
+  @Test
+  void derivesFreeBagAttributesOnTheDatastream() throws Exception {
+    // The Datastream bag carries free attributes just like the Thing's — its own reference key plus
+    // a free scalar.
+    Map<String, Object> datasink =
+        json(
+            """
+            { "dataStructure": {
+                "properties": { "thing": { "$ref": "#/$defs/Thing" } },
+                "$defs": {
+                  "Thing": {
+                    "properties": {
+                      "properties": {
+                        "type": "object",
+                        "properties": { "reference": { "type": "string", "x-core-primaryKey": true } }
+                      },
+                      "Datastreams": { "type": "array", "items": { "$ref": "#/$defs/Datastream" } }
+                    }
+                  },
+                  "Datastream": {
+                    "properties": {
+                      "properties": {
+                        "type": "object",
+                        "properties": {
+                          "reference": { "type": "string", "x-core-primaryKey": true },
+                          "unit": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """);
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertEquals(
+        List.of(new KeyAttribute("reference"), new FreeAttribute("unit", StaJsonType.ANY)),
+        spec.staProperties().datastream());
   }
 
   @Test
@@ -154,14 +276,14 @@ class FrostSinkStageTest {
 
     FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
 
-    assertEquals(List.of("reference"), spec.staKeys().thingKeys());
-    assertTrue(spec.staKeys().datastreamKeys().isEmpty());
+    assertEquals(List.of("reference"), spec.staProperties().thingKeys());
+    assertTrue(spec.staProperties().datastreamKeys().isEmpty());
   }
 
   @Test
   void missingDataStructureYieldsNullKeysForPassthrough() throws Exception {
     FrostSinkSpec spec = stage.parseSpec(Map.of("configuration", Map.of()), ctx);
-    assertNull(spec.staKeys());
+    assertNull(spec.staProperties());
   }
 
   @Test

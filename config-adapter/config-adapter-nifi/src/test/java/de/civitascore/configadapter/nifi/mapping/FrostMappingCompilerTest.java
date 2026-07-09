@@ -10,14 +10,18 @@
 package de.civitascore.configadapter.nifi.mapping;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan.FilterTerm;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.FreeAttribute;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.FrostCompilation;
-import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.KeyAttribute;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaJsonType;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConstNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.CopyNode;
@@ -34,7 +38,8 @@ import org.junit.jupiter.api.Test;
  */
 class FrostMappingCompilerTest {
 
-  private static final StaKeys KEYS = new StaKeys(List.of("reference"), List.of("reference"));
+  private static final StaProperties KEYS =
+      StaProperties.ofKeys(List.of("reference"), List.of("reference"));
 
   private final FrostMappingCompiler compiler = new FrostMappingCompiler(new RecordPathCompiler());
 
@@ -338,7 +343,7 @@ class FrostMappingCompilerTest {
 
   @Test
   void rejectsADatastreamTouchWithoutADatastreamKeyInTheStructure() {
-    StaKeys noDsKey = new StaKeys(List.of("reference"), List.of());
+    StaProperties noDsKey = StaProperties.ofKeys(List.of("reference"), List.of());
     FatalAdapterException ex =
         assertThrows(
             FatalAdapterException.class,
@@ -347,58 +352,31 @@ class FrostMappingCompilerTest {
   }
 
   @Test
-  void compositeMatchKeysProduceOrderedFilterTermsAndProperties() throws Exception {
-    StaKeys composite = new StaKeys(List.of("tenant", "station"), List.of());
-    FrostCompilation compilation =
-        compiler.compile(
-            mapping(
-                "$.properties.tenant", new CopyNode("$.t"),
-                "$.properties.station", new CopyNode("$.s"),
-                "$.name", new CopyNode("$.n"),
-                "$.description", new CopyNode("$.d")),
-            composite);
-
-    assertEquals(
-        List.of(
-            new FilterTerm("properties/tenant", "sta_0_tenant"),
-            new FilterTerm("properties/station", "sta_1_station")),
-        compilation.plan().thingFilter());
-    assertTrue(
-        compilation
-            .plan()
-            .thingBody()
-            .contains(
-                "\"properties\":{\"tenant\":\"${sta_0_tenant:escapeJson()}\","
-                    + "\"station\":\"${sta_1_station:escapeJson()}\"}"));
+  void rejectsAPropertiesBagWithMoreThanOneMatchKey() {
+    // A FROST entity has a single find-or-create identity — a bag with two keys is not a
+    // representable state.
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> StaProperties.ofKeys(List.of("tenant", "station"), List.of()));
+    assertTrue(ex.getMessage().contains("more than one key"));
   }
 
   @Test
-  void namesEveryMissingCompositeKey() {
-    StaKeys composite = new StaKeys(List.of("tenant", "station"), List.of());
-    FatalAdapterException ex =
+  void rejectsABagAttributeNamedLikeThePropertiesBag() {
+    // A key named 'properties' would render as properties.properties and shadow the bag itself —
+    // rejected at the type boundary, never reaching the compiler.
+    IllegalArgumentException ex =
         assertThrows(
-            FatalAdapterException.class,
-            () -> compiler.compile(mapping("$.name", new CopyNode("$.n")), composite));
-    assertTrue(ex.getMessage().contains("$.properties.tenant, $.properties.station"));
-  }
-
-  @Test
-  void rejectsAMatchKeyNamedLikeThePropertiesBag() {
-    // A key named 'properties' would render as properties.properties and shadow the bag itself.
-    StaKeys reserved = new StaKeys(List.of("properties"), List.of());
-    FatalAdapterException ex =
-        assertThrows(
-            FatalAdapterException.class,
-            () ->
-                compiler.compile(
-                    mapping("$.properties.properties", new CopyNode("$.n")), reserved));
+            IllegalArgumentException.class,
+            () -> StaProperties.ofKeys(List.of("properties"), List.of()));
     assertTrue(ex.getMessage().contains("must not be named 'properties'"));
   }
 
   @Test
   void acceptsAMatchKeyNamedLikeAStandardStaField() throws Exception {
     // Inside the properties bag, a key named like a top-level field ('name') no longer collides.
-    StaKeys named = new StaKeys(List.of("name"), List.of());
+    StaProperties named = StaProperties.ofKeys(List.of("name"), List.of());
     FrostCompilation compilation =
         compiler.compile(
             mapping(
@@ -412,13 +390,133 @@ class FrostMappingCompilerTest {
   }
 
   @Test
-  void rejectsAnUnsafeKeyNameAtTheStaKeysBoundary() {
-    // An unsafe key name can never inhabit a constructed StaKeys — it is rejected at the type
-    // boundary before it could reach the compiler, let alone a $filter URL.
+  void rendersFreeBagAttributesAlongsideTheMatchKeyButFiltersOnlyOnTheKey() throws Exception {
+    // Thing bag: match key 'reference' + two free attributes (a scalar 'owner', a raw-json 'meta').
+    StaProperties props =
+        new StaProperties(
+            List.of(
+                new KeyAttribute("reference"),
+                new FreeAttribute("owner", StaJsonType.ANY),
+                new FreeAttribute("meta", StaJsonType.RAW_JSON)),
+            List.of());
+    FrostCompilation compilation =
+        compiler.compile(
+            mapping(
+                "$.name", new CopyNode("$.station"),
+                "$.description", new CopyNode("$.desc"),
+                "$.properties.reference", new CopyNode("$.ref"),
+                "$.properties.owner", new CopyNode("$.owner"),
+                "$.properties.meta", new CopyNode("$.meta")),
+            props);
+
+    // All three bag attributes render under properties, in declaration order: the match key stays a
+    // plain quoted string, the free scalar 'owner' is an optional ANY (null-fallback + quoted when
+    // present), 'meta' embeds verbatim as raw json.
+    assertTrue(
+        compilation
+            .plan()
+            .thingBody()
+            .contains(
+                "\"properties\":{\"reference\":\"${sta_2_reference:escapeJson()}\","
+                    + "\"owner\":${sta_3_owner:isEmpty():ifElse('null',"
+                    + " ${sta_3_owner:escapeJson():prepend('\"'):append('\"')})},"
+                    + "\"meta\":${sta_4_meta}}"),
+        compilation.plan().thingBody());
+    // Only the match key drives the $filter — free attributes never do.
+    assertEquals(
+        List.of(new FilterTerm("properties/reference", "sta_2_reference")),
+        compilation.plan().thingFilter());
+  }
+
+  @Test
+  void freeBagAttributesAreOptional() throws Exception {
+    // A bag declaring free attributes the mapping does NOT touch is fine — only the key is
+    // required.
+    StaProperties props =
+        new StaProperties(
+            List.of(new KeyAttribute("reference"), new FreeAttribute("owner", StaJsonType.ANY)),
+            List.of());
+    FrostCompilation compilation = compiler.compile(thingOnlyMapping(), props);
+
+    assertTrue(compilation.plan().thingBody().contains("\"properties\":{\"reference\":"));
+    assertFalse(compilation.plan().thingBody().contains("owner"));
+  }
+
+  @Test
+  void rendersFreeBagAttributesOnTheDatastreamBesideTheThingLink() throws Exception {
+    // A free Datastream bag attribute renders under the datastream's properties alongside the
+    // injected Thing @iot.id link; the datastream $filter still keys only on the match key.
+    StaProperties props =
+        new StaProperties(
+            List.of(new KeyAttribute("reference")),
+            List.of(new KeyAttribute("reference"), new FreeAttribute("unit", StaJsonType.ANY)));
+    FrostCompilation compilation =
+        compiler.compile(
+            mapping(
+                "$.name", new CopyNode("$.station"),
+                "$.description", new CopyNode("$.desc"),
+                "$.properties.reference", new CopyNode("$.ref"),
+                "$.Datastreams[].name", new CopyNode("$.dsName"),
+                "$.Datastreams[].description", new ConstNode("d", null),
+                "$.Datastreams[].observationType", new ConstNode("om", null),
+                "$.Datastreams[].unitOfMeasurement.name", new ConstNode("°C", null),
+                "$.Datastreams[].unitOfMeasurement.symbol", new ConstNode("C", null),
+                "$.Datastreams[].unitOfMeasurement.definition", new ConstNode("ucum", null),
+                "$.Datastreams[].Sensor.name", new ConstNode("s", null),
+                "$.Datastreams[].Sensor.description", new ConstNode("s", null),
+                "$.Datastreams[].Sensor.encodingType", new ConstNode("application/pdf", null),
+                "$.Datastreams[].Sensor.metadata", new ConstNode("m", null),
+                "$.Datastreams[].ObservedProperty.name", new ConstNode("t", null),
+                "$.Datastreams[].ObservedProperty.definition", new ConstNode("d", null),
+                "$.Datastreams[].ObservedProperty.description", new ConstNode("d", null),
+                "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
+                "$.Datastreams[].properties.unit", new CopyNode("$.unit")),
+            props);
+
+    String datastreamBody = compilation.plan().datastreamBody();
+    assertTrue(
+        datastreamBody.contains(
+            "\"properties\":{\"reference\":\"${sta_16_reference:escapeJson()}\","
+                + "\"unit\":${sta_17_unit:isEmpty():ifElse('null',"
+                + " ${sta_17_unit:escapeJson():prepend('\"'):append('\"')})}}"),
+        datastreamBody);
+    assertTrue(datastreamBody.contains("\"Thing\":{\"@iot.id\":${frost.thing.id}}"));
+    assertEquals(
+        List.of(new FilterTerm("properties/reference", "sta_16_reference")),
+        compilation.plan().datastreamFilter());
+  }
+
+  @Test
+  void aFreeBagAttributeDoesNotSatisfyAPartialCreateSet() {
+    // A free bag attribute is OPTIONAL — it must not make a partially-mapped Thing create set look
+    // complete; the missing create field is still rejected.
+    StaProperties props =
+        new StaProperties(
+            List.of(new KeyAttribute("reference"), new FreeAttribute("owner", StaJsonType.ANY)),
+            List.of());
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    mapping(
+                        "$.properties.reference", new CopyNode("$.ref"),
+                        "$.properties.owner", new CopyNode("$.owner"),
+                        "$.name", new CopyNode("$.station")),
+                    props));
+    assertTrue(ex.getMessage().contains("$.description"));
+  }
+
+  @Test
+  void rejectsAnUnsafeAttributeNameAtTheStaPropertiesBoundary() {
+    // An unsafe attribute name can never inhabit a constructed StaProperties — it is rejected at
+    // the
+    // type boundary before it could reach the compiler, let alone a $filter URL.
     IllegalArgumentException ex =
         assertThrows(
-            IllegalArgumentException.class, () -> new StaKeys(List.of("ref' or true"), List.of()));
-    assertTrue(ex.getMessage().contains("unsafe match-key name"));
+            IllegalArgumentException.class,
+            () -> StaProperties.ofKeys(List.of("ref' or true"), List.of()));
+    assertTrue(ex.getMessage().contains("unsafe properties attribute name"));
   }
 
   @Test
