@@ -50,13 +50,13 @@ class FrostMappingCompilerTest {
     return mapping(
         "$.name", new CopyNode("$.station"),
         "$.description", new CopyNode("$.desc"),
-        "$.reference", new CopyNode("$.ref"));
+        "$.properties.reference", new CopyNode("$.ref"));
   }
 
   private static MappingConfig lookupOnlyWithObservationMapping() {
     return mapping(
-        "$.reference", new CopyNode("$.ref"),
-        "$.Datastreams[].reference", new CopyNode("$.ref"),
+        "$.properties.reference", new CopyNode("$.ref"),
+        "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
         "$.Datastreams[].Observations[].result",
             new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null),
         "$.Datastreams[].Observations[].phenomenonTime", new CopyNode("$.ts"));
@@ -107,8 +107,8 @@ class FrostMappingCompilerTest {
   void rendersOptionalObservationFieldsResultQualityAndValidTime() throws Exception {
     MappingConfig mapping =
         mapping(
-            "$.reference", new CopyNode("$.ref"),
-            "$.Datastreams[].reference", new CopyNode("$.ref"),
+            "$.properties.reference", new CopyNode("$.ref"),
+            "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
             "$.Datastreams[].Observations[].result",
                 new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null),
             "$.Datastreams[].Observations[].resultQuality", new CopyNode("$.quality"),
@@ -132,7 +132,7 @@ class FrostMappingCompilerTest {
         mapping(
             "$.name", new CopyNode("$.station"),
             "$.description", new ConstNode("s", null),
-            "$.reference", new CopyNode("$.ref"),
+            "$.properties.reference", new CopyNode("$.ref"),
             "$.Locations[].name", new ConstNode("loc", null),
             "$.Locations[].description", new ConstNode("d", null),
             "$.Locations[].encodingType", new ConstNode("application/geo+json", null),
@@ -151,8 +151,8 @@ class FrostMappingCompilerTest {
   void deepInsertsAMappedFeatureOfInterestIntoTheObservationBody() throws Exception {
     MappingConfig mapping =
         mapping(
-            "$.reference", new CopyNode("$.ref"),
-            "$.Datastreams[].reference", new CopyNode("$.ref"),
+            "$.properties.reference", new CopyNode("$.ref"),
+            "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
             "$.Datastreams[].Observations[].result",
                 new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null),
             "$.Datastreams[].Observations[].FeatureOfInterest.name", new ConstNode("foi", null),
@@ -179,8 +179,8 @@ class FrostMappingCompilerTest {
   void rejectsAFeatureOfInterestWithoutAnObservation() {
     MappingConfig mapping =
         mapping(
-            "$.reference", new CopyNode("$.ref"),
-            "$.Datastreams[].reference", new CopyNode("$.ref"),
+            "$.properties.reference", new CopyNode("$.ref"),
+            "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
             "$.Datastreams[].Observations[].FeatureOfInterest.name", new ConstNode("foi", null),
             "$.Datastreams[].Observations[].FeatureOfInterest.description",
                 new ConstNode("d", null),
@@ -196,8 +196,8 @@ class FrostMappingCompilerTest {
   void rejectsAPartiallyMappedFeatureOfInterestCreateSet() {
     MappingConfig mapping =
         mapping(
-            "$.reference", new CopyNode("$.ref"),
-            "$.Datastreams[].reference", new CopyNode("$.ref"),
+            "$.properties.reference", new CopyNode("$.ref"),
+            "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
             "$.Datastreams[].Observations[].result", new CopyNode("$.temp"),
             "$.Datastreams[].Observations[].FeatureOfInterest.name", new ConstNode("foi", null));
 
@@ -209,7 +209,7 @@ class FrostMappingCompilerTest {
     Map<String, ValueNode> fields = new LinkedHashMap<>();
     fields.put("$.name", new CopyNode("$.station"));
     fields.put("$.description", new ConstNode("station", null));
-    fields.put("$.reference", new CopyNode("$.ref"));
+    fields.put("$.properties.reference", new CopyNode("$.ref"));
     fields.put("$.Locations[].name", new ConstNode("loc", null));
     fields.put("$.Locations[].description", new ConstNode("d", null));
     fields.put("$.Locations[].encodingType", new ConstNode("application/geo+json", null));
@@ -228,7 +228,7 @@ class FrostMappingCompilerTest {
     fields.put("$.Datastreams[].ObservedProperty.name", new ConstNode("Temperature", null));
     fields.put("$.Datastreams[].ObservedProperty.definition", new ConstNode("http://t", null));
     fields.put("$.Datastreams[].ObservedProperty.description", new ConstNode("temp", null));
-    fields.put("$.Datastreams[].reference", new CopyNode("$.ref"));
+    fields.put("$.Datastreams[].properties.reference", new CopyNode("$.ref"));
     fields.put(
         "$.Datastreams[].Observations[].result",
         new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null));
@@ -274,7 +274,7 @@ class FrostMappingCompilerTest {
             () ->
                 compiler.compile(
                     mapping(
-                        "$.reference", new CopyNode("$.ref"),
+                        "$.properties.reference", new CopyNode("$.ref"),
                         "$.serialNumber", new CopyNode("$.sn")),
                     KEYS));
     assertTrue(ex.getMessage().contains("$.serialNumber"));
@@ -297,7 +297,7 @@ class FrostMappingCompilerTest {
             () ->
                 compiler.compile(
                     mapping(
-                        "$.reference", new CopyNode("$.ref"),
+                        "$.properties.reference", new CopyNode("$.ref"),
                         "$.name", new CopyNode("$.station")),
                     KEYS));
     assertTrue(ex.getMessage().contains("$.description"));
@@ -311,7 +311,7 @@ class FrostMappingCompilerTest {
             () ->
                 compiler.compile(
                     mapping(
-                        "$.reference", new CopyNode("$.ref"),
+                        "$.properties.reference", new CopyNode("$.ref"),
                         "$.Locations[].name", new ConstNode("loc", null),
                         "$.Locations[].description", new ConstNode("d", null),
                         "$.Locations[].encodingType", new ConstNode("e", null),
@@ -329,8 +329,8 @@ class FrostMappingCompilerTest {
             () ->
                 compiler.compile(
                     mapping(
-                        "$.reference", new CopyNode("$.ref"),
-                        "$.Datastreams[].reference", new CopyNode("$.ref"),
+                        "$.properties.reference", new CopyNode("$.ref"),
+                        "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
                         "$.Datastreams[].Observations[].phenomenonTime", new CopyNode("$.ts")),
                     KEYS));
     assertTrue(ex.getMessage().contains("result"));
@@ -352,8 +352,8 @@ class FrostMappingCompilerTest {
     FrostCompilation compilation =
         compiler.compile(
             mapping(
-                "$.tenant", new CopyNode("$.t"),
-                "$.station", new CopyNode("$.s"),
+                "$.properties.tenant", new CopyNode("$.t"),
+                "$.properties.station", new CopyNode("$.s"),
                 "$.name", new CopyNode("$.n"),
                 "$.description", new CopyNode("$.d")),
             composite);
@@ -379,28 +379,36 @@ class FrostMappingCompilerTest {
         assertThrows(
             FatalAdapterException.class,
             () -> compiler.compile(mapping("$.name", new CopyNode("$.n")), composite));
-    assertTrue(ex.getMessage().contains("$.tenant, $.station"));
+    assertTrue(ex.getMessage().contains("$.properties.tenant, $.properties.station"));
   }
 
   @Test
-  void rejectsAMatchKeyNamedLikeAStandardStaField() {
-    // 'name' as {id} would make $.name mean both the STA field and the properties-bag key.
-    StaKeys reserved = new StaKeys(List.of("name"), List.of());
+  void rejectsAMatchKeyNamedLikeThePropertiesBag() {
+    // A key named 'properties' would render as properties.properties and shadow the bag itself.
+    StaKeys reserved = new StaKeys(List.of("properties"), List.of());
     FatalAdapterException ex =
         assertThrows(
             FatalAdapterException.class,
-            () -> compiler.compile(mapping("$.name", new CopyNode("$.n")), reserved));
-    assertTrue(ex.getMessage().contains("collides with a standard SensorThings field"));
+            () ->
+                compiler.compile(
+                    mapping("$.properties.properties", new CopyNode("$.n")), reserved));
+    assertTrue(ex.getMessage().contains("must not be named 'properties'"));
   }
 
   @Test
-  void rejectsAMatchKeyNamedLikeANestedStaContainer() {
-    StaKeys reserved = new StaKeys(List.of("reference"), List.of("Sensor"));
-    FatalAdapterException ex =
-        assertThrows(
-            FatalAdapterException.class,
-            () -> compiler.compile(lookupOnlyWithObservationMapping(), reserved));
-    assertTrue(ex.getMessage().contains("collides with a standard SensorThings field"));
+  void acceptsAMatchKeyNamedLikeAStandardStaField() throws Exception {
+    // Inside the properties bag, a key named like a top-level field ('name') no longer collides.
+    StaKeys named = new StaKeys(List.of("name"), List.of());
+    FrostCompilation compilation =
+        compiler.compile(
+            mapping(
+                "$.name", new CopyNode("$.station"),
+                "$.description", new CopyNode("$.desc"),
+                "$.properties.name", new CopyNode("$.ref")),
+            named);
+
+    assertEquals(
+        List.of(new FilterTerm("properties/name", "sta_2_name")), compilation.plan().thingFilter());
   }
 
   @Test
@@ -421,9 +429,9 @@ class FrostMappingCompilerTest {
             () ->
                 compiler.compile(
                     mapping(
-                        "$.reference", new CopyNode("$.ref"),
+                        "$.properties.reference", new CopyNode("$.ref"),
                         "$.Datastreams[].Observations[].result", new ConstNode(null, null),
-                        "$.Datastreams[].reference", new CopyNode("$.ref")),
+                        "$.Datastreams[].properties.reference", new CopyNode("$.ref")),
                     KEYS));
     assertTrue(ex.getMessage().contains("null constant"));
   }
@@ -441,8 +449,8 @@ class FrostMappingCompilerTest {
     FrostCompilation compilation =
         compiler.compile(
             mapping(
-                "$.reference", new CopyNode("$.ref"),
-                "$.Datastreams[].reference", new CopyNode("$.ref"),
+                "$.properties.reference", new CopyNode("$.ref"),
+                "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
                 "$.Datastreams[].Observations[].result", resultNode),
             KEYS);
     String body = compilation.plan().observationBody();
@@ -495,7 +503,7 @@ class FrostMappingCompilerTest {
             .compile(
                 mapping(
                     "$.description", new ConstNode("d", null),
-                    "$.reference", new CopyNode("$.ref"),
+                    "$.properties.reference", new CopyNode("$.ref"),
                     "$.name", new CopyNode("$.station")),
                 KEYS)
             .plan()
@@ -506,7 +514,7 @@ class FrostMappingCompilerTest {
                 mapping(
                     "$.name", new CopyNode("$.station"),
                     "$.description", new ConstNode("d", null),
-                    "$.reference", new CopyNode("$.ref")),
+                    "$.properties.reference", new CopyNode("$.ref")),
                 KEYS)
             .plan()
             .thingBody();

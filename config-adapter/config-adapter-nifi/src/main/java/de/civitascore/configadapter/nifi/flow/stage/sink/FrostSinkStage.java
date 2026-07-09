@@ -134,13 +134,15 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
   /**
    * The match keys of the sink's Thing-shaped target structure ({@code datasinks[].dataStructure},
-   * the mapping's target the portal embeds at publish time): per entity class the {@code
-   * x-core-primaryKey} attributes, falling back to a declared {@code reference} attribute. Null
-   * when the datasink carries no structure — a passthrough flow needs none; the mapping compilation
-   * rejects a mapped flow without keys, since only it knows a mapping is present. A structurally
-   * broken schema (unresolvable root, mis-shaped {@code Datastreams} class) throws {@link
-   * IllegalArgumentException} instead of degrading to "no keys" — the caller turns it into a
-   * payload error; only a legitimately absent {@code Datastreams} property yields empty keys.
+   * the mapping's target the portal embeds at publish time): per entity, the {@code
+   * x-core-primaryKey} attributes of its {@code properties} class, falling back to a declared
+   * {@code properties.reference} attribute — SensorThings keeps identifiers in {@code properties},
+   * not top-level. Null when the datasink carries no structure — a passthrough flow needs none; the
+   * mapping compilation rejects a mapped flow without keys, since only it knows a mapping is
+   * present. A structurally broken schema (unresolvable root, mis-shaped {@code Datastreams} class)
+   * throws {@link IllegalArgumentException} instead of degrading to "no keys" — the caller turns it
+   * into a payload error; a legitimately absent {@code Datastreams} or {@code properties} class
+   * yields empty keys.
    */
   @SuppressWarnings("unchecked")
   private static StaKeys resolveStaKeys(Map<String, Object> datasink) {
@@ -156,18 +158,50 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     return new StaKeys(entityKeys(schema, List.of()), datastreamKeys);
   }
 
+  @SuppressWarnings("unchecked")
   private static List<String> entityKeys(Map<String, Object> schema, List<String> path) {
-    List<String> marked = DataStructureSchema.primaryKeyColumnsAt(schema, path);
+    // SensorThings keeps identifiers in the entity's 'properties' bag, not top-level, so the match
+    // key is derived from the 'properties' class — not the entity class itself. A structurally
+    // broken entity class throws here (resolveDefinitionAt is unguarded) and surfaces as a payload
+    // error rather than degrading to "no keys".
+    Object bagSpec =
+        DataStructureSchema.resolveDefinitionAt(schema, path).properties().get("properties");
+    if (!(bagSpec instanceof Map<?, ?> spec) || isEmptyBagSpec((Map<String, Object>) spec)) {
+      // No 'properties' bag, or one modelled with no attributes: legitimate (passthrough /
+      // lookup-only) — the compiler rejects a mapped entity without a key, but only it knows a
+      // mapping is present. A bag that DOES declare content (a $ref or nested properties) is
+      // resolved below, so a broken $ref there still surfaces as a payload error rather than
+      // degrading silently to "no keys".
+      return List.of();
+    }
+    List<String> propertiesPath = new ArrayList<>(path);
+    propertiesPath.add("properties");
+
+    List<String> marked = DataStructureSchema.primaryKeyColumnsAt(schema, propertiesPath);
     if (!marked.isEmpty()) {
       return marked;
     }
-    // Fallback for structures without a {id} marker: a declared 'reference' attribute keeps the
-    // pre-marker convention working; neither → empty, rejected by the compiler once touched.
-    return DataStructureSchema.resolveDefinitionAt(schema, path)
+    // Fallback for a 'properties' bag without an {id} marker: a declared 'reference' attribute
+    // keeps the pre-marker convention working; neither → empty. Resolves fully (follows a local
+    // $ref / allOf) — the modelled bag may be a named class shared across entities.
+    return DataStructureSchema.resolveDefinitionAt(schema, propertiesPath)
             .properties()
             .containsKey("reference")
         ? List.of("reference")
         : List.of();
+  }
+
+  /**
+   * Whether a {@code properties} bag spec declares no resolvable content — an inline object without
+   * {@code $ref}, {@code allOf} or nested {@code properties}. Such a bag legitimately carries no
+   * match key; a bag that does declare content is resolved by the caller so a broken reference in
+   * it surfaces as an error instead of degrading to "no keys".
+   */
+  private static boolean isEmptyBagSpec(Map<String, Object> spec) {
+    if (spec.containsKey("$ref") || spec.containsKey("allOf")) {
+      return false;
+    }
+    return !(spec.get("properties") instanceof Map<?, ?> nested) || nested.isEmpty();
   }
 
   @Override

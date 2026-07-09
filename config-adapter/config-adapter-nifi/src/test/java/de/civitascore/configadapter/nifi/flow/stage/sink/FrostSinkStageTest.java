@@ -42,7 +42,10 @@ class FrostSinkStageTest {
     }
   }
 
-  /** A wrapper-rooted Thing structure, parameterized on the two entity classes' properties. */
+  /**
+   * A wrapper-rooted Thing structure, parameterized on the two entity classes' {@code properties}
+   * bag content — the match key lives inside {@code properties}, not on the entity class itself.
+   */
   private static Map<String, Object> datasinkWith(String thingProps, String datastreamProps) {
     return json(
         """
@@ -50,9 +53,12 @@ class FrostSinkStageTest {
             "title": "SensorThingsDataModel",
             "properties": { "thing": { "$ref": "#/$defs/Thing" } },
             "$defs": {
-              "Thing": { "properties": { %s
+              "Thing": { "properties": {
+                  "properties": { "type": "object", "properties": { %s } },
                   "Datastreams": { "type": "array", "items": { "$ref": "#/$defs/Datastream" } } } },
-              "Datastream": { "properties": { %s "name": { "type": "string" } } } } } }
+              "Datastream": { "properties": {
+                  "properties": { "type": "object", "properties": { %s } },
+                  "name": { "type": "string" } } } } } }
         """
             .formatted(thingProps, datastreamProps));
   }
@@ -63,8 +69,8 @@ class FrostSinkStageTest {
         stage.parseSpec(
             datasinkWith(
                 "\"stationId\": { \"type\": \"string\", \"x-core-primaryKey\": true },"
-                    + " \"reference\": { \"type\": \"string\" },",
-                "\"dsId\": { \"type\": \"string\", \"x-core-primaryKey\": true },"),
+                    + " \"reference\": { \"type\": \"string\" }",
+                "\"dsId\": { \"type\": \"string\", \"x-core-primaryKey\": true }"),
             ctx);
 
     assertEquals(List.of("stationId"), spec.staKeys().thingKeys());
@@ -76,8 +82,8 @@ class FrostSinkStageTest {
     FrostSinkSpec spec =
         stage.parseSpec(
             datasinkWith(
-                "\"reference\": { \"type\": \"string\" },",
-                "\"reference\": { \"type\": \"string\" },"),
+                "\"reference\": { \"type\": \"string\" }",
+                "\"reference\": { \"type\": \"string\" }"),
             ctx);
 
     assertEquals(List.of("reference"), spec.staKeys().thingKeys());
@@ -93,6 +99,48 @@ class FrostSinkStageTest {
   }
 
   @Test
+  void aBrokenPropertiesBagRefFailsThePlanInsteadOfDegradingToNoKeys() {
+    // A properties bag that DECLARES content via a dangling $ref is structurally broken, not an
+    // absent bag — degrading it to "no keys" would surface as the misleading "declares no match
+    // key" error instead of naming the broken reference.
+    Map<String, Object> datasink =
+        json(
+            """
+            { "dataStructure": {
+                "properties": { "thing": { "$ref": "#/$defs/Thing" } },
+                "$defs": { "Thing": { "properties": {
+                    "properties": { "$ref": "#/$defs/Missing" } } } } } }
+            """);
+
+    assertThrows(FatalAdapterException.class, () -> stage.parseSpec(datasink, ctx));
+  }
+
+  @Test
+  void resolvesAPropertiesBagModelledAsASharedNamedClassRef() throws Exception {
+    // The UML modeller authors the properties bag as a shared named class both entities compose,
+    // so the entity's 'properties' is a $ref the derivation must follow, not an inline object.
+    Map<String, Object> datasink =
+        json(
+            """
+            { "dataStructure": {
+                "properties": { "thing": { "$ref": "#/$defs/Thing" } },
+                "$defs": {
+                  "Properties": { "properties": {
+                      "reference": { "type": "string", "x-core-primaryKey": true } } },
+                  "Thing": { "properties": {
+                      "properties": { "$ref": "#/$defs/Properties" },
+                      "Datastreams": { "type": "array", "items": { "$ref": "#/$defs/Datastream" } } } },
+                  "Datastream": { "properties": {
+                      "properties": { "$ref": "#/$defs/Properties" } } } } } }
+            """);
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertEquals(List.of("reference"), spec.staKeys().thingKeys());
+    assertEquals(List.of("reference"), spec.staKeys().datastreamKeys());
+  }
+
+  @Test
   void missingDatastreamsClassYieldsEmptyDatastreamKeys() throws Exception {
     Map<String, Object> datasink =
         json(
@@ -100,7 +148,8 @@ class FrostSinkStageTest {
             { "dataStructure": {
                 "properties": { "thing": { "$ref": "#/$defs/Thing" } },
                 "$defs": { "Thing": { "properties": {
-                    "reference": { "type": "string", "x-core-primaryKey": true } } } } } }
+                    "properties": { "type": "object", "properties": {
+                        "reference": { "type": "string", "x-core-primaryKey": true } } } } } } } }
             """);
 
     FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
@@ -125,7 +174,8 @@ class FrostSinkStageTest {
             { "dataStructure": {
                 "properties": { "thing": { "$ref": "#/$defs/Thing" } },
                 "$defs": { "Thing": { "properties": {
-                    "reference": { "type": "string", "x-core-primaryKey": true },
+                    "properties": { "type": "object", "properties": {
+                        "reference": { "type": "string", "x-core-primaryKey": true } } },
                     "Datastreams": { "type": "array" } } } } } }
             """);
 

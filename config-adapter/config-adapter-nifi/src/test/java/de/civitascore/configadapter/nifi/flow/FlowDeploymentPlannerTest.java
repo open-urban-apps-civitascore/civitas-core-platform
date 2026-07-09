@@ -447,7 +447,8 @@ class FlowDeploymentPlannerTest {
                               mqttSource(null),
                               new FrostSinkSpec("1", NifiTestFixtures.STA_KEYS))));
       assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
-      assertTrue(ex.getMessage().contains("must map the thing match key(s): $.reference"));
+      assertTrue(
+          ex.getMessage().contains("must map the thing match key(s): $.properties.reference"));
     }
   }
 

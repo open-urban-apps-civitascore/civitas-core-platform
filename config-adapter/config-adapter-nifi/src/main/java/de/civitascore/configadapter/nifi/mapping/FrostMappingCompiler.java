@@ -36,13 +36,14 @@ import java.util.stream.Collectors;
  * <p>Validation is mandatory here, not left to the runtime error sink: the saga/API path bypasses
  * the editor's validation, and a mapping missing a match key would deploy a flow that routes every
  * message to the error sink — an invisible permanent failure instead of a clear plan error. Thing
- * and Datastream follow two rules: the <b>match key</b> paths (from {@code x-core-primaryKey},
- * fallback {@code reference}) must be mapped — the Thing's always, the Datastream's once any
- * Datastream/Observation path is touched — and the fixed <b>create set</b> is all-or-nothing: all
- * present makes the entity creatable (miss → POST), none present leaves it lookup-only (miss →
- * error sink). Locations and Observations are create-only (Thing deep insert / append). Runtime
- * <em>data</em> errors (a malformed date, a wrong type) stay error-sink territory; the deployed
- * chain guards empty match-key values into the error sink before any lookup.
+ * and Datastream follow two rules: the <b>match key</b> paths (from {@code x-core-primaryKey} under
+ * the entity's {@code properties}, fallback {@code properties.reference}) must be mapped — the
+ * Thing's always, the Datastream's once any Datastream/Observation path is touched — and the fixed
+ * <b>create set</b> is all-or-nothing: all present makes the entity creatable (miss → POST), none
+ * present leaves it lookup-only (miss → error sink). Locations and Observations are create-only
+ * (Thing deep insert / append). Runtime <em>data</em> errors (a malformed date, a wrong type) stay
+ * error-sink territory; the deployed chain guards empty match-key values into the error sink before
+ * any lookup.
  *
  * <p>Everything emitted is byte-deterministic: template keys follow the catalog order, flat keys
  * and capture properties follow the mapping's insertion order — never map iteration of unspecified
@@ -62,9 +63,10 @@ public class FrostMappingCompiler {
 
   /**
    * The schema-derived match keys of the mapping's target structure, resolved by the sink spec: the
-   * entity classes' {@code x-core-primaryKey} attributes (fallback: a {@code reference} attribute).
-   * Key names must pass {@link StaTargetCatalog#isSafeKeyName(String)} — they end up in {@code
-   * $filter} expressions and template keys.
+   * {@code x-core-primaryKey} attributes of each entity's {@code properties} class (fallback: a
+   * {@code properties.reference} attribute). Key names must pass {@link
+   * StaTargetCatalog#isSafeKeyName(String)} — they end up in {@code $filter} expressions and
+   * template keys.
    *
    * @param thingKeys the Thing class's key attribute names (never empty for a valid FROST target)
    * @param datastreamKeys the Datastream class's key attribute names (empty when the structure has
@@ -179,8 +181,9 @@ public class FrostMappingCompiler {
     }
     if (keys.thingKeys().isEmpty()) {
       throw reject(
-          "the FROST target structure declares no match key on its Thing class; mark the"
-              + " identifying attribute with the UML {id} flag or add a 'reference' attribute");
+          "the FROST target structure declares no match key on its Thing's properties class; mark"
+              + " an attribute under properties with the UML {id} flag or add a 'reference'"
+              + " attribute under properties");
     }
   }
 
@@ -193,22 +196,17 @@ public class FrostMappingCompiler {
   }
 
   /**
-   * A match key named like a fixed catalog field ({@code name}, {@code Sensor}, …) would make one
-   * mapping path mean two things — the standard SensorThings field and the {@code properties}-bag
-   * key — so it is rejected rather than resolved by precedence.
+   * The match key lives inside the entity's {@code properties} bag, so it no longer collides with a
+   * standard top-level field — but a key literally named {@code properties} would make its rendered
+   * path ({@code properties.properties}) shadow the bag itself, so it is rejected.
    */
   private void requireUnreservedKeyName(String key, StaEntity entity) throws FatalAdapterException {
-    boolean reserved =
-        StaTargetCatalog.byPath(StaTargetCatalog.keyPath(entity, key)).isPresent()
-            || StaTargetCatalog.targetsOf(entity).stream()
-                .anyMatch(target -> target.relativePath().split("\\.")[0].equals(key));
-    if (reserved) {
+    if ("properties".equals(key)) {
       throw reject(
-          "the match-key attribute '"
-              + key
-              + "' collides with a standard SensorThings field of "
+          "the "
               + entity.name().toLowerCase(Locale.ROOT)
-              + "; rename the identifying attribute");
+              + " match-key attribute must not be named 'properties'; it is the reserved name of"
+              + " the properties bag the match key lives in — rename the identifying attribute");
     }
   }
 
@@ -297,8 +295,9 @@ public class FrostMappingCompiler {
     }
     if (keys.datastreamKeys().isEmpty()) {
       throw reject(
-          "the FROST target structure declares no match key on its Datastream class; mark the"
-              + " identifying attribute with the UML {id} flag or add a 'reference' attribute");
+          "the FROST target structure declares no match key on its Datastream's properties class;"
+              + " mark an attribute under properties with the UML {id} flag or add a 'reference'"
+              + " attribute under properties");
     }
     requireKeys(mapping, keys.datastreamKeys(), StaEntity.DATASTREAM);
     requireCompleteCreateSet(mapping, StaEntity.DATASTREAM);
