@@ -116,10 +116,10 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
         />
       </div>
 
-      {/* Multiplicities */}
+      {/* Cardinalities */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Source Multiplicity</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Source Cardinality</label>
           <select
             value={relationship.sourceMultiplicity || ''}
             onChange={handleSourceMultiplicityChange}
@@ -135,7 +135,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Target Multiplicity</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Target Cardinality</label>
           <select
             value={relationship.targetMultiplicity || ''}
             onChange={handleTargetMultiplicityChange}
@@ -233,12 +233,12 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
           )}
           {relationship.sourceMultiplicity && (
             <p>
-              <strong>Source Multiplicity:</strong> {relationship.sourceMultiplicity}
+              <strong>Source Cardinality:</strong> {relationship.sourceMultiplicity}
             </p>
           )}
           {relationship.targetMultiplicity && (
             <p>
-              <strong>Target Multiplicity:</strong> {relationship.targetMultiplicity}
+              <strong>Target Cardinality:</strong> {relationship.targetMultiplicity}
             </p>
           )}
           {relationship.sourceRole && (

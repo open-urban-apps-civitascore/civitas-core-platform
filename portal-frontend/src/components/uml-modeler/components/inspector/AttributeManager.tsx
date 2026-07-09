@@ -18,13 +18,7 @@ import {
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
 import { canMultiplicityBePrimaryKey } from '../../services/jsonSchemaExportService'
-import {
-  type UMLAttribute,
-  type UMLElement,
-  type UMLGeometryType,
-  type UMLPrimitiveType,
-  type Visibility,
-} from '../../types/uml'
+import { type UMLAttribute, type UMLElement, type UMLGeometryType, type UMLPrimitiveType } from '../../types/uml'
 
 interface AttributeManagerProps {
   nodeId: string
@@ -43,7 +37,6 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
         id: crypto.randomUUID(),
         name: 'neuesAttribut',
         type: 'String',
-        visibility: 'private',
         isId: false,
       }
       updateNode(nodeId, {
@@ -78,12 +71,6 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     return null
   }
 
-  const visibilityOptions: SelectOption<Visibility>[] = [
-    { value: 'public', label: '+' },
-    { value: 'private', label: '-' },
-    { value: 'protected', label: '#' },
-    { value: 'package', label: '~' },
-  ]
   // Options for the cardinality dropdown of a single attribute. Imported or
   // edge-authored models may carry a multiplicity outside the dropdown's four
   // values (e.g. `*` or a range like `1..5`); we surface that value as an extra
@@ -248,19 +235,6 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
                 disabled={!isFirstGeomAttr(attribute.id)}
                 size="sm"
                 triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Visibility */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Visibility</label>
-              <BasicSelect
-                options={visibilityOptions}
-                onValueChange={e => updateAttribute(attribute.id, { visibility: e as Visibility })}
-                value={attribute.visibility}
-                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                size="sm"
-                disabled={isReadOnly}
               />
             </div>
 

@@ -24,12 +24,12 @@ const elementWith = (attribute: Partial<UMLAttribute>): UMLClass => ({
   id: 'elem-1',
   name: 'TrafficSensor',
   type: 'class',
-  attributes: [{ id: 'a1', name: 'field', type: 'String', visibility: 'public', ...attribute }],
+  attributes: [{ id: 'a1', name: 'field', type: 'String', ...attribute }],
   operations: [],
 })
 
 // The Cardinality field is the only BasicSelect labelled "Cardinality"; scope all
-// queries to its surrounding container to avoid the Type/Visibility selects.
+// queries to its surrounding container to avoid the Type select.
 const cardinalityField = () => screen.getByText('Cardinality').closest('div') as HTMLElement
 
 const openCardinality = () => {

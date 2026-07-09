@@ -43,7 +43,6 @@ export const createClassTemplate = (name?: string): UMLClass => ({
       id: generateId(),
       name: 'attribut',
       type: 'String',
-      visibility: 'private',
     },
   ],
   operations: [],
@@ -59,7 +58,6 @@ export const createInterfaceTemplate = (name?: string): UMLInterface => ({
     {
       id: generateId(),
       name: 'operation',
-      visibility: 'public',
       parameters: [],
       returnType: 'void',
     },
@@ -76,14 +74,12 @@ export const createAbstractClassTemplate = (name?: string): UMLAbstractClass => 
       id: generateId(),
       name: 'attribut',
       type: 'String',
-      visibility: 'protected',
     },
   ],
   operations: [
     {
       id: generateId(),
       name: 'abstractOperation',
-      visibility: 'public',
       isAbstract: true,
       parameters: [],
       returnType: 'void',

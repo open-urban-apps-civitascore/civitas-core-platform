@@ -4,7 +4,6 @@ import type { NodeProps } from '@xyflow/react'
 
 import type { UMLNodeData } from '../../types/diagram'
 import type { UMLClass, UMLType } from '../../types/uml'
-import { VISIBILITY_SYMBOLS } from '../../types/uml'
 import { BaseUMLNode, NodeLine, NodeSection } from './BaseUMLNode'
 
 // Helper to format UML type names
@@ -31,7 +30,7 @@ export const ClassNode: React.FC<NodeProps> = ({ data, selected: isSelected = fa
       <NodeSection isEmpty={!element.attributes || element.attributes.length === 0}>
         {element.attributes?.map(attribute => (
           <NodeLine key={attribute.id}>
-            {VISIBILITY_SYMBOLS[attribute.visibility]} {attribute.name}: {formatTypeName(attribute.type)}
+            {attribute.name}: {formatTypeName(attribute.type)}
             {attribute.isId && ' {id}'}
             {attribute.multiplicity && ` [${attribute.multiplicity}]`}
             {attribute.isStatic && ' {static}'}
