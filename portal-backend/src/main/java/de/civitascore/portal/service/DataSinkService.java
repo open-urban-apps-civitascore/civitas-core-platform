@@ -2,13 +2,16 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.LayerRepository;
+import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -33,18 +36,21 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   private final DataSetRepository dataSetRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
   private final LayerRepository layerRepository;
+  private final ScopeAccessAuthorizer scopeAccessAuthorizer;
 
   public DataSinkService(
       DataSinkRepository dataSinkRepository,
       DataSinkMapper dataSinkMapper,
       DataSetRepository dataSetRepository,
       DataStructureVersionRepository dataStructureVersionRepository,
-      LayerRepository layerRepository) {
+      LayerRepository layerRepository,
+      ScopeAccessAuthorizer scopeAccessAuthorizer) {
     this.dataSinkRepository = dataSinkRepository;
     this.dataSinkMapper = dataSinkMapper;
     this.dataSetRepository = dataSetRepository;
     this.dataStructureVersionRepository = dataStructureVersionRepository;
     this.layerRepository = layerRepository;
+    this.scopeAccessAuthorizer = scopeAccessAuthorizer;
   }
 
   @Override
@@ -217,11 +223,20 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
           "dataStructureVersionId must be a valid UUID");
     }
 
-    if (!dataStructureVersionRepository.existsById(dsvId)) {
-      throw new InvalidInputException(
-          "DataSink",
-          "configuration.dataStructureVersionId",
-          "DataStructureVersion not found: " + dsvId);
-    }
+    DataStructureVersion dsv =
+        dataStructureVersionRepository
+            .findById(dsvId)
+            .orElseThrow(
+                () ->
+                    new InvalidInputException(
+                        "DataSink",
+                        "configuration.dataStructureVersionId",
+                        "DataStructureVersion not found: " + dsvId));
+
+    // The version references a DATASTRUCTURE-scoped entity, which the DATASET-typed route header
+    // cannot cover — authorize the caller against the parent structure. This is the whole guard:
+    // DataSinkController is a plain BaseController with no scope filtering of its own.
+    scopeAccessAuthorizer.authorizeReferences(
+        ScopeType.DATASTRUCTURE, Set.of(dsv.getDataStructure().getId()));
   }
 }

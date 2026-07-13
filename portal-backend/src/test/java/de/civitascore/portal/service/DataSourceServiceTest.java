@@ -3,6 +3,8 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataSourceMapper;
@@ -11,6 +13,7 @@ import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
@@ -21,6 +24,7 @@ import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import de.civitascore.portal.util.InvalidInputException;
@@ -39,6 +43,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataSourceService Tests")
@@ -54,6 +59,7 @@ class DataSourceServiceTest {
   @Mock private DataSetRepository dataSetRepository;
   @Mock private PipelineRepository pipelineRepository;
   @Mock private DataPoolRepository dataPoolRepository;
+  @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
 
   @InjectMocks private DataSourceService dataSourceService;
 
@@ -692,6 +698,7 @@ class DataSourceServiceTest {
       dsv.setId(dsvId);
       dsv.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       DataStructure ds = new DataStructure();
+      ds.setId(UUID.randomUUID());
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       dsv.setDataStructure(ds);
 
@@ -718,6 +725,7 @@ class DataSourceServiceTest {
       dsv.setId(dsvId);
       dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       DataStructure ds = new DataStructure();
+      ds.setId(UUID.randomUUID());
       ds.setDataStructureStatus(DataStructureStatus.DRAFT);
       dsv.setDataStructure(ds);
 
@@ -734,6 +742,31 @@ class DataSourceServiceTest {
       assertThatThrownBy(() -> dataSourceService.create(input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("parent DataStructure");
+    }
+
+    @Test
+    @DisplayName("Should deny linking when the caller is not authorized for the parent structure")
+    void shouldDenyWhenNotAuthorizedForDataStructure() {
+      UUID dsvId = UUID.randomUUID();
+      DataStructureVersion dsv = createDataStructureVersion();
+      dsv.setId(dsvId);
+      dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("test");
+      input.setDataStructureVersionId(dsvId);
+
+      DataSource entity = new DataSource();
+      entity.setId(UUID.randomUUID());
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+      when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
+      doThrow(new AccessDeniedException("denied"))
+          .when(scopeAccessAuthorizer)
+          .authorizeReferences(eq(ScopeType.DATASTRUCTURE), any());
+
+      assertThatThrownBy(() -> dataSourceService.create(input))
+          .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
@@ -1050,6 +1083,29 @@ class DataSourceServiceTest {
     }
 
     @Test
+    @DisplayName("Should deny SPECIFIC scope when the caller is not authorized for a DataPool")
+    void shouldDenyWhenNotAuthorizedForDatapool() {
+      UUID poolId = UUID.randomUUID();
+      DataSource entity = DataSource.builder().build();
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(poolId));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("source");
+      input.setDatapoolScope(scope);
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+      doThrow(new AccessDeniedException("denied"))
+          .when(scopeAccessAuthorizer)
+          .authorizeReferences(eq(ScopeType.DATAPOOL), any());
+
+      assertThatThrownBy(() -> dataSourceService.create(input))
+          .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
     @DisplayName("Should reject SPECIFIC scope with null datapoolIds")
     void shouldRejectSpecificScopeWithNullIds() {
       DataSource entity = DataSource.builder().build();
@@ -1176,6 +1232,9 @@ class DataSourceServiceTest {
   private DataStructureVersion createDataStructureVersion() {
     DataStructureVersion dsv = new DataStructureVersion();
     dsv.setId(UUID.randomUUID());
+    DataStructure parent = new DataStructure();
+    parent.setId(UUID.randomUUID());
+    dsv.setDataStructure(parent);
     return dsv;
   }
 }
