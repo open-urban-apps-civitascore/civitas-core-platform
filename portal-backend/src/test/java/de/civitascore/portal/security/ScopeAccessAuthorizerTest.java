@@ -107,8 +107,10 @@ class ScopeAccessAuthorizerTest {
   }
 
   @Test
-  @DisplayName("Wildcard header grants any reference (tenant cascade)")
+  @DisplayName("Wildcard header grants any reference — it is a decision the PDP already made")
   void wildcardGrantsAny() {
+    // A wildcard header means OPA already authorized tenant-wide access; the backend does not
+    // re-adjudicate it. No DB assignment lookup is needed on this path.
     allowedScopes.setWildcard();
     authenticateAs(userId);
 

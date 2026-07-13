@@ -223,6 +223,9 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
           "dataStructureVersionId must be a valid UUID");
     }
 
+    // Authorization scopes on the parent DataStructure, which is only known after loading the
+    // version, so existence is necessarily checked first. Keep the not-found message free of the
+    // supplied id so the 400-vs-403 difference cannot be used to probe which version ids exist.
     DataStructureVersion dsv =
         dataStructureVersionRepository
             .findById(dsvId)
@@ -231,7 +234,7 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
                     new InvalidInputException(
                         "DataSink",
                         "configuration.dataStructureVersionId",
-                        "DataStructureVersion not found: " + dsvId));
+                        "Referenced DataStructureVersion is not available"));
 
     // The version references a DATASTRUCTURE-scoped entity, which the DATASET-typed route header
     // cannot cover — authorize the caller against the parent structure. This is the whole guard:

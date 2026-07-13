@@ -82,7 +82,9 @@ public class ScopeAccessAuthorizer {
 
     String externalId = currentUserExternalId();
 
-    // The wildcard header is a tenant-wide grant, which cascades to every resource type.
+    // A wildcard header is a decision the PDP (OPA) has already made: the caller has tenant-wide
+    // access, which cascades to every resource type. The backend only fills the gap where OPA
+    // cannot see the body-referenced ids — it does not re-adjudicate a decision OPA already took.
     if (scopes.isWildcard()) {
       log.info(
           "{} access granted (tenant) for user {} referencing {}",
@@ -94,10 +96,15 @@ public class ScopeAccessAuthorizer {
 
     PermissionName readPermission = READ_PERMISSIONS.get(scopeType);
     if (readPermission == null) {
-      throw new IllegalArgumentException("No read permission mapping for scope type " + scopeType);
+      // Fail closed: an unmapped scope type is a wiring error, but a security guard must never
+      // grant on an unrecognized input.
+      log.error("{} access denied: no read permission mapped for scope type", scopeType);
+      throw new AccessDeniedException("No read permission mapping for scope type " + scopeType);
     }
     List<Assignment> assignments = assignmentService.findAllByUserExternalId(externalId);
 
+    // A non-wildcard caller may still hold a tenant/unscoped assignment for the referenced type
+    // (OPA scopes its header to the route type, so it would not surface such a grant here).
     if (hasTenantWideRead(assignments, readPermission)) {
       log.info(
           "{} access granted (tenant assignment) for user {} referencing {}",

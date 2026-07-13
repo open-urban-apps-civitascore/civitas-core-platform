@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
@@ -21,6 +22,7 @@ import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -177,13 +180,22 @@ class DataSinkServiceTest {
       input.setConfiguration(Map.of("dataStructureVersionId", dsvId.toString()));
 
       DataSink entity = new DataSink();
+      DataStructureVersion dsv = dataStructureVersion(dsvId);
       when(dataSinkMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
-      when(dataStructureVersionRepository.findById(dsvId))
-          .thenReturn(Optional.of(dataStructureVersion(dsvId)));
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(dsv));
       when(dataSinkRepository.save(any())).thenReturn(entity);
 
       assertThat(dataSinkService.create(input)).isSameAs(entity);
+
+      // The guard must authorize the parent DataStructure id, never the version id — assignments
+      // scope on the structure, so authorizing the version id would deny every legitimate caller.
+      ArgumentCaptor<Collection<UUID>> captor = ArgumentCaptor.forClass(Collection.class);
+      verify(scopeAccessAuthorizer)
+          .authorizeReferences(eq(ScopeType.DATASTRUCTURE), captor.capture());
+      assertThat(captor.getValue())
+          .containsExactly(dsv.getDataStructure().getId())
+          .doesNotContain(dsvId);
     }
 
     @Test

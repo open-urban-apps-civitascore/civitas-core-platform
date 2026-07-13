@@ -137,12 +137,14 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
             });
 
     if (input.getDataSourceIds() != null && !input.getDataSourceIds().isEmpty()) {
+      // Authorize before revealing existence: a "not found" answer for an unauthorized caller
+      // would otherwise turn this endpoint into an existence oracle over the DataSource table.
+      scopeAccessAuthorizer.authorizeReferences(ScopeType.DATASOURCE, input.getDataSourceIds());
       List<DataSource> dataSources = dataSourceRepository.findAllById(input.getDataSourceIds());
       if (dataSources.size() != input.getDataSourceIds().size()) {
         throw new InvalidInputException(
             "Pipeline", "dataSourceIds", "One or more DataSource IDs not found");
       }
-      scopeAccessAuthorizer.authorizeReferences(ScopeType.DATASOURCE, input.getDataSourceIds());
       dataSources.forEach(this::validateDataSourceLinkable);
       validateDataSourcesInScope(dataSources, entity.getDataSet());
       entity.setDataSources(new HashSet<>(dataSources));
