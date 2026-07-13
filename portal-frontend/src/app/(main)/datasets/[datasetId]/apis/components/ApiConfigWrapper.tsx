@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { FormEvent } from 'react'
 
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -113,15 +114,19 @@ export const ApiConfigWrapper = (props: ApiConfigWrapperProps) => {
         }}
       />
       <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
-        <form
-          id="api-config-form"
-          data-testid="apiConfigForm"
-          aria-label={`${tCommon('form')} ${typeLabel}`}
-          onSubmit={onSubmit}
-          className="h-full"
-        >
-          {children}
-        </form>
+        {isLoading ? (
+          <LoadingSpinner className="h-full"/>
+        ) : (
+          <form
+            id="api-config-form"
+            data-testid="apiConfigForm"
+            aria-label={`${tCommon('form')} ${typeLabel}`}
+            onSubmit={onSubmit}
+            className="h-full"
+          >
+            {children}
+          </form>
+        )}
       </PageBackground>
       <ExitWarningModal
         open={isExitModalOpen}
