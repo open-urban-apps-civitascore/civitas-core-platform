@@ -104,7 +104,8 @@ export const useApiConfig = <TFormData extends FormData>({
         existingApis: otherNamedApis,
       })
       toast.success(t('messages.createSuccess'))
-      router.push(`${redirectUrl}?mode=edit`)
+      router.replace(`${redirectUrl}?mode=edit`)
+      router.refresh()
     } else {
       const otherInputs: NamedApiPayload[] = otherNamedApis.map(a => ({
         name: a.name,
@@ -116,11 +117,11 @@ export const useApiConfig = <TFormData extends FormData>({
       await updateDataset.mutateAsync({ id: dataset.id, namedApis: [...otherInputs, newApi] })
       toast.success(t('messages.updateSuccess'))
       form.reset(data)
-      router.refresh()
       updateMode(false)
       if (newApi.slug !== initialSlug) {
         router.push(redirectUrl)
       }
+      router.refresh()
     }
   }
 

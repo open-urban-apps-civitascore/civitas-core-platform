@@ -240,7 +240,7 @@ describe('ApiConfigPage', () => {
       fireEvent.submit(screen.getByTestId('apiConfigForm'))
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/datasets/test-id/apis/sta?mode=edit')
+        expect(mockReplace).toHaveBeenCalledWith('/datasets/test-id/apis/sta?mode=edit')
       })
     })
 

@@ -12,7 +12,6 @@ import { useDeleteLayer, useGetLayers } from '@/app/services/api/datasets/layers
 import { useDeleteStyle, useGetStyles } from '@/app/services/api/datasets/styles/clientRequests'
 import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { ContentCard } from '@/components/content-card/ContentCard'
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { Form } from '@/components/ui/form'
 import { Dataset } from '@/types/datasets'
 import { DATASINK_TYPES } from '@/types/datasinks'
@@ -303,7 +302,7 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
       isReadOnly={isReadOnly}
       hasUnsavedChanges={form.formState.isDirty}
       isFormValid={form.formState.isValid}
-      isLoading={isLoading}
+      isLoading={isLoading || isDataLoading}
       tabs={tabs}
       selectedTab={selectedTab}
       onTabChange={setSelectedTab}
@@ -318,52 +317,48 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
       onSaveAndExit={handleSaveAndExit}
       onSubmit={handleSubmit}
     >
-      {isDataLoading ? (
-        <LoadingSpinner className="h-full" />
-      ) : (
-        <Form {...form}>
-          {selectedTab === 'basicInfo' && (
-            <ContentCard>
-              <BaseInfoForm
-                form={form as unknown as UseFormReturn<StaApiFormData>}
-                apiType={apiType}
-                isReadOnly={isReadOnly}
-                datasetId={dataset.id}
-                typeLabel={typeLabel}
-                urlPreviewSlug={urlPreviewSlug}
-                onSlugBlur={handleSlugBlur}
-              />
-            </ContentCard>
-          )}
-          {selectedTab === 'layer' && (
-            <LayerConfig
-              form={form}
-              styles={apiStyles}
-              postgisDataSinks={postgisDataSinks}
-              postGisDatastructures={postgisDatastructures}
-              selectedLayerIndex={selectedLayerIndex}
+      <Form {...form}>
+        {selectedTab === 'basicInfo' && (
+          <ContentCard>
+            <BaseInfoForm
+              form={form as unknown as UseFormReturn<StaApiFormData>}
+              apiType={apiType}
               isReadOnly={isReadOnly}
-              isDeleteLayerLoading={deleteLayer.isPending}
-              onSelectLayer={handleSelectLayer}
-              onAddLayer={handleAddLayer}
-              onDeleteLayer={handleDeleteLayer}
-              onTableChange={handleTableChange}
+              datasetId={dataset.id}
+              typeLabel={typeLabel}
+              urlPreviewSlug={urlPreviewSlug}
+              onSlugBlur={handleSlugBlur}
             />
-          )}
-          {selectedTab === 'styles' && (
-            <StylesConfig
-              form={form}
-              existingStyles={styleFields}
-              selectedStyleIndex={selectedStyleIndex}
-              isReadOnly={isReadOnly}
-              isDeleteStyleLoading={deleteStyle.isPending}
-              onSelectStyle={handleSelectStyle}
-              onAddStyle={handleAddStyle}
-              onDeleteStyle={handleDeleteStyle}
-            />
-          )}
-        </Form>
-      )}
+          </ContentCard>
+        )}
+        {selectedTab === 'layer' && (
+          <LayerConfig
+            form={form}
+            styles={apiStyles}
+            postgisDataSinks={postgisDataSinks}
+            postGisDatastructures={postgisDatastructures}
+            selectedLayerIndex={selectedLayerIndex}
+            isReadOnly={isReadOnly}
+            isDeleteLayerLoading={deleteLayer.isPending}
+            onSelectLayer={handleSelectLayer}
+            onAddLayer={handleAddLayer}
+            onDeleteLayer={handleDeleteLayer}
+            onTableChange={handleTableChange}
+          />
+        )}
+        {selectedTab === 'styles' && (
+          <StylesConfig
+            form={form}
+            existingStyles={styleFields}
+            selectedStyleIndex={selectedStyleIndex}
+            isReadOnly={isReadOnly}
+            isDeleteStyleLoading={deleteStyle.isPending}
+            onSelectStyle={handleSelectStyle}
+            onAddStyle={handleAddStyle}
+            onDeleteStyle={handleDeleteStyle}
+          />
+        )}
+      </Form>
     </ApiConfigWrapper>
   )
 }
