@@ -115,7 +115,7 @@ export const ApiConfigWrapper = (props: ApiConfigWrapperProps) => {
       />
       <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
         {isLoading ? (
-          <LoadingSpinner className="h-full"/>
+          <LoadingSpinner className="h-full" />
         ) : (
           <form
             id="api-config-form"
