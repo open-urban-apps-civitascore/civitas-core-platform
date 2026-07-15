@@ -30,6 +30,7 @@ import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
 import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkAuth;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
@@ -50,6 +51,7 @@ import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -154,7 +156,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
                 new SqlSourceStage(credentialResolver, new JdbcSqlSourceProbe())),
             List.of(
                 new PostgisSinkStage(platformSink),
-                new FrostSinkStage(getProperty("frost.url", null))),
+                new FrostSinkStage(getProperty("frost.url", null), resolveFrostSinkAuth(config))),
             List.of(new MappingNodeType(new MappingConfigParser(), new RecordPathCompiler())));
     this.planner =
         new FlowDeploymentPlanner(new GraphParser(), new NifiFlowBuilder(stages), stages);
@@ -165,6 +167,25 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       this.nifiClient = new NifiRestClient(url, oidcTokenProvider(), jaxrs);
     }
     log.info("NifiSagaHandler initialized for: {}", Encode.forJava(url));
+  }
+
+  private FrostSinkAuth resolveFrostSinkAuth(AdapterConfig config) {
+    Map<String, Object> properties = new LinkedHashMap<>();
+    putIfNotNull(
+        properties,
+        FrostSinkAuth.BASIC_AUTH_USERNAME,
+        getProperty("frost.basic.auth.username", config.getProperty("frost.basic.auth.username")));
+    putIfNotNull(
+        properties,
+        FrostSinkAuth.BASIC_AUTH_PASSWORD,
+        getProperty("frost.basic.auth.password", config.getProperty("frost.basic.auth.password")));
+    return FrostSinkAuth.fromProperties(credentialResolver, properties);
+  }
+
+  private static void putIfNotNull(Map<String, Object> properties, String key, Object value) {
+    if (value != null) {
+      properties.put(key, value);
+    }
   }
 
   /**
