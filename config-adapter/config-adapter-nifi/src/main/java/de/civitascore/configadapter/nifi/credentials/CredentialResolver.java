@@ -18,11 +18,11 @@ import java.util.Arrays;
 import java.util.Map;
 
 /**
- * Decrypts {@code ENC(...)} datasource credentials at deploy time, reusing the shared crypto
- * utilities. The decrypted plaintext is destined only for NiFi <em>sensitive</em>
- * controller-service properties pushed over REST — never the uploaded snapshot, environment
- * variables, or a Parameter Context that a flow could read via Expression Language. The stretched
- * key is held only for the resolver's lifetime and zeroed on {@link #close()}.
+ * Decrypts {@code ENC(...)} credentials at deploy time, reusing the shared crypto utilities. The
+ * decrypted plaintext is destined only for NiFi <em>sensitive</em> component properties pushed over
+ * REST — never the uploaded snapshot, environment variables, or a Parameter Context that a flow
+ * could read via Expression Language. The stretched key is held only for the resolver's lifetime
+ * and zeroed on {@link #close()}.
  */
 public class CredentialResolver implements AutoCloseable {
 
@@ -73,7 +73,7 @@ public class CredentialResolver implements AutoCloseable {
       return CredentialDecryptor.decryptMapValues(properties, stretchedKey, credentialContext);
     } catch (GeneralSecurityException e) {
       throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_FLOW_ERROR, e, "datasource credential decryption failed");
+          AdapterErrorCode.NIFI_FLOW_ERROR, e, "credential decryption failed");
     }
   }
 

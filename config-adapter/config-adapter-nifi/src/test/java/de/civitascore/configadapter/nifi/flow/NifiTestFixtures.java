@@ -16,6 +16,7 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkAuth;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkStage;
@@ -59,7 +60,9 @@ public final class NifiTestFixtures {
       String frostBaseUrl) {
     return new StageRegistry(
         List.of(new MqttSourceStage(resolver), new SqlSourceStage(resolver, probe)),
-        List.of(new PostgisSinkStage(platformSink), new FrostSinkStage(frostBaseUrl)),
+        List.of(
+            new PostgisSinkStage(platformSink),
+            new FrostSinkStage(frostBaseUrl, FrostSinkAuth.basicAuth("frost", "secret"))),
         List.of(new MappingNodeType(new MappingConfigParser(), new RecordPathCompiler())));
   }
 
@@ -90,7 +93,7 @@ public final class NifiTestFixtures {
   }
 
   static Map<String, Object> map(String json) throws Exception {
-    return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {});
+    return MAPPER.readValue(json, new TypeReference<>() {});
   }
 
   static Map<String, Object> graphWithMapping() throws Exception {

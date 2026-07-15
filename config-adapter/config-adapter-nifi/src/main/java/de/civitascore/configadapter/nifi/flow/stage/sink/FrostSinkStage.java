@@ -65,14 +65,22 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
    */
   public static final String FROST_PROJECT_ID = "Frost Project Id";
 
+  /** Non-secret InvokeHTTP property used when FROST is configured with Basic Auth. */
+  static final String FROST_BASIC_AUTH_USERNAME = "Frost Basic Auth Username";
+
+  /** Friendly name shared by all FROST InvokeHTTP processors for post-upload secret patching. */
+  static final String FROST_HTTP_PROCESSOR = "FrostPublish";
+
   /** InvokeHTTP failure-side relationships routed to the error sink (find-or-create stages). */
   private static final List<String> HTTP_FAILURE_RELATIONSHIPS =
       List.of("Failure", "Retry", "No Retry");
 
   private final String frostBaseUrl;
+  private final FrostSinkAuth frostAuth;
 
-  public FrostSinkStage(String frostBaseUrl) {
+  public FrostSinkStage(String frostBaseUrl, FrostSinkAuth frostAuth) {
     this.frostBaseUrl = frostBaseUrl;
+    this.frostAuth = frostAuth;
   }
 
   @Override
@@ -214,7 +222,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       Map<String, Object> schema, List<String> propertiesPath, Map<String, Object> attributes) {
     List<String> marked = DataStructureSchema.primaryKeyColumnsAt(schema, propertiesPath);
     if (!marked.isEmpty()) {
-      return marked.get(0);
+      return marked.getFirst();
     }
     return attributes.containsKey("reference") ? "reference" : null;
   }
@@ -246,6 +254,9 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     // The saga's project id scopes those URLs to the dataset's FROST project; the spec
     // guarantees it is present and numeric.
     out.putSinkProperty(FROST_PROJECT_ID, spec.projectId());
+    // Authentication is platform-managed. The username may enter the snapshot, but the password or
+    // API key is patched onto every FrostPublish processor only after upload.
+    frostAuth.bind(out);
   }
 
   /**
@@ -412,7 +423,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     if (plan.observationBody() != null) {
       Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "obsBody");
       setProp(renderBody, "Replacement Value", plan.observationBody());
-      Processor post = ctx.loadProcessor(Fragment.INVOKE_HTTP, null, "obsPost");
+      Processor post = loadFrostHttp(ctx, null, "obsPost");
       setProp(post, "HTTP Method", "POST");
       setProp(post, "HTTP URL", base + "/Observations");
       setProp(post, "Request Content-Type", "application/json");
@@ -443,7 +454,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     List<FrostEntityPlan.FilterTerm> terms = new ArrayList<>(plan.thingFilter());
     terms.addAll(plan.datastreamFilter());
     StringBuilder condition =
-        new StringBuilder("${").append(terms.get(0).flatKey()).append(":isEmpty()");
+        new StringBuilder("${").append(terms.getFirst().flatKey()).append(":isEmpty()");
     for (FrostEntityPlan.FilterTerm term : terms.subList(1, terms.size())) {
       condition.append(":or(${").append(term.flatKey()).append(":isEmpty()})");
     }
@@ -465,7 +476,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       List<Tail> upstream,
       Processor errorSink)
       throws FatalAdapterException {
-    Processor get = ctx.loadProcessor(Fragment.INVOKE_HTTP, "Response", disc + "Get");
+    Processor get = loadFrostHttp(ctx, "Response", disc + "Get");
     setProp(get, "HTTP Method", "GET");
     setProp(get, "HTTP URL", lookupUrl);
     Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
@@ -491,7 +502,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
     Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", disc + "Body");
     setProp(renderBody, "Replacement Value", body);
-    Processor post = ctx.loadProcessor(Fragment.INVOKE_HTTP, "Response", disc + "Post");
+    Processor post = loadFrostHttp(ctx, "Response", disc + "Post");
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", postUrl);
     setProp(post, "Request Content-Type", "application/json");
@@ -500,7 +511,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     // in the FlowFile content — the EvaluateJsonPath extractors read $.value[0].@iot.id from it, so
     // diverting their body to an attribute would break find-or-create entirely.
     setProp(post, "Response Body Attribute Name", "frost.response.body");
-    Processor reGet = ctx.loadProcessor(Fragment.INVOKE_HTTP, "Response", disc + "ReGet");
+    Processor reGet = loadFrostHttp(ctx, "Response", disc + "ReGet");
     setProp(reGet, "HTTP Method", "GET");
     setProp(reGet, "HTTP URL", lookupUrl);
     Processor reId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "ReId");
@@ -553,7 +564,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
   private String filterExpression(List<FrostEntityPlan.FilterTerm> terms, String projectId) {
     StringBuilder filter = new StringBuilder();
     for (FrostEntityPlan.FilterTerm term : terms) {
-      if (filter.length() > 0) {
+      if (!filter.isEmpty()) {
         filter.append("%20and%20");
       }
       filter
@@ -588,7 +599,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
     Processor restore = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "thingRestore");
     setProp(restore, "Replacement Value", "${frost.body}");
-    Processor post = ctx.loadProcessor(Fragment.INVOKE_HTTP, null, "thingPost");
+    Processor post = loadFrostHttp(ctx, null, "thingPost");
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", base + "/Things");
     setProp(post, "Request Content-Type", "application/json");
@@ -644,7 +655,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     setProp(inject, "Replacement Strategy", "Regex Replace");
     setProp(inject, "Search Value", "^\\{");
     setProp(inject, "Replacement Value", "{\"Datastream\":{\"@iot.id\":${frost.id}},");
-    Processor post = ctx.loadProcessor(Fragment.INVOKE_HTTP, null, "obsPost");
+    Processor post = loadFrostHttp(ctx, null, "obsPost");
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", base + "/Observations");
     setProp(post, "Request Content-Type", "application/json");
@@ -697,7 +708,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       setProp(extractRef, ref.getKey(), ref.getValue());
     }
 
-    Processor get = ctx.loadProcessor(Fragment.INVOKE_HTTP, "Response", disc + "Get");
+    Processor get = loadFrostHttp(ctx, "Response", disc + "Get");
     setProp(get, "HTTP Method", "GET");
     setProp(get, "HTTP URL", leg.getUrl());
 
@@ -735,5 +746,16 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       removeAutoTerminated(http, relationship);
       ctx.addConnection(http, errorSink, relationship);
     }
+  }
+
+  /** Loads an InvokeHTTP processor and applies the non-secret half of FROST Basic Auth, if used. */
+  private Processor loadFrostHttp(BuildContext ctx, String relationship, String discriminator)
+      throws FatalAdapterException {
+    Processor http = ctx.loadProcessor(Fragment.INVOKE_HTTP, relationship, discriminator);
+    String username = ctx.spec().sinkProperties().get(FROST_BASIC_AUTH_USERNAME);
+    if (username != null) {
+      setProp(http, "Request Username", username);
+    }
+    return http;
   }
 }

@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkAuth;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
@@ -28,7 +29,8 @@ class MappingNodeTypeTest {
 
   private final MappingNodeType mappingNodeType =
       new MappingNodeType(new MappingConfigParser(), new RecordPathCompiler());
-  private final FrostSinkStage envelopeSink = new FrostSinkStage("https://frost.example/FROST");
+  private final FrostSinkStage envelopeSink =
+      new FrostSinkStage("https://frost.example/FROST", FrostSinkAuth.basicAuth("frost", "secret"));
 
   private static GraphNode mappingNode(String id, Map<String, Object> fields) {
     return new GraphNode(id, "mapping", Map.of("mappingConfig", Map.of("fields", fields)));

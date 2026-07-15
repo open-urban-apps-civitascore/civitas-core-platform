@@ -549,6 +549,11 @@ class FlowDeploymentPlannerTest {
       assertTrue(
           snapshot.contains("Thing/Projects/id%20eq%207"),
           "Datastream lookup must be filtered by the saga's project");
+      assertFalse(snapshot.contains("secret"), "FROST secret must not enter the snapshot");
+      assertEquals(
+          "secret",
+          plan.sensitivePropsByComponent().get("FrostPublish").get("Request Password"),
+          "the Basic Auth password must be patched onto FROST processors after upload");
     }
   }
 
