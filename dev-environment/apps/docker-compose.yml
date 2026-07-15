@@ -131,7 +131,10 @@ services:
       interval: 15s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      # Generous grace: on arm64 hosts the amd64-pinned base runs under emulation and
+      # portal-backend (Spring Boot + Flowable) is slow to start. On amd64 it becomes
+      # healthy quickly, so this upper bound has no effect there.
+      start_period: 300s
 
   portal-frontend:
     build:
@@ -144,6 +147,16 @@ services:
     environment:
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
+      # Auth.js (NextAuth v5) runs behind the container host; without trusting the host it
+      # rejects the auth routes with "UntrustedHost" and renders the "Server error / problem
+      # with the server configuration" page. Safe for local dev behind a known host.
+      AUTH_TRUST_HOST: "true"
+      # Server-side (container) can't reach Keycloak at localhost:8080 (that's the
+      # container itself). Keycloak's discovery is backchannel-dynamic: fetched via this
+      # internal URL it returns internal token/jwks endpoints but keeps issuer +
+      # authorization on localhost:8080 (browser + iss stay correct). auth.ts points its
+      # wellKnown here; tokenUtils.ts uses it for the refresh token endpoint.
+      KEYCLOAK_INTERNAL_ISSUER: http://civitas-keycloak:8080/realms/civitas-core
     env_file:
       - path: ../../portal-frontend/.env.local
         required: false

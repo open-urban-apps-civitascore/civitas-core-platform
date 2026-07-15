@@ -314,22 +314,6 @@ services:
       retries: 10
       start_period: 30s
 
-  # ── Model Atlas ─────────────────────────────────────────
-
-  apicurio-registry:
-    image: apicurio/apicurio-registry:3.0.15
-    environment:
-      APICURIO_REST_DELETION_GROUP_ENABLED: "true"
-      APICURIO_REST_DELETION_ARTIFACT_ENABLED: "true"
-      APICURIO_REST_DELETION_ARTIFACT-VERSION_ENABLED: "true"
-      APICURIO_REST_MUTABILITY_ARTIFACT_VERSION_CONTENT_ENABLED: "true"
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8080/apis/registry/v3/system/info"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
   # ── Data Pipelines ──────────────────────────────────────
 
   nifi:
