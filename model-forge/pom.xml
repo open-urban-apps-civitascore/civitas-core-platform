@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+           https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    Parent POM — inherits Spring Boot's dependency management so that all
+    sub-modules get consistent, managed dependency versions without having
+    to repeat them. Model Forge is published as embedded Java modules; no
+    standalone REST service module is built.
+  -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <!-- Aligned with the target host `portal-backend` and the sibling `portal-model`
+         (both on 4.1.0) in the civitas-core-platform mono-repo. -->
+    <version>4.1.0</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>de.civitascore</groupId>
+  <artifactId>core-model-forge-parent</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>CIVITAS/CORE Model Forge — Parent</name>
+  <description>Parent POM for embedded Model Forge Java modules</description>
+
+  <licenses>
+    <license>
+      <name>European Union Public Licence v. 1.2</name>
+      <url>https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <properties>
+    <!-- Host baseline: portal-backend builds with Java 25 (portal-backend/pom.xml). -->
+    <java.version>25</java.version>
+    <!-- Reproducible builds: identical inputs produce byte-identical artifacts -->
+    <project.build.outputTimestamp>2026-06-12T00:00:00Z</project.build.outputTimestamp>
+    <!-- SBOM generator version (review finding BUILD-5). Pinned here so the CI `sbom`
+         job can invoke the short goal `cyclonedx:makeAggregateBom` and have Maven's
+         pluginManagement supply this version — which makes the version visible to
+         Renovate's maven manager instead of being hidden in an inline CI coordinate. -->
+    <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
+    <!-- Pin tool versions once; child modules inherit these properties. -->
+    <jacoco.version>0.8.14</jacoco.version>
+    <archunit.version>1.4.2</archunit.version>
+    <testcontainers.version>2.0.4</testcontainers.version>
+    <!-- Apache Wicket: Jakarta-based 10.x line (Servlet 6), used only by the admin-ui demo host. -->
+    <wicket.version>10.9.1</wicket.version>
+  </properties>
+
+  <modules>
+    <module>model-forge-contract</module>
+    <module>model-forge-runtime</module>
+    <module>model-forge-spring-boot-starter</module>
+    <!-- Debug/admin host application: not part of the embedded library move set, it is a
+         consumer of it, same as portal-backend will be. Exempt from the library's own
+         no-web/no-REST rules; it may freely use spring-boot-starter-web. -->
+    <module>model-forge-admin-ui</module>
+    <!-- Not a Java module: wraps the npm package so `mvn` regenerates the TypeScript/Zod types
+         from the runtime JSON Schemas on every build (frontend-maven-plugin brings its own node).
+         The npm publish stays in the CI publish-npm job. -->
+    <module>core-model-forge-types</module>
+  </modules>
+
+  <build>
+    <!-- pluginManagement only declares versions/config; it does NOT bind any execution.
+         This keeps `mvn verify` unchanged (no new goals run) while making the SBOM
+         plugin's version Renovate-trackable and letting the CI `sbom` job call the
+         short goal `cyclonedx:makeAggregateBom`. -->
+    <pluginManagement>
+      <plugins>
+        <!-- CycloneDX SBOM generator (review finding BUILD-5). Version-managed only;
+             invoked on demand by the CI `sbom` job, never bound to a lifecycle phase. -->
+        <plugin>
+          <groupId>org.cyclonedx</groupId>
+          <artifactId>cyclonedx-maven-plugin</artifactId>
+          <version>${cyclonedx-maven-plugin.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <!-- Formatting gate: deliberately minimal (whitespace hygiene only) so the
+           diff noise of a full reformat is avoided; fails `verify` on violations. -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>3.6.0</version>
+        <configuration>
+          <java>
+            <includes>
+              <include>src/main/java/**/*.java</include>
+              <include>src/test/java/**/*.java</include>
+            </includes>
+            <trimTrailingWhitespace/>
+            <endWithNewline/>
+          </java>
+        </configuration>
+        <executions>
+          <execution>
+            <id>spotless-check</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Static-analysis gate (review finding T1): runs SpotBugs over both modules'
+           main bytecode in `verify` and fails the build on findings at/above the
+           configured confidence threshold. False positives are scoped out in the
+           repo-level spotbugs-exclude.xml (each entry justified inline). -->
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <version>4.10.2.0</version>
+        <configuration>
+          <effort>Max</effort>
+          <threshold>Medium</threshold>
+          <failOnError>true</failOnError>
+          <includeTests>false</includeTests>
+          <!-- Resolved against each module dir; the file lives at the repo root. -->
+          <excludeFilterFile>${maven.multiModuleProjectDirectory}/spotbugs-exclude.xml</excludeFilterFile>
+        </configuration>
+        <executions>
+          <execution>
+            <id>spotbugs-check</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Build environment guardrails: fail fast on wrong JDK/Maven, duplicate deps,
+           or direct web/API dependencies in the embedded artifacts. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-build-environment</id>
+            <goals><goal>enforce</goal></goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[25,)</version>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.9,)</version>
+                </requireMavenVersion>
+                <banDuplicatePomDependencyVersions/>
+                <bannedDependencies>
+                  <searchTransitive>false</searchTransitive>
+                  <excludes>
+                    <exclude>org.springframework.boot:spring-boot-starter-web</exclude>
+                    <exclude>org.springframework.boot:spring-boot-starter-webflux</exclude>
+                    <exclude>org.springframework.boot:spring-boot-starter-webmvc</exclude>
+                    <exclude>org.springframework:spring-web</exclude>
+                    <exclude>org.springframework:spring-webmvc</exclude>
+                    <exclude>org.springframework:spring-webflux</exclude>
+                    <exclude>org.springframework.security:spring-security-web</exclude>
+                    <exclude>jakarta.servlet:jakarta.servlet-api</exclude>
+                    <exclude>org.springdoc:*</exclude>
+                    <exclude>io.swagger.core.v3:*</exclude>
+                  </excludes>
+                </bannedDependencies>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

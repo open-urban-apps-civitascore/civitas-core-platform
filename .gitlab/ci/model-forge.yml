@@ -1,0 +1,202 @@
+# CIVITAS/CORE Model Forge — CI jobs for the mono-repo.
+#
+# Ported from the former standalone model-forge/.gitlab-ci.yml. Model Forge is a set of
+# embedded Java libraries (model-forge-contract / -runtime / -spring-boot-starter, plus the
+# model-forge-admin-ui demo host) and the npm types package core-model-forge-types. It builds
+# like portal-model / config-adapter: build + test the Maven reactor, then publish the Maven
+# artifacts (and the npm package) to the project registry so consumers (portal-backend) can
+# resolve them.
+#
+# Not ported (handled elsewhere or obsolete in the mono-repo):
+#   - Security templates (SAST / Secret-Detection / Dependency-Scanning): included globally in .gitlab-ci.yml
+#   - renovate:            covered by .gitlab/ci/renovate.yml
+#   - commitlint:          repo-wide concern, not run per module here
+#   - pages (Docusaurus):  the docs live in the separate documentation repo, not this mono-repo
+#   - semantic-release:    the mono-repo has its own release process
+#   - validate-schemas docs-drift guard: the docs schema copies moved to the documentation repo,
+#                          so only the JSON Schema metaschema validation is kept below
+#
+# NOTE on versioning: Model Forge keeps its own fixed version (0.1.0-SNAPSHOT from its poms);
+# it does NOT use the ${revision} pattern of portal-model / config-adapter and does not take part
+# in repo-wide version tags. portal-backend consumes core-model-forge-*:0.1.0-SNAPSHOT. Today the
+# backend still resolves it from the external Model Forge project registry; once its pom
+# <repository> is repointed to this project's registry, add `portal-backend/**/*` to the change
+# rule below and wire a `needs: [publish-model-forge]` ordering into the backend build.
+
+# Hidden job that defines rules for model-forge changes. All model-forge jobs extend this.
+.only-model-forge-changes:
+  rules:
+    # Always run on the nightly scheduled pipeline
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
+    # Always run on tags
+    - if: $CI_COMMIT_TAG
+    # Always run on main and develop branch
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    # Run on MR only when model-forge (or its CI) changes
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - model-forge/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/model-forge.yml
+
+# Generate the maven dependency graph JSON for license/dependency scanning.
+# Always runs (own rules, no `changes`) so the scanner has the graph even when the
+# build job is skipped because nothing changed.
+generate-graph-model-forge:
+  image: maven:3.9-eclipse-temurin-25-alpine
+  stage: lint
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: model-forge-maven
+      files:
+        - model-forge/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd model-forge
+    # Reactor build: writes one maven.graph.json per module (and the aggregator pom).
+    - mvn -B dependency:tree -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - model-forge/maven.graph.json
+      - model-forge/*/maven.graph.json
+
+# Validate the CORE-IR JSON Schemas against the JSON Schema metaschema.
+# (The docs-drift half of the original job is dropped — the docs schema copies now live
+#  in the documentation repo.)
+validate-schemas-model-forge:
+  extends: .only-model-forge-changes
+  image: python:3.12-slim
+  stage: lint
+  needs: []
+  script:
+    - pip install --quiet check-jsonschema
+    - |
+      FAILED=0
+      for f in model-forge/model-forge-runtime/src/main/resources/*.schema.json; do
+        echo "Validating $f ..."
+        check-jsonschema --check-metaschema "$f" || FAILED=1
+      done
+      exit $FAILED
+
+# Build + test the whole reactor. `mvn verify` also runs the quality gates bound to the
+# verify phase (spotless format check, spotbugs static analysis) and regenerates + builds
+# the npm types module via frontend-maven-plugin. Needs Docker-in-Docker for the
+# Testcontainers-based tests (PostGIS registry client, admin-ui boot test).
+test-model-forge:
+  extends: .only-model-forge-changes
+  image: maven:3.9-eclipse-temurin-25
+  stage: build-package
+  needs: []
+  services:
+    - name: docker:27-dind
+      alias: docker
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ''
+    DOCKER_DRIVER: overlay2
+    TESTCONTAINERS_HOST_OVERRIDE: docker
+  cache:
+    key:
+      prefix: model-forge-maven
+      files:
+        - model-forge/pom.xml
+    paths:
+      - .m2/repository
+      - model-forge/core-model-forge-types/node_modules
+  script:
+    - cd model-forge
+    - mvn $MAVEN_CLI_OPTS verify
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - model-forge/*/target/*.jar
+      - model-forge/*/target/surefire-reports/
+      - model-forge/*/target/site/jacoco/
+    reports:
+      junit:
+        - model-forge/*/target/surefire-reports/TEST-*.xml
+
+# Publish the Maven artifacts to this project's GitLab Maven registry so consumers can
+# resolve core-model-forge-*:0.1.0-SNAPSHOT. Skips tests/quality (already run in test-model-forge).
+# Runs on main/develop (and the nightly schedule) only — not on MRs, to avoid overwriting the
+# shared SNAPSHOT with unmerged code.
+publish-model-forge:
+  image: maven:3.9-eclipse-temurin-25-alpine
+  stage: deploy-package
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+  needs:
+    - job: test-model-forge
+      artifacts: false
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: model-forge-maven
+      files:
+        - model-forge/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd model-forge
+    # Exclude core-model-forge-types: it publishes no Maven artifact (maven.deploy.skip=true) and
+    # only drives frontend-maven-plugin, which downloads a glibc Node that cannot run on this
+    # Alpine image. Its npm package is published separately by publish-npm-model-forge.
+    - |
+      mvn deploy -DskipTests -pl '!:core-model-forge-types' \
+        -Dspotless.check.skip=true \
+        -Dspotbugs.skip=true \
+        -Djacoco.skip=true \
+        -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
+        -s ci_settings.xml
+
+# Publish the core-model-forge-types npm package to this project's GitLab npm registry.
+# Snapshot builds (main/develop) publish under the `next` dist-tag with a SHA-suffixed version;
+# the publish is skipped if that exact version already exists in the registry.
+publish-npm-model-forge:
+  image: node:22-alpine
+  stage: publish
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+  needs:
+    - job: test-model-forge
+      artifacts: false
+  script:
+    - cd model-forge/core-model-forge-types
+    - |
+      cat > .npmrc <<EOF
+      @civitasconnect:registry=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/npm/
+      //${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN}
+      EOF
+    - |
+      BASE_VERSION=$(node -p "require('./package.json').version.split('-')[0]")
+      PUBLISH_VERSION="${BASE_VERSION}-snapshot.${CI_COMMIT_SHORT_SHA}"
+      NPM_DIST_TAG="next"
+    - |
+      PKG_NAME=$(node -p "require('./package.json').name")
+      if npm view "${PKG_NAME}@${PUBLISH_VERSION}" version >/dev/null 2>&1; then
+        echo "${PKG_NAME}@${PUBLISH_VERSION} already exists in the registry - skipping publish."
+        exit 0
+      fi
+    - npm version "${PUBLISH_VERSION}" --no-git-tag-version --allow-same-version
+    - npm ci
+    - node generate.mjs
+    - npm publish --tag "${NPM_DIST_TAG}"

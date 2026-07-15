@@ -1,0 +1,49 @@
+<html xmlns:wicket="http://wicket.apache.org">
+<body>
+<wicket:extend>
+  <h2>Import from XRepository (xOEV)</h2>
+
+  <form wicket:id="searchForm">
+    <div class="field-row">
+      <label>Search</label>
+      <input type="text" wicket:id="query"/>
+    </div>
+    <button type="submit">Search</button>
+  </form>
+
+  <form wicket:id="importForm">
+    <div class="field-row">
+      <label><input type="checkbox" wicket:id="preserveUpstreamVersion"/> Preserve upstream (XÖV) version</label>
+    </div>
+
+    <div wicket:id="resultsContainer">
+      <table>
+        <thead>
+        <tr>
+          <th>Identifier</th>
+          <th>Name</th>
+          <th>Version</th>
+          <th>Kind</th>
+          <th>Status</th>
+          <th>Import</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr wicket:id="rows">
+          <td><span wicket:id="identifier"></span></td>
+          <td><span wicket:id="name"></span></td>
+          <td><span wicket:id="version"></span></td>
+          <td><span wicket:id="kind"></span></td>
+          <td><span wicket:id="status"></span></td>
+          <td>
+            <a wicket:id="importJson">as JSON Schema</a> |
+            <a wicket:id="importXsd">as XSD</a>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </form>
+</wicket:extend>
+</body>
+</html>

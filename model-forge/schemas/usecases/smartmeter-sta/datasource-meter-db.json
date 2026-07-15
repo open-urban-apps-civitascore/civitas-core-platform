@@ -1,0 +1,12 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource",
+  "id":             "urn:core:platform:civitas:datasource:smartmeter:meter-db:1.0.0",
+  "title":          "Zählerstammdaten PostgreSQL",
+  "connectionType": "database",
+  "element":  "urn:core:platform:civitas:element:smartmeter:MeterMasterData:1.0.0",
+  "jdbcUrl":        "jdbc:postgresql://postgres:5432/coredata",
+  "username":       "coreuser",
+  "password":       "corepass",
+  "lookupTable":    "meter_master_data",
+  "lookupKey":      "meter_id"
+}

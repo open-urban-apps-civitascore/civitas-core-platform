@@ -1,0 +1,14 @@
+{
+  "$schema": "https://civitasconnect.digital/core/artifact-envelope/v1",
+  "artifactId": "urn:core:platform:civitas:element:common:AirQualityEnvelope:uxqttdplsw",
+  "artifactType": "XSD",
+  "groupId": "elements",
+  "title": "AirQualityEnvelope",
+  "firstVersion": {
+    "version": "1.0.0",
+    "content": {
+      "contentType": "application/xml",
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" targetNamespace=\"https://example.test/air-quality-envelope\" xmlns=\"https://example.test/air-quality-envelope\" elementFormDefault=\"qualified\"><xs:complexType name=\"AirQualityEnvelopeMeasurement\"><xs:sequence><xs:element name=\"stationId\" type=\"xs:string\"/><xs:element name=\"pm25\" type=\"xs:decimal\"/><xs:element name=\"measuredAt\" type=\"xs:dateTime\"/></xs:sequence></xs:complexType><xs:element name=\"measurement\" type=\"AirQualityEnvelopeMeasurement\"/></xs:schema>"
+    }
+  }
+}

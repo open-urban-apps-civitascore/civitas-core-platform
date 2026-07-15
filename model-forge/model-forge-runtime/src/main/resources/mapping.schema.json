@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://civitasconnect.digital/core/mapping/v1",
+  "title":   "CORE Mapping",
+  "description": "A declarative field-to-field mapping between two CORE Elements. Each exported Mapping document carries '$schema': 'https://civitasconnect.digital/core/mapping/v1' so it is self-describing.\n\nNote: the 'x-core-ref' annotations on 'source' and 'target' declare that each value is the CORE URN of an Element; existence is checked by registry-aware services.",
+  "type": "object",
+  "required": ["$schema", "id", "source", "target", "fields"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "enum": [
+        "https://civitasconnect.digital/core/mapping/v1",
+        "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "description": "Versioned CORE URN of this Mapping.",
+      "pattern": "^urn:core:[^:]+:[^:]+:mapping:[^:]+:[^:]+:[^:]+$"
+    },
+    "title":       { "type": "string", "description": "Human-readable display name." },
+    "description": { "type": "string" },
+    "source": {
+      "$ref": "#/$defs/ElementUrn",
+      "description": "Versioned CORE URN of the source Element (the schema being read from).",
+      "x-core-ref": { "type": "urn:core:type:Element" }
+    },
+    "target": {
+      "$ref": "#/$defs/ElementUrn",
+      "description": "Versioned CORE URN of the target Element (the schema being written to).",
+      "x-core-ref": { "type": "urn:core:type:Element" }
+    },
+    "fields": {
+      "type": "object",
+      "description": "Map of target field paths to their field operations.",
+      "additionalProperties": { "$ref": "#/$defs/MappingField" }
+    }
+  },
+  "$defs": {
+    "ElementUrn": {
+      "description": "Versioned CORE URN of a JSON Schema Element.",
+      "type": "string",
+      "pattern": "^urn:core:[^:]+:[^:]+:element:[^:]+:[^:]+:[^:]+$"
+    },
+    "CopyFieldOperation": {
+      "description": "Copies a value from an input field path.",
+      "type": "object",
+      "required": ["op", "input"],
+      "properties": {
+        "op":    { "type": "string", "const": "copy" },
+        "input": { "type": "string", "description": "JSONPath expression, e.g. '$.sensorId'." }
+      },
+      "additionalProperties": false
+    },
+    "ConcatFieldOperation": {
+      "description": "Concatenates multiple input field values with an optional separator.",
+      "type": "object",
+      "required": ["op", "inputs"],
+      "properties": {
+        "op":        { "type": "string", "const": "concat" },
+        "inputs":    { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "JSONPath expressions whose values are concatenated in order." },
+        "separator": { "type": "string", "default": "" }
+      },
+      "additionalProperties": false
+    },
+    "ConstFieldOperation": {
+      "description": "Writes a constant literal value into the target field regardless of source data.",
+      "type": "object",
+      "required": ["op", "value"],
+      "properties": {
+        "op":    { "type": "string", "const": "const" },
+        "value": { "description": "The constant value. Can be a string, number, or boolean." }
+      },
+      "additionalProperties": false
+    },
+    "ToStringFieldOperation": {
+      "description": "Converts the input value to its string representation.",
+      "type": "object",
+      "required": ["op", "input"],
+      "properties": {
+        "op":    { "type": "string", "const": "toString" },
+        "input": { "type": "string", "description": "JSONPath expression of the value to convert." }
+      },
+      "additionalProperties": false
+    },
+    "ToIntFieldOperation": {
+      "description": "Parses the input value as an integer.",
+      "type": "object",
+      "required": ["op", "input"],
+      "properties": {
+        "op":    { "type": "string", "const": "toInt" },
+        "input": { "type": "string", "description": "JSONPath expression of the value to convert." }
+      },
+      "additionalProperties": false
+    },
+    "ToFloatFieldOperation": {
+      "description": "Parses the input value as a floating-point number.",
+      "type": "object",
+      "required": ["op", "input"],
+      "properties": {
+        "op":    { "type": "string", "const": "toFloat" },
+        "input": { "type": "string", "description": "JSONPath expression of the value to convert." }
+      },
+      "additionalProperties": false
+    },
+    "ToDateFieldOperation": {
+      "description": "Parses the input string into a date/time value using a date pattern.",
+      "type": "object",
+      "required": ["op", "input", "pattern"],
+      "properties": {
+        "op":      { "type": "string", "const": "toDate" },
+        "input":   { "type": "string", "description": "JSONPath expression of the string value to parse." },
+        "pattern": { "type": "string", "description": "Date pattern used to parse the input, e.g. 'yyyy-MM-dd'." }
+      },
+      "additionalProperties": false
+    },
+    "FormatFieldOperation": {
+      "description": "Formats the input date/time value into a string using a date pattern.",
+      "type": "object",
+      "required": ["op", "input", "pattern"],
+      "properties": {
+        "op":      { "type": "string", "const": "format" },
+        "input":   { "type": "string", "description": "JSONPath expression of the date/time value to format." },
+        "pattern": { "type": "string", "description": "Date pattern used to format the output, e.g. 'yyyy-MM-dd'." }
+      },
+      "additionalProperties": false
+    },
+    "MappingOperation": {
+      "description": "A single field mapping rule.",
+      "oneOf": [
+        { "$ref": "#/$defs/CopyFieldOperation" },
+        { "$ref": "#/$defs/ConcatFieldOperation" },
+        { "$ref": "#/$defs/ConstFieldOperation" },
+        { "$ref": "#/$defs/ToStringFieldOperation" },
+        { "$ref": "#/$defs/ToIntFieldOperation" },
+        { "$ref": "#/$defs/ToFloatFieldOperation" },
+        { "$ref": "#/$defs/ToDateFieldOperation" },
+        { "$ref": "#/$defs/FormatFieldOperation" }
+      ]
+    },
+    "MappingField": {
+      "description": "A field mapping — either a shorthand input path string or a full operation object.",
+      "oneOf": [
+        { "type": "string", "description": "Shorthand for a copy operation: value is the input path." },
+        { "$ref": "#/$defs/MappingOperation" }
+      ]
+    }
+  }
+}

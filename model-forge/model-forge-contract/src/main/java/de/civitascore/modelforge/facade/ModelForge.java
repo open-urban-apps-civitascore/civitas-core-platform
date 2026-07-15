@@ -1,0 +1,191 @@
+package de.civitascore.modelforge.facade;
+
+import de.civitascore.modelforge.contract.ArtifactId;
+import de.civitascore.modelforge.contract.ArtifactSearchQuery;
+import de.civitascore.modelforge.contract.ArtifactSummary;
+import de.civitascore.modelforge.contract.ArtifactView;
+import de.civitascore.modelforge.contract.ArtifactWriteResult;
+import de.civitascore.modelforge.contract.CreateArtifactCommand;
+import de.civitascore.modelforge.contract.DependencyGraphView;
+import de.civitascore.modelforge.contract.DependencyQuery;
+import de.civitascore.modelforge.contract.ImportResult;
+import de.civitascore.modelforge.contract.ImportSchemaCommand;
+import de.civitascore.modelforge.contract.ImportSmartDataModelCommand;
+import de.civitascore.modelforge.contract.ImportXRepositoryCommand;
+import de.civitascore.modelforge.contract.SaveArtifactCommand;
+import de.civitascore.modelforge.contract.SchemaViewQuery;
+import de.civitascore.modelforge.contract.ValidateInstanceCommand;
+import de.civitascore.modelforge.contract.ValidateSchemaCommand;
+import de.civitascore.modelforge.contract.ValidationFailedException;
+import de.civitascore.modelforge.contract.ValidationResult;
+import de.civitascore.modelforge.contract.XRepositoryHit;
+import de.civitascore.modelforge.contract.XRepositorySearchQuery;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Public Java entry point for embedded Model Forge usage.
+ *
+ * <p>Methods are grouped below as: import, read, validate, dependency graph, search, write,
+ * delete. The API is uniform in its argument and return shapes:
+ * <ul>
+ *   <li><b>Arguments</b> — every operation takes a single argument: either the {@link ArtifactId}
+ *       identity value object (for the identity-only operations {@link #getArtifact} and
+ *       {@link #deleteArtifact}), or a dedicated {@code Command}/{@code Query} record. No operation
+ *       takes a raw {@code JsonNode} or a loose primitive; adding a parameter therefore means adding
+ *       a field to the record, never changing a signature (see {@link SchemaViewQuery#maxDepth()}
+ *       and {@link DependencyQuery#maxDepth()}, both added that way).
+ *   <li><b>Returns</b> — reads return a typed view ({@link ArtifactView}), never a raw
+ *       {@code JsonNode}; writes return a typed result ({@link ImportResult} /
+ *       {@link ArtifactWriteResult}); an absent single result is an {@link Optional}.
+ * </ul>
+ */
+public interface ModelForge {
+
+    // ── Import ───────────────────────────────────────────────────────────────
+
+    /**
+     * Imports one JSON Schema document. The returned {@link ImportResult#rootArtifactId()} is a
+     * <em>versioned</em> URN pinning the concrete version the registry assigned — store it to
+     * reference exactly this version later (Model Forge owns version assignment; see
+     * {@link ImportResult}).
+     *
+     * <p>The import stores the Elements (splitting {@code $defs}) and their automatic
+     * DataStructure grouping. Composition into a DataSet is the caller's concern: build or update
+     * the DataSet manifest through {@link #saveArtifact(SaveArtifactCommand)}.
+     *
+     * @throws ValidationFailedException when the document fails schema validation or has an
+     *     unresolved {@code x-core-ref} foreign key
+     */
+    ImportResult importSchema(ImportSchemaCommand command);
+
+    /**
+     * Imports a JSON Schema from the public Smart Data Models catalogue.
+     *
+     * @throws ValidationFailedException when the fetched document fails schema validation or has
+     *     an unresolved {@code x-core-ref} foreign key
+     */
+    ImportResult importFromSmartDataModels(ImportSmartDataModelCommand command);
+
+    /**
+     * Downloads and imports one artifact from the XRepository (xOEV) catalog — either converted
+     * to JSON Schema Elements, or stored as a raw XSD artifact (see
+     * {@link ImportXRepositoryCommand#importAsXsd()}). When converting, every type the XSD
+     * declares is imported atomically as one document, so {@link ImportResult#importedArtifactIds()}
+     * lists all of them — the same single-document convention as {@link #importSchema}.
+     *
+     * @throws ValidationFailedException when the (converted or raw) document fails schema
+     *     validation or has an unresolved {@code x-core-ref} foreign key
+     */
+    ImportResult importFromXRepository(ImportXRepositoryCommand command);
+
+    // ── Read ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Reads an artifact's authored content. Accepts both a logical (version-free) URN — reads the
+     * current version — and a versioned URN — reads exactly that version. See {@link ArtifactId}.
+     */
+    Optional<ArtifactView> getArtifact(ArtifactId artifactId);
+
+    /**
+     * Bundled view: dependencies embedded under {@code $defs}. The query's {@link ArtifactId}
+     * may be logical (current version) or versioned (that exact version).
+     */
+    Optional<ArtifactView> getBundledView(SchemaViewQuery query);
+
+    /**
+     * Inlined view: same artifact as {@link #getBundledView(SchemaViewQuery)}, but with every
+     * CORE-URN {@code $ref} recursively inlined instead of embedded under {@code $defs}. See
+     * {@code ViewService} for when to prefer one over the other.
+     */
+    Optional<ArtifactView> getInlinedView(SchemaViewQuery query);
+
+    // ── Validate ─────────────────────────────────────────────────────────────
+
+    ValidationResult validateSchema(ValidateSchemaCommand command);
+
+    ValidationResult validateInstance(ValidateInstanceCommand command);
+
+    // ── Dependency graph ─────────────────────────────────────────────────────
+
+    DependencyGraphView dependencies(DependencyQuery query);
+
+    /** Reverse of {@link #dependencies}: artifacts that reference this one. */
+    DependencyGraphView dependents(DependencyQuery query);
+
+    /** Mappings that use this artifact as their source, as {@code maps-to} edges. */
+    DependencyGraphView mapsTo(DependencyQuery query);
+
+    /** Mappings that use this artifact as their target, as {@code mapped-from} edges. */
+    DependencyGraphView mappedFrom(DependencyQuery query);
+
+    // ── Search ───────────────────────────────────────────────────────────────
+
+    /** Searches the local artifact registry. */
+    List<ArtifactSummary> search(ArtifactSearchQuery query);
+
+    /** Searches the external XRepository (xOEV) catalog; import a hit via {@link #importFromXRepository}. */
+    List<XRepositoryHit> searchXRepository(XRepositorySearchQuery query);
+
+    // ── Write ────────────────────────────────────────────────────────────────
+
+    /**
+     * Creates a <em>new</em> Mapping, Pipeline, DataSource, DataSink, DataSet or DataStructure.
+     * Model Forge mints the URN from the command's display name (clean {@code name} segment plus a
+     * short disambiguator segment, so equal names never collide), stamps it into the document's {@code id} and
+     * returns the <em>versioned</em> pin plus the artifact's outgoing
+     * {@link ArtifactWriteResult#dependencies() dependency lists}. Store the returned id and pass
+     * it to {@link #saveArtifact(SaveArtifactCommand)} for follow-up versions. Elements are
+     * created via {@link #importSchema(ImportSchemaCommand)} instead.
+     *
+     * @throws IllegalArgumentException when {@code command.kind()} is {@code ELEMENT}
+     * @throws ValidationFailedException when the content fails schema validation or has an
+     *     unresolved {@code x-core-ref} foreign key
+     */
+    ArtifactWriteResult createArtifact(CreateArtifactCommand command);
+
+    /**
+     * Stores a new version of an artifact and returns the <em>versioned</em> pin the registry
+     * assigned plus the version's outgoing {@link ArtifactWriteResult#dependencies() dependency
+     * lists}. The version segment of the command's {@code artifactId} is not authoritative —
+     * Model Forge assigns the SemVer version from the command's {@code versionBump} — so the
+     * returned pin, not the input, is what a caller stores.
+     *
+     * @throws ValidationFailedException when the content fails schema validation or has an
+     *     unresolved {@code x-core-ref} foreign key
+     */
+    ArtifactWriteResult saveArtifact(SaveArtifactCommand command);
+
+    // ── Delete ───────────────────────────────────────────────────────────────
+
+    /**
+     * Deletes the artifact (all versions) behind a logical URN. Equivalent to
+     * {@link #deleteArtifact(ArtifactId, boolean) deleteArtifact(artifactId, false)}.
+     *
+     * @throws de.civitascore.modelforge.contract.ArtifactInUseException when any other artifact
+     *     still references this one — the model stays intact; remove or update the listed dependents
+     *     first. Every reference type blocks (a grouping protects its member too); only
+     *     self-references are exempt.
+     */
+    default void deleteArtifact(ArtifactId artifactId) {
+        deleteArtifact(artifactId, false);
+    }
+
+    /**
+     * Deletes the artifact (all versions) behind a logical URN, optionally cascading into its
+     * members.
+     *
+     * <p>The target itself is deleted only when nothing else references it (as in
+     * {@link #deleteArtifact(ArtifactId)}). When {@code cascade} is {@code true}, the target's
+     * members — the artifacts it references (a DataStructure's Elements, a DataSet's contents, a
+     * Pipeline's nodes, …) — are deleted too, but each one <em>only if</em>, once this container is
+     * gone, no other artifact still references it; shared members are kept. Cascade recurses, so a
+     * member that itself becomes orphaned has its own orphaned members removed, always stopping at
+     * anything still in use (mutually-referencing members keep each other alive).
+     *
+     * @throws de.civitascore.modelforge.contract.ArtifactInUseException when any other artifact
+     *     still references the target — cascade only ever deletes downward into members, never a
+     *     still-referenced target.
+     */
+    void deleteArtifact(ArtifactId artifactId, boolean cascade);
+}

@@ -1,0 +1,123 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Pipeline",
+  "id": "urn:core:platform:civitas:pipeline:taf10-grid:TAF10-Grid-Protection:1.0.0",
+  "title": "TAF10 Low-Voltage Grid Protection",
+  "debug": false,
+  "nodes": [
+    {
+      "id": "n-start",
+      "kind": "start",
+      "label": "Start",
+      "x-ui-position": { "x": 60, "y": 320 }
+    },
+    {
+      "id": "n-source",
+      "kind": "source",
+      "label": "TAF10 MQTT",
+      "sourceRef": "urn:core:platform:civitas:datasource:taf10-grid:taf10-mqtt:1.0.0",
+      "x-ui-position": { "x": 220, "y": 320 }
+    },
+    {
+      "id": "n-quality-filter",
+      "kind": "filter",
+      "label": "Plausibilitaet",
+      "expression": "$.activePowerPlus.quality != 'bad' && $.activePowerMinus.quality != 'bad' && $.voltage.quality != 'bad'",
+      "x-ui-position": { "x": 400, "y": 320 }
+    },
+    {
+      "id": "n-enrich",
+      "kind": "enrich",
+      "label": "Grid-Node Stammdaten",
+      "lookupSourceRef": "urn:core:platform:civitas:datasource:taf10-grid:gridnode-db:1.0.0",
+      "lookupKey": "$.gridNodeId",
+      "x-ui-position": { "x": 600, "y": 320 }
+    },
+    {
+      "id": "n-map-p-plus",
+      "kind": "mapping",
+      "label": "Wirkleistung Bezug",
+      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-activepowerplus:1.0.0",
+      "x-ui-position": { "x": 830, "y": 100 }
+    },
+    {
+      "id": "n-map-p-minus",
+      "kind": "mapping",
+      "label": "Wirkleistung Einspeisung",
+      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-activepowerminus:1.0.0",
+      "x-ui-position": { "x": 830, "y": 260 }
+    },
+    {
+      "id": "n-map-voltage",
+      "kind": "mapping",
+      "label": "Spannung",
+      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-voltage:1.0.0",
+      "x-ui-position": { "x": 830, "y": 420 }
+    },
+    {
+      "id": "n-peak-filter",
+      "kind": "filter",
+      "label": "Last-/Einspeisepeak",
+      "expression": "$.activePowerPlus.value > $.maxLoadW || $.activePowerMinus.value > $.maxFeedInW || $.voltage.value < $.voltageMinV || $.voltage.value > $.voltageMaxV",
+      "x-ui-position": { "x": 830, "y": 600 }
+    },
+    {
+      "id": "n-map-action",
+      "kind": "mapping",
+      "label": "Schaltaktion",
+      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-switching-action:1.0.0",
+      "x-ui-position": { "x": 1060, "y": 600 }
+    },
+    {
+      "id": "n-sink-p-plus",
+      "kind": "sink",
+      "label": "FROST Bezug",
+      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:frost-observations:1.0.0",
+      "x-ui-position": { "x": 1060, "y": 100 }
+    },
+    {
+      "id": "n-sink-p-minus",
+      "kind": "sink",
+      "label": "FROST Einspeisung",
+      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:frost-observations:1.0.0",
+      "x-ui-position": { "x": 1060, "y": 260 }
+    },
+    {
+      "id": "n-sink-voltage",
+      "kind": "sink",
+      "label": "FROST Spannung",
+      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:frost-observations:1.0.0",
+      "x-ui-position": { "x": 1060, "y": 420 }
+    },
+    {
+      "id": "n-sink-action",
+      "kind": "sink",
+      "label": "Grid Control",
+      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:grid-control-actions:1.0.0",
+      "x-ui-position": { "x": 1280, "y": 600 }
+    },
+    {
+      "id": "n-end",
+      "kind": "end",
+      "label": "End",
+      "x-ui-position": { "x": 1500, "y": 320 }
+    }
+  ],
+  "edges": [
+    { "id": "e-start-src", "source": "n-start", "target": "n-source", "kind": "control" },
+    { "id": "e-src-quality", "source": "n-source", "target": "n-quality-filter", "kind": "data" },
+    { "id": "e-quality-enrich", "source": "n-quality-filter", "target": "n-enrich", "kind": "data" },
+    { "id": "e-enrich-p-plus", "source": "n-enrich", "target": "n-map-p-plus", "kind": "data" },
+    { "id": "e-enrich-p-minus", "source": "n-enrich", "target": "n-map-p-minus", "kind": "data" },
+    { "id": "e-enrich-voltage", "source": "n-enrich", "target": "n-map-voltage", "kind": "data" },
+    { "id": "e-enrich-peak", "source": "n-enrich", "target": "n-peak-filter", "kind": "data" },
+    { "id": "e-p-plus-sink", "source": "n-map-p-plus", "target": "n-sink-p-plus", "kind": "data" },
+    { "id": "e-p-minus-sink", "source": "n-map-p-minus", "target": "n-sink-p-minus", "kind": "data" },
+    { "id": "e-voltage-sink", "source": "n-map-voltage", "target": "n-sink-voltage", "kind": "data" },
+    { "id": "e-peak-action", "source": "n-peak-filter", "target": "n-map-action", "kind": "data" },
+    { "id": "e-action-sink", "source": "n-map-action", "target": "n-sink-action", "kind": "data" },
+    { "id": "e-sink1-end", "source": "n-sink-p-plus", "target": "n-end", "kind": "control" },
+    { "id": "e-sink2-end", "source": "n-sink-p-minus", "target": "n-end", "kind": "control" },
+    { "id": "e-sink3-end", "source": "n-sink-voltage", "target": "n-end", "kind": "control" },
+    { "id": "e-sink4-end", "source": "n-sink-action", "target": "n-end", "kind": "control" }
+  ]
+}

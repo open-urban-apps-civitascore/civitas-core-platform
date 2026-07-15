@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:core:platform:civitas:element:sta:STAThing:1.0.0",
+  "title": "STAThing",
+  "description": "OGC SensorThings API v1.1 complete static master-data document for one measurement station. Covers the Thing entity together with its Locations (as STALocation references), Datastreams, Sensors, and ObservedProperties as nested entities — exactly as accepted by a FROST-Server POST /Things deep-insert request.",
+  "type": "object",
+  "required": [
+    "name",
+    "description",
+    "Locations"
+  ],
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "properties": {
+      "type": "object",
+      "description": "Freeform domain-specific metadata stored alongside the Thing.",
+      "properties": {
+        "stationId": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "stationType": {
+          "type": "string",
+          "enum": [
+            "traffic",
+            "background",
+            "industry",
+            "rural"
+          ]
+        },
+        "installDate": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "Locations": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Geographic position(s) of this Thing. Items conform to STALocation.",
+      "items": {
+        "$ref": "urn:core:platform:civitas:element:sta:STALocation:1.0.0"
+      }
+    },
+    "Datastreams": {
+      "type": "array",
+      "description": "One Datastream per measured quantity (e.g. NO2, PM2.5, CO).",
+      "items": {
+        "$ref": "#/$defs/Datastream"
+      }
+    }
+  },
+  "$defs": {
+    "Datastream": {
+      "type": "object",
+      "required": [
+        "name",
+        "observationType",
+        "unitOfMeasurement",
+        "ObservedProperty",
+        "Sensor"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "observationType": {
+          "type": "string",
+          "default": "http://www.opengis.net/def/observationType/OGC-OM/2.0/OM_Measurement"
+        },
+        "unitOfMeasurement": {
+          "$ref": "#/$defs/UnitOfMeasurement"
+        },
+        "ObservedProperty": {
+          "$ref": "#/$defs/ObservedPropertyRef"
+        },
+        "Sensor": {
+          "$ref": "#/$defs/SensorRef"
+        },
+        "properties": {
+          "type": "object"
+        }
+      }
+    },
+    "UnitOfMeasurement": {
+      "type": "object",
+      "required": [
+        "name",
+        "symbol",
+        "definition"
+      ],
+      "description": "Unit of measurement per UCUM/QUDT.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "symbol": {
+          "type": "string"
+        },
+        "definition": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "ObservedPropertyRef": {
+      "description": "ObservedProperty by @iot.id (existing in FROST) or inline definition.",
+      "oneOf": [
+        {
+          "title": "By reference",
+          "type": "object",
+          "required": [
+            "@iot.id"
+          ],
+          "properties": {
+            "@iot.id": {
+              "type": "integer"
+            }
+          }
+        },
+        {
+          "title": "Inline",
+          "type": "object",
+          "required": [
+            "name",
+            "definition"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "definition": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        }
+      ]
+    },
+    "SensorRef": {
+      "description": "Sensor by @iot.id (existing in FROST) or inline definition.",
+      "oneOf": [
+        {
+          "title": "By reference",
+          "type": "object",
+          "required": [
+            "@iot.id"
+          ],
+          "properties": {
+            "@iot.id": {
+              "type": "integer"
+            }
+          }
+        },
+        {
+          "title": "Inline",
+          "type": "object",
+          "required": [
+            "name",
+            "encodingType",
+            "metadata"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "encodingType": {
+              "type": "string"
+            },
+            "metadata": {
+              "type": "string"
+            },
+            "properties": {
+              "type": "object"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

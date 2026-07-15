@@ -1,0 +1,10 @@
+{
+  "$schema": "https://civitasconnect.digital/core/datasource/v1",
+  "id": "urn:core:platform:civitas:datasource:common:aq-mqtt-source:yv3oxe088a:1.0.0",
+  "title": "Air Quality MQTT Broker",
+  "description": "Receives telemetry from air quality sensors.",
+  "connectionType": "mqtt",
+  "topic": "city/air-quality/+/reading",
+  "brokerUrl": "tcp://mqtt.example.test:1883",
+  "element": "urn:core:platform:civitas:element:common:SensorReading:d28s38wfmi:1.0.0"
+}

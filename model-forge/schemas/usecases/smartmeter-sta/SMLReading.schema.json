@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "urn:core:platform:civitas:element:smartmeter:SMLReading:1.0.0",
+  "title":   "SMLReading",
+  "description": "Raw SML (Smart Message Language) measurement payload from a smart electricity meter, published via MQTT. Each measurement quantity (Wirkleistung, Spannung, Strom …) is typed as Measurement — the same shared base type used by the Luftqualität use case — demonstrating cross-domain schema reuse via $ref.",
+  "type": "object",
+  "required": ["meterId", "timestamp", "activePowerPlus"],
+  "properties": {
+    "meterId": {
+      "type": "string",
+      "description": "Unique meter identifier — matches MeterMasterData.meterId and used as lookup key."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp of the readout cycle."
+    },
+    "activePowerPlus": {
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+      "description": "Wirkleistung Bezug (consumption) in W."
+    },
+    "activePowerMinus": {
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+      "description": "Wirkleistung Lieferung (feed-in / generation) in W."
+    },
+    "reactivePower": {
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+      "description": "Blindleistung in var."
+    },
+    "voltage": {
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+      "description": "Netzspannung in V (L1-N RMS)."
+    },
+    "current": {
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+      "description": "Strom in A (L1 RMS)."
+    },
+    "frequency": {
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+      "description": "Netzfrequenz in Hz."
+    },
+    "location": {
+      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+      "description": "GPS position of the meter, if available."
+    }
+  }
+}

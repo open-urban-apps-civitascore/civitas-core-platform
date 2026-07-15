@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+  "title":   "Measurement",
+  "description": "A single pollutant measurement with quality indicator and optional raw (uncalibrated) value.",
+  "type": "object",
+  "required": ["value", "unit"],
+  "properties": {
+    "value": {
+      "type": "number",
+      "description": "Calibrated measurement value in the given unit."
+    },
+    "unit": {
+      "type": "string",
+      "description": "Physical unit, e.g. 'µg/m³', 'mg/m³', 'ppb'."
+    },
+    "quality": {
+      "type": "string",
+      "enum": ["good", "suspect", "bad", "unknown"],
+      "default": "unknown",
+      "description": "Data quality flag set by the sensor firmware."
+    },
+    "rawValue": {
+      "type": "number",
+      "description": "Raw (uncalibrated) ADC or sensor value. Present when calibration factors are applied downstream."
+    }
+  }
+}

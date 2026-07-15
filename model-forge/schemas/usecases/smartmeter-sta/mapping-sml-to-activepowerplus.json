@@ -1,0 +1,13 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
+  "id":     "urn:core:platform:civitas:mapping:smartmeter:sml-to-activepowerplus:1.0.0",
+  "title":  "SMLReading Wirkleistung Bezug → STA Observation",
+  "source": "urn:core:platform:civitas:element:smartmeter:SMLReading:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0",
+  "fields": {
+    "phenomenonTime": { "op": "copy", "input": "$.timestamp" },
+    "resultTime":     { "op": "copy", "input": "$.timestamp" },
+    "result":         { "op": "copy", "input": "$.activePowerPlus.value" },
+    "resultQuality":  { "op": "copy", "input": "$.activePowerPlus.quality" }
+  }
+}

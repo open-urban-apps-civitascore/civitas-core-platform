@@ -1,0 +1,25 @@
+{
+  "$schema": "https://civitasconnect.digital/core/artifact-envelope/v1",
+  "artifactId": "urn:core:platform:civitas:element:common:AirQualityJsonEnvelope:wroftlu650",
+  "artifactType": "JSON_SCHEMA",
+  "groupId": "elements",
+  "title": "AirQualityJsonEnvelope",
+  "firstVersion": {
+    "version": "1.0.0",
+    "content": {
+      "contentType": "application/schema+json",
+      "content": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "urn:core:platform:civitas:element:common:AirQualityJsonEnvelope:wroftlu650:1.0.0",
+        "title": "AirQualityJsonEnvelope",
+        "type": "object",
+        "required": ["stationId", "temperature"],
+        "properties": {
+          "stationId": { "type": "string" },
+          "temperature": { "type": "number" },
+          "measuredAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

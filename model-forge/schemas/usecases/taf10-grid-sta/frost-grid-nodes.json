@@ -1,0 +1,32 @@
+[
+  {
+    "id": "GRID-MS-LV-001",
+    "name": "Muenster Roxel Trafostation 12",
+    "operator": "Stadtwerke Muenster",
+    "type": "transformer",
+    "transformerId": "TR-MS-012",
+    "feederId": "FDR-01",
+    "lat": 51.9538,
+    "lon": 7.5321
+  },
+  {
+    "id": "GRID-MS-LV-002",
+    "name": "Muenster Hiltrup PV-Feeder Nord",
+    "operator": "Stadtwerke Muenster",
+    "type": "feeder",
+    "transformerId": "TR-MS-044",
+    "feederId": "FDR-PV-N",
+    "lat": 51.9066,
+    "lon": 7.6359
+  },
+  {
+    "id": "GRID-MS-LV-003",
+    "name": "Muenster Hafen Gewerbecluster",
+    "operator": "Westfalen Weser Netz GmbH",
+    "type": "meter-aggregation",
+    "transformerId": "TR-MS-071",
+    "feederId": "FDR-GW-03",
+    "lat": 51.9504,
+    "lon": 7.6463
+  }
+]

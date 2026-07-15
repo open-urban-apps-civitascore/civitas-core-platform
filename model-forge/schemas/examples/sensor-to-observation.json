@@ -1,0 +1,29 @@
+{
+  "$schema": "https://civitasconnect.digital/core/mapping/v1",
+  "id": "urn:core:platform:civitas:mapping:common:sensor-to-observation:1.0.0",
+  "title": "Sensor → Beobachtung",
+  "source": "urn:core:platform:civitas:element:common:SensorReading:1.0.0",
+  "target": "urn:core:platform:civitas:element:common:Observation:1.0.0",
+  "fields": {
+    "id": {
+      "op": "copy",
+      "input": "$.sensorId"
+    },
+    "result": {
+      "op": "copy",
+      "input": "$.temperature"
+    },
+    "phenomenonTime": {
+      "op": "copy",
+      "input": "$.observedAt"
+    },
+    "location": {
+      "op": "copy",
+      "input": "$.location"
+    },
+    "source": {
+      "op": "const",
+      "value": "mqtt"
+    }
+  }
+}
