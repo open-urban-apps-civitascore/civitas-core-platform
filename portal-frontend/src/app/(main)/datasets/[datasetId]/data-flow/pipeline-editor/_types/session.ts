@@ -1,5 +1,13 @@
 import type { Pipeline } from './pipeline'
 
+/**
+ * A pipeline value or a function that derives the next pipeline from the current one.
+ * The updater form lets multiple synchronous updates compose against the latest state
+ * instead of overwriting each other (e.g. React Flow emitting edge + node changes when
+ * a connected node is deleted).
+ */
+export type PipelineUpdater = (previous: Pipeline) => Pipeline
+
 // ============================================================================
 // Pipeline Session
 // ============================================================================
@@ -50,7 +58,7 @@ export type PipelineSessionAction =
   | { type: 'CLOSE_SESSION'; payload: { sessionId: string } }
   | { type: 'SWITCH_SESSION'; payload: { sessionId: string } }
   | { type: 'UPDATE_SESSION_NAME'; payload: { sessionId: string; name: string } }
-  | { type: 'UPDATE_SESSION_PIPELINE'; payload: { sessionId: string; pipeline: Pipeline } }
+  | { type: 'UPDATE_SESSION_PIPELINE'; payload: { sessionId: string; pipeline: Pipeline | PipelineUpdater } }
   | { type: 'MARK_SESSION_DIRTY'; payload: { sessionId: string } }
   | { type: 'MARK_SESSION_CLEAN'; payload: { sessionId: string } }
   | { type: 'LOAD_SESSIONS'; payload: { sessions: PipelineSession[]; activeSessionId: string | null } }
@@ -71,8 +79,8 @@ export interface PipelineSessionActions {
   switchToSession: (sessionId: string) => void
   /** Updates the name of a session (tab rename) */
   updateSessionName: (sessionId: string, name: string) => void
-  /** Updates the pipeline in a session */
-  updateSessionPipeline: (sessionId: string, pipeline: Pipeline) => void
+  /** Updates the pipeline in a session. Accepts a value or an updater derived from the current pipeline. */
+  updateSessionPipeline: (sessionId: string, pipeline: Pipeline | PipelineUpdater) => void
   /** Marks a session as having unsaved changes */
   markSessionDirty: (sessionId: string) => void
   /** Marks a session as saved (no pending changes) */

@@ -387,6 +387,27 @@ describe('PipelineEditorProviderComponent', () => {
 
       expect(contextRef.current?.pipeline?.edges).toHaveLength(0)
     })
+
+    it('removes connected edges when React Flow emits edge + node removals in the same event', () => {
+      const pipeline = {
+        ...createEmptyPipeline('Test'),
+        nodes: [makeNode('node-1'), makeNode('node-2', PIPELINE_NODE_TYPES.End)],
+        edges: [{ id: 'edge-1', source: 'node-1', target: 'node-2', type: 'smoothstep', data: { label: '' } }],
+      }
+
+      renderProvider(makeSession({ pipeline }))
+
+      // React Flow's native delete synchronously dispatches the connected-edge removal
+      // first, then the node removal. Both must compose so no orphaned edge remains.
+      act(() => {
+        contextRef.current?.dispatch({ type: 'EDGE_CHANGES', payload: [{ type: 'remove', id: 'edge-1' }] })
+        contextRef.current?.dispatch({ type: 'NODE_CHANGES', payload: [{ type: 'remove', id: 'node-1' }] })
+      })
+
+      expect(contextRef.current?.pipeline?.nodes).toHaveLength(1)
+      expect(contextRef.current?.pipeline?.nodes[0].id).toBe('node-2')
+      expect(contextRef.current?.pipeline?.edges).toHaveLength(0)
+    })
   })
 
   describe('addEdge', () => {

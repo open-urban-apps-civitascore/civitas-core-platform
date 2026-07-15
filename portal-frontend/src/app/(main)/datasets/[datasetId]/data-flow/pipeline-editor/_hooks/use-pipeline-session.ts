@@ -17,7 +17,12 @@ import {
   sessionReducer,
 } from '../_services/sessionService'
 import type { Pipeline } from '../_types/pipeline'
-import type { PipelineSession, PipelineSessionAction, UsePipelineSessionReturn } from '../_types/session'
+import type {
+  PipelineSession,
+  PipelineSessionAction,
+  PipelineUpdater,
+  UsePipelineSessionReturn,
+} from '../_types/session'
 
 /**
  * Hook for managing multiple pipeline sessions (tabs).
@@ -72,7 +77,7 @@ export const usePipelineSession = (initialSession?: PipelineSession): UsePipelin
   )
 
   const updateSessionPipeline = useCallback(
-    (sessionId: string, pipeline: Pipeline): void => {
+    (sessionId: string, pipeline: Pipeline | PipelineUpdater): void => {
       dispatch({
         type: 'UPDATE_SESSION_PIPELINE',
         payload: { sessionId, pipeline },
