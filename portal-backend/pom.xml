@@ -17,6 +17,9 @@
     <description>portal-backend</description>
 
     <repositories>
+        <!-- Mono-repo package registry: portal-model, config-adapter and Model Forge
+             (core-model-forge-*) are all published here by their CI jobs, so a single
+             repository resolves every intra-repo dependency. -->
         <repository>
             <id>gitlab-maven</id>
             <url>https://gitlab.com/api/v4/projects/72402288/packages/maven</url>
@@ -45,6 +48,8 @@
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
         <config-adapter.version>1.0.2-MR-660-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
+        <model-forge.version>0.1.0-SNAPSHOT</model-forge.version>
+        <archunit.version>1.4.2</archunit.version>
     </properties>
 
     <dependencies>
@@ -53,6 +58,14 @@
             <groupId>de.civitascore</groupId>
             <artifactId>portal-model</artifactId>
             <version>${portal-model.version}</version>
+        </dependency>
+
+        <!-- Model Forge — embedded schema/model registry (facade + auto-configuration).
+             Web-free; brings contract and runtime transitively. -->
+        <dependency>
+            <groupId>de.civitascore</groupId>
+            <artifactId>core-model-forge-spring-boot-starter</artifactId>
+            <version>${model-forge.version}</version>
         </dependency>
 
         <!-- Web, Data, Validation -->
@@ -133,6 +146,12 @@
         </dependency>
 
         <!-- Test -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security-test</artifactId>

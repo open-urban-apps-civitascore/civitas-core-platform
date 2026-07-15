@@ -10,6 +10,8 @@ import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.PipelineInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -43,6 +45,7 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
   private final DataSourceRepository dataSourceRepository;
   private final DataSinkService dataSinkService;
   private final DataSinkRepository dataSinkRepository;
+  private final ModelRegistryGateway modelRegistryGateway;
 
   public PipelineService(
       PipelineRepository pipelineRepository,
@@ -50,13 +53,15 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
       DataSetRepository dataSetRepository,
       DataSourceRepository dataSourceRepository,
       DataSinkService dataSinkService,
-      DataSinkRepository dataSinkRepository) {
+      DataSinkRepository dataSinkRepository,
+      ModelRegistryGateway modelRegistryGateway) {
     this.pipelineRepository = pipelineRepository;
     this.pipelineMapper = pipelineMapper;
     this.dataSetRepository = dataSetRepository;
     this.dataSourceRepository = dataSourceRepository;
     this.dataSinkService = dataSinkService;
     this.dataSinkRepository = dataSinkRepository;
+    this.modelRegistryGateway = modelRegistryGateway;
   }
 
   @Override
@@ -144,7 +149,45 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
       entity.setDataSources(null);
     }
 
+    storeDefinitionInRegistry(entity, input);
+
     return super.postConvertToEntity(entity, input);
+  }
+
+  /**
+   * Stores the pipeline definition (editor-built graph plus the React Flow layout merged in as
+   * {@code x-ui-styles}) in the Model Forge registry and mirrors the assigned pin onto the shell.
+   * When the input carries neither model nor styles, the content pin is cleared (a full update may
+   * clear the definition); the logical URN is kept so a later store versions the same artifact.
+   *
+   * @param entity the pipeline entity
+   * @param input the input DTO carrying model and styles
+   */
+  private void storeDefinitionInRegistry(Pipeline entity, PipelineInputDTO input) {
+    boolean hasModel = input.getModel() != null && !input.getModel().isEmpty();
+    boolean hasStyles = input.getStyles() != null && !input.getStyles().isEmpty();
+    if (!hasModel && !hasStyles) {
+      entity.setModelUrn(null);
+      return;
+    }
+    if (entity.getModelUrn() != null
+        && modelRegistryGateway.isUnchanged(
+            entity.getModelUrn(), input.getModel(), input.getStyles())) {
+      // Unchanged content keeps the existing pin — a metadata-only update or PATCH round-trip
+      // must not mint a new registry version.
+      return;
+    }
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storePayload(
+            PayloadKind.PIPELINE,
+            Optional.ofNullable(entity.getModelLogicalUrn()),
+            entity.getName(),
+            input.getModel(),
+            input.getStyles());
+    if (entity.getModelLogicalUrn() == null) {
+      entity.setModelLogicalUrn(pin.logicalUrn());
+    }
+    entity.setModelUrn(pin.versionedUrn());
   }
 
   /**
@@ -304,5 +347,20 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
     dataSinkService.unlinkByPipelineId(id);
 
     return pipeline;
+  }
+
+  /**
+   * After the pipeline row is deleted, delete the backing definition artifact from Model Forge in
+   * the same transaction. No-op when no definition was ever stored. (Datasets cascade-delete their
+   * pipelines via JPA without this hook; the orphaned registry artifacts are harmless append-only
+   * history — see concept 6.7.)
+   *
+   * @param entity the deleted pipeline
+   */
+  @Override
+  protected void postDelete(Pipeline entity) {
+    if (entity != null && entity.getModelLogicalUrn() != null) {
+      modelRegistryGateway.deletePayload(entity.getModelLogicalUrn());
+    }
   }
 }

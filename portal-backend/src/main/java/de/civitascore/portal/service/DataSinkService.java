@@ -5,9 +5,10 @@ import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -22,7 +23,9 @@ import org.springframework.stereotype.Service;
 /**
  * Service for managing {@link DataSink} entities. A DataSink belongs directly to a {@link DataSet};
  * its {@link de.civitascore.portal.model.entity.Pipeline Pipeline} link is optional and managed by
- * {@link PipelineService} when a Pipeline declares the DataSink in its {@code dataSinkIds}.
+ * {@link PipelineService} when a Pipeline declares the DataSink in its {@code dataSinkIds}. The
+ * type-specific configuration document lives in the Model Forge registry, pinned by the sink's
+ * {@code configurationUrn}.
  */
 @Slf4j
 @Service
@@ -31,20 +34,20 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   private final DataSinkRepository dataSinkRepository;
   private final DataSinkMapper dataSinkMapper;
   private final DataSetRepository dataSetRepository;
-  private final DataStructureVersionRepository dataStructureVersionRepository;
   private final LayerRepository layerRepository;
+  private final ModelRegistryGateway modelRegistryGateway;
 
   public DataSinkService(
       DataSinkRepository dataSinkRepository,
       DataSinkMapper dataSinkMapper,
       DataSetRepository dataSetRepository,
-      DataStructureVersionRepository dataStructureVersionRepository,
-      LayerRepository layerRepository) {
+      LayerRepository layerRepository,
+      ModelRegistryGateway modelRegistryGateway) {
     this.dataSinkRepository = dataSinkRepository;
     this.dataSinkMapper = dataSinkMapper;
     this.dataSetRepository = dataSetRepository;
-    this.dataStructureVersionRepository = dataStructureVersionRepository;
     this.layerRepository = layerRepository;
+    this.modelRegistryGateway = modelRegistryGateway;
   }
 
   @Override
@@ -103,7 +106,8 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   }
 
   /**
-   * Resolves the parent dataset and validates the type-specific configuration.
+   * Resolves the parent dataset, validates the type-specific configuration and stores it in the
+   * Model Forge registry, mirroring the assigned pin onto the shell.
    *
    * @throws ResourceNotFoundException if the dataset is not found
    * @throws InvalidInputException if the configuration is invalid for the given type
@@ -120,8 +124,57 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
     entity.setDataSet(dataSet);
 
     validateConfiguration(input.getDataSinkType(), input.getConfiguration());
+    storeConfigurationInRegistry(entity, input);
 
     return super.postConvertToEntity(entity, input);
+  }
+
+  /**
+   * Stores the validated configuration in the Model Forge registry (kind {@code DATA_SINK}) and
+   * mirrors the assigned pin onto the shell. FROST sinks require an absent/empty configuration —
+   * nothing is stored and both URN columns stay null. The {@code element} URN soft reference is
+   * preserved verbatim inside the stored payload, where Model Forge records it as a
+   * {@code datasink-element} dependency edge onto the referenced model.
+   *
+   * @param entity the data sink entity
+   * @param input the input DTO carrying the configuration
+   */
+  private void storeConfigurationInRegistry(DataSink entity, DataSinkInputDTO input) {
+    Map<String, Object> configuration = input.getConfiguration();
+    if (configuration == null || configuration.isEmpty()) {
+      entity.setConfigurationUrn(null);
+      return;
+    }
+    if (entity.getConfigurationUrn() != null
+        && modelRegistryGateway.isUnchanged(entity.getConfigurationUrn(), configuration, null)) {
+      // Unchanged configuration keeps the existing pin — no new registry version.
+      return;
+    }
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storePayload(
+            PayloadKind.DATA_SINK,
+            Optional.ofNullable(entity.getConfigurationLogicalUrn()),
+            deriveArtifactName(input, configuration),
+            configuration,
+            null);
+    if (entity.getConfigurationLogicalUrn() == null) {
+      entity.setConfigurationLogicalUrn(pin.logicalUrn());
+    }
+    entity.setConfigurationUrn(pin.versionedUrn());
+  }
+
+  /**
+   * Derives a readable registry artifact name for the sink configuration: the POSTGIS table name
+   * when present, otherwise the sink type. Model Forge appends a UUID, so equal names never
+   * collide.
+   */
+  private static String deriveArtifactName(DataSinkInputDTO input, Map<String, Object> config) {
+    if (config.get("tableName") instanceof String tableName && !tableName.isBlank()) {
+      return tableName;
+    }
+    return input.getDataSinkType() != null
+        ? input.getDataSinkType().name().toLowerCase() + "-sink"
+        : "datasink";
   }
 
   /**
@@ -160,6 +213,19 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
     return sink;
   }
 
+  /**
+   * After the sink row is deleted, delete the backing configuration artifact from Model Forge in
+   * the same transaction. No-op when no configuration was ever stored (FROST sinks).
+   *
+   * @param entity the deleted data sink
+   */
+  @Override
+  protected void postDelete(DataSink entity) {
+    if (entity != null && entity.getConfigurationLogicalUrn() != null) {
+      modelRegistryGateway.deletePayload(entity.getConfigurationLogicalUrn());
+    }
+  }
+
   private void validateConfiguration(DataSinkType type, Map<String, Object> config) {
     switch (type) {
       case FROST -> validateFrostConfiguration(config);
@@ -175,13 +241,11 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
     if (config == null || config.isEmpty()) {
       return;
     }
-    if (!config.keySet().equals(Set.of("dataStructureVersionId"))) {
+    if (!config.keySet().equals(Set.of("element"))) {
       throw new InvalidInputException(
-          "DataSink",
-          "configuration",
-          "FROST sinks accept only an optional dataStructureVersionId");
+          "DataSink", "configuration", "FROST sinks accept only an optional element URN");
     }
-    requireExistingDataStructureVersion(config.get("dataStructureVersionId"));
+    requireExistingElement(config.get("element"));
   }
 
   private void validatePostgisConfiguration(Map<String, Object> config) {
@@ -196,32 +260,30 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
           "DataSink", "configuration.tableName", "tableName is required for POSTGIS sinks");
     }
 
-    Object dsvIdRaw = config.get("dataStructureVersionId");
-    if (dsvIdRaw == null) {
+    Object elementRaw = config.get("element");
+    if (elementRaw == null) {
       throw new InvalidInputException(
-          "DataSink",
-          "configuration.dataStructureVersionId",
-          "dataStructureVersionId is required for POSTGIS sinks");
+          "DataSink", "configuration.element", "element is required for POSTGIS sinks");
     }
-    requireExistingDataStructureVersion(dsvIdRaw);
+    requireExistingElement(elementRaw);
   }
 
-  private void requireExistingDataStructureVersion(Object dsvIdRaw) {
-    UUID dsvId;
-    try {
-      dsvId = UUID.fromString(String.valueOf(dsvIdRaw));
-    } catch (IllegalArgumentException e) {
+  /**
+   * Validates the {@code element} soft reference: it must be a non-blank CORE URN that resolves to
+   * an existing model (Element) in the registry. Model Forge tracks this URN as a {@code
+   * datasink-element} dependency edge when the configuration is stored, which is what the in-use
+   * guard on {@code DataStructureVersion} queries.
+   */
+  private void requireExistingElement(Object elementRaw) {
+    if (!(elementRaw instanceof String urn) || urn.isBlank()) {
       throw new InvalidInputException(
-          "DataSink",
-          "configuration.dataStructureVersionId",
-          "dataStructureVersionId must be a valid UUID");
+          "DataSink", "configuration.element", "element must be a CORE URN");
     }
-
-    if (!dataStructureVersionRepository.existsById(dsvId)) {
+    if (modelRegistryGateway.fetchModel(urn).isEmpty()) {
       throw new InvalidInputException(
           "DataSink",
-          "configuration.dataStructureVersionId",
-          "DataStructureVersion not found: " + dsvId);
+          "configuration.element",
+          "Referenced Element not found in the model registry: " + urn);
     }
   }
 }

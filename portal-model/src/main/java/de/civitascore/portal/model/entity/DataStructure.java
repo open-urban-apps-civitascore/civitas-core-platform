@@ -65,6 +65,13 @@ public class DataStructure extends BaseDataEntity {
   @Builder.Default
   private Boolean createdFromDataSource = false;
 
+  /**
+   * Stable logical CORE URN of this data structure's model artifact in Model Forge, minted once on
+   * first store and reused for every following version. Null until the first model is stored.
+   */
+  @Column(name = "model_logical_urn")
+  private String modelLogicalUrn;
+
   @Setter(AccessLevel.NONE)
   @OneToMany(
       mappedBy = "dataStructure",

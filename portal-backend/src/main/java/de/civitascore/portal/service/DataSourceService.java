@@ -14,6 +14,8 @@ import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -27,6 +29,7 @@ import jakarta.validation.groups.Default;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -38,7 +41,9 @@ import tools.jackson.databind.JsonNode;
 /**
  * Service for managing {@link DataSource} entities through their full lifecycle (DRAFT to
  * AVAILABLE). Handles connector configuration normalization, encryption of sensitive fields, data
- * structure version linking, and release/unrelease status transitions.
+ * structure version linking, and release/unrelease status transitions. The connector configuration
+ * document (encrypted sensitive fields included) lives in the Model Forge registry, pinned by the
+ * source's {@code configurationUrn}.
  */
 @Service
 @RequiredArgsConstructor
@@ -52,6 +57,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final DataSetRepository dataSetRepository;
   private final PipelineRepository pipelineRepository;
   private final DataPoolRepository dataPoolRepository;
+  private final ModelRegistryGateway modelRegistryGateway;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -116,7 +122,64 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     if (input.getDatapoolScope() != null) {
       applyDatapoolScope(entity, input.getDatapoolScope());
     }
+
+    // The input's configuration was already normalized + encrypted by the pre-process hooks;
+    // store it in the registry and mirror the pin. An absent configuration on a full update
+    // clears the pin (the artifact history stays in the registry).
+    storeConfigurationInRegistry(entity, input.getConfiguration());
+
     return super.postConvertToEntity(entity, input);
+  }
+
+  /**
+   * Stores the (already normalized and encrypted) connector configuration in the Model Forge
+   * registry (kind {@code DATA_SOURCE}) and mirrors the assigned pin onto the shell. A null
+   * configuration clears the content pin; the logical URN is kept so a later store versions the
+   * same artifact.
+   *
+   * @param entity the data source entity
+   * @param configuration the encrypted configuration document, or null to clear
+   */
+  private void storeConfigurationInRegistry(DataSource entity, Map<String, Object> configuration) {
+    if (configuration == null || configuration.isEmpty()) {
+      entity.setConfigurationUrn(null);
+      return;
+    }
+    if (entity.getConfigurationUrn() != null
+        && modelRegistryGateway.isUnchanged(entity.getConfigurationUrn(), configuration, null)) {
+      // Unchanged configuration keeps the existing pin — no new registry version. (Encrypted
+      // values only compare equal when encryption is deterministic; otherwise this is a no-op.)
+      return;
+    }
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storePayload(
+            PayloadKind.DATA_SOURCE,
+            Optional.ofNullable(entity.getConfigurationLogicalUrn()),
+            entity.getName() != null ? entity.getName() : "datasource",
+            configuration,
+            null);
+    if (entity.getConfigurationLogicalUrn() == null) {
+      entity.setConfigurationLogicalUrn(pin.logicalUrn());
+    }
+    entity.setConfigurationUrn(pin.versionedUrn());
+  }
+
+  /**
+   * Reads the data source's current configuration document back from the registry. Returns a
+   * mutable copy, or {@code null} when no configuration is stored.
+   *
+   * @param entity the data source entity
+   * @return the stored configuration or null
+   */
+  private Map<String, Object> fetchConfiguration(DataSource entity) {
+    if (entity.getConfigurationUrn() == null) {
+      return null;
+    }
+    return modelRegistryGateway
+        .fetchPayload(entity.getConfigurationUrn())
+        .map(ModelRegistryGateway.RegistryDocument::content)
+        .map(HashMap::new)
+        .orElse(null);
   }
 
   /**
@@ -162,9 +225,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       }
       ConnectorHandler handler = connectorHandlerRegistry.getHandlerOrThrow(type);
 
-      // Defensive copy: MapStruct's updateEntity does clear() + putAll() on the entity's map.
-      // If the DTO shares the same map reference, clear() empties both.
-      Map<String, Object> existingConfig = copyConfiguration(existingEntity.getConfiguration());
+      // The current configuration is read back from the registry (masked-value restore needs the
+      // original encrypted values).
+      Map<String, Object> existingConfig = fetchConfiguration(existingEntity);
 
       Map<String, Object> normalized = handler.normalizeAndValidate(input.getConfiguration());
       // Encrypt first, then restore: masked "********" values get encrypted to a garbage value,
@@ -190,7 +253,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   public void mergeConfigurationForPatch(
       DataSourceInputDTO patchedDto, DataSource existing, JsonNode rawPatch) {
     JsonNode configPatch = rawPatch.path("configuration");
-    Map<String, Object> existingConfig = copyConfiguration(existing.getConfiguration());
+    Map<String, Object> existingConfig = fetchConfiguration(existing);
 
     if (configPatch.isMissingNode()) {
       patchedDto.setConfiguration(existingConfig);
@@ -214,12 +277,6 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     return input.getConnectorType() != null
         ? input.getConnectorType()
         : existing.getConnectorType();
-  }
-
-  // Defensive copy: MapStruct's updateEntity does clear() + putAll(), which corrupts the original
-  // when Hibernate's first-level cache makes entity and input share the same map reference.
-  private Map<String, Object> copyConfiguration(Map<String, Object> config) {
-    return config != null ? new HashMap<>(config) : null;
   }
 
   private void validateConnectorTypeChange(DataSourceInputDTO input, DataSource existingEntity) {
@@ -391,14 +448,14 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       }
       ConnectorHandler handler = connectorHandlerRegistry.getHandlerOrThrow(type);
 
-      Map<String, Object> existingConfig = copyConfiguration(entity.getConfiguration());
+      Map<String, Object> existingConfig = fetchConfiguration(entity);
 
       Map<String, Object> normalized = handler.normalizeAndValidate(input.getConfiguration());
       Map<String, Object> encrypted = handler.encryptSensitiveFields(normalized);
       if (existingConfig != null) {
         restoreMaskedValues(encrypted, existingConfig, handler, normalized);
       }
-      entity.setConfiguration(encrypted);
+      storeConfigurationInRegistry(entity, encrypted);
     }
   }
 
@@ -420,6 +477,19 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
 
     return entity;
+  }
+
+  /**
+   * After the data source row is deleted, delete the backing configuration artifact from Model
+   * Forge in the same transaction. No-op when no configuration was ever stored.
+   *
+   * @param entity the deleted data source
+   */
+  @Override
+  protected void postDelete(DataSource entity) {
+    if (entity != null && entity.getConfigurationLogicalUrn() != null) {
+      modelRegistryGateway.deletePayload(entity.getConfigurationLogicalUrn());
+    }
   }
 
   private void applyDatapoolScope(DataSource entity, DatapoolScopeInputDTO scope) {
@@ -468,7 +538,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
           getEntityName(), entity.getId(), "Connector type is required for validation");
     }
 
-    Map<String, Object> config = entity.getConfiguration();
+    Map<String, Object> config = fetchConfiguration(entity);
     if (config == null || config.isEmpty()) {
       throw new InvalidInputException(
           getEntityName(), entity.getId(), "Configuration is required for releasing");
