@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "urn:core:platform:civitas:element:smartmeter:MeterMasterData:1.0.0",
+  "title":   "MeterMasterData",
+  "description": "Reference data for a smart electricity meter from the utility's master database. Looked up at runtime via LookupRecord (DatabaseRecordLookup) using meterId as key. Mirrors the role of StationMasterData in the Luftqualität use case.",
+  "type": "object",
+  "required": ["meterId", "meterType"],
+  "properties": {
+    "meterId": {
+      "type": "string",
+      "description": "Unique meter identifier matching SMLReading.meterId."
+    },
+    "meterType": {
+      "type": "string",
+      "enum": ["residential", "commercial", "industrial", "pv-feed-in"],
+      "description": "Tariff / installation category."
+    },
+    "owner": {
+      "type": "string",
+      "description": "Name of the metered party or building."
+    },
+    "operator": {
+      "type": "string",
+      "description": "Utility company or grid operator responsible for this meter."
+    },
+    "installDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "location": {
+      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0"
+    },
+    "frostThingId": {
+      "type": "integer",
+      "description": "FROST-Server @iot.id of the corresponding STA Thing (populated after initial FROST sync)."
+    },
+    "frostDatastreamIds": {
+      "type": "object",
+      "description": "Maps quantity names to their FROST Datastream @iot.id.",
+      "properties": {
+        "activePowerPlus":  { "type": "integer" },
+        "activePowerMinus": { "type": "integer" },
+        "voltage":          { "type": "integer" }
+      }
+    }
+  }
+}

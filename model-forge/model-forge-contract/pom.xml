@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+           https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>de.civitascore</groupId>
+    <artifactId>core-model-forge-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>core-model-forge-contract</artifactId>
+  <packaging>jar</packaging>
+
+  <name>CIVITAS/CORE Model Forge — Contract</name>
+  <description>
+    Embedded contract candidate: public DTOs, domain records, diagnostics, and
+    the stateless UrnParser utility. No Spring Boot, no server-side dependencies,
+    no HTTP/HAL representation types.
+  </description>
+
+  <dependencies>
+
+    <!--
+      Jackson 3 Databind — for JsonNode / ObjectNode fields in DTOs and the
+      @JsonInclude annotation (annotations keep the com.fasterxml package).
+      Version is managed by spring-boot-starter-parent.
+    -->
+    <dependency>
+      <groupId>tools.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <version>${archunit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Section 7.2 module boundary: contract depends on no other Model Forge module and
+           never on JDBC/Postgres/Flyway (ArchUnit's contract_is_transport_and_infrastructure_free
+           checks this at bytecode level; this catches it at dependency-declaration level too). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-contract-boundaries</id>
+            <goals><goal>enforce</goal></goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <searchTransitive>false</searchTransitive>
+                  <excludes>
+                    <exclude>de.civitascore:core-model-forge-core</exclude>
+                    <exclude>de.civitascore:core-model-forge-application</exclude>
+                    <exclude>de.civitascore:core-model-forge-persistence-postgres</exclude>
+                    <exclude>de.civitascore:core-model-forge-spring-boot-starter</exclude>
+                    <exclude>org.springframework:spring-jdbc</exclude>
+                    <exclude>org.flywaydb:*</exclude>
+                    <exclude>org.postgresql:postgresql</exclude>
+                  </excludes>
+                </bannedDependencies>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Coverage instrumentation + report (review finding TEST-1): this module previously had
+           no coverage at all. Minimal setup — agent + report, NO hard gate — so the module's
+           DTO/UrnParser coverage is at least measured and reported (target/site/jacoco). -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Produce a sources jar so IDEs can navigate to DTO definitions -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals><goal>jar-no-fork</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Produce Javadoc jar for publishing to a registry -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-javadocs</id>
+            <goals><goal>jar</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

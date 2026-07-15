@@ -1,0 +1,19 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
+  "id":     "urn:core:platform:civitas:mapping:luftqualitaet:station-to-sta-thing:1.0.0",
+  "title":  "StationMasterData → STAThing",
+  "source": "urn:core:platform:civitas:element:luftqualitaet:StationMasterData:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:STAThing:1.0.0",
+  "fields": {
+    "name":                    { "op": "copy",   "input": "$.stationName" },
+    "description": {
+      "op": "concat",
+      "inputs": ["$.stationType", "$.stationName"],
+      "separator": " — "
+    },
+    "properties.stationId":   { "op": "copy",   "input": "$.stationId" },
+    "properties.operator":    { "op": "copy",   "input": "$.operator" },
+    "properties.stationType": { "op": "copy",   "input": "$.stationType" },
+    "properties.installDate": { "op": "copy",   "input": "$.installDate" }
+  }
+}

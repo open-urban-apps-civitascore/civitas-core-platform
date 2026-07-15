@@ -1,0 +1,93 @@
+<html xmlns:wicket="http://wicket.apache.org">
+<body>
+<wicket:extend>
+  <p class="mf-crumbs">
+    <a wicket:id="browseLink">Browse</a><span class="sep">›</span><span wicket:id="crumbType"></span><span class="sep">›</span><span wicket:id="crumbName"></span>
+  </p>
+
+  <h2><span wicket:id="heading"></span></h2>
+  <div class="mf-meta">
+    <span wicket:id="typeBadge"></span>
+    <span>version <strong wicket:id="version"></strong></span>
+  </div>
+  <p class="mf-urn">
+    <span wicket:id="urn"></span>
+    <button type="button" wicket:id="copyUrnButton" class="mf-copy-btn">Copy</button>
+  </p>
+
+  <div>
+    <a wicket:id="editLink" class="button-link">Edit</a>
+    <a wicket:id="viewsLink" class="button-link secondary">Bundled / inlined view</a>
+    <a wicket:id="graphLink" class="button-link secondary">Show in graph</a>
+    <a wicket:id="deleteLink" class="button-link danger">Delete</a>
+  </div>
+
+  <div wicket:id="notFound">
+    <p class="mf-rel-empty">Artifact not found.</p>
+  </div>
+
+  <div wicket:id="contentBox">
+    <h3>Content</h3>
+    <div wicket:id="content"></div>
+  </div>
+
+  <h3>Relations</h3>
+
+  <div class="mf-rel-block">
+    <strong>Depends on</strong>
+    <div wicket:id="dependenciesContainer">
+      <p wicket:id="dependenciesEmpty" class="mf-rel-empty">None.</p>
+      <div wicket:id="dependenciesChips">
+        <ul class="mf-chips">
+          <li wicket:id="dependenciesRows">
+            <a wicket:id="relLink" class="mf-chip"><span wicket:id="relLabel"></span><span wicket:id="relKind" class="mf-chip-kind"></span></a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="mf-rel-block">
+    <strong>Depended on by</strong>
+    <div wicket:id="dependentsContainer">
+      <p wicket:id="dependentsEmpty" class="mf-rel-empty">None.</p>
+      <div wicket:id="dependentsChips">
+        <ul class="mf-chips">
+          <li wicket:id="dependentsRows">
+            <a wicket:id="relLink" class="mf-chip"><span wicket:id="relLabel"></span><span wicket:id="relKind" class="mf-chip-kind"></span></a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="mf-rel-block">
+    <strong>Maps to (this is a mapping source)</strong>
+    <div wicket:id="mapsToContainer">
+      <p wicket:id="mapsToEmpty" class="mf-rel-empty">None.</p>
+      <div wicket:id="mapsToChips">
+        <ul class="mf-chips">
+          <li wicket:id="mapsToRows">
+            <a wicket:id="relLink" class="mf-chip"><span wicket:id="relLabel"></span><span wicket:id="relKind" class="mf-chip-kind"></span></a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="mf-rel-block">
+    <strong>Mapped from (this is a mapping target)</strong>
+    <div wicket:id="mappedFromContainer">
+      <p wicket:id="mappedFromEmpty" class="mf-rel-empty">None.</p>
+      <div wicket:id="mappedFromChips">
+        <ul class="mf-chips">
+          <li wicket:id="mappedFromRows">
+            <a wicket:id="relLink" class="mf-chip"><span wicket:id="relLabel"></span><span wicket:id="relKind" class="mf-chip-kind"></span></a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</wicket:extend>
+</body>
+</html>

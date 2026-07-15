@@ -1,0 +1,25 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
+  "id": "urn:core:platform:civitas:mapping:luftqualitaet:airquality-pm25-to-observation:1.0.0",
+  "title": "Air Quality PM2.5 -> STA Observation",
+  "source": "urn:core:platform:civitas:element:luftqualitaet:AirQualityRawReading:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0",
+  "fields": {
+    "phenomenonTime": {
+      "op": "copy",
+      "input": "$.timestamp"
+    },
+    "resultTime": {
+      "op": "copy",
+      "input": "$.timestamp"
+    },
+    "result": {
+      "op": "copy",
+      "input": "$.pm25.value"
+    },
+    "resultQuality": {
+      "op": "copy",
+      "input": "$.pm25.quality"
+    }
+  }
+}

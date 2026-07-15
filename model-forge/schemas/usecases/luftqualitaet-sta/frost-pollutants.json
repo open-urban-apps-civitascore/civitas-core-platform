@@ -1,0 +1,35 @@
+[
+  {
+    "key":         "no2",
+    "name":        "NO₂",
+    "description": "Air quality pollutant: Nitrogen dioxide (NO₂)",
+    "definition":  "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/8",
+    "unit": {
+      "name":       "Microgram per cubic metre",
+      "symbol":     "µg/m³",
+      "definition": "http://qudt.org/vocab/unit/MicroGM-PER-M3"
+    }
+  },
+  {
+    "key":         "pm25",
+    "name":        "PM2.5",
+    "description": "Air quality pollutant: Particulate Matter PM2.5",
+    "definition":  "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/6001",
+    "unit": {
+      "name":       "Microgram per cubic metre",
+      "symbol":     "µg/m³",
+      "definition": "http://qudt.org/vocab/unit/MicroGM-PER-M3"
+    }
+  },
+  {
+    "key":         "co",
+    "name":        "CO",
+    "description": "Air quality pollutant: Carbon monoxide (CO)",
+    "definition":  "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/10",
+    "unit": {
+      "name":       "Milligram per cubic metre",
+      "symbol":     "mg/m³",
+      "definition": "http://qudt.org/vocab/unit/MilliGM-PER-M3"
+    }
+  }
+]

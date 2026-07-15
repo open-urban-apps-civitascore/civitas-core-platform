@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://civitasconnect.digital/core/datasink/v1",
+  "title":   "CORE DataSink",
+  "description": "Configuration for a data sink that receives transformed data from a CORE pipeline. Currently supports SQL databases via JDBC. The 'element' field references an Element by versioned CORE URN — this constraint is enforced in the DataSet context.",
+  "type": "object",
+  "required": ["$schema", "id", "connectionType"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "enum": [
+        "https://civitasconnect.digital/core/datasink/v1",
+        "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSink"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "description": "Versioned CORE URN of this DataSink.",
+      "pattern": "^urn:core:[^:]+:[^:]+:datasink:[^:]+:[^:]+:[^:]+$"
+    },
+    "title":       { "type": "string", "description": "Human-readable display name." },
+    "description": { "type": "string" },
+    "connectionType": {
+      "type": "string",
+      "enum": ["sql", "http"],
+      "description": "Protocol used by this data sink."
+    },
+    "element": {
+      "type": "string",
+      "description": "Versioned CORE URN of the Element that describes the output row format.",
+      "x-core-ref": { "type": "urn:core:type:Element" }
+    },
+    "jdbcUrl": {
+      "type": "string",
+      "description": "JDBC connection URL, e.g. 'jdbc:postgresql://postgres:5432/coredata'."
+    },
+    "tableName": {
+      "type": "string",
+      "description": "Target database table name."
+    },
+    "dbSchema": {
+      "type": "string",
+      "description": "Database schema (namespace). Defaults to 'public' for PostgreSQL.",
+      "default": "public"
+    },
+    "username": {
+      "type": "string",
+      "description": "Database login username."
+    },
+    "password": {
+      "type": "string",
+      "description": "Database login password. Do not commit plaintext credentials — use secrets management in production."
+    },
+    "url": {
+      "type": "string",
+      "description": "HTTP endpoint URL for HTTP sinks."
+    },
+    "method": {
+      "type": "string",
+      "enum": ["POST", "PUT", "PATCH"],
+      "description": "HTTP method for HTTP sinks."
+    },
+    "contentType": {
+      "type": "string",
+      "description": "Payload content type for HTTP sinks."
+    }
+  }
+}

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs exclude filter.
+
+  Only genuine framework/idiomatic false positives or explicitly accepted,
+  documented trade-offs belong here. Every entry carries a justification.
+  Real bugs are fixed in the code, not silenced here.
+
+  Bug threshold is Medium at effort Max; categories are not blanket-disabled.
+-->
+<FindBugsFilter>
+
+  <!--
+    EI_EXPOSE_REP / EI_EXPOSE_REP2 on immutable domain/DTO/application records.
+    These records intentionally carry List<...>, Map<...> and Jackson
+    JsonNode/ObjectNode fields. They are value carriers inside the embedded API,
+    and JsonNode is not cheaply deep-copyable; defensive copies in
+    accessors/constructors would add cost and noise for no benefit.
+  -->
+  <Match>
+    <Class name="~de\.civitascore\.modelforge\.(domain|dto|application)\..*"/>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+  </Match>
+
+  <!--
+    Same rationale for the core-port record type that carries upstream search
+    results as mutable collection references. Immutable record, no security
+    boundary.
+  -->
+  <Match>
+    <Class name="de.civitascore.modelforge.core.port.XRepositorySearchResult"/>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+  </Match>
+
+  <!--
+    EI_EXPOSE_REP2 on constructors of Spring beans (@Service / @Component) and the
+    core.facade adapters the starter's auto-configuration wires by hand (e.g.
+    DefaultModelForge storing its ModelForgeOperations port). These constructors
+    store constructor-injected collaborators: other Spring singletons plus shared
+    infrastructure such as ObjectMapper and ArtifactRegistry. Spring/the
+    auto-configuration owns these singletons' lifecycle; defensive-copying an
+    injected bean or port is neither possible nor desirable.
+  -->
+  <Match>
+    <Class name="~de\.civitascore\.modelforge\.(application|graph|validation|xsd|store|persistence\.postgres|core\.facade|integrations(\.xrepository)?)\..*"/>
+    <Method name="&lt;init&gt;"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+
+  <!--
+    Same idiom in the admin-ui: SeedImporter (@Component) stores the constructor-injected
+    ModelForge facade, a Spring singleton. Defensive-copying an injected bean is neither
+    possible nor desirable. The admin-ui is a standalone debug host, not a security boundary.
+  -->
+  <Match>
+    <Class name="~de\.civitascore\.modelforge\.adminui\.seed\..*"/>
+    <Method name="&lt;init&gt;"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+
+  <!--
+    SeedPage holds its collaborator via Wicket's @SpringBean, which injects a *serializable*
+    LazyInitProxy, so the page serializes across requests despite the field's declared (concrete)
+    bean type being non-Serializable. SpotBugs only sees the declared type. Other pages sidestep
+    this by depending on the ModelForge interface; SeedPage needs the concrete SeedImporter.
+  -->
+  <Match>
+    <Class name="de.civitascore.modelforge.adminui.wicket.pages.SeedPage"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+
+  <!--
+    Same idiom, one level removed: ArtifactTreeProvider is a plain (non-@SpringBean) helper
+    constructed by BasePage as `new ArtifactTreeProvider(modelForge)`, handed the *already*
+    @SpringBean-injected (and therefore serializable-proxy) ModelForge reference. It must itself
+    be Serializable — Wicket's NestedTree holds its ITreeProvider as page-persisted component
+    state — so it carries the same declared-type-vs-runtime-type mismatch SpotBugs can't see
+    through, plus the field-exposure and missing-serialVersionUID findings that come with any
+    Serializable class holding a constructor-injected collaborator.
+  -->
+  <Match>
+    <Class name="de.civitascore.modelforge.adminui.wicket.tree.ArtifactTreeProvider"/>
+    <Bug pattern="SE_BAD_FIELD,SE_NO_SERIALVERSIONID,EI_EXPOSE_REP2"/>
+  </Match>
+
+  <!--
+    CT_CONSTRUCTOR_THROW on ArtifactTreeNodePanel: its constructor dispatches to static helpers via
+    an exhaustive switch over the sealed ArtifactTreeNode hierarchy — by construction every case is
+    covered, so no path actually throws, but SpotBugs's constructor-throw heuristic can't see that
+    and flags any constructor invoking a method it can't prove exception-free. Panel (the
+    superclass) declares no finalizer, so the "partially-constructed object surviving via a
+    finalizer" premise the check guards against does not apply here.
+  -->
+  <Match>
+    <Class name="de.civitascore.modelforge.adminui.wicket.tree.ArtifactTreeNodePanel"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+
+</FindBugsFilter>

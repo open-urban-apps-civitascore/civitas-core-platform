@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="https://civitasconnect.digital/xsd/air-quality"
+           targetNamespace="https://civitasconnect.digital/xsd/air-quality"
+           elementFormDefault="qualified">
+  <xs:simpleType name="Pollutant">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="PM25"/>
+      <xs:enumeration value="PM10"/>
+      <xs:enumeration value="NO2"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="AirQualityMeasurement">
+    <xs:annotation>
+      <xs:documentation>Air quality measurement for a station and pollutant.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="stationId" type="xs:string" minOccurs="1"/>
+      <xs:element name="pollutant" type="tns:Pollutant" minOccurs="1"/>
+      <xs:element name="value" type="xs:decimal" minOccurs="1"/>
+      <xs:element name="measuredAt" type="xs:dateTime" minOccurs="1"/>
+    </xs:sequence>
+    <xs:attribute name="qualityFlag" type="xs:string" use="optional"/>
+  </xs:complexType>
+</xs:schema>

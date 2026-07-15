@@ -1,0 +1,6 @@
+{
+  "name": "Luftqualitaetssensor",
+  "description": "Multi-parameter air-quality sensor measuring NO2, PM2.5, and CO",
+  "encodingType": "application/pdf",
+  "metadata": "https://example.org/air-quality-sensor-datasheet"
+}

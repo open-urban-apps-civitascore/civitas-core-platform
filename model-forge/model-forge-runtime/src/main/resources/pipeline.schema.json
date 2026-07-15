@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://civitasconnect.digital/core/pipeline/v1",
+  "title":   "CORE Pipeline",
+  "description": "A CORE integration pipeline — a directed acyclic graph (DAG) connecting data sources, mapping transformations, and data sinks. Each exported Pipeline document carries '$schema': 'https://civitasconnect.digital/core/pipeline/v1'.\n\nThe 'x-core-ref' annotations on node reference fields (sourceRef, mappingRef, sinkRef) declare that each value is the CORE URN of the referenced artifact; existence is checked by registry-aware services.",
+  "type": "object",
+  "required": ["$schema", "id", "nodes", "edges"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "enum": [
+        "https://civitasconnect.digital/core/pipeline/v1",
+        "https://civitasconnect.digital/core-dataset/v1#/$defs/Pipeline"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "description": "Versioned CORE URN of this Pipeline.",
+      "pattern": "^urn:core:[^:]+:[^:]+:pipeline:[^:]+:[^:]+:[^:]+$"
+    },
+    "title":       { "type": "string", "description": "Human-readable display name." },
+    "description": { "type": "string" },
+    "debug": {
+      "type": "boolean",
+      "description": "When true, MiNiFi emits additional debug log events.",
+      "default": false
+    },
+    "nodes": {
+      "type": "array",
+      "description": "Ordered list of pipeline nodes.",
+      "items": { "$ref": "#/$defs/PipelineNode" }
+    },
+    "edges": {
+      "type": "array",
+      "description": "Connections between nodes.",
+      "items": { "$ref": "#/$defs/PipelineEdge" }
+    }
+  },
+  "$defs": {
+    "Position": {
+      "description": "Visual position in the pipeline canvas (x/y coordinates in pixels).",
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "PipelineNode": {
+      "description": "Discriminated union of all pipeline node types. The 'kind' property selects the concrete type.",
+      "oneOf": [
+        { "$ref": "#/$defs/StartNode"   },
+        { "$ref": "#/$defs/EndNode"     },
+        { "$ref": "#/$defs/SourceNode"  },
+        { "$ref": "#/$defs/FilterNode"  },
+        { "$ref": "#/$defs/EnrichNode"  },
+        { "$ref": "#/$defs/MappingNode" },
+        { "$ref": "#/$defs/SinkNode"    },
+        { "$ref": "#/$defs/SplitNode"   }
+      ]
+    },
+    "PipelineNodeBase": {
+      "description": "Common fields shared by all pipeline nodes.",
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id":            { "type": "string" },
+        "kind":          { "type": "string" },
+        "label":         { "type": "string" },
+        "description":   { "type": "string" },
+        "x-ui-position": { "$ref": "#/$defs/Position" }
+      }
+    },
+    "StartNode": {
+      "description": "Entry point of the pipeline. Exactly one per pipeline.",
+      "allOf": [
+        { "$ref": "#/$defs/PipelineNodeBase" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "start" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "EndNode": {
+      "description": "Exit point of the pipeline. Exactly one per pipeline.",
+      "allOf": [
+        { "$ref": "#/$defs/PipelineNodeBase" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "end" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "SourceNode": {
+      "description": "Reads structured data from a DataSource (e.g. MQTT broker).",
+      "allOf": [
+        { "$ref": "#/$defs/PipelineNodeBase" },
+        {
+          "type": "object",
+          "required": ["sourceRef"],
+          "properties": {
+            "kind": { "type": "string", "const": "source" },
+            "sourceRef": {
+              "type": "string",
+              "description": "CORE URN of the referenced DataSource.",
+              "x-core-ref": { "type": "urn:core:type:DataSource" }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "FilterNode": {
+      "description": "Filters events with a boolean expression.",
+      "allOf": [
+        { "$ref": "#/$defs/PipelineNodeBase" },
+        {
+          "type": "object",
+          "required": ["expression"],
+          "properties": {
+            "kind":       { "type": "string", "const": "filter" },
+            "expression": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "EnrichNode": {
+      "description": "Enriches events through a lookup source.",
+      "allOf": [
+        { "$ref": "#/$defs/PipelineNodeBase" },
+        {
+          "type": "object",
+          "required": ["lookupSourceRef", "lookupKey"],
+          "properties": {
+            "kind": { "type": "string", "const": "enrich" },
+            "lookupSourceRef": {
+              "type": "string",
+              "description": "CORE URN of the DataSource used for enrichment lookups.",
+              "x-core-ref": { "type": "urn:core:type:DataSource" }
+            },
+            "lookupKey": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "MappingNode": {
+      "description": "Applies a declarative field mapping to transform the data stream.",
+      "allOf": [
+        { "$ref": "#/$defs/PipelineNodeBase" },
+        {
+          "type": "object",
+          "required": ["mappingRef"],
+          "properties": {
+            "kind": { "type": "string", "const": "mapping" },
+            "mappingRef": {
+              "type": "string",
+              "description": "CORE URN of the referenced Mapping.",
+              "x-core-ref": { "type": "urn:core:type:Mapping" }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "SinkNode": {
+      "description": "Writes transformed data to a DataSink (e.g. SQL database).",
+      "allOf": [
+        { "$ref": "#/$defs/PipelineNodeBase" },
+        {
+          "type": "object",
+          "required": ["sinkRef"],
+          "properties": {
+            "kind": { "type": "string", "const": "sink" },
+            "sinkRef": {
+              "type": "string",
+              "description": "CORE URN of the referenced DataSink.",
+              "x-core-ref": { "type": "urn:core:type:DataSink" }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "SplitNode": {
+      "description": "Splits one incoming flow record into multiple outgoing records.",
+      "allOf": [
+        { "$ref": "#/$defs/PipelineNodeBase" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "split" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "PipelineEdge": {
+      "description": "A directed connection between two pipeline nodes.",
+      "type": "object",
+      "required": ["id", "source", "target"],
+      "properties": {
+        "id":     { "type": "string" },
+        "source": { "type": "string", "description": "ID of the source node." },
+        "target": { "type": "string", "description": "ID of the target node." },
+        "label":  { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": ["data", "control"],
+          "default": "data",
+          "description": "'data' edges carry the transformed payload; 'control' edges signal completion."
+        }
+      }
+    }
+  }
+}

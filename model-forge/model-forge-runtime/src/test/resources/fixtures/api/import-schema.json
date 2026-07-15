@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:core:platform:civitas:element:common:Observation:ulhry9fjx6:1.0.0",
+    "title": "Observation",
+    "type": "object",
+    "required": ["id", "observedAt", "value"],
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "observedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "value": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string"
+      }
+    }
+  }
+}

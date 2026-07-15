@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://civitasconnect.digital/core/datasource/v1",
+  "title":   "CORE DataSource",
+  "description": "Configuration for a data source that feeds structured data into a CORE pipeline. Currently supports MQTT brokers. The 'element' field references an Element by versioned CORE URN — this constraint is enforced in the DataSet context.",
+  "type": "object",
+  "required": ["$schema", "id", "connectionType"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "enum": [
+        "https://civitasconnect.digital/core/datasource/v1",
+        "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "description": "Versioned CORE URN of this DataSource.",
+      "pattern": "^urn:core:[^:]+:[^:]+:datasource:[^:]+:[^:]+:[^:]+$"
+    },
+    "title":       { "type": "string", "description": "Human-readable display name." },
+    "description": { "type": "string" },
+    "connectionType": {
+      "type": "string",
+      "enum": ["mqtt", "database", "http"],
+      "description": "Protocol used by this data source."
+    },
+    "element": {
+      "type": "string",
+      "description": "Versioned CORE URN of the Element that describes the payload format.",
+      "x-core-ref": { "type": "urn:core:type:Element" }
+    },
+    "brokerUrl": {
+      "type": "string",
+      "description": "MQTT broker URL, e.g. 'mqtt://mosquitto:1883'."
+    },
+    "topic": {
+      "type": "string",
+      "description": "MQTT topic to subscribe to. Wildcards (+, #) are supported."
+    },
+    "clientId": {
+      "type": "string",
+      "description": "Optional MQTT client ID. Auto-generated if omitted."
+    },
+    "qos": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2,
+      "description": "MQTT Quality of Service level: 0 = at most once, 1 = at least once, 2 = exactly once.",
+      "default": 0
+    },
+    "jdbcUrl": {
+      "type": "string",
+      "description": "JDBC connection URL for database-backed lookup sources."
+    },
+    "username": {
+      "type": "string",
+      "description": "Database login username."
+    },
+    "password": {
+      "type": "string",
+      "description": "Database login password. Do not commit plaintext credentials."
+    },
+    "lookupTable": {
+      "type": "string",
+      "description": "Database table used for enrichment lookups."
+    },
+    "lookupKey": {
+      "type": "string",
+      "description": "Database key column used for enrichment lookups."
+    },
+    "url": {
+      "type": "string",
+      "description": "HTTP endpoint URL for HTTP sources."
+    },
+    "method": {
+      "type": "string",
+      "enum": ["GET", "POST"],
+      "description": "HTTP method for HTTP sources."
+    }
+  }
+}

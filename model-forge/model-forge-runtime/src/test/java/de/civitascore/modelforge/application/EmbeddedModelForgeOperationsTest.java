@@ -1,0 +1,416 @@
+package de.civitascore.modelforge.application;
+
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.StringNode;
+import de.civitascore.modelforge.contract.ArtifactId;
+import de.civitascore.modelforge.contract.ArtifactKind;
+import de.civitascore.modelforge.contract.ArtifactSearchQuery;
+import de.civitascore.modelforge.contract.CreateArtifactCommand;
+import de.civitascore.modelforge.contract.ImportSchemaCommand;
+import de.civitascore.modelforge.contract.SaveArtifactCommand;
+import de.civitascore.modelforge.contract.VersionBump;
+import de.civitascore.modelforge.core.port.ArtifactRegistry;
+import de.civitascore.modelforge.core.port.ArtifactSearchResult;
+import de.civitascore.modelforge.graph.DependencyGraphService;
+import de.civitascore.modelforge.graph.SchemaRefExtractor;
+import de.civitascore.modelforge.urn.UrnParser;
+import de.civitascore.modelforge.validation.ModelValidator;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * Unit tests for the facade operations added to expose search/save/delete beyond the original
+ * import/read/validate/dependencies surface (needed by non-web consumers like the admin UI).
+ */
+class EmbeddedModelForgeOperationsTest {
+
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    private ArtifactRegistry registry;
+    private DependencyGraphService graph;
+    private ElementCommandService elementCommandService;
+    private SchemaImportService schemaImportService;
+    private ViewService viewService;
+    private EmbeddedModelForgeOperations operations;
+
+    @BeforeEach
+    void setUp() {
+        registry = mock(ArtifactRegistry.class);
+        graph = mock(DependencyGraphService.class);
+        var refExtractor = mock(SchemaRefExtractor.class);
+        when(refExtractor.extractRefs(any())).thenReturn(Set.of());
+        when(refExtractor.extractCoreRefTypes(any())).thenReturn(Set.of());
+        elementCommandService = new ElementCommandService(registry, graph, refExtractor);
+        var elementQueryService = new ElementQueryService(registry);
+        schemaImportService = mock(SchemaImportService.class);
+        viewService = mock(ViewService.class);
+        var modelValidator = mock(ModelValidator.class);
+        var smartDataModelsService = mock(SmartDataModelsService.class);
+        var xRepositoryService = mock(XRepositoryService.class);
+
+        operations = new EmbeddedModelForgeOperations(
+            schemaImportService,
+            elementQueryService,
+            elementCommandService,
+            viewService,
+            modelValidator,
+            new de.civitascore.modelforge.validation.CoreSchemaValidator(mapper),
+            new ReferenceExistenceValidator(registry, refExtractor),
+            graph,
+            registry,
+            smartDataModelsService,
+            xRepositoryService,
+            new de.civitascore.modelforge.urn.UrnService("platform", "civitas", "common", "1.0.0")
+        );
+    }
+
+    @Test
+    void searchMapsRegistryHitsToArtifactSummaries() {
+        when(registry.searchArtifacts(any())).thenReturn(List.of(
+            new ArtifactSearchResult("urn:example:element:Sensor:1.0.0", "urn:example:element:Sensor",
+                "element", "Sensor", "1.0.0", "json-schema", 1)
+        ));
+
+        var results = operations.search(new ArtifactSearchQuery("Sensor", null, null, 10, 0));
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).artifactId()).isEqualTo(new ArtifactId("urn:example:element:Sensor:1.0.0"));
+        assertThat(results.get(0).title()).isEqualTo("Sensor");
+    }
+
+    @Test
+    void getBundledViewWithNoMaxDepthCallsTheUnboundedBundle() {
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0");
+        when(viewService.bundle(artifactId.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+
+        operations.getBundledView(new de.civitascore.modelforge.contract.SchemaViewQuery(artifactId));
+
+        verify(viewService).bundle(artifactId.value());
+        verify(viewService, org.mockito.Mockito.never()).bundle(anyString(), org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void getBundledViewWithMaxDepthCallsTheBoundedBundle() {
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0");
+        when(viewService.bundle(artifactId.value(), 2)).thenReturn(Optional.of(mapper.createObjectNode()));
+
+        operations.getBundledView(new de.civitascore.modelforge.contract.SchemaViewQuery(artifactId, 2));
+
+        verify(viewService).bundle(artifactId.value(), 2);
+        verify(viewService, org.mockito.Mockito.never()).bundle(anyString());
+    }
+
+    @Test
+    void getInlinedViewWithMaxDepthCallsTheBoundedInline() {
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0");
+        when(viewService.inline(artifactId.value(), 3)).thenReturn(Optional.of(mapper.createObjectNode()));
+
+        operations.getInlinedView(new de.civitascore.modelforge.contract.SchemaViewQuery(artifactId, 3));
+
+        verify(viewService).inline(artifactId.value(), 3);
+        verify(viewService, org.mockito.Mockito.never()).inline(anyString());
+    }
+
+    @Test
+    void saveArtifactRoutesElementKindThroughElementCommandService() {
+        JsonNode schema = mapper.createObjectNode().put("type", "object");
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0");
+        // Model Forge assigns the version INSIDE the write and returns the pin with it — the
+        // facade uses that returned pin directly, without any resolveReference read-back.
+        when(registry.storeElement(eq("Sensor"), any(), anySet(), anySet(), eq(de.civitascore.modelforge.contract.VersionBump.PATCH)))
+            .thenReturn("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0");
+
+        var result = operations.saveArtifact(
+            new SaveArtifactCommand(artifactId, ArtifactKind.ELEMENT, schema, VersionBump.PATCH));
+
+        assertThat(result.artifactId()).isEqualTo(artifactId);
+        verify(registry).storeElement(eq("Sensor"), any(), anySet(), anySet(), eq(de.civitascore.modelforge.contract.VersionBump.PATCH));
+        verify(registry, org.mockito.Mockito.never()).resolveReference(anyString());
+    }
+
+    @Test
+    void saveArtifactRoutesTextualElementContentToXsdStorage() {
+        // XSD is not a separate kind: an ELEMENT whose content is a textual node carries a raw XSD
+        // document (rather than a JSON Schema object), so the save must route to the XSD storage
+        // path. This is what the collapsed XSD_ELEMENT kind used to select explicitly.
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0");
+        JsonNode xsd = StringNode.valueOf("<xs:schema/>");
+        when(registry.extractImportRefs(any())).thenReturn(Set.of());
+        when(registry.storeXsdElement(anyString(), eq("<xs:schema/>"), anySet(), any(de.civitascore.modelforge.contract.VersionBump.class)))
+            .thenReturn("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0");
+
+        var result = operations.saveArtifact(
+            new SaveArtifactCommand(artifactId, ArtifactKind.ELEMENT, xsd, VersionBump.PATCH));
+
+        assertThat(result.artifactId()).isEqualTo(artifactId);
+        verify(registry).storeXsdElement(anyString(), eq("<xs:schema/>"), anySet(), any(de.civitascore.modelforge.contract.VersionBump.class));
+        verify(registry, org.mockito.Mockito.never())
+            .storeElement(anyString(), any(), anySet(), anySet(), any(de.civitascore.modelforge.contract.VersionBump.class));
+    }
+
+    @Test
+    void saveArtifactReturnsThePinAssignedByTheWriteWithoutReadBack() {
+        // The pin in the write result must be exactly what the write itself assigned — no
+        // resolveReference stubbing at all, and the save path must never call it. This pins the
+        // fix for writes inside a surrounding (not-yet-committed) host transaction, where a
+        // read-back could not see the write and returned an unversioned URN.
+        JsonNode schema = mapper.createObjectNode().put("type", "object");
+        var logicalId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56");
+        when(registry.storeElement(eq("Sensor"), any(), anySet(), anySet(), any(de.civitascore.modelforge.contract.VersionBump.class)))
+            .thenReturn("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.3.0");
+
+        var result = operations.saveArtifact(
+            new SaveArtifactCommand(logicalId, ArtifactKind.ELEMENT, schema, VersionBump.MINOR));
+
+        assertThat(result.artifactId().value())
+            .isEqualTo("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.3.0");
+        verify(registry, org.mockito.Mockito.never()).resolveReference(anyString());
+    }
+
+    @Test
+    void saveArtifactRepointsAStaleVersionedIdAtTheTargetUrn() {
+        // Content round-tripped from a fetched (pinned-version) artifact keeps its old $id (here
+        // ":1.0.0"), even though the caller is saving against the logical (version-free) urn so
+        // the registry can mint a fresh version. Saving it back must re-point $id at the target
+        // urn, not silently keep serving the stale, now-outdated version number.
+        var logicalArtifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56");
+        JsonNode staleContent = mapper.createObjectNode()
+            .put("$id", "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0")
+            .put("type", "object");
+
+        var result = operations.saveArtifact(
+            new SaveArtifactCommand(logicalArtifactId, ArtifactKind.ELEMENT, staleContent, VersionBump.PATCH));
+
+        assertThat(result.artifactId()).isEqualTo(logicalArtifactId);
+        var contentCaptor = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry).storeElement(eq("Sensor"), contentCaptor.capture(), anySet(), anySet(), eq(de.civitascore.modelforge.contract.VersionBump.PATCH));
+        assertThat(contentCaptor.getValue().path("$id").asText()).isEqualTo(logicalArtifactId.value());
+    }
+
+    @Test
+    void saveArtifactRoutesNonElementKindsDirectlyToTheMatchingRegistryMethod() {
+        JsonNode content = mapper.createObjectNode().put("id", "m1");
+        var artifactId = new ArtifactId("urn:example:mapping:m1:1.0.0");
+        when(registry.storeMapping(anyString(), eq(content), eq(de.civitascore.modelforge.contract.VersionBump.MINOR)))
+            .thenReturn("urn:example:mapping:m1:1.0.0");
+
+        var result = operations.saveArtifact(
+            new SaveArtifactCommand(artifactId, ArtifactKind.MAPPING, content, VersionBump.MINOR));
+
+        assertThat(result.artifactId()).isEqualTo(artifactId);
+        verify(registry).storeMapping(anyString(), eq(content), eq(de.civitascore.modelforge.contract.VersionBump.MINOR));
+    }
+
+    @Test
+    void saveArtifactSyncsTheGraphFromDurableRefsForEveryNonElementKind() {
+        // Each non-Element kind stores through the registry (which persists its per-type reference
+        // edges) and must then mirror those durable edges into the in-memory graph, so a saved
+        // mapping/pipeline/datastructure/dataset is navigable via dependencies()/dependents().
+        record Case(ArtifactKind kind, String urn) {}
+        var cases = List.of(
+            new Case(ArtifactKind.MAPPING, "urn:core:platform:civitas:mapping:common:m1:mdqlihwds3:1.0.0"),
+            new Case(ArtifactKind.PIPELINE, "urn:core:platform:civitas:pipeline:common:p1:ux90yocznr:1.0.0"),
+            new Case(ArtifactKind.DATA_STRUCTURE, "urn:core:platform:civitas:datastructure:common:d1:vbrfl8zinc:1.0.0"),
+            new Case(ArtifactKind.DATA_SOURCE, "urn:core:platform:civitas:datasource:common:src1:v6lye7ewm8:1.0.0"),
+            new Case(ArtifactKind.DATA_SINK, "urn:core:platform:civitas:datasink:common:snk1:nqfzyxqan7:1.0.0"),
+            new Case(ArtifactKind.DATA_SET, "urn:core:platform:civitas:dataset:common:ds1:2qrg9ij09q:1.0.0"));
+
+        for (Case c : cases) {
+            var artifactId = new ArtifactId(c.urn());
+            operations.saveArtifact(new SaveArtifactCommand(
+                artifactId, c.kind(), mapper.createObjectNode(), VersionBump.PATCH));
+            verify(graph).registerFromRegistry(c.urn());
+        }
+    }
+
+    @Test
+    void saveArtifactDoesNotDoubleRegisterElementKindsInTheGraph() {
+        // Element/XSD register their graph edges inside ElementCommandService, so saveArtifact
+        // must NOT additionally call registerFromRegistry for them (that path resolves refs from
+        // content, not the durable table).
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0");
+
+        operations.saveArtifact(new SaveArtifactCommand(
+            artifactId, ArtifactKind.ELEMENT, mapper.createObjectNode().put("type", "object"), VersionBump.PATCH));
+
+        verify(graph, org.mockito.Mockito.never()).registerFromRegistry(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void deleteArtifactDelegatesToElementCommandService() {
+        var artifactId = new ArtifactId("urn:example:element:Sensor:1.0.0");
+
+        operations.deleteArtifact(artifactId);
+
+        verify(registry).deleteArtifact(artifactId.value());
+    }
+
+    @Test
+    void deleteArtifactCascadeRemovesOrphanedMembersButKeepsSharedOnes() {
+        var container = new ArtifactId("urn:core:platform:civitas:datastructure:common:d1:vbrfl8zinc:1.0.0");
+        String orphan = "urn:core:platform:civitas:element:common:A:aaaaaaaaaa:1.0.0";
+        String shared = "urn:core:platform:civitas:element:common:B:bbbbbbbbbb:1.0.0";
+        String orphanLogical = UrnParser.logicalUrn(orphan);
+        String sharedLogical = UrnParser.logicalUrn(shared);
+
+        when(registry.blockingDependents(container.value())).thenReturn(List.of());
+        when(registry.fetchArtifactRefUrns(container.value())).thenReturn(List.of(orphan, shared));
+        // Once the container is gone, A is orphaned but B is still grouped by another DataStructure.
+        when(registry.blockingDependents(orphanLogical)).thenReturn(List.of());
+        when(registry.blockingDependents(sharedLogical))
+            .thenReturn(List.of("urn:core:platform:civitas:datastructure:common:d2:zzzzzzzzzz"));
+        when(registry.fetch(orphanLogical)).thenReturn(Optional.of(mapper.createObjectNode()));
+        when(registry.fetch(sharedLogical)).thenReturn(Optional.of(mapper.createObjectNode()));
+        when(registry.fetchArtifactRefUrns(orphanLogical)).thenReturn(List.of());
+
+        operations.deleteArtifact(container, true);
+
+        verify(registry).deleteArtifact(container.value());
+        verify(registry).deleteArtifact(orphanLogical);
+        verify(registry, org.mockito.Mockito.never()).deleteArtifact(shared);
+        verify(registry, org.mockito.Mockito.never()).deleteArtifact(sharedLogical);
+    }
+
+    @Test
+    void deleteArtifactIsBlockedWhileDependentsExist() {
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0");
+        when(registry.blockingDependents(artifactId.value()))
+            .thenReturn(List.of("urn:core:platform:civitas:mapping:common:sensor-to-obs:4rrb1hifsm"));
+
+        assertThatThrownBy(() -> operations.deleteArtifact(artifactId))
+            .isInstanceOf(de.civitascore.modelforge.contract.ArtifactInUseException.class)
+            .hasMessageContaining("sensor-to-obs");
+
+        verify(registry, org.mockito.Mockito.never()).deleteArtifact(any());
+    }
+
+    @Test
+    void importSchemaReturnsTheConcreteVersionedPinAssignedByTheRegistry() {
+        // The import service carries the registry-assigned pin (returned by the write itself)
+        // through in its resourceId; the facade must return it VERBATIM — no resolveReference
+        // read-back — so a host pins exactly what was stored, even mid-transaction.
+        when(schemaImportService.importSchema(any())).thenReturn(new SchemaImportResult("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.2.0", List.of()));
+
+        var result = operations.importSchema(new ImportSchemaCommand(mapper.createObjectNode()));
+
+        assertThat(result.rootArtifactId().value())
+            .isEqualTo("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.2.0");
+        assertThat(UrnParser.versionFromUrn(result.rootArtifactId().value())).isEqualTo("1.2.0");
+        assertThat(result.importedArtifactIds()).containsExactly(result.rootArtifactId());
+        verify(registry, org.mockito.Mockito.never()).resolveReference(anyString());
+    }
+
+    @Test
+    void importSchemaFallsBackToResolveReferenceOnlyWhenTheResultCarriesNoVersionedPin() {
+        // Only a version-less resourceId (e.g. a registry double that returned no pin) may use
+        // the resolveReference fallback.
+        when(schemaImportService.importSchema(any())).thenReturn(new SchemaImportResult("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56", List.of()));
+        when(registry.resolveReference("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56"))
+            .thenReturn(Optional.of("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.2.0"));
+
+        var result = operations.importSchema(new ImportSchemaCommand(mapper.createObjectNode()));
+
+        assertThat(result.rootArtifactId().value())
+            .isEqualTo("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.2.0");
+    }
+
+    @Test
+    void getArtifactForwardsAVersionedUrnForVersionPreciseReads() {
+        // A versioned ArtifactId must read exactly that version: the facade forwards it verbatim
+        // to the registry (no coercion to the logical/current URN).
+        String versioned = "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0";
+        JsonNode content = mapper.createObjectNode().put("$id", versioned);
+        when(registry.fetch(versioned)).thenReturn(Optional.of(content));
+
+        var view = operations.getArtifact(new ArtifactId(versioned));
+
+        assertThat(view).isPresent();
+        assertThat(view.get().artifactId().value()).isEqualTo(versioned);
+        assertThat(view.get().content()).isEqualTo(content);
+        verify(registry).fetch(versioned);
+    }
+
+    // ── createArtifact: minted identities for the non-Element kinds ──────────────
+
+    @Test
+    void createArtifactMintsDistinctIdentitiesForEqualNames() {
+        // The write itself returns the assigned versioned pin.
+        when(registry.storeMapping(anyString(), any(), any()))
+            .thenAnswer(inv -> UrnParser.withVersion(UrnParser.logicalUrn(inv.getArgument(0)), "1.0.0"));
+        JsonNode content = mapper.createObjectNode().put("source", "urn:core:x");
+
+        var first = operations.createArtifact(
+            new CreateArtifactCommand(ArtifactKind.MAPPING, "Sensor to Obs", content)).artifactId();
+        var second = operations.createArtifact(
+            new CreateArtifactCommand(ArtifactKind.MAPPING, "Sensor to Obs", content)).artifactId();
+
+        // Equal display names → two independent artifacts, each with a minted, versioned pin.
+        assertThat(UrnParser.disambiguatorFromUrn(first.value())).isNotBlank();
+        assertThat(UrnParser.nameFromUrn(first.value())).isEqualTo("Sensor-to-Obs");
+        assertThat(UrnParser.versionFromUrn(first.value())).isEqualTo("1.0.0");
+        assertThat(UrnParser.logicalUrn(first.value())).isNotEqualTo(UrnParser.logicalUrn(second.value()));
+    }
+
+    @Test
+    void writeResultsCarryTheDependencyListsGroupedByReferenceType() {
+        when(registry.storeMapping(anyString(), any(), any()))
+            .thenAnswer(inv -> UrnParser.withVersion(UrnParser.logicalUrn(inv.getArgument(0)), "1.0.0"));
+        String source = "urn:core:platform:civitas:element:common:Raw-abc:fh7j0g5lj5:1.0.0";
+        String target = "urn:core:platform:civitas:element:common:Obs-def:vnrud078ub:1.0.0";
+        when(registry.referencesByType(anyString())).thenReturn(java.util.Map.of(
+            "mapping-source", List.of(source),
+            "mapping-target", List.of(target)));
+        JsonNode content = mapper.createObjectNode().put("source", source).put("target", target);
+
+        var result = operations.createArtifact(
+            new CreateArtifactCommand(ArtifactKind.MAPPING, "Raw to Obs", content));
+
+        // The HAL-link-style lists a host mirrors: stored reference type → target pins.
+        assertThat(result.dependencies())
+            .containsEntry("mapping-source", List.of(new ArtifactId(source)))
+            .containsEntry("mapping-target", List.of(new ArtifactId(target)));
+        verify(registry).referencesByType(result.artifactId().value());
+    }
+
+    @Test
+    void createArtifactStampsTheMintedUrnIntoTheDocument() {
+        when(registry.storePipeline(anyString(), any(), any()))
+            .thenAnswer(inv -> UrnParser.withVersion(UrnParser.logicalUrn(inv.getArgument(0)), "1.0.0"));
+        // A caller-supplied id is stale by definition — Model Forge owns the created identity.
+        JsonNode content = mapper.createObjectNode().put("id", "urn:core:something:stale");
+
+        operations.createArtifact(new CreateArtifactCommand(ArtifactKind.PIPELINE, "Import Flow", content));
+
+        var urn = org.mockito.ArgumentCaptor.forClass(String.class);
+        var stored = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry).storePipeline(urn.capture(), stored.capture(),
+            eq(de.civitascore.modelforge.contract.VersionBump.PATCH));
+        assertThat(stored.getValue().path("id").asString()).isEqualTo(urn.getValue());
+        assertThat(UrnParser.disambiguatorFromUrn(urn.getValue())).isNotBlank();
+        verify(graph).registerFromRegistry(urn.getValue());
+    }
+
+    @Test
+    void createArtifactRejectsElementKinds() {
+        JsonNode schema = mapper.createObjectNode().put("type", "object");
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                operations.createArtifact(new CreateArtifactCommand(ArtifactKind.ELEMENT, "Sensor", schema)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("importSchema");
+    }
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://civitasconnect.digital/core-datastructure/v1",
+  "title": "CORE DataStructure",
+  "description": "A CORE DataStructure: a named, versioned grouping of Elements. A DataStructure is a stored artifact (not a View) — it records which Elements belong together (e.g. all entities of one imported JSON Schema document). It carries no embedded content of its own; its members are referenced by URN and resolved on read.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "id"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://civitasconnect.digital/core-datastructure/v1"
+    },
+    "id": {
+      "type": "string",
+      "description": "Versioned CORE URN of this DataStructure.",
+      "pattern": "^urn:core:[^:]+:[^:]+:datastructure:[^:]+:[^:]+:[^:]+$"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "elementRefs": {
+      "description": "URNs of the Elements grouped by this DataStructure.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^urn:",
+        "x-core-ref": { "type": "urn:core:type:Element" }
+      }
+    }
+  }
+}

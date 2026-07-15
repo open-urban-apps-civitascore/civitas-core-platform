@@ -1,0 +1,43 @@
+server:
+  # 8090 is fine when the Admin UI runs on its own. When running ALONGSIDE the main dev
+  # stack (dev-environment/start-portal-dev.sh), Kafka UI already owns 8090 — start the
+  # Admin UI with SERVER_PORT=8091 (see dev-environment/model-forge/vertical-slice.sh).
+  port: 8090
+
+spring:
+  application:
+    name: model-forge-admin-ui
+  # DEFAULT: the Admin UI is a console over the PLATFORM registry. It points at
+  # portal-backend's own database, where the embedded Model Forge writes the `model_forge`
+  # schema — so the UI shows and manages exactly what portal-backend created. Start the
+  # platform stack first (dev-environment/start-portal-dev.sh), then run the Admin UI
+  # (see dev-environment/model-forge/vertical-slice.sh).
+  #
+  # NOTE: this is a read-WRITE console — imports/edits/deletes here hit the real registry.
+  #
+  # STANDALONE (no portal-backend, seeded example schemas): point it at the bundled Postgres
+  # and enable the seed instead — see dev-environment/model-forge/local-demo.md:
+  #   SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/model_forge_admin?sslmode=disable \
+  #   SPRING_DATASOURCE_USERNAME=model_forge SPRING_DATASOURCE_PASSWORD=model_forge \
+  #   MODEL_FORGE_ADMIN_UI_SEED_ENABLED=true mvn spring-boot:run
+  datasource:
+    url: jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable
+    username: admin
+    password: admin
+  # The admin-ui has no host-owned migrations of its own, and Model Forge's starter already
+  # runs its own dedicated Flyway instance against the model_forge schema. Spring Boot's
+  # default flywayInitializer would otherwise also try to migrate (against whatever schema the
+  # datasource's default search_path resolves to) and fail once that schema is non-empty.
+  autoconfigure:
+    exclude: org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
+
+model-forge:
+  admin-ui:
+    seed:
+      # DEFAULT off: when pointed at portal-backend's registry we must NOT seed the bundled
+      # OGC SensorThings examples into it. Enable only for STANDALONE mode (own database).
+      enabled: false
+
+logging:
+  level:
+    de.civitascore.modelforge: INFO

@@ -1,0 +1,252 @@
+/* ── Design tokens ─────────────────────────────────────────────────────────── */
+/* Single source of truth for color/spacing/radius, shared with ArtifactTree.css
+   (the artifact-type palette below is also what GraphPage's vis-network legend mirrors). */
+:root {
+  --mf-bg: #eef1f5;
+  --mf-surface: #ffffff;
+  --mf-surface-alt: #f7f9fb;
+  --mf-border: #dde2e8;
+  --mf-border-soft: #e6eaef;
+  --mf-text: #202b37;
+  --mf-text-muted: #5c6975;
+  --mf-text-faint: #8a95a1;
+  --mf-primary: #2a4a6b;
+  --mf-primary-hover: #1c3450;
+  --mf-accent: #4a90d9;
+  --mf-accent-soft: rgba(74, 144, 217, 0.16);
+  --mf-danger: #a33d3d;
+  --mf-danger-hover: #822f2f;
+  --mf-secondary: #566573;
+  --mf-secondary-hover: #3f4b57;
+
+  --mf-radius-sm: 5px;
+  --mf-radius: 8px;
+  --mf-radius-lg: 10px;
+  --mf-shadow-sm: 0 1px 2px rgba(16, 24, 32, 0.06);
+  --mf-shadow-md: 0 4px 12px rgba(16, 24, 32, 0.10);
+
+  --mf-type-element: #4e79a7;
+  --mf-type-datastructure: #f28e2b;
+  --mf-type-mapping: #e15759;
+  --mf-type-pipeline: #4a9b95;
+  --mf-type-datasource: #59a14f;
+  --mf-type-datasink: #bf9a0f;
+  --mf-type-dataset: #b07aa1;
+  --mf-type-other: #8a95a1;
+}
+
+/* Dark theme: same tokens, different values. Applied via [data-theme="dark"] on <html>, set by
+   THEME_INIT_JS (BasePage.java) before first paint from localStorage, falling back to the OS
+   preference. Type/badge colors stay as-is — already saturated enough to read on a dark surface. */
+:root[data-theme="dark"] {
+  --mf-bg: #0f1519;
+  --mf-surface: #1a2228;
+  --mf-surface-alt: #151b20;
+  --mf-border: #2b3540;
+  --mf-border-soft: #232b33;
+  --mf-text: #e4e9ed;
+  --mf-text-muted: #9aa7b1;
+  --mf-text-faint: #6d7982;
+  --mf-primary: #5b9bd9;
+  --mf-primary-hover: #7fb2e3;
+  --mf-accent: #5b9bd9;
+  --mf-accent-soft: rgba(91, 155, 217, 0.22);
+  --mf-danger: #e0736f;
+  --mf-danger-hover: #ea9490;
+  --mf-secondary: #7c8996;
+  --mf-secondary-hover: #99a4af;
+  --mf-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --mf-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="dark"] li.feedbackPanelERROR { background: #38201f; color: #ff9d9a; border-left-color: #b94a4a; }
+:root[data-theme="dark"] li.feedbackPanelWARNING { background: #362e1a; color: #ffd580; border-left-color: #d9b23f; }
+:root[data-theme="dark"] li.feedbackPanelINFO, :root[data-theme="dark"] li.feedbackPanelSUCCESS { background: #17301f; color: #83e0a3; border-left-color: #3f9d63; }
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  margin: 0; color: var(--mf-text); background: var(--mf-bg);
+  line-height: 1.5; -webkit-font-smoothing: antialiased;
+}
+a { color: var(--mf-primary); }
+:focus-visible {
+  outline: 2px solid var(--mf-accent); outline-offset: 2px; border-radius: var(--mf-radius-sm);
+}
+
+nav {
+  background: #131c26; padding: 0.85rem 1.5rem; display: flex; align-items: center; gap: 1.4rem;
+  position: sticky; top: 0; z-index: 20; box-shadow: var(--mf-shadow-md); flex-wrap: wrap;
+}
+nav a {
+  color: #c3ccd4; text-decoration: none; font-size: 0.88rem; padding: 0.3rem 0.1rem;
+  border-bottom: 2px solid transparent; transition: color 0.15s ease, border-color 0.15s ease;
+}
+nav a:hover { color: #fff; border-bottom-color: var(--mf-accent); }
+nav .brand {
+  color: #fff; font-weight: 700; margin-right: 0.5rem; letter-spacing: 0.01em; font-size: 0.95rem;
+}
+.mf-nav-spacer { flex: 1; }
+.mf-theme-toggle {
+  background: rgba(255, 255, 255, 0.08); color: #dfe6ec; border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px; padding: 0.35rem 0.85rem; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.mf-theme-toggle:hover { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.28); }
+
+/* ── Layout: persistent sidebar + main ─────────────────────────────────────── */
+.mf-layout { display: flex; align-items: flex-start; }
+.mf-sidebar {
+  width: 300px; flex-shrink: 0; background: var(--mf-surface-alt); border-right: 1px solid var(--mf-border);
+  padding: 1rem 0.75rem; position: sticky; top: 3rem; align-self: flex-start;
+  max-height: calc(100vh - 3rem); overflow-y: auto;
+}
+.mf-filter {
+  width: 100%; padding: 0.5rem 0.65rem; font-size: 0.85rem; margin-bottom: 0.85rem;
+  border: 1px solid var(--mf-border); border-radius: var(--mf-radius-sm); background: var(--mf-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.mf-filter:focus { outline: none; border-color: var(--mf-accent); box-shadow: 0 0 0 3px var(--mf-accent-soft); }
+.mf-empty { font-size: 0.85rem; color: var(--mf-text-muted); padding: 0.5rem 0.25rem; line-height: 1.5; }
+
+main { flex: 1; min-width: 0; padding: 1.75rem 2rem; max-width: 1200px; }
+h2 {
+  margin-top: 0; padding-bottom: 0.6rem; border-bottom: 1px solid var(--mf-border);
+  font-size: 1.35rem; font-weight: 700; letter-spacing: -0.01em;
+}
+h3 { font-size: 1rem; font-weight: 700; color: var(--mf-text-muted); margin: 1.6rem 0 0.6rem; }
+
+/* ── Registry stats strip (ArtifactListPage) ──────────────────────────────────── */
+.mf-stats { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1rem 0 1.5rem; }
+.mf-stat {
+  display: flex; align-items: center; gap: 0.45rem; background: var(--mf-surface);
+  border: 1px solid var(--mf-border); border-radius: var(--mf-radius-lg);
+  padding: 0.5rem 0.9rem; box-shadow: var(--mf-shadow-sm);
+}
+.mf-stat--total { background: var(--mf-primary); border-color: var(--mf-primary); }
+.mf-stat--total .mf-stat-count, .mf-stat--total .mf-stat-label { color: #fff; }
+.mf-stat-dot { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 50%; flex-shrink: 0; }
+.mf-stat-count { font-size: 1.05rem; font-weight: 800; color: var(--mf-text); }
+.mf-stat-label { font-size: 0.78rem; color: var(--mf-text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+
+table {
+  border-collapse: collapse; width: 100%; background: var(--mf-surface);
+  border-radius: var(--mf-radius); overflow: hidden; box-shadow: var(--mf-shadow-sm);
+}
+th, td { padding: 0.6rem 0.8rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--mf-border-soft); }
+th { background: var(--mf-surface-alt); font-weight: 700; color: var(--mf-text-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+tbody tr { transition: background-color 0.1s ease; }
+tbody tr:hover { background: var(--mf-surface-alt); }
+tbody tr:last-child td { border-bottom: none; }
+
+label { display: block; margin: 0.7rem 0 0.3rem; font-weight: 600; font-size: 0.85rem; color: var(--mf-text-muted); }
+input[type=text], select {
+  padding: 0.5rem 0.65rem; font-size: 0.9rem; width: 100%; max-width: 420px;
+  border: 1px solid var(--mf-border); border-radius: var(--mf-radius-sm); background: var(--mf-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input[type=text].input-wide { max-width: 640px; }
+input[type=text]:focus, select:focus {
+  outline: none; border-color: var(--mf-accent); box-shadow: 0 0 0 3px var(--mf-accent-soft);
+}
+button, .button-link {
+  background: var(--mf-primary); color: #fff; border: none; padding: 0.55rem 1.15rem; cursor: pointer;
+  font-size: 0.88rem; font-weight: 600; border-radius: var(--mf-radius-sm); text-decoration: none;
+  display: inline-block; margin-top: 0.75rem; margin-right: 0.4rem;
+  transition: background-color 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
+}
+button:hover, .button-link:hover { background: var(--mf-primary-hover); box-shadow: var(--mf-shadow-sm); }
+button:active, .button-link:active { transform: translateY(1px); }
+.button-link.secondary { background: var(--mf-secondary); }
+.button-link.secondary:hover { background: var(--mf-secondary-hover); }
+.button-link.danger { background: var(--mf-danger); }
+.button-link.danger:hover { background: var(--mf-danger-hover); }
+
+ul.feedbackPanel { list-style: none; padding: 0; margin: 0 0 1.25rem; }
+ul.feedbackPanel li {
+  padding: 0.65rem 1rem; margin-bottom: 0.4rem; border-radius: var(--mf-radius-sm);
+  border-left: 3px solid transparent; font-size: 0.88rem; box-shadow: var(--mf-shadow-sm);
+}
+li.feedbackPanelERROR { background: #fdeeee; color: #8a1f1f; border-left-color: #b94a4a; }
+li.feedbackPanelWARNING { background: #fdf6e3; color: #8a6d1f; border-left-color: #d9b23f; }
+li.feedbackPanelINFO, li.feedbackPanelSUCCESS { background: #eaf7f0; color: #1f6b3a; border-left-color: #3f9d63; }
+pre {
+  background: var(--mf-surface); border: 1px solid var(--mf-border); border-radius: var(--mf-radius);
+  box-shadow: var(--mf-shadow-sm); font-size: 0.85rem;
+}
+.field-row { margin-bottom: 0.6rem; }
+
+/* ── Breadcrumbs + artifact detail header ──────────────────────────────────── */
+.mf-crumbs { font-size: 0.85rem; color: var(--mf-text-muted); margin: 0 0 0.5rem; }
+.mf-crumbs a { color: var(--mf-primary); text-decoration: none; }
+.mf-crumbs a:hover { text-decoration: underline; }
+.mf-crumbs .sep { margin: 0 0.4rem; color: var(--mf-text-faint); }
+.mf-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.75rem; margin: 0.3rem 0 0.9rem; }
+.mf-urn { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; color: var(--mf-text-muted); word-break: break-all; }
+.mf-badge {
+  display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.7rem;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #fff; background: var(--mf-secondary);
+}
+.mf-badge--element { background: var(--mf-type-element); }
+.mf-badge--datastructure { background: var(--mf-type-datastructure); }
+.mf-badge--mapping { background: var(--mf-type-mapping); }
+.mf-badge--pipeline { background: var(--mf-type-pipeline); }
+.mf-badge--datasource { background: var(--mf-type-datasource); }
+.mf-badge--datasink { background: var(--mf-type-datasink); }
+.mf-badge--dataset { background: var(--mf-type-dataset); }
+
+.mf-copy-btn {
+  background: transparent; color: var(--mf-text-muted); border: 1px solid var(--mf-border);
+  border-radius: var(--mf-radius-sm); padding: 0.1rem 0.5rem; font-size: 0.72rem; cursor: pointer;
+  margin-left: 0.4rem; vertical-align: middle; transition: background-color 0.15s ease, color 0.15s ease;
+}
+.mf-copy-btn:hover { background: var(--mf-surface-alt); color: var(--mf-text); }
+
+/* ── Relation chips ────────────────────────────────────────────────────────── */
+.mf-rel-block { margin-bottom: 0.6rem; }
+.mf-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.3rem 0 0; padding: 0; list-style: none; }
+.mf-chip {
+  display: inline-flex; align-items: baseline; gap: 0.35rem; background: var(--mf-surface); border: 1px solid var(--mf-border);
+  border-radius: 999px; padding: 0.25rem 0.7rem; font-size: 0.82rem; text-decoration: none; color: var(--mf-text);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.mf-chip:hover { border-color: var(--mf-accent); background: var(--mf-accent-soft); }
+.mf-chip .mf-chip-kind { font-size: 0.66rem; color: var(--mf-text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
+.mf-rel-empty { font-size: 0.85rem; color: var(--mf-text-faint); margin: 0.3rem 0 0; font-style: italic; }
+
+/* ── CodeMirror 6 editor ───────────────────────────────────────────────────── */
+.mf-editor-wrap { max-width: 900px; }
+.mf-editor { border: 1px solid var(--mf-border); border-radius: var(--mf-radius-sm); overflow: hidden; box-shadow: var(--mf-shadow-sm); }
+.cm-editor { max-height: 520px; font-size: 0.85rem; }
+.cm-editor.cm-focused { outline: none; }
+.cm-scroller { overflow: auto; }
+/* Once CodeMirror is mounted the underlying textarea is hidden; without JS it stays visible. */
+.code-editor-fallback { width: 100%; font-family: monospace; }
+.mf-editor-src { display: none; }
+.mf-hidden { display: none !important; }
+
+/* ── Page utilities ────────────────────────────────────────────────────────── */
+.content-pre { padding: 1rem; overflow: auto; max-height: 520px; }
+.content-pre.tall { max-height: 600px; }
+.split-pane { display: flex; gap: 1.25rem; }
+.split-pane > div { flex: 1; min-width: 0; }
+.graph-canvas { width: 100%; height: 700px; border: 1px solid var(--mf-border); border-radius: var(--mf-radius); background: var(--mf-surface); }
+.legend-dot { font-size: 1.1em; }
+.legend-dot--element { color: var(--mf-type-element); }
+.legend-dot--datastructure { color: var(--mf-type-datastructure); }
+.legend-dot--mapping { color: var(--mf-type-mapping); }
+.legend-dot--pipeline { color: var(--mf-type-pipeline); }
+.legend-dot--datasource { color: var(--mf-type-datasource); }
+.legend-dot--datasink { color: var(--mf-type-datasink); }
+.legend-dot--dataset { color: var(--mf-type-dataset); }
+
+/* ── Seed page cards ───────────────────────────────────────────────────────── */
+.mf-bundle {
+  background: var(--mf-surface); border: 1px solid var(--mf-border); border-radius: var(--mf-radius);
+  padding: 1rem 1.2rem; margin-bottom: 0.75rem; box-shadow: var(--mf-shadow-sm);
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.mf-bundle:hover { box-shadow: var(--mf-shadow-md); border-color: var(--mf-border-soft); }
+.mf-bundle-title { font-weight: 700; }
+.mf-bundle-sub { font-size: 0.82rem; color: var(--mf-text-muted); }
