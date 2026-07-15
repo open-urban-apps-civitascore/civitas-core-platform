@@ -38,6 +38,8 @@ config_adapter_arg=""
 backend_arg=""
 frontend_arg=""
 keycloak_secret_arg="dev-only-portal-frontend-secret"
+skip_build_arg=""
+no_clean_arg=""
 
 usage() {
     echo "Usage: $(basename "$0") [OPTIONS]"
@@ -56,6 +58,12 @@ usage() {
     echo "                                   auto = Docker container (production build)"
     echo "                                   cmd  = command line (pnpm dev, requires Node.js)"
     echo "  --keycloak-secret=SECRET         Keycloak client secret for portal-frontend"
+    echo "  --skip-build                     Reuse the already-built JARs/images and just"
+    echo "                                   (re)start the containers (no Maven build, no"
+    echo "                                   'docker build'). Use after a first full run when"
+    echo "                                   nothing changed — much faster startup."
+    echo "  --no-clean                       Incremental Maven build (drop 'clean'); only"
+    echo "                                   changed modules recompile (default: clean build)."
     echo "  -h, --help                       Show this help message"
     echo
     echo "Examples:"
@@ -101,6 +109,8 @@ while [ $# -gt 0 ]; do
             esac ;;
         --keycloak-secret=*)
             keycloak_secret_arg="${1#*=}" ;;
+        --skip-build) skip_build_arg="true" ;;
+        --no-clean) no_clean_arg="true" ;;
         -h|--help) usage ;;
         *)
             echo "ERROR: Unknown option: $1"
@@ -109,6 +119,24 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
+
+# ---- Build vs. reuse -------------------------------------------------
+# By default every run rebuilds the Maven artifacts (clean) and the Docker images.
+# --skip-build reuses the already-built JARs/images and only (re)starts the containers.
+SKIP_BUILD="${skip_build_arg:-false}"
+if [ "$SKIP_BUILD" = "true" ]; then COMPOSE_BUILD=""; else COMPOSE_BUILD="--build"; fi
+# --no-clean drops the Maven 'clean' goal for incremental builds. Default keeps 'clean',
+# so an unchanged invocation behaves exactly as before.
+NO_CLEAN="${no_clean_arg:-false}"
+if [ "$NO_CLEAN" = "true" ]; then MVN_CLEAN=""; else MVN_CLEAN="clean"; fi
+# Wrapper around mvn_in_container that no-ops when --skip-build is set.
+mvn_build() {
+    if [ "$SKIP_BUILD" = "true" ]; then
+        echo "  (--skip-build) reusing existing artifacts, skipping build of ${1##*/}"
+        return 0
+    fi
+    mvn_in_container "$@"
+}
 
 echo "======================================================"
 echo "CIVITAS CORE Platform - Portal Development Setup"
@@ -576,11 +604,11 @@ fi
 # Build AuthZ Repository JAR (required by its Dockerfile)
 # Uses containerized Maven (JDK 25) so the host doesn't need Java 25 installed.
 echo "Building AuthZ Repository..."
-if ! mvn_in_container "$SCRIPT_DIR/../portal-model" clean install -DskipTests -Drevision=$DEV_VERSION -q; then
+if ! mvn_build "$SCRIPT_DIR/../portal-model" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q; then
     echo "ERROR: Portal Model build failed"
     exit 1
 fi
-if ! mvn_in_container "$SCRIPT_DIR/../authz/repository" clean package -DskipTests -Dportal-model.version=$DEV_VERSION -q; then
+if ! mvn_build "$SCRIPT_DIR/../authz/repository" $MVN_CLEAN package -DskipTests -Dportal-model.version=$DEV_VERSION -q; then
     echo "ERROR: AuthZ Repository build failed"
     exit 1
 fi
@@ -588,7 +616,7 @@ echo "  AuthZ Repository built successfully"
 
 # Start AuthZ services (OPA + AuthZ Repository)
 cd "$SCRIPT_DIR/apisix"
-$DOCKER_COMPOSE -f docker-compose.authz.yml up -d --build
+$DOCKER_COMPOSE -f docker-compose.authz.yml up -d $COMPOSE_BUILD
 echo "  AuthZ services started (OPA + AuthZ Repository)"
 
 # Start APISIX gateway
@@ -766,7 +794,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
     echo "Building Java artifacts for Docker images (containerized Maven)..."
 
     # portal-model is a dependency for both services
-    if ! mvn_in_container "$SCRIPT_DIR/../portal-model" clean install -DskipTests -Drevision=$DEV_VERSION -q; then
+    if ! mvn_build "$SCRIPT_DIR/../portal-model" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q; then
         echo "ERROR: Portal Model build failed"
         exit 1
     fi
@@ -774,7 +802,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
 
     # Config Adapter JAR (needed by config-adapter Dockerfile)
     if [ "$config_adapter_option" = "1" ]; then
-        if ! mvn_in_container "$SCRIPT_DIR/../config-adapter" clean install -DskipTests -Drevision=$DEV_VERSION -Pdist -q; then
+        if ! mvn_build "$SCRIPT_DIR/../config-adapter" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -Pdist -q; then
             echo "ERROR: Config Adapter build failed"
             exit 1
         fi
@@ -788,13 +816,13 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
         # core-model-forge-*:0.1.0-SNAPSHOT locally — it is not published to the external
         # registry in a fresh dev setup. Model Forge keeps its own fixed version (no
         # -Drevision). Skip the npm types module; portal-backend only needs the Java jars.
-        if ! mvn_in_container "$SCRIPT_DIR/../model-forge" clean install -DskipTests -Dspotless.check.skip=true -Dspotbugs.skip=true -pl '!core-model-forge-types' -q; then
+        if ! mvn_build "$SCRIPT_DIR/../model-forge" $MVN_CLEAN install -DskipTests -Dspotless.check.skip=true -Dspotbugs.skip=true -pl '!core-model-forge-types' -q; then
             echo "ERROR: Model Forge build failed"
             exit 1
         fi
         echo "  Model Forge built"
 
-        if ! mvn_in_container "$SCRIPT_DIR/../portal-backend" clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -q; then
+        if ! mvn_build "$SCRIPT_DIR/../portal-backend" $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -q; then
             echo "ERROR: Portal Backend build failed"
             exit 1
         fi
@@ -816,7 +844,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
         COMPOSE_SERVICES="$COMPOSE_SERVICES portal-backend"
     fi
 
-    $DOCKER_COMPOSE up -d --build $COMPOSE_SERVICES
+    $DOCKER_COMPOSE up -d $COMPOSE_BUILD $COMPOSE_SERVICES
     echo "  Application containers started: $COMPOSE_SERVICES"
     echo
 fi
@@ -828,7 +856,7 @@ if [ "$config_adapter_option" = "2" ] || [ "$backend_option" = "2" ]; then
 
     # portal-model is a dependency for both services
     cd "$SCRIPT_DIR/../portal-model"
-    if ! mvn clean install -DskipTests -Drevision=$DEV_VERSION -q; then
+    if ! mvn $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q; then
         echo "ERROR: Portal Model build failed"
         exit 1
     fi
@@ -836,7 +864,7 @@ if [ "$config_adapter_option" = "2" ] || [ "$backend_option" = "2" ]; then
 
     if [ "$config_adapter_option" = "2" ]; then
         cd "$SCRIPT_DIR/../config-adapter"
-        if ! mvn clean install -DskipTests -Drevision=$DEV_VERSION -Pdist; then
+        if ! mvn $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -Pdist; then
             echo "ERROR: Config Adapter build failed"
             exit 1
         fi
@@ -845,7 +873,7 @@ if [ "$config_adapter_option" = "2" ] || [ "$backend_option" = "2" ]; then
 
     if [ "$backend_option" = "2" ]; then
         cd "$SCRIPT_DIR/../portal-backend"
-        if ! mvn clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION; then
+        if ! mvn $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION; then
             echo "ERROR: Portal Backend build failed"
             exit 1
         fi
@@ -988,7 +1016,7 @@ if [ "$config_adapter_option" = "3" ]; then
     echo
     echo "Build first (if not already done):"
     echo "  cd config-adapter"
-    echo "  mvn clean install -DskipTests -Drevision=$DEV_VERSION"
+    echo "  mvn $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION"
     echo
     echo "Then start in your IDE:"
     echo "  Project: config-adapter/config-adapter-application"
@@ -1051,9 +1079,9 @@ if [ "$backend_option" = "3" ]; then
     echo "======================================================"
     echo
     echo "Build first (if not already done):"
-    echo "  cd portal-model && mvn clean install -DskipTests && cd .."
+    echo "  cd portal-model && mvn $MVN_CLEAN install -DskipTests && cd .."
     echo "  cd portal-backend"
-    echo "  mvn clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION"
+    echo "  mvn $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION"
     echo
     echo "Then start in your IDE:"
     echo "  Project: portal-backend"
@@ -1145,7 +1173,7 @@ if [ "$frontend_option" = "1" ]; then
     echo "Starting Portal Frontend (Docker)..."
     docker rm -f civitas-portal-frontend 2>/dev/null || true
     cd "$SCRIPT_DIR/apps"
-    $DOCKER_COMPOSE up -d --build portal-frontend
+    $DOCKER_COMPOSE up -d $COMPOSE_BUILD portal-frontend
     echo "  Frontend container started on http://localhost:3000"
     echo "  Logs: cd dev-environment/apps && docker compose logs -f portal-frontend"
     cd "$SCRIPT_DIR"
