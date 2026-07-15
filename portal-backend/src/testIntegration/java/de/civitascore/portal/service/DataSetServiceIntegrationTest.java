@@ -174,14 +174,14 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     DataSource ds2 = portalData.dataSource();
     DataSource ds3 = portalData.dataSource();
 
-    return portalData.pipeline(
-        dataSet,
-        b ->
-            b.name(name + "_" + System.currentTimeMillis())
-                .description("Test pipeline for " + name)
-                .styles(createSampleStyles())
-                .dataSources(new HashSet<>(Set.of(ds1, ds2, ds3)))
-                .model(createSampleModel()));
+    Pipeline pipeline =
+        portalData.pipeline(
+            dataSet,
+            b ->
+                b.name(name + "_" + System.currentTimeMillis())
+                    .description("Test pipeline for " + name)
+                    .dataSources(new HashSet<>(Set.of(ds1, ds2, ds3))));
+    return portalData.attachPipelineDefinition(pipeline, createSampleModel(), createSampleStyles());
   }
 
   private Distribution createDistributionForDataSet(DataSet dataSet, String apiPath) {

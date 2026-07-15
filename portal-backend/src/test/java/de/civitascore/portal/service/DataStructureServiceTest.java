@@ -1,6 +1,7 @@
 package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -9,8 +10,8 @@ import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -35,7 +36,7 @@ class DataStructureServiceTest {
   @Mock private AssignmentRepository assignmentRepository;
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private DataSourceRepository dataSourceRepository;
-  @Mock private DataSinkRepository dataSinkRepository;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
 
   @InjectMocks private DataStructureService dataStructureService;
 
@@ -84,7 +85,7 @@ class DataStructureServiceTest {
       when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(false);
-      when(dataSinkRepository.existsByDataStructureVersionIdIn(Set.of(versionId))).thenReturn(true);
+      when(modelRegistryGateway.isReferencedBySink(any())).thenReturn(true);
 
       assertThatThrownBy(() -> dataStructureService.unrelease(dsId))
           .isInstanceOf(ResourceInUseException.class);
@@ -159,7 +160,7 @@ class DataStructureServiceTest {
       when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(false);
-      when(dataSinkRepository.existsByDataStructureVersionIdIn(Set.of(versionId))).thenReturn(true);
+      when(modelRegistryGateway.isReferencedBySink(any())).thenReturn(true);
 
       assertThatThrownBy(() -> dataStructureService.deleteById(dsId))
           .isInstanceOf(ResourceInUseException.class);

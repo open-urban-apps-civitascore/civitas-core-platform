@@ -9,7 +9,6 @@ API test collection for the Portal Backend, built with [Bruno](https://www.usebr
 | Portal Backend   | `http://localhost:8089`     | All tests            |
 | Keycloak         | `http://localhost:8080`     | Authentication       |
 | PostgreSQL       | `localhost:5432`            | Backend persistence  |
-| Model Atlas      | `http://localhost:8086`     | DataStructure release/version patch |
 
 Start the backend with:
 

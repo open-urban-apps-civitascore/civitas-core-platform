@@ -27,7 +27,7 @@ docs {
   Releases the DSV created in step 1 so it becomes AVAILABLE. Required
   because `DataSourceService.validateDataStructureVersionLinkable` rejects
   linking a DRAFT DSV — step 3's DataSource POST would fail with 400
-  otherwise. The DSV's Model Atlas upload (configured in step 1's body)
-  must already have succeeded for this release to pass; the saga workflow
-  uses the same pattern.
+  otherwise. The DSV's model must already be stored in Model Forge (done
+  synchronously as part of step 1's create call) for this release to pass;
+  the saga workflow uses the same pattern.
 }

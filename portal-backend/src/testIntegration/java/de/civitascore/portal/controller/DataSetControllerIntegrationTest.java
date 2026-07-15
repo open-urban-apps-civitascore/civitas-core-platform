@@ -192,23 +192,23 @@ class DataSetControllerIntegrationTest
     pipeline1.setName("test_pipeline_1_" + System.currentTimeMillis());
     pipeline1.setDescription("Test pipeline 1");
     pipeline1.setDataSet(dataSet);
-    pipeline1.setStyles(createSampleStyles());
     pipeline1.getDataSources().add(dataSource1);
     pipeline1.getDataSources().add(dataSource2);
 
-    pipeline1.setModel(createSampleModel());
     pipeline1 = pipelineRepository.save(pipeline1);
+    pipeline1 =
+        portalData.attachPipelineDefinition(pipeline1, createSampleModel(), createSampleStyles());
 
     Pipeline pipeline2 = new Pipeline();
     pipeline2.setName("test_pipeline_2_" + System.currentTimeMillis());
     pipeline2.setDescription("Test pipeline 2");
     pipeline2.setDataSet(dataSet);
-    pipeline2.setStyles(createSampleStyles());
     pipeline2.getDataSources().add(dataSource3);
     pipeline2.getDataSources().add(dataSource4);
 
-    pipeline2.setModel(createSampleModel());
     pipeline2 = pipelineRepository.save(pipeline2);
+    pipeline2 =
+        portalData.attachPipelineDefinition(pipeline2, createSampleModel(), createSampleStyles());
 
     // Create distributions for the dataset
     Distribution distribution1 = new Distribution();
@@ -1466,19 +1466,19 @@ class DataSetControllerIntegrationTest
       pipeline1.setName("test_pipeline_api1_" + System.currentTimeMillis());
       pipeline1.setDescription("Pipeline 1");
       pipeline1.setDataSet(dataSet);
-      pipeline1.setStyles(createSampleStyles());
-      pipeline1.setModel(createSampleModel());
 
-      pipelineRepository.save(pipeline1);
+      pipeline1 = pipelineRepository.save(pipeline1);
+      pipeline1 =
+          portalData.attachPipelineDefinition(pipeline1, createSampleModel(), createSampleStyles());
 
       Pipeline pipeline2 = new Pipeline();
       pipeline2.setName("test_pipeline_api2_" + System.currentTimeMillis());
       pipeline2.setDescription("Pipeline 2");
       pipeline2.setDataSet(dataSet);
-      pipeline2.setStyles(createSampleStyles());
-      pipeline2.setModel(createSampleModel());
 
-      pipelineRepository.save(pipeline2);
+      pipeline2 = pipelineRepository.save(pipeline2);
+      pipeline2 =
+          portalData.attachPipelineDefinition(pipeline2, createSampleModel(), createSampleStyles());
 
       seedStageRequirements(pipeline1, pipeline2);
 

@@ -30,11 +30,10 @@ script:post-response {
 }
 
 tests {
-  test("Patch accepted or Model Atlas unavailable", function() {
+  test("Patch accepted or wrong lifecycle state", function() {
     const status = res.getStatus();
-    // 200=patched, 400=wrong lifecycle state, 502=Model Atlas unavailable
-    if (status === 502) { console.warn('⚠ Model Atlas unavailable — patch not actually tested'); }
-    expect(status === 200 || status === 400 || status === 502).to.be.true;
+    // 200=patched, 400=wrong lifecycle state
+    expect(status === 200 || status === 400).to.be.true;
   });
 }
 

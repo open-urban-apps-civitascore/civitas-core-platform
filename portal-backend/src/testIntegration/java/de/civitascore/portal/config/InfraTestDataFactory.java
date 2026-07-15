@@ -7,6 +7,7 @@ import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -80,22 +81,24 @@ public class InfraTestDataFactory {
   }
 
   public DataSource createMqttDataSource() {
-    return portalData.dataSource(
-        b ->
-            b.name("mqtt-datasource-" + System.nanoTime())
-                .description("MQTT datasource for saga test")
-                .connectorType(ConnectorType.MQTT)
-                .dataSourceStatus(DataSourceStatus.AVAILABLE)
-                .configuration(
-                    Map.of(
-                        "host",
-                        "mqtt-broker",
-                        "port",
-                        1883,
-                        "topics",
-                        List.of("sensors/e2e"),
-                        "client_id",
-                        "civitas-e2e-" + System.nanoTime())));
+    DataSource dataSource =
+        portalData.dataSource(
+            b ->
+                b.name("mqtt-datasource-" + System.nanoTime())
+                    .description("MQTT datasource for saga test")
+                    .connectorType(ConnectorType.MQTT)
+                    .dataSourceStatus(DataSourceStatus.AVAILABLE));
+    return portalData.attachSourceConfiguration(
+        dataSource,
+        Map.of(
+            "host",
+            "mqtt-broker",
+            "port",
+            1883,
+            "topics",
+            List.of("sensors/e2e"),
+            "client_id",
+            "civitas-e2e-" + System.nanoTime()));
   }
 
   public DataSource createSqlDataSource() {
@@ -107,13 +110,14 @@ public class InfraTestDataFactory {
     config.put("password", encryptCredential("testpass"));
     config.put("query", "SELECT sensor_name, sensor_description FROM sensors");
 
-    return portalData.dataSource(
-        b ->
-            b.name("sql-datasource-" + System.nanoTime())
-                .description("PostgreSQL datasource for saga test")
-                .connectorType(ConnectorType.SQL)
-                .dataSourceStatus(DataSourceStatus.AVAILABLE)
-                .configuration(config));
+    DataSource dataSource =
+        portalData.dataSource(
+            b ->
+                b.name("sql-datasource-" + System.nanoTime())
+                    .description("PostgreSQL datasource for saga test")
+                    .connectorType(ConnectorType.SQL)
+                    .dataSourceStatus(DataSourceStatus.AVAILABLE));
+    return portalData.attachSourceConfiguration(dataSource, config);
   }
 
   /**
@@ -127,13 +131,15 @@ public class InfraTestDataFactory {
 
   public Pipeline createGeneratePipeline(
       DataSet dataSet, DataSource dataSource, String nameSuffix) {
-    return portalData.pipeline(
-        dataSet,
-        b ->
-            b.name("pipeline-" + nameSuffix + "-" + System.nanoTime())
-                .description("Generate → FROST pipeline")
-                .dataSources(Set.of(dataSource))
-                .model(loadPipelineConfig("pipelines/generate-pipeline-config.json")));
+    Pipeline pipeline =
+        portalData.pipeline(
+            dataSet,
+            b ->
+                b.name("pipeline-" + nameSuffix + "-" + System.nanoTime())
+                    .description("Generate → FROST pipeline")
+                    .dataSources(Set.of(dataSource)));
+    return portalData.attachPipelineDefinition(
+        pipeline, loadPipelineConfig("pipelines/generate-pipeline-config.json"), null);
   }
 
   /**
@@ -142,16 +148,19 @@ public class InfraTestDataFactory {
    * resolves at deploy time using the datasource's UUID.
    */
   public Pipeline createSqlPipeline(DataSet dataSet, DataSource dataSource) {
-    return portalData.pipeline(
-        dataSet,
-        b ->
-            b.name("sql-pipeline-" + System.nanoTime())
-                .description("SQL → FROST pipeline")
-                .dataSources(Set.of(dataSource))
-                .model(
-                    injectDatasourceId(
-                        loadPipelineConfig("pipelines/sql-pipeline-config.json"),
-                        dataSource.getId().toString())));
+    Pipeline pipeline =
+        portalData.pipeline(
+            dataSet,
+            b ->
+                b.name("sql-pipeline-" + System.nanoTime())
+                    .description("SQL → FROST pipeline")
+                    .dataSources(Set.of(dataSource)));
+    return portalData.attachPipelineDefinition(
+        pipeline,
+        injectDatasourceId(
+            loadPipelineConfig("pipelines/sql-pipeline-config.json"),
+            dataSource.getId().toString()),
+        null);
   }
 
   /**
@@ -160,16 +169,19 @@ public class InfraTestDataFactory {
    * resolves at deploy time using the datasource's UUID.
    */
   public Pipeline createMqttPipeline(DataSet dataSet, DataSource dataSource) {
-    return portalData.pipeline(
-        dataSet,
-        b ->
-            b.name("mqtt-pipeline-" + System.nanoTime())
-                .description("MQTT → FROST pipeline")
-                .dataSources(Set.of(dataSource))
-                .model(
-                    injectDatasourceId(
-                        loadPipelineConfig("pipelines/mqtt-pipeline-config.json"),
-                        dataSource.getId().toString())));
+    Pipeline pipeline =
+        portalData.pipeline(
+            dataSet,
+            b ->
+                b.name("mqtt-pipeline-" + System.nanoTime())
+                    .description("MQTT → FROST pipeline")
+                    .dataSources(Set.of(dataSource)));
+    return portalData.attachPipelineDefinition(
+        pipeline,
+        injectDatasourceId(
+            loadPipelineConfig("pipelines/mqtt-pipeline-config.json"),
+            dataSource.getId().toString()),
+        null);
   }
 
   /**
@@ -181,15 +193,12 @@ public class InfraTestDataFactory {
       DataSet dataSet, DataSource dataSource, String tableName, Map<String, Object> model) {
     Pipeline pipeline = createGeneratePipeline(dataSet, dataSource, "geo");
     var dataStructure = portalData.dataStructure();
-    var version = portalData.dataStructureVersion(dataStructure, b -> b.model(model));
-    portalData.dataSink(
-        dataSet,
-        pipeline,
-        sink -> {
-          sink.setDataSinkType(DataSinkType.POSTGIS);
-          sink.setConfiguration(
-              Map.of("tableName", tableName, "dataStructureVersionId", version.getId().toString()));
-        });
+    var version = portalData.dataStructureVersion(dataStructure);
+    portalData.attachModel(version, model);
+    DataSink sink =
+        portalData.dataSink(dataSet, pipeline, s -> s.setDataSinkType(DataSinkType.POSTGIS));
+    portalData.attachSinkConfiguration(
+        sink, Map.of("tableName", tableName, "element", version.getModelUrn()));
     return pipeline;
   }
 
