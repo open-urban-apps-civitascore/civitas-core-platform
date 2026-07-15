@@ -31,7 +31,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      # Generous grace: on arm64 hosts the amd64-pinned base runs under emulation and
+      # Spring Boot needs ~75s+ to start. On amd64 it becomes healthy in ~15s, so this
+      # upper bound has no effect there.
+      start_period: 180s
 
   # OPA - Policy Decision Point
   opa:

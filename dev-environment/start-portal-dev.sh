@@ -20,6 +20,17 @@ cd "$SCRIPT_DIR"
 
 OS_TYPE=$(uname -s)
 
+# ---- Docker-on-Windows path helpers ---------------------------------
+# Git Bash / MSYS rewrites a lone "/foo" command-line arg into a Windows path
+# (e.g. C:/Program Files/Git/foo), which corrupts container-internal paths passed to
+# `docker run` (-w, -v targets, in-container tool args). A leading "//" is left untouched
+# by MSYS and still resolves to "/foo" inside Linux. Bind-mount HOST paths additionally
+# need to be real Windows paths, so convert them with cygpath. On Linux/macOS CP="/" and
+# winhost() is a plain echo, so behaviour there is byte-for-byte unchanged.
+CP="/"
+case "$OS_TYPE" in MINGW*|MSYS*|CYGWIN*) CP="//" ;; esac
+winhost() { case "$OS_TYPE" in MINGW*|MSYS*|CYGWIN*) cygpath -m "$1" ;; *) printf '%s' "$1" ;; esac; }
+
 # ---- CLI Arguments ---------------------------------------------------
 
 authz_arg=""
@@ -178,7 +189,7 @@ fi
 # Docker mode uses containerized Maven inside a JDK 25 container.
 MVN_AVAILABLE=false
 if command -v mvn >/dev/null 2>&1; then
-    MVN_VERSION=$(mvn -version 2>&1 | head -1 | awk '{print $3}')
+    MVN_VERSION=$(mvn -version 2>&1 | awk '/Apache Maven/ {print $3; exit}')
     MVN_MAJOR=$(echo "$MVN_VERSION" | cut -d'.' -f1)
     MVN_MINOR=$(echo "$MVN_VERSION" | cut -d'.' -f2)
     if [ "$MVN_MAJOR" -gt 3 ] || { [ "$MVN_MAJOR" -eq 3 ] && [ "$MVN_MINOR" -ge 6 ]; }; then
@@ -240,10 +251,10 @@ mvn_in_container() {
     host_gid=$(id -g)
 
     docker run --rm \
-        -v "$PROJECT_ROOT:/project" \
-        -v "$MVN_CACHE_VOLUME:/var/maven/.m2" \
-        -e MAVEN_CONFIG=/var/maven/.m2 \
-        -w "/project/$rel_path" \
+        -v "$(winhost "$PROJECT_ROOT"):${CP}project" \
+        -v "$MVN_CACHE_VOLUME:${CP}var/maven/.m2" \
+        -e "MAVEN_CONFIG=${CP}var/maven/.m2" \
+        -w "${CP}project/$rel_path" \
         maven:3.9-eclipse-temurin-25 \
         sh -c "
             chown -R $host_uid:$host_gid /var/maven/.m2 && \
@@ -509,11 +520,11 @@ fi
 echo "  Running database migrations..."
 FLYWAY_MIGRATIONS="$SCRIPT_DIR/../portal-backend/src/main/resources/db/migration"
 if docker run --rm --network civitas-network \
-    -v "$FLYWAY_MIGRATIONS:/flyway/sql:ro" \
+    -v "$(winhost "$FLYWAY_MIGRATIONS"):${CP}flyway/sql:ro" \
     flyway/flyway:11-alpine \
     -url=jdbc:postgresql://postgres-portal:5432/portal_backend \
     -user=admin -password=admin \
-    -locations=filesystem:/flyway/sql \
+    -locations=filesystem:${CP}flyway/sql \
     migrate; then
     echo "  Database migrations complete"
 else
@@ -668,7 +679,7 @@ wait_for_service() {
 wait_for_service "Keycloak" "http://localhost:8080/realms/master" 60
 wait_for_service "Kafka UI" "http://localhost:8090" 30
 wait_for_service "OPA" "http://localhost:8181/health" 30
-wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 60
+wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 120
 
 # macOS: disable Keycloak https requirement on master realm on macos
 if [ "$OS_TYPE" = "Darwin" ]; then
@@ -732,6 +743,17 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
 
     # Portal Backend JAR (needed by portal-backend Dockerfile)
     if [ "$backend_option" = "1" ]; then
+        # Model Forge is embedded in portal-backend (core-model-forge-* artifacts). Build it
+        # into the container Maven cache first so portal-backend can resolve
+        # core-model-forge-*:0.1.0-SNAPSHOT locally — it is not published to the external
+        # registry in a fresh dev setup. Model Forge keeps its own fixed version (no
+        # -Drevision). Skip the npm types module; portal-backend only needs the Java jars.
+        if ! mvn_in_container "$SCRIPT_DIR/../model-forge" clean install -DskipTests -Dspotless.check.skip=true -Dspotbugs.skip=true -pl '!core-model-forge-types' -q; then
+            echo "ERROR: Model Forge build failed"
+            exit 1
+        fi
+        echo "  Model Forge built"
+
         if ! mvn_in_container "$SCRIPT_DIR/../portal-backend" clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -q; then
             echo "ERROR: Portal Backend build failed"
             exit 1
@@ -805,6 +827,7 @@ if [ "$config_adapter_option" = "2" ]; then
 # Config Adapter environment variables (from application.properties)
 export HEALTHCHECK_PORT=8088
 export ADAPTERS=keycloak,apisix,frost
+export CIVITAS_MASTER_KEY=${CIVITAS_MASTER_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
 export EVENTHANDLER_NAME=kafka
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 export KAFKA_GROUP_ID=config-adapter-group
