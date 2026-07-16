@@ -56,6 +56,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final PipelineRepository pipelineRepository;
   private final DataPoolRepository dataPoolRepository;
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
+  private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -341,6 +342,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
     if (input.getDatapoolScope() != null) {
       applyDatapoolScope(entity, input.getDatapoolScope());
+      if (inUse) {
+        revalidateLinkedDatasetsAgainstNewScope(entity);
+      }
     }
 
     if (!inUse) {
@@ -348,6 +352,27 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
 
     return save(entity);
+  }
+
+  /**
+   * Re-asserts the DataSource→DataPool scope rule after this DataSource's own scope was narrowed,
+   * for every dataset it already feeds. Narrowing a bound DataSource (e.g. {@code ALL → SPECIFIC}
+   * excluding a pool it is linked into, or {@code → NONE}) would otherwise reach the same persisted
+   * state the pipeline-write validation rejects, without any path re-checking it. Each referencing
+   * pipeline is validated against its own dataset's datapool; the managed DataSource already
+   * carries the new scope.
+   *
+   * @param dataSource the DataSource whose scope has just been changed
+   * @throws de.civitascore.portal.util.DataSourceScopeViolationException if it is now out of scope
+   *     for any dataset it feeds
+   */
+  private void revalidateLinkedDatasetsAgainstNewScope(DataSource dataSource) {
+    pipelineRepository
+        .findByDataSourcesId(dataSource.getId())
+        .forEach(
+            pipeline ->
+                datapoolScopeValidator.validate(
+                    List.of(dataSource), pipeline.getDataSet().getDataPool()));
   }
 
   private void validateInUseConstraints(DataSourceInputDTO input, DataSource entity) {

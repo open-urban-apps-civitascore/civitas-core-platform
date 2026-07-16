@@ -8,6 +8,7 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
@@ -26,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.encoder.Encode;
@@ -62,6 +64,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
+  private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
+
   public DataSetService(
       DataSetRepository dataSetRepository,
       DataSinkRepository dataSinkRepository,
@@ -69,7 +73,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       DataPoolRepository dataPoolRepository,
       AssignmentFactory assignmentFactory,
       DataSetSagaPublisher sagaPublisher,
-      ObjectProvider<AllowedScopes> allowedScopesProvider) {
+      ObjectProvider<AllowedScopes> allowedScopesProvider,
+      DataSourceDatapoolScopeValidator datapoolScopeValidator) {
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
     this.dataSetMapper = dataSetMapper;
@@ -77,6 +82,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     this.assignmentFactory = assignmentFactory;
     this.sagaPublisher = sagaPublisher;
     this.allowedScopesProvider = allowedScopesProvider;
+    this.datapoolScopeValidator = datapoolScopeValidator;
   }
 
   /**
@@ -96,6 +102,28 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
     throw new AccessDeniedException(
         "Not authorized to place a dataset into datapool " + datapoolId);
+  }
+
+  /**
+   * Re-asserts the DataSource→DataPool scope rule for every DataSource across the dataset's
+   * existing pipelines against the dataset's current datapool. The rule is enforced at
+   * pipeline-write time against the pool the dataset had then; moving the dataset into a different
+   * pool afterwards would otherwise leave a pipeline holding a DataSource that is out of scope for
+   * the new pool. Rejecting here (and as a backstop before staging/release) keeps a dataset from
+   * ever being released while carrying an out-of-scope DataSource.
+   *
+   * @param dataSet the dataset whose pipelines' DataSources are checked against {@code
+   *     dataSet.getDataPool()}
+   * @throws de.civitascore.portal.util.DataSourceScopeViolationException if any is out of scope
+   */
+  private void revalidatePipelineDataSourcesAgainstPool(DataSet dataSet) {
+    Set<DataSource> dataSources =
+        dataSet.getPipelines().stream()
+            .flatMap(p -> p.getDataSources() == null ? Stream.empty() : p.getDataSources().stream())
+            .collect(Collectors.toSet());
+    if (!dataSources.isEmpty()) {
+      datapoolScopeValidator.validate(dataSources, dataSet.getDataPool());
+    }
   }
 
   @Override
@@ -170,6 +198,11 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     } else {
       entity.setDataPool(null);
     }
+
+    // Re-assert scope against the resolved pool unconditionally: it is idempotent and cheap, so
+    // decoupling it from the pool-change decision keeps the guard from silently lapsing if any
+    // future mutation path is added here. The pool-change condition gates only authorization above.
+    revalidatePipelineDataSourcesAgainstPool(entity);
 
     List<NamedApiInputDTO> incoming = input.getNamedApis();
     if (incoming != null) {
@@ -297,7 +330,10 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    */
   @Transactional
   public DataSet stage(UUID id) {
-    DataSet dataSet = findByIdOrThrow(id);
+    DataSet dataSet =
+        dataSetRepository
+            .findByIdWithPipelineDataSources(id)
+            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
 
     if (dataSet.getDataSetStatus() != DataSetStatus.DRAFT) {
       throw new InvalidInputException("dataSetStatus", id, "Only DRAFT datasets can be staged");
@@ -319,6 +355,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       throw new InvalidInputException(
           "pipelines", id, "DataSet must have at least one Pipeline with DataSources");
     }
+
+    revalidatePipelineDataSourcesAgainstPool(dataSet);
 
     dataSet.setDataSetStatus(DataSetStatus.READY);
     return dataSetRepository.save(dataSet);
@@ -387,6 +425,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           id,
           "Cannot release while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
+
+    revalidatePipelineDataSourcesAgainstPool(dataSet);
 
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
     dataSet.setPendingSagaType(PendingSagaType.CREATE);

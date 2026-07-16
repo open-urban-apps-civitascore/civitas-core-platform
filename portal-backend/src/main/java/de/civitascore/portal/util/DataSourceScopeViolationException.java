@@ -13,7 +13,7 @@ public class DataSourceScopeViolationException extends RuntimeException {
 
   public DataSourceScopeViolationException(List<UUID> offendingDataSourceIds) {
     super("One or more DataSources are not permitted for the Dataset's DataPool scope");
-    this.offendingDataSourceIds = offendingDataSourceIds;
+    this.offendingDataSourceIds = List.copyOf(offendingDataSourceIds);
   }
 
   public List<UUID> getOffendingDataSourceIds() {

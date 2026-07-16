@@ -16,9 +16,11 @@ import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataPool;
+import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
@@ -28,11 +30,13 @@ import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
+import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -45,6 +49,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -63,6 +68,8 @@ class DataSourceServiceTest {
   @Mock private PipelineRepository pipelineRepository;
   @Mock private DataPoolRepository dataPoolRepository;
   @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
+
+  @Spy private DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
   @InjectMocks private DataSourceService dataSourceService;
 
@@ -711,6 +718,124 @@ class DataSourceServiceTest {
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getAssignments()).isEmpty();
+    }
+
+    @Test
+    @DisplayName(
+        "Should reject narrowing an in-use datasource's scope to exclude a pool it already feeds")
+    void shouldRejectNarrowingScopeExcludingLinkedPool() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setDatapoolScopeType(DatapoolScopeType.ALL);
+
+      // The datasource already feeds a dataset sitting in poolA.
+      DataPool poolA = new DataPool();
+      poolA.setId(UUID.randomUUID());
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setDataPool(poolA);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSet(dataSet);
+      pipeline.setDataSources(new HashSet<>(Set.of(entity)));
+
+      // Narrow the scope to a DIFFERENT pool (poolB), excluding poolA.
+      DataPool poolB = new DataPool();
+      poolB.setId(UUID.randomUUID());
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(poolB.getId()));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setDatapoolScope(scope);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      stubInUse(id);
+      when(dataPoolRepository.findAllById(List.of(poolB.getId()))).thenReturn(List.of(poolB));
+      when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(id));
+    }
+
+    @Test
+    @DisplayName("Should accept narrowing an in-use datasource's scope to a pool it already feeds")
+    void shouldAcceptNarrowingScopeIncludingLinkedPool() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setDatapoolScopeType(DatapoolScopeType.ALL);
+
+      DataPool poolA = new DataPool();
+      poolA.setId(UUID.randomUUID());
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setDataPool(poolA);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSet(dataSet);
+      pipeline.setDataSources(new HashSet<>(Set.of(entity)));
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(poolA.getId()));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setDatapoolScope(scope);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      stubInUse(id);
+      when(dataPoolRepository.findAllById(List.of(poolA.getId()))).thenReturn(List.of(poolA));
+      when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
+      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
+
+      assertThat(result.getDatapoolScopeType()).isEqualTo(DatapoolScopeType.SPECIFIC);
+    }
+
+    @Test
+    @DisplayName("Should reject narrowing an in-use datasource's scope to NONE")
+    void shouldRejectNarrowingScopeToNone() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setDatapoolScopeType(DatapoolScopeType.ALL);
+
+      DataPool poolA = new DataPool();
+      poolA.setId(UUID.randomUUID());
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setDataPool(poolA);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSet(dataSet);
+      pipeline.setDataSources(new HashSet<>(Set.of(entity)));
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.NONE);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setDatapoolScope(scope);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      stubInUse(id);
+      when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(id));
     }
   }
 
