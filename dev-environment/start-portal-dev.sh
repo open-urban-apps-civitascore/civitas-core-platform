@@ -41,15 +41,24 @@ keycloak_secret_arg="dev-only-portal-frontend-secret"
 skip_build_arg=""
 no_clean_arg=""
 
+# Optional infra services (default: start them). These are Kafka-decoupled from the modeling
+# path (frontend → APISIX → backend → Keycloak/Postgres/Kafka + embedded Model Forge), so they
+# can be skipped when you only need to model DataStructures/Datasets/Pipelines and don't deploy.
+# Turned off by --no-frost/--no-geoserver/--no-nifi, or all at once (plus config-adapter) by --modeling.
+START_FROST=true
+START_GEOSERVER=true
+START_NIFI=true
+
 usage() {
     echo "Usage: $(basename "$0") [OPTIONS]"
     echo
     echo "Options:"
     echo "  --authz=full|allowall            AuthZ mode (default: prompt, default answer: allowall)"
-    echo "  --config-adapter=auto|cmd|ide    Config Adapter startup (default: prompt)"
+    echo "  --config-adapter=auto|cmd|ide|none  Config Adapter startup (default: prompt)"
     echo "                                   auto = Docker container (recommended)"
     echo "                                   cmd  = command line (java -jar, requires Java 25+)"
     echo "                                   ide  = manual/IDE debugging (requires Java 25+)"
+    echo "                                   none = do not start it (alias: --no-config-adapter)"
     echo "  --backend=auto|cmd|ide           Portal Backend startup (default: prompt)"
     echo "                                   auto = Docker container (recommended)"
     echo "                                   cmd  = command line (mvn spring-boot:run, requires Java 25+)"
@@ -64,12 +73,19 @@ usage() {
     echo "                                   nothing changed — much faster startup."
     echo "  --no-clean                       Incremental Maven build (drop 'clean'); only"
     echo "                                   changed modules recompile (default: clean build)."
+    echo "  --no-frost                       Do not start the FROST server"
+    echo "  --no-geoserver                   Do not start GeoServer"
+    echo "  --no-nifi                        Do not start Apache NiFi"
+    echo "  --no-config-adapter              Do not start the Config Adapter"
+    echo "  --modeling                       Modeling-only: skip config-adapter, NiFi, FROST and"
+    echo "                                   GeoServer (the deployment side). They are Kafka-decoupled,"
+    echo "                                   so modeling DataStructures/Datasets/Pipelines still works."
     echo "  -h, --help                       Show this help message"
     echo
     echo "Examples:"
     echo "  $0 --authz=allowall --config-adapter=auto --backend=auto --frontend=auto"
     echo "  $0 --config-adapter=cmd --backend=cmd --frontend=manual"
-    echo "  $0 --config-adapter=ide --backend=ide --frontend=manual"
+    echo "  $0 --backend=auto --frontend=auto --modeling      # just the modeling stack"
     echo "  $0 --backend=auto --keycloak-secret=abc123"
     exit 0
 }
@@ -89,8 +105,18 @@ while [ $# -gt 0 ]; do
                 auto) config_adapter_arg="1" ;;
                 cmd)  config_adapter_arg="2" ;;
                 ide)  config_adapter_arg="3" ;;
-                *) echo "ERROR: --config-adapter must be 'auto', 'cmd', or 'ide'"; exit 1 ;;
+                none) config_adapter_arg="0" ;;
+                *) echo "ERROR: --config-adapter must be 'auto', 'cmd', 'ide', or 'none'"; exit 1 ;;
             esac ;;
+        --no-config-adapter) config_adapter_arg="0" ;;
+        --no-frost)     START_FROST=false ;;
+        --no-geoserver) START_GEOSERVER=false ;;
+        --no-nifi)      START_NIFI=false ;;
+        --modeling)
+            # Modeling-only: skip the deployment side. Only default the config-adapter to "none"
+            # so an explicit --config-adapter=... still wins.
+            [ -z "$config_adapter_arg" ] && config_adapter_arg="0"
+            START_FROST=false; START_GEOSERVER=false; START_NIFI=false ;;
         --backend=*)
             val="${1#*=}"
             case "$val" in
@@ -346,6 +372,7 @@ echo
 if [ -n "$config_adapter_arg" ]; then
     config_adapter_option="$config_adapter_arg"
     case "$config_adapter_option" in
+        0) echo "Config Adapter: disabled (--config-adapter=none)" ;;
         1) echo "Config Adapter: Docker (--config-adapter=auto)" ;;
         2) echo "Config Adapter: Command line (--config-adapter=cmd)" ;;
         3) echo "Config Adapter: IDE (--config-adapter=ide)" ;;
@@ -356,8 +383,9 @@ else
     echo "  1) Docker (build & run as container)  [recommended]"
     echo "  2) Command line (java -jar in terminal — requires Java 25+)"
     echo "  3) Manual / IDE (for debugging — requires Java 25+)"
+    echo "  0) None (skip — not needed for modeling; it only deploys to NiFi/FROST/GeoServer)"
     echo
-    read -p "Select option [1/2/3]: " config_adapter_option
+    read -p "Select option [1/2/3/0]: " config_adapter_option
 fi
 
 echo
@@ -470,6 +498,7 @@ echo "Configuration Summary"
 echo "------------------------------------------------------"
 echo "  AuthZ mode:      $([ "$authz_option" = "1" ] && echo 'Full AuthZ' || echo 'Allow-all')"
 case "$config_adapter_option" in
+    0) echo "  Config Adapter:  disabled" ;;
     1) echo "  Config Adapter:  Docker" ;;
     2) echo "  Config Adapter:  Command line" ;;
     3) echo "  Config Adapter:  Manual/IDE" ;;
@@ -484,6 +513,11 @@ case "$frontend_option" in
     2) echo "  Portal Frontend: Command line" ;;
     3) echo "  Portal Frontend: Manual" ;;
 esac
+skipped_infra=""
+[ "$START_FROST" = "true" ]     || skipped_infra="$skipped_infra FROST"
+[ "$START_GEOSERVER" = "true" ] || skipped_infra="$skipped_infra GeoServer"
+[ "$START_NIFI" = "true" ]      || skipped_infra="$skipped_infra NiFi"
+[ -n "$skipped_infra" ] && echo "  Skipped infra:  $skipped_infra"
 echo "------------------------------------------------------"
 echo
 
@@ -624,30 +658,39 @@ cd "$SCRIPT_DIR/apisix"
 $DOCKER_COMPOSE up -d
 echo "  APISIX started"
 
-cd "$SCRIPT_DIR/frost"
-if [ ! -f .env ] && [ -f .env.example ]; then
-    cp .env.example .env
-    echo "  Created frost/.env from .env.example (set FROST_DB_PASSWORD to change the password)"
-fi
-if $DOCKER_COMPOSE up -d 2>&1; then
-    echo "  FROST Server started"
+if [ "$START_FROST" = "true" ]; then
+    cd "$SCRIPT_DIR/frost"
+    if [ ! -f .env ] && [ -f .env.example ]; then
+        cp .env.example .env
+        echo "  Created frost/.env from .env.example (set FROST_DB_PASSWORD to change the password)"
+    fi
+    if $DOCKER_COMPOSE up -d 2>&1; then
+        echo "  FROST Server started"
+    else
+        echo "  WARNING: FROST Server failed to start (may not support this architecture)"
+        echo "           Portal development works fine without it."
+    fi
 else
-    echo "  WARNING: FROST Server failed to start (may not support this architecture)"
-    echo "           Portal development works fine without it."
+    echo "  Skipping FROST Server (--no-frost/--modeling)"
 fi
 
-cd "$SCRIPT_DIR/geoserver"
-if [ ! -f .env ] && [ -f .env.example ]; then
-    cp .env.example .env
-    echo "  Created geoserver/.env from .env.example (set GEOSERVER_ADMIN_PASSWORD to change the password)"
-fi
-if $DOCKER_COMPOSE up -d 2>&1; then
-    echo "  GeoServer started"
+if [ "$START_GEOSERVER" = "true" ]; then
+    cd "$SCRIPT_DIR/geoserver"
+    if [ ! -f .env ] && [ -f .env.example ]; then
+        cp .env.example .env
+        echo "  Created geoserver/.env from .env.example (set GEOSERVER_ADMIN_PASSWORD to change the password)"
+    fi
+    if $DOCKER_COMPOSE up -d 2>&1; then
+        echo "  GeoServer started"
+    else
+        echo "  WARNING: GeoServer failed to start"
+        echo "           Portal development works fine without it."
+    fi
 else
-    echo "  WARNING: GeoServer failed to start"
-    echo "           Portal development works fine without it."
+    echo "  Skipping GeoServer (--no-geoserver/--modeling)"
 fi
 
+if [ "$START_NIFI" = "true" ]; then
 cd "$SCRIPT_DIR/nifi"
 # Seed the NiFi credentials file from the checked-in example
 if [ ! -f .env ] && [ -f .env.example ]; then
@@ -698,6 +741,9 @@ if $DOCKER_COMPOSE up -d 2>&1; then
 else
     echo "  WARNING: Apache NiFi failed to start"
     echo "           Dataset pipeline deployment will not work."
+fi
+else
+    echo "  Skipping Apache NiFi (--no-nifi/--modeling)"
 fi
 
 cd "$SCRIPT_DIR"
