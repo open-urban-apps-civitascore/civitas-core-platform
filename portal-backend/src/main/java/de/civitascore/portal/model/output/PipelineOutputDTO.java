@@ -19,5 +19,6 @@ public class PipelineOutputDTO extends BaseOutputDTO {
   private String description;
   private Map<String, Object> styles;
   private List<UUID> dataSinkIds = new ArrayList<>();
+  private List<UUID> dataSourceIds = new ArrayList<>();
   private Map<String, Object> model;
 }

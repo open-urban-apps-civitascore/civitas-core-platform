@@ -1112,10 +1112,8 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName(
-        "Should allow updating pipeline fields without re-validating unchanged datasource associations")
-    void shouldAllowPatchWhenLinkedDataSourceBecomesUnreleased() {
-      // Create pipeline with an AVAILABLE datasource
+    @DisplayName("PATCH of a non-datasource field preserves the pipeline's linked datasources")
+    void shouldPreserveDataSourcesWhenPatchingOtherFields() {
       DataSource dataSource = createTestDataSource();
       dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
       dataSourceRepository.save(dataSource);
@@ -1126,43 +1124,27 @@ class PipelineControllerIntegrationTest
       assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       UUID pipelineId = createResponse.getBody().getId();
 
-      // Unrelease the datasource (revert to DRAFT)
-      dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
-      dataSourceRepository.save(dataSource);
-
-      // PATCH a non-datasource field — should succeed because dataSourceIds is not in the patch
+      // PATCH a non-datasource field; dataSourceIds is omitted from the body.
       Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("description", "Updated after datasource unreleased");
+      patchMap.put("description", "Updated description");
 
       ResponseEntity<PipelineOutputDTO> patchResponse = performPatch(pipelineId, patchMap);
 
       assertThat(patchResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(patchResponse.getBody().getDescription())
-          .isEqualTo("Updated after datasource unreleased");
+      assertThat(patchResponse.getBody().getDescription()).isEqualTo("Updated description");
+      // Omitted dataSourceIds must be preserved, not wiped (work item #1759).
+      assertThat(patchResponse.getBody().getDataSourceIds()).containsExactly(dataSource.getId());
     }
 
     @Test
-    @DisplayName(
-        "Should reject updating datasource associations when a linked datasource is no longer AVAILABLE")
-    void shouldRejectUpdateWhenReSubmittingUnreleasedDataSource() {
-      // Create pipeline with an AVAILABLE datasource
-      DataSource dataSource = createTestDataSource();
-      dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      dataSourceRepository.save(dataSource);
+    @DisplayName("PUT rejects linking a DRAFT (non-AVAILABLE) datasource")
+    void shouldRejectUpdateAddingDraftDataSource() {
+      // A freshly created, never-linked datasource is DRAFT by default and may not be attached.
+      UUID pipelineId = createTestEntity();
+      DataSource draftDataSource = createTestDataSource();
 
-      PipelineInputDTO input = createValidInput();
-      input.setDataSourceIds(Set.of(dataSource.getId()));
-      ResponseEntity<PipelineOutputDTO> createResponse = performCreate(input);
-      assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      UUID pipelineId = createResponse.getBody().getId();
-
-      // Unrelease the datasource (revert to DRAFT)
-      dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
-      dataSourceRepository.save(dataSource);
-
-      // PUT with the same datasource IDs — should fail because the datasource is now DRAFT
       PipelineInputDTO updateInput = createUpdateInput();
-      updateInput.setDataSourceIds(Set.of(dataSource.getId()));
+      updateInput.setDataSourceIds(Set.of(draftDataSource.getId()));
 
       ResponseEntity<String> response =
           restTemplate.exchange(
@@ -1173,6 +1155,29 @@ class PipelineControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       assertThat(response.getBody()).contains("AVAILABLE status");
+    }
+
+    @Test
+    @DisplayName("PUT omitting dataSourceIds clears the pipeline's datasource associations")
+    void shouldClearDataSourcesWhenPutOmitsDataSourceIds() {
+      DataSource dataSource = createTestDataSource();
+      dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      dataSourceRepository.save(dataSource);
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(Set.of(dataSource.getId()));
+      ResponseEntity<PipelineOutputDTO> createResponse = performCreate(input);
+      assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID pipelineId = createResponse.getBody().getId();
+
+      // PUT is a full replace: omitting dataSourceIds clears the associations (unlike PATCH, which
+      // reconstructs and preserves them).
+      PipelineInputDTO putInput = createUpdateInput();
+
+      ResponseEntity<PipelineOutputDTO> putResponse = performUpdate(pipelineId, putInput);
+
+      assertThat(putResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(putResponse.getBody().getDataSourceIds()).isEmpty();
     }
   }
 
@@ -1247,10 +1252,18 @@ class PipelineControllerIntegrationTest
       ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      Pipeline saved = pipelineRepository.findById(response.getBody().getId()).orElseThrow();
+      UUID pipelineId = response.getBody().getId();
+      Pipeline saved = pipelineRepository.findById(pipelineId).orElseThrow();
       assertThat(saved.getDataSources())
           .extracting(DataSource::getId)
           .containsExactly(specificDs.getId());
+
+      // The API response must expose the linked datasource via dataSourceIds (work item #1760).
+      assertThat(response.getBody().getDataSourceIds()).containsExactly(specificDs.getId());
+
+      ResponseEntity<PipelineOutputDTO> getResponse = performGetById(pipelineId);
+      assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(getResponse.getBody().getDataSourceIds()).containsExactly(specificDs.getId());
     }
 
     @Test
