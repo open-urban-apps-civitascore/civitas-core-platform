@@ -416,8 +416,10 @@ class DataSourceServiceTest {
           .when(scopeAccessAuthorizer)
           .authorizeReferences(eq(ScopeType.DATASTRUCTURE), any());
 
+      // An unauthorized version must surface as the same not-found failure as a missing one, so
+      // the caller cannot distinguish an existing-but-forbidden version from a non-existent one.
       assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
-          .isInstanceOf(AccessDeniedException.class);
+          .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -834,7 +836,7 @@ class DataSourceServiceTest {
     }
 
     @Test
-    @DisplayName("Should deny linking when the caller is not authorized for the parent structure")
+    @DisplayName("Should deny an unauthorized structure indistinguishably from a missing version")
     void shouldDenyWhenNotAuthorizedForDataStructure() {
       UUID dsvId = UUID.randomUUID();
       DataStructureVersion dsv = createDataStructureVersion();
@@ -854,8 +856,10 @@ class DataSourceServiceTest {
           .when(scopeAccessAuthorizer)
           .authorizeReferences(eq(ScopeType.DATASTRUCTURE), any());
 
+      // An unauthorized version must surface as the same not-found failure as a missing one, so
+      // the caller cannot distinguish an existing-but-forbidden version from a non-existent one.
       assertThatThrownBy(() -> dataSourceService.create(input))
-          .isInstanceOf(AccessDeniedException.class);
+          .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test

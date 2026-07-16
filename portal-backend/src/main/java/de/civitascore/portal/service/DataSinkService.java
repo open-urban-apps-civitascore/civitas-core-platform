@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -224,22 +225,28 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
     }
 
     // Authorization scopes on the parent DataStructure, which is only known after loading the
-    // version, so existence is necessarily checked first. Keep the not-found message free of the
-    // supplied id so the 400-vs-403 difference cannot be used to probe which version ids exist.
+    // version, so existence is necessarily checked first. A missing version and an unauthorized
+    // one must yield the SAME outward failure, otherwise the 400-vs-403 difference is an existence
+    // oracle over version ids. Both therefore raise the identical "not available" 400; the real
+    // authorization denial is still logged server-side by ScopeAccessAuthorizer for audit.
     DataStructureVersion dsv =
-        dataStructureVersionRepository
-            .findById(dsvId)
-            .orElseThrow(
-                () ->
-                    new InvalidInputException(
-                        "DataSink",
-                        "configuration.dataStructureVersionId",
-                        "Referenced DataStructureVersion is not available"));
+        dataStructureVersionRepository.findById(dsvId).orElseThrow(this::versionNotAvailable);
 
     // The version references a DATASTRUCTURE-scoped entity, which the DATASET-typed route header
     // cannot cover — authorize the caller against the parent structure. This is the whole guard:
     // DataSinkController is a plain BaseController with no scope filtering of its own.
-    scopeAccessAuthorizer.authorizeReferences(
-        ScopeType.DATASTRUCTURE, Set.of(dsv.getDataStructure().getId()));
+    try {
+      scopeAccessAuthorizer.authorizeReferences(
+          ScopeType.DATASTRUCTURE, Set.of(dsv.getDataStructure().getId()));
+    } catch (AccessDeniedException e) {
+      throw versionNotAvailable();
+    }
+  }
+
+  private InvalidInputException versionNotAvailable() {
+    return new InvalidInputException(
+        "DataSink",
+        "configuration.dataStructureVersionId",
+        "Referenced DataStructureVersion is not available");
   }
 }

@@ -199,7 +199,7 @@ class DataSinkServiceTest {
     }
 
     @Test
-    @DisplayName("Should deny when the caller is not authorized for the referenced structure")
+    @DisplayName("Should deny an unauthorized structure indistinguishably from a missing one")
     void shouldDenyWhenNotAuthorizedForStructure() {
       UUID dataSetId = UUID.randomUUID();
       UUID dsvId = UUID.randomUUID();
@@ -217,8 +217,13 @@ class DataSinkServiceTest {
           .when(scopeAccessAuthorizer)
           .authorizeReferences(eq(ScopeType.DATASTRUCTURE), any());
 
+      // An unauthorized reference must surface as the SAME failure as a missing one (see the
+      // missing-version test below): same exception type, same message, no id — so a caller cannot
+      // tell an existing-but-forbidden version apart from a non-existent one (existence oracle).
       assertThatThrownBy(() -> dataSinkService.create(input))
-          .isInstanceOf(AccessDeniedException.class);
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Referenced DataStructureVersion is not available")
+          .hasMessageNotContaining(dsvId.toString());
     }
 
     @Test

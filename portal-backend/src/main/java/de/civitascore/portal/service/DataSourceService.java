@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -510,8 +511,16 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
    */
   private DataStructureVersion resolveAuthorizedVersion(UUID versionId) {
     DataStructureVersion dsv = dataStructureVersionService.findByIdOrThrow(versionId);
-    scopeAccessAuthorizer.authorizeReferences(
-        ScopeType.DATASTRUCTURE, Set.of(dsv.getDataStructure().getId()));
+    // A missing version (findByIdOrThrow → 404) and an unauthorized one must be indistinguishable
+    // from the outside, otherwise the 404-vs-403 difference is an existence oracle over version
+    // ids. Map the denial onto the same not-found response; ScopeAccessAuthorizer has already
+    // logged the real authorization denial server-side for audit.
+    try {
+      scopeAccessAuthorizer.authorizeReferences(
+          ScopeType.DATASTRUCTURE, Set.of(dsv.getDataStructure().getId()));
+    } catch (AccessDeniedException e) {
+      throw new ResourceNotFoundException(getEntityName(), versionId);
+    }
     validateDataStructureVersionLinkable(dsv);
     return dsv;
   }
