@@ -152,7 +152,7 @@ public final class DataStructureSchema {
       // marker intended — no dedup, no constraint — with no diagnostic trail.
       LOG.warn(
           "Could not resolve data structure schema to derive its primary key: {}",
-          Encode.forJava(String.valueOf(unresolvable.getMessage())));
+          Encode.forJava(unresolvable.getMessage()));
       return List.of();
     }
     return markerColumns(properties);
