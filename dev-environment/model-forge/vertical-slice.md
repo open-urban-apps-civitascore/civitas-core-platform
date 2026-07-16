@@ -24,7 +24,7 @@ The Admin UI is started with:
   portal-backend's registry
 * `MODEL_FORGE_REGISTRY_MIGRATIONS_ENABLED=false` → the schema is already migrated by
   portal-backend; the Admin UI is a pure **reader** here
-* `SERVER_PORT=8091` → avoid the Kafka-UI port (8090) used by the main stack
+* `SERVER_PORT=8092` → avoid the Kafka-UI port (8090) used by the main stack
 
 ## Run it
 
@@ -37,7 +37,7 @@ cd dev-environment
 bash model-forge/vertical-slice.sh
 ```
 
-Then open **http://localhost:8091** and look for `VerticalSliceModel` under Elements.
+Then open **http://localhost:8092** and look for `VerticalSliceModel` under Elements.
 Ctrl+C stops the Admin UI; the created artifact stays in the database.
 
 ## Requirements

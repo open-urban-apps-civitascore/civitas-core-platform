@@ -158,6 +158,11 @@ services:
       # authorization on localhost:8080 (browser + iss stay correct). auth.ts points its
       # wellKnown here; tokenUtils.ts uses it for the refresh token endpoint.
       KEYCLOAK_INTERNAL_ISSUER: http://civitas-keycloak:8080/realms/civitas-core
+      # Server-side BFF calls (serverFetch / the /api proxy) run inside the container, so
+      # they must reach APISIX by its Docker network name — localhost:9080 (from .env.local)
+      # is the container itself and refuses the connection (ECONNREFUSED).
+      API_BASE_URL: http://civitas-apisix
+      API_PORT: "9080"
     env_file:
       - path: ../../portal-frontend/.env.local
         required: false
