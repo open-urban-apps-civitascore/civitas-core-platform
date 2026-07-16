@@ -582,6 +582,25 @@
         <di:waypoint xsi:type="dc:Point" x="526.0" y="620.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_50"/>
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_28" bpmnElement="flow-sink-error" sourceElement="BPMNShape_provision_sink_error" targetElement="BPMNShape_ServiceTask_8">
+        <di:waypoint xsi:type="dc:Point" x="623.0" y="468.0"/>
+        <di:waypoint xsi:type="dc:Point" x="623.0" y="519.0"/>
+        <di:waypoint xsi:type="dc:Point" x="526.0" y="519.0"/>
+        <di:waypoint xsi:type="dc:Point" x="526.0" y="570.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_56"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_29" bpmnElement="flow-comp-sink-apisix" sourceElement="BPMNShape_compensate_sink" targetElement="BPMNShape_ServiceTask_8">
+        <di:waypoint xsi:type="dc:Point" x="658.0" y="595.0"/>
+        <di:waypoint xsi:type="dc:Point" x="620.0" y="595.0"/>
+        <di:waypoint xsi:type="dc:Point" x="581.0" y="595.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_57"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_30" bpmnElement="flow-sink-workspace" sourceElement="BPMNShape_provision_sink" targetElement="BPMNShape_ServiceTask_3">
+        <di:waypoint xsi:type="dc:Point" x="678.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="704.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="730.0" y="425.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_58"/>
+      </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
     <bpmndi:BPMNLabelStyle id="BPMNLabelStyle_1">
       <dc:Font name="arial" size="9.0"/>
