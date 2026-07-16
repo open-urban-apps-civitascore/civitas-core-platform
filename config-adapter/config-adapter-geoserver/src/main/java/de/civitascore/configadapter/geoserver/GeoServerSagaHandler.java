@@ -14,6 +14,7 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
+import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.model.dataset.SafeNames;
 import de.civitascore.configadapter.model.dataset.WorkspaceNames;
 import jakarta.ws.rs.client.Client;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -55,11 +57,15 @@ import org.owasp.encoder.Encode;
  *
  * <p>Input contract (process variables forwarded from the saga trigger): {@code datasetId} (the
  * workspace name is derived from it), an optional {@code datasinks} list whose {@code POSTGIS}
- * sinks carry {@code configuration.tableName}, and a {@code layers} list of {@code {layerName,
- * nativeName?, crs?}} describing the feature types to publish. A layer's native PostGIS table is
- * its {@code nativeName}; if omitted it defaults to the single {@code POSTGIS} sink table (or the
- * layer name when no sink is given), and {@code nativeName} is required when multiple table sinks
- * exist. Connection parameters for the PostGIS datastore are read from adapter config: {@code
+ * sinks carry {@code configuration.tableName} and the referenced {@code dataStructure} (JSON
+ * Schema), and a {@code layers} list of {@code {layerName, nativeName?, crs?, geometryColumnRef?}}
+ * describing the feature types to publish. A layer's native PostGIS table is its {@code
+ * nativeName}; if omitted it defaults to the single {@code POSTGIS} sink table (or the layer name
+ * when no sink is given), and {@code nativeName} is required when multiple table sinks exist. The
+ * declared SRS is {@code crs}; the native CRS is read from the matching sink's {@code
+ * dataStructure} geometry (the same {@code crs} the PostGIS adapter turns into the geometry
+ * column's SRID), with {@code geometryColumnRef} selecting the geometry when the structure has more
+ * than one. Connection parameters for the PostGIS datastore are read from adapter config: {@code
  * geoserver.postgis.host}, {@code .port}, {@code .database}, {@code .schema}, {@code .user}, {@code
  * .password}.
  */
@@ -400,7 +406,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     // already exists in the workspace.
     upsertStyles(command, workspaceName);
     List<Map<String, Object>> layers = mapList(command, "layers");
-    List<String> sinkTables = sinkTableNames(command);
+    Map<String, Map<String, Object>> sinkDataStructures = sinkDataStructuresByTable(command);
+    List<String> sinkTables = new ArrayList<>(sinkDataStructures.keySet());
     for (Map<String, Object> layer : layers) {
       String layerName = stringValue(layer, "layerName");
       if (layerName == null || layerName.isBlank()) {
@@ -416,6 +423,12 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       if (crs == null || crs.isBlank()) {
         crs = DEFAULT_CRS;
       }
+      // The native CRS is read from the data structure's geometry (the same source PostGIS uses for
+      // the geometry column's SRID), not auto-detected by GeoServer — its REST feature-type
+      // creation does not read the native CRS from the store, so without this the layer stays
+      // invalid under REPROJECT_TO_DECLARED.
+      String nativeCrs =
+          resolveNativeCrs(layer, layerName, crs, sinkDataStructures.get(nativeName));
       // Validate style refs before publishing this layer (with the name checks above). Not a
       // global no-side-effects guarantee — styles were already uploaded and earlier layers may be
       // published — it just avoids publishing this layer with a ref that would then fail.
@@ -428,9 +441,9 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
         requireSafeName(alternativeStyle, "alternativeStyle");
       }
       if (upsert) {
-        upsertFeatureType(workspaceName, datastoreName, layerName, nativeName, crs);
+        upsertFeatureType(workspaceName, datastoreName, layerName, nativeName, crs, nativeCrs);
       } else {
-        createFeatureType(workspaceName, datastoreName, layerName, nativeName, crs);
+        createFeatureType(workspaceName, datastoreName, layerName, nativeName, crs, nativeCrs);
       }
       if ((defaultStyle != null && !defaultStyle.isBlank()) || !alternativeStyles.isEmpty()) {
         assignLayerStyles(workspaceName, layerName, defaultStyle, alternativeStyles);
@@ -465,21 +478,75 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
             + " POSTGIS data sinks");
   }
 
-  /** Distinct {@code tableName}s across the {@code POSTGIS} data sinks, in encounter order. */
-  private static List<String> sinkTableNames(SagaCommandMessage command) {
-    List<String> tables = new ArrayList<>();
+  /**
+   * The {@code POSTGIS} data sinks keyed by {@code tableName}, in encounter order, each mapped to
+   * its {@code dataStructure} JSON Schema (empty map when the sink carries none). The key set is
+   * the distinct table names {@link #resolveNativeName} matches a layer against; the schema is the
+   * source {@link #resolveNativeCrs} reads the geometry's native CRS from. The first sink wins a
+   * duplicate table name (matching the previous distinct-name behavior).
+   */
+  private static Map<String, Map<String, Object>> sinkDataStructuresByTable(
+      SagaCommandMessage command) {
+    Map<String, Map<String, Object>> byTable = new LinkedHashMap<>();
     for (Map<String, Object> sink : mapList(command, "datasinks")) {
       if (!DATASINK_TYPE_POSTGIS.equals(sink.get("type"))) {
         continue;
       }
       Map<String, Object> configuration = mapValue(sink, "configuration");
-      if (configuration.get("tableName") instanceof String tableName
-          && !tableName.isBlank()
-          && !tables.contains(tableName)) {
-        tables.add(tableName);
+      if (configuration.get("tableName") instanceof String tableName && !tableName.isBlank()) {
+        byTable.putIfAbsent(tableName, mapValue(sink, "dataStructure"));
       }
     }
-    return tables;
+    return byTable;
+  }
+
+  /**
+   * The native CRS for a layer, read from the geometry of its sink's data structure — the same
+   * geometry {@code crs} the PostGIS adapter turns into the geometry column's SRID, so it always
+   * matches the stored data. When the data structure defines more than one geometry the layer's
+   * {@code geometryColumnRef} selects which one; with a single geometry the reference is optional.
+   *
+   * <p>Falls back to the declared CRS when no geometry CRS can be determined (no data structure, no
+   * geometry, or a geometry without an explicit {@code crs} — PostGIS defaults such a column to
+   * EPSG:4326, which {@code declaredCrs} already resolves to when unset). Fails fast when a layer
+   * neither pins a geometry nor can one be inferred, mirroring {@link #resolveNativeName}.
+   */
+  private static String resolveNativeCrs(
+      Map<String, Object> layer,
+      String layerName,
+      String declaredCrs,
+      Map<String, Object> dataStructure) {
+    if (dataStructure == null || dataStructure.isEmpty()) {
+      return declaredCrs;
+    }
+    Map<String, String> geometryCrs = DataStructureSchema.geometryCrsByColumn(dataStructure);
+    if (geometryCrs.isEmpty()) {
+      return declaredCrs;
+    }
+    String geometryColumnRef = stringValue(layer, "geometryColumnRef");
+    String selected;
+    if (geometryColumnRef != null && !geometryColumnRef.isBlank()) {
+      if (!geometryCrs.containsKey(geometryColumnRef)) {
+        throw new IllegalArgumentException(
+            "layer '"
+                + layerName
+                + "' geometryColumnRef '"
+                + geometryColumnRef
+                + "' is not a geometry property of the sink's data structure");
+      }
+      selected = geometryColumnRef;
+    } else if (geometryCrs.size() == 1) {
+      selected = geometryCrs.keySet().iterator().next();
+    } else {
+      throw new IllegalArgumentException(
+          "layer '"
+              + layerName
+              + "' must specify geometryColumnRef: the data structure has "
+              + geometryCrs.size()
+              + " geometry columns");
+    }
+    String crs = geometryCrs.get(selected);
+    return (crs != null && !crs.isBlank()) ? crs : declaredCrs;
   }
 
   // ── Payload type guards ─────────────────────────────────────────────────────
@@ -544,10 +611,13 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   /**
    * Builds the GeoServer {@code featureType} REST body. The published layer is named {@code name};
    * {@code nativeName} is the underlying PostGIS table. GeoServer derives columns, primary key and
-   * geometry from the table itself, so only naming, SRS and the projection policy are mapped.
+   * geometry from the table itself, so only naming, the declared SRS, the native CRS and the
+   * projection policy are mapped. The native CRS is set explicitly (read from the data structure's
+   * geometry) rather than relying on GeoServer to auto-detect it on REST creation — which it does
+   * not do, leaving the feature type invalid under {@code REPROJECT_TO_DECLARED}.
    */
   private static Map<String, Object> featureTypePayload(
-      String name, String nativeName, String crs) {
+      String name, String nativeName, String crs, String nativeCrs) {
     return Map.of(
         "featureType",
         Map.of(
@@ -555,19 +625,25 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
             "nativeName", nativeName,
             "title", name,
             "srs", crs,
+            "nativeCRS", nativeCrs,
             "projectionPolicy", DEFAULT_PROJECTION_POLICY));
   }
 
   /** Creates a feature type idempotently: HTTP 409 (already exists) is treated as success. */
   private void createFeatureType(
-      String workspaceName, String datastoreName, String name, String nativeName, String crs) {
+      String workspaceName,
+      String datastoreName,
+      String name,
+      String nativeName,
+      String crs,
+      String nativeCrs) {
     try (Response response =
         auth.apply(
                 client()
                     .target(serverUrl)
                     .path(featureTypesPath(workspaceName, datastoreName))
                     .request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(featureTypePayload(name, nativeName, crs)))) {
+            .post(Entity.json(featureTypePayload(name, nativeName, crs, nativeCrs)))) {
       if (response.getStatus() != 201 && response.getStatus() != 409) {
         checkResponse(response, "create-featuretype/" + name);
       }
@@ -580,8 +656,13 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * UPDATE_WORKSPACE} would report success without applying any change.
    */
   private void upsertFeatureType(
-      String workspaceName, String datastoreName, String name, String nativeName, String crs) {
-    Map<String, Object> payload = featureTypePayload(name, nativeName, crs);
+      String workspaceName,
+      String datastoreName,
+      String name,
+      String nativeName,
+      String crs,
+      String nativeCrs) {
+    Map<String, Object> payload = featureTypePayload(name, nativeName, crs, nativeCrs);
     try (Response createResponse =
         auth.apply(
                 client()
