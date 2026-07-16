@@ -4,6 +4,7 @@ import de.civitascore.portal.mapper.PipelineMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -14,6 +15,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -43,6 +45,7 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
   private final DataSourceRepository dataSourceRepository;
   private final DataSinkService dataSinkService;
   private final DataSinkRepository dataSinkRepository;
+  private final ScopeAccessAuthorizer scopeAccessAuthorizer;
 
   public PipelineService(
       PipelineRepository pipelineRepository,
@@ -50,13 +53,15 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
       DataSetRepository dataSetRepository,
       DataSourceRepository dataSourceRepository,
       DataSinkService dataSinkService,
-      DataSinkRepository dataSinkRepository) {
+      DataSinkRepository dataSinkRepository,
+      ScopeAccessAuthorizer scopeAccessAuthorizer) {
     this.pipelineRepository = pipelineRepository;
     this.pipelineMapper = pipelineMapper;
     this.dataSetRepository = dataSetRepository;
     this.dataSourceRepository = dataSourceRepository;
     this.dataSinkService = dataSinkService;
     this.dataSinkRepository = dataSinkRepository;
+    this.scopeAccessAuthorizer = scopeAccessAuthorizer;
   }
 
   @Override
@@ -132,6 +137,9 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
             });
 
     if (input.getDataSourceIds() != null && !input.getDataSourceIds().isEmpty()) {
+      // Authorize before revealing existence: a "not found" answer for an unauthorized caller
+      // would otherwise turn this endpoint into an existence oracle over the DataSource table.
+      scopeAccessAuthorizer.authorizeReferences(ScopeType.DATASOURCE, input.getDataSourceIds());
       List<DataSource> dataSources = dataSourceRepository.findAllById(input.getDataSourceIds());
       if (dataSources.size() != input.getDataSourceIds().size()) {
         throw new InvalidInputException(
