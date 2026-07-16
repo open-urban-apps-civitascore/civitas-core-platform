@@ -1,4 +1,4 @@
-package de.civitascore.portal.service;
+package de.civitascore.portal.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
