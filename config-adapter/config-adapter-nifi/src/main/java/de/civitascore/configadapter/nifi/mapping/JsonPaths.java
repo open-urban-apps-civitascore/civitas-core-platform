@@ -9,21 +9,63 @@
  */
 package de.civitascore.configadapter.nifi.mapping;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /** Translates the CORE Mapping JSONPath dialect into NiFi RecordPath. */
 final class JsonPaths {
 
   private JsonPaths() {}
 
   /**
-   * Converts a JSONPath such as {@code $.a.b[0].c} into the equivalent RecordPath {@code
-   * /a/b[0]/c}. The root {@code $} becomes {@code /}. Array-index brackets are preserved.
+   * Converts a CORE JSONPath such as {@code $.a.b[0].c} into the equivalent RecordPath {@code
+   * /a/b[0]/c}. The root {@code $} becomes {@code /}. Concrete array indices are preserved and
+   * CORE's empty array selector ({@code []}) becomes NiFi's all-elements selector ({@code [*]}).
    *
    * @param jsonPath the source JSONPath
    * @return the equivalent RecordPath
    */
   static String toRecordPath(String jsonPath) {
+    return parse(jsonPath).recordPath();
+  }
+
+  /** Parsed CORE path used to reason about an UpdateRecord field's array context. */
+  record ParsedPath(List<String> segments, int lastArraySegment) {
+    ParsedPath {
+      segments = List.copyOf(segments);
+    }
+
+    String recordPath() {
+      return segments.isEmpty() ? "/" : "/" + String.join("/", recordSegments());
+    }
+
+    boolean hasArrayContext() {
+      return lastArraySegment >= 0;
+    }
+
+    /** Path from the root through the innermost array selector, in CORE notation. */
+    List<String> arrayContext() {
+      return hasArrayContext() ? segments.subList(0, lastArraySegment + 1) : List.of();
+    }
+
+    /** Segments below the innermost array selector. */
+    List<String> suffixWithinArray() {
+      return hasArrayContext() ? segments.subList(lastArraySegment + 1, segments.size()) : segments;
+    }
+
+    private List<String> recordSegments() {
+      return segments.stream().map(segment -> segment.replace("[]", "[*]")).toList();
+    }
+  }
+
+  /**
+   * Parses the deliberately small CORE path dialect emitted by the mapping editor. Property names
+   * are dot-separated; selectors stay attached to their property segment. Empty segments are
+   * rejected so malformed tenant input never becomes a different, apparently valid RecordPath.
+   */
+  static ParsedPath parse(String jsonPath) {
     if (jsonPath == null || jsonPath.isBlank() || "$".equals(jsonPath)) {
-      return "/";
+      return new ParsedPath(List.of(), -1);
     }
     String path = jsonPath;
     if (path.startsWith("$")) {
@@ -32,10 +74,23 @@ final class JsonPaths {
     if (path.startsWith(".")) {
       path = path.substring(1);
     }
-    StringBuilder builder = new StringBuilder();
-    for (String segment : path.split("\\.")) {
-      builder.append('/').append(segment);
+    if (path.isEmpty()) {
+      return new ParsedPath(List.of(), -1);
     }
-    return builder.toString();
+
+    String[] rawSegments = path.split("\\.", -1);
+    List<String> segments = new ArrayList<>(rawSegments.length);
+    int lastArraySegment = -1;
+    for (String segment : rawSegments) {
+      if (segment.isEmpty()) {
+        throw new IllegalArgumentException(
+            "CORE path contains an empty property segment: " + jsonPath);
+      }
+      segments.add(segment);
+      if (segment.contains("[]")) {
+        lastArraySegment = segments.size() - 1;
+      }
+    }
+    return new ParsedPath(segments, lastArraySegment);
   }
 }

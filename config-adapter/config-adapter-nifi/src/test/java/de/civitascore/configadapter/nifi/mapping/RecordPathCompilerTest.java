@@ -10,8 +10,11 @@
 package de.civitascore.configadapter.nifi.mapping;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.ReplacementStrategy;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.util.List;
@@ -54,6 +57,64 @@ class RecordPathCompilerTest {
 
     UpdateRecordProperty p = props.get("/a/b[0]/c");
     assertEquals("/x/y", p.value());
+  }
+
+  @Test
+  void coreArraySelectorsBecomeNifiWildcardsAndCopyWithinTheCurrentElement() throws Exception {
+    var props = byPath(compile("{ \"$.items[].name\": \"$.items[].sourceName\" }"));
+
+    UpdateRecordProperty p = props.get("/items[*]/name");
+    assertEquals("../sourceName", p.value());
+  }
+
+  @Test
+  void nestedArraySelectorsUseTheInnermostElementAsTheirRelativeContext() throws Exception {
+    var props =
+        byPath(
+            compile(
+                "{ \"$.orders[].items[].details.name\":"
+                    + " \"$.orders[].items[].source.label\" }"));
+
+    UpdateRecordProperty p = props.get("/orders[*]/items[*]/details/name");
+    assertEquals("../../source/label", p.value());
+  }
+
+  @Test
+  void rootScalarCanBeBroadcastIntoEveryArrayElement() throws Exception {
+    var props = byPath(compile("{ \"$.items[].tenant\": \"$.tenant\" }"));
+
+    assertEquals("/tenant", props.get("/items[*]/tenant").value());
+  }
+
+  @Test
+  void conversionAndConcatInputsKeepTheTargetArrayContext() throws Exception {
+    var props =
+        byPath(
+            compile(
+                "{ \"$.items[].label\": { \"op\": \"concat\", \"separator\": \"-\","
+                    + " \"inputs\": [\"$.items[].code\","
+                    + " { \"op\": \"toString\", \"input\": \"$.items[].number\" }] } }"));
+
+    assertEquals("concat(../code, '-', toString(../number))", props.get("/items[*]/label").value());
+  }
+
+  @Test
+  void differentArrayContextsAreRejectedInsteadOfBeingPositionallyGuessed() throws Exception {
+    FatalAdapterException error =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compile("{ \"$.target[].name\": \"$.source[].name\" }"));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+  }
+
+  @Test
+  void arraySelectionCannotBeAssignedToAScalarTarget() throws Exception {
+    FatalAdapterException error =
+        assertThrows(
+            FatalAdapterException.class, () -> compile("{ \"$.name\": \"$.items[].name\" }"));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
   }
 
   @Test

@@ -205,7 +205,7 @@ public class FrostMappingCompiler {
     for (Map.Entry<String, ValueNode> field : mapping.fields().entrySet()) {
       flatProperties.add(
           recordPathCompiler.compileField(
-              "/" + flatKeyByPath.get(field.getKey()), field.getValue(), GeometryEncoding.GEOJSON));
+              "/" + flatKeyByPath.get(field.getKey()), field.getValue()));
     }
 
     boolean thingCreatable = hasCompleteCreateSet(mapping, StaEntity.THING);
