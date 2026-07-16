@@ -229,7 +229,7 @@ public final class DataStructureSchema {
     } catch (IllegalArgumentException unresolvable) {
       LOG.warn(
           "Could not resolve data structure schema to read geometry CRS: {}",
-          Encode.forJava(String.valueOf(unresolvable.getMessage())));
+          Encode.forJava(unresolvable.getMessage()));
       return Map.of();
     }
     LinkedHashMap<String, String> geometryCrs = new LinkedHashMap<>();
