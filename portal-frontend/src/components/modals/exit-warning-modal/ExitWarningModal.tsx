@@ -29,7 +29,7 @@ export const ExitWarningModal = (props: ExitWarningModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid="exitWarningModal" className="sm:max-w-md" showCloseButton={false}>
+      <DialogContent data-testid="exitWarningModal" className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title || t('title')}</DialogTitle>
           <DialogDescription>{description || t('description')}</DialogDescription>

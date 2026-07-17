@@ -456,6 +456,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         onDiscard={handleDiscardAndExit}
         onConfirm={handleSaveAndExit}
         isLoading={isLoading}
+        onOpenChange={setIsExitModalOpen}
       />
     </PageContainer>
   )
