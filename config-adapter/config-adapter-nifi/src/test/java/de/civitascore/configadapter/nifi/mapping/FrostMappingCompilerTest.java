@@ -11,6 +11,7 @@ package de.civitascore.configadapter.nifi.mapping;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -94,6 +95,35 @@ class FrostMappingCompilerTest {
     assertEquals(
         List.of(new FilterTerm("properties/reference", "sta_1_reference")),
         compilation.plan().datastreamFilter());
+  }
+
+  @Test
+  void rendersRelatedBodiesForLookupOnlyParents() throws Exception {
+    MappingConfig mapping =
+        mapping(
+            "$.properties.reference", new CopyNode("$.thingRef"),
+            "$.Locations[].name", new ConstNode("Location", null),
+            "$.Locations[].description", new ConstNode("Station location", null),
+            "$.Locations[].encodingType", new ConstNode("application/geo+json", null),
+            "$.Locations[].location",
+                new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")),
+            "$.Datastreams[].properties.reference", new CopyNode("$.dsRef"),
+            "$.Datastreams[].Sensor.name", new ConstNode("Sensor", null),
+            "$.Datastreams[].Sensor.description", new ConstNode("Description", null),
+            "$.Datastreams[].Sensor.encodingType", new ConstNode("text/html", null),
+            "$.Datastreams[].Sensor.metadata", new ConstNode("https://example.test", null),
+            "$.Datastreams[].ObservedProperty.name", new ConstNode("Temperature", null),
+            "$.Datastreams[].ObservedProperty.definition",
+                new ConstNode("https://example.test/temperature", null),
+            "$.Datastreams[].ObservedProperty.description", new ConstNode("Temperature", null));
+
+    FrostCompilation compilation = compiler.compile(mapping, KEYS);
+
+    assertNull(compilation.plan().thingBody());
+    assertNotNull(compilation.plan().locationBody());
+    assertNull(compilation.plan().datastreamBody());
+    assertNotNull(compilation.plan().sensorBody());
+    assertNotNull(compilation.plan().observedPropertyBody());
   }
 
   @Test
@@ -244,11 +274,23 @@ class FrostMappingCompilerTest {
     // Locations ride inside the Thing body (deep insert); the geometry embeds verbatim.
     assertTrue(thingBody.contains("\"Locations\":[{\"name\":"));
     assertTrue(thingBody.contains("\"location\":${sta_6_location}}]"));
+    assertFalse(compilation.plan().thingUpdateBody().contains("\"Locations\""));
+    assertTrue(compilation.plan().locationBody().contains("\"name\":\"${sta_3_name"));
+    assertTrue(compilation.plan().locationBody().contains("\"location\":${sta_6_location}"));
 
     String datastreamBody = compilation.plan().datastreamBody();
     assertTrue(datastreamBody.contains("\"unitOfMeasurement\":{\"name\":"));
     assertTrue(datastreamBody.contains("\"Sensor\":{\"name\":"));
     assertTrue(datastreamBody.contains("\"ObservedProperty\":{\"name\":"));
+    String datastreamUpdateBody = compilation.plan().datastreamUpdateBody();
+    assertFalse(datastreamUpdateBody.contains("\"Sensor\""));
+    assertFalse(datastreamUpdateBody.contains("\"ObservedProperty\""));
+    assertFalse(datastreamUpdateBody.contains("\"Thing\""));
+    assertTrue(datastreamUpdateBody.contains("\"unitOfMeasurement\":{\"name\":"));
+    assertTrue(compilation.plan().sensorBody().contains("\"name\":\"${sta_13_name"));
+    assertFalse(compilation.plan().sensorBody().contains("\"Sensor\""));
+    assertTrue(compilation.plan().observedPropertyBody().contains("\"name\":\"${sta_17_name"));
+    assertFalse(compilation.plan().observedPropertyBody().contains("\"ObservedProperty\""));
     // The created datastream carries its match key and the parent Thing link.
     assertTrue(
         datastreamBody.contains(
@@ -309,21 +351,20 @@ class FrostMappingCompilerTest {
   }
 
   @Test
-  void rejectsALocationWithoutACreatableThing() {
-    FatalAdapterException ex =
-        assertThrows(
-            FatalAdapterException.class,
-            () ->
-                compiler.compile(
-                    mapping(
-                        "$.properties.reference", new CopyNode("$.ref"),
-                        "$.Locations[].name", new ConstNode("loc", null),
-                        "$.Locations[].description", new ConstNode("d", null),
-                        "$.Locations[].encodingType", new ConstNode("e", null),
-                        "$.Locations[].location",
-                            new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat"))),
-                    KEYS));
-    assertTrue(ex.getMessage().contains("creatable Thing"));
+  void acceptsALocationWithALookupOnlyThing() throws Exception {
+    FrostCompilation compilation =
+        compiler.compile(
+            mapping(
+                "$.properties.reference", new CopyNode("$.ref"),
+                "$.Locations[].name", new ConstNode("loc", null),
+                "$.Locations[].description", new ConstNode("d", null),
+                "$.Locations[].encodingType", new ConstNode("e", null),
+                "$.Locations[].location",
+                    new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat"))),
+            KEYS);
+
+    assertNull(compilation.plan().thingBody());
+    assertNotNull(compilation.plan().locationBody());
   }
 
   @Test
