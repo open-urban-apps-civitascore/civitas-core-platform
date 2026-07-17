@@ -343,13 +343,21 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   /** Creates the workspace idempotently: HTTP 409 (already exists) is treated as success. */
   private void createWorkspace(String workspaceName) {
+    // Create the workspace isolated: its content is reachable only through the per-workspace
+    // virtual OWS services (matching geoserver.web.globalServices=false) and it gets its own
+    // namespace. This is what makes the WMS service resolve the workspace's layers for
+    // (APISIX-gated) anonymous requests — a non-isolated workspace shares the global namespace,
+    // where the WMS layer-by-name lookup fails to resolve/hides the layer and same-named layers
+    // across datasets collide. WFS is unaffected either way; WMS needs the isolation.
     try (Response response =
         auth.apply(
                 client()
                     .target(serverUrl)
                     .path("/rest/workspaces")
                     .request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(Map.of("workspace", Map.of("name", workspaceName))))) {
+            .post(
+                Entity.json(
+                    Map.of("workspace", Map.of("name", workspaceName, "isolated", true))))) {
       if (response.getStatus() != 201 && response.getStatus() != 409) {
         checkResponse(response, "CREATE_WORKSPACE/" + workspaceName);
       }

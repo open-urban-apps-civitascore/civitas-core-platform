@@ -100,7 +100,18 @@ class GeoServerSagaHandlerTest {
         assertEquals("ds_abc", result.resultData().get("workspaceName"));
         assertNotNull(result.resultData().get("wfsUrl"));
         assertEquals("ds_abc", result.compensationData().get("workspaceName"));
-        verify(mockBuilder, times(1)).post(any(Entity.class));
+
+        // The workspace is created isolated: reachable only via its virtual OWS services (matching
+        // globalServices=false) with its own namespace, so the WMS service resolves its layers for
+        // anonymous (APISIX-gated) requests and same-named layers across datasets don't collide.
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(1)).post(captor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> workspace =
+            (Map<String, Object>)
+                ((Map<String, Object>) captor.getValue().getEntity()).get("workspace");
+        assertEquals("ds_abc", workspace.get("name"));
+        assertEquals(Boolean.TRUE, workspace.get("isolated"));
       }
     }
 
