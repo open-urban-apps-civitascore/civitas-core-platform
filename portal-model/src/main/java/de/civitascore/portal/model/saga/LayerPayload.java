@@ -2,6 +2,7 @@ package de.civitascore.portal.model.saga;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A WFS/WMS layer carried in the dataset saga trigger payload. The config-adapter consumes these to
@@ -28,6 +29,12 @@ import java.util.List;
  *   <li>{@code geometryColumnRef} — optional; the name of the geometry column the layer publishes.
  *       The adapter uses it to pick the geometry (and thus the native CRS) from the sink's data
  *       structure when it defines more than one; {@code null}/absent is fine for a single geometry.
+ *   <li>{@code nativeBoundingBox} — optional; the layer's bounding box in its native CRS, as a map
+ *       {@code {minX, minY, maxX, maxY, crs}}. Forwarded to the GeoServer feature type so the layer
+ *       advertises a usable extent (empty at provisioning time otherwise). {@code null} lets
+ *       GeoServer compute it.
+ *   <li>{@code latLonBoundingBox} — optional; the layer's bounding box in EPSG:4326. Usually left
+ *       to GeoServer to reproject from {@code nativeBoundingBox}; carried for completeness.
  *   <li>{@code defaultStyle} — optional; the name of a {@link StylePayload} carried on the same
  *       trigger. {@code null} lets GeoServer fall back to its generic style.
  *   <li>{@code alternativeStyles} — optional; further {@link StylePayload} names available on the
@@ -41,5 +48,7 @@ public record LayerPayload(
     String nativeName,
     String crs,
     String geometryColumnRef,
+    Map<String, Object> nativeBoundingBox,
+    Map<String, Object> latLonBoundingBox,
     String defaultStyle,
     List<String> alternativeStyles) {}

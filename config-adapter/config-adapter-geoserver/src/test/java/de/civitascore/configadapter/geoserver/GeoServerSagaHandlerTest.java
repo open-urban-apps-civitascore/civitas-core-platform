@@ -275,6 +275,81 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void forwardsNativeBoundingBoxTaggedWithNativeCrsAndReprojectsLatLon() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", Map.of("geom", "EPSG:25832"))),
+                        "layers",
+                        List.of(
+                            Map.of(
+                                "layerName",
+                                "roads",
+                                "crs",
+                                "EPSG:4326",
+                                "nativeBoundingBox",
+                                Map.of(
+                                    "minX", 239323.44,
+                                    "minY", 4290145.58,
+                                    "maxX", 761545.65,
+                                    "maxY", 9365801.91,
+                                    "crs", ""))))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // Native box is mapped to GeoServer field names and tagged with the resolved native CRS
+        // (the portal box's own crs is ignored — it may be blank).
+        Map<String, Object> bbox =
+            (Map<String, Object>) postedFeatureType().get("nativeBoundingBox");
+        assertEquals(239323.44, bbox.get("minx"));
+        assertEquals(4290145.58, bbox.get("miny"));
+        assertEquals(761545.65, bbox.get("maxx"));
+        assertEquals(9365801.91, bbox.get("maxy"));
+        assertEquals("EPSG:25832", bbox.get("crs"));
+        // With a native box supplied, only the lat/lon box is reprojected — no data-driven
+        // recompute.
+        verify(mockPathTarget).queryParam("recalculate", "latlonbbox");
+      }
+    }
+
+    @Test
+    void computesBothBoxesFromDataWhenNoNativeBoundingBoxGiven() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", Map.of("geom", "EPSG:25832"))),
+                        "layers",
+                        List.of(Map.of("layerName", "roads", "crs", "EPSG:4326")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertNull(postedFeatureType().get("nativeBoundingBox"));
+        verify(mockPathTarget).queryParam("recalculate", "nativebbox,latlonbbox");
+      }
+    }
+
+    @Test
     void selectsGeometryByGeometryColumnRefWhenMultiple() {
       try (GeoServerSagaHandler handler = createHandler()) {
         Response created = mock(Response.class);

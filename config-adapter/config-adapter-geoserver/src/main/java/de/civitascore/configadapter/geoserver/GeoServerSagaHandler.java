@@ -429,6 +429,10 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       // invalid under REPROJECT_TO_DECLARED.
       String nativeCrs =
           resolveNativeCrs(layer, layerName, crs, sinkDataStructures.get(nativeName));
+      // Forward the portal's native bounding box (tagged with the native CRS) so the published
+      // layer has a usable extent; absent → GeoServer computes it itself.
+      Map<String, Object> nativeBBox =
+          geoServerNativeBoundingBox(mapValue(layer, "nativeBoundingBox"), nativeCrs);
       // Validate style refs before publishing this layer (with the name checks above). Not a
       // global no-side-effects guarantee — styles were already uploaded and earlier layers may be
       // published — it just avoids publishing this layer with a ref that would then fail.
@@ -441,9 +445,11 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
         requireSafeName(alternativeStyle, "alternativeStyle");
       }
       if (upsert) {
-        upsertFeatureType(workspaceName, datastoreName, layerName, nativeName, crs, nativeCrs);
+        upsertFeatureType(
+            workspaceName, datastoreName, layerName, nativeName, crs, nativeCrs, nativeBBox);
       } else {
-        createFeatureType(workspaceName, datastoreName, layerName, nativeName, crs, nativeCrs);
+        createFeatureType(
+            workspaceName, datastoreName, layerName, nativeName, crs, nativeCrs, nativeBBox);
       }
       if ((defaultStyle != null && !defaultStyle.isBlank()) || !alternativeStyles.isEmpty()) {
         assignLayerStyles(workspaceName, layerName, defaultStyle, alternativeStyles);
@@ -609,24 +615,65 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
+   * Maps a portal bounding-box map ({@code {minX,minY,maxX,maxY}}) to the GeoServer feature-type
+   * shape ({@code {minx,miny,maxx,maxy,crs}}), tagging it with the native CRS (the portal box's own
+   * {@code crs} is ignored — it may be blank). Returns null when the box is absent or any corner is
+   * missing, so GeoServer computes the extent itself.
+   */
+  private static Map<String, Object> geoServerNativeBoundingBox(
+      Map<String, Object> portalBox, String nativeCrs) {
+    if (portalBox == null || portalBox.isEmpty()) {
+      return null;
+    }
+    Object minX = portalBox.get("minX");
+    Object minY = portalBox.get("minY");
+    Object maxX = portalBox.get("maxX");
+    Object maxY = portalBox.get("maxY");
+    if (minX == null || minY == null || maxX == null || maxY == null) {
+      return null;
+    }
+    return Map.of("minx", minX, "miny", minY, "maxx", maxX, "maxy", maxY, "crs", nativeCrs);
+  }
+
+  /**
    * Builds the GeoServer {@code featureType} REST body. The published layer is named {@code name};
    * {@code nativeName} is the underlying PostGIS table. GeoServer derives columns, primary key and
-   * geometry from the table itself, so only naming, the declared SRS, the native CRS and the
-   * projection policy are mapped. The native CRS is set explicitly (read from the data structure's
-   * geometry) rather than relying on GeoServer to auto-detect it on REST creation — which it does
-   * not do, leaving the feature type invalid under {@code REPROJECT_TO_DECLARED}.
+   * geometry from the table itself, so only naming, the declared SRS, the native CRS, the native
+   * bounding box and the projection policy are mapped. The native CRS is set explicitly (read from
+   * the data structure's geometry) rather than relying on GeoServer to auto-detect it on REST
+   * creation — which it does not do, leaving the feature type invalid under {@code
+   * REPROJECT_TO_DECLARED}. When {@code nativeBBox} is present it is sent so the layer advertises a
+   * usable extent (GeoServer would otherwise compute it against the still-empty sink table at
+   * provisioning time and never refresh it); the lat/lon box is left to GeoServer to reproject (see
+   * the {@code recalculate} parameter on the request).
    */
   private static Map<String, Object> featureTypePayload(
-      String name, String nativeName, String crs, String nativeCrs) {
-    return Map.of(
-        "featureType",
-        Map.of(
-            "name", name,
-            "nativeName", nativeName,
-            "title", name,
-            "srs", crs,
-            "nativeCRS", nativeCrs,
-            "projectionPolicy", DEFAULT_PROJECTION_POLICY));
+      String name,
+      String nativeName,
+      String crs,
+      String nativeCrs,
+      Map<String, Object> nativeBBox) {
+    Map<String, Object> featureType = new LinkedHashMap<>();
+    featureType.put("name", name);
+    featureType.put("nativeName", nativeName);
+    featureType.put("title", name);
+    featureType.put("srs", crs);
+    featureType.put("nativeCRS", nativeCrs);
+    featureType.put("projectionPolicy", DEFAULT_PROJECTION_POLICY);
+    if (nativeBBox != null) {
+      featureType.put("nativeBoundingBox", nativeBBox);
+    }
+    return Map.of("featureType", featureType);
+  }
+
+  /**
+   * The {@code recalculate} query value: when the caller supplies a native bounding box, keep it
+   * and only reproject the lat/lon box ({@code latlonbbox}) — a pure coordinate transform, no data
+   * query. Without a native box, let GeoServer compute both from the store ({@code
+   * nativebbox,latlonbbox}).
+   */
+  private static String recalculateFor(Map<String, Object> nativeBBox) {
+    return nativeBBox != null ? "latlonbbox" : "nativebbox,latlonbbox";
   }
 
   /** Creates a feature type idempotently: HTTP 409 (already exists) is treated as success. */
@@ -636,14 +683,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       String name,
       String nativeName,
       String crs,
-      String nativeCrs) {
+      String nativeCrs,
+      Map<String, Object> nativeBBox) {
     try (Response response =
         auth.apply(
                 client()
                     .target(serverUrl)
                     .path(featureTypesPath(workspaceName, datastoreName))
+                    .queryParam("recalculate", recalculateFor(nativeBBox))
                     .request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(featureTypePayload(name, nativeName, crs, nativeCrs)))) {
+            .post(Entity.json(featureTypePayload(name, nativeName, crs, nativeCrs, nativeBBox)))) {
       if (response.getStatus() != 201 && response.getStatus() != 409) {
         checkResponse(response, "create-featuretype/" + name);
       }
@@ -661,13 +710,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       String name,
       String nativeName,
       String crs,
-      String nativeCrs) {
-    Map<String, Object> payload = featureTypePayload(name, nativeName, crs, nativeCrs);
+      String nativeCrs,
+      Map<String, Object> nativeBBox) {
+    Map<String, Object> payload = featureTypePayload(name, nativeName, crs, nativeCrs, nativeBBox);
+    String recalculate = recalculateFor(nativeBBox);
     try (Response createResponse =
         auth.apply(
                 client()
                     .target(serverUrl)
                     .path(featureTypesPath(workspaceName, datastoreName))
+                    .queryParam("recalculate", recalculate)
                     .request(MediaType.APPLICATION_JSON))
             .post(Entity.json(payload))) {
       if (createResponse.getStatus() == 201) {
@@ -683,6 +735,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
                 client()
                     .target(serverUrl)
                     .path(featureTypesPath(workspaceName, datastoreName) + "/" + name)
+                    .queryParam("recalculate", recalculate)
                     .request(MediaType.APPLICATION_JSON))
             .put(Entity.json(payload))) {
       checkResponse(updateResponse, "update-featuretype/" + name);
