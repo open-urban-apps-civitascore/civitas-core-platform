@@ -365,23 +365,26 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
         return;
       }
     }
-    // On fresh creation, enable the per-workspace WMS and WFS virtual services so a map client
-    // (QGIS, …) shows the dataset's workspace as the service level between connection and layer.
+    // On fresh creation, enable the per-workspace WMS virtual service so a map client (QGIS, …)
+    // shows the dataset as the named service (the capabilities root layer) above the layers.
     if (status == 201) {
-      enableWorkspaceServices(workspaceName, serviceTitle);
+      enableWorkspaceWmsService(workspaceName, serviceTitle);
     }
   }
 
   /**
-   * Enables the per-workspace WMS and WFS virtual services, each titled with {@code serviceTitle}
-   * (the dataset's display name), so the workspace surfaces as a named service in clients
-   * (consistent with {@code globalServices=false} + isolated workspaces). Best-effort: a failure is
-   * logged but does not fail workspace provisioning — the layer stays reachable, only the service
-   * title would be unset.
+   * Enables the per-workspace WMS virtual service, titled with {@code serviceTitle} (the dataset's
+   * display name), so the workspace surfaces as a named service in clients (consistent with {@code
+   * globalServices=false} + isolated workspaces). Best-effort: a failure is logged but does not
+   * fail workspace provisioning — the layer stays reachable, only the service title would be unset.
+   *
+   * <p>WFS is deliberately NOT enabled per-workspace: a WFS capabilities document has a flat
+   * feature type list (no root-layer node to title, unlike WMS), so it gains nothing in a client;
+   * and a workspace-local {@code WFSInfo} created via REST has a null {@code serviceLevel}, which
+   * makes WFS GetCapabilities fail with a 500/400. WFS keeps using the global service defaults.
    */
-  private void enableWorkspaceServices(String workspaceName, String serviceTitle) {
+  private void enableWorkspaceWmsService(String workspaceName, String serviceTitle) {
     putWorkspaceServiceSettings(workspaceName, serviceTitle, "wms", "WMS");
-    putWorkspaceServiceSettings(workspaceName, serviceTitle, "wfs", "WFS");
   }
 
   /**

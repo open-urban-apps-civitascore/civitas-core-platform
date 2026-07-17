@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.geoserver;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -113,20 +114,22 @@ class GeoServerSagaHandlerTest {
         assertEquals("ds_abc", workspace.get("name"));
         assertEquals(Boolean.TRUE, workspace.get("isolated"));
 
-        // The per-workspace WMS and WFS services are enabled and titled with the workspace name, so
-        // the workspace shows up as a named service in map clients (between connection and layer).
+        // Only the per-workspace WMS service is enabled (and titled with the workspace name), so
+        // the
+        // workspace shows up as a named service in map clients. WFS is deliberately not enabled per
+        // workspace (flat feature-type list, and a REST-created WFSInfo has a null serviceLevel
+        // that
+        // breaks WFS GetCapabilities).
         assertTrue(capturedPaths().contains("/rest/services/wms/workspaces/ds_abc/settings"));
-        assertTrue(capturedPaths().contains("/rest/services/wfs/workspaces/ds_abc/settings"));
+        assertFalse(capturedPaths().contains("/rest/services/wfs/workspaces/ds_abc/settings"));
         ArgumentCaptor<Entity> putCaptor = ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(2)).put(putCaptor.capture());
-        for (Entity entity : putCaptor.getAllValues()) {
-          @SuppressWarnings("unchecked")
-          Map<String, Object> body = (Map<String, Object>) entity.getEntity();
-          @SuppressWarnings("unchecked")
-          Map<String, Object> svc = (Map<String, Object>) body.getOrDefault("wms", body.get("wfs"));
-          assertEquals(Boolean.TRUE, svc.get("enabled"));
-          assertEquals("ds_abc", svc.get("title"));
-        }
+        verify(mockBuilder, times(1)).put(putCaptor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> svc =
+            (Map<String, Object>)
+                ((Map<String, Object>) putCaptor.getValue().getEntity()).get("wms");
+        assertEquals(Boolean.TRUE, svc.get("enabled"));
+        assertEquals("ds_abc", svc.get("title"));
       }
     }
 
@@ -148,14 +151,12 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         ArgumentCaptor<Entity> putCaptor = ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(2)).put(putCaptor.capture());
-        for (Entity entity : putCaptor.getAllValues()) {
-          @SuppressWarnings("unchecked")
-          Map<String, Object> body = (Map<String, Object>) entity.getEntity();
-          @SuppressWarnings("unchecked")
-          Map<String, Object> svc = (Map<String, Object>) body.getOrDefault("wms", body.get("wfs"));
-          assertEquals("Bewohnerparkzonen Bielefeld", svc.get("title"));
-        }
+        verify(mockBuilder, times(1)).put(putCaptor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> svc =
+            (Map<String, Object>)
+                ((Map<String, Object>) putCaptor.getValue().getEntity()).get("wms");
+        assertEquals("Bewohnerparkzonen Bielefeld", svc.get("title"));
       }
     }
 
