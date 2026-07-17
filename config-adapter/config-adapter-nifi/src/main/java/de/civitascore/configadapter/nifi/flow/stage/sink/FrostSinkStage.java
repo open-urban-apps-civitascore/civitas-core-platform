@@ -41,27 +41,26 @@ import java.util.Set;
 
 /**
  * FROST SensorThings sink in one of two modes. <b>Passthrough</b> (no mapping): the source must
- * deliver the STA envelope itself ({@link PayloadForm#STA_ENVELOPE}, MQTT), consumed by two
- * find-or-create legs ({@code $.things}/{@code $.observations}). <b>Mapped</b> (record mapping
- * present, {@link MappingSupport#ENVELOPE}): any source works — the compiled {@link
- * FrostEntityPlan} drives one linear find-or-create chain per record (split → capture → Thing →
- * Datastream → Observation).
+ * deliver the STA envelope itself ({@link PayloadForm#STA_ENVELOPE}, MQTT), consumed by two upsert
+ * legs ({@code $.things}/{@code $.observations}). <b>Mapped</b> (record mapping present, {@link
+ * MappingSupport#ENVELOPE}): any source works — the compiled {@link FrostEntityPlan} drives one
+ * linear upsert chain per record (split → capture → Thing → Datastream → Observation).
  */
 public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
   /**
-   * Sink-property key carrying the FROST SensorThings base URL into the find-or-create sub-flow
-   * (set by the bind half; consumed by the build half, not bound as a processor property).
+   * Sink-property key carrying the FROST SensorThings base URL into the upsert sub-flow (set by the
+   * bind half; consumed by the build half, not bound as a processor property).
    */
   public static final String FROST_BASE_URL = "Frost Base URL";
 
   /**
    * Sink-property key carrying the dataset's FROST project id (numeric, from the saga's
    * create-project step; set by the bind half). Required for every FROST sink — the build fails
-   * without it. It scopes the find-or-create sub-flow: Things are looked up and created under
-   * {@code /Projects(n)} so they are visible through the dataset's project-scoped named API, and
-   * the Datastream lookup filters on {@code Thing/Projects/id} (the projects plugin exposes no
-   * direct {@code /Projects(n)/Datastreams} collection).
+   * without it. It scopes the upsert sub-flow: Things are looked up and written under {@code
+   * /Projects(n)} so they are visible through the dataset's project-scoped named API, and the
+   * Datastream lookup filters on {@code Thing/Projects/id} (the projects plugin exposes no direct
+   * {@code /Projects(n)/Datastreams} collection).
    */
   public static final String FROST_PROJECT_ID = "Frost Project Id";
 
@@ -71,7 +70,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
   /** Friendly name shared by all FROST InvokeHTTP processors for post-upload secret patching. */
   static final String FROST_HTTP_PROCESSOR = "FrostPublish";
 
-  /** InvokeHTTP failure-side relationships routed to the error sink (find-or-create stages). */
+  /** InvokeHTTP failure-side relationships routed to the error sink (upsert stages). */
   private static final List<String> HTTP_FAILURE_RELATIONSHIPS =
       List.of("Failure", "Retry", "No Retry");
 
@@ -255,18 +254,18 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     // guarantees it is present and numeric.
     out.putSinkProperty(FROST_PROJECT_ID, spec.projectId());
     // Authentication is platform-managed. The username may enter the snapshot, but the password or
-    // API key is patched onto every FrostPublish processor only after upload.
+    // password is patched onto every FrostPublish processor only after upload.
     frostAuth.bind(out);
   }
 
   /**
-   * Builds the FROST sub-flow. A mapped flow (entity plan present) becomes the linear
-   * find-or-create chain of {@link #buildMappedChain}. A passthrough flow processes the source's
-   * STA envelope in two independent legs:
+   * Builds the FROST sub-flow. A mapped flow (entity plan present) becomes the linear upsert chain
+   * of {@link #buildMappedChain}. A passthrough flow processes the source's STA envelope in two
+   * independent legs:
    *
    * <ul>
-   *   <li><b>Things</b> ({@code $.things}): look up by {@code properties/reference}; POST only when
-   *       absent, so a re-delivered message never duplicates a Thing.
+   *   <li><b>Things</b> ({@code $.things}): look up by {@code properties/reference}; PATCH the
+   *       resolved {@code @iot.id} when present, otherwise POST a new Thing.
    *   <li><b>Observations</b> ({@code $.observations}): look up the Datastream by {@code
    *       properties/reference} + {@code name}; if found, merge its {@code @iot.id} into the
    *       observation and POST {@code /Observations}; if not found, route to the error sink (the
@@ -344,20 +343,18 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
   }
 
   /**
-   * The mapped flow: one linear find-or-create chain per record. The pre-region splits the
-   * record-writer array into single records ({@code $[*]} — the JsonRecordSetWriter always writes
-   * an array, and a SQL source delivers many records per FlowFile; this is also what enforces 1
-   * record = 1 Thing) and captures the flat mapped fields into FlowFile attributes; every later
-   * stage is attribute-driven, so no body capture/restore is needed. The stages run strictly in
-   * sequence — Thing before Datastream before Observation — because each entity's create needs its
-   * parent's {@code @iot.id}; parallel legs would race a brand-new Thing against its first
-   * observation.
+   * The mapped flow: one linear upsert chain per record. The pre-region splits the record-writer
+   * array into single records ({@code $[*]} — the JsonRecordSetWriter always writes an array, and a
+   * SQL source delivers many records per FlowFile; this is also what enforces 1 record = 1 Thing)
+   * and captures the flat mapped fields into FlowFile attributes; every later stage is
+   * attribute-driven, so no body capture/restore is needed. The stages run strictly in sequence —
+   * Thing before Datastream before Observation — because each entity's create needs its parent's
+   * {@code @iot.id}; parallel legs would race a brand-new Thing against its first observation.
    *
-   * <p>Each entity stage is find-or-create: GET by the plan's match-key filter, route on the
-   * extracted {@code @iot.id}. A miss on a creatable entity POSTs the plan's body template and
-   * re-GETs the id (no response parsing — creation is rare, one extra GET is cheap and both paths
-   * end in the same attribute); a miss on a lookup-only entity routes to the error sink, matching
-   * the passthrough legs' semantics.
+   * <p>Each creatable entity stage is an upsert: GET by the plan's match-key filter, PATCH the
+   * extracted {@code @iot.id} on a hit, or POST the body template and re-GET the id on a miss. A
+   * miss on a lookup-only entity routes to the error sink, matching the passthrough legs'
+   * semantics.
    */
   private void buildMappedChain(
       BuildContext ctx,
@@ -400,9 +397,23 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
             thingBase + "/Things?$filter=" + filterExpression(plan.thingFilter(), null),
             FrostEntityPlan.THING_ID_ATTRIBUTE,
             plan.thingBody(),
+            plan.thingUpdateBody(),
             thingBase + "/Things",
             List.of(new Tail(keyGuard, "unmatched")),
             errorSink);
+
+    if (plan.locationBody() != null) {
+      tails =
+          buildRelatedCollectionUpsert(
+              ctx,
+              "location",
+              base + "/Things(${" + FrostEntityPlan.THING_ID_ATTRIBUTE + "})/Locations",
+              "frost.location.id",
+              plan.locationBody(),
+              base + "/Locations",
+              tails,
+              errorSink);
+    }
 
     if (!plan.datastreamFilter().isEmpty()) {
       // The Datastream lookup filters on Thing/Projects/id: Datastreams are not project-scoped
@@ -415,9 +426,35 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
               base + "/Datastreams?$filter=" + filterExpression(plan.datastreamFilter(), projectId),
               FrostEntityPlan.DS_ID_ATTRIBUTE,
               plan.datastreamBody(),
+              plan.datastreamUpdateBody(),
               base + "/Datastreams",
               tails,
               errorSink);
+
+      if (plan.sensorBody() != null) {
+        tails =
+            buildRelatedEntityLookupAndPatch(
+                ctx,
+                "sensor",
+                base + "/Datastreams(${" + FrostEntityPlan.DS_ID_ATTRIBUTE + "})/Sensor",
+                "frost.sensor.id",
+                plan.sensorBody(),
+                base + "/Sensors",
+                tails,
+                errorSink);
+      }
+      if (plan.observedPropertyBody() != null) {
+        tails =
+            buildRelatedEntityLookupAndPatch(
+                ctx,
+                "observedProperty",
+                base + "/Datastreams(${" + FrostEntityPlan.DS_ID_ATTRIBUTE + "})/ObservedProperty",
+                "frost.observedProperty.id",
+                plan.observedPropertyBody(),
+                base + "/ObservedProperties",
+                tails,
+                errorSink);
+      }
     }
 
     if (plan.observationBody() != null) {
@@ -462,9 +499,8 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
   }
 
   /**
-   * One find-or-create stage. Returns the tails both outcomes converge on: the found route (the id
-   * attribute set by the lookup) and — for a creatable entity — the re-GET's extraction (the id of
-   * the just-created entity).
+   * One lookup/upsert stage. Returns the tails both outcomes converge on: the successful PATCH of
+   * an existing entity and — for a newly created entity — the confirmed re-GET result.
    */
   private List<Tail> buildEntityStage(
       BuildContext ctx,
@@ -472,6 +508,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       String lookupUrl,
       String idAttribute,
       String body,
+      String updateBody,
       String postUrl,
       List<Tail> upstream,
       Processor errorSink)
@@ -499,6 +536,8 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       ctx.addConnection(route, errorSink, "new");
       return List.of(new Tail(route, "unmatched"));
     }
+
+    Tail updated = buildPatchPath(ctx, disc, idAttribute, updateBody, postUrl, route, errorSink);
 
     Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", disc + "Body");
     setProp(renderBody, "Replacement Value", body);
@@ -541,7 +580,122 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     ctx.routeFailure(reId, errorSink);
     ctx.addConnection(confirm, errorSink, "unconfirmed");
 
-    return List.of(new Tail(confirm, "unmatched"), new Tail(route, "unmatched"));
+    return List.of(new Tail(confirm, "unmatched"), updated);
+  }
+
+  /**
+   * Upserts the first entity of a parent's collection navigation. A missing child is POSTed to the
+   * navigation collection, which makes SensorThings link it to the parent automatically; an
+   * existing child is PATCHed by its resolved id. The mapped Thing shape contains one Location,
+   * matching SensorThings' recommendation that a Thing normally has only one current Location.
+   */
+  private List<Tail> buildRelatedCollectionUpsert(
+      BuildContext ctx,
+      String disc,
+      String navigationUrl,
+      String idAttribute,
+      String body,
+      String entityUrl,
+      List<Tail> upstream,
+      Processor errorSink)
+      throws FatalAdapterException {
+    Processor get = loadFrostHttp(ctx, "Response", disc + "Get");
+    setProp(get, "HTTP Method", "GET");
+    setProp(get, "HTTP URL", navigationUrl + "?$top=1");
+    Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
+    setProp(extractId, idAttribute, "$.value[0]['@iot.id']");
+    Processor route = ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, "new", disc + "Route");
+    setProp(route, "new", "${" + idAttribute + ":isEmpty()}");
+
+    for (Processor processor : List.of(get, extractId, route)) {
+      ctx.addProcessor(processor);
+    }
+    connect(ctx, upstream, get);
+    removeAutoTerminated(get, "Response");
+    ctx.addChainConnection(get, extractId);
+    ctx.addChainConnection(extractId, route);
+    routeHttpFailures(ctx, get, errorSink);
+    ctx.routeFailure(extractId, errorSink);
+
+    Tail updated = buildPatchPath(ctx, disc, idAttribute, body, entityUrl, route, errorSink);
+
+    Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", disc + "Body");
+    setProp(renderBody, "Replacement Value", body);
+    Processor post = loadFrostHttp(ctx, "Original", disc + "Post");
+    setProp(post, "HTTP Method", "POST");
+    setProp(post, "HTTP URL", navigationUrl);
+    setProp(post, "Request Content-Type", "application/json");
+    setProp(post, "Response Body Attribute Name", "frost.response.body");
+    ctx.addProcessor(renderBody);
+    ctx.addProcessor(post);
+    ctx.addConnection(route, renderBody, "new");
+    ctx.addChainConnection(renderBody, post);
+    removeAutoTerminated(post, "Original");
+    ctx.routeFailure(renderBody, errorSink);
+    routeHttpFailures(ctx, post, errorSink);
+
+    return List.of(new Tail(post, "Original"), updated);
+  }
+
+  /** Resolves a single-valued navigation entity and PATCHes the concrete entity by its id. */
+  private List<Tail> buildRelatedEntityLookupAndPatch(
+      BuildContext ctx,
+      String disc,
+      String navigationUrl,
+      String idAttribute,
+      String body,
+      String entityUrl,
+      List<Tail> upstream,
+      Processor errorSink)
+      throws FatalAdapterException {
+    Processor get = loadFrostHttp(ctx, "Response", disc + "Get");
+    setProp(get, "HTTP Method", "GET");
+    setProp(get, "HTTP URL", navigationUrl);
+    Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
+    setProp(extractId, idAttribute, "$['@iot.id']");
+    Processor route = ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, "missing", disc + "Route");
+    setProp(route, "missing", "${" + idAttribute + ":isEmpty()}");
+
+    for (Processor processor : List.of(get, extractId, route)) {
+      ctx.addProcessor(processor);
+    }
+    connect(ctx, upstream, get);
+    removeAutoTerminated(get, "Response");
+    ctx.addChainConnection(get, extractId);
+    ctx.addChainConnection(extractId, route);
+    routeHttpFailures(ctx, get, errorSink);
+    ctx.routeFailure(extractId, errorSink);
+    ctx.addConnection(route, errorSink, "missing");
+
+    return List.of(buildPatchPath(ctx, disc, idAttribute, body, entityUrl, route, errorSink));
+  }
+
+  /** Builds the lookup-hit branch that PATCHes the concrete entity resolved by {@code @iot.id}. */
+  private Tail buildPatchPath(
+      BuildContext ctx,
+      String disc,
+      String idAttribute,
+      String body,
+      String entityUrl,
+      Processor route,
+      Processor errorSink)
+      throws FatalAdapterException {
+    Processor updateBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", disc + "UpdateBody");
+    setProp(updateBody, "Replacement Value", body);
+    Processor patch = loadFrostHttp(ctx, "Original", disc + "Patch");
+    setProp(patch, "HTTP Method", "PATCH");
+    setProp(patch, "HTTP URL", entityUrl + "(${" + idAttribute + "})");
+    setProp(patch, "Request Content-Type", "application/json");
+    setProp(patch, "Response Body Attribute Name", "frost.response.body");
+    ctx.addProcessor(updateBody);
+    ctx.addProcessor(patch);
+    removeAutoTerminated(route, "unmatched");
+    ctx.addConnection(route, updateBody, "unmatched");
+    ctx.addChainConnection(updateBody, patch);
+    removeAutoTerminated(patch, "Original");
+    ctx.routeFailure(updateBody, errorSink);
+    routeHttpFailures(ctx, patch, errorSink);
+    return new Tail(patch, "Original");
   }
 
   /** A stage outcome: the processor and the relationship the next stage consumes. */
@@ -579,7 +733,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     return filter.toString();
   }
 
-  /** Things leg: find by reference, POST only when absent (idempotent create). */
+  /** Things leg: find by reference, PATCH the existing entity or POST when absent. */
   private void buildThingLeg(BuildContext ctx, String base, Processor upstream, Processor errorSink)
       throws FatalAdapterException {
     Processor route =
@@ -604,12 +758,28 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     setProp(post, "HTTP URL", base + "/Things");
     setProp(post, "Request Content-Type", "application/json");
 
+    Processor updateRestore =
+        ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "thingUpdateRestore");
+    setProp(updateRestore, "Replacement Value", "${frost.body}");
+    Processor patch = loadFrostHttp(ctx, null, "thingPatch");
+    setProp(patch, "HTTP Method", "PATCH");
+    setProp(patch, "HTTP URL", base + "/Things(${frost.id})");
+    setProp(patch, "Request Content-Type", "application/json");
+    setProp(patch, "Response Body Attribute Name", "frost.response.body");
+
     ctx.addProcessor(restore);
     ctx.addProcessor(post);
+    ctx.addProcessor(updateRestore);
+    ctx.addProcessor(patch);
     ctx.addChainConnection(route, restore);
     ctx.addChainConnection(restore, post);
+    removeAutoTerminated(route, "unmatched");
+    ctx.addConnection(route, updateRestore, "unmatched");
+    ctx.addChainConnection(updateRestore, patch);
     ctx.routeFailure(restore, errorSink);
+    ctx.routeFailure(updateRestore, errorSink);
     routeHttpFailures(ctx, post, errorSink);
+    routeHttpFailures(ctx, patch, errorSink);
   }
 
   /**

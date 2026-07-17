@@ -29,6 +29,7 @@ import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
+import jakarta.ws.rs.core.Response;
 import java.io.File;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -45,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.awaitility.core.ConditionTimeoutException;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
@@ -348,6 +350,10 @@ class NifiFrostMappingIT extends AbstractNifiIT {
                     && !t.path("Datastreams").path(0).path("Observations").isEmpty();
               });
       thing = expandedThing(REF_CREATE);
+    } catch (ConditionTimeoutException e) {
+      throw new AssertionError(
+          "creatable mapped chain did not reach its Observation. NiFi bulletins:\n" + bulletins(),
+          e);
     }
 
     JsonNode location = thing.path("Locations").path(0);
@@ -372,6 +378,19 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     assertTrue(
         datastream.path("Observations").path(0).path("result").isNumber(),
         "the observation must land on the freshly created Datastream");
+  }
+
+  /** Dumps the NiFi bulletin board when the asynchronous chain does not reach FROST in time. */
+  private String bulletins() throws Exception {
+    String token = client.authenticate();
+    try (Response response =
+        httpClient
+            .target("https://" + dockerHost + ":" + HOST_PORT + "/nifi-api/flow/bulletin-board")
+            .request()
+            .header("Authorization", "Bearer " + token)
+            .get()) {
+      return response.readEntity(String.class);
+    }
   }
 
   @Test

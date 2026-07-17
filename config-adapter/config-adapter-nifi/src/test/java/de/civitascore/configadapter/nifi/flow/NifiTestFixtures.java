@@ -491,4 +491,57 @@ public final class NifiTestFixtures {
         null,
         compilation.plan());
   }
+
+  /** A fully creatable mapped chain including every related entity update stage. */
+  static FlowBuildSpec frostSinkWithRelatedEntityMapping() throws Exception {
+    Map<String, ValueNode> fields = new LinkedHashMap<>();
+    fields.put("$.name", new ValueNode.CopyNode("$.station"));
+    fields.put("$.description", new ValueNode.ConstNode("station", null));
+    fields.put("$.properties.reference", new ValueNode.CopyNode("$.ref"));
+    fields.put("$.Locations[].name", new ValueNode.ConstNode("location", null));
+    fields.put("$.Locations[].description", new ValueNode.ConstNode("location", null));
+    fields.put("$.Locations[].encodingType", new ValueNode.ConstNode("application/geo+json", null));
+    fields.put(
+        "$.Locations[].location",
+        new ValueNode.GeoPointNode(
+            new ValueNode.CopyNode("$.lon"), new ValueNode.CopyNode("$.lat")));
+    fields.put("$.Datastreams[].name", new ValueNode.CopyNode("$.stream"));
+    fields.put("$.Datastreams[].description", new ValueNode.ConstNode("stream", null));
+    fields.put("$.Datastreams[].observationType", new ValueNode.ConstNode("measurement", null));
+    fields.put("$.Datastreams[].unitOfMeasurement.name", new ValueNode.ConstNode("Celsius", null));
+    fields.put("$.Datastreams[].unitOfMeasurement.symbol", new ValueNode.ConstNode("C", null));
+    fields.put(
+        "$.Datastreams[].unitOfMeasurement.definition", new ValueNode.ConstNode("ucum:Cel", null));
+    fields.put("$.Datastreams[].Sensor.name", new ValueNode.ConstNode("sensor", null));
+    fields.put("$.Datastreams[].Sensor.description", new ValueNode.ConstNode("sensor", null));
+    fields.put(
+        "$.Datastreams[].Sensor.encodingType", new ValueNode.ConstNode("application/pdf", null));
+    fields.put("$.Datastreams[].Sensor.metadata", new ValueNode.ConstNode("metadata", null));
+    fields.put(
+        "$.Datastreams[].ObservedProperty.name", new ValueNode.ConstNode("temperature", null));
+    fields.put(
+        "$.Datastreams[].ObservedProperty.definition",
+        new ValueNode.ConstNode("https://example.org/temperature", null));
+    fields.put(
+        "$.Datastreams[].ObservedProperty.description",
+        new ValueNode.ConstNode("temperature", null));
+    fields.put("$.Datastreams[].properties.reference", new ValueNode.CopyNode("$.ref"));
+    FrostMappingCompiler.FrostCompilation compilation =
+        new FrostMappingCompiler(new RecordPathCompiler())
+            .compile(new MappingConfig(null, null, fields), STA_KEYS);
+    return new FlowBuildSpec(
+        "pipeline-frost-related-updates",
+        SourceType.MQTT,
+        Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/meta"),
+        SinkType.FROST,
+        Map.of(
+            FrostSinkStage.FROST_BASE_URL,
+            "http://frost:8080/FROST-Server/v1.1",
+            FrostSinkStage.FROST_PROJECT_ID,
+            "7"),
+        compiled(compilation.flatProperties()),
+        Map.of(),
+        null,
+        compilation.plan());
+  }
 }
