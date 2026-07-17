@@ -65,7 +65,8 @@ describe('DatasetCreateForm', () => {
   test('renders title and subtitle', () => {
     setup()
     expect(screen.getAllByText('create.title')).toHaveLength(2)
-    expect(screen.getAllByText('create.subtitle')).toHaveLength(2)
+    expect(screen.getByText('create.subtitle')).toBeInTheDocument()
+    expect(screen.getByText('info.creationSubtitle')).toBeInTheDocument()
   })
 
   test('submit button is disabled when form is not dirty', () => {
