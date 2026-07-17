@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { useCreateDatasource } from '@/app/services/api/datasources/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
+import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -36,12 +37,13 @@ export const DatasourceCreateForm = () => {
     resolver: zodResolver(DatasourceCreateFormSchema),
     defaultValues: {
       name: '',
+      description: '',
     },
   })
 
   const handleCreateDatasource = async (formData: DatasourceCreateData): Promise<boolean> => {
     try {
-      const { data } = await createDatasource.mutateAsync({ name: formData.name! })
+      const { data } = await createDatasource.mutateAsync({ name: formData.name, description: formData.description })
       toast.success(tCommon('messages.createSuccess', { item: tCommon('items.datasource') }))
       router.push(`/datasources/${data.id}?mode=edit`)
       return true
@@ -124,16 +126,30 @@ export const DatasourceCreateForm = () => {
               {isLoading ? (
                 <LoadingSpinner className="h-[120px]" />
               ) : (
-                <DetailsFieldContainer className="max-w-300">
-                  <TextField
-                    id="datasourceName"
-                    form={form}
-                    label={t('form.name')}
-                    name="name"
-                    placeholder={t('form.namePlaceholder')}
-                    required
-                  />
-                </DetailsFieldContainer>
+                <>
+                  <DetailsFieldContainer className="max-w-300">
+                    <TextField
+                      id="datasourceName"
+                      form={form}
+                      label={t('form.name')}
+                      name="name"
+                      placeholder={t('form.namePlaceholder')}
+                      required
+                    />
+                  </DetailsFieldContainer>
+                  <DetailsFieldContainer className="max-w-300">
+                    <FormTextArea
+                      form={form}
+                      name="description"
+                      label={t('form.description')}
+                      placeholder={t('form.description')}
+                      hint={tCommon('info.descriptionHint')}
+                      maxLength={150}
+                      hasCharacterCount
+                      className="min-h-[100px] resize-none"
+                    />
+                  </DetailsFieldContainer>
+                </>
               )}
             </form>
           </Form>

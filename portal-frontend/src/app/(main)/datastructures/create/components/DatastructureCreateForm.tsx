@@ -6,6 +6,7 @@ import { FormEvent } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
+import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -105,16 +106,30 @@ export const DatastructureCreateForm = () => {
               {isLoading ? (
                 <LoadingSpinner className="h-[120px]" />
               ) : (
-                <DetailsFieldContainer className="max-w-300">
-                  <TextField
-                    id="datastructureName"
-                    form={form}
-                    label={t('form.name')}
-                    name="name"
-                    placeholder={t('form.namePlaceholder')}
-                    required
-                  />
-                </DetailsFieldContainer>
+                <>
+                  <DetailsFieldContainer className="max-w-300">
+                    <TextField
+                      id="datastructureName"
+                      form={form}
+                      label={t('form.name')}
+                      name="name"
+                      placeholder={t('form.namePlaceholder')}
+                      required
+                    />
+                  </DetailsFieldContainer>
+                  <DetailsFieldContainer className="max-w-300">
+                    <FormTextArea
+                      form={form}
+                      name="description"
+                      label={t('form.description')}
+                      placeholder={t('form.description')}
+                      hint={tCommon('info.descriptionHint')}
+                      maxLength={150}
+                      hasCharacterCount
+                      className="min-h-[100px] resize-none"
+                    />
+                  </DetailsFieldContainer>
+                </>
               )}
             </form>
           </Form>

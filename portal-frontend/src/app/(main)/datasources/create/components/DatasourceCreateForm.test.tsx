@@ -70,9 +70,13 @@ describe('DatasourceCreateForm', () => {
 
   test('submit button is enabled after changing form values', () => {
     setup()
-    const nameInput = screen.getByRole('textbox')
-    fireEvent.change(nameInput, { target: { value: 'Test Datasource' } })
+    fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Datasource' } })
     expect(screen.getByTestId('submitButton')).toBeEnabled()
+  })
+
+  test('renders the description field', () => {
+    setup()
+    expect(screen.getByTestId('descriptionTextArea')).toBeInTheDocument()
   })
 
   test('cancel button navigates back to datasources list', () => {
@@ -83,17 +87,23 @@ describe('DatasourceCreateForm', () => {
 
   test('calls createDatasource mutation on form submission and shows success toast', async () => {
     setup()
-    const nameInput = screen.getByRole('textbox')
-    fireEvent.change(nameInput, { target: { value: 'Test Datasource' } })
+    fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Datasource' } })
     fireEvent.click(screen.getByTestId('submitButton'))
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Test Datasource',
-        }),
-      )
+      expect(mockMutateAsync).toHaveBeenCalledWith({ name: 'Test Datasource', description: '' })
       expect(toast.success).toHaveBeenCalled()
+    })
+  })
+
+  test('includes description in mutation when filled in', async () => {
+    setup()
+    fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Datasource' } })
+    fireEvent.change(screen.getByTestId('descriptionTextArea'), { target: { value: 'A description' } })
+    fireEvent.click(screen.getByTestId('submitButton'))
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith({ name: 'Test Datasource', description: 'A description' })
     })
   })
 
@@ -101,8 +111,7 @@ describe('DatasourceCreateForm', () => {
     mockMutateAsync.mockRejectedValueOnce(new Error('Unexpected error'))
 
     setup()
-    const nameInput = screen.getByRole('textbox')
-    fireEvent.change(nameInput, { target: { value: 'Test Datasource' } })
+    fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Datasource' } })
     fireEvent.click(screen.getByTestId('submitButton'))
 
     await waitFor(() => {

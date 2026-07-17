@@ -45,6 +45,12 @@ vi.mock('@/components/form/fields/TextField', () => ({
   TextField: ({ placeholder }: { placeholder: string }) => <input aria-label="name" placeholder={placeholder} />,
 }))
 
+vi.mock('@/components/form/fields/FormTextArea', () => ({
+  FormTextArea: ({ placeholder }: { placeholder: string }) => (
+    <textarea aria-label="description" placeholder={placeholder} />
+  ),
+}))
+
 vi.mock('@/components/loading-spinner/LoadingSpinner', () => ({
   LoadingSpinner: () => <div data-testid="loadingSpinner" />,
 }))

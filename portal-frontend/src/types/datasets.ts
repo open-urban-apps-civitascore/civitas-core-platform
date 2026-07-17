@@ -102,6 +102,12 @@ export type DatasetBaseFormData = z.input<typeof DatasetBaseFormSchema>
 export const DatasetCreateFormSchema = z.object({
   name: z.string().trim().min(3, 'common.errors.atLeast3').max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
   datapoolId: z.string().nullable(),
+  description: z
+    .string()
+    .trim()
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength')
+    .optional()
+    .or(z.literal('')),
 })
 
 export type DatasetCreateFormData = z.input<typeof DatasetCreateFormSchema>
