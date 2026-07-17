@@ -72,7 +72,12 @@ export const LayerFormSchema = z
   .object({
     id: z.string(),
     title: z.string().trim().min(1, 'common.errors.required'),
-    layerName: z.string().trim().min(1, 'common.errors.required'),
+    layerName: z
+      .string()
+      .trim()
+      .min(1, 'common.errors.required')
+      .regex(/^[A-Za-z0-9_-]*$/, 'common.errors.invalidCharacters')
+      .regex(/^[^0-9]/, 'common.errors.mustNotStartWithNumber'),
     description: z
       .string()
       .trim()

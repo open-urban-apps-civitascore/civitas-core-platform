@@ -9,6 +9,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("LayerInputDTO Validation Tests")
 class LayerInputDTOTest {
@@ -58,6 +60,32 @@ class LayerInputDTOTest {
   void blankLayerNameShouldFail() {
     LayerInputDTO dto = valid();
     dto.setLayerName("   ");
+
+    Set<ConstraintViolation<LayerInputDTO>> violations = VALIDATOR.validate(dto);
+
+    // Whitespace-only trips both @NotBlank and @Pattern, so assert by property rather than count.
+    assertThat(violations).isNotEmpty();
+    assertThat(violations)
+        .allSatisfy(v -> assertThat(v.getPropertyPath().toString()).isEqualTo("layerName"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"a", "traffic_layer", "Traffic-Layer", "_leading", "-leading", "abc123"})
+  @DisplayName("layerName with only safe characters and no leading digit should pass")
+  void safeLayerNameShouldPass(String layerName) {
+    LayerInputDTO dto = valid();
+    dto.setLayerName(layerName);
+
+    assertThat(VALIDATOR.validate(dto)).isEmpty();
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"traffic layer", "traffic.layer", "traffic/layer", "trafficäöü", "1layer"})
+  @DisplayName("layerName with invalid characters or a leading digit should fail validation")
+  void invalidLayerNameShouldFail(String layerName) {
+    LayerInputDTO dto = valid();
+    dto.setLayerName(layerName);
 
     Set<ConstraintViolation<LayerInputDTO>> violations = VALIDATOR.validate(dto);
 
