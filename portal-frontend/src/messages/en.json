@@ -1359,7 +1359,9 @@
       },
       "errors": {
         "typeMismatchWithType": "Types don't match ({type}). Add a conversion function.",
-        "typeMismatch": "Types don't match. Add a conversion function."
+        "typeMismatch": "Types don't match. Add a conversion function.",
+        "outputToOutput": "Two outputs can't be connected.",
+        "inputToInput": "Two inputs can't be connected."
       },
       "unconnectedWarning": {
         "title": "Remove unconnected transforms?",

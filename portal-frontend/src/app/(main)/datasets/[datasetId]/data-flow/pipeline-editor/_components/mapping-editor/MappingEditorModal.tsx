@@ -246,12 +246,19 @@ export const MappingEditorModal = ({
     (_event, connectionState) => {
       // connectionState.isValid is false when the drag ended on an incompatible handle
       if (connectionState && !connectionState.isValid && pendingConnection.current) {
-        const from = endpointInfo(pendingConnection.current.nodeId, pendingConnection.current.handleId)
-        // Only show the message when we can identify the source type (not a missed drop into empty space)
-        if (from?.sub) {
-          toast.error(t('errors.typeMismatchWithType', { type: from.sub }))
-        } else if (from) {
-          toast.error(t('errors.typeMismatch'))
+        const fromDir = connectionState.fromHandle?.type
+        const toDir = connectionState.toHandle?.type
+        // Same-direction drop (output-output or input-input)
+        if (toDir && fromDir === toDir) {
+          toast.error(fromDir === 'source' ? t('errors.outputToOutput') : t('errors.inputToInput'))
+        } else {
+          const from = endpointInfo(pendingConnection.current.nodeId, pendingConnection.current.handleId)
+          // Only show the message when we can identify the source type (not a missed drop into empty space)
+          if (from?.sub) {
+            toast.error(t('errors.typeMismatchWithType', { type: from.sub }))
+          } else if (from) {
+            toast.error(t('errors.typeMismatch'))
+          }
         }
       }
       pendingConnection.current = null
