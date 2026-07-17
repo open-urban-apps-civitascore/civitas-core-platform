@@ -11,6 +11,7 @@ import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
+import { PageHeader } from '@/components/page-header/PageHeader'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
@@ -57,35 +58,21 @@ export const DatastructureCreateForm = () => {
 
   useRegisterUnsavedChanges(form.formState.isDirty, handleSave)
 
+  const customElementCreateMode = (
+    <div className="flex items-center gap-4 mr-3.5">
+      <Button onClick={() => handleCancel()} type="button" variant="ghost" disabled={isLoading}>
+        {tCommon('actions.cancel')}
+      </Button>
+
+      <Button type="submit" form="datastructure-create-form" disabled={!form.formState.isDirty || isLoading}>
+        {tCommon('actions.saveAndContinue')}
+      </Button>
+    </div>
+  )
+
   return (
     <PageContainer testId="createDatastructurePage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
-      <div className="w-full flex flex-col h-[var(--title-height)] py-[var(--layout-padding)] border-b-1">
-        <div className="flex items-center justify-between px-[var(--layout-padding)]">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-3xl font-bold truncate max-w-full min-w-0">{t('create.title')}</h1>
-            <p className="mt-2 text-muted-foreground">{t('create.subtitle')}</p>
-          </div>
-          <div className="flex items-center gap-4 flex-shrink-0">
-            <Button
-              data-testid="cancelButton"
-              type="button"
-              variant="ghost"
-              onClick={handleCancel}
-              disabled={isLoading}
-            >
-              {tCommon('actions.cancel')}
-            </Button>
-            <Button
-              data-testid="submitButton"
-              type="submit"
-              disabled={!form.formState.isDirty || isLoading}
-              form="datastructure-create-form"
-            >
-              {tCommon('actions.saveAndContinue')}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <PageHeader title={t('create.title')} subtitle={t('create.subtitle')} customElement={customElementCreateMode} />
       <PageBackground className="overflow-y-auto">
         <ContentCard className={cn('overflow-auto')}>
           <Form {...form}>
