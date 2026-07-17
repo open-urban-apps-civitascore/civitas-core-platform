@@ -131,6 +131,35 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void titlesWorkspaceServicesWithDatasetName() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        // With a datasetName in the trigger, the workspace WMS/WFS services are titled with the
+        // human-facing dataset name (not the technical workspace name).
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "CREATE_WORKSPACE",
+                    Map.of("datasetId", "ds-abc", "datasetName", "Bewohnerparkzonen Bielefeld")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        ArgumentCaptor<Entity> putCaptor = ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(2)).put(putCaptor.capture());
+        for (Entity entity : putCaptor.getAllValues()) {
+          @SuppressWarnings("unchecked")
+          Map<String, Object> body = (Map<String, Object>) entity.getEntity();
+          @SuppressWarnings("unchecked")
+          Map<String, Object> svc = (Map<String, Object>) body.getOrDefault("wms", body.get("wfs"));
+          assertEquals("Bewohnerparkzonen Bielefeld", svc.get("title"));
+        }
+      }
+    }
+
+    @Test
     void createDatastoreStepDerivesDatastoreName() {
       try (GeoServerSagaHandler handler = createHandler()) {
         Response created = mock(Response.class);

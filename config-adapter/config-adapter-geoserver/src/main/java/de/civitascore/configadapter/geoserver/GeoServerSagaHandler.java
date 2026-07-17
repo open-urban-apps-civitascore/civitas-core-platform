@@ -161,7 +161,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   private SagaCommandResult handleCreateWorkspace(SagaCommandMessage command) {
     String workspaceName = resolveWorkspaceName(command);
-    createWorkspace(workspaceName);
+    createWorkspace(workspaceName, resolveServiceTitle(command, workspaceName));
 
     log.info(
         "GeoServer workspace created: workspaceName={}, saga={}",
@@ -205,7 +205,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     String workspaceName = resolveWorkspaceName(command);
     String datastoreName = datastoreName(workspaceName);
 
-    createWorkspace(workspaceName);
+    createWorkspace(workspaceName, resolveServiceTitle(command, workspaceName));
     createDatastore(workspaceName, datastoreName);
     processLayers(command, workspaceName, datastoreName, false);
 
@@ -229,7 +229,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     // be the first time geo is provisioned for a dataset (e.g. a geo sink added on a later update),
     // in which case neither exists yet and a plain feature-type POST would 404. Both creates are
     // idempotent (HTTP 409 = already exists).
-    createWorkspace(workspaceName);
+    createWorkspace(workspaceName, resolveServiceTitle(command, workspaceName));
     createDatastore(workspaceName, datastoreName);
 
     // Create or update feature types from the new layers
@@ -342,7 +342,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   // ============== HELPERS ==============
 
   /** Creates the workspace idempotently: HTTP 409 (already exists) is treated as success. */
-  private void createWorkspace(String workspaceName) {
+  private void createWorkspace(String workspaceName, String serviceTitle) {
     // Create the workspace isolated: its content is reachable only through the per-workspace
     // virtual OWS services (matching geoserver.web.globalServices=false) and it gets its own
     // namespace. This is what makes the WMS service resolve the workspace's layers for
@@ -368,33 +368,34 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     // On fresh creation, enable the per-workspace WMS and WFS virtual services so a map client
     // (QGIS, …) shows the dataset's workspace as the service level between connection and layer.
     if (status == 201) {
-      enableWorkspaceServices(workspaceName);
+      enableWorkspaceServices(workspaceName, serviceTitle);
     }
   }
 
   /**
-   * Enables the per-workspace WMS and WFS virtual services, each titled with the workspace name, so
-   * the workspace surfaces as a named service in clients (consistent with {@code
-   * globalServices=false} + isolated workspaces). Best-effort: a failure is logged but does not
-   * fail workspace provisioning — the layer stays reachable, only the service title would be unset.
+   * Enables the per-workspace WMS and WFS virtual services, each titled with {@code serviceTitle}
+   * (the dataset's display name), so the workspace surfaces as a named service in clients
+   * (consistent with {@code globalServices=false} + isolated workspaces). Best-effort: a failure is
+   * logged but does not fail workspace provisioning — the layer stays reachable, only the service
+   * title would be unset.
    */
-  private void enableWorkspaceServices(String workspaceName) {
-    putWorkspaceServiceSettings(workspaceName, "wms", "WMS");
-    putWorkspaceServiceSettings(workspaceName, "wfs", "WFS");
+  private void enableWorkspaceServices(String workspaceName, String serviceTitle) {
+    putWorkspaceServiceSettings(workspaceName, serviceTitle, "wms", "WMS");
+    putWorkspaceServiceSettings(workspaceName, serviceTitle, "wfs", "WFS");
   }
 
   /**
    * Upserts the workspace-local settings for a single OWS service ({@code wms}/{@code wfs}):
-   * enables it and sets its title to the workspace name via {@code PUT
+   * enables it and sets its title to {@code serviceTitle} via {@code PUT
    * /rest/services/{service}/workspaces/{workspace}/settings}.
    */
   private void putWorkspaceServiceSettings(
-      String workspaceName, String service, String serviceName) {
+      String workspaceName, String serviceTitle, String service, String serviceName) {
     Map<String, Object> settings = new LinkedHashMap<>();
     settings.put("workspace", Map.of("name", workspaceName));
     settings.put("enabled", true);
     settings.put("name", serviceName);
-    settings.put("title", workspaceName);
+    settings.put("title", serviceTitle);
     try (Response response =
         auth.apply(
                 client()
@@ -1143,6 +1144,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       return workspaceName;
     }
     return toWorkspaceName(requireString(command, "datasetId"));
+  }
+
+  /**
+   * Human-facing title for the workspace-local OWS services: the dataset's display name from the
+   * saga trigger ({@code datasetName}), falling back to the workspace name when it is absent or
+   * blank (e.g. a step that carries only {@code datasetId}).
+   */
+  private static String resolveServiceTitle(SagaCommandMessage command, String workspaceName) {
+    String datasetName = stringValue(command.payload(), "datasetName");
+    return datasetName != null && !datasetName.isBlank() ? datasetName : workspaceName;
   }
 
   static String toWorkspaceName(String datasetId) {
