@@ -60,6 +60,12 @@ final class RouteAuthConfigurer {
   /** {@code proxy-rewrite.headers} sub-map of request headers to set on the upstream. */
   private static final String HEADERS_SET_KEY = "set";
 
+  /**
+   * OWS service endpoints GeoServer emits in its capabilities self-URLs ({@code .../{ws}/wfs},
+   * etc.) — the alternation matched by the OWS {@code response-rewrite} filter.
+   */
+  private static final String OWS_SERVICE_ALTERNATION = "wfs|wms|wcs|wps|wmts|ows|gwc";
+
   private final ApisixHandlerSettings settings;
 
   RouteAuthConfigurer(ApisixHandlerSettings settings) {
@@ -156,6 +162,107 @@ final class RouteAuthConfigurer {
     }
     // STA routes inject the FROST upstream credential; OWS map-service routes carry none.
     mergeProxyRewriteHeaders(proxyRewrite, managedHeader, sta);
+
+    // OWS routes additionally rewrite GeoServer's self-referential capabilities URLs to this
+    // route's external endpoint so map clients can follow them back through the gateway.
+    if (!sta) {
+      applyOwsCapabilitiesRewrite(route, plugins, proxyRewrite);
+    }
+  }
+
+  /**
+   * OWS routes only: add a {@code response-rewrite} filter that rewrites GeoServer's
+   * self-referential capabilities URLs from the internal gateway path (scheme + any host + {@code
+   * /…/{workspace}/{wfs|wms|…}}) to this route's external dataset endpoint ({@code
+   * https://{apiHost}{routePath}}). GeoServer advertises the internal {@code
+   * /geoserver-cloud/{workspace}/wfs} form in GetCapabilities; APISIX does not route that path, so
+   * a client (QGIS, …) following the advertised GetMap/GetFeature URL would get a 404. The route's
+   * own {@code regex_uri} maps the external endpoint back to the workspace OWS endpoint, so the
+   * rewritten URL round-trips.
+   *
+   * <p>Also strips the request {@code Accept-Encoding} so the upstream returns an uncompressed
+   * body: {@code response-rewrite} filters match the raw response bytes and would silently no-op on
+   * a gzipped capabilities document.
+   *
+   * <p>Everything is derived from the route body — the external path from {@code uris}, the
+   * workspace path from {@code proxy-rewrite.regex_uri} — so CREATE (fresh skeleton) and
+   * UPDATE/RESTORE (route read back from APISIX) all produce the same shape.
+   */
+  private void applyOwsCapabilitiesRewrite(
+      Map<String, Object> route, Map<String, Object> plugins, Map<String, Object> proxyRewrite) {
+    String externalPath = firstUri(route);
+    String workspacePath = upstreamWorkspacePath(proxyRewrite);
+    if (externalPath == null || workspacePath == null) {
+      return;
+    }
+
+    Map<String, Object> filter = new HashMap<>();
+    filter.put(
+        "regex",
+        "https?://[^/]+" + regexEscape(workspacePath) + "/(" + OWS_SERVICE_ALTERNATION + ")");
+    filter.put("scope", "global");
+    filter.put("replace", "https://" + settings.apiHost() + externalPath);
+
+    Map<String, Object> responseRewrite = new HashMap<>();
+    responseRewrite.put("filters", new Object[] {filter});
+    plugins.put("response-rewrite", responseRewrite);
+
+    stripRequestBodyEncoding(proxyRewrite);
+  }
+
+  /**
+   * First URI a route matches — its external path (e.g. {@code /v1/datasets/{id}/{slug}}). Reads
+   * {@code uris} (what CREATE writes) and falls back to a singular {@code uri} (APISIX may return
+   * either form on read-back).
+   */
+  private static String firstUri(Map<String, Object> route) {
+    List<String> uris = readStringList(route.get("uris"));
+    if (!uris.isEmpty()) {
+      return uris.get(0);
+    }
+    Object uri = route.get("uri");
+    return uri instanceof String s && !s.isBlank() ? s : null;
+  }
+
+  /**
+   * The workspace OWS path without the trailing {@code /ows}, read from the route's {@code
+   * proxy-rewrite.regex_uri} replacement (e.g. {@code /geoserver-cloud/{ws}/ows$1} → {@code
+   * /geoserver-cloud/{ws}}). Null when the route carries no such OWS mapping.
+   */
+  private static String upstreamWorkspacePath(Map<String, Object> proxyRewrite) {
+    List<String> regexUri = readStringList(proxyRewrite.get("regex_uri"));
+    if (regexUri.size() < 2) {
+      return null;
+    }
+    String upstreamPath = regexUri.get(1);
+    int marker = upstreamPath.indexOf('$');
+    if (marker >= 0) {
+      upstreamPath = upstreamPath.substring(0, marker);
+    }
+    if (!upstreamPath.endsWith("/ows")) {
+      return null;
+    }
+    return upstreamPath.substring(0, upstreamPath.length() - "/ows".length());
+  }
+
+  /**
+   * Add {@code Accept-Encoding} to {@code proxy-rewrite.headers.remove} (idempotent union) so the
+   * upstream returns an uncompressed body the {@code response-rewrite} filter can match.
+   */
+  @SuppressWarnings("unchecked")
+  private static void stripRequestBodyEncoding(Map<String, Object> proxyRewrite) {
+    Map<String, Object> headers = mutableMap((Map<String, Object>) proxyRewrite.get("headers"));
+    List<String> remove = readStringList(headers.get("remove"));
+    if (!remove.contains("Accept-Encoding")) {
+      remove.add("Accept-Encoding");
+    }
+    headers.put("remove", remove);
+    proxyRewrite.put("headers", headers);
+  }
+
+  /** Escape PCRE metacharacters in a literal path used inside a {@code response-rewrite} regex. */
+  private static String regexEscape(String literal) {
+    return literal.replaceAll("([.^$*+?()\\[\\]{}|\\\\])", "\\\\$1");
   }
 
   /** A route's upstream kind, read from {@link #MANAGED_STANDARD_LABEL}; absent marker ⇒ STA. */
