@@ -1346,7 +1346,9 @@
       },
       "errors": {
         "typeMismatchWithType": "Typen stimmen nicht überein ({type}). Konvertierungsfunktion hinzufügen.",
-        "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen."
+        "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen.",
+        "outputToOutput": "Zwei Ausgänge können nicht verbunden werden.",
+        "inputToInput": "Zwei Eingänge können nicht verbunden werden."
       },
       "unconnectedWarning": {
         "title": "Nicht verbundene Transformationen entfernen?",
