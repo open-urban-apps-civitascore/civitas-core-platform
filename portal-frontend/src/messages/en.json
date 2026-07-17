@@ -114,7 +114,8 @@
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
       "commaSeparated": "comma-separated",
       "requiredInAvailable": "This field is required in the available mode.",
-      "descriptionHint": "max. 150 characters"
+      "descriptionHint": "max. 150 characters",
+      "creationSubtitle": "Only a name is required in the first step. Additional basic information can be added later."
     },
     "success": {
       "statusChangeSuccess": "The availability status has been successfully updated.",

@@ -87,7 +87,7 @@ export const DatastructureCreateForm = () => {
         </div>
       </div>
       <PageBackground className="overflow-y-auto">
-        <ContentCard className={cn('h-full overflow-auto')}>
+        <ContentCard className={cn('overflow-auto')}>
           <Form {...form}>
             <form
               id="datastructure-create-form"
@@ -100,7 +100,7 @@ export const DatastructureCreateForm = () => {
                 <SubHeader
                   title={t('create.basicInfo.title')}
                   titleClassName="text-2xl leading-none font-bold"
-                  subtitle={t('create.basicInfo.subtitle')}
+                  subtitle={tCommon('info.creationSubtitle')}
                 />
               </DetailsFieldContainer>
               {isLoading ? (
@@ -117,7 +117,7 @@ export const DatastructureCreateForm = () => {
                       required
                     />
                   </DetailsFieldContainer>
-                  <DetailsFieldContainer className="max-w-300">
+                  <DetailsFieldContainer className="max-w-300" hasBorder={false}>
                     <FormTextArea
                       form={form}
                       name="description"
