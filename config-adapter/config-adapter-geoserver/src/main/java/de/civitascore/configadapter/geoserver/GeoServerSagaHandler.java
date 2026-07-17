@@ -349,6 +349,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     // (APISIX-gated) anonymous requests — a non-isolated workspace shares the global namespace,
     // where the WMS layer-by-name lookup fails to resolve/hides the layer and same-named layers
     // across datasets collide. WFS is unaffected either way; WMS needs the isolation.
+    int status;
     try (Response response =
         auth.apply(
                 client()
@@ -358,8 +359,57 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
             .post(
                 Entity.json(
                     Map.of("workspace", Map.of("name", workspaceName, "isolated", true))))) {
-      if (response.getStatus() != 201 && response.getStatus() != 409) {
+      status = response.getStatus();
+      if (status != 201 && status != 409) {
         checkResponse(response, "CREATE_WORKSPACE/" + workspaceName);
+        return;
+      }
+    }
+    // On fresh creation, enable the per-workspace WMS and WFS virtual services so a map client
+    // (QGIS, …) shows the dataset's workspace as the service level between connection and layer.
+    if (status == 201) {
+      enableWorkspaceServices(workspaceName);
+    }
+  }
+
+  /**
+   * Enables the per-workspace WMS and WFS virtual services, each titled with the workspace name, so
+   * the workspace surfaces as a named service in clients (consistent with {@code
+   * globalServices=false} + isolated workspaces). Best-effort: a failure is logged but does not
+   * fail workspace provisioning — the layer stays reachable, only the service title would be unset.
+   */
+  private void enableWorkspaceServices(String workspaceName) {
+    putWorkspaceServiceSettings(workspaceName, "wms", "WMS");
+    putWorkspaceServiceSettings(workspaceName, "wfs", "WFS");
+  }
+
+  /**
+   * Upserts the workspace-local settings for a single OWS service ({@code wms}/{@code wfs}):
+   * enables it and sets its title to the workspace name via {@code PUT
+   * /rest/services/{service}/workspaces/{workspace}/settings}.
+   */
+  private void putWorkspaceServiceSettings(
+      String workspaceName, String service, String serviceName) {
+    Map<String, Object> settings = new LinkedHashMap<>();
+    settings.put("workspace", Map.of("name", workspaceName));
+    settings.put("enabled", true);
+    settings.put("name", serviceName);
+    settings.put("title", workspaceName);
+    try (Response response =
+        auth.apply(
+                client()
+                    .target(serverUrl)
+                    .path(
+                        "/rest/services/" + service + "/workspaces/" + workspaceName + "/settings")
+                    .request(MediaType.APPLICATION_JSON))
+            .put(Entity.json(Map.of(service, settings)))) {
+      if (response.getStatus() != 200 && response.getStatus() != 201) {
+        log.warn(
+            "Could not enable {} service for workspace {} (status {}); the layer stays reachable,"
+                + " only the workspace service title is unset",
+            serviceName,
+            Encode.forJava(workspaceName),
+            response.getStatus());
       }
     }
   }

@@ -112,6 +112,21 @@ class GeoServerSagaHandlerTest {
                 ((Map<String, Object>) captor.getValue().getEntity()).get("workspace");
         assertEquals("ds_abc", workspace.get("name"));
         assertEquals(Boolean.TRUE, workspace.get("isolated"));
+
+        // The per-workspace WMS and WFS services are enabled and titled with the workspace name, so
+        // the workspace shows up as a named service in map clients (between connection and layer).
+        assertTrue(capturedPaths().contains("/rest/services/wms/workspaces/ds_abc/settings"));
+        assertTrue(capturedPaths().contains("/rest/services/wfs/workspaces/ds_abc/settings"));
+        ArgumentCaptor<Entity> putCaptor = ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(2)).put(putCaptor.capture());
+        for (Entity entity : putCaptor.getAllValues()) {
+          @SuppressWarnings("unchecked")
+          Map<String, Object> body = (Map<String, Object>) entity.getEntity();
+          @SuppressWarnings("unchecked")
+          Map<String, Object> svc = (Map<String, Object>) body.getOrDefault("wms", body.get("wfs"));
+          assertEquals(Boolean.TRUE, svc.get("enabled"));
+          assertEquals("ds_abc", svc.get("title"));
+        }
       }
     }
 
@@ -1412,6 +1427,13 @@ class GeoServerSagaHandlerTest {
     when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
     when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
     when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
+    // Lenient default so the best-effort per-workspace WMS/WFS service-settings PUTs (issued after
+    // a
+    // fresh workspace CREATE) don't NPE in tests that don't stub put themselves; tests that assert
+    // specific put behaviour override this.
+    Response okPut = mock(Response.class);
+    when(okPut.getStatus()).thenReturn(200);
+    when(mockBuilder.put(any(Entity.class))).thenReturn(okPut);
 
     handler.setTestClient(mockClient);
     return handler;
