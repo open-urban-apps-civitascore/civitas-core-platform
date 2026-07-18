@@ -48,6 +48,7 @@ public class DataSourceAssembler implements BaseAssembler<DataSource, DataSource
     dto.setInUse(pipelineRepository.existsByDataSourcesId(entity.getId()));
     dto.setDatapoolScope(buildDatapoolScopeOutput(entity));
     dto.setConfiguration(fetchConfiguration(entity));
+    dto.setConfigurationUrn(entity.getConfigurationUrn());
     return dto;
   }
 

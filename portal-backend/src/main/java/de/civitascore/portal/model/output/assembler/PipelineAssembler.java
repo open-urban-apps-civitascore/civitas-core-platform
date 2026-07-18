@@ -46,6 +46,7 @@ public class PipelineAssembler implements BaseAssembler<Pipeline, PipelineOutput
   public PipelineOutputDTO enrichDto(PipelineOutputDTO dto, Pipeline entity) {
     dto.setDataSinkIds(findDataSinkIds(entity));
     dto.setDataSourceIds(findDataSourceIds(entity));
+    dto.setModelUrn(entity.getModelUrn());
     if (entity.getModelUrn() != null) {
       modelRegistryGateway
           .fetchPayload(entity.getModelUrn())

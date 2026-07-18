@@ -29,7 +29,9 @@ import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import jakarta.validation.groups.Default;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -127,7 +129,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     // The input's configuration was already normalized + encrypted by the pre-process hooks;
     // store it in the registry and mirror the pin. An absent configuration on a full update
     // clears the pin (the artifact history stays in the registry).
-    storeConfigurationInRegistry(entity, input.getConfiguration());
+    storeConfigurationInRegistry(entity, input.getConfiguration(), input.getConnectorType());
 
     return super.postConvertToEntity(entity, input);
   }
@@ -141,13 +143,26 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
    * @param entity the data source entity
    * @param configuration the encrypted configuration document, or null to clear
    */
-  private void storeConfigurationInRegistry(DataSource entity, Map<String, Object> configuration) {
+  private void storeConfigurationInRegistry(
+      DataSource entity, Map<String, Object> configuration, ConnectorType connectorType) {
     if (configuration == null || configuration.isEmpty()) {
       entity.setConfigurationUrn(null);
       return;
     }
+    // The host supplies only content: the connectionType. Model Forge stamps $schema + id on write
+    // so
+    // the stored payload satisfies datasource.schema.json's
+    // required:["$schema","id","connectionType"].
+    // Resolve the type from the request first (create / connector PATCH), else the entity's stored
+    // value (a status-only PATCH does not re-send it) — it must never be null here or validation
+    // fails.
+    ConnectorType type = connectorType != null ? connectorType : entity.getConnectorType();
+    Map<String, Object> payload = new LinkedHashMap<>(configuration);
+    if (type != null) {
+      payload.put("connectionType", type.name().toLowerCase(Locale.ROOT));
+    }
     if (entity.getConfigurationUrn() != null
-        && modelRegistryGateway.isUnchanged(entity.getConfigurationUrn(), configuration, null)) {
+        && modelRegistryGateway.isUnchanged(entity.getConfigurationUrn(), payload, null)) {
       // Unchanged configuration keeps the existing pin — no new registry version. (Encrypted
       // values only compare equal when encryption is deterministic; otherwise this is a no-op.)
       return;
@@ -157,7 +172,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
             PayloadKind.DATA_SOURCE,
             Optional.ofNullable(entity.getConfigurationLogicalUrn()),
             entity.getName() != null ? entity.getName() : "datasource",
-            configuration,
+            payload,
             null);
     if (entity.getConfigurationLogicalUrn() == null) {
       entity.setConfigurationLogicalUrn(pin.logicalUrn());
@@ -453,7 +468,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       if (existingConfig != null) {
         restoreMaskedValues(encrypted, existingConfig, handler, normalized);
       }
-      storeConfigurationInRegistry(entity, encrypted);
+      storeConfigurationInRegistry(entity, encrypted, entity.getConnectorType());
     }
   }
 

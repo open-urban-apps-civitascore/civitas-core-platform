@@ -531,8 +531,7 @@ class DataSinkControllerIntegrationTest
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("dataSinkType", DataSinkType.POSTGIS.name());
       patchMap.put(
-          "configuration",
-          Map.of("tableName", "patched_table", "element", dsv.getId().toString()));
+          "configuration", Map.of("tableName", "patched_table", "element", dsv.getId().toString()));
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(

@@ -64,11 +64,22 @@ class DataSetSagaPublisherTest {
             modelRegistryGateway);
   }
 
+  private static String datasourceUrn(UUID id) {
+    return "urn:core:platform:civitas:data-source:common:src-" + id + ":1.0.0";
+  }
+
   private DataSource dataSource(UUID id, ConnectorType type) {
     DataSource ds = new DataSource();
     ds.setId(id);
     ds.setName("ds-" + id);
     ds.setConnectorType(type);
+    // The datasource catalog is now keyed by the configuration CORE URN; pin one and stub its read.
+    String urn = datasourceUrn(id);
+    ds.setConfigurationUrn(urn);
+    lenient()
+        .when(modelRegistryGateway.fetchPayload(urn))
+        .thenReturn(
+            Optional.of(new ModelRegistryGateway.RegistryDocument(Map.of("host", "h"), null)));
     return ds;
   }
 
@@ -153,7 +164,9 @@ class DataSetSagaPublisherTest {
       var datasources = payload.get("datasources");
       assertThat(datasources).isNotNull();
       assertThat(datasources.size()).as("Shared datasource should appear only once").isEqualTo(1);
-      assertThat(datasources.get(0).get("id").asString()).isEqualTo(dsId.toString());
+      assertThat(datasources.get(0).get("id").asString())
+          .as("datasource is keyed by its configuration CORE URN, not its GUID")
+          .isEqualTo(datasourceUrn(dsId));
     }
   }
 
@@ -182,7 +195,8 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
-    @DisplayName("carries the referenced element's inlined registry model (JSON Schema) on the sink")
+    @DisplayName(
+        "carries the referenced element's inlined registry model (JSON Schema) on the sink")
     void carriesPersistedModelOnSink() {
       UUID sinkId = UUID.randomUUID();
       Pipeline pipeline = pipeline(UUID.randomUUID());
@@ -220,12 +234,15 @@ class DataSetSagaPublisherTest {
       assertThat(datasinks).isNotNull();
       assertThat(datasinks.size()).isEqualTo(1);
       var ds = datasinks.get(0);
-      assertThat(ds.get("id").asString()).isEqualTo(sinkId.toString());
+      assertThat(ds.get("id").asString())
+          .as("datasink is keyed by its configuration CORE URN, not its GUID")
+          .isEqualTo("urn:core:platform:civitas:data-sink:common:sink-" + sinkId + ":1.0.0");
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
       assertThat(ds.get("configuration").get("element").asString())
-          .as("the element URN soft reference is preserved verbatim inside the shipped configuration")
+          .as(
+              "the element URN soft reference is preserved verbatim inside the shipped configuration")
           .isEqualTo(modelUrn);
       assertThat(ds.get("dataStructure").get("title").asString()).isEqualTo("Observation");
       assertThat(ds.get("dataStructure").get("x-core-primaryKey").asString())
@@ -320,7 +337,9 @@ class DataSetSagaPublisherTest {
       assertThat(datasinks).isNotNull();
       assertThat(datasinks.size()).isEqualTo(1);
       var ds = datasinks.get(0);
-      assertThat(ds.get("id").asString()).isEqualTo(sinkId.toString());
+      assertThat(ds.get("id").asString())
+          .as("datasink is keyed by its configuration CORE URN, not its GUID")
+          .isEqualTo("urn:core:platform:civitas:data-sink:common:sink-" + sinkId + ":1.0.0");
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
@@ -765,6 +784,53 @@ class DataSetSagaPublisherTest {
           .as("the saga payload carries the definition only, never the UI layout")
           .isFalse();
       assertThat(entry.get("version").asString()).isEqualTo("3");
+    }
+
+    @Test
+    @DisplayName("pipeline ships the Mapping artifacts it depends on (from the dependency graph)")
+    void pipelineShipsMappingsForDependencies() {
+      DataSource ds = dataSource(UUID.randomUUID(), ConnectorType.MQTT);
+      Pipeline p = pipeline(UUID.randomUUID(), ds);
+      String pipelineUrn = "urn:core:platform:civitas:pipeline:common:pipe:1.0.0";
+      String mappingUrn = "urn:core:dataset:neustadt:mapping:traffic:M:0000000001:1.0.0";
+      p.setModelUrn(pipelineUrn);
+      // The saga learns which Mappings the pipeline uses from Model Forge's dependency graph (an
+      // envelope concern) — never by parsing the pipeline document — then ships each Mapping's
+      // content so the callback-free config-adapter can build it.
+      when(modelRegistryGateway.dependencyUrnsOfType(pipelineUrn, "mapping"))
+          .thenReturn(List.of(mappingUrn));
+      when(modelRegistryGateway.fetchPayload(pipelineUrn))
+          .thenReturn(
+              Optional.of(
+                  new ModelRegistryGateway.RegistryDocument(
+                      Map.of(
+                          "nodes",
+                          List.of(
+                              Map.of("id", "n-map", "kind", "mapping", "mappingRef", mappingUrn))),
+                      null)));
+      when(modelRegistryGateway.fetchPayload(mappingUrn))
+          .thenReturn(
+              Optional.of(
+                  new ModelRegistryGateway.RegistryDocument(
+                      Map.of("fields", Map.of("$.name", "$.station")), null)));
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of(p));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("dataPipelines").get(0);
+      var mappings = entry.get("mappings");
+      assertThat(mappings).as("the pipeline entry carries a mappings catalog").isNotNull();
+      assertThat(mappings.get(mappingUrn))
+          .as("keyed by the Mapping CORE URN the pipeline depends on")
+          .isNotNull();
+      assertThat(mappings.get(mappingUrn).get("fields").get("$.name").asString())
+          .isEqualTo("$.station");
     }
 
     @Test

@@ -26,6 +26,7 @@ import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.security.AllowedScopes;
@@ -59,19 +60,30 @@ class DataSetServiceTest {
   @Mock private AssignmentFactory assignmentFactory;
   @Mock private DataSetSagaPublisher sagaPublisher;
   @Mock private ObjectProvider<AllowedScopes> allowedScopesProvider;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
 
   private DataSetService createService() {
     // Default to TENANT wildcard so the F4 target-pool check passes for existing pool-setting
     // tests;
     // F4-specific tests override allowedScopesProvider.getObject() after calling createService().
     lenient().when(allowedScopesProvider.getObject()).thenReturn(wildcardScopes());
+    // Persisting a dataset creates its Model Forge manifest; return a dummy pin so tests exercising
+    // create/update do not NPE (lenient — not every test triggers a persist).
+    lenient()
+        .when(modelRegistryGateway.createDataSetManifest(any()))
+        .thenReturn(
+            new ModelRegistryGateway.ModelPin(
+                "urn:core:platform:civitas:dataset:common:test:abcdefghij",
+                "urn:core:platform:civitas:dataset:common:test:abcdefghij:1.0.0",
+                "1.0.0"));
     return new DataSetService(
         dataSetRepository,
         dataSetMapper,
         dataPoolRepository,
         assignmentFactory,
         sagaPublisher,
-        allowedScopesProvider);
+        allowedScopesProvider,
+        modelRegistryGateway);
   }
 
   private static AllowedScopes wildcardScopes() {

@@ -205,13 +205,20 @@ class DataSinkServiceTest {
 
       DataSink result = dataSinkService.create(input);
 
-      // The element URN soft reference is preserved verbatim inside the stored payload.
+      // The element URN soft reference is preserved verbatim, and the host enriches the payload with
+      // connectionType (from the sink type). Model Forge owns self-description — it stamps $schema +
+      // id on write (EmbeddedModelForgeOperations.saveArtifact), so the host does NOT add them here.
+      // Map equality is order-independent.
       verify(modelRegistryGateway)
           .storePayload(
               eq(PayloadKind.DATA_SINK),
               eq(Optional.empty()),
               eq("sensor_readings"),
-              eq(configuration),
+              eq(
+                  Map.of(
+                      "tableName", "sensor_readings",
+                      "element", ELEMENT_URN,
+                      "connectionType", "postgis")),
               isNull());
       assertThat(result.getConfigurationLogicalUrn()).isEqualTo(STORED_LOGICAL_URN);
       assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);

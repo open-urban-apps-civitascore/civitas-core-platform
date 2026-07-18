@@ -45,14 +45,16 @@ public class DataStructureVersionAssembler
     dto.setInUse(
         dataSourceRepository.existsByDataStructureVersionId(entity.getId())
             || modelRegistryGateway.isReferencedBySink(entity.getModelUrn()));
+    dto.setModelUrn(entity.getModelUrn());
     if (entity.getModelUrn() != null) {
+      // Styles (the UML diagram) ride on the bundled view's x-ui-styles keyword.
       modelRegistryGateway
           .fetchModel(entity.getModelUrn())
-          .ifPresent(
-              document -> {
-                dto.setModel(document.content());
-                dto.setStyles(document.styles());
-              });
+          .ifPresent(document -> dto.setStyles(document.styles()));
+      // Serve the model fully inlined (no CORE-URN $refs) so the field-mapping editor — which
+      // resolves only local #/$defs/ pointers, not the bundled view's $id-based URN $refs — can
+      // expand every field of the source/target structures.
+      modelRegistryGateway.fetchInlinedModel(entity.getModelUrn()).ifPresent(dto::setModel);
     }
     return dto;
   }

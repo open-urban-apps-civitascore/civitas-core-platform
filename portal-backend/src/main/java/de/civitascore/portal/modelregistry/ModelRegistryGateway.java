@@ -14,6 +14,7 @@ import de.civitascore.modelforge.contract.SchemaViewQuery;
 import de.civitascore.modelforge.contract.ValidateSchemaCommand;
 import de.civitascore.modelforge.contract.ValidationResult;
 import de.civitascore.modelforge.facade.ModelForge;
+import de.civitascore.modelforge.urn.UrnParser;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,8 +39,8 @@ import tools.jackson.databind.node.ObjectNode;
  * Model Forge's schema fidelity preserves unknown {@code x-*} keywords verbatim. The gateway merges
  * the host's separate {@code styles} map into the document on write and splits it off again on
  * read, so host DTOs keep their stable separate {@code model}/{@code styles} fields. The saga path
- * uses {@link #fetchInlinedModel(String)}, which strips the keyword so the event payload stays
- * a pure schema document.
+ * uses {@link #fetchInlinedModel(String)}, which strips the keyword so the event payload stays a
+ * pure schema document.
  */
 @Slf4j
 @Service
@@ -118,11 +119,39 @@ public class ModelRegistryGateway {
       Map<String, Object> styles,
       VersionBump bump) {
     JsonNode content = mergeStyles(model, styles);
-    ArtifactId root =
-        existingLogicalUrn
-            .map(logicalUrn -> saveVersion(logicalUrn, ArtifactKind.ELEMENT, content, bump))
-            .orElseGet(() -> importRoot(withTitle(content, name)));
+    ArtifactId root;
+    if (isDataStructureModel(content, existingLogicalUrn)) {
+      // A datastructure model is folded into a single DataStructure artifact by importSchema (which
+      // also splits + versions its member Elements), whether new OR re-versioned. It must NOT go
+      // through saveArtifact(ELEMENT) — that would store an Element under a :datastructure: URN.
+      // importSchema versions the existing logical URN idempotently; the requested bump is not yet
+      // threaded through the datastructure import path, so a re-version lands as a registry PATCH.
+      root = importRoot(withTitle(content, name));
+    } else if (existingLogicalUrn.isPresent()) {
+      root = saveVersion(existingLogicalUrn.get(), ArtifactKind.ELEMENT, content, bump);
+    } else {
+      root = importRoot(withTitle(content, name));
+    }
     return toPin(root);
+  }
+
+  /**
+   * Whether the model being stored is a DataStructure (as opposed to a plain Element). True when
+   * the content's {@code $id} — or the existing logical URN it re-versions — is a {@code
+   * :datastructure:} URN. The portal stamps a datastructure URN on a UML model's {@code $id};
+   * model-forge then folds the wrapper into one DataStructure artifact holding its shape + member
+   * Elements.
+   */
+  private static boolean isDataStructureModel(
+      JsonNode content, Optional<String> existingLogicalUrn) {
+    String id = content.path("$id").asText(null);
+    if (UrnParser.isUrn(id) && "datastructure".equals(UrnParser.artifactTypeFromUrn(id))) {
+      return true;
+    }
+    return existingLogicalUrn
+        .filter(UrnParser::isUrn)
+        .map(u -> "datastructure".equals(UrnParser.artifactTypeFromUrn(u)))
+        .orElse(false);
   }
 
   /**
@@ -134,7 +163,8 @@ public class ModelRegistryGateway {
    * @return the split document, or empty when the artifact does not exist
    */
   public Optional<RegistryDocument> fetchModel(String urn) {
-    return modelForge.getBundledView(new SchemaViewQuery(new ArtifactId(urn)))
+    return modelForge
+        .getBundledView(new SchemaViewQuery(new ArtifactId(urn)))
         .map(ArtifactView::content)
         .map(this::split);
   }
@@ -165,10 +195,11 @@ public class ModelRegistryGateway {
 
   /**
    * Whether any DataSink references the given model (Element) URN. A sink records the reference by
-   * carrying the URN in its configuration's top-level {@code element} field; Model Forge tracks that
-   * as a {@code datasink-element} dependency edge on store. This is the registry-native replacement
-   * for the former {@code data_sinks.configuration ->> 'dataStructureVersionId'} query — the host
-   * in-use guard on {@code DataStructureVersion} asks Model Forge who references the version's model.
+   * carrying the URN in its configuration's top-level {@code element} field; Model Forge tracks
+   * that as a {@code datasink-element} dependency edge on store. This is the registry-native
+   * replacement for the former {@code data_sinks.configuration ->> 'dataStructureVersionId'} query
+   * — the host in-use guard on {@code DataStructureVersion} asks Model Forge who references the
+   * version's model.
    *
    * @param modelUrn versioned or logical CORE URN of the model; null/blank yields {@code false}
    * @return true if at least one DataSink artifact depends on the model
@@ -182,10 +213,45 @@ public class ModelRegistryGateway {
         .anyMatch(ModelRegistryGateway::isDataSinkUrn);
   }
 
-  /** A CORE URN identifies a DataSink when its type segment (5th, colon-delimited) is "datasink". */
+  /**
+   * A CORE URN identifies a DataSink when its type segment (5th, colon-delimited) is "datasink".
+   */
   private static boolean isDataSinkUrn(String urn) {
     String[] segments = urn.split(":");
     return segments.length > 4 && "datasink".equals(segments[4]);
+  }
+
+  /**
+   * The logical (version-free) form of a CORE URN. Exposed so host services can normalize a URN
+   * without importing Model Forge's {@code UrnParser} directly — Model Forge stays behind this
+   * anti-corruption layer (enforced by {@code ModelForgeBoundaryTest}).
+   *
+   * @param urn a versioned, logical or {@code :latest} CORE URN
+   * @return the logical URN (the first 8 segments, no trailing version)
+   */
+  public String logicalUrn(String urn) {
+    return UrnParser.logicalUrn(urn);
+  }
+
+  /**
+   * The versioned CORE URNs of a given artifact type that {@code urn} depends on, read from Model
+   * Forge's dependency graph. This is the envelope-level way for host orchestration to learn, e.g.,
+   * which Mappings a pipeline references — <b>without ever parsing the pipeline's content</b> (the
+   * dependency graph is part of the envelope; see the portal-backend integration contract). Empty
+   * when {@code urn} is null/blank.
+   *
+   * @param urn the depending artifact's logical or versioned CORE URN
+   * @param artifactType the CORE artifact-type segment to keep (e.g. {@code "mapping"})
+   */
+  public List<String> dependencyUrnsOfType(String urn, String artifactType) {
+    if (urn == null || urn.isBlank()) {
+      return List.of();
+    }
+    return modelForge.dependencies(new DependencyQuery(new ArtifactId(urn))).nodes().stream()
+        .map(node -> node.artifactId().value())
+        .filter(u -> artifactType.equals(UrnParser.artifactTypeFromUrn(u)))
+        .distinct()
+        .toList();
   }
 
   /**
@@ -212,20 +278,114 @@ public class ModelRegistryGateway {
       String name,
       Map<String, Object> payload,
       Map<String, Object> styles) {
+    return storePayload(kind, existingLogicalUrn, name, payload, styles, null);
+  }
+
+  /**
+   * As {@link #storePayload(PayloadKind, Optional, String, Map, Map)}, but additionally links the
+   * stored artifact into a DataSet: {@code dataSet} is the CORE URN of the DataSet manifest to add
+   * it to. Model Forge maintains the manifest (for a Pipeline it links the whole reference closure
+   * too). {@code null} stores without DataSet membership.
+   */
+  public ModelPin storePayload(
+      PayloadKind kind,
+      Optional<String> existingLogicalUrn,
+      String name,
+      Map<String, Object> payload,
+      Map<String, Object> styles,
+      String dataSet) {
     JsonNode content = mergeStyles(payload, styles);
     ArtifactKind artifactKind = toArtifactKind(kind);
     ArtifactId root =
         existingLogicalUrn
-            .map(logicalUrn -> saveVersion(logicalUrn, artifactKind, content, VersionBump.MINOR))
+            .map(
+                logicalUrn ->
+                    saveVersion(logicalUrn, artifactKind, content, VersionBump.MINOR, dataSet))
             .orElseGet(
                 () -> {
                   ArtifactWriteResult result =
                       modelForge.createArtifact(
-                          new CreateArtifactCommand(artifactKind, name, content));
+                          new CreateArtifactCommand(artifactKind, name, content, dataSet));
                   logDependencies(result.artifactId(), result.dependencies());
                   return result.artifactId();
                 });
     return toPin(root);
+  }
+
+  /**
+   * Creates an (initially empty) DataSet manifest artifact and returns its pin. Members are linked
+   * in later by storing them with this DataSet's URN (see the {@code dataSet} parameter of {@link
+   * #storePayload}); Model Forge maintains the manifest and validates it against {@code
+   * dataset.schema.json}.
+   */
+  public ModelPin createDataSetManifest(String name) {
+    String safeName = name == null || name.isBlank() ? "dataset" : name;
+    JsonNode content = mergeStyles(Map.of("title", safeName), null);
+    ArtifactWriteResult result =
+        modelForge.createArtifact(
+            new CreateArtifactCommand(ArtifactKind.DATA_SET, safeName, content));
+    return toPin(result.artifactId());
+  }
+
+  /**
+   * Deletes a DataSet manifest by its logical URN. Its members are kept (a DataSet groups, it does
+   * not own); Model Forge drops the manifest's outgoing {@code dataset-ref} edges so no member
+   * dangles.
+   */
+  public void deleteDataSet(String logicalUrn) {
+    if (logicalUrn != null && !logicalUrn.isBlank()) {
+      modelForge.deleteArtifact(new ArtifactId(logicalUrn));
+    }
+  }
+
+  /**
+   * CORE URNs of artifacts of the given type ({@code mapping}/{@code pipeline}/{@code datasource}/
+   * {@code datasink}/{@code datastructure}) that belong to no DataSet — the "orphans by type"
+   * query.
+   */
+  public List<String> orphanUrns(String artifactType) {
+    ArtifactKind kind = artifactKindForType(artifactType);
+    if (kind == null) {
+      return List.of();
+    }
+    return modelForge.orphans(kind).stream().map(summary -> summary.artifactId().value()).toList();
+  }
+
+  /** Explicitly adds a member artifact to a DataSet's manifest ({@code dataset-ref} membership). */
+  public void linkToDataSet(String dataSetUrn, String memberUrn) {
+    modelForge.linkToDataSet(new ArtifactId(dataSetUrn), new ArtifactId(memberUrn));
+  }
+
+  /** Explicitly removes an artifact from a DataSet's manifest. */
+  public void unlinkFromDataSet(String dataSetUrn, String memberUrn) {
+    modelForge.unlinkFromDataSet(new ArtifactId(dataSetUrn), new ArtifactId(memberUrn));
+  }
+
+  /**
+   * Deletes an artifact under the DataSet-aware deletion policy, optionally cascading into members
+   * and/or forcing past the blocks (admin repair — may dangle references). Non-force is the safe
+   * path.
+   */
+  public void deleteArtifact(String logicalUrn, boolean cascade, boolean force) {
+    if (logicalUrn != null && !logicalUrn.isBlank()) {
+      modelForge.deleteArtifact(new ArtifactId(logicalUrn), cascade, force);
+    }
+  }
+
+  private static ArtifactKind artifactKindForType(String type) {
+    if (type == null) {
+      return null;
+    }
+    return switch (type.toLowerCase(java.util.Locale.ROOT)) {
+      case "mapping" -> ArtifactKind.MAPPING;
+      case "pipeline" -> ArtifactKind.PIPELINE;
+      case "datasource" -> ArtifactKind.DATA_SOURCE;
+      case "datasink" -> ArtifactKind.DATA_SINK;
+      case "datastructure" -> ArtifactKind.DATA_STRUCTURE;
+      case "dataset" -> ArtifactKind.DATA_SET;
+      case "element" -> ArtifactKind.ELEMENT;
+      default -> null;
+    };
   }
 
   /**
@@ -277,10 +437,15 @@ public class ModelRegistryGateway {
   /** Stores a follow-up version of an existing artifact; dependency edges are logged. */
   private ArtifactId saveVersion(
       String logicalUrn, ArtifactKind kind, JsonNode content, VersionBump bump) {
+    return saveVersion(logicalUrn, kind, content, bump, null);
+  }
+
+  private ArtifactId saveVersion(
+      String logicalUrn, ArtifactKind kind, JsonNode content, VersionBump bump, String dataSet) {
     ArtifactWriteResult result =
         modelForge.saveArtifact(
             new SaveArtifactCommand(
-                new ArtifactId(logicalUrn), kind, content, toModelForgeBump(bump)));
+                new ArtifactId(logicalUrn), kind, content, toModelForgeBump(bump), dataSet));
     logDependencies(result.artifactId(), result.dependencies());
     return result.artifactId();
   }
@@ -311,6 +476,7 @@ public class ModelRegistryGateway {
       case PIPELINE -> ArtifactKind.PIPELINE;
       case DATA_SOURCE -> ArtifactKind.DATA_SOURCE;
       case DATA_SINK -> ArtifactKind.DATA_SINK;
+      case MAPPING -> ArtifactKind.MAPPING;
       case DATA_SET -> ArtifactKind.DATA_SET;
     };
   }

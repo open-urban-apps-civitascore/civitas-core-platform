@@ -53,6 +53,7 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     }
 
     dto.setConfiguration(buildConfiguration(entity, fetchConfiguration(entity)));
+    dto.setConfigurationUrn(entity.getConfigurationUrn());
     return dto;
   }
 

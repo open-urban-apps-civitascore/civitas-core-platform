@@ -9,6 +9,7 @@ import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PipelineAction;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Style;
@@ -20,8 +21,10 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -141,7 +144,10 @@ public class DataSetSagaPublisher {
         .map(
             ds -> {
               var datasource = new Datasource();
-              datasource.setId(ds.getId().toString());
+              // Keyed by the DataSource's configuration CORE URN — the same URN a pipeline's
+              // source node carries as its sourceRef — so the callback-free config-adapter can
+              // correlate the two on URNs, not GUIDs.
+              datasource.setId(ds.getConfigurationUrn());
               datasource.setName(ds.getName());
               datasource.setType(
                   ds.getConnectorType() != null ? ds.getConnectorType().name() : null);
@@ -185,8 +191,12 @@ public class DataSetSagaPublisher {
   private DataSinkPayload toDataSinkPayload(DataSink sink) {
     Map<String, Object> configuration =
         fetchConfiguration(sink.getConfigurationUrn(), "DataSink", sink.getId());
+    // Keyed by the DataSink's configuration CORE URN — the same URN a pipeline's sink node carries
+    // as its sinkRef — so the config-adapter resolves the sink on URNs, not GUIDs. A passthrough
+    // FROST sink stores no configuration, so its URN (and this id) is null; such a sink cannot be
+    // referenced by a pipeline node anyway (its sinkRef would be absent too).
     return new DataSinkPayload(
-        sink.getId().toString(),
+        sink.getConfigurationUrn(),
         sink.getDataSinkType() != null ? sink.getDataSinkType().name() : null,
         configuration,
         resolveDataStructure(sink, configuration));
@@ -299,9 +309,9 @@ public class DataSetSagaPublisher {
 
   /**
    * Resolves the sink's referenced data-structure model (JSON Schema) from the Model Forge registry
-   * directly via the configuration's {@code element} CORE URN. The inlined view (every
-   * CORE-URN {@code $ref} inlined, {@code x-ui-styles} stripped) keeps the CloudEvent contract a
-   * pure schema document — the config-adapter keeps reading {@code x-core-primaryKey} from {@code
+   * directly via the configuration's {@code element} CORE URN. The inlined view (every CORE-URN
+   * {@code $ref} inlined, {@code x-ui-styles} stripped) keeps the CloudEvent contract a pure schema
+   * document — the config-adapter keeps reading {@code x-core-primaryKey} from {@code
    * datasinks[].dataStructure} unchanged. {@code null} when no element is referenced (e.g. FROST
    * passthrough); throws {@link InvalidInputException} if the referenced element is missing or
    * carries no model, failing the publish. The URN is already validated at sink save time.
@@ -310,8 +320,7 @@ public class DataSetSagaPublisher {
     if (sinkConfig == null) {
       return null;
     }
-    String element =
-        objectMapper.convertValue(sinkConfig, PostgisConfiguration.class).getElement();
+    String element = objectMapper.convertValue(sinkConfig, PostgisConfiguration.class).getElement();
     if (element == null) {
       return null; // e.g. FROST passthrough sink — no referenced element
     }
@@ -350,7 +359,13 @@ public class DataSetSagaPublisher {
       if (!currentMap.containsKey(id)) {
         result.add(
             new DataPipeline(
-                id.toString(), "0", PipelineAction.DELETE.name(), null, List.of(), List.of()));
+                id.toString(),
+                "0",
+                PipelineAction.DELETE.name(),
+                null,
+                List.of(),
+                List.of(),
+                Map.of()));
       }
     }
 
@@ -423,13 +438,20 @@ public class DataSetSagaPublisher {
     if (pipeline.getDataSources() == null) {
       throw invariant("pipeline %s has a null dataSources relation", pipeline.getId());
     }
+    // Association carried as the referenced configuration CORE URNs (not GUIDs) — the same URNs the
+    // pipeline graph's source/sink nodes carry as sourceRef/sinkRef, and the keys of the
+    // datasource/datasink catalogs. Sorted so the payload is deterministic (relations are unordered
+    // sets). A source/sink without a stored configuration (null URN) is skipped.
     List<String> dataSourceIds =
-        pipeline.getDataSources().stream().map(ds -> ds.getId().toString()).sorted().toList();
-    // The model holds the editor-built, engine-neutral pipeline graph (nodes/edges + inline
-    // mappingConfig), stored in the Model Forge registry and pinned by the pipeline's modelUrn.
-    // It is forwarded to the config-adapter with the same shape as before — the gateway strips
-    // the x-ui-styles keyword (React Flow layout), which was never part of the saga payload.
-    // The config-adapter (NiFi) is the only place engine specifics appear.
+        pipeline.getDataSources().stream()
+            .map(DataSource::getConfigurationUrn)
+            .filter(Objects::nonNull)
+            .sorted()
+            .toList();
+    // The model holds the clean CORE Pipeline document (nodes/edges referencing source/sink/mapping
+    // by CORE URN), stored in the Model Forge registry and pinned by the pipeline's modelUrn. The
+    // gateway strips the x-ui-styles keyword (React Flow layout), which was never part of the saga
+    // payload. The config-adapter (NiFi) is the only place engine specifics appear.
     Map<String, Object> model =
         pipeline.getModelUrn() == null
             ? null
@@ -448,12 +470,43 @@ public class DataSetSagaPublisher {
         String.valueOf(pipeline.getVersion()),
         action.name(),
         model,
-        // Sorted so the payload is deterministic — the entity relations are unordered sets.
         dataSourceIds,
         dataSinkRepository.findByPipelineId(pipeline.getId()).stream()
-            .map(sink -> sink.getId().toString())
+            .map(DataSink::getConfigurationUrn)
+            .filter(Objects::nonNull)
             .sorted()
-            .toList());
+            .toList(),
+        buildMappings(pipeline));
+  }
+
+  /**
+   * Ships the Mapping artifacts the pipeline depends on as {@code URN -> { fields, source, target
+   * }}. The config-adapter is callback-free, so a mapping's transform rules must travel in the saga
+   * payload rather than being fetched at deploy time.
+   *
+   * <p>The set of referenced Mappings is read from Model Forge's <b>dependency graph</b> (an
+   * envelope concern), never by parsing the pipeline document — the host must not interpret
+   * pipeline content ({@code nodes}/{@code mappingRef}); that is the frontend's / Model Forge's
+   * job. Fails the publish if a referenced Mapping cannot be resolved (host/registry
+   * inconsistency).
+   */
+  private Map<String, Object> buildMappings(Pipeline pipeline) {
+    Map<String, Object> mappings = new LinkedHashMap<>();
+    for (String ref :
+        modelRegistryGateway.dependencyUrnsOfType(pipeline.getModelUrn(), "mapping")) {
+      Map<String, Object> content =
+          modelRegistryGateway
+              .fetchPayload(ref)
+              .map(ModelRegistryGateway.RegistryDocument::content)
+              .orElseThrow(
+                  () ->
+                      new InvalidInputException(
+                          "Pipeline",
+                          pipeline.getId(),
+                          "Referenced Mapping not found in the model registry: " + ref));
+      mappings.put(ref, content);
+    }
+    return mappings;
   }
 
   /**

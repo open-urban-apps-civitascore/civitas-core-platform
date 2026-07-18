@@ -532,8 +532,11 @@ class DataSourceServiceTest {
 
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
-      // The new configuration went to the registry; the assigned pin was mirrored on the shell.
-      verify(modelRegistryGateway).storePayload(any(), any(), any(), eq(newConfig), isNull());
+      // The new configuration — enriched with connectionType (from the connector type); Model Forge
+      // stamps $schema + id on write — went to the registry; the assigned pin was mirrored on the shell.
+      Map<String, Object> expectedPayload = new java.util.HashMap<>(newConfig);
+      expectedPayload.put("connectionType", "mqtt");
+      verify(modelRegistryGateway).storePayload(any(), any(), any(), eq(expectedPayload), isNull());
       assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);
     }
 
@@ -586,7 +589,11 @@ class DataSourceServiceTest {
       // configuration was stored; the pin was re-mirrored.
       assertThat(encrypted).containsEntry("password", "enc_secret");
       assertThat(encrypted).containsEntry("dsn", "postgres://new-host/db");
-      verify(modelRegistryGateway).storePayload(any(), any(), any(), eq(encrypted), isNull());
+      // Stored payload = the restored/encrypted config enriched with connectionType (from the
+      // connector type); Model Forge stamps $schema + id on write.
+      Map<String, Object> expectedPayload = new java.util.HashMap<>(encrypted);
+      expectedPayload.put("connectionType", "sql");
+      verify(modelRegistryGateway).storePayload(any(), any(), any(), eq(expectedPayload), isNull());
       assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);
     }
 

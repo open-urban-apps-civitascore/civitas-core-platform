@@ -12,6 +12,10 @@ public enum PayloadKind {
   DATA_SOURCE,
   /** Type-specific configuration of a data sink. */
   DATA_SINK,
+  /**
+   * Declarative field-to-field mapping between two DataStructures, extracted from a pipeline node.
+   */
+  MAPPING,
   /** Dataset manifest (currently unused — datasets own no opaque JSON payload). */
   DATA_SET
 }

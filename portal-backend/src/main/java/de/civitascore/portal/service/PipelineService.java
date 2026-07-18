@@ -181,17 +181,31 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
     if (entity.getModelUrn() != null
         && modelRegistryGateway.isUnchanged(
             entity.getModelUrn(), input.getModel(), input.getStyles())) {
-      // Unchanged content keeps the existing pin — a metadata-only update or PATCH round-trip
-      // must not mint a new registry version.
+      // Unchanged content keeps the existing pin — a metadata-only update or PATCH round-trip must
+      // not mint a new registry version.
       return;
     }
+    // Pass-through: the FRONTEND delivers a clean, schema-valid CORE Pipeline document (nodes keyed
+    // by
+    // `kind` with sourceRef/sinkRef/mappingRef CORE URNs). The backend is a thin shell — it stores
+    // the
+    // model verbatim (Model Forge validates it against pipeline.schema.json and stamps $schema +
+    // id) and
+    // never parses the pipeline's contents. The ReactFlow editor layout rides along as x-ui-styles.
+    // Link the pipeline into its DataSet's manifest (Model Forge adds it and its whole reference
+    // closure — sources/sinks/mappings/structures — as dataset-ref members). The pipeline belongs
+    // to
+    // exactly one DataSet; its manifest is created when the dataset is created.
+    String dataSetUrn =
+        entity.getDataSet() != null ? entity.getDataSet().getManifestLogicalUrn() : null;
     ModelRegistryGateway.ModelPin pin =
         modelRegistryGateway.storePayload(
             PayloadKind.PIPELINE,
             Optional.ofNullable(entity.getModelLogicalUrn()),
             entity.getName(),
             input.getModel(),
-            input.getStyles());
+            input.getStyles(),
+            dataSetUrn);
     if (entity.getModelLogicalUrn() == null) {
       entity.setModelLogicalUrn(pin.logicalUrn());
     }
