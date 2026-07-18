@@ -27,7 +27,6 @@ The stable integration boundary is the embedded Java facade.
 | `model-forge-runtime` | The embedded runtime: facade implementation, ports, use cases, PostgreSQL registry adapter (Flyway migrations) and HTTP integration adapters. Internal slice boundaries are enforced by ArchUnit tests. |
 | `model-forge-spring-boot-starter` | Spring Boot 4 auto-configuration for host applications. |
 | `model-forge-admin-ui` | Local Wicket-based developer/debug UI. A consumer of the library through the public facade, not part of the embedded runtime. |
-| `core-model-forge-types` | TypeScript/Zod types generated from the CORE-IR JSON Schemas. |
 
 ## Spring Boot Usage
 
@@ -114,13 +113,12 @@ From the repository root:
 .\mvnw.cmd verify
 ```
 
-Generate and build TypeScript/Zod schema artifacts:
+The TypeScript/Zod CORE types are generated in the frontend directly from these runtime JSON
+Schemas (the single source of truth) — there is no separate npm package:
 
 ```powershell
-cd core-model-forge-types
-npm ci
-npm run generate
-npm run build
+cd ../portal-frontend
+npm run generate:core-types
 ```
 
 ## Monorepo Move Set
@@ -130,7 +128,6 @@ The directories intended to move 1:1 into `civitas-core-platform` are:
 - `model-forge-contract`
 - `model-forge-runtime`
 - `model-forge-spring-boot-starter`
-- `core-model-forge-types`
 
 `model-forge-admin-ui` is intentionally not part of the move set. It is a local
 developer/debug UI that consumes the library through the public facade, like

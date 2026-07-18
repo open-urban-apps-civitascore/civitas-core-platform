@@ -87,24 +87,28 @@ class ReferenceExtractionTest {
 
     @Test
     void dataSetRefs_extractsAllRefArrays() {
+        // A DataSet manifest lists its members by kind-specific *Refs arrays; every one becomes a
+        // uniform `dataset-ref` edge (the member kind is carried in the reference name, not the type).
         var rows = ReferenceExtraction.dataSetRefs(json("""
-            {"elementRefs":["urn:core:p:o:element:c:A:daismsxdll:1.0.0"],
+            {"datastructureRefs":["urn:core:p:o:datastructure:c:D:daismsxdll:1.0.0"],
              "mappingRefs":["urn:core:p:o:mapping:c:m:qiyelzcdyp:1.0.0"],
              "pipelineRefs":["urn:core:p:o:pipeline:c:p:kxhhnk5pd0:1.0.0"],
              "dataSourceRefs":["urn:core:p:o:datasource:c:src:1mrurdxu0y:1.0.0"],
              "dataSinkRefs":["urn:core:p:o:datasink:c:snk:ig78w0m13k:1.0.0"]}"""));
         assertThat(byUrn(rows)).containsOnly(
-            java.util.Map.entry("urn:core:p:o:element:c:A:daismsxdll:1.0.0", "dataset-ref"),
+            java.util.Map.entry("urn:core:p:o:datastructure:c:D:daismsxdll:1.0.0", "dataset-ref"),
             java.util.Map.entry("urn:core:p:o:mapping:c:m:qiyelzcdyp:1.0.0", "dataset-ref"),
             java.util.Map.entry("urn:core:p:o:pipeline:c:p:kxhhnk5pd0:1.0.0", "dataset-ref"),
-            java.util.Map.entry("urn:core:p:o:datasource:c:src:1mrurdxu0y:1.0.0", "datasource-ref"),
-            java.util.Map.entry("urn:core:p:o:datasink:c:snk:ig78w0m13k:1.0.0", "datasink-ref"));
+            java.util.Map.entry("urn:core:p:o:datasource:c:src:1mrurdxu0y:1.0.0", "dataset-ref"),
+            java.util.Map.entry("urn:core:p:o:datasink:c:snk:ig78w0m13k:1.0.0", "dataset-ref"));
     }
 
     @Test
-    void dataStructureRefs_extractsElementRefs() {
+    void dataStructureRefs_extractsDefsMemberRefs() {
+        // A DataStructure is a $defs library of URN-$refs (no elementRefs array); each $defs.*.$ref
+        // is a member Element URN → a datastructure-ref edge.
         var rows = ReferenceExtraction.dataStructureRefs(json("""
-            {"elementRefs":["urn:core:p:o:element:c:A:daismsxdll:1.0.0","urn:core:p:o:element:c:B:7i4d2lwsn3:1.0.0"]}"""));
+            {"$defs":{"A":{"$ref":"urn:core:p:o:element:c:A:daismsxdll:1.0.0"},"B":{"$ref":"urn:core:p:o:element:c:B:7i4d2lwsn3:1.0.0"}}}"""));
         assertThat(byUrn(rows)).containsOnly(
             java.util.Map.entry("urn:core:p:o:element:c:A:daismsxdll:1.0.0", "datastructure-ref"),
             java.util.Map.entry("urn:core:p:o:element:c:B:7i4d2lwsn3:1.0.0", "datastructure-ref"));

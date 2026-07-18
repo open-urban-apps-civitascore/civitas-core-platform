@@ -2,12 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://civitasconnect.digital/core-dataset/v1",
   "title": "CORE DataSet",
-  "description": "A CORE DataSet: data structures (JSON Schema), declarative mappings, pipelines, data sources and data sinks.",
+  "description": "A CORE DataSet manifest: the envelope of a dataset and its member artifacts referenced by versioned CORE URN (data structures, mappings, pipelines, data sources, data sinks). The backend composes it from the DataSet entity and its relations; the members themselves are separate CORE artifacts. This is the stored manifest form — member content is not inlined here.",
   "type": "object",
-  "required": [
-    "$schema",
-    "id"
-  ],
+  "required": ["$schema", "id"],
+  "additionalProperties": false,
   "properties": {
     "$schema": {
       "type": "string",
@@ -15,98 +13,56 @@
     },
     "id": {
       "type": "string",
-      "description": "Versioned CORE URN of this DataSet.",
-      "pattern": "^urn:core:[^:]+:[^:]+:dataset:[^:]+:[^:]+:[^:]+$"
+      "description": "CORE URN of this DataSet (logical, or with a trailing :version).",
+      "pattern": "^urn:core:[^:]+:[^:]+:dataset:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
     },
-    "title": {
-      "type": "string"
-    },
-    "description": {
-      "type": "string"
-    },
-    "version": {
-      "type": "string"
-    },
-    "elementRefs": {
-      "description": "URNs of globally persisted Elements.",
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "version": { "type": "string" },
+    "datastructureRefs": {
+      "description": "Versioned CORE URNs of the DataStructures used in this dataset.",
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^urn:",
-        "x-core-ref": { "type": "urn:core:type:Element" }
+        "pattern": "^urn:core:[^:]+:[^:]+:datastructure:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+        "x-core-ref": { "type": "urn:core:type:DataStructure" }
       }
     },
     "mappingRefs": {
-      "description": "URNs of globally persisted Mappings.",
+      "description": "Versioned CORE URNs of the Mappings used in this dataset.",
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^urn:",
+        "pattern": "^urn:core:[^:]+:[^:]+:mapping:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
         "x-core-ref": { "type": "urn:core:type:Mapping" }
       }
     },
     "pipelineRefs": {
-      "description": "URNs of globally persisted Pipelines.",
+      "description": "Versioned CORE URNs of the Pipelines in this dataset.",
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^urn:",
+        "pattern": "^urn:core:[^:]+:[^:]+:pipeline:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
         "x-core-ref": { "type": "urn:core:type:Pipeline" }
       }
     },
     "dataSourceRefs": {
-      "description": "URNs of globally persisted DataSources.",
+      "description": "Versioned CORE URNs of the DataSource configurations in this dataset.",
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^urn:",
+        "pattern": "^urn:core:[^:]+:[^:]+:datasource:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
         "x-core-ref": { "type": "urn:core:type:DataSource" }
       }
     },
     "dataSinkRefs": {
-      "description": "URNs of globally persisted DataSinks.",
+      "description": "Versioned CORE URNs of the DataSink configurations in this dataset.",
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^urn:",
+        "pattern": "^urn:core:[^:]+:[^:]+:datasink:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
         "x-core-ref": { "type": "urn:core:type:DataSink" }
       }
-    },
-    "elements": {
-      "description": "Named JSON Schema definitions. Present in resolved API responses; in storage replaced by elementRefs.",
-      "type": "object",
-      "additionalProperties": {
-        "type": "object"
-      }
-    },
-    "mappings": {
-      "description": "Declarative field mappings between elements.",
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/Mapping"
-      }
-    },
-    "pipelines": {
-      "description": "Integration pipelines as directed acyclic graphs.",
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/Pipeline"
-      }
-    },
-    "dataSources": {
-      "description": "Named data sources.",
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/DataSource"
-      }
-    },
-    "dataSinks": {
-      "description": "Named data sinks.",
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/DataSink"
-      }
     }
-  },
-  "$defs": {}
+  }
 }

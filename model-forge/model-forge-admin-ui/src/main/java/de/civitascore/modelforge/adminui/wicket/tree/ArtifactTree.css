@@ -53,8 +53,12 @@
 .mf-tree-dot--group { background: transparent; border: 1px solid var(--mf-text-faint); box-shadow: none; }
 
 /* ── Label ─────────────────────────────────────────────────────────────────── */
+/* inline-flex (NOT flex): the label is an <a> sibling of the colour dot. Block-level `display: flex`
+   makes it take the full row and wrap onto its own line UNDER the dot; inline-flex keeps it beside
+   the dot while still giving the text + version chip their gap/baseline layout and ellipsis. */
 .mf-tree-label {
-  display: flex; align-items: baseline; gap: 0.4rem; flex: 1; min-width: 0;
+  display: inline-flex; align-items: baseline; gap: 0.4rem; min-width: 0; max-width: 100%;
+  vertical-align: middle;
   text-decoration: none; color: var(--mf-text);
 }
 .mf-tree-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

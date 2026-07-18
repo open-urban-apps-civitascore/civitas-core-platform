@@ -100,6 +100,15 @@ public interface ArtifactRegistry {
      */
     List<String> blockingDependents(String urn);
 
+    /**
+     * Non-DataSet dependents that block deletion (referential integrity). DataSet membership is
+     * counted separately by the deletion policy via {@link #dataSetMemberships}.
+     */
+    List<String> nonDataSetBlockingDependents(String urn);
+
+    /** Logical URNs of the DataSets this artifact is a member of ({@code dataset-ref} in-edges). */
+    List<String> dataSetMemberships(String urn);
+
     Optional<JsonNode> fetch(String urn);
 
     List<String> fetchArtifactRefUrns(String urn);

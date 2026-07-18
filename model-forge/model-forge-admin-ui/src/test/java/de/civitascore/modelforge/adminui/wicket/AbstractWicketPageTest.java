@@ -16,6 +16,7 @@ import de.civitascore.modelforge.adminui.wicket.pages.ValidatePage;
 import de.civitascore.modelforge.adminui.wicket.pages.XRepositoryImportPage;
 import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.facade.ModelForge;
+import de.civitascore.modelforge.graph.DependencyGraphService;
 import java.util.List;
 import org.apache.wicket.Page;
 import org.apache.wicket.protocol.http.WebApplication;
@@ -45,6 +46,7 @@ public abstract class AbstractWicketPageTest {
     protected WicketTester tester;
     protected ModelForge modelForge;
     protected SeedImporter seedImporter;
+    protected DependencyGraphService dependencyGraphService;
 
     @BeforeEach
     void setUpWicket() {
@@ -57,9 +59,15 @@ public abstract class AbstractWicketPageTest {
         seedImporter = mock(SeedImporter.class);
         when(seedImporter.discoverBundles()).thenReturn(List.of());
 
+        // GraphPage / ArtifactViewPage @SpringBean-inject the dependency-graph service and call
+        // rebuild() during construction; a bare mock (no-op rebuild) satisfies the injection — the
+        // rendered relations come from the mocked ModelForge.dependencies/dependents.
+        dependencyGraphService = mock(DependencyGraphService.class);
+
         ApplicationContextMock context = new ApplicationContextMock();
         context.putBean("modelForge", modelForge);
         context.putBean("seedImporter", seedImporter);
+        context.putBean("dependencyGraphService", dependencyGraphService);
 
         WebApplication application = new WebApplication() {
             @Override

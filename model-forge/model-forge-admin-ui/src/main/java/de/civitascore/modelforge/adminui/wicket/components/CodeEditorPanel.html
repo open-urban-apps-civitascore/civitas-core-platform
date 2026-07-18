@@ -1,10 +1,9 @@
 <html xmlns:wicket="http://wicket.apache.org">
 <body>
 <wicket:panel>
-  <div class="mf-editor-wrap">
-    <textarea wicket:id="editor" rows="20" class="code-editor-fallback"></textarea>
-    <div wicket:id="mount" class="mf-editor"></div>
-    <script wicket:id="schemaData" type="application/json"></script>
+  <div wicket:id="wrap" class="mf-editor-wrap">
+    <pre wicket:id="viewer" class="mf-code"></pre>
+    <textarea wicket:id="editor" rows="20" class="mf-code-edit" spellcheck="false" wrap="off"></textarea>
   </div>
 </wicket:panel>
 </body>

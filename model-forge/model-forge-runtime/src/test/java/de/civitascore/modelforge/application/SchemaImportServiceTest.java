@@ -8,6 +8,7 @@ import de.civitascore.modelforge.core.port.ArtifactRegistry;
 import de.civitascore.modelforge.core.port.RemoteSchemaRepository;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.modelforge.urn.UrnService;
+import de.civitascore.modelforge.validation.CoreSchemaValidator;
 import de.civitascore.modelforge.validation.ModelValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,7 +65,8 @@ class SchemaImportServiceTest {
         ReferenceExistenceValidator refExistence = new ReferenceExistenceValidator(registry, refExtractor);
         RemoteSchemaRepository remoteFetcher = mock(RemoteSchemaRepository.class);
         svc = new SchemaImportService(validator, mapper, registry,
-                urns, refExtractor, graph, refExistence, remoteFetcher);
+                urns, refExtractor, graph, refExistence, remoteFetcher,
+                new CoreSchemaValidator(mapper));
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -181,6 +183,61 @@ class SchemaImportServiceTest {
 
         assertThat(elementOf(stored, "Station").path("x-core-primaryKey").asText()).isEqualTo("stationId");
         assertThat(elementOf(stored, "Sensor").path("x-core-primaryKey").asText()).isEqualTo("sensorId");
+    }
+
+    @Test
+    void datastructureRoot_storedAsDefsLibrary_membersSplitToElements() {
+        // A datastructure-URN root that is a $defs library (no root shape) is stored as an ordinary
+        // JSON-Schema $defs library of URN-$refs: each $defs member is split into a SEPARATE Element
+        // artifact, and the DataStructure references it by URN under $defs (no type/properties of its
+        // own). The DataStructure's pin is the import root (→ version.model_urn).
+        JsonNode schema;
+        try {
+            schema = mapper.readTree("""
+                {
+                  "$schema":"https://json-schema.org/draft/2020-12/schema",
+                  "$id":"urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b:1.0.0",
+                  "title":"People",
+                  "$defs": {
+                    "Person": {
+                      "$id":"urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.0",
+                      "type":"object",
+                      "properties":{"name":{"type":"string"}}
+                    }
+                  }
+                }
+                """);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class)))
+            .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.0");
+        when(registry.storeDataStructure(anyString(), any()))
+            .thenAnswer(inv -> inv.getArgument(0) + ":1.0.0");
+
+        SchemaImportResult result = svc.importSchema(new SchemaImportRequest(schema));
+
+        assertThat(result.diagnostics()).isEmpty();
+        // Root = the DataStructure (its pin → model_urn), not an Element.
+        assertThat(UrnParser.artifactTypeFromUrn(result.resourceId())).isEqualTo("datastructure");
+
+        // The member class is split out as a separate Element (keyed by its display name).
+        ArgumentCaptor<String> elName = ArgumentCaptor.forClass(String.class);
+        verify(registry).storeElement(elName.capture(), any(), anySet(), anySet(), nullable(String.class));
+        assertThat(elName.getValue()).isEqualTo("Person");
+
+        // The stored DataStructure is a $defs library of URN-$refs — no root shape.
+        ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry).storeDataStructure(anyString(), ds.capture());
+        JsonNode content = ds.getValue();
+        assertThat(content.path("$schema").asText())
+            .isEqualTo("https://json-schema.org/draft/2020-12/schema");
+        assertThat(content.path("$id").asText())
+            .startsWith("urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b");
+        assertThat(content.has("type")).isFalse();
+        assertThat(content.has("properties")).isFalse();
+        assertThat(content.path("$defs").path("Person").path("$ref").asText())
+            .startsWith("urn:core:platform:civitas:element:common:Person");
     }
 
     @Test
@@ -319,10 +376,11 @@ class SchemaImportServiceTest {
         // disambiguator segments (so re-imports version the same grouping).
         assertThat(urn.getValue()).isEqualTo(dsLogical);
         JsonNode m = manifest.getValue();
-        assertThat(m.path("$schema").asText()).isEqualTo("https://civitasconnect.digital/core-datastructure/v1");
-        assertThat(m.path("id").asText()).isEqualTo(dsLogical + ":1.0.0");
-        // Groups every Element produced by the import (root + extracted $defs).
-        assertThat(m.path("elementRefs").toString()).contains(
+        assertThat(m.path("$schema").asText()).isEqualTo("https://json-schema.org/draft/2020-12/schema");
+        assertThat(m.path("$id").asText()).isEqualTo(dsLogical + ":1.0.0");
+        // $defs IS the member list: every Element produced by the import (root + extracted $defs),
+        // each as a $ref to its Element URN.
+        assertThat(m.path("$defs").toString()).contains(
             urnOf(stored, "DefCatalog"),
             urnOf(stored, "DefProduct"),
             urnOf(stored, "DefCategory"),
@@ -491,10 +549,10 @@ class SchemaImportServiceTest {
         assertThat(UrnParser.nameFromUrn(urnOf(stored, "Alpha"))).isEqualTo("Alpha");
         assertThat(UrnParser.nameFromUrn(urnOf(stored, "Beta"))).isEqualTo("Beta");
 
-        // The DataStructure still groups every def, borrowing the first def's identity.
+        // The DataStructure still groups every def (as $defs member $refs), borrowing the first def's identity.
         ArgumentCaptor<JsonNode> manifest = ArgumentCaptor.forClass(JsonNode.class);
         verify(registry).storeDataStructure(anyString(), manifest.capture());
-        assertThat(manifest.getValue().path("elementRefs").toString())
+        assertThat(manifest.getValue().path("$defs").toString())
             .contains(urnOf(stored, "Alpha"), urnOf(stored, "Beta"));
     }
 }

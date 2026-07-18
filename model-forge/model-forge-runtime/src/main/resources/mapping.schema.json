@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id":     "https://civitasconnect.digital/core/mapping/v1",
   "title":   "CORE Mapping",
-  "description": "A declarative field-to-field mapping between two CORE Elements. Each exported Mapping document carries '$schema': 'https://civitasconnect.digital/core/mapping/v1' so it is self-describing.\n\nNote: the 'x-core-ref' annotations on 'source' and 'target' declare that each value is the CORE URN of an Element; existence is checked by registry-aware services.",
+  "description": "A declarative field-to-field mapping between two CORE DataStructures. Each exported Mapping document carries '$schema': 'https://civitasconnect.digital/core/mapping/v1' so it is self-describing.\n\nNote: the 'x-core-ref' annotations on 'source' and 'target' declare that each value is the CORE URN of a DataStructure (an Element URN is also accepted for backward compatibility); existence is checked by registry-aware services.",
   "type": "object",
-  "required": ["$schema", "id", "source", "target", "fields"],
+  "required": ["$schema", "id", "fields"],
   "properties": {
     "$schema": {
       "type": "string",
@@ -16,19 +16,19 @@
     "id": {
       "type": "string",
       "description": "Versioned CORE URN of this Mapping.",
-      "pattern": "^urn:core:[^:]+:[^:]+:mapping:[^:]+:[^:]+:[^:]+$"
+      "pattern": "^urn:core:[^:]+:[^:]+:mapping:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
     },
     "title":       { "type": "string", "description": "Human-readable display name." },
     "description": { "type": "string" },
     "source": {
-      "$ref": "#/$defs/ElementUrn",
-      "description": "Versioned CORE URN of the source Element (the schema being read from).",
-      "x-core-ref": { "type": "urn:core:type:Element" }
+      "$ref": "#/$defs/StructureUrn",
+      "description": "Versioned CORE URN of the source DataStructure (the structure being read from). An Element URN is also accepted for backward compatibility.",
+      "x-core-ref": { "type": "urn:core:type:DataStructure" }
     },
     "target": {
-      "$ref": "#/$defs/ElementUrn",
-      "description": "Versioned CORE URN of the target Element (the schema being written to).",
-      "x-core-ref": { "type": "urn:core:type:Element" }
+      "$ref": "#/$defs/StructureUrn",
+      "description": "Versioned CORE URN of the target DataStructure (the structure being written to). An Element URN is also accepted for backward compatibility.",
+      "x-core-ref": { "type": "urn:core:type:DataStructure" }
     },
     "fields": {
       "type": "object",
@@ -37,19 +37,24 @@
     }
   },
   "$defs": {
-    "ElementUrn": {
-      "description": "Versioned CORE URN of a JSON Schema Element.",
+    "StructureUrn": {
+      "description": "Versioned CORE URN of a DataStructure that a Mapping binds (an Element URN is also accepted for backward compatibility).",
       "type": "string",
-      "pattern": "^urn:core:[^:]+:[^:]+:element:[^:]+:[^:]+:[^:]+$"
+      "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$"
     },
     "CopyFieldOperation": {
-      "description": "Copies a value from an input field path.",
+      "description": "Copies a value from an input field path. The path is given as 'sourcePath' (the mapping editor's field name) or 'input' (legacy alias); at least one must be present.",
       "type": "object",
-      "required": ["op", "input"],
+      "required": ["op"],
       "properties": {
-        "op":    { "type": "string", "const": "copy" },
-        "input": { "type": "string", "description": "JSONPath expression, e.g. '$.sensorId'." }
+        "op":         { "type": "string", "const": "copy" },
+        "input":      { "type": "string", "description": "JSONPath expression, e.g. '$.sensorId'." },
+        "sourcePath": { "type": "string", "description": "JSONPath expression, e.g. '$.sensorId' (editor field name)." }
       },
+      "anyOf": [
+        { "required": ["input"] },
+        { "required": ["sourcePath"] }
+      ],
       "additionalProperties": false
     },
     "ConcatFieldOperation": {
@@ -58,7 +63,7 @@
       "required": ["op", "inputs"],
       "properties": {
         "op":        { "type": "string", "const": "concat" },
-        "inputs":    { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "JSONPath expressions whose values are concatenated in order." },
+        "inputs":    { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/MappingField" }, "description": "Inputs concatenated in order — each a JSONPath string or a nested operation." },
         "separator": { "type": "string", "default": "" }
       },
       "additionalProperties": false
@@ -68,8 +73,9 @@
       "type": "object",
       "required": ["op", "value"],
       "properties": {
-        "op":    { "type": "string", "const": "const" },
-        "value": { "description": "The constant value. Can be a string, number, or boolean." }
+        "op":        { "type": "string", "const": "const" },
+        "value":     { "description": "The constant value. Can be a string, number, or boolean." },
+        "valueType": { "type": "string", "description": "Optional editor hint for how to interpret 'value' (e.g. string/number/boolean)." }
       },
       "additionalProperties": false
     },
@@ -79,7 +85,7 @@
       "required": ["op", "input"],
       "properties": {
         "op":    { "type": "string", "const": "toString" },
-        "input": { "type": "string", "description": "JSONPath expression of the value to convert." }
+        "input": { "$ref": "#/$defs/MappingField", "description": "Value to convert — a JSONPath string or a nested operation." }
       },
       "additionalProperties": false
     },
@@ -89,7 +95,7 @@
       "required": ["op", "input"],
       "properties": {
         "op":    { "type": "string", "const": "toInt" },
-        "input": { "type": "string", "description": "JSONPath expression of the value to convert." }
+        "input": { "$ref": "#/$defs/MappingField", "description": "Value to convert — a JSONPath string or a nested operation." }
       },
       "additionalProperties": false
     },
@@ -99,7 +105,7 @@
       "required": ["op", "input"],
       "properties": {
         "op":    { "type": "string", "const": "toFloat" },
-        "input": { "type": "string", "description": "JSONPath expression of the value to convert." }
+        "input": { "$ref": "#/$defs/MappingField", "description": "Value to convert — a JSONPath string or a nested operation." }
       },
       "additionalProperties": false
     },
@@ -109,7 +115,7 @@
       "required": ["op", "input", "pattern"],
       "properties": {
         "op":      { "type": "string", "const": "toDate" },
-        "input":   { "type": "string", "description": "JSONPath expression of the string value to parse." },
+        "input":   { "$ref": "#/$defs/MappingField", "description": "String value to parse — a JSONPath string or a nested operation." },
         "pattern": { "type": "string", "description": "Date pattern used to parse the input, e.g. 'yyyy-MM-dd'." }
       },
       "additionalProperties": false
@@ -120,8 +126,19 @@
       "required": ["op", "input", "pattern"],
       "properties": {
         "op":      { "type": "string", "const": "format" },
-        "input":   { "type": "string", "description": "JSONPath expression of the date/time value to format." },
+        "input":   { "$ref": "#/$defs/MappingField", "description": "Date/time value to format — a JSONPath string or a nested operation." },
         "pattern": { "type": "string", "description": "Date pattern used to format the output, e.g. 'yyyy-MM-dd'." }
+      },
+      "additionalProperties": false
+    },
+    "GeoPointFieldOperation": {
+      "description": "Builds a GeoJSON-style point from a longitude and latitude input.",
+      "type": "object",
+      "required": ["op", "lon", "lat"],
+      "properties": {
+        "op":  { "type": "string", "const": "geoPoint" },
+        "lon": { "$ref": "#/$defs/MappingField", "description": "Longitude — a JSONPath string or a nested operation." },
+        "lat": { "$ref": "#/$defs/MappingField", "description": "Latitude — a JSONPath string or a nested operation." }
       },
       "additionalProperties": false
     },
@@ -135,7 +152,8 @@
         { "$ref": "#/$defs/ToIntFieldOperation" },
         { "$ref": "#/$defs/ToFloatFieldOperation" },
         { "$ref": "#/$defs/ToDateFieldOperation" },
-        { "$ref": "#/$defs/FormatFieldOperation" }
+        { "$ref": "#/$defs/FormatFieldOperation" },
+        { "$ref": "#/$defs/GeoPointFieldOperation" }
       ]
     },
     "MappingField": {

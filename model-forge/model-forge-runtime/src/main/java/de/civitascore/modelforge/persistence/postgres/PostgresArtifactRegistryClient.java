@@ -185,6 +185,28 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         }
     }
 
+    @Override
+    public List<String> nonDataSetBlockingDependents(String urn) {
+        UrnParser.requireNoControlChars(urn);
+        String logical = UrnParser.logicalUrn(urn);
+        try {
+            return references.nonDataSetBlockingDependents(logical);
+        } catch (DataAccessException e) {
+            throw translate(e, "Could not read dependents of " + logical);
+        }
+    }
+
+    @Override
+    public List<String> dataSetMemberships(String urn) {
+        UrnParser.requireNoControlChars(urn);
+        String logical = UrnParser.logicalUrn(urn);
+        try {
+            return references.dataSetMemberships(logical);
+        } catch (DataAccessException e) {
+            throw translate(e, "Could not read DataSet memberships of " + logical);
+        }
+    }
+
     // ── Read ──────────────────────────────────────────────────────────────────
 
     @Override

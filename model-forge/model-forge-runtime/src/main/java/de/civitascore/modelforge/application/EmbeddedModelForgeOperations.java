@@ -5,6 +5,7 @@ import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.contract.ArtifactSummary;
+import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
@@ -39,6 +40,9 @@ import java.util.Optional;
 import java.util.Set;
 
 public class EmbeddedModelForgeOperations implements ModelForge {
+
+    private static final org.slf4j.Logger LOG =
+        org.slf4j.LoggerFactory.getLogger(EmbeddedModelForgeOperations.class);
 
     private final SchemaImportService schemaImportService;
     private final ElementQueryService elementQueryService;
@@ -294,25 +298,43 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             content = stamped;
         }
         return saveArtifact(
-            new SaveArtifactCommand(new ArtifactId(urn), command.kind(), content, VersionBump.PATCH));
+            new SaveArtifactCommand(
+                new ArtifactId(urn), command.kind(), content, VersionBump.PATCH, command.dataSet()));
     }
 
     @Override
     public ArtifactWriteResult saveArtifact(SaveArtifactCommand command) {
         String urn = command.artifactId().value();
-        // Opt-in structural validation: a document that declares a CORE $schema must satisfy it.
-        // Documents without a (known) $schema are stored unvalidated — the transitional contract.
-        List<Diagnostic> violations = coreSchemaValidator.validate(command.content());
+        // Stamp the CORE $schema for the opaque payload kinds (Mapping/Pipeline/DataSource/DataSink)
+        // so the stored document self-describes and satisfies its schema's required:["$schema"].
+        // DataStructure/DataSet keep the JSON-Schema meta-schema $schema they already carry; Element
+        // is never stamped. All non-Element writes flow through here, so this is the single choke point.
+        JsonNode content = command.content();
+        String schemaUri = CoreSchemaValidator.schemaUriToStamp(command.kind());
+        if (schemaUri != null && content != null && content.isObject()) {
+            // Model Forge owns identity + self-description: stamp $schema AND id on EVERY write of an
+            // opaque payload kind (create and re-version), so the host never stamps either. (Create
+            // also stamps id in createArtifact; re-version relies on this.)
+            tools.jackson.databind.node.ObjectNode stamped =
+                (tools.jackson.databind.node.ObjectNode) content.deepCopy();
+            stamped.put("$schema", schemaUri);
+            stamped.put("id", urn);
+            content = stamped;
+        }
+        // Mandatory structural validation: every artifact must satisfy the CORE schema for its kind
+        // (Element excepted — it is an arbitrary JSON Schema validated on import). No more opt-in.
+        List<Diagnostic> violations = coreSchemaValidator.validate(command.kind(), content);
         if (violations.stream().anyMatch(d -> d.severity() == DiagnosticSeverity.ERROR)) {
+            LOG.warn("Artifact {} ({}) rejected by its CORE schema: {}", urn, command.kind(), violations);
             throw new ValidationFailedException(
-                "Artifact does not satisfy its declared CORE $schema", violations);
+                "Artifact does not satisfy its CORE schema", violations);
         }
         // x-core-ref foreign keys are existence-checked on every write, not just on import: a save
         // may introduce a new reference, so the target must resolve now too. The check keys off the
         // content (it only does work when the document actually carries x-core-ref), so it needs no
         // artifact-kind branch; a lone save has no co-imported corpus beyond the artifact itself.
         List<Diagnostic> unresolvedRefs = referenceExistenceValidator.checkForeignKeys(
-            command.content(), Set.of(UrnParser.logicalUrn(urn)));
+            content, Set.of(UrnParser.logicalUrn(urn)));
         if (!unresolvedRefs.isEmpty()) {
             throw new ValidationFailedException(
                 "Artifact has unresolved x-core-ref foreign keys", unresolvedRefs);
@@ -329,25 +351,120 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             // content has none, so content round-tripped from a fetched (pinned-version) artifact
             // would keep its stale versioned $id and silently defeat the version bump; the caller's
             // urn is the authoritative target identity, so always re-point $id at it (withoutId).
-            case ELEMENT -> command.content().isTextual()
-                ? elementCommandService.storeXsd(urn, command.content().asText(), bump)
-                : elementCommandService.storeJsonSchema(urn, withoutId(command.content()), bump);
+            case ELEMENT -> content.isTextual()
+                ? elementCommandService.storeXsd(urn, content.asText(), bump)
+                : elementCommandService.storeJsonSchema(urn, withoutId(content), bump);
             // The non-Element kinds store straight through the registry, which extracts and
             // persists their per-type reference edges (Mapping source/target, Pipeline nodes,
             // DataStructure/DataSet *Refs). registerFromRegistry() then mirrors those durable
             // edges into the in-memory graph so dependencies()/dependents() see them.
-            case DATA_STRUCTURE -> { String p = registry.storeDataStructure(urn, command.content(), bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case MAPPING -> { String p = registry.storeMapping(urn, command.content(), bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case PIPELINE -> { String p = registry.storePipeline(urn, command.content(), bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case DATA_SOURCE -> { String p = registry.storeDataSource(urn, command.content(), bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case DATA_SINK -> { String p = registry.storeDataSink(urn, command.content(), bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case DATA_SET -> { String p = registry.storeDataSet(urn, command.content(), bump); dependencyGraph.registerFromRegistry(urn); yield p; }
+            case DATA_STRUCTURE -> { String p = registry.storeDataStructure(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
+            case MAPPING -> { String p = registry.storeMapping(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
+            case PIPELINE -> { String p = registry.storePipeline(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
+            case DATA_SOURCE -> { String p = registry.storeDataSource(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
+            case DATA_SINK -> { String p = registry.storeDataSink(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
+            case DATA_SET -> { String p = registry.storeDataSet(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
         };
         // Defensive fallback (a registry double may return nothing): the honest unversioned
         // logical URN — deliberately NOT a resolveReference read-back.
         var pin = new ArtifactId(assigned != null && !assigned.isBlank()
             ? assigned : UrnParser.logicalUrn(urn));
+        // DataSet membership: when the write requested it, link this artifact into the DataSet's
+        // manifest (dataset-ref edges). A Pipeline drags its whole reference closure in too — the
+        // sources/sinks/mappings it uses and, transitively, their DataStructures. A DataSet manifest
+        // is never itself linked into a DataSet.
+        if (command.dataSet() != null && command.kind() != ArtifactKind.DATA_SET) {
+            java.util.Map<String, ArtifactKind> members = new java.util.LinkedHashMap<>();
+            members.put(pin.value(), command.kind());
+            if (command.kind() == ArtifactKind.PIPELINE) {
+                collectMemberDeps(pin.value(), members);
+            }
+            linkMembersIntoDataSet(command.dataSet(), members);
+        }
         return new ArtifactWriteResult(pin, dependenciesOf(pin));
+    }
+
+    /**
+     * Recursively collects the DataSet-member artifacts that {@code urn} references (via the stored
+     * reference edges), classifying each by its CORE artifact type. Used to drag a Pipeline's whole
+     * reference closure (sources/sinks/mappings and, transitively, their DataStructures) into a
+     * DataSet. Non-member kinds (e.g. Element) are skipped.
+     */
+    private void collectMemberDeps(String urn, java.util.Map<String, ArtifactKind> out) {
+        for (String dep : registry.fetchArtifactRefUrns(urn)) {
+            ArtifactKind kind = memberKindOf(dep);
+            if (kind == null || out.containsKey(dep)) {
+                continue;
+            }
+            out.put(dep, kind);
+            collectMemberDeps(dep, out);
+        }
+    }
+
+    /** The DataSet-member ArtifactKind for a CORE URN, or {@code null} for a non-member kind. */
+    private static ArtifactKind memberKindOf(String urn) {
+        return switch (UrnParser.artifactTypeFromUrn(urn) == null ? "" : UrnParser.artifactTypeFromUrn(urn)) {
+            case "pipeline" -> ArtifactKind.PIPELINE;
+            case "mapping" -> ArtifactKind.MAPPING;
+            case "datasource" -> ArtifactKind.DATA_SOURCE;
+            case "datasink" -> ArtifactKind.DATA_SINK;
+            case "datastructure" -> ArtifactKind.DATA_STRUCTURE;
+            default -> null;
+        };
+    }
+
+    /** The DataSet manifest {@code *Refs} field for a member kind, or {@code null} if not a member. */
+    private static String refFieldFor(ArtifactKind kind) {
+        return switch (kind) {
+            case PIPELINE -> "pipelineRefs";
+            case DATA_SOURCE -> "dataSourceRefs";
+            case DATA_SINK -> "dataSinkRefs";
+            case MAPPING -> "mappingRefs";
+            case DATA_STRUCTURE -> "datastructureRefs";
+            case DATA_SET, ELEMENT -> null;
+        };
+    }
+
+    /**
+     * Adds each member (by its logical URN, in the {@code *Refs} array matching its kind) to
+     * {@code dataSetUrn}'s manifest and re-stores it once — the {@code dataset-ref} edges that make
+     * them DataSet members. Members already listed are skipped; the manifest is re-stored only when it
+     * actually changed (so re-saving an existing member mints no new manifest version). A no-op
+     * (logged) when the DataSet manifest does not exist.
+     */
+    private void linkMembersIntoDataSet(String dataSetUrn, java.util.Map<String, ArtifactKind> members) {
+        Optional<ArtifactView> manifest = getArtifact(new ArtifactId(dataSetUrn));
+        if (manifest.isEmpty() || manifest.get().content() == null || !manifest.get().content().isObject()) {
+            LOG.warn("DataSet {} not found (or not an object); cannot link members {}", dataSetUrn, members.keySet());
+            return;
+        }
+        tools.jackson.databind.node.ObjectNode doc =
+            (tools.jackson.databind.node.ObjectNode) manifest.get().content().deepCopy();
+        boolean changed = false;
+        for (var entry : members.entrySet()) {
+            String field = refFieldFor(entry.getValue());
+            if (field == null) {
+                continue;
+            }
+            String memberLogical = UrnParser.logicalUrn(entry.getKey());
+            tools.jackson.databind.node.ArrayNode refs =
+                doc.get(field) instanceof tools.jackson.databind.node.ArrayNode a ? a : doc.putArray(field);
+            boolean present = false;
+            for (JsonNode existing : refs) {
+                if (memberLogical.equals(UrnParser.logicalUrn(existing.asText()))) {
+                    present = true;
+                    break;
+                }
+            }
+            if (!present) {
+                refs.add(memberLogical);
+                changed = true;
+            }
+        }
+        if (changed) {
+            saveArtifact(new SaveArtifactCommand(
+                new ArtifactId(UrnParser.logicalUrn(dataSetUrn)), ArtifactKind.DATA_SET, doc, VersionBump.MINOR));
+        }
     }
 
     /**
@@ -389,8 +506,45 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     }
 
     @Override
-    public void deleteArtifact(ArtifactId artifactId, boolean cascade) {
-        elementCommandService.delete(artifactId.value(), cascade);
+    public void deleteArtifact(ArtifactId artifactId, boolean cascade, boolean force) {
+        elementCommandService.delete(artifactId.value(), cascade, force);
+    }
+
+    @Override
+    public List<ArtifactSummary> orphans(ArtifactKind kind) {
+        // Artifacts of this kind with no dataset-ref in-edge — search by type, then keep only those
+        // the registry reports as members of zero DataSets.
+        return search(new ArtifactSearchQuery(null, typeSegmentFor(kind), null, Integer.MAX_VALUE, 0)).stream()
+            .filter(summary -> registry.dataSetMemberships(summary.artifactId().value()).isEmpty())
+            .toList();
+    }
+
+    @Override
+    public void linkToDataSet(ArtifactId dataSet, ArtifactId member) {
+        ArtifactKind kind = memberKindOf(member.value());
+        if (kind == null) {
+            throw new IllegalArgumentException("Not a DataSet-member artifact: " + member.value());
+        }
+        linkMembersIntoDataSet(dataSet.value(), java.util.Map.of(member.value(), kind));
+    }
+
+    @Override
+    public void unlinkFromDataSet(ArtifactId dataSet, ArtifactId member) {
+        elementCommandService.unlinkFromDataSet(
+            UrnParser.logicalUrn(dataSet.value()), UrnParser.logicalUrn(member.value()));
+    }
+
+    /** The registry {@code artifact_type} segment for a kind (matches the CORE URN's type segment). */
+    private static String typeSegmentFor(ArtifactKind kind) {
+        return switch (kind) {
+            case MAPPING -> "mapping";
+            case PIPELINE -> "pipeline";
+            case DATA_SOURCE -> "datasource";
+            case DATA_SINK -> "datasink";
+            case DATA_STRUCTURE -> "datastructure";
+            case DATA_SET -> "dataset";
+            case ELEMENT -> "element";
+        };
     }
 
     private static JsonNode withoutId(JsonNode content) {

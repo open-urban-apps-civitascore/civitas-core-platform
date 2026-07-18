@@ -9,6 +9,8 @@ import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.facade.ModelForge;
+import de.civitascore.modelforge.graph.DependencyGraphService;
+import de.civitascore.modelforge.urn.UrnParser;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -42,6 +44,12 @@ public class GraphPage extends BasePage {
     @SpringBean
     private ModelForge modelForge;
 
+    // Per-process in-memory graph — rebuild from the durable artifact_reference rows before rendering
+    // so edges portal-backend wrote after this (separate) console started are included. See the same
+    // note on ArtifactViewPage. Fine for a development registry, per this page's class comment.
+    @SpringBean
+    private DependencyGraphService dependencyGraph;
+
     private final String graphDataJson;
 
     public GraphPage() {
@@ -61,8 +69,26 @@ public class GraphPage extends BasePage {
             + "var mfDark = document.documentElement.getAttribute('data-theme') === 'dark';"
             + "var nodes = new vis.DataSet(modelForgeGraphData.nodes);"
             + "var edges = new vis.DataSet(modelForgeGraphData.edges);"
+            // Filtering: each type checkbox toggles a whole artifact kind; the search box matches a
+            // node's label or URN (case-insensitive substring). Nodes render through a DataView whose
+            // filter reads the live state, edges through a DataView that hides any edge with a
+            // filtered-out endpoint (else vis-network draws it dangling). xsd_element shares the
+            // Element toggle; a group with no checkbox stays visible (it can't be filtered).
+            + "var mfTypeState = {};"
+            + "var mfSearch = '';"
+            + "function mfGroup(n){ return n.group === 'xsd_element' ? 'element' : n.group; }"
+            + "function mfNodeVisible(n){"
+            + "  if (mfTypeState[mfGroup(n)] === false) return false;"
+            + "  if (mfSearch) { var hay = ((n.label || '') + ' ' + n.id).toLowerCase(); if (hay.indexOf(mfSearch) < 0) return false; }"
+            + "  return true;"
+            + "}"
+            + "var mfVisibleIds = {};"
+            + "function mfRecompute(){ mfVisibleIds = {}; nodes.get().forEach(function(n){ if (mfNodeVisible(n)) mfVisibleIds[n.id] = true; }); }"
+            + "mfRecompute();"
+            + "var nodesView = new vis.DataView(nodes, {filter: mfNodeVisible});"
+            + "var edgesView = new vis.DataView(edges, {filter: function(e){ return mfVisibleIds[e.from] && mfVisibleIds[e.to]; }});"
             + "var container = document.getElementById('modelforge-graph');"
-            + "var network = new vis.Network(container, {nodes: nodes, edges: edges}, {"
+            + "var network = new vis.Network(container, {nodes: nodesView, edges: edgesView}, {"
             + "  layout: {improvedLayout: true},"
             + "  physics: {stabilization: true, barnesHut: {springLength: 140}},"
             + "  interaction: {hover: true},"
@@ -80,6 +106,16 @@ public class GraphPage extends BasePage {
             + "    dataset: {color: {background: '#b07aa1', border: '#6e4568'}}"
             + "  }"
             + "});"
+            // Re-evaluate both DataViews whenever a control changes: recompute the visible-id set
+            // first (the edge filter reads it), then refresh nodes and edges.
+            + "function mfRefresh(){ mfRecompute(); nodesView.refresh(); edgesView.refresh(); }"
+            + "Array.prototype.forEach.call(document.querySelectorAll('.mf-graph-type input[type=checkbox]'), function(cb){"
+            + "  var g = cb.getAttribute('data-group');"
+            + "  mfTypeState[g] = cb.checked;"
+            + "  cb.addEventListener('change', function(){ mfTypeState[g] = cb.checked; mfRefresh(); });"
+            + "});"
+            + "var mfSearchEl = document.getElementById('mf-graph-search');"
+            + "if (mfSearchEl) { mfSearchEl.addEventListener('input', function(){ mfSearch = mfSearchEl.value.trim().toLowerCase(); mfRefresh(); }); }"
             // Nodes are keyed by URN (see buildGraphJson) — clicking one opens its detail page;
             // hover feedback makes that discoverable without a legend entry for it.
             + "network.on('click', function(params) {"
@@ -102,7 +138,24 @@ public class GraphPage extends BasePage {
         return json.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026");
     }
 
+    /**
+     * The vis-network group (colour) for a node, derived from the URN's type segment first and only
+     * falling back to the registry's {@code artifact_type} (then {@code element}). The URN is the more
+     * reliable signal: an artifact whose stored {@code artifact_type} disagrees with its URN — e.g. a
+     * root Element mistakenly persisted under a {@code :datastructure:} URN — would otherwise be
+     * mis-coloured as an Element. Unknown/blank segments fall back so every node still gets a group.
+     */
+    private static String groupForUrn(String urn, String fallbackType) {
+        String type = UrnParser.artifactTypeFromUrn(urn);
+        if (type != null && !type.isBlank()) {
+            return type;
+        }
+        return fallbackType == null || fallbackType.isBlank() ? "element" : fallbackType;
+    }
+
     private String buildGraphJson() {
+        // Refresh the per-process graph from the DB so cross-process (portal-backend) writes appear.
+        dependencyGraph.rebuild();
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode root = mapper.createObjectNode();
         ArrayNode nodesArray = root.putArray("nodes");
@@ -114,8 +167,10 @@ public class GraphPage extends BasePage {
 
         var artifacts = modelForge.search(new ArtifactSearchQuery(null, null, null, 300, 0));
         for (ArtifactSummary artifact : artifacts) {
-            String urn = artifact.artifactId().value();
-            nodeGroups.put(urn, artifact.type() == null ? "element" : artifact.type());
+            // Key nodes by the logical (version-less) URN so they match the normalised edge endpoints
+            // (see collectEdges) — one node per artifact, edges resolve against it.
+            String urn = UrnParser.logicalUrn(artifact.artifactId().value());
+            nodeGroups.put(urn, groupForUrn(urn, artifact.type()));
             nodeLabels.put(urn, artifact.title() == null ? urn : artifact.title());
         }
 
@@ -146,15 +201,22 @@ public class GraphPage extends BasePage {
     ) {
         ObjectMapper mapper = new ObjectMapper();
         for (var node : graph.nodes()) {
-            nodeGroups.putIfAbsent(node.artifactId().value(), "element");
-            nodeLabels.putIfAbsent(node.artifactId().value(), node.label());
+            String nodeUrn = UrnParser.logicalUrn(node.artifactId().value());
+            nodeGroups.putIfAbsent(nodeUrn, groupForUrn(nodeUrn, null));
+            nodeLabels.putIfAbsent(nodeUrn, node.label());
         }
         for (var edge : graph.edges()) {
-            String key = edge.source().value() + "->" + edge.target().value() + ":" + edge.relation();
+            // The dependency view keys nodes and edges by VERSIONED URNs, but the graph's nodes are
+            // keyed by their logical (version-less) URN (from search). Normalise both endpoints to the
+            // logical URN so they match a node id — vis-network drops any edge whose endpoints are not
+            // visible nodes, which is why versioned edge endpoints previously rendered no edges at all.
+            String from = UrnParser.logicalUrn(edge.source().value());
+            String to = UrnParser.logicalUrn(edge.target().value());
+            String key = from + "->" + to + ":" + edge.relation();
             if (!edgeKeys.add(key)) continue;
             ObjectNode edgeNode = mapper.createObjectNode();
-            edgeNode.put("from", edge.source().value());
-            edgeNode.put("to", edge.target().value());
+            edgeNode.put("from", from);
+            edgeNode.put("to", to);
             edgeNode.put("label", edge.relation());
             edgesArray.add(edgeNode);
         }

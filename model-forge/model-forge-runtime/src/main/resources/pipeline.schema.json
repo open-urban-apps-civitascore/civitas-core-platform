@@ -16,7 +16,7 @@
     "id": {
       "type": "string",
       "description": "Versioned CORE URN of this Pipeline.",
-      "pattern": "^urn:core:[^:]+:[^:]+:pipeline:[^:]+:[^:]+:[^:]+$"
+      "pattern": "^urn:core:[^:]+:[^:]+:pipeline:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
     },
     "title":       { "type": "string", "description": "Human-readable display name." },
     "description": { "type": "string" },
@@ -50,6 +50,7 @@
       "oneOf": [
         { "$ref": "#/$defs/StartNode"   },
         { "$ref": "#/$defs/EndNode"     },
+        { "$ref": "#/$defs/CronNode"    },
         { "$ref": "#/$defs/SourceNode"  },
         { "$ref": "#/$defs/FilterNode"  },
         { "$ref": "#/$defs/EnrichNode"  },
@@ -96,13 +97,27 @@
       ],
       "unevaluatedProperties": false
     },
+    "CronNode": {
+      "description": "Scheduled trigger — fires the pipeline's source on a cron schedule (e.g. a polling SQL source).",
+      "allOf": [
+        { "$ref": "#/$defs/PipelineNodeBase" },
+        {
+          "type": "object",
+          "properties": {
+            "kind":           { "type": "string", "const": "cron" },
+            "cronExpression": { "type": "string", "description": "Quartz/NiFi cron expression, e.g. '0 0/5 * * * ?'." },
+            "cronPreview":    { "type": "string", "description": "Human-readable schedule preview (editor hint)." }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
     "SourceNode": {
       "description": "Reads structured data from a DataSource (e.g. MQTT broker).",
       "allOf": [
         { "$ref": "#/$defs/PipelineNodeBase" },
         {
           "type": "object",
-          "required": ["sourceRef"],
           "properties": {
             "kind": { "type": "string", "const": "source" },
             "sourceRef": {
@@ -156,7 +171,6 @@
         { "$ref": "#/$defs/PipelineNodeBase" },
         {
           "type": "object",
-          "required": ["mappingRef"],
           "properties": {
             "kind": { "type": "string", "const": "mapping" },
             "mappingRef": {
@@ -175,7 +189,6 @@
         { "$ref": "#/$defs/PipelineNodeBase" },
         {
           "type": "object",
-          "required": ["sinkRef"],
           "properties": {
             "kind": { "type": "string", "const": "sink" },
             "sinkRef": {

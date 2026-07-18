@@ -62,10 +62,8 @@
          consumer of it, same as portal-backend will be. Exempt from the library's own
          no-web/no-REST rules; it may freely use spring-boot-starter-web. -->
     <module>model-forge-admin-ui</module>
-    <!-- Not a Java module: wraps the npm package so `mvn` regenerates the TypeScript/Zod types
-         from the runtime JSON Schemas on every build (frontend-maven-plugin brings its own node).
-         The npm publish stays in the CI publish-npm job. -->
-    <module>core-model-forge-types</module>
+    <!-- The TypeScript/Zod CORE types are generated directly in portal-frontend from these runtime
+         JSON Schemas (portal-frontend/scripts/generate-core-types.mjs) — no separate npm module. -->
   </modules>
 
   <build>
