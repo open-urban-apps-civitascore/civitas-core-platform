@@ -1,7 +1,9 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
@@ -9,7 +11,9 @@ import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.LayerRepository;
+import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -18,6 +22,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -35,19 +40,25 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   private final DataSinkMapper dataSinkMapper;
   private final DataSetRepository dataSetRepository;
   private final LayerRepository layerRepository;
+  private final DataStructureVersionRepository dataStructureVersionRepository;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final ScopeAccessAuthorizer scopeAccessAuthorizer;
 
   public DataSinkService(
       DataSinkRepository dataSinkRepository,
       DataSinkMapper dataSinkMapper,
       DataSetRepository dataSetRepository,
+      DataStructureVersionRepository dataStructureVersionRepository,
       LayerRepository layerRepository,
-      ModelRegistryGateway modelRegistryGateway) {
+      ModelRegistryGateway modelRegistryGateway,
+      ScopeAccessAuthorizer scopeAccessAuthorizer) {
     this.dataSinkRepository = dataSinkRepository;
     this.dataSinkMapper = dataSinkMapper;
     this.dataSetRepository = dataSetRepository;
+    this.dataStructureVersionRepository = dataStructureVersionRepository;
     this.layerRepository = layerRepository;
     this.modelRegistryGateway = modelRegistryGateway;
+    this.scopeAccessAuthorizer = scopeAccessAuthorizer;
   }
 
   @Override
@@ -285,5 +296,37 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
           "configuration.element",
           "Referenced Element not found in the model registry: " + urn);
     }
+    authorizeReferencedStructure(urn);
+  }
+
+  /**
+   * Authorizes the caller against the DataStructure that owns the referenced {@code element} URN.
+   *
+   * <p>The sink's {@code element} is a versioned CORE {@code :datastructure:} URN (the mapping's
+   * target structure). It is resolved to the owning portal DataStructure via that structure's
+   * {@code modelUrn}, matched version-agnostically since every version of a structure shares the
+   * same parent. The DataStructure is DATASTRUCTURE-scoped, which the DATASET-typed route header
+   * cannot cover — so DataSinkService authorizes the reference here (DataSinkController is a plain
+   * BaseController with no scope filtering of its own). A URN that resolves to no known
+   * DataStructure and an unauthorized one must yield the SAME outward failure, otherwise the
+   * difference is an existence oracle over structure URNs; both raise the identical "not available"
+   * 400 and the real denial is logged by {@link ScopeAccessAuthorizer} for audit.
+   */
+  private void authorizeReferencedStructure(String elementUrn) {
+    UUID dataStructureId =
+        dataStructureVersionRepository
+            .findFirstByModelUrnStartingWith(UrnParser.logicalUrn(elementUrn) + ":")
+            .map(dsv -> dsv.getDataStructure().getId())
+            .orElseThrow(this::referencedStructureNotAvailable);
+    try {
+      scopeAccessAuthorizer.authorizeReferences(ScopeType.DATASTRUCTURE, Set.of(dataStructureId));
+    } catch (AccessDeniedException e) {
+      throw referencedStructureNotAvailable();
+    }
+  }
+
+  private InvalidInputException referencedStructureNotAvailable() {
+    return new InvalidInputException(
+        "DataSink", "configuration.element", "Referenced DataStructure is not available");
   }
 }

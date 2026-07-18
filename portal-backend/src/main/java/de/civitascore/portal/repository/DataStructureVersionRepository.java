@@ -32,4 +32,18 @@ public interface DataStructureVersionRepository extends BaseRepository<DataStruc
    * @return matching data structure versions
    */
   Set<DataStructureVersion> findAllByDataStructureIdAndVersion(UUID id, String version);
+
+  /**
+   * Finds any version whose {@code modelUrn} begins with the given prefix — typically the logical
+   * ({@code version}-free) CORE URN of a DataStructure followed by {@code ":"}, so it matches every
+   * stored version of that structure. Used to resolve a versioned {@code :datastructure:} URN
+   * referenced by a DataSink back to its owning portal DataStructure for authorization: every
+   * version shares the same parent, so the first match suffices. The {@code dataStructure} is
+   * eagerly fetched so the caller can read its id outside the persistence context.
+   *
+   * @param modelUrnPrefix the {@code modelUrn} prefix to match (e.g. {@code logicalUrn + ":"})
+   * @return a matching version, or empty if no stored version references that structure
+   */
+  @EntityGraph(attributePaths = {"dataStructure"})
+  Optional<DataStructureVersion> findFirstByModelUrnStartingWith(String modelUrnPrefix);
 }

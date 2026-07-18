@@ -32,6 +32,7 @@ import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Nested;
@@ -241,6 +242,156 @@ class GeoServerSagaHandlerTest {
                 ((Map<String, Object>) captor.getValue().getEntity()).get("featureType");
         assertEquals("roads", featureType.get("name"));
         assertEquals("traffic", featureType.get("nativeName"));
+      }
+    }
+
+    @Test
+    void derivesNativeCrsFromDataStructureGeometry() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", Map.of("geom", "EPSG:25832"))),
+                        "layers",
+                        List.of(Map.of("layerName", "roads", "crs", "EPSG:4326")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // Declared SRS from the layer, native CRS read from the geometry in the data structure —
+        // the same source PostGIS uses for the column SRID.
+        Map<String, Object> featureType = postedFeatureType();
+        assertEquals("EPSG:4326", featureType.get("srs"));
+        assertEquals("EPSG:25832", featureType.get("nativeCRS"));
+      }
+    }
+
+    @Test
+    void selectsGeometryByGeometryColumnRefWhenMultiple() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        // Two geometry columns with different CRS; geometryColumnRef picks which one is published.
+        LinkedHashMap<String, String> geometries = new LinkedHashMap<>();
+        geometries.put("geom_a", "EPSG:25832");
+        geometries.put("geom_b", "EPSG:3857");
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", geometries)),
+                        "layers",
+                        List.of(
+                            Map.of(
+                                "layerName", "roads",
+                                "crs", "EPSG:4326",
+                                "geometryColumnRef", "geom_b")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("EPSG:3857", postedFeatureType().get("nativeCRS"));
+      }
+    }
+
+    @Test
+    void failsWhenMultipleGeometriesAndNoGeometryColumnRef() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // Ambiguous: two geometry columns and no geometryColumnRef → fail rather than guess,
+        // mirroring the nativeName handling across multiple sinks.
+        LinkedHashMap<String, String> geometries = new LinkedHashMap<>();
+        geometries.put("geom_a", "EPSG:25832");
+        geometries.put("geom_b", "EPSG:3857");
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", geometries)),
+                        "layers",
+                        List.of(Map.of("layerName", "roads", "crs", "EPSG:4326")))));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertTrue(result.error().contains("geometryColumnRef"), result.error());
+        verify(mockBuilder, times(0)).post(any(Entity.class));
+      }
+    }
+
+    @Test
+    void fallsBackToDeclaredCrsWhenGeometryHasNoCrs() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        // Geometry present but without an explicit crs — PostGIS defaults such a column to
+        // EPSG:4326, so the native CRS falls back to the declared CRS (which is EPSG:4326 here).
+        LinkedHashMap<String, String> geometries = new LinkedHashMap<>();
+        geometries.put("geom", null);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", geometries)),
+                        "layers",
+                        List.of(Map.of("layerName", "roads", "crs", "EPSG:4326")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("EPSG:4326", postedFeatureType().get("nativeCRS"));
+      }
+    }
+
+    @Test
+    void fallsBackToDeclaredCrsWhenNoDataStructure() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        // A POSTGIS sink without a data structure (nothing to derive from) → the native CRS mirrors
+        // the declared CRS so the layer stays valid under REPROJECT_TO_DECLARED.
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(
+                            Map.of(
+                                "type", "POSTGIS", "configuration", Map.of("tableName", "roads"))),
+                        "layers",
+                        List.of(Map.of("layerName", "roads", "crs", "EPSG:25832")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("EPSG:25832", postedFeatureType().get("nativeCRS"));
       }
     }
 
@@ -1195,6 +1346,43 @@ class GeoServerSagaHandlerTest {
         List.of(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", layerName))),
         "layers",
         List.of(Map.of("layerName", layerName, "crs", "EPSG:4326")));
+  }
+
+  /**
+   * A POSTGIS data sink for {@code tableName} whose {@code dataStructure} defines the given
+   * geometry columns (column name → CRS; a {@code null} CRS means the geometry declares none), plus
+   * a scalar {@code id} column so the schema resolves as a normal table.
+   */
+  private static Map<String, Object> postgisSinkWithGeometry(
+      String tableName, Map<String, String> geometryCrs) {
+    LinkedHashMap<String, Object> properties = new LinkedHashMap<>();
+    properties.put("id", Map.of("type", "integer"));
+    geometryCrs.forEach(
+        (column, crs) -> {
+          LinkedHashMap<String, Object> spec = new LinkedHashMap<>();
+          spec.put("$ref", "https://geojson.org/schema/Point.json");
+          if (crs != null) {
+            spec.put("crs", crs);
+          }
+          properties.put(column, spec);
+        });
+    return Map.of(
+        "type", "POSTGIS",
+        "configuration", Map.of("tableName", tableName),
+        "dataStructure", Map.of("properties", properties));
+  }
+
+  /** The {@code featureType} object from the captured feature-type POST body. */
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private Map<String, Object> postedFeatureType() {
+    ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+    verify(mockBuilder, atLeastOnce()).post(captor.capture());
+    for (Entity entity : captor.getAllValues()) {
+      if (entity.getEntity() instanceof Map<?, ?> body && body.get("featureType") instanceof Map) {
+        return (Map<String, Object>) ((Map<String, Object>) body).get("featureType");
+      }
+    }
+    throw new AssertionError("no featureType POST captured");
   }
 
   /** Mocks a 200 {@code featuretypes.json} response listing the given feature type names. */

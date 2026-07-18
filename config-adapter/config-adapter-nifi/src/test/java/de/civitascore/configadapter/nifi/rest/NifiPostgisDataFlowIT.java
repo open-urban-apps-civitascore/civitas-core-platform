@@ -61,6 +61,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
 
   private static final int HOST_PORT = 18445;
   private static final String TOPIC = "civitas/it/postgis";
+  private static final String ARRAY_TOPIC = "civitas/it/postgis-array";
   private static final String GEO_TOPIC = "civitas/it/postgis-geo";
   private static final String GEO_25832_TOPIC = "civitas/it/postgis-geo-25832";
   private static final String DB = "nifi_demo";
@@ -176,6 +177,66 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                     TOPIC,
                     "{\"stationid\":\"S1\",\"count\":\"42\",\"meta\":{\"a\":1,\"b\":\"x\"}}");
                 return rowLanded();
+              });
+    }
+  }
+
+  @Test
+  void deployedFlowMapsFieldsWithinEachArrayElement() throws Exception {
+    // CORE uses [] for an all-elements path. The compiler must emit NiFi's [*] selector and a
+    // relative source path, so each item receives its own sourceName rather than the complete
+    // multi-value selection.
+    Map<String, Object> graph =
+        map(
+            """
+            { "nodes": [
+                { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
+                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
+                    "fields": { "$.stationid": "$.stationid",
+                                "$.items[].name": "$.items[].sourceName" } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
+                { "id": "e", "type": "end", "data": {} } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+
+    Datasource source = new Datasource();
+    source.setId("ds-pg-array-it");
+    source.setType("MQTT");
+    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
+    source.handleUnknownProperty("topics", List.of(ARRAY_TOPIC));
+
+    FlowDeploymentPlanner planner =
+        NifiTestFixtures.planner(
+            new CredentialResolver(new byte[0]),
+            SqlSourceProbe.NO_OP,
+            new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
+            null);
+    DeploymentPlan plan =
+        planner.plan(
+            new PipelineDeploymentRequest(
+                "pg-array-it", graph, source, new PostgisSinkSpec("array_observation")));
+
+    client.deployFlow(plan);
+
+    String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
+    try (MqttPublisher publisher = new MqttPublisher(brokerUrl)) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(
+                    ARRAY_TOPIC,
+                    "{\"stationid\":\"S4\",\"items\":["
+                        + "{\"sourceName\":\"A\",\"name\":null},"
+                        + "{\"sourceName\":\"B\",\"name\":null}]}");
+                return arrayRowLanded();
               });
     }
   }
@@ -339,6 +400,22 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     }
   }
 
+  /** Asserts that UpdateRecord evaluated the source relative to each selected array element. */
+  private boolean arrayRowLanded() throws Exception {
+    try (Connection c = dbConnection();
+        Statement st = c.createStatement();
+        ResultSet rs =
+            st.executeQuery("SELECT items FROM array_observation WHERE stationid = 'S4'")) {
+      if (!rs.next()) {
+        return false;
+      }
+      var items = mapper.readTree(rs.getString("items"));
+      assertEquals("A", items.get(0).get("name").asText());
+      assertEquals("B", items.get(1).get("name").asText());
+      return true;
+    }
+  }
+
   /**
    * Asserts the geoPoint landed as a real PostGIS Point with the column's SRID and right coords.
    */
@@ -365,6 +442,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         Statement st = c.createStatement()) {
       st.execute("CREATE EXTENSION IF NOT EXISTS postgis");
       st.execute("CREATE TABLE observation (stationid text, count integer, meta jsonb)");
+      st.execute("CREATE TABLE array_observation (stationid text, items jsonb)");
       st.execute("CREATE TABLE geo_observation (stationid text, geom geometry(Point,4326))");
       st.execute("CREATE TABLE geo_observation_25832 (stationid text, geom geometry(Point,25832))");
     }

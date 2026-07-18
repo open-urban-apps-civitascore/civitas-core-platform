@@ -210,6 +210,7 @@ public class DataSetSagaPublisher {
         layer.getLayerName(),
         resolveNativeName(layer),
         layer.getCrs(),
+        layer.getGeometryColumnRef(),
         layer.getDefaultStyle() != null ? layer.getDefaultStyle().getName() : null,
         buildAlternativeStyleNames(layer));
   }

@@ -82,7 +82,8 @@
       "emailExists": "Diese E-Mail ist bereits vergeben.",
       "emailExistsToast": "Die E-mail {email} ist bereits vergeben. Bitte wählen Sie eine andere E-Mail-Adresse.",
       "insufficientPermissions": "Sie verfügen nicht über die notwendigen Berechtigungen für diese Aktion.",
-      "invalidCharacters": "Es sind nur Buchstaben, Zahlen, Binde- und Unterstriche erlaubt."
+      "invalidCharacters": "Es sind nur Buchstaben, Zahlen, Binde- und Unterstriche erlaubt.",
+      "mustNotStartWithNumber": "Darf nicht mit einer Nummer beginnen."
     },
     "items": {
       "data": "Daten",
@@ -1346,7 +1347,9 @@
       },
       "errors": {
         "typeMismatchWithType": "Typen stimmen nicht überein ({type}). Konvertierungsfunktion hinzufügen.",
-        "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen."
+        "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen.",
+        "outputToOutput": "Zwei Ausgänge können nicht verbunden werden.",
+        "inputToInput": "Zwei Eingänge können nicht verbunden werden."
       },
       "unconnectedWarning": {
         "title": "Nicht verbundene Transformationen entfernen?",

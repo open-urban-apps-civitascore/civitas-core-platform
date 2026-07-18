@@ -145,6 +145,42 @@ class FrostSinkStageTest {
   }
 
   @Test
+  void resolvesReferenceFromALittleThingModel() throws Exception {
+    Map<String, Object> datasink =
+        json(
+            """
+            { "dataStructure": {
+                "$id": "urn:core:platform:civitas:datastructure:common:ALittleThing:91zjftfn1i:1.0.0",
+                "type": "object",
+                "$defs": {
+                  "Thing": {
+                    "type": "object",
+                    "required": ["name", "description", "definition", "properties"],
+                    "properties": {
+                      "name": { "type": "string" },
+                      "definition": { "type": "string" },
+                      "properties": { "$ref": "#/$defs/properties" },
+                      "description": { "type": "string" }
+                    }
+                  },
+                  "properties": {
+                    "type": "object",
+                    "required": ["reference"],
+                    "properties": { "reference": { "type": "string" } }
+                  }
+                },
+                "properties": { "thing": { "$ref": "#/$defs/Thing" } }
+              }
+            }
+            """);
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertEquals(List.of("reference"), spec.staProperties().thingKeys());
+    assertTrue(spec.staProperties().datastreamKeys().isEmpty());
+  }
+
+  @Test
   void derivesFreeBagAttributesWithTypesAndTheMatchKeyFlag() throws Exception {
     // A bag with the match key + a free scalar + a free object: scalar → ANY, object → RAW_JSON,
     // only the marked attribute is the key. Declaration order is preserved.

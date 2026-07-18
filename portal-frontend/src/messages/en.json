@@ -83,7 +83,8 @@
       "emailExists": "This email is already in use.",
       "emailExistsToast": "The email {email} is already in use. Please, choose another email address.",
       "insufficientPermissions": "You do not have the necessary permissions to perform this action.",
-      "invalidCharacters": "Only letters, numbers, hyphens and underscores are allowed."
+      "invalidCharacters": "Only letters, numbers, hyphens and underscores are allowed.",
+      "mustNotStartWithNumber": "Must not start with a number."
     },
     "items": {
       "data": "data",
@@ -1359,7 +1360,9 @@
       },
       "errors": {
         "typeMismatchWithType": "Types don't match ({type}). Add a conversion function.",
-        "typeMismatch": "Types don't match. Add a conversion function."
+        "typeMismatch": "Types don't match. Add a conversion function.",
+        "outputToOutput": "Two outputs can't be connected.",
+        "inputToInput": "Two inputs can't be connected."
       },
       "unconnectedWarning": {
         "title": "Remove unconnected transforms?",

@@ -184,8 +184,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     (action: PipelineReducerAction) => {
       if (!activeSession) return
 
-      const updatedPipeline = pipelineReducerWithReactFlow(activeSession.pipeline, action)
-      sessionManager.updateSessionPipeline(activeSession.id, updatedPipeline)
+      // Apply the reducer against the latest pipeline via an updater rather than the
+      // closure-captured value. This lets multiple synchronous dispatches compose — e.g.
+      // deleting a connected node makes React Flow emit an edge-removal change followed by a
+      // node-removal change, and both must build on each other instead of overwriting.
+      sessionManager.updateSessionPipeline(activeSession.id, previous => pipelineReducerWithReactFlow(previous, action))
 
       // Mark as dirty for most actions
       if (action.type !== 'MARK_CLEAN') {

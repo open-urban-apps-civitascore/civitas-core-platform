@@ -46,11 +46,10 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * DATA-CORRECTNESS integration test for the FROST find-or-create sub-flow against a <b>real
- * FROST-Server</b>: deploys the MQTT→find-or-create flow built by {@link NifiFlowBuilder} onto an
- * actual NiFi 2.9.0, publishes an STA-envelope message repeatedly, and asserts that FROST ends up
- * with exactly ONE Thing for the reference — i.e. the lookup-by-reference really dedups
- * (idempotency) end to end, not just against a mock.
+ * DATA-CORRECTNESS integration test for the FROST upsert sub-flow against a <b>real
+ * FROST-Server</b>: deploys the MQTT→upsert flow built by {@link NifiFlowBuilder} onto an actual
+ * NiFi 2.9.0, publishes STA-envelope messages repeatedly, and asserts that FROST ends up with
+ * exactly ONE updated Thing for the reference.
  *
  * <p>Topology (one Docker network): Mosquitto (alias {@code mqtt}) ← NiFi → FROST (alias {@code
  * frost}) → PostGIS (alias {@code database}). Skipped when Docker is unavailable.
@@ -62,6 +61,11 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
   private static final String REFERENCE = "STATION-IT-1";
   private static final String ENVELOPE =
       "{\"things\":[{\"name\":\"Station IT 1\",\"description\":\"find-or-create IT\","
+          + "\"properties\":{\"reference\":\""
+          + REFERENCE
+          + "\"}}]}";
+  private static final String UPDATED_ENVELOPE =
+      "{\"things\":[{\"name\":\"Station IT 1 updated\",\"description\":\"upsert IT\","
           + "\"properties\":{\"reference\":\""
           + REFERENCE
           + "\"}}]}";
@@ -195,7 +199,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
   }
 
   @Test
-  void findOrCreateCreatesThingExactlyOnceAcrossRepeatedMessages() throws Exception {
+  void upsertCreatesOnceAndUpdatesOnRepeatedReference() throws Exception {
     String snapshot =
         NifiTestFixtures.flowBuilder()
             .build(
@@ -217,7 +221,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
 
     String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
     try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-frost")) {
-      // The Thing must appear in FROST (created via the find-or-create POST).
+      // The first delivery creates the Thing via POST.
       await()
           .atMost(Duration.ofSeconds(120))
           .pollInterval(Duration.ofSeconds(3))
@@ -228,16 +232,23 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                 return countThings(REFERENCE) >= 1;
               });
 
-      // Keep delivering the same message; find-or-create must reuse the existing Thing, never
-      // creating a duplicate.
+      // A changed record with the same reference must PATCH the existing Thing, never create a
+      // duplicate.
       for (int i = 0; i < 5; i++) {
-        publisher.publish(TOPIC, ENVELOPE);
+        publisher.publish(TOPIC, UPDATED_ENVELOPE);
         Thread.sleep(Duration.ofSeconds(2).toMillis());
       }
-      assertEquals(
-          1,
-          countThings(REFERENCE),
-          "find-or-create must keep exactly one Thing for the reference (idempotency)");
+      await()
+          .atMost(Duration.ofSeconds(60))
+          .pollInterval(Duration.ofSeconds(2))
+          .untilAsserted(
+              () -> {
+                assertEquals(1, countThings(REFERENCE), "upsert must not duplicate the Thing");
+                assertEquals(
+                    "Station IT 1 updated",
+                    thingName(REFERENCE),
+                    "the existing Thing must be updated by reference");
+              });
     }
   }
 
@@ -373,6 +384,21 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                 .build(),
             HttpResponse.BodyHandlers.ofString());
     return mapper.readTree(response.body()).path("value").size();
+  }
+
+  /** Returns the name of the single Thing identified by reference inside the IT project. */
+  private String thingName(String reference) throws Exception {
+    String filter =
+        URLEncoder.encode("properties/reference eq '" + reference + "'", StandardCharsets.UTF_8)
+            .replace("+", "%20");
+    HttpResponse<String> response =
+        http.send(
+            HttpRequest.newBuilder()
+                .uri(URI.create(frostUrl("/Projects(" + projectId + ")/Things?$filter=" + filter)))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    return mapper.readTree(response.body()).path("value").path(0).path("name").asText();
   }
 
   /** Counts FROST Datastreams matching the flow's lookup filter (properties/reference + name). */

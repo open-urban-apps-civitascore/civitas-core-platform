@@ -23,8 +23,11 @@ import java.util.List;
  *   <li>{@code nativeName} — optional; the underlying table name in the data source. {@code null}
  *       when the layer is not attached to a POSTGIS sink; the adapter then falls back to the sole
  *       POSTGIS table on the dataset, or to {@code layerName}.
- *   <li>{@code crs} — optional; the coordinate reference system identifier (e.g. {@code
- *       EPSG:4326}). {@code null} lets the adapter apply its {@code DEFAULT_CRS}.
+ *   <li>{@code crs} — optional; the declared (published) coordinate reference system identifier
+ *       (e.g. {@code EPSG:4326}). {@code null} lets the adapter apply its {@code DEFAULT_CRS}.
+ *   <li>{@code geometryColumnRef} — optional; the name of the geometry column the layer publishes.
+ *       The adapter uses it to pick the geometry (and thus the native CRS) from the sink's data
+ *       structure when it defines more than one; {@code null}/absent is fine for a single geometry.
  *   <li>{@code defaultStyle} — optional; the name of a {@link StylePayload} carried on the same
  *       trigger. {@code null} lets GeoServer fall back to its generic style.
  *   <li>{@code alternativeStyles} — optional; further {@link StylePayload} names available on the
@@ -37,5 +40,6 @@ public record LayerPayload(
     String layerName,
     String nativeName,
     String crs,
+    String geometryColumnRef,
     String defaultStyle,
     List<String> alternativeStyles) {}

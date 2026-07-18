@@ -345,6 +345,7 @@ class DataSetSagaPublisherTest {
       UUID layerId = UUID.randomUUID();
       DataSink sink = postgisSink(sinkId, "my_table");
       Layer l = layer(layerId, "layer1", "EPSG:4326", sink);
+      l.setGeometryColumnRef("geom");
 
       DataSet dataSet = new DataSet();
       dataSet.setId(UUID.randomUUID());
@@ -364,6 +365,9 @@ class DataSetSagaPublisherTest {
       assertThat(entry.get("layerName").asString()).isEqualTo("layer1");
       assertThat(entry.get("nativeName").asString()).isEqualTo("my_table");
       assertThat(entry.get("crs").asString()).isEqualTo("EPSG:4326");
+      assertThat(entry.get("geometryColumnRef").asString())
+          .as("the geometry-column selection is forwarded so the adapter can pick the native CRS")
+          .isEqualTo("geom");
     }
 
     @Test

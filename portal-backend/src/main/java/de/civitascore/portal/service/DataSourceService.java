@@ -8,6 +8,7 @@ import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
@@ -20,6 +21,7 @@ import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import de.civitascore.portal.util.InvalidInputException;
@@ -34,6 +36,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -58,6 +61,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final PipelineRepository pipelineRepository;
   private final DataPoolRepository dataPoolRepository;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final ScopeAccessAuthorizer scopeAccessAuthorizer;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -112,10 +116,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   @Override
   protected DataSource postConvertToEntity(DataSource entity, DataSourceInputDTO input) {
     if (input.getDataStructureVersionId() != null) {
-      DataStructureVersion dsv =
-          dataStructureVersionService.findByIdOrThrow(input.getDataStructureVersionId());
-      validateDataStructureVersionLinkable(dsv);
-      entity.setDataStructureVersion(dsv);
+      entity.setDataStructureVersion(resolveAuthorizedVersion(input.getDataStructureVersionId()));
     } else {
       entity.setDataStructureVersion(null);
     }
@@ -435,10 +436,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       entity.setConnectorType(input.getConnectorType());
     }
     if (input.getDataStructureVersionId() != null) {
-      DataStructureVersion dsv =
-          dataStructureVersionService.findByIdOrThrow(input.getDataStructureVersionId());
-      validateDataStructureVersionLinkable(dsv);
-      entity.setDataStructureVersion(dsv);
+      entity.setDataStructureVersion(resolveAuthorizedVersion(input.getDataStructureVersionId()));
     }
     if (input.getConfiguration() != null) {
       ConnectorType type = entity.getConnectorType();
@@ -510,6 +508,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
 
   private List<DataPool> resolveSpecificDatapools(DatapoolScopeInputDTO scope) {
     requireDatapoolIdsNotEmpty(scope);
+    // The datapool ids reference a DATAPOOL-scoped entity, which the DATASOURCE-typed route header
+    // cannot cover — authorize the caller against them before binding.
+    scopeAccessAuthorizer.authorizeReferences(ScopeType.DATAPOOL, scope.getDatapoolIds());
     List<DataPool> resolvedPools = dataPoolRepository.findAllById(scope.getDatapoolIds());
     validateAllDatapoolsFound(scope.getDatapoolIds(), resolvedPools);
     return resolvedPools;
@@ -570,6 +571,28 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
     return dataStructureVersionService.findByIdOrThrow(
         dataSource.getDataStructureVersion().getId());
+  }
+
+  /**
+   * Resolves a data structure version by ID, authorizing the caller against its parent data
+   * structure. The version id in the request body references a DATASTRUCTURE-scoped entity, which
+   * the DATASOURCE-typed route header cannot cover; assignments scope on the parent structure, so
+   * authorization targets {@code dataStructure.id}, not the version id.
+   */
+  private DataStructureVersion resolveAuthorizedVersion(UUID versionId) {
+    DataStructureVersion dsv = dataStructureVersionService.findByIdOrThrow(versionId);
+    // A missing version (findByIdOrThrow → 404) and an unauthorized one must be indistinguishable
+    // from the outside, otherwise the 404-vs-403 difference is an existence oracle over version
+    // ids. Map the denial onto the same not-found response; ScopeAccessAuthorizer has already
+    // logged the real authorization denial server-side for audit.
+    try {
+      scopeAccessAuthorizer.authorizeReferences(
+          ScopeType.DATASTRUCTURE, Set.of(dsv.getDataStructure().getId()));
+    } catch (AccessDeniedException e) {
+      throw new ResourceNotFoundException(getEntityName(), versionId);
+    }
+    validateDataStructureVersionLinkable(dsv);
+    return dsv;
   }
 
   private void validateDataStructureVersionLinkable(DataStructureVersion dsv) {

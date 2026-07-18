@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.model.dataset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -312,5 +313,59 @@ class DataStructureSchemaTest {
         DataStructureSchema.resolveDefinition(
             json("{ \"title\": \"T\", \"properties\": { \"id\": { \"type\": \"string\" } } }"));
     assertEquals(List.of("id"), List.copyOf(resolved.properties().keySet()));
+  }
+
+  @Test
+  void geometryCrsByColumnReadsCrsFromGeojsonProperty() {
+    Map<String, String> geometryCrs =
+        DataStructureSchema.geometryCrsByColumn(
+            json(
+                """
+                { "properties": {
+                    "id":       { "type": "integer" },
+                    "location": { "$ref": "https://geojson.org/schema/Point.json",
+                                  "crs": "EPSG:25832" } } }
+                """));
+    assertEquals(Map.of("location", "EPSG:25832"), geometryCrs);
+  }
+
+  @Test
+  void geometryCrsByColumnKeepsNullWhenGeometryDeclaresNoCrs() {
+    Map<String, String> geometryCrs =
+        DataStructureSchema.geometryCrsByColumn(
+            json(
+                """
+                { "properties": {
+                    "area": { "$ref": "https://geojson.org/schema/MultiPolygon.json" } } }
+                """));
+    assertTrue(geometryCrs.containsKey("area"));
+    assertNull(geometryCrs.get("area"));
+  }
+
+  @Test
+  void geometryCrsByColumnPreservesDeclarationOrderForMultipleGeometries() {
+    Map<String, String> geometryCrs =
+        DataStructureSchema.geometryCrsByColumn(
+            json(
+                """
+                { "properties": {
+                    "a": { "$ref": "https://geojson.org/schema/Point.json", "crs": "EPSG:25832" },
+                    "b": { "$ref": "https://geojson.org/schema/Point.json", "crs": "EPSG:3857" } } }
+                """));
+    assertEquals(List.of("a", "b"), List.copyOf(geometryCrs.keySet()));
+    assertEquals("EPSG:3857", geometryCrs.get("b"));
+  }
+
+  @Test
+  void geometryCrsByColumnIsEmptyWithoutGeometry() {
+    assertTrue(
+        DataStructureSchema.geometryCrsByColumn(
+                json("{ \"properties\": { \"id\": { \"type\": \"string\" } } }"))
+            .isEmpty());
+  }
+
+  @Test
+  void geometryCrsByColumnIsEmptyForNullSchema() {
+    assertTrue(DataStructureSchema.geometryCrsByColumn(null).isEmpty());
   }
 }

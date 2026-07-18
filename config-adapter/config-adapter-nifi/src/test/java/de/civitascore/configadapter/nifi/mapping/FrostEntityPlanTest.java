@@ -48,8 +48,7 @@ class FrostEntityPlanTest {
     IllegalArgumentException ex =
         assertThrows(
             IllegalArgumentException.class,
-            () ->
-                new FrostEntityPlan(List.of("sta_0_ref"), List.of(), null, List.of(), null, null));
+            () -> plan(List.of("sta_0_ref"), List.of(), null, List.of(), null, null));
     assertTrue(ex.getMessage().contains("requires a Thing lookup filter"));
   }
 
@@ -59,7 +58,7 @@ class FrostEntityPlanTest {
         assertThrows(
             IllegalArgumentException.class,
             () ->
-                new FrostEntityPlan(
+                plan(
                     List.of("sta_0_ref"),
                     List.of(THING_TERM),
                     null,
@@ -75,7 +74,7 @@ class FrostEntityPlanTest {
         assertThrows(
             IllegalArgumentException.class,
             () ->
-                new FrostEntityPlan(
+                plan(
                     List.of("sta_0_ref"),
                     List.of(THING_TERM),
                     null,
@@ -91,7 +90,7 @@ class FrostEntityPlanTest {
         assertThrows(
             IllegalArgumentException.class,
             () ->
-                new FrostEntityPlan(
+                plan(
                     List.of("sta_0_ref"), // sta_1_ref (the DS term) is not captured
                     List.of(THING_TERM),
                     null,
@@ -106,7 +105,7 @@ class FrostEntityPlanTest {
     FrostEntityPlan plan =
         assertDoesNotThrow(
             () ->
-                new FrostEntityPlan(
+                plan(
                     List.of("sta_0_ref", "sta_1_ref"),
                     List.of(THING_TERM),
                     null,
@@ -115,5 +114,62 @@ class FrostEntityPlanTest {
                     "{\"result\":1}"));
     assertEquals(List.of(THING_TERM), plan.thingFilter());
     assertEquals(List.of(DS_TERM), plan.datastreamFilter());
+  }
+
+  @Test
+  void relatedBodiesSupportLookupOnlyParentsButRequireTheirLookupStage() {
+    assertDoesNotThrow(
+        () ->
+            new FrostEntityPlan(
+                List.of("sta_0_ref", "sta_1_ref"),
+                List.of(THING_TERM),
+                null,
+                null,
+                "{\"name\":\"loc\"}",
+                List.of(DS_TERM),
+                null,
+                null,
+                "{\"name\":\"sensor\"}",
+                "{\"name\":\"property\"}",
+                null));
+
+    IllegalArgumentException sensorWithoutDatastream =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new FrostEntityPlan(
+                    List.of("sta_0_ref"),
+                    List.of(THING_TERM),
+                    null,
+                    null,
+                    null,
+                    List.of(),
+                    null,
+                    null,
+                    "{\"name\":\"sensor\"}",
+                    null,
+                    null));
+    assertTrue(sensorWithoutDatastream.getMessage().contains("lookup filter"));
+  }
+
+  private static FrostEntityPlan plan(
+      List<String> flatKeys,
+      List<FilterTerm> thingFilter,
+      String thingBody,
+      List<FilterTerm> datastreamFilter,
+      String datastreamBody,
+      String observationBody) {
+    return new FrostEntityPlan(
+        flatKeys,
+        thingFilter,
+        thingBody,
+        null,
+        null,
+        datastreamFilter,
+        datastreamBody,
+        null,
+        null,
+        null,
+        observationBody);
   }
 }
