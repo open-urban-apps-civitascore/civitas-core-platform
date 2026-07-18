@@ -70,6 +70,18 @@
   </Match>
 
   <!--
+    Same idiom as SeedPage: ArtifactViewPage and GraphPage hold the concrete DependencyGraphService
+    via Wicket's @SpringBean (a *serializable* LazyInitProxy) so they can rebuild the per-process
+    dependency index before reading cross-process relations. The interface-depending sidestep other
+    pages use is unavailable — DependencyGraphService is a concrete class — so SpotBugs sees only the
+    declared, non-Serializable field type.
+  -->
+  <Match>
+    <Class name="~de\.civitascore\.modelforge\.adminui\.wicket\.pages\.(ArtifactViewPage|GraphPage)"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+
+  <!--
     Same idiom, one level removed: ArtifactTreeProvider is a plain (non-@SpringBean) helper
     constructed by BasePage as `new ArtifactTreeProvider(modelForge)`, handed the *already*
     @SpringBean-injected (and therefore serializable-proxy) ModelForge reference. It must itself
