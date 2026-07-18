@@ -212,6 +212,11 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(saved).toBe(true)
     expect(toast.warning).not.toHaveBeenCalled()
     const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
-    expect(payload.data.model).toMatchObject({ properties: { alpha: { $ref: '#/$defs/Alpha' } } })
+    // Saved under a DataStructure URN → the canonical $defs library: the root class Alpha is a $defs
+    // member stamped with its Element URN as $id, designated by a top-level $ref to that same URN
+    // (no inline root `properties`). Model Forge splits the members into Elements on ingest.
+    const model = payload.data.model as { $ref?: string; $defs?: Record<string, { $id?: string }> }
+    expect(model.$defs?.Alpha).toBeDefined()
+    expect(model.$ref).toBe(model.$defs?.Alpha?.$id)
   })
 })

@@ -182,6 +182,19 @@ interface ResolvedRecordRoot {
 
 /** Mirrors `DataStructureSchema.resolveDefinition`'s precedence: wrapper → root itself → named definition. */
 const resolveRecordRoot = (root: SchemaNode, defs: Record<string, SchemaNode>): ResolvedRecordRoot => {
+  // Canonical DataStructure export: the document root carries no inline shape, only a bare top-level
+  // `$ref` designating the root member (a local `#/$defs/<Name>` pointer). Resolve it through to that
+  // member, like a wrapper root. In production the backend serves an inlined model; the raw
+  // split-ready export takes this path (e.g. the adapter↔generator consistency checks).
+  const rootRefName = localDefName(asString(root.$ref))
+  if (rootRefName) {
+    const target = defs[rootRefName]
+    if (!target || Object.keys(target).length === 0) {
+      throw new ModelResolutionError(`Root $ref references missing definition '${rootRefName}'`)
+    }
+    return { className: rootRefName, definition: mergeDefinition(target, defs) }
+  }
+
   const wrapperName = wrappedRootName(root, defs)
   if (wrapperName) {
     return { className: wrapperName, definition: mergeDefinition(defs[wrapperName], defs) }

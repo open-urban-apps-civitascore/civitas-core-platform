@@ -47,6 +47,9 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
       onUpdate({
         entityId: entity.id,
         entityName: entity.name,
+        // Resolve the CORE configurationUrn from the picker's fetched list so it can be emitted as
+        // the CORE pipeline node's `sourceRef`; round-trips via `styles`.
+        configurationUrn: fullEntity?.configurationUrn ?? undefined,
         configured: true,
         entityMetadata: fullEntity?.connectorType ? { connector: fullEntity.connectorType } : undefined,
       })
@@ -54,6 +57,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
       onUpdate({
         entityId: undefined,
         entityName: undefined,
+        configurationUrn: undefined,
         entityMetadata: undefined,
         configured: false,
       })

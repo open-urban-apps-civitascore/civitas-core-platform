@@ -105,6 +105,51 @@ export interface PipelineStylesPayload {
   edges: PipelineEdge[]
 }
 
+// ============================================================================
+// CORE Pipeline Document (the clean, URN-native `model`)
+// ============================================================================
+
+/** The `kind` discriminator of a CORE pipeline node, derived from the React-Flow node `type`. */
+export type CorePipelineNodeKind = 'source' | 'sink' | 'mapping' | 'cron' | 'start' | 'end'
+
+/**
+ * A single node of the clean CORE Pipeline document. References are versioned CORE URNs
+ * (`sourceRef`/`sinkRef`/`mappingRef`) and are omitted when the node is not yet configured.
+ * `x-ui-position` carries the canvas position; `id`/`kind`/`label` are the stable identity.
+ */
+export interface CorePipelineNode {
+  id: string
+  kind: CorePipelineNodeKind
+  label?: string
+  /** Versioned CORE URN of the referenced DataSource (source nodes). */
+  sourceRef?: string
+  /** Versioned CORE URN of the referenced DataSink (sink nodes). */
+  sinkRef?: string
+  /** Versioned CORE URN of the referenced Mapping (mapping nodes). */
+  mappingRef?: string
+  /** Quartz/NiFi cron expression (cron nodes). */
+  cronExpression?: string
+  'x-ui-position'?: { x: number; y: number }
+}
+
+/** A directed connection between two CORE pipeline nodes. */
+export interface CorePipelineEdge {
+  id: string
+  source: string
+  target: string
+  label?: string
+}
+
+/**
+ * The clean CORE Pipeline document emitted in the payload `model` field. It contains NO React-Flow
+ * specifics (no `type`/`data`) — only URN-native nodes/edges. `$schema`/`id` are omitted here and
+ * stamped by Model Forge on ingest. Validated against the generated `PipelineDraftSchema` before send.
+ */
+export interface CorePipelineModel {
+  nodes: CorePipelineNode[]
+  edges: CorePipelineEdge[]
+}
+
 /**
  * Backend API payload structure for saving pipelines.
  * This is the format expected by `POST /backend/pipeline`.
@@ -113,12 +158,12 @@ export interface PipelineStylesPayload {
 export interface PipelinePayload {
   name: string
   description: string
-  /** JSON-stringified PipelineStylesPayload — backend stores as opaque string */
+  /** Full React-Flow graph (viewport + nodes/edges) for editor round-tripping. */
   styles: PipelineStylesPayload
   dataSourceIds: string[] // IDs extracted from DataSource nodes
   dataSinkIds: string[] // IDs of data sinks
-  /** Engine-neutral pipeline graph forwarded to the config-adapter as-is (React-Flow nodes/edges + mappingConfig). */
-  model: PipelineStylesPayload
+  /** The clean, URN-native CORE Pipeline document (schema-valid; validated on the frontend). */
+  model: CorePipelineModel
 }
 
 // ============================================================================

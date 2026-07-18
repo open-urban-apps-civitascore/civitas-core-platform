@@ -17,6 +17,7 @@ import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi
 import { SchemaExportError } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
+import { DataStructureSchema } from '@/generated/core'
 import { useError } from '@/hooks/use-error'
 import { STATUS_TYPES } from '@/types/common'
 import {
@@ -287,6 +288,11 @@ export const useDatastructureVersion = ({
 
     try {
       const sessionDiagram = nodesWatch.length > 0 ? activeSession?.diagram || null : null
+      // The model document IS the DataStructure: its $id is the DataStructure URN. Model Forge folds
+      // the wrapper into a single DataStructure artifact (carrying the shape + styles) that CONTAINS
+      // its member Elements (the $defs classes) — with no separate root Element. Mappings and sinks
+      // bind to this DataStructure URN (also built via buildDataStructureUrn), so it is the one
+      // identity the model, its grouping, and every reference to it all share.
       const modelUri = sessionDiagram
         ? buildDataStructureUrn(dataStructureName, datastructureId, parsed.data.version)
         : undefined
@@ -303,6 +309,18 @@ export const useDatastructureVersion = ({
           if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE) {
             const reason = rootFailureMessage(tUmlModeler, error.failure)
             toast.error(t('errors.releaseInvalidModel', { reason }))
+            return false
+          }
+        }
+        // Validate the assembled CORE DataStructure document against the generated schema before
+        // sending — the frontend guarantees a schema-valid payload to the (schema-agnostic) backend,
+        // mirroring the pipeline/mapping/datasource editors. Model Forge splits the $defs members into
+        // Element artifacts on ingest; the host only ever stores the envelope.
+        if (model) {
+          const validated = DataStructureSchema.safeParse(model)
+          if (!validated.success) {
+            console.error('DataStructure model failed CORE schema validation:', validated.error.issues, model)
+            toast.error(tCommon('errors.unexpectedError'))
             return false
           }
         }
