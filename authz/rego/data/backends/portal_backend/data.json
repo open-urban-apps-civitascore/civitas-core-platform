@@ -137,6 +137,20 @@
       "GET": "DATASOURCE_READ",
       "POST": "DATASOURCE_CREATE"
     },
+    "/v1/mappings": {
+      "_collection": true,
+      "GET": "DATASTRUCTURE_READ",
+      "POST": "DATASTRUCTURE_CREATE",
+      "PUT": "DATASTRUCTURE_UPDATE"
+    },
+    "/v1/orphans": {
+      "_collection": true,
+      "GET": "DATASET_READ"
+    },
+    "/v1/datasets/{id}/members": {
+      "POST": "DATASET_UPDATE",
+      "DELETE": "DATASET_UPDATE"
+    },
     "/v1/datasources/{id}": {
       "GET": "DATASOURCE_READ",
       "PUT": "DATASOURCE_UPDATE",
