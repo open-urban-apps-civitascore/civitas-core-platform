@@ -27,6 +27,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       token: `${KC_INTERNAL}/protocol/openid-connect/token`,
       userinfo: `${KC_INTERNAL}/protocol/openid-connect/userinfo`,
+      // Auth.js OIDC endpoint override; the key is a library-defined snake_case field
+      // (IssuerMetadata in @auth/core), so it cannot be camelCased.
+      // eslint-disable-next-line @typescript-eslint/naming-convention
       jwks_endpoint: `${KC_INTERNAL}/protocol/openid-connect/certs`,
     }),
   ],
