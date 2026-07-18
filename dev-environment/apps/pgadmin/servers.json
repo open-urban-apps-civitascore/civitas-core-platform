@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "CIVITAS Portal DB",
+      "Group": "CIVITAS",
+      "Host": "postgres-portal",
+      "Port": 5432,
+      "MaintenanceDB": "portal_backend",
+      "Username": "admin",
+      "SSLMode": "prefer",
+      "Comment": "Portal backend DB (schemas: public, model_forge). Password: admin"
+    }
+  }
+}

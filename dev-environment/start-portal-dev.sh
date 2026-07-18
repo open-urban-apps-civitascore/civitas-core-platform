@@ -48,6 +48,13 @@ no_clean_arg=""
 START_FROST=true
 START_GEOSERVER=true
 START_NIFI=true
+# Model Forge Admin UI — the registry console (dev-environment/apps: model-forge-admin-ui on :8092,
+# pointed at portal-backend's model_forge schema). Part of the MODELING path (it inspects/edits what
+# modeling creates), so it stays ON under --modeling; turn it off with --no-admin-ui.
+START_ADMIN_UI=true
+# pgAdmin — optional web DB console for the portal Postgres (schemas public + model_forge). OFF by
+# default (it is a debugging convenience, not part of any path); enable with --pgadmin (:5050).
+START_PGADMIN=false
 
 usage() {
     echo "Usage: $(basename "$0") [OPTIONS]"
@@ -77,6 +84,8 @@ usage() {
     echo "  --no-geoserver                   Do not start GeoServer"
     echo "  --no-nifi                        Do not start Apache NiFi"
     echo "  --no-config-adapter              Do not start the Config Adapter"
+    echo "  --no-admin-ui                    Do not start the Model Forge Admin UI (:8092)"
+    echo "  --pgadmin                        Also start pgAdmin (optional DB console, :5050)"
     echo "  --modeling                       Modeling-only: skip config-adapter, NiFi, FROST and"
     echo "                                   GeoServer (the deployment side). They are Kafka-decoupled,"
     echo "                                   so modeling DataStructures/Datasets/Pipelines still works."
@@ -112,6 +121,8 @@ while [ $# -gt 0 ]; do
         --no-frost)     START_FROST=false ;;
         --no-geoserver) START_GEOSERVER=false ;;
         --no-nifi)      START_NIFI=false ;;
+        --no-admin-ui)  START_ADMIN_UI=false ;;
+        --pgadmin)      START_PGADMIN=true ;;
         --modeling)
             # Modeling-only: skip the deployment side. Only default the config-adapter to "none"
             # so an explicit --config-adapter=... still wins.
@@ -517,7 +528,10 @@ skipped_infra=""
 [ "$START_FROST" = "true" ]     || skipped_infra="$skipped_infra FROST"
 [ "$START_GEOSERVER" = "true" ] || skipped_infra="$skipped_infra GeoServer"
 [ "$START_NIFI" = "true" ]      || skipped_infra="$skipped_infra NiFi"
+[ "$START_ADMIN_UI" = "true" ]  || skipped_infra="$skipped_infra Admin-UI"
 [ -n "$skipped_infra" ] && echo "  Skipped infra:  $skipped_infra"
+[ "$START_ADMIN_UI" = "true" ]  && echo "  Model Forge Admin UI: http://localhost:8092"
+[ "$START_PGADMIN" = "true" ]   && echo "  pgAdmin:              http://localhost:5050 (admin@civitas.com / admin)"
 echo "------------------------------------------------------"
 echo
 
@@ -836,7 +850,7 @@ echo
 
 # Docker mode: build JARs via containerized Maven (JDK 25), then
 # start containers via docker compose. No local Java 25 required.
-if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
+if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$START_ADMIN_UI" = "true" ] || [ "$START_PGADMIN" = "true" ]; then
     echo "Building Java artifacts for Docker images (containerized Maven)..."
 
     # portal-model is a dependency for both services
@@ -855,19 +869,21 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
         echo "  Config Adapter JAR built"
     fi
 
-    # Portal Backend JAR (needed by portal-backend Dockerfile)
-    if [ "$backend_option" = "1" ]; then
-        # Model Forge is embedded in portal-backend (core-model-forge-* artifacts). Build it
-        # into the container Maven cache first so portal-backend can resolve
-        # core-model-forge-*:0.1.0-SNAPSHOT locally — it is not published to the external
-        # registry in a fresh dev setup. Model Forge keeps its own fixed version (no
-        # -Drevision). Skip the npm types module; portal-backend only needs the Java jars.
-        if ! mvn_build "$SCRIPT_DIR/../model-forge" $MVN_CLEAN install -DskipTests -Dspotless.check.skip=true -Dspotbugs.skip=true -pl '!core-model-forge-types' -q; then
+    # Model Forge is embedded in portal-backend (core-model-forge-* artifacts) AND is the source of
+    # the Admin UI fat JAR (the reactor build packages core-model-forge-admin-ui too). Build it into
+    # the container Maven cache first so portal-backend can resolve core-model-forge-*:0.1.0-SNAPSHOT
+    # locally — it is not published to the external registry in a fresh dev setup. Model Forge keeps
+    # its own fixed version (no -Drevision). Only the Java jars are needed.
+    if [ "$backend_option" = "1" ] || [ "$START_ADMIN_UI" = "true" ]; then
+        if ! mvn_build "$SCRIPT_DIR/../model-forge" $MVN_CLEAN install -DskipTests -Dspotless.check.skip=true -Dspotbugs.skip=true -q; then
             echo "ERROR: Model Forge build failed"
             exit 1
         fi
         echo "  Model Forge built"
+    fi
 
+    # Portal Backend JAR (needed by portal-backend Dockerfile)
+    if [ "$backend_option" = "1" ]; then
         if ! mvn_build "$SCRIPT_DIR/../portal-backend" $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -q; then
             echo "ERROR: Portal Backend build failed"
             exit 1
@@ -888,6 +904,12 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
     fi
     if [ "$backend_option" = "1" ]; then
         COMPOSE_SERVICES="$COMPOSE_SERVICES portal-backend"
+    fi
+    if [ "$START_ADMIN_UI" = "true" ]; then
+        COMPOSE_SERVICES="$COMPOSE_SERVICES model-forge-admin-ui"
+    fi
+    if [ "$START_PGADMIN" = "true" ]; then
+        COMPOSE_SERVICES="$COMPOSE_SERVICES pgadmin"
     fi
 
     $DOCKER_COMPOSE up -d $COMPOSE_BUILD $COMPOSE_SERVICES

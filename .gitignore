@@ -36,3 +36,4 @@ dev-environment/nifi/drivers/*.jar
 /graphify-out/
 
 .github/**
+dev-environment/e2e/artifacts/*.png
