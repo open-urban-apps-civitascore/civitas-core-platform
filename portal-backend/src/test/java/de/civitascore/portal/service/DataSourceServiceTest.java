@@ -533,7 +533,8 @@ class DataSourceServiceTest {
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       // The new configuration — enriched with connectionType (from the connector type); Model Forge
-      // stamps $schema + id on write — went to the registry; the assigned pin was mirrored on the shell.
+      // stamps $schema + id on write — went to the registry; the assigned pin was mirrored on the
+      // shell.
       Map<String, Object> expectedPayload = new java.util.HashMap<>(newConfig);
       expectedPayload.put("connectionType", "mqtt");
       verify(modelRegistryGateway).storePayload(any(), any(), any(), eq(expectedPayload), isNull());

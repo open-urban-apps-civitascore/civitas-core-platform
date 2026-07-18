@@ -907,4 +907,87 @@ class DataSetServiceTest {
       verify(dataPoolRepository, never()).findById(any());
     }
   }
+
+  @Nested
+  @DisplayName("Membership and orphans")
+  class MembershipAndOrphans {
+
+    private static final String MANIFEST_URN =
+        "urn:core:platform:civitas:dataset:common:test:abcdefghij";
+    private static final String MEMBER_URN =
+        "urn:core:platform:civitas:datastructure:common:Thing:xyz1234567:1.0.0";
+
+    private DataSet dataSetWithManifest(UUID id) {
+      DataSet ds = draftDataSet(id);
+      ds.setManifestLogicalUrn(MANIFEST_URN);
+      return ds;
+    }
+
+    @Test
+    void orphans_returnsUrnsFromRegistry() {
+      when(modelRegistryGateway.orphanUrns("datastructure")).thenReturn(List.of(MEMBER_URN));
+
+      assertThat(createService().orphans("datastructure")).containsExactly(MEMBER_URN);
+    }
+
+    @Test
+    void linkMember_whenManifestAndUrnPresent_linksInRegistry() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(dataSetWithManifest(id)));
+
+      createService().linkMember(id, MEMBER_URN);
+
+      verify(modelRegistryGateway).linkToDataSet(MANIFEST_URN, MEMBER_URN);
+    }
+
+    @Test
+    void linkMember_whenDatasetMissing_throwsNotFound() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.empty());
+
+      assertThatThrownBy(() -> createService().linkMember(id, MEMBER_URN))
+          .isInstanceOf(ResourceNotFoundException.class);
+      verify(modelRegistryGateway, never()).linkToDataSet(any(), any());
+    }
+
+    @Test
+    void linkMember_whenManifestMissing_throwsInvalidInput() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(draftDataSet(id)));
+
+      assertThatThrownBy(() -> createService().linkMember(id, MEMBER_URN))
+          .isInstanceOf(InvalidInputException.class);
+      verify(modelRegistryGateway, never()).linkToDataSet(any(), any());
+    }
+
+    @Test
+    void linkMember_whenUrnBlank_throwsInvalidInput() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(dataSetWithManifest(id)));
+
+      assertThatThrownBy(() -> createService().linkMember(id, "  "))
+          .isInstanceOf(InvalidInputException.class);
+      verify(modelRegistryGateway, never()).linkToDataSet(any(), any());
+    }
+
+    @Test
+    void unlinkMember_whenManifestAndUrnPresent_unlinksInRegistry() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(dataSetWithManifest(id)));
+
+      createService().unlinkMember(id, MEMBER_URN);
+
+      verify(modelRegistryGateway).unlinkFromDataSet(MANIFEST_URN, MEMBER_URN);
+    }
+
+    @Test
+    void unlinkMember_whenManifestMissing_isNoOp() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(draftDataSet(id)));
+
+      createService().unlinkMember(id, MEMBER_URN);
+
+      verify(modelRegistryGateway, never()).unlinkFromDataSet(any(), any());
+    }
+  }
 }

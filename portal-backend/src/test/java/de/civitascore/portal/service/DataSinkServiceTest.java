@@ -205,9 +205,12 @@ class DataSinkServiceTest {
 
       DataSink result = dataSinkService.create(input);
 
-      // The element URN soft reference is preserved verbatim, and the host enriches the payload with
-      // connectionType (from the sink type). Model Forge owns self-description — it stamps $schema +
-      // id on write (EmbeddedModelForgeOperations.saveArtifact), so the host does NOT add them here.
+      // The element URN soft reference is preserved verbatim, and the host enriches the payload
+      // with
+      // connectionType (from the sink type). Model Forge owns self-description — it stamps $schema
+      // +
+      // id on write (EmbeddedModelForgeOperations.saveArtifact), so the host does NOT add them
+      // here.
       // Map equality is order-independent.
       verify(modelRegistryGateway)
           .storePayload(
