@@ -130,7 +130,13 @@ const sinkNode = (urn?: string): TestNode => ({
   id: 'sink-1',
   type: 'geoPersistence',
   position: { x: 30, y: 40 },
-  data: { label: 'PostGIS', configured: true, entityType: 'persistence', entityId: 'sink-guid-1', configurationUrn: urn },
+  data: {
+    label: 'PostGIS',
+    configured: true,
+    entityType: 'persistence',
+    entityId: 'sink-guid-1',
+    configurationUrn: urn,
+  },
 })
 const mappingRefNode = (ref?: string): TestNode => ({
   id: 'map-1',
@@ -180,10 +186,7 @@ describe('buildPipelinePayload — clean CORE Pipeline document', () => {
   })
 
   it('emits CORE edges (id/source/target + optional label) mirroring the graph', () => {
-    const p = pipeline(
-      [sourceNode(DS_URN), sinkNode(SINK_URN)],
-      [{ source: 'src-1', target: 'sink-1', label: 'data' }],
-    )
+    const p = pipeline([sourceNode(DS_URN), sinkNode(SINK_URN)], [{ source: 'src-1', target: 'sink-1', label: 'data' }])
     const { model } = buildPipelinePayload(p)
     expect(model.edges).toEqual([{ id: 'e-0', source: 'src-1', target: 'sink-1', label: 'data' }])
   })

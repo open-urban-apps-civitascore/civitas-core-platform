@@ -83,15 +83,9 @@ const toDisambiguator = (datastructureId: string): string => {
  * @param version - the SemVer version string (e.g. `1.0.0`); the form schemas
  *   enforce this shape (`VERSION_PATTERN`), the URN grammar rejects any other
  */
-const buildCoreUrn = (
-  artifactType: string,
-  name: string,
-  datastructureId: string,
-  version: string,
-): string => {
+const buildCoreUrn = (artifactType: string, name: string, datastructureId: string, version: string): string => {
   const normalizedName = toPascalCaseName(name)
-  if (!normalizedName)
-    throw new Error(`buildCoreUrn: name yields no URN segment (got ${JSON.stringify(name)})`)
+  if (!normalizedName) throw new Error(`buildCoreUrn: name yields no URN segment (got ${JSON.stringify(name)})`)
   if (!datastructureId) throw new Error('buildCoreUrn: datastructureId is required')
   if (!version) throw new Error('buildCoreUrn: version is required')
 

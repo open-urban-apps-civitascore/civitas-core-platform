@@ -129,6 +129,8 @@ export interface CorePipelineNode {
   mappingRef?: string
   /** Quartz/NiFi cron expression (cron nodes). */
   cronExpression?: string
+  /** Editor-only layout hint carried under the CORE `x-ui-*` extension namespace. */
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- CORE spec kebab-case extension key, cannot be camelCased
   'x-ui-position'?: { x: number; y: number }
 }
 

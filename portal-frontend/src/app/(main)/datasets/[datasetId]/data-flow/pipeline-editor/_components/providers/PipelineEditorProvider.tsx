@@ -455,7 +455,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
                 configurationUrn: response.data?.configurationUrn,
               })
             } else if (hasDataSinkChanged(nodeId, payload, snapshot)) {
-              const response = await updateDataSinkMutation.mutateAsync({ datasetId, dataSinkId: entityId, data: payload })
+              const response = await updateDataSinkMutation.mutateAsync({
+                datasetId,
+                dataSinkId: entityId,
+                data: payload,
+              })
               currentPipeline = updateNodeData(currentPipeline, nodeId, {
                 configurationUrn: response?.data?.configurationUrn,
               })

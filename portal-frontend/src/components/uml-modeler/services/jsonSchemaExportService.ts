@@ -331,14 +331,14 @@ export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): Json
   // nothing). Model Forge then splits the members into stable, name-based Element artifacts without
   // minting, and the frontend can validate the document against the generated CORE schema. Without a
   // URN (e.g. a standalone download/preview) the local "#/$defs/<Name>" form is kept.
-  const canonical = /^urn:core:[^:]+:[^:]+:datastructure:/.test(id)
+  const isCanonical = /^urn:core:[^:]+:[^:]+:datastructure:/.test(id)
 
   const defs = buildDefs(elements, diagram, classDefKeyById)
-  if (Object.keys(defs).length > 0) schema.$defs = canonical ? canonicalizeDefs(defs, id) : defs
+  if (Object.keys(defs).length > 0) schema.$defs = isCanonical ? canonicalizeDefs(defs, id) : defs
 
   if (resolution.kind !== 'empty') {
     const rootDefKey = classDefKeyById.get(resolution.root.id)
-    if (rootDefKey) schema.$ref = canonical ? elementModelUrnForMember(id, rootDefKey) : `#/$defs/${rootDefKey}`
+    if (rootDefKey) schema.$ref = isCanonical ? elementModelUrnForMember(id, rootDefKey) : `#/$defs/${rootDefKey}`
   }
   return schema
 }

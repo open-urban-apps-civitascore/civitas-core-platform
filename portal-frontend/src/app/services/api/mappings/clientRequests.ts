@@ -1,7 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 
 import { apiRequest, type ApiServiceResponse } from '@/app/services/api/request/apiRequest'
-
 import type { MappingField } from '@/generated/core'
 
 /**
@@ -34,7 +33,7 @@ export interface MappingArtifactBody {
   positions?: Record<string, { x: number; y: number }>
 }
 
-export interface CreateMappingInput extends MappingArtifactBody {}
+export type CreateMappingInput = MappingArtifactBody
 
 export interface UpdateMappingInput extends MappingArtifactBody {
   /** Logical URN of the mapping to version. */

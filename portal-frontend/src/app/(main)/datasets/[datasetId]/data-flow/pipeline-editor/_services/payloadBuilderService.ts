@@ -10,11 +10,11 @@
  * full React-Flow graph for editor round-tripping (the LOAD path hydrates from `styles`).
  */
 
-import { DataSinkDraftSchema, MappingDraftSchema, PipelineDraftSchema } from '@/generated/core'
 import type { MappingArtifactBody } from '@/app/services/api/mappings/clientRequests'
+import { DataSinkDraftSchema, MappingDraftSchema, PipelineDraftSchema } from '@/generated/core'
 import { DATASINK_TYPES, type DataSinkPayload } from '@/types/datasinks'
 
-import type { CronNodeData, DataSourceNodeData, PipelineNodeData } from '../_types/nodes'
+import type { DataSourceNodeData, PipelineNodeData } from '../_types/nodes'
 import {
   isCronNodeData,
   isDataSourceNodeData,
@@ -372,11 +372,7 @@ export const getRemovedDataSinkIds = (pipeline: Pipeline, snapshot: DataSinkSnap
  * server-assigned URNs (datasink `configurationUrn`, mapping `mappingRef`/`mappingLogicalUrn`) back
  * onto the node so they are emitted in the CORE `model` and round-trip via `styles`.
  */
-export const updateNodeData = (
-  pipeline: Pipeline,
-  nodeId: string,
-  patch: Partial<PipelineNodeData>,
-): Pipeline => {
+export const updateNodeData = (pipeline: Pipeline, nodeId: string, patch: Partial<PipelineNodeData>): Pipeline => {
   return {
     ...pipeline,
     nodes: pipeline.nodes.map(node =>
