@@ -173,8 +173,11 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
    */
   private void storeDefinitionInRegistry(Pipeline entity, PipelineInputDTO input) {
     boolean hasModel = input.getModel() != null && !input.getModel().isEmpty();
-    boolean hasStyles = input.getStyles() != null && !input.getStyles().isEmpty();
-    if (!hasModel && !hasStyles) {
+    // A PIPELINE artifact's content IS the CORE model; the React Flow layout only decorates it as
+    // x-ui-styles. Without a model there is nothing to store or validate — a draft may still carry
+    // layout but no graph yet — so clear the content pin rather than shipping a null/empty model to
+    // Model Forge, which would reject it against pipeline.schema.json.
+    if (!hasModel) {
       entity.setModelUrn(null);
       return;
     }
