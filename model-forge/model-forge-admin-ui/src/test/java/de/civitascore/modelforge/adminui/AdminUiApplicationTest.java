@@ -19,10 +19,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Boots the full UI against a throwaway Testcontainers Postgres — the admin-ui always runs
  * against a real registry. Skipped when no Docker daemon is available (e.g. plain CI runners).
  *
- * <p>The STA seed runs at startup (default {@code seed.enabled=true}), so the registry is populated
- * and the sidebar renders real groups. These are server-side render smoke tests: they catch Wicket
- * markup/component mismatches across every page type. The CodeMirror editor itself is client-side
- * (CDN ESM) and needs a browser to exercise; the tests only assert its bootstrap is emitted.
+ * <p>Seeding is OFF by default (so the admin-ui never writes the bundled OGC SensorThings examples
+ * into portal-backend's shared registry); this test runs against its OWN throwaway Postgres and
+ * enables it (see {@link #registryDatasource}) so the registry is populated and the sidebar renders
+ * real groups. These are server-side render smoke tests: they catch Wicket markup/component
+ * mismatches across every page type. The editor is a same-origin local highlighter; the tests only
+ * assert its bootstrap is emitted (its runtime behaviour needs a browser).
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -36,6 +38,9 @@ class AdminUiApplicationTest {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+        // Seeding is off by default; enable it here so the throwaway registry is populated for the
+        // seeded-sidebar render assertions below.
+        registry.add("model-forge.admin-ui.seed.enabled", () -> "true");
     }
 
     @LocalServerPort
@@ -63,15 +68,13 @@ class AdminUiApplicationTest {
     }
 
     @Test
-    void editorPagesEmitCodeMirrorBootstrapAndSchema() throws Exception {
-        // Import page: the CodeMirror 6 loader and the JSON-Schema data island must both be emitted.
-        String importBody = get("/import");
-        assertThat(importBody).contains("esm.sh/codemirror");
-        assertThat(importBody).contains("application/json");
-
-        // New-artifact and validate pages render their forms without component errors.
-        assertThat(get("/artifacts/edit")).contains("esm.sh/codemirror");
-        assertThat(get("/validate")).contains("esm.sh/codemirror");
+    void editorPagesEmitTheLocalHighlighterBootstrap() throws Exception {
+        // The editor is a same-origin local highlighter (window.__mfHL, CodeEditorPanel.js) that
+        // replaced the former CodeMirror-6-from-esm.sh editor (the CDN modules were CSP-blocked).
+        // Assert the highlighter bootstrap is emitted on every editor page (each also renders 200).
+        assertThat(get("/import")).contains("__mfHL");
+        assertThat(get("/artifacts/edit")).contains("__mfHL");
+        assertThat(get("/validate")).contains("__mfHL");
     }
 
     private String get(String path) throws Exception {
