@@ -90,8 +90,11 @@ services:
       CIVITAS_MASTER_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     networks:
       - civitas-network
-      # PostGIS DDL + GeoServer datastore live on the GeoServer stack's internal network
-      - geoserver-internal
+      # geoserver-internal (the GeoServer stack's internal network) intentionally removed: it is NOT
+      # created by the dev-environment stack (the GeoServer compose lives elsewhere), and declaring it
+      # as external made `docker compose up` fail whenever GeoServer is not running — e.g. the modeling
+      # subset. config-adapter reaches civitas-geoserver-db over civitas-network in full mode; re-add
+      # this network only if a PostGIS/GeoServer deploy proves it needs the GeoServer stack's own network.
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/health/ready"]
       interval: 15s
@@ -183,10 +186,52 @@ services:
       retries: 5
       start_period: 30s
 
+  # Model Forge Admin UI — registry console (Wicket + Spring Boot). Standalone app (not embedded in
+  # portal-backend); points at portal-backend's DB (the model_forge schema) so it shows exactly what
+  # the platform created. Started by start-portal-dev.sh unless --no-admin-ui.
+  model-forge-admin-ui:
+    build:
+      context: ../../model-forge/model-forge-admin-ui
+      dockerfile: Dockerfile
+    container_name: civitas-model-forge-admin-ui
+    restart: unless-stopped
+    ports:
+      - "8092:8092"
+    environment:
+      SERVER_PORT: 8092
+      # Host is the Docker service name (not localhost); read-WRITE console over the real registry.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend?sslmode=disable
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8092/"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # pgAdmin — optional web DB console for the portal Postgres (schemas: public + model_forge).
+  # Off by default; started by start-portal-dev.sh only with --pgadmin. The "CIVITAS Portal DB"
+  # server is pre-registered via servers.json (enter password "admin" on first connect).
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: civitas-pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@civitas.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - civitas-network
+
 networks:
   civitas-network:
     name: civitas-network
-    external: true
-  geoserver-internal:
-    name: geoserver_geoserver-internal
     external: true

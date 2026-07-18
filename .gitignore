@@ -33,3 +33,4 @@ dev-environment/nifi/drivers/*.jar
 /.playwright-mcp
 
 .github/**
+dev-environment/e2e/artifacts/*.png

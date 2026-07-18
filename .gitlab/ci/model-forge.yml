@@ -2,10 +2,10 @@
 #
 # Ported from the former standalone model-forge/.gitlab-ci.yml. Model Forge is a set of
 # embedded Java libraries (model-forge-contract / -runtime / -spring-boot-starter, plus the
-# model-forge-admin-ui demo host) and the npm types package core-model-forge-types. It builds
-# like portal-model / config-adapter: build + test the Maven reactor, then publish the Maven
-# artifacts (and the npm package) to the project registry so consumers (portal-backend) can
-# resolve them.
+# model-forge-admin-ui demo host). It builds like portal-model / config-adapter: build + test
+# the Maven reactor, then publish the Maven artifacts to the project registry so consumers
+# (portal-backend) can resolve them. (The TypeScript/Zod CORE types are generated directly in
+# portal-frontend from the CORE JSON Schemas — see portal-frontend/scripts/generate-core-types.mjs.)
 #
 # Not ported (handled elsewhere or obsolete in the mono-repo):
 #   - Security templates (SAST / Secret-Detection / Dependency-Scanning): included globally in .gitlab-ci.yml
@@ -155,48 +155,10 @@ publish-model-forge:
       - .m2/repository
   script:
     - cd model-forge
-    # Exclude core-model-forge-types: it publishes no Maven artifact (maven.deploy.skip=true) and
-    # only drives frontend-maven-plugin, which downloads a glibc Node that cannot run on this
-    # Alpine image. Its npm package is published separately by publish-npm-model-forge.
     - |
-      mvn deploy -DskipTests -pl '!:core-model-forge-types' \
+      mvn deploy -DskipTests \
         -Dspotless.check.skip=true \
         -Dspotbugs.skip=true \
         -Djacoco.skip=true \
         -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
         -s ci_settings.xml
-
-# Publish the core-model-forge-types npm package to this project's GitLab npm registry.
-# Snapshot builds (main/develop) publish under the `next` dist-tag with a SHA-suffixed version;
-# the publish is skipped if that exact version already exists in the registry.
-publish-npm-model-forge:
-  image: node:22-alpine
-  stage: publish
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "develop"
-  needs:
-    - job: test-model-forge
-      artifacts: false
-  script:
-    - cd model-forge/core-model-forge-types
-    - |
-      cat > .npmrc <<EOF
-      @civitasconnect:registry=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/npm/
-      //${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN}
-      EOF
-    - |
-      BASE_VERSION=$(node -p "require('./package.json').version.split('-')[0]")
-      PUBLISH_VERSION="${BASE_VERSION}-snapshot.${CI_COMMIT_SHORT_SHA}"
-      NPM_DIST_TAG="next"
-    - |
-      PKG_NAME=$(node -p "require('./package.json').name")
-      if npm view "${PKG_NAME}@${PUBLISH_VERSION}" version >/dev/null 2>&1; then
-        echo "${PKG_NAME}@${PUBLISH_VERSION} already exists in the registry - skipping publish."
-        exit 0
-      fi
-    - npm version "${PUBLISH_VERSION}" --no-git-tag-version --allow-same-version
-    - npm ci
-    - node generate.mjs
-    - npm publish --tag "${NPM_DIST_TAG}"

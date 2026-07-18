@@ -191,13 +191,18 @@ fi
 # ---- portal-backend (embedded model-forge + pre-built fat JAR) --------------
 if [ "$DO_BACKEND" = "true" ]; then
     echo "== portal-backend =="
+    # portal-model is a backend dependency resolved from the shared .m2 cache; rebuild it first so a
+    # changed model (new entity/saga-payload field) is picked up. Not gated by --skip-model-forge —
+    # that flag is about the embedded model-forge, a separate dependency.
+    echo "  Building portal-model ($DEV_VERSION) — backend dependency..."
+    mvn_in_container "$PROJECT_ROOT/portal-model" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q
     if [ "$SKIP_MODEL_FORGE" = "false" ]; then
         # model-forge is embedded in the backend as core-model-forge-*:0.1.0-SNAPSHOT
         # (fixed version, no -Drevision). Rebuild it into the cache first so the backend
-        # resolves it. Skip the npm types module — the backend only needs the Java jars.
+        # resolves it.
         echo "  Building model-forge (0.1.0-SNAPSHOT)..."
         mvn_in_container "$PROJECT_ROOT/model-forge" $MVN_CLEAN install -DskipTests \
-            -Dspotless.check.skip=true -Dspotbugs.skip=true -pl '!core-model-forge-types' -q
+            -Dspotless.check.skip=true -Dspotbugs.skip=true -q
     else
         echo "  (--skip-model-forge) reusing the cached model-forge"
     fi
