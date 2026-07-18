@@ -91,10 +91,8 @@ public class InfraTestDataFactory {
     return portalData.attachSourceConfiguration(
         dataSource,
         Map.of(
-            "host",
-            "mqtt-broker",
-            "port",
-            1883,
+            "urls",
+            List.of("mqtt://mqtt-broker:1883"),
             "topics",
             List.of("sensors/e2e"),
             "client_id",
@@ -103,12 +101,12 @@ public class InfraTestDataFactory {
 
   public DataSource createSqlDataSource() {
     Map<String, Object> config = new LinkedHashMap<>();
-    config.put("host", "datasource-db");
-    config.put("port", 5432);
-    config.put("database", "testdb");
-    config.put("username", "testuser");
+    config.put("driver", "postgres");
+    config.put("dsn", "postgresql://datasource-db:5432/testdb");
+    config.put("table", "sensors");
+    config.put("columns", List.of("sensor_name", "sensor_description"));
+    config.put("user", "testuser");
     config.put("password", encryptCredential("testpass"));
-    config.put("query", "SELECT sensor_name, sensor_description FROM sensors");
 
     DataSource dataSource =
         portalData.dataSource(

@@ -50,6 +50,8 @@ import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.repository.UserRepository;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
@@ -156,12 +158,18 @@ public class PortalTestDataFactory {
    * shell.
    */
   public DataSink attachSinkConfiguration(DataSink sink, Map<String, Object> configuration) {
+    // Mirror DataSinkService: the stored CORE payload carries connectionType (derived from the sink
+    // type); Model Forge stamps $schema + id on write and validates against datasink.schema.json.
+    Map<String, Object> payload = new LinkedHashMap<>(configuration);
+    if (sink.getDataSinkType() != null) {
+      payload.put("connectionType", sink.getDataSinkType().name().toLowerCase(Locale.ROOT));
+    }
     ModelRegistryGateway.ModelPin pin =
         modelRegistryGateway.storePayload(
             PayloadKind.DATA_SINK,
             Optional.ofNullable(sink.getConfigurationLogicalUrn()),
-            configuration.get("tableName") instanceof String tableName ? tableName : "datasink",
-            configuration,
+            payload.get("tableName") instanceof String tableName ? tableName : "datasink",
+            payload,
             null);
     if (sink.getConfigurationLogicalUrn() == null) {
       sink.setConfigurationLogicalUrn(pin.logicalUrn());
@@ -176,12 +184,19 @@ public class PortalTestDataFactory {
    */
   public DataSource attachSourceConfiguration(
       DataSource dataSource, Map<String, Object> configuration) {
+    // Mirror DataSourceService: the stored CORE payload carries connectionType (derived from the
+    // connector type); Model Forge stamps $schema + id on write and validates against
+    // datasource.schema.json.
+    Map<String, Object> payload = new LinkedHashMap<>(configuration);
+    if (dataSource.getConnectorType() != null) {
+      payload.put("connectionType", dataSource.getConnectorType().name().toLowerCase(Locale.ROOT));
+    }
     ModelRegistryGateway.ModelPin pin =
         modelRegistryGateway.storePayload(
             PayloadKind.DATA_SOURCE,
             Optional.ofNullable(dataSource.getConfigurationLogicalUrn()),
             dataSource.getName() != null ? dataSource.getName() : "datasource",
-            configuration,
+            payload,
             null);
     if (dataSource.getConfigurationLogicalUrn() == null) {
       dataSource.setConfigurationLogicalUrn(pin.logicalUrn());
