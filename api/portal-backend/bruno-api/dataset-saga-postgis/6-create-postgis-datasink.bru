@@ -19,7 +19,7 @@ body:json {
     "dataSinkType": "POSTGIS",
     "configuration": {
       "tableName": "saga_geo_observations",
-      "dataStructureVersionId": "{{pgTargetVersionId}}"
+      "element": "{{pgTargetVersionModelUrn}}"
     }
   }
 }
@@ -27,6 +27,7 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('pgDataSinkId', res.body.id);
+    if (res.body.configurationUrn) bru.setVar('pgDataSinkConfigUrn', res.body.configurationUrn);
   }
 }
 

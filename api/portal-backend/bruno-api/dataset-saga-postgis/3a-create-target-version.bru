@@ -37,6 +37,7 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('pgTargetVersionId', res.body.id);
+    bru.setVar('pgTargetVersionModelUrn', res.body.modelUrn);
   }
 }
 

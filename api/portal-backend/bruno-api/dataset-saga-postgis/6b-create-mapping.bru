@@ -1,0 +1,53 @@
+meta {
+  name: 6b. Create Mapping (geoPoint)
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/mappings
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "source": "{{pgSourceVersionModelUrn}}",
+    "target": "{{pgTargetVersionModelUrn}}",
+    "title": "GeoSensorSource-to-GeoSensorTarget",
+    "fields": {
+      "$.stationid": "$.stationid",
+      "$.geo": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.versionedUrn) {
+    bru.setVar('pgMappingUrn', res.body.versionedUrn);
+  }
+}
+
+tests {
+  test("Mapping created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Returns a versioned URN", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.versionedUrn).to.be.a('string');
+    }
+  });
+}
+
+docs {
+  **PostGIS saga step 6b** — Prerequisites: source + target DataStructure versions released
+  (steps 2b/3b), so `pgSourceVersionModelUrn` / `pgTargetVersionModelUrn` are set.
+
+  Creates a first-class CORE Mapping artifact via `POST /mappings`; the pipeline (step 7) references
+  it by `mappingRef` = the returned `versionedUrn`. The release saga ships the mapping's `fields` to
+  the config-adapter, which compiles the `geoPoint` op to a WKT `POINT(<lon> <lat>)` literal for the
+  `GEOMETRY(POINT,4326)` sink column.
+
+  **Post-condition:** Save `pgMappingUrn` from `body.versionedUrn`.
+}

@@ -38,6 +38,8 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('sqlSourceVersionId', res.body.id);
+    // Versioned CORE URN of the stored model — the mapping's `source` reference.
+    bru.setVar('sqlSourceVersionModelUrn', res.body.modelUrn);
   }
 }
 

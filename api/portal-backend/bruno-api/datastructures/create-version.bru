@@ -35,6 +35,8 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('dataStructureVersionId', res.body.id);
+    // Versioned CORE URN of the stored model — a POSTGIS sink's `element` reference.
+    bru.setVar('dataStructureVersionModelUrn', res.body.modelUrn);
     bru.setVar('scopeType', 'DATASTRUCTURE');
     bru.setVar('scopeId', bru.getVar('dataStructureId'));
   }

@@ -31,6 +31,9 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('sqlDataSourceId', res.body.id);
+    // Versioned CORE URN of the stored connector config — the pipeline source node's `sourceRef`.
+    // Re-captured after patch/release in case those re-version the config.
+    if (res.body.configurationUrn) bru.setVar('sqlDataSourceConfigUrn', res.body.configurationUrn);
   }
 }
 

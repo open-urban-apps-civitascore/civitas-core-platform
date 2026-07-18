@@ -34,6 +34,7 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('sagaDataSourceId', res.body.id);
+    if (res.body.configurationUrn) bru.setVar('sagaDataSourceConfigUrn', res.body.configurationUrn);
   }
 }
 

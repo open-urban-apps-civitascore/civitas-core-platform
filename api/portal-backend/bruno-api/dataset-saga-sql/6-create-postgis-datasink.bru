@@ -19,7 +19,7 @@ body:json {
     "dataSinkType": "POSTGIS",
     "configuration": {
       "tableName": "saga_sql_observations",
-      "dataStructureVersionId": "{{sqlTargetVersionId}}"
+      "element": "{{sqlTargetVersionModelUrn}}"
     }
   }
 }
@@ -27,6 +27,8 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('sqlDataSinkId', res.body.id);
+    // Versioned CORE URN of the stored sink config — the pipeline sink node's `sinkRef`.
+    if (res.body.configurationUrn) bru.setVar('sqlDataSinkConfigUrn', res.body.configurationUrn);
   }
 }
 

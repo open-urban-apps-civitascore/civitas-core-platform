@@ -37,6 +37,8 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('sqlTargetVersionId', res.body.id);
+    // Versioned CORE URN of the stored model — the mapping's `target` and the POSTGIS sink's `element`.
+    bru.setVar('sqlTargetVersionModelUrn', res.body.modelUrn);
   }
 }
 
