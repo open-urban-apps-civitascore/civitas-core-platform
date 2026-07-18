@@ -46,7 +46,10 @@
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
-        <config-adapter.version>1.0.2-MR-660-SNAPSHOT</config-adapter.version>
+        <!-- Default to the develop snapshot; CI overrides it per-branch with
+             -Dconfig-adapter.version=$CONFIG_ADAPTER_VERSION (e.g. 1.0.2-MR-<iid>-SNAPSHOT on an MR)
+             so portal-backend always resolves the config-adapter built in the SAME pipeline. -->
+        <config-adapter.version>1.0.2-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
         <model-forge.version>0.1.0-SNAPSHOT</model-forge.version>
         <archunit.version>1.4.2</archunit.version>
@@ -321,6 +324,15 @@
                         <!-- portal-model is heavily used but analyzer can't detect it
                              through the ${revision}/flatten-plugin indirection -->
                         <ignoredUnusedDeclaredDependency>de.civitascore:portal-model</ignoredUnusedDeclaredDependency>
+                        <!-- Model Forge starter is declared for its Spring auto-configuration
+                             (provides the ModelForge bean + runtime + Postgres persistence);
+                             portal-backend compiles only against the contract module it pulls
+                             transitively, so the starter itself has no direct class usage -->
+                        <ignoredUnusedDeclaredDependency>de.civitascore:core-model-forge-spring-boot-starter</ignoredUnusedDeclaredDependency>
+                        <!-- ArchUnit JUnit5 aggregator: declared per the ArchUnit docs so its
+                             test engine is on the classpath; the boundary tests import only the
+                             core + junit5-api classes it pulls transitively -->
+                        <ignoredUnusedDeclaredDependency>com.tngtech.archunit:archunit-junit5</ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
                     <ignoredNonTestScopedDependencies>
                         <ignoredNonTestScopedDependency>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</ignoredNonTestScopedDependency>
@@ -362,12 +374,17 @@
                         <ignoredUsedUndeclaredDependency>org.keycloak:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.apache.kafka:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.testcontainers:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>com.tngtech.archunit:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.apache.jena:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.apache.tomcat.embed:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>io.swagger.core.v3:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.awaitility:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.apache.logging.log4j:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.postgresql:*</ignoredUsedUndeclaredDependency>
+                        <!-- Model Forge contract (facade + DTOs + URN parser) is compiled
+                             against directly but reaches portal-backend transitively through
+                             the core-model-forge-spring-boot-starter dependency above -->
+                        <ignoredUsedUndeclaredDependency>de.civitascore:core-model-forge-contract</ignoredUsedUndeclaredDependency>
                         <!-- Transitively pulled, used directly only in tests; versions
                              managed by upstream BOMs (testcontainers, oauth2-resource-server) -->
                         <ignoredUsedUndeclaredDependency>com.github.docker-java:*</ignoredUsedUndeclaredDependency>
