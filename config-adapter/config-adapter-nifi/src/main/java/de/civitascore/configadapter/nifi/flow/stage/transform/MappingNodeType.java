@@ -12,6 +12,7 @@ package de.civitascore.configadapter.nifi.flow.stage.transform;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.configadapter.nifi.flow.stage.MappingSupport;
 import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.TransformNodeType;
@@ -27,17 +28,17 @@ import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
- * The mapping node kind: parses each node's {@code mappingConfig} and compiles the chain to
- * RecordPath (directly for a records sink, or via the FROST mapping compiler for a mapped FROST
- * sink). For a FROST sink the intermediate mappings stay plain record transforms while the LAST
- * mapping targets the sink's Thing-shaped structure and compiles into flat intermediate fields plus
- * the entity plan the sink's build half turns into its find-or-create chain.
+ * The mapping node kind: resolves each node's {@code mappingRef} against the pipeline's shipped
+ * mappings catalog and compiles the chain to RecordPath (directly for a records sink, or via the
+ * FROST mapping compiler for a mapped FROST sink). For a FROST sink the intermediate mappings stay
+ * plain record transforms while the LAST mapping targets the sink's Thing-shaped structure and
+ * compiles into flat intermediate fields plus the entity plan the sink's build half turns into its
+ * find-or-create chain.
  */
 public final class MappingNodeType implements TransformNodeType {
-
-  private static final String KEY_MAPPING_CONFIG = "mappingConfig";
 
   private final ObjectMapper mapper = new ObjectMapper();
   private final MappingConfigParser mappingConfigParser;
@@ -63,9 +64,10 @@ public final class MappingNodeType implements TransformNodeType {
   }
 
   @Override
-  public Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink, SinkSpec sinkSpec)
+  public Compilation compile(
+      List<GraphNode> ownNodes, SinkStage<?> sink, SinkSpec sinkSpec, Map<String, Object> mappings)
       throws FatalAdapterException {
-    List<MappingConfig> mappingConfigs = parse(ownNodes);
+    List<MappingConfig> mappingConfigs = parse(ownNodes, mappings);
     if (sink.mappingSupport() == MappingSupport.NONE) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, sink.mappingRejectionMessage());
@@ -96,19 +98,48 @@ public final class MappingNodeType implements TransformNodeType {
     return new Compilation(units, null);
   }
 
-  /** Parses each node's config, in flow order. */
-  private List<MappingConfig> parse(List<GraphNode> ownNodes) throws FatalAdapterException {
+  /**
+   * Resolves each node's {@code mappingRef} against the shipped catalog and parses the mapping
+   * document, in flow order. The config-adapter is callback-free, so the referenced Mapping's
+   * content must have travelled in the pipeline's {@code mappings} catalog; a wired mapping node
+   * with no ref, or one whose ref is not shipped, is a corrupted payload that would otherwise
+   * deploy untransformed.
+   */
+  private List<MappingConfig> parse(List<GraphNode> ownNodes, Map<String, Object> mappings)
+      throws FatalAdapterException {
     List<MappingConfig> configs = new ArrayList<>();
     for (GraphNode node : ownNodes) {
-      Object rawConfig = node.data().get(KEY_MAPPING_CONFIG);
-      if (rawConfig == null) {
-        // A wired mapping node must carry a config; a missing one is a corrupted payload that
-        // would otherwise deploy untransformed. (A pipeline with no mapping node at all is fine.)
+      String ref = node.mappingRef();
+      if (ref == null || ref.isBlank()) {
         throw new FatalAdapterException(
-            AdapterErrorCode.NIFI_TEMPLATE_ERROR, "mapping node has no mappingConfig");
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR, "mapping node has no mappingRef");
       }
-      configs.add(mappingConfigParser.parse(mapper.valueToTree(rawConfig)));
+      Object document = lookup(mappings, ref);
+      if (!(document instanceof Map<?, ?> map)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            "mapping '" + ref + "' was not shipped in the pipeline's mappings catalog");
+      }
+      configs.add(mappingConfigParser.parse(mapper.valueToTree(map)));
     }
     return configs;
+  }
+
+  /**
+   * The mapping document for {@code ref} from the shipped catalog, tolerating a version drift
+   * between the pipeline's pinned {@code mappingRef} and the catalog key (exact match first, then a
+   * logical-URN match), or {@code null} when absent.
+   */
+  private static Object lookup(Map<String, Object> mappings, String ref) {
+    Object exact = mappings.get(ref);
+    if (exact != null) {
+      return exact;
+    }
+    for (Map.Entry<String, Object> entry : mappings.entrySet()) {
+      if (CoreUrn.sameArtifact(entry.getKey(), ref)) {
+        return entry.getValue();
+      }
+    }
+    return null;
   }
 }

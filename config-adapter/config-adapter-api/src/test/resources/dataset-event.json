@@ -158,6 +158,16 @@
               ]
             }
           }
+        },
+        "mappings": {
+          "urn:core:dataset:neustadt:mapping:traffic:TreeToThing:0a1b2c3d4e:1.0.0": {
+            "source": "urn:core:dataset:neustadt:datastructure:traffic:Tree:1a2b3c4d5e:1.0.0",
+            "target": "urn:core:dataset:neustadt:datastructure:traffic:Thing:2b3c4d5e6f:1.0.0",
+            "fields": {
+              "$.name": "$.id",
+              "$.properties.art": "$.art"
+            }
+          }
         }
       },
       {

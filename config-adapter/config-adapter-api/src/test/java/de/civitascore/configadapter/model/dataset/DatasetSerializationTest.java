@@ -149,11 +149,41 @@ class DatasetSerializationTest {
         objectMapper.readValue(
             """
             {"id":"p1","version":"1","action":"ADD","data":{},
-             "dataSourceIds":["src-1"],"dataSinkIds":["sink-1","sink-2"]}
+             "dataSourceIds":["urn:core:dataset:d:datasource:c:Src:0000000001:1.0.0"],
+             "dataSinkIds":["urn:core:dataset:d:datasink:c:A:0000000002:1.0.0",
+                            "urn:core:dataset:d:datasink:c:B:0000000003:1.0.0"]}
             """,
             DataPipeline.class);
-    assertEquals(List.of("src-1"), pipeline.dataSourceIds());
-    assertEquals(List.of("sink-1", "sink-2"), pipeline.dataSinkIds());
+    assertEquals(
+        List.of("urn:core:dataset:d:datasource:c:Src:0000000001:1.0.0"), pipeline.dataSourceIds());
+    assertEquals(
+        List.of(
+            "urn:core:dataset:d:datasink:c:A:0000000002:1.0.0",
+            "urn:core:dataset:d:datasink:c:B:0000000003:1.0.0"),
+        pipeline.dataSinkIds());
+  }
+
+  @Test
+  void shouldDeserializeMappingsCatalog() {
+    // The ADD pipeline ships a mappings catalog keyed by the mapping's CORE URN so the
+    // callback-free
+    // pipeline-engine adapter can build the transform from a mappingRef without a registry lookup.
+    DataPipeline addPipeline = dataset.datapipelines().getFirst();
+    Map<String, Object> mappings = addPipeline.mappings();
+    assertEquals(1, mappings.size());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> mapping =
+        (Map<String, Object>)
+            mappings.get("urn:core:dataset:neustadt:mapping:traffic:TreeToThing:0a1b2c3d4e:1.0.0");
+    assertNotNull(mapping);
+    assertTrue(((Map<?, ?>) mapping.get("fields")).containsKey("$.name"));
+  }
+
+  @Test
+  void absentMappingsDeserializeAsEmptyMap() {
+    // The DELETE pipeline omits the field; the record normalizes it so consumers never see null.
+    DataPipeline deletePipeline = dataset.datapipelines().get(1);
+    assertTrue(deletePipeline.mappings().isEmpty());
   }
 
   @Test

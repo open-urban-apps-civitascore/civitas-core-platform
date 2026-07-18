@@ -120,13 +120,12 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.stationid": "$.stationid", "$.temperature": "$.temperature" } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "c", "kind": "cron", "cronExpression": "%s" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
                 { "id": "e2", "source": "c", "target": "src" },
@@ -135,10 +134,17 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
                 { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
+    Map<String, Object> mappings =
+        mapping("{ \"$.stationid\": \"$.stationid\", \"$.temperature\": \"$.temperature\" }");
 
     Datasource source = sqlSource("sensor_input");
     // a cron-scheduled SQL source requires a sink primary key (dedup of re-read rows)
-    deploy("sql-typed-it", graph, source, new PostgisSinkSpec("observation", List.of("stationid")));
+    deploy(
+        "sql-typed-it",
+        graph,
+        source,
+        new PostgisSinkSpec("observation", List.of("stationid")),
+        mappings);
 
     // the row must arrive…
     await()
@@ -157,14 +163,12 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.stationid": "$.stationid",
-                                "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "c", "kind": "cron", "cronExpression": "%s" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
                 { "id": "e2", "source": "c", "target": "src" },
@@ -173,10 +177,18 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
                 { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
+    Map<String, Object> mappings =
+        mapping(
+            "{ \"$.stationid\": \"$.stationid\","
+                + " \"$.geom\": { \"op\": \"geoPoint\", \"lon\": \"$.lon\", \"lat\": \"$.lat\" } }");
 
     Datasource source = sqlSource("geo_input");
     deploy(
-        "sql-geo-it", graph, source, new PostgisSinkSpec("geo_observation", List.of("stationid")));
+        "sql-geo-it",
+        graph,
+        source,
+        new PostgisSinkSpec("geo_observation", List.of("stationid")),
+        mappings);
 
     await()
         .atMost(Duration.ofSeconds(90))
@@ -193,13 +205,12 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.stationid": "$.stationid", "$.temperature": "$.temperature" } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "c", "kind": "cron", "cronExpression": "%s" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
                 { "id": "e2", "source": "c", "target": "src" },
@@ -208,13 +219,16 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
                 { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
+    Map<String, Object> mappings =
+        mapping("{ \"$.stationid\": \"$.stationid\", \"$.temperature\": \"$.temperature\" }");
 
     Datasource source = sqlSource("sensor_input");
     deploy(
         "sql-dedup-it",
         graph,
         source,
-        new PostgisSinkSpec("dedup_observation", List.of("stationid")));
+        new PostgisSinkSpec("dedup_observation", List.of("stationid")),
+        mappings);
 
     // the row lands…
     await()
@@ -240,13 +254,12 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.stationId": "$.stationId", "$.tempValue": "$.tempValue" } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "c", "kind": "cron", "cronExpression": "%s" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
                 { "id": "e2", "source": "c", "target": "src" },
@@ -255,12 +268,15 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
                 { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
+    Map<String, Object> mappings =
+        mapping("{ \"$.stationId\": \"$.stationId\", \"$.tempValue\": \"$.tempValue\" }");
 
     deploy(
         "sql-mixedcase-it",
         graph,
         sqlSource("mixed_input"),
-        new PostgisSinkSpec("mixedObservation", List.of("stationId")));
+        new PostgisSinkSpec("mixedObservation", List.of("stationId")),
+        mappings);
 
     await()
         .atMost(Duration.ofSeconds(90))
@@ -278,7 +294,11 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
   }
 
   private void deploy(
-      String pipelineId, Map<String, Object> graph, Datasource source, SinkSpec sink)
+      String pipelineId,
+      Map<String, Object> graph,
+      Datasource source,
+      SinkSpec sink,
+      Map<String, Object> mappings)
       throws Exception {
     byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
     try (CredentialResolver resolver = new CredentialResolver(key)) {
@@ -289,9 +309,14 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
               new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
               null);
       DeploymentPlan plan =
-          planner.plan(new PipelineDeploymentRequest(pipelineId, graph, source, sink));
+          planner.plan(new PipelineDeploymentRequest(pipelineId, graph, source, sink, mappings));
       client.deployFlow(plan);
     }
+  }
+
+  /** A single-entry mappings catalog keyed by {@code map-1} (the graphs' mappingRef). */
+  private Map<String, Object> mapping(String fieldsJson) throws Exception {
+    return map("{ \"map-1\": { \"fields\": " + fieldsJson + " } }");
   }
 
   private Datasource sqlSource(String table) throws Exception {

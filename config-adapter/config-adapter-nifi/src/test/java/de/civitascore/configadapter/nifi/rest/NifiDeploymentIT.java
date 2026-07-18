@@ -71,19 +71,23 @@ class NifiDeploymentIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping",
-                  "data": { "mappingConfig": { "fields": {
-                    "$.station_id": "$.station_id",
-                    "$.temperature": "$.temperature" } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+    Map<String, Object> mappings =
+        map(
+            """
+            { "map-1": { "fields": {
+                "$.station_id": "$.station_id",
+                "$.temperature": "$.temperature" } } }
             """);
 
     FlowDeploymentPlanner planner =
@@ -94,7 +98,7 @@ class NifiDeploymentIT extends AbstractNifiIT {
                 "jdbc:postgresql://localhost:5432/civitas", "nifi", "nifi-db-secret"),
             "http://localhost:8080/FROST-Server/v1.1");
 
-    return planner.plan(new PipelineDeploymentRequest("it-1", graph, source, sink));
+    return planner.plan(new PipelineDeploymentRequest("it-1", graph, source, sink, mappings));
   }
 
   @Test
@@ -149,10 +153,10 @@ class NifiDeploymentIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "k" },

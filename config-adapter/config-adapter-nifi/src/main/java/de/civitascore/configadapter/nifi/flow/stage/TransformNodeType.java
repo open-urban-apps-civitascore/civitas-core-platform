@@ -16,6 +16,7 @@ import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
 import de.civitascore.configadapter.nifi.mapping.SinkPreRegionPlan;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -36,10 +37,14 @@ public interface TransformNodeType {
    * @param sink the pipeline's sink stage (target namespace, geometry encoding, mapping support)
    * @param sinkSpec the pipeline's parsed sink spec — the payload-derived values a compilation may
    *     need (e.g. the FROST target structure's match keys)
+   * @param mappings the pipeline's shipped mappings catalog (Mapping CORE URN → mapping document);
+   *     a node kind that references artifacts by URN (the mapping kind, via {@code mappingRef})
+   *     resolves them here without a registry callback
    * @return the compilation; its units align 1:1 with {@code ownNodes}
    * @throws FatalAdapterException if a node payload is missing or invalid
    */
-  Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink, SinkSpec sinkSpec)
+  Compilation compile(
+      List<GraphNode> ownNodes, SinkStage<?> sink, SinkSpec sinkSpec, Map<String, Object> mappings)
       throws FatalAdapterException;
 
   /**

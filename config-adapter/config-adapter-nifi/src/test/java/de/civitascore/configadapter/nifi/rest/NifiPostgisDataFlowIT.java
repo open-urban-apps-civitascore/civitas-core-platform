@@ -131,18 +131,22 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.stationid": "$.stationid", "$.count": "$.count",
-                                "$.meta": "$.meta" } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+    Map<String, Object> mappings =
+        map(
+            """
+            { "map-1": { "fields": { "$.stationid": "$.stationid", "$.count": "$.count",
+                                     "$.meta": "$.meta" } } }
             """);
 
     Datasource source = new Datasource();
@@ -160,7 +164,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "pg-data-it", graph, source, new PostgisSinkSpec("observation")));
+                "pg-data-it", graph, source, new PostgisSinkSpec("observation"), mappings));
 
     client.deployFlow(plan);
 
@@ -252,18 +256,22 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.stationid": "$.stationid",
-                                "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+    Map<String, Object> mappings =
+        map(
+            """
+            { "map-1": { "fields": { "$.stationid": "$.stationid",
+                          "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } }
             """);
 
     Datasource source = new Datasource();
@@ -281,7 +289,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "pg-geo-it", graph, source, new PostgisSinkSpec("geo_observation")));
+                "pg-geo-it", graph, source, new PostgisSinkSpec("geo_observation"), mappings));
 
     client.deployFlow(plan);
 
@@ -310,18 +318,22 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.stationid": "$.stationid",
-                                "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+    Map<String, Object> mappings =
+        map(
+            """
+            { "map-1": { "fields": { "$.stationid": "$.stationid",
+                          "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } }
             """);
 
     Datasource source = new Datasource();
@@ -339,7 +351,11 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "pg-geo25832-it", graph, source, new PostgisSinkSpec("geo_observation_25832")));
+                "pg-geo25832-it",
+                graph,
+                source,
+                new PostgisSinkSpec("geo_observation_25832"),
+                mappings));
 
     client.deployFlow(plan);
 

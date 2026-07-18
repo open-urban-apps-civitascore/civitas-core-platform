@@ -31,15 +31,14 @@ class GraphParserTest {
     return mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
   }
 
-  private static final String WI1513_GRAPH =
+  private static final String CORE_GRAPH =
       """
       {
-        "viewport": { "x": 0, "y": 0, "zoom": 1 },
         "nodes": [
-          { "id": "n-start", "type": "start", "data": { "nodeType": "start" } },
-          { "id": "n-map", "type": "mapping",
-            "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } },
-          { "id": "n-end", "type": "end", "data": { "nodeType": "end" } }
+          { "id": "n-start", "kind": "start" },
+          { "id": "n-map", "kind": "mapping",
+            "mappingRef": "urn:core:dataset:d:mapping:c:M:0000000001:1.0.0" },
+          { "id": "n-end", "kind": "end" }
         ],
         "edges": [
           { "id": "e1", "source": "n-start", "target": "n-map" },
@@ -50,11 +49,13 @@ class GraphParserTest {
 
   @Test
   void parsesNodesAndEdges() throws Exception {
-    PipelineGraph graph = parser.parse(map(WI1513_GRAPH));
+    PipelineGraph graph = parser.parse(map(CORE_GRAPH));
 
     assertEquals(3, graph.nodes().size());
     assertEquals(2, graph.edges().size());
-    assertTrue(graph.nodes().get(1).data().containsKey("mappingConfig"));
+    assertEquals("mapping", graph.nodes().get(1).kind());
+    assertEquals(
+        "urn:core:dataset:d:mapping:c:M:0000000001:1.0.0", graph.nodes().get(1).mappingRef());
   }
 
   @Test
@@ -73,9 +74,9 @@ class GraphParserTest {
         map(
             """
             { "nodes": [
-                { "type": "dataSource", "data": {} },
-                { "id": "n-map", "type": "mapping",
-                  "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
+                { "kind": "source" },
+                { "id": "n-map", "kind": "mapping",
+                  "mappingRef": "urn:core:dataset:d:mapping:c:M:0000000001:1.0.0" } ],
               "edges": [] }
             """);
 
@@ -88,8 +89,8 @@ class GraphParserTest {
         map(
             """
             { "nodes": [
-                { "id": "n-1", "type": "dataSource", "data": {} },
-                { "id": "n-1", "type": "mapping", "data": {} } ],
+                { "id": "n-1", "kind": "source" },
+                { "id": "n-1", "kind": "mapping" } ],
               "edges": [] }
             """);
 
@@ -104,9 +105,9 @@ class GraphParserTest {
         map(
             """
             { "nodes": [
-                { "id": "n-src", "type": "dataSource", "data": {} },
-                { "id": "n-map", "type": "mapping",
-                  "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
+                { "id": "n-src", "kind": "source" },
+                { "id": "n-map", "kind": "mapping",
+                  "mappingRef": "urn:core:dataset:d:mapping:c:M:0000000001:1.0.0" } ],
               "edges": [
                 { "id": "e1", "source": "n-src", "target": "n-map" },
                 { "id": "e2", "source": "n-map", "target": "ghost-deleted" } ] }
@@ -122,7 +123,7 @@ class GraphParserTest {
     Map<String, Object> data =
         map(
             """
-            { "nodes": [ { "id": "n-src", "type": "dataSource", "data": {} } ],
+            { "nodes": [ { "id": "n-src", "kind": "source" } ],
               "edges": [ { "id": "e1", "source": "n-src", "target": "ghost-deleted" } ] }
             """);
 
