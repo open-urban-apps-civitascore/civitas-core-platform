@@ -30,11 +30,12 @@ script:post-response {
 
 tests {
   test("Mapping created", function() {
-    expect(res.getStatus()).to.equal(201);
+    // POST /mappings returns 200 OK with the URN pins (not 201).
+    expect(res.getStatus()).to.equal(200);
   });
 
   test("Returns a versioned URN", function() {
-    if (res.getStatus() === 201) {
+    if (res.getStatus() === 200) {
       expect(res.body.versionedUrn).to.be.a('string');
     }
   });
