@@ -92,6 +92,52 @@ class ArtifactReferenceRepository {
             .list();
     }
 
+    /**
+     * Like {@link #blockingDependents}, but excluding {@code dataset-ref} membership edges — the
+     * non-DataSet references that unconditionally block deletion (referential integrity). DataSet
+     * membership is handled separately by the count-based deletion policy (see
+     * {@link #dataSetMemberships} and the deletion-policy concept).
+     */
+    List<String> nonDataSetBlockingDependents(String targetLogicalUrn) {
+        return jdbc.sql("""
+                select distinct a.logical_urn
+                  from model_forge.artifact_reference r
+                  join model_forge.artifact_version fv on fv.id = r.from_version_id
+                  join model_forge.artifact a          on a.id = fv.artifact_id
+                 where r.target_artifact_id = (select id from model_forge.artifact
+                                                where logical_urn = :logical)
+                   and a.logical_urn <> :logical
+                   and r.reference_type <> 'dataset-ref'
+                 order by a.logical_urn
+                """)
+            .param("logical", targetLogicalUrn)
+            .query(String.class)
+            .list();
+    }
+
+    /**
+     * Logical URNs of the DataSet manifests that list the given artifact as a member
+     * ({@code dataset-ref} in-edges) — i.e. the DataSets the artifact belongs to. Drives the
+     * count-based deletion rule (0 → deletable, 1 → deletable + auto-unlink, ≥2 → blocked).
+     */
+    List<String> dataSetMemberships(String targetLogicalUrn) {
+        return jdbc.sql("""
+                select distinct a.logical_urn
+                  from model_forge.artifact_reference r
+                  join model_forge.artifact_version fv on fv.id = r.from_version_id
+                  join model_forge.artifact a          on a.id = fv.artifact_id
+                                                      and fv.version = a.current_version
+                 where r.target_artifact_id = (select id from model_forge.artifact
+                                                where logical_urn = :logical)
+                   and a.logical_urn <> :logical
+                   and r.reference_type = 'dataset-ref'
+                 order by a.logical_urn
+                """)
+            .param("logical", targetLogicalUrn)
+            .query(String.class)
+            .list();
+    }
+
     /** Full reference rows of a version, in stored order — used to copy edges onto a renamed version. */
     List<ReferenceRow> rowsForVersion(UUID fromVersionId) {
         return jdbc.sql("""

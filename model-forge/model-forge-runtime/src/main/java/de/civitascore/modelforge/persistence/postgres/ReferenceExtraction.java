@@ -18,7 +18,8 @@ import java.util.Set;
  *   <li><b>Mapping</b> — {@code source} / {@code target} ({@link #mappingRefs}).</li>
  *   <li><b>Pipeline</b> — each node's reference field: {@code sourceRef} / {@code sinkRef} /
  *       {@code mappingRef} / an enrich node's {@code lookupSourceRef} ({@link #pipelineRefs}).</li>
- *   <li><b>DataStructure</b> — {@code elementRefs} ({@link #dataStructureRefs}).</li>
+ *   <li><b>DataStructure</b> — its member {@code $ref}s: a {@code $defs} library of URN-{@code $ref}s,
+ *       plus an optional root {@code $ref} (and a legacy {@code elementRefs} array) ({@link #dataStructureRefs}).</li>
  *   <li><b>DataSet</b> — all {@code *Refs} arrays ({@link #dataSetRefs}).</li>
  *   <li><b>DataSource / DataSink</b> — the {@code element} field describing the payload/row format
  *       ({@link #dataSourceRefs}/{@link #dataSinkRefs}).</li>
@@ -112,23 +113,39 @@ final class ReferenceExtraction {
         return rows;
     }
 
-    /** The DataSet manifest's {@code *Refs} arrays → dataset / datasource / datasink edges. */
+    /**
+     * The DataSet manifest's {@code *Refs} arrays → uniform {@code dataset-ref} membership edges (one
+     * per member), the member kind carried in {@code referenceName}. Uniform typing lets the deletion
+     * policy count a member's DataSet memberships independently of non-DataSet references (see the
+     * deletion-policy concept): a {@code dataset-ref} in-edge means "member of this DataSet".
+     */
+    static final String DATASET_REF = "dataset-ref";
+
     static List<ReferenceRow> dataSetRefs(JsonNode manifest) {
         List<ReferenceRow> rows = new ArrayList<>();
         int[] i = {0};
-        addArrayRefs(rows, manifest.path("elementRefs"),    "dataset-ref",    "element",  i);
-        addArrayRefs(rows, manifest.path("mappingRefs"),    "dataset-ref",    "mapping",  i);
-        addArrayRefs(rows, manifest.path("pipelineRefs"),   "dataset-ref",    "pipeline", i);
-        addArrayRefs(rows, manifest.path("dataSourceRefs"), "datasource-ref", null,       i);
-        addArrayRefs(rows, manifest.path("dataSinkRefs"),   "datasink-ref",   null,       i);
+        addArrayRefs(rows, manifest.path("datastructureRefs"), DATASET_REF, "datastructure", i);
+        addArrayRefs(rows, manifest.path("mappingRefs"),       DATASET_REF, "mapping",       i);
+        addArrayRefs(rows, manifest.path("pipelineRefs"),      DATASET_REF, "pipeline",      i);
+        addArrayRefs(rows, manifest.path("dataSourceRefs"),    DATASET_REF, "datasource",    i);
+        addArrayRefs(rows, manifest.path("dataSinkRefs"),      DATASET_REF, "datasink",      i);
         return rows;
     }
 
-    /** The DataStructure manifest's {@code elementRefs} array → datastructure-ref edges. */
+    /**
+     * A DataStructure's member Element {@code $ref}s → datastructure-ref edges. A DataStructure is a
+     * JSON-Schema {@code $defs} library of URN-{@code $ref}s (no root shape): each {@code $defs.*.$ref}
+     * is a member Element URN.
+     */
     static List<ReferenceRow> dataStructureRefs(JsonNode manifest) {
         List<ReferenceRow> rows = new ArrayList<>();
-        int[] i = {0};
-        addArrayRefs(rows, manifest.path("elementRefs"), "datastructure-ref", "element", i);
+        JsonNode defs = manifest.path("$defs");
+        if (defs.isObject()) {
+            int i = 0;
+            for (JsonNode def : defs) {
+                addRef(rows, def.path("$ref").asText(null), "datastructure-ref", "element", i++);
+            }
+        }
         return rows;
     }
 

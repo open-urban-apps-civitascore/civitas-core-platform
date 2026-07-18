@@ -12,6 +12,7 @@ import de.civitascore.modelforge.graph.SchemaRefExtractor;
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.modelforge.urn.UrnService;
+import de.civitascore.modelforge.validation.CoreSchemaValidator;
 import de.civitascore.modelforge.validation.ModelValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,7 @@ public class SchemaImportService {
     private final DependencyGraphService   graph;
     private final ReferenceExistenceValidator refExistence;
     private final RemoteSchemaRepository   remoteFetcher;
+    private final CoreSchemaValidator      coreSchemaValidator;
 
     public SchemaImportService(ModelValidator validator,
                                ObjectMapper mapper,
@@ -43,7 +45,8 @@ public class SchemaImportService {
                                SchemaRefExtractor refExtractor,
                                DependencyGraphService graph,
                                ReferenceExistenceValidator refExistence,
-                               RemoteSchemaRepository remoteFetcher) {
+                               RemoteSchemaRepository remoteFetcher,
+                               CoreSchemaValidator coreSchemaValidator) {
         this.validator      = validator;
         this.mapper         = mapper;
         this.registry       = registry;
@@ -52,6 +55,7 @@ public class SchemaImportService {
         this.graph          = graph;
         this.refExistence   = refExistence;
         this.remoteFetcher  = remoteFetcher;
+        this.coreSchemaValidator = coreSchemaValidator;
     }
 
     // ── Import ────────────────────────────────────────────────────────────────
@@ -91,7 +95,13 @@ public class SchemaImportService {
         String schemaTitle = schema.path("title").asText(null);
         String safeTitle   = sanitizeId(schemaTitle, UUID.randomUUID().toString());
 
-        ObjectNode elements = buildElements(schema, safeTitle, schemaTitle);
+        // When the root's $id is a :datastructure: URN, the caller intends the document to BE a
+        // DataStructure — one artifact that holds its own shape + styles and *contains* its $defs
+        // Elements — rather than a separate root Element grouped by an auto-created DataStructure.
+        // dsRootUrn drives that fold; null preserves the classic Element/XSD/flat import verbatim.
+        String dsRootUrn = dataStructureRootUrn(schema);
+        ImportModel built = buildElements(schema, safeTitle, schemaTitle, dsRootUrn);
+        ObjectNode elements = built.elements();
 
         // Registry-aware existence check: every concrete x-core-ref foreign-key target must
         // resolve to an existing artifact, or be one of the elements imported in this request
@@ -103,14 +113,33 @@ public class SchemaImportService {
             return new SchemaImportResult(null, refDiags);
         }
 
+        // Validate the DataStructure against datastructure.schema.json BEFORE storing anything: its
+        // elementRefs `pattern` enforces that every member is an Element URN, and (for a folded
+        // datastructure-root) that its own `id` is a :datastructure: URN. Failing here, up front,
+        // keeps a malformed grouping from persisting any half-imported Elements.
+        ObjectNode dataStructure = built.dataStructure();
+        if (dataStructure != null) {
+            List<Diagnostic> dataStructureDiags = coreSchemaValidator.validate(dataStructure);
+            if (!dataStructureDiags.isEmpty()) {
+                return new SchemaImportResult(null, dataStructureDiags);
+            }
+        }
+
         // The registry assigns the versions inside the write and returns the pins; the ROOT
         // element's pin (first entry, by construction) is carried through so the facade can
         // return it — and every sibling Element's pin, for importedResourceIds — verbatim,
         // without any read-back.
         List<String> pins = storeElementsInRegistry(elements, explicitVersion);
-        createDataStructureForImport(elements, schemaTitle, safeTitle);
+        String dataStructurePin = null;
+        if (dataStructure != null) {
+            dataStructurePin = storeDataStructureManifest(dataStructure);
+        }
 
-        String rootPin = pins.isEmpty() ? primaryResourceId(elements, safeTitle) : pins.getFirst();
+        // For a folded datastructure-root the DataStructure IS the model, so its pin is the root
+        // (→ version.model_urn); otherwise the root Element's pin (first entry) is the root, as before.
+        String rootPin = (dsRootUrn != null && dataStructurePin != null)
+            ? dataStructurePin
+            : (pins.isEmpty() ? primaryResourceId(elements, safeTitle) : pins.getFirst());
         return new SchemaImportResult(rootPin, pins, List.of());
     }
 
@@ -186,15 +215,35 @@ public class SchemaImportService {
         "type", "properties", "required", "$ref", "allOf", "oneOf", "anyOf", "enum", "const",
         "items", "additionalProperties", "patternProperties", "not");
 
-    private ObjectNode buildElements(JsonNode schema, String safeTitle, String schemaTitle) {
+    /** The Elements to store plus the DataStructure grouping — the folded datastructure-root content
+     *  when the root is a DataStructure, or the classic auto-created manifest otherwise. */
+    private record ImportModel(ObjectNode elements, ObjectNode dataStructure) {}
+
+    /**
+     * The DataStructure URN a root carries when the caller intends the document to BE a DataStructure
+     * (its {@code $id} is a {@code :datastructure:} URN) rather than a root Element. Drives the fold in
+     * {@link #buildElements}/{@link #buildDataStructureContent}; {@code null} for an Element/XSD/flat
+     * root, preserving the classic element-root import.
+     */
+    private static String dataStructureRootUrn(JsonNode schema) {
+        String id = schema.path("$id").asText(null);
+        return UrnParser.isUrn(id) && "datastructure".equals(UrnParser.artifactTypeFromUrn(id)) ? id : null;
+    }
+
+    private ImportModel buildElements(JsonNode schema, String safeTitle, String schemaTitle, String dsRootUrn) {
         ObjectNode elements = mapper.createObjectNode();
         JsonNode defs = schema.path("$defs");
 
         if (!defs.isObject() || defs.isEmpty()) {
+            if (dsRootUrn != null) {
+                // A DataStructure root with no $defs classes: no member Elements, just the grouping —
+                // which still carries the root's own shape + styles.
+                return new ImportModel(elements, buildDataStructureContent(schema, Map.of(), dsRootUrn, schemaTitle));
+            }
             // Flat schema (no $defs): the whole schema is one Element.
             ObjectNode flat = buildFlatElement(schema, safeTitle, schemaTitle);
             elements.set(schemaKey(flat, safeTitle), flat);
-            return elements;
+            return new ImportModel(elements, buildDataStructureManifest(elements, schemaTitle, safeTitle));
         }
 
         // The root's URN is resolved up front (used to seed de-dup / re-import-matching for the
@@ -207,8 +256,10 @@ public class SchemaImportService {
 
         // A document with no shape of its own (no type/properties/$ref/composition keyword — just
         // metadata and $defs) is a pure container: the DataStructure grouping its defs, not an
-        // Element in its own right, so — unlike a root with real content — it is not itself stored.
-        if (hasOwnShape(schema)) {
+        // Element in its own right. A datastructure-root (dsRootUrn != null) is likewise not extracted
+        // as a root Element — its shape belongs to the DataStructure artifact itself (see
+        // buildDataStructureContent). Only a plain Element root with its own shape becomes an Element.
+        if (hasOwnShape(schema) && dsRootUrn == null) {
             ObjectNode root = buildRootElement(schema, defUrns, rootUrn, schemaTitle);
             elements.set(schemaKey(root, safeTitle), root);
         }
@@ -220,7 +271,52 @@ public class SchemaImportService {
             elements.set(uniqueElementKey(elements,
                 UrnParser.nameFromUrn(defUrns.get(e.getKey()))), def);
         });
-        return elements;
+
+        ObjectNode dataStructure = dsRootUrn != null
+            ? buildDataStructureContent(schema, defUrns, dsRootUrn, schemaTitle)
+            : buildDataStructureManifest(elements, schemaTitle, safeTitle);
+        return new ImportModel(elements, dataStructure);
+    }
+
+    /**
+     * The DataStructure artifact for a datastructure-rooted import. A DataStructure is a JSON-Schema
+     * {@code $defs} library of URN-{@code $ref}s with NO inline root shape: one {@code $defs} entry per
+     * member Element, whose value is a {@code $ref} to that Element's CORE URN (the Elements themselves
+     * are split out and stored separately; bundle/inline re-embed/resolve them on read). An OPTIONAL
+     * top-level {@code $ref} (rewritten from an incoming {@code "#/$defs/<Name>"} pointer or already a
+     * URN) designates one member as the root shape, so a root-shaped schema can be derived for clients
+     * that need one. The {@code x-ui-styles} diagram is carried verbatim. The document keeps the
+     * standard JSON-Schema {@code $id}/{@code $defs} form so it is a usable schema library, identified
+     * as a DataStructure by its {@code $id} URN type.
+     */
+    private ObjectNode buildDataStructureContent(JsonNode schema, Map<String, String> defUrns,
+                                                 String dsRootUrn, String schemaTitle) {
+        ObjectNode content = mapper.createObjectNode();
+        content.put("$schema", "https://json-schema.org/draft/2020-12/schema");
+        content.put("$id", dsRootUrn);
+        if (schemaTitle != null) content.put("title", schemaTitle);
+        ObjectNode defs = content.putObject("$defs");
+        defUrns.forEach((defKey, elementUrn) -> defs.putObject(defKey).put("$ref", elementUrn));
+        // Optional root shape: a top-level $ref designating one member (local "#/$defs/<Name>" → member
+        // URN, or already a URN). Its target is a $defs member, so it needs no separate graph edge.
+        JsonNode rootRef = schema.path("$ref");
+        if (rootRef.isTextual()) {
+            content.put("$ref", localDefTarget(rootRef.asText(), defUrns));
+        }
+        if (schema.has("x-ui-styles")) {
+            content.set("x-ui-styles", schema.get("x-ui-styles").deepCopy());
+        }
+        return content;
+    }
+
+    /** Resolve a {@code "#/$defs/<Name>"} pointer to the member Element's CORE URN; a value that is
+     *  already a URN (or an unknown pointer) is returned verbatim. */
+    private static String localDefTarget(String ref, Map<String, String> defUrns) {
+        if (ref != null && ref.startsWith("#/$defs/")) {
+            String urn = defUrns.get(ref.substring("#/$defs/".length()));
+            if (urn != null) return urn;
+        }
+        return ref;
     }
 
     private static boolean hasOwnShape(JsonNode schema) {
@@ -445,28 +541,52 @@ public class SchemaImportService {
     }
 
     /**
-     * Creates (or versions) a DataStructure grouping every Element produced by this import — one
-     * DataStructure per imported JSON Schema document, named after the document title. A
-     * DataStructure is a stored artifact (not a View): it records which Elements belong together,
-     * referencing its members by URN. Skipped when the import yielded no
-     * elements.
+     * Creates (or versions) a DataStructure grouping every Element produced by an element-rooted import
+     * (XSD / Smart-Data-Model / flat JSON Schema) — one DataStructure per imported document, named
+     * after the document title. Same {@code $defs}-library form as {@link #buildDataStructureContent}:
+     * a JSON-Schema document whose {@code $defs} members are URN-{@code $ref}s to the extracted Elements
+     * (root Element included). Skipped when the import yielded no elements.
      */
-    private void createDataStructureForImport(ObjectNode elements, String schemaTitle, String safeTitle) {
+    private ObjectNode buildDataStructureManifest(ObjectNode elements, String schemaTitle, String safeTitle) {
         List<String> members = elementUrns(elements);
-        if (members.isEmpty()) return;
-        // The grouping reuses the root Element's identity (first member) — its name AND
-        // disambiguator segments — so a re-imported document versions its existing DataStructure
-        // instead of minting a new one.
-        String firstMember = members.getFirst();
-        String dataStructureUrn = urns.dataStructure(
-            UrnParser.nameFromUrn(firstMember), UrnParser.disambiguatorFromUrn(firstMember));
+        if (members.isEmpty()) return null;
         ObjectNode manifest = mapper.createObjectNode();
-        manifest.put("$schema", "https://civitasconnect.digital/core-datastructure/v1");
-        manifest.put("id", dataStructureUrn);
+        manifest.put("$schema", "https://json-schema.org/draft/2020-12/schema");
+        manifest.put("$id", dataStructureUrnForMembers(members));
         manifest.put("title", schemaTitle != null ? schemaTitle : safeTitle);
-        ArrayNode refs = manifest.putArray("elementRefs");
-        members.forEach(refs::add);
-        registry.storeDataStructure(UrnParser.logicalUrn(dataStructureUrn), manifest);
+        ObjectNode defs = manifest.putObject("$defs");
+        int[] i = {0};
+        elements.properties().forEach(e -> defs.putObject(e.getKey()).put("$ref", members.get(i[0]++)));
+        return manifest;
+    }
+
+    private String storeDataStructureManifest(ObjectNode manifest) {
+        // The $defs-library DataStructure identifies itself with the JSON-Schema `$id`; a legacy
+        // grouping manifest used `id`. Accept either.
+        String idField = manifest.has("$id")
+            ? manifest.path("$id").asText(null)
+            : manifest.path("id").asText(null);
+        String dataStructureLogicalUrn = UrnParser.logicalUrn(idField);
+        String pin = registry.storeDataStructure(dataStructureLogicalUrn, manifest);
+        // Mirror the just-persisted elementRefs edges into the in-memory dependency graph. The
+        // registry write alone does not touch the graph, so without this the grouping shows no
+        // relations and no graph edges until the next full rebuild() — unlike the createArtifact
+        // write path, which pairs every store with registerFromRegistry().
+        graph.registerFromRegistry(dataStructureLogicalUrn);
+        return pin;
+    }
+
+    /**
+     * The grouping DataStructure's URN: the root Element's identity (first member) — its name AND
+     * disambiguator segments — reused with the {@code datastructure} type, so a re-imported document
+     * versions its existing DataStructure instead of minting a new one. Used by
+     * {@link #buildDataStructureManifest} so the URN a grouping is validated and stored under is one
+     * and the same.
+     */
+    private String dataStructureUrnForMembers(List<String> members) {
+        String firstMember = members.getFirst();
+        return urns.dataStructure(
+            UrnParser.nameFromUrn(firstMember), UrnParser.disambiguatorFromUrn(firstMember));
     }
 
     /** The member Element URNs of an import, in order: each element's $id (or generated URN). */

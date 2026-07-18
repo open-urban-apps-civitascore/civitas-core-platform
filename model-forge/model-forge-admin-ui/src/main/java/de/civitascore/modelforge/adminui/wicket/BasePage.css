@@ -214,16 +214,50 @@ pre {
 .mf-chip .mf-chip-kind { font-size: 0.66rem; color: var(--mf-text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
 .mf-rel-empty { font-size: 0.85rem; color: var(--mf-text-faint); margin: 0.3rem 0 0; font-style: italic; }
 
-/* ── CodeMirror 6 editor ───────────────────────────────────────────────────── */
-.mf-editor-wrap { max-width: 900px; }
-.mf-editor { border: 1px solid var(--mf-border); border-radius: var(--mf-radius-sm); overflow: hidden; box-shadow: var(--mf-shadow-sm); }
-.cm-editor { max-height: 520px; font-size: 0.85rem; }
-.cm-editor.cm-focused { outline: none; }
-.cm-scroller { overflow: auto; }
-/* Once CodeMirror is mounted the underlying textarea is hidden; without JS it stays visible. */
-.code-editor-fallback { width: 100%; font-family: monospace; }
-.mf-editor-src { display: none; }
+/* ── Code editor / viewer (self-contained, see CodeEditorPanel + CodeEditorPanel.js) ─────────── */
+.mf-editor-wrap { max-width: 900px; position: relative; }
+
+/* Shared box model so the highlighted <pre> and the <textarea> overlay line up character-for-character. */
+.mf-code, .mf-code-edit {
+  margin: 0; box-sizing: border-box; width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem; line-height: 1.5; tab-size: 2;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--mf-border); border-radius: var(--mf-radius-sm);
+  background: var(--mf-surface-alt); color: var(--mf-text);
+  white-space: pre; overflow: auto;
+}
+.mf-code { max-height: 560px; box-shadow: var(--mf-shadow-sm); }
+.mf-editor-wrap .mf-code-edit { max-height: 560px; resize: vertical; }
+.mf-editor-wrap .mf-code-edit:focus { outline: none; border-color: var(--mf-accent); box-shadow: 0 0 0 3px var(--mf-accent-soft); }
+
+/* Editable: the coloured <pre> sits directly behind a textarea whose text is transparent (caret stays
+   visible); the bootstrap mirrors scroll so the colours track the caret. */
+.mf-editor-wrap.editable .mf-code {
+  position: absolute; inset: 0; height: 100%; max-height: none;
+  overflow: hidden; pointer-events: none; box-shadow: none;
+}
+.mf-editor-wrap.editable .mf-code-edit {
+  position: relative; background: transparent; color: transparent; caret-color: var(--mf-text);
+}
+
 .mf-hidden { display: none !important; }
+
+/* Syntax tokens — light defaults; dark overrides follow. */
+.mf-tok-key     { color: #1f5b9e; }
+.mf-tok-str     { color: #b4690e; }
+.mf-tok-num     { color: #16794f; }
+.mf-tok-bool    { color: #8250df; }
+.mf-tok-null    { color: var(--mf-text-faint); }
+.mf-tok-tag     { color: #1f5b9e; }
+.mf-tok-attr    { color: #b4690e; }
+.mf-tok-comment { color: var(--mf-text-faint); font-style: italic; }
+:root[data-theme="dark"] .mf-tok-key  { color: #7fb2e3; }
+:root[data-theme="dark"] .mf-tok-str  { color: #e0a458; }
+:root[data-theme="dark"] .mf-tok-num  { color: #6cc79a; }
+:root[data-theme="dark"] .mf-tok-bool { color: #c99bf5; }
+:root[data-theme="dark"] .mf-tok-tag  { color: #7fb2e3; }
+:root[data-theme="dark"] .mf-tok-attr { color: #e0a458; }
 
 /* ── Page utilities ────────────────────────────────────────────────────────── */
 .content-pre { padding: 1rem; overflow: auto; max-height: 520px; }
@@ -231,6 +265,21 @@ pre {
 .split-pane { display: flex; gap: 1.25rem; }
 .split-pane > div { flex: 1; min-width: 0; }
 .graph-canvas { width: 100%; height: 700px; border: 1px solid var(--mf-border); border-radius: var(--mf-radius); background: var(--mf-surface); }
+
+/* Graph filter toolbar (GraphPage): search box + one toggle per artifact type. */
+.mf-graph-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1.25rem; margin: 0 0 0.85rem; }
+.mf-graph-search {
+  width: 260px; max-width: 100%; padding: 0.45rem 0.65rem; font-size: 0.85rem; color: var(--mf-text);
+  border: 1px solid var(--mf-border); border-radius: var(--mf-radius-sm); background: var(--mf-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.mf-graph-search:focus { outline: none; border-color: var(--mf-accent); box-shadow: 0 0 0 3px var(--mf-accent-soft); }
+.mf-graph-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; }
+.mf-graph-type {
+  display: inline-flex; align-items: center; gap: 0.35rem; margin: 0;
+  font-weight: 500; font-size: 0.85rem; color: var(--mf-text); cursor: pointer; user-select: none;
+}
+.mf-graph-type input { margin: 0; cursor: pointer; }
 .legend-dot { font-size: 1.1em; }
 .legend-dot--element { color: var(--mf-type-element); }
 .legend-dot--datastructure { color: var(--mf-type-datastructure); }

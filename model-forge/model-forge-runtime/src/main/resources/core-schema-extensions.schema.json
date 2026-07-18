@@ -13,6 +13,9 @@
     },
     "x-ui-position": {
       "$ref": "#/$defs/UiPosition"
+    },
+    "x-ui-styles": {
+      "$ref": "#/$defs/UiStyles"
     }
   },
   "additionalProperties": false,
@@ -42,6 +45,10 @@
         "x": { "type": "number" },
         "y": { "type": "number" }
       }
+    },
+    "UiStyles": {
+      "description": "Host UI state carried by a stored model — the editor diagram (nodes, edges, positions, labels). Opaque to the registry (host-owned, split off on read); shape is intentionally permissive.",
+      "type": "object"
     }
   }
 }

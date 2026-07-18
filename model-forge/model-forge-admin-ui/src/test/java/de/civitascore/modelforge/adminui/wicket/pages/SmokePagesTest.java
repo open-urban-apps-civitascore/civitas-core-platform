@@ -108,6 +108,8 @@ class SmokePagesTest extends AbstractWicketPageTest {
 
         tester.assertRenderedPage(ArtifactEditPage.class);
         tester.assertNoErrorMessage();
-        tester.assertContains("\"type\"");
+        // The pre-loaded content renders inside the CodeEditorPanel's textarea/viewer, where Wicket
+        // HTML-escapes the JSON quotes ({"type":"object"} → {&quot;type&quot;:&quot;object&quot;}).
+        tester.assertContains("&quot;type&quot;");
     }
 }

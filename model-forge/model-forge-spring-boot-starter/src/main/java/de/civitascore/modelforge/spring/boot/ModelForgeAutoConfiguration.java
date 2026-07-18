@@ -196,7 +196,8 @@ public class ModelForgeAutoConfiguration {
         SchemaRefExtractor refExtractor,
         DependencyGraphService graph,
         ReferenceExistenceValidator refExistence,
-        RemoteSchemaRepository remoteFetcher
+        RemoteSchemaRepository remoteFetcher,
+        CoreSchemaValidator coreSchemaValidator
     ) {
         return new SchemaImportService(
             validator,
@@ -206,7 +207,8 @@ public class ModelForgeAutoConfiguration {
             refExtractor,
             graph,
             refExistence,
-            remoteFetcher
+            remoteFetcher,
+            coreSchemaValidator
         );
     }
 

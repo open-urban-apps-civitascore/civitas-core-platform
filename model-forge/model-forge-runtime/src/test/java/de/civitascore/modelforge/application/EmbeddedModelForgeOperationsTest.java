@@ -68,7 +68,10 @@ class EmbeddedModelForgeOperationsTest {
             elementCommandService,
             viewService,
             modelValidator,
-            new de.civitascore.modelforge.validation.CoreSchemaValidator(mapper),
+            // These are orchestration tests (URN stamping, registry routing, dependency lists) — CORE
+            // schema conformance is covered by CoreSchemaValidatorTest. Mock the validator so the
+            // now-mandatory write-time validation doesn't reject the minimal fixtures used here.
+            mock(de.civitascore.modelforge.validation.CoreSchemaValidator.class),
             new ReferenceExistenceValidator(registry, refExtractor),
             graph,
             registry,
@@ -205,14 +208,17 @@ class EmbeddedModelForgeOperationsTest {
     void saveArtifactRoutesNonElementKindsDirectlyToTheMatchingRegistryMethod() {
         JsonNode content = mapper.createObjectNode().put("id", "m1");
         var artifactId = new ArtifactId("urn:example:mapping:m1:1.0.0");
-        when(registry.storeMapping(anyString(), eq(content), eq(de.civitascore.modelforge.contract.VersionBump.MINOR)))
+        // saveArtifact stamps $schema + the minted id into a COPY before storing, so the stored doc is
+        // not the caller's original. This test asserts only the ROUTING (MAPPING → storeMapping); the
+        // doc stamping itself is covered by createArtifactStampsTheMintedUrnIntoTheDocument.
+        when(registry.storeMapping(anyString(), any(), eq(de.civitascore.modelforge.contract.VersionBump.MINOR)))
             .thenReturn("urn:example:mapping:m1:1.0.0");
 
         var result = operations.saveArtifact(
             new SaveArtifactCommand(artifactId, ArtifactKind.MAPPING, content, VersionBump.MINOR));
 
         assertThat(result.artifactId()).isEqualTo(artifactId);
-        verify(registry).storeMapping(anyString(), eq(content), eq(de.civitascore.modelforge.contract.VersionBump.MINOR));
+        verify(registry).storeMapping(anyString(), any(), eq(de.civitascore.modelforge.contract.VersionBump.MINOR));
     }
 
     @Test
@@ -267,11 +273,11 @@ class EmbeddedModelForgeOperationsTest {
         String orphanLogical = UrnParser.logicalUrn(orphan);
         String sharedLogical = UrnParser.logicalUrn(shared);
 
-        when(registry.blockingDependents(container.value())).thenReturn(List.of());
+        when(registry.nonDataSetBlockingDependents(container.value())).thenReturn(List.of());
         when(registry.fetchArtifactRefUrns(container.value())).thenReturn(List.of(orphan, shared));
         // Once the container is gone, A is orphaned but B is still grouped by another DataStructure.
-        when(registry.blockingDependents(orphanLogical)).thenReturn(List.of());
-        when(registry.blockingDependents(sharedLogical))
+        when(registry.nonDataSetBlockingDependents(orphanLogical)).thenReturn(List.of());
+        when(registry.nonDataSetBlockingDependents(sharedLogical))
             .thenReturn(List.of("urn:core:platform:civitas:datastructure:common:d2:zzzzzzzzzz"));
         when(registry.fetch(orphanLogical)).thenReturn(Optional.of(mapper.createObjectNode()));
         when(registry.fetch(sharedLogical)).thenReturn(Optional.of(mapper.createObjectNode()));
@@ -288,7 +294,7 @@ class EmbeddedModelForgeOperationsTest {
     @Test
     void deleteArtifactIsBlockedWhileDependentsExist() {
         var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0");
-        when(registry.blockingDependents(artifactId.value()))
+        when(registry.nonDataSetBlockingDependents(artifactId.value()))
             .thenReturn(List.of("urn:core:platform:civitas:mapping:common:sensor-to-obs:4rrb1hifsm"));
 
         assertThatThrownBy(() -> operations.deleteArtifact(artifactId))

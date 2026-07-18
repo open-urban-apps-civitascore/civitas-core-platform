@@ -104,7 +104,22 @@ class EmbeddedModelForgeTest {
                 }
 
                 @Override
-                public void deleteArtifact(ArtifactId artifactId, boolean cascade) {
+                public void deleteArtifact(ArtifactId artifactId, boolean cascade, boolean force) {
+                    // no-op fake
+                }
+
+                @Override
+                public List<ArtifactSummary> orphans(de.civitascore.modelforge.contract.ArtifactKind kind) {
+                    return List.of();
+                }
+
+                @Override
+                public void linkToDataSet(ArtifactId dataSet, ArtifactId member) {
+                    // no-op fake
+                }
+
+                @Override
+                public void unlinkFromDataSet(ArtifactId dataSet, ArtifactId member) {
                     // no-op fake
                 }
 

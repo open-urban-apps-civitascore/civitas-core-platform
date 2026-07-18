@@ -1,6 +1,7 @@
 package de.civitascore.modelforge.facade;
 
 import de.civitascore.modelforge.contract.ArtifactId;
+import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.ArtifactView;
@@ -168,24 +169,48 @@ public interface ModelForge {
      *     self-references are exempt.
      */
     default void deleteArtifact(ArtifactId artifactId) {
-        deleteArtifact(artifactId, false);
+        deleteArtifact(artifactId, false, false);
+    }
+
+    default void deleteArtifact(ArtifactId artifactId, boolean cascade) {
+        deleteArtifact(artifactId, cascade, false);
     }
 
     /**
-     * Deletes the artifact (all versions) behind a logical URN, optionally cascading into its
-     * members.
+     * Deletes the artifact (all versions) behind a logical URN under the DataSet-aware deletion
+     * policy (see the deletion-policy concept), optionally cascading into its members.
      *
-     * <p>The target itself is deleted only when nothing else references it (as in
-     * {@link #deleteArtifact(ArtifactId)}). When {@code cascade} is {@code true}, the target's
-     * members — the artifacts it references (a DataStructure's Elements, a DataSet's contents, a
-     * Pipeline's nodes, …) — are deleted too, but each one <em>only if</em>, once this container is
-     * gone, no other artifact still references it; shared members are kept. Cascade recurses, so a
-     * member that itself becomes orphaned has its own orphaned members removed, always stopping at
-     * anything still in use (mutually-referencing members keep each other alive).
+     * <p>Non-DataSet references block unconditionally (referential integrity). DataSet membership is
+     * count-based: 0 → delete; 1 → delete and auto-unlink from that DataSet's manifest; ≥2 → blocked
+     * (remove from the other DataSets first). Deleting a DataSet deletes only its manifest — its
+     * members are kept.
      *
-     * @throws de.civitascore.modelforge.contract.ArtifactInUseException when any other artifact
-     *     still references the target — cascade only ever deletes downward into members, never a
-     *     still-referenced target.
+     * <p>When {@code cascade} is {@code true}, the target's members are deleted too, but each only if
+     * it becomes fully orphaned once this container is gone (no non-DataSet referrer, in no other
+     * DataSet); shared members are kept. When {@code force} is {@code true}, the blocks are overridden
+     * and the target is deleted regardless of referrers (and auto-unlinked from every DataSet) —
+     * dangerous (may dangle non-DataSet references); for administrative repair only.
+     *
+     * @throws de.civitascore.modelforge.contract.ArtifactInUseException when a non-DataSet artifact
+     *     still references the target, or it is a member of ≥2 DataSets, and {@code force} is false.
      */
-    void deleteArtifact(ArtifactId artifactId, boolean cascade);
+    void deleteArtifact(ArtifactId artifactId, boolean cascade, boolean force);
+
+    // ── DataSet membership ─────────────────────────────────────────────────────
+
+    /**
+     * Artifacts of the given kind that belong to no DataSet (no {@code dataset-ref} in-edge) — the
+     * generic "orphans by type" query (e.g. all Mappings / Pipelines / DataSources in no DataSet), so
+     * they can be reviewed, assigned, or cleaned up.
+     */
+    List<ArtifactSummary> orphans(ArtifactKind kind);
+
+    /**
+     * Explicitly adds a reusable artifact to a DataSet's manifest (a {@code dataset-ref} member),
+     * independent of any Pipeline that uses it. Idempotent; no-op if already a member.
+     */
+    void linkToDataSet(ArtifactId dataSet, ArtifactId member);
+
+    /** Explicitly removes an artifact from a DataSet's manifest. Idempotent. */
+    void unlinkFromDataSet(ArtifactId dataSet, ArtifactId member);
 }

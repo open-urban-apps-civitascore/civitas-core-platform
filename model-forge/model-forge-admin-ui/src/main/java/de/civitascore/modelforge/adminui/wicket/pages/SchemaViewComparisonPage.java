@@ -1,9 +1,13 @@
 package de.civitascore.modelforge.adminui.wicket.pages;
 
 import de.civitascore.modelforge.adminui.wicket.BasePage;
+import de.civitascore.modelforge.adminui.wicket.components.CodeEditorPanel;
 import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.SchemaViewQuery;
 import de.civitascore.modelforge.facade.ModelForge;
+import org.apache.wicket.markup.head.IHeaderResponse;
+import org.apache.wicket.markup.head.JavaScriptHeaderItem;
+import org.apache.wicket.markup.head.OnDomReadyHeaderItem;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.request.mapper.parameter.PageParameters;
@@ -43,8 +47,25 @@ public class SchemaViewComparisonPage extends BasePage {
             identical = bundled.equals(inlined);
         }
 
-        add(new Label("bundled", Model.of(bundled)));
-        add(new Label("inlined", Model.of(inlined)));
+        bundledLabel = new Label("bundled", Model.of(bundled));
+        bundledLabel.setOutputMarkupId(true);
+        add(bundledLabel);
+        inlinedLabel = new Label("inlined", Model.of(inlined));
+        inlinedLabel.setOutputMarkupId(true);
+        add(inlinedLabel);
         add(new Label("identical", Model.of(identical ? "identical" : "different")));
+    }
+
+    // Both panes are pretty-printed JSON; highlight them with the shared local highlighter.
+    private final Label bundledLabel;
+    private final Label inlinedLabel;
+
+    @Override
+    public void renderHead(IHeaderResponse response) {
+        super.renderHead(response);
+        response.render(JavaScriptHeaderItem.forReference(CodeEditorPanel.HIGHLIGHTER_JS));
+        response.render(OnDomReadyHeaderItem.forScript(
+            CodeEditorPanel.highlightScript(bundledLabel.getMarkupId(), CodeEditorPanel.MODE_JSON)
+                + CodeEditorPanel.highlightScript(inlinedLabel.getMarkupId(), CodeEditorPanel.MODE_JSON)));
     }
 }

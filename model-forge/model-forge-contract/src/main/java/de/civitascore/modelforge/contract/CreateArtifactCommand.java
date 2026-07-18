@@ -16,11 +16,15 @@ import tools.jackson.databind.JsonNode;
  *                XSD-backed ones, are created through {@code importSchema})
  * @param name    display name the URN name segment is derived from (must not be blank)
  * @param content the artifact document; its {@code id} field is overwritten with the minted URN
+ * @param dataSet optional CORE URN of a DataSet to link the new artifact into as a member; when
+ *                non-null, Model Forge adds it (and, for a Pipeline, the artifacts it references) to
+ *                that DataSet's manifest. {@code null} means no DataSet membership (the default).
  */
 public record CreateArtifactCommand(
     ArtifactKind kind,
     String name,
-    JsonNode content
+    JsonNode content,
+    String dataSet
 ) {
 
     public CreateArtifactCommand {
@@ -30,5 +34,10 @@ public record CreateArtifactCommand(
         if (name.isBlank()) {
             throw new IllegalArgumentException("name must not be blank");
         }
+    }
+
+    /** Backward-compatible: create without linking the artifact into any DataSet. */
+    public CreateArtifactCommand(ArtifactKind kind, String name, JsonNode content) {
+        this(kind, name, content, null);
     }
 }

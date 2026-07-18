@@ -6,6 +6,7 @@ import de.civitascore.modelforge.adminui.wicket.components.CodeEditorPanel;
 import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
+import de.civitascore.modelforge.graph.DependencyGraphService;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.modelforge.urn.UrnParser;
@@ -51,6 +52,14 @@ public class ArtifactViewPage extends BasePage {
 
     @SpringBean
     private ModelForge modelForge;
+
+    // This admin console runs as a SEPARATE process from portal-backend, which writes the shared
+    // model_forge schema. The dependency graph is a per-process in-memory index (rebuilt at startup,
+    // updated only on writes through THIS process), so references portal-backend created after the
+    // console started are absent from ours. Rebuild it from the durable artifact_reference rows before
+    // reading relations so cross-process writes show up (fine for a dev registry; see GraphPage).
+    @SpringBean
+    private DependencyGraphService dependencyGraph;
 
     private final String urn;
 
@@ -118,7 +127,11 @@ public class ArtifactViewPage extends BasePage {
         deleteLink.setVisible(exists);
         add(deleteLink);
 
-        // Relations as chips
+        // Relations as chips. Refresh the per-process graph first so references created by
+        // portal-backend after this console started are reflected (see the dependencyGraph field).
+        if (exists) {
+            dependencyGraph.rebuild();
+        }
         addRelations("dependencies", exists ? modelForge.dependencies(new DependencyQuery(artifactId)) : null, artifactId);
         addRelations("dependents", exists ? modelForge.dependents(new DependencyQuery(artifactId)) : null, artifactId);
         addRelations("mapsTo", exists ? modelForge.mapsTo(new DependencyQuery(artifactId)) : null, artifactId);
