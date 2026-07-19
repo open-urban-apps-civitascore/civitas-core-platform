@@ -190,7 +190,17 @@ public class ModelRegistryGateway {
    * Deletes the artifact (all versions) behind a logical URN. No-op semantics are Model Forge's.
    */
   public void deleteModel(String logicalUrn) {
-    modelForge.deleteArtifact(new ArtifactId(logicalUrn));
+    // A datastructure model is stored as a DataStructure grouping artifact plus its member
+    // Elements.
+    // For a flat single-object model the stored pin is the Element itself; its auto-created
+    // grouping
+    // (same name + disambiguator, differing only in the ':datastructure:' type segment) references
+    // it and — under Model Forge's strict deletion policy — a grouping edge blocks deleting the
+    // Element directly. Target the grouping with cascade so it and its now-orphaned member Elements
+    // are removed together, leaving no dangling grouping edge. When the pin is already the grouping
+    // (a multi-$defs model), the replace is a no-op and the same cascade delete applies.
+    String groupingUrn = logicalUrn.replace(":element:", ":datastructure:");
+    modelForge.deleteArtifact(new ArtifactId(groupingUrn), true, false);
   }
 
   /**
