@@ -2,7 +2,9 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -144,5 +146,22 @@ class MappingServiceTest {
 
     assertThat(mappingService.get("urn:core:platform:civitas:mapping:common:missing:zzz9999999"))
         .isEmpty();
+  }
+
+  @Test
+  void delete_whenNotForced_delegatesToPlainDeletePayload() {
+    mappingService.delete(VERSIONED_URN, false);
+
+    verify(registry).deletePayload(VERSIONED_URN);
+    verify(registry, never()).deleteArtifact(any(), anyBoolean(), anyBoolean());
+  }
+
+  @Test
+  void delete_whenForced_forceDeletesAndUnlinksFromDataSets() {
+    mappingService.delete(VERSIONED_URN, true);
+
+    // force delete: no cascade, force=true (unlinks the mapping from any DataSets, ignores refs).
+    verify(registry).deleteArtifact(VERSIONED_URN, false, true);
+    verify(registry, never()).deletePayload(any());
   }
 }

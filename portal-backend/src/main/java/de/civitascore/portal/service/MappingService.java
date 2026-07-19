@@ -45,6 +45,21 @@ public class MappingService {
     return registry.fetchPayload(urn).map(ModelRegistryGateway.RegistryDocument::content);
   }
 
+  /**
+   * Deletes a Mapping artifact by its (logical or versioned) CORE URN. Without {@code force} the
+   * delete is rejected by Model Forge while another artifact still references the mapping (e.g. a
+   * pipeline's {@code mappingRef}); with {@code force} it is unlinked from any DataSets and deleted
+   * regardless. Deleting a mapping that a pipeline still references leaves a dangling reference, so
+   * callers should delete referencing pipelines first (or pass {@code force}).
+   */
+  public void delete(String urn, boolean force) {
+    if (force) {
+      registry.deleteArtifact(urn, false, true);
+    } else {
+      registry.deletePayload(urn);
+    }
+  }
+
   private static String deriveName(Map<String, Object> doc) {
     Object title = doc.get("title");
     return title instanceof String s && !s.isBlank() ? s : "mapping";

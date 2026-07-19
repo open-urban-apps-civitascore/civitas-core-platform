@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -55,6 +56,20 @@ public class MappingController {
         .get(urn)
         .map(ResponseEntity::ok)
         .orElseGet(() -> ResponseEntity.notFound().build());
+  }
+
+  @DeleteMapping
+  @Operation(
+      summary = "Delete a Mapping artifact by its (logical or versioned) CORE URN",
+      description =
+          "Without force=true the delete is rejected while another artifact (e.g. a pipeline's"
+              + " mappingRef) still references the mapping; force=true unlinks it from any DataSets"
+              + " and deletes regardless.")
+  public ResponseEntity<Void> delete(
+      @RequestParam("urn") String urn,
+      @RequestParam(value = "force", defaultValue = "false") boolean force) {
+    mappingService.delete(urn, force);
+    return ResponseEntity.noContent().build();
   }
 
   private static Map<String, String> pins(ModelRegistryGateway.ModelPin pin) {

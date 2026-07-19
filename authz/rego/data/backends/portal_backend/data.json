@@ -141,7 +141,8 @@
       "_collection": true,
       "GET": "DATASTRUCTURE_READ",
       "POST": "DATASTRUCTURE_CREATE",
-      "PUT": "DATASTRUCTURE_UPDATE"
+      "PUT": "DATASTRUCTURE_UPDATE",
+      "DELETE": "DATASTRUCTURE_DELETE"
     },
     "/v1/orphans": {
       "_collection": true,
