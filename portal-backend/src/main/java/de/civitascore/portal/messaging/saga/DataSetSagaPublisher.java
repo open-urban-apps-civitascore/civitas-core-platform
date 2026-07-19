@@ -192,9 +192,9 @@ public class DataSetSagaPublisher {
     Map<String, Object> configuration =
         fetchConfiguration(sink.getConfigurationUrn(), "DataSink", sink.getId());
     // Keyed by the DataSink's configuration CORE URN — the same URN a pipeline's sink node carries
-    // as its sinkRef — so the config-adapter resolves the sink on URNs, not GUIDs. A passthrough
-    // FROST sink stores no configuration, so its URN (and this id) is null; such a sink cannot be
-    // referenced by a pipeline node anyway (its sinkRef would be absent too).
+    // as its sinkRef — so the config-adapter resolves the sink on URNs, not GUIDs. Every sink,
+    // including a passthrough FROST sink (whose config is just its stamped connectionType), owns a
+    // configurationUrn, so every sink node can carry a sinkRef.
     return new DataSinkPayload(
         sink.getConfigurationUrn(),
         sink.getDataSinkType() != null ? sink.getDataSinkType().name() : null,

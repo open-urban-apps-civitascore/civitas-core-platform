@@ -143,28 +143,38 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
 
   /**
    * Stores the validated configuration in the Model Forge registry (kind {@code DATA_SINK}) and
-   * mirrors the assigned pin onto the shell. FROST sinks require an absent/empty configuration —
-   * nothing is stored and both URN columns stay null. The {@code element} URN soft reference is
-   * preserved verbatim inside the stored payload, where Model Forge records it as a {@code
-   * datasink-element} dependency edge onto the referenced model.
+   * mirrors the assigned pin onto the shell. Every DataSink — including a passthrough FROST sink
+   * whose only content is its {@code connectionType} — is a first-class CORE DataSink artifact that
+   * pipelines reference by {@code sinkRef}, so it always owns a {@code configurationUrn}. A {@code
+   * null} configuration (a metadata-only update that does not touch the config) keeps the existing
+   * pin untouched; an empty configuration still stores the stamped {@code connectionType} (all a
+   * FROST sink needs). The {@code element} URN soft reference is preserved verbatim inside the
+   * stored payload, where Model Forge records it as a {@code datasink-element} dependency edge onto
+   * the referenced model.
    *
    * @param entity the data sink entity
    * @param input the input DTO carrying the configuration
    */
   private void storeConfigurationInRegistry(DataSink entity, DataSinkInputDTO input) {
     Map<String, Object> configuration = input.getConfiguration();
-    if (configuration == null || configuration.isEmpty()) {
+    DataSinkType type = input.getDataSinkType();
+    // No configuration and no type to identify the sink → nothing to store (clear the pin). A null
+    // configuration with a known type is a metadata-only update: keep the existing pin.
+    if (type == null) {
       entity.setConfigurationUrn(null);
       return;
     }
-    // The host supplies only content: the connectionType (from the sink type). Model Forge owns the
-    // artifact's self-description — it stamps $schema and id on every write (see EmbeddedModelForge
-    // Operations.saveArtifact) so the stored payload satisfies datasink.schema.json. isUnchanged's
-    // comparable() ignores those stamps, so re-versions only mint when a real field changed.
-    Map<String, Object> payload = new LinkedHashMap<>(configuration);
-    if (input.getDataSinkType() != null) {
-      payload.put("connectionType", input.getDataSinkType().name().toLowerCase(Locale.ROOT));
+    if (configuration == null) {
+      return;
     }
+    // The host supplies only content: the connectionType (from the sink type) plus any
+    // type-specific
+    // fields. Model Forge owns the artifact's self-description — it stamps $schema and id on every
+    // write (see EmbeddedModelForgeOperations.saveArtifact) so the stored payload satisfies
+    // datasink.schema.json. isUnchanged's comparable() ignores those stamps, so re-versions only
+    // mint when a real field changed.
+    Map<String, Object> payload = new LinkedHashMap<>(configuration);
+    payload.put("connectionType", type.name().toLowerCase(Locale.ROOT));
     if (entity.getConfigurationUrn() != null
         && modelRegistryGateway.isUnchanged(entity.getConfigurationUrn(), payload, null)) {
       // Unchanged configuration keeps the existing pin — no new registry version.

@@ -74,6 +74,15 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
   /**
    * Reads the sink's configuration document back from the registry; {@code null} when no
    * configuration is stored (e.g. FROST sinks).
+   *
+   * <p>The {@code connectionType} discriminator is <b>synthetic</b>: {@link
+   * de.civitascore.portal.service.DataSinkService} derives it from {@code dataSinkType} and stamps
+   * it into the payload on write so the document satisfies {@code datasink.schema.json}'s {@code
+   * oneOf}. It is not user-authored configuration, so it is stripped here — symmetric to the write
+   * — leaving {@code configuration} as pure host content. Without this, a PATCH would reconstitute
+   * the current configuration (via {@link #toInput}) with {@code connectionType} included, and
+   * {@code DataSinkService.validateFrostConfiguration} (which requires an exact {@code {element}}
+   * key set) would reject the unchanged FROST config with a 400.
    */
   private Map<String, Object> fetchConfiguration(DataSink entity) {
     if (entity.getConfigurationUrn() == null) {
@@ -82,6 +91,13 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     return modelRegistryGateway
         .fetchPayload(entity.getConfigurationUrn())
         .map(ModelRegistryGateway.RegistryDocument::content)
+        .map(
+            content -> {
+              // Defensive copy: the registry read is mutable, but a stubbed Map.of(...) is not.
+              Map<String, Object> hostContent = new HashMap<>(content);
+              hostContent.remove("connectionType");
+              return hostContent;
+            })
         .orElse(null);
   }
 

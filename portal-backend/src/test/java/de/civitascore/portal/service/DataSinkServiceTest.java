@@ -228,8 +228,8 @@ class DataSinkServiceTest {
     }
 
     @Test
-    @DisplayName("FROST create stores nothing in the registry (empty configuration)")
-    void frostCreateStoresNothing() {
+    @DisplayName("FROST create stores {connectionType:frost} and pins its configurationUrn")
+    void frostCreatePinsConnectionType() {
       UUID dataSetId = UUID.randomUUID();
 
       DataSinkInputDTO input = new DataSinkInputDTO();
@@ -244,9 +244,18 @@ class DataSinkServiceTest {
 
       DataSink result = dataSinkService.create(input);
 
-      verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any());
-      assertThat(result.getConfigurationLogicalUrn()).isNull();
-      assertThat(result.getConfigurationUrn()).isNull();
+      // A FROST sink is a first-class CORE DataSink artifact whose only content is its stamped
+      // connectionType (all a passthrough FROST sink needs), so it obtains a configurationUrn a
+      // pipeline can reference by sinkRef. Model Forge stamps $schema + id on write.
+      verify(modelRegistryGateway)
+          .storePayload(
+              eq(PayloadKind.DATA_SINK),
+              eq(Optional.empty()),
+              any(),
+              eq(Map.of("connectionType", "frost")),
+              isNull());
+      assertThat(result.getConfigurationLogicalUrn()).isEqualTo(STORED_LOGICAL_URN);
+      assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);
     }
 
     @Test
