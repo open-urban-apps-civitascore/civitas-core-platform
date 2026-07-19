@@ -24,6 +24,9 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('sagaDataSinkId', res.body.id);
+    // A FROST sink is a first-class CORE artifact ({connectionType:"frost"}) with its own
+    // configurationUrn — the pipeline's sink node references it as sinkRef.
+    if (res.body.configurationUrn) bru.setVar('sagaDataSinkConfigUrn', res.body.configurationUrn);
   }
 }
 

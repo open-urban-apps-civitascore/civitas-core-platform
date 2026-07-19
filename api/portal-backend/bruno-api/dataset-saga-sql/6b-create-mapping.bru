@@ -25,6 +25,7 @@ body:json {
 script:post-response {
   if (res.body && res.body.versionedUrn) {
     bru.setVar('sqlMappingUrn', res.body.versionedUrn);
+    bru.setVar('sqlMappingLogicalUrn', res.body.logicalUrn);
   }
 }
 

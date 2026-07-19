@@ -1,0 +1,30 @@
+meta {
+  name: 12b. Cleanup — Delete Mapping
+  type: http
+  seq: 21
+}
+
+delete {
+  url: {{baseUrl}}/mappings?urn={{pgMappingLogicalUrn}}&force=true
+  body: none
+  auth: inherit
+}
+
+params:query {
+  urn: {{pgMappingLogicalUrn}}
+  force: true
+}
+
+tests {
+  test("Mapping deleted or already gone", function() {
+    const status = res.getStatus();
+    expect([204, 404]).to.include(status);
+  });
+}
+
+docs {
+  **PostGIS saga cleanup** — deletes the Mapping artifact from step 6b. Runs BEFORE the pipeline and
+  datastructures: force=true unlinks it from the DataSet and deletes it regardless of the pipeline's
+  still-present mappingRef, so the referenced source/target DataStructures can be torn down
+  afterwards (Model Forge blocks deleting a still-referenced artifact).
+}

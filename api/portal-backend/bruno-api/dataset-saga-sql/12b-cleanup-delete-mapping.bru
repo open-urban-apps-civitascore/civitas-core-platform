@@ -1,0 +1,30 @@
+meta {
+  name: 12b. Cleanup — Delete Mapping
+  type: http
+  seq: 21
+}
+
+delete {
+  url: {{baseUrl}}/mappings?urn={{sqlMappingLogicalUrn}}&force=true
+  body: none
+  auth: inherit
+}
+
+params:query {
+  urn: {{sqlMappingLogicalUrn}}
+  force: true
+}
+
+tests {
+  test("Mapping deleted or already gone", function() {
+    const status = res.getStatus();
+    expect([204, 404]).to.include(status);
+  });
+}
+
+docs {
+  **SQL saga cleanup** — deletes the Mapping artifact created in step 6b. Runs BEFORE the pipeline
+  and datastructures: force=true unlinks it from the DataSet and deletes it regardless of the
+  pipeline's still-present mappingRef, so the referenced source/target DataStructures can be torn
+  down afterwards (Model Forge blocks deleting an artifact that is still referenced).
+}

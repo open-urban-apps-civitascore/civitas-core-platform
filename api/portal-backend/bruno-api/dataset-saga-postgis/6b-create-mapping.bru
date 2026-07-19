@@ -25,6 +25,7 @@ body:json {
 script:post-response {
   if (res.body && res.body.versionedUrn) {
     bru.setVar('pgMappingUrn', res.body.versionedUrn);
+    bru.setVar('pgMappingLogicalUrn', res.body.logicalUrn);
   }
 }
 
