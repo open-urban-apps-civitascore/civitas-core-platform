@@ -368,12 +368,12 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
    *     for any dataset it feeds
    */
   private void revalidateLinkedDatasetsAgainstNewScope(DataSource dataSource) {
+    List<DataSource> sources = List.of(dataSource);
     pipelineRepository
         .findByDataSourcesId(dataSource.getId())
         .forEach(
             pipeline ->
-                datapoolScopeValidator.validate(
-                    List.of(dataSource), pipeline.getDataSet().getDataPool()));
+                datapoolScopeValidator.validate(sources, pipeline.getDataSet().getDataPool()));
   }
 
   private void validateInUseConstraints(DataSourceInputDTO input, DataSource entity) {
