@@ -326,6 +326,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @param id the dataset ID
    * @return the unstaged dataset
    * @throws InvalidInputException if dataset is not in READY status
+   * @throws ResourceInUseException if a saga is already in-flight
    */
   @Transactional
   public DataSet unstage(UUID id) {
@@ -334,6 +335,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     if (dataSet.getDataSetStatus() != DataSetStatus.READY) {
       throw new InvalidInputException(
           "dataSetStatus", id, "DataSet can only be unstaged from READY status");
+    }
+
+    if (dataSet.getPendingSagaType() != null) {
+      throw new ResourceInUseException(
+          "DataSet",
+          id,
+          "Cannot unstage while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
 
     dataSet.setDataSetStatus(DataSetStatus.DRAFT);
@@ -349,6 +357,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @param id the dataset ID
    * @return the released dataset
    * @throws InvalidInputException if dataset is not in READY status
+   * @throws ResourceInUseException if a saga is already in-flight
    */
   @Override
   @Transactional
@@ -363,6 +372,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "dataSetStatus", id, "DataSet can only be released from READY status");
     }
 
+    if (dataSet.getPendingSagaType() != null) {
+      throw new ResourceInUseException(
+          "DataSet",
+          id,
+          "Cannot release while a saga is in-flight: " + dataSet.getPendingSagaType());
+    }
+
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
     dataSet.setPendingSagaType(PendingSagaType.CREATE);
     DataSet saved = dataSetRepository.save(dataSet);
@@ -373,11 +389,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Unreleases a dataset by triggering a DATASET_DELETE saga to tear down infrastructure. On saga
-   * completion, the dataset transitions from AVAILABLE to READY.
+   * Unreleases a dataset by triggering a DATASET_DELETE saga to tear down infrastructure. The
+   * status transitions to READY optimistically (mirroring {@link #release}, which sets AVAILABLE up
+   * front); the DELETE saga then tears down infrastructure asynchronously. A failed teardown
+   * reverts to AVAILABLE.
    *
    * @param id the dataset ID
-   * @return the dataset with pending DELETE saga
+   * @return the dataset in READY status with a pending DELETE saga
    * @throws InvalidInputException if dataset is not AVAILABLE
    * @throws ResourceInUseException if a saga is already in-flight
    */
@@ -398,9 +416,12 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "Cannot unrelease while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
 
+    dataSet.setDataSetStatus(DataSetStatus.READY);
     dataSet.setPendingSagaType(PendingSagaType.DELETE);
     DataSet saved = dataSetRepository.save(dataSet);
 
+    // Publish before the infrastructure fields are cleared (only the completion callback clears
+    // them) so the teardown payload still carries the resource IDs it must deprovision.
     sagaPublisher.publishDeleteRequested(saved);
 
     return saved;
@@ -417,8 +438,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
     if (pendingType == PendingSagaType.DELETE) {
       dataSet.clearInfrastructureFields();
-      dataSet.setDataSetStatus(DataSetStatus.READY);
-      log.info("Saga DELETE completed for dataset {}, reverted to READY", datasetId);
+      log.info("Saga DELETE completed for dataset {}, infrastructure torn down", datasetId);
     } else if (pendingType == PendingSagaType.CREATE) {
       applyInfrastructureResult(dataSet, result);
       log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
@@ -437,9 +457,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Handles a failed saga result. Reverts state as needed based on the pending saga type. For
-   * CREATE failures the dataset reverts to READY; for UPDATE and DELETE failures it stays
-   * AVAILABLE.
+   * Handles a failed saga result. Reverts state as needed based on the pending saga type. CREATE
+   * failures revert to READY and DELETE failures revert to AVAILABLE (undoing the optimistic status
+   * change); UPDATE failures stay AVAILABLE.
    *
    * @param datasetId the dataset ID
    * @param failedStep the saga step that failed
@@ -468,9 +488,10 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           Encode.forJava(error),
           compensated);
     } else if (pendingType == PendingSagaType.DELETE) {
+      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
       log.warn(
           "Saga DELETE failed for dataset {}: step={}, error={}, compensated={}. "
-              + "Staying AVAILABLE — stale resources may exist",
+              + "Reverted to AVAILABLE — stale resources may exist",
           datasetId,
           Encode.forJava(failedStep),
           Encode.forJava(error),

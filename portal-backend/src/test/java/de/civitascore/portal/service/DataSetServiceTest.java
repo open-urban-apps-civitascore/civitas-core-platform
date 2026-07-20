@@ -196,6 +196,49 @@ class DataSetServiceTest {
   }
 
   @Nested
+  @DisplayName("unstage()")
+  class UnstageTests {
+
+    @Test
+    @DisplayName("throws when dataset not in READY status")
+    void throwsWhenNotReady() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().unstage(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("READY");
+    }
+
+    @Test
+    @DisplayName("throws ResourceInUseException when a saga is in-flight")
+    void throwsWhenSagaInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().unstage(id))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight");
+    }
+
+    @Test
+    @DisplayName("reverts status to DRAFT")
+    void revertsToDraft() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet result = createService().unstage(id);
+
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+    }
+  }
+
+  @Nested
   @DisplayName("release()")
   class ReleaseTests {
 
@@ -219,6 +262,19 @@ class DataSetServiceTest {
       assertThatThrownBy(() -> createService().release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("READY");
+    }
+
+    @Test
+    @DisplayName("throws ResourceInUseException when a saga is in-flight")
+    void throwsWhenSagaInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight");
     }
 
     @Test
@@ -268,8 +324,9 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("sets pendingSagaType to DELETE and publishes trigger")
-    void setsPendingDeleteAndPublishes() {
+    @DisplayName(
+        "optimistically sets status to READY, pendingSagaType to DELETE, publishes trigger")
+    void setsReadyAndPendingDeleteAndPublishes() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
@@ -278,6 +335,7 @@ class DataSetServiceTest {
       DataSetService service = createService();
       DataSet result = service.unrelease(id);
 
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
       assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
       verify(sagaPublisher).publishDeleteRequested(result);
     }
@@ -730,10 +788,11 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("DELETE: clears infrastructure fields and reverts to READY")
-    void deleteClearsAndReverts() {
+    @DisplayName("DELETE: clears infrastructure fields, status already READY")
+    void deleteClearsInfrastructure() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.READY);
       ds.setPendingSagaType(PendingSagaType.DELETE);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -792,6 +851,24 @@ class DataSetServiceTest {
       ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
       verify(dataSetRepository).save(saved.capture());
       assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("DELETE failure: reverts status to AVAILABLE")
+    void deleteFailureRevertsToAvailable() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.READY);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaFailed(id, "FROST", "timeout", false);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
       assertThat(saved.getValue().getPendingSagaType()).isNull();
     }
   }
