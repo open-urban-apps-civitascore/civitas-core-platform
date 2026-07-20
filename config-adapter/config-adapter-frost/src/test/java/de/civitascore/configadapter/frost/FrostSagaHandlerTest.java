@@ -171,16 +171,10 @@ class FrostSagaHandlerTest {
     }
 
     @Test
-    @DisplayName(
-        "returns success when FROST signals duplicate via 500 'Failed to store data.' and project exists")
-    void shouldReturnSuccessWhenFrostSignalsDuplicateAndProjectExists() {
+    @DisplayName("reuses an existing project found by name and skips the POST (find-or-create)")
+    void shouldReuseExistingProjectAndSkipPost() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response postResponse = mock(Response.class);
-        when(postResponse.getStatus()).thenReturn(500);
-        when(postResponse.readEntity(String.class))
-            .thenReturn("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
-
+        // Up-front lookup finds the dataset's own project → reuse it, never POST.
         Response getResponse = mock(Response.class);
         when(getResponse.getStatus()).thenReturn(200);
         when(getResponse.readEntity(Map.class))
@@ -197,12 +191,50 @@ class FrostSagaHandlerTest {
         assertEquals("42", result.resultData().get("projectId"));
         assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
+        verify(mockBuilder, never()).post(any(Entity.class));
       }
     }
 
     @Test
     @DisplayName(
-        "returns failure when FROST signals duplicate via 500 'Failed to store data.' but no project found by name")
+        "recovers via the 500 'Failed to store data.' race guard when a concurrent create won and"
+            + " the second lookup finds the project")
+    void shouldReturnSuccessWhenFrostSignalsDuplicateAndProjectExists() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response postResponse = mock(Response.class);
+        when(postResponse.getStatus()).thenReturn(500);
+        when(postResponse.readEntity(String.class))
+            .thenReturn("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
+
+        // First lookup: empty (POST is attempted). After the POST's 500, the recovery lookup finds
+        // the project a concurrent create inserted in between.
+        Response emptyLookup = mock(Response.class);
+        when(emptyLookup.getStatus()).thenReturn(200);
+        when(emptyLookup.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
+        Response foundLookup = mock(Response.class);
+        when(foundLookup.getStatus()).thenReturn(200);
+        when(foundLookup.readEntity(Map.class))
+            .thenReturn(Map.of("value", List.of(Map.of("@iot.id", 42))));
+        when(mockBuilder.get()).thenReturn(emptyLookup, foundLookup);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Existing Dataset"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("42", result.resultData().get("projectId"));
+        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
+        assertEquals("42", result.compensationData().get("projectId"));
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "returns failure when the POST fails with 500 'Failed to store data.' but no project is"
+            + " found by name")
     void shouldReturnFailureWhenFrostSignalsDuplicateButProjectNotFound() {
       try (FrostSagaHandler handler = createHandler()) {
         Response postResponse = mock(Response.class);
@@ -211,11 +243,7 @@ class FrostSagaHandlerTest {
             .thenReturn("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}");
         when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
 
-        Response getResponse = mock(Response.class);
-        when(getResponse.getStatus()).thenReturn(200);
-        when(getResponse.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
-        when(mockBuilder.get()).thenReturn(getResponse);
-
+        // Both the up-front and the recovery lookup return empty (default from setup).
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Ghost Dataset"));
 
@@ -1203,6 +1231,14 @@ class FrostSagaHandlerTest {
     when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
     when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
     when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
+
+    // CREATE_PROJECT is now find-or-create: it always issues a name-lookup GET before the POST.
+    // Default that lookup to "no existing project" so the POST path is exercised; tests that assert
+    // reuse override mockBuilder.get() with a non-empty result.
+    Response emptyLookup = mock(Response.class);
+    when(emptyLookup.getStatus()).thenReturn(200);
+    when(emptyLookup.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
+    when(mockBuilder.get()).thenReturn(emptyLookup);
 
     handler.setTestClient(mockClient);
     return handler;

@@ -109,6 +109,23 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
 
     String projectName = frostProjectName(datasetName, datasetId);
+
+    // Find-or-create: the project name carries the globally-unique datasetId, so a pre-existing
+    // project can only be this dataset's own — a prior CREATE_PROJECT that already ran (re-release,
+    // retried saga). Reusing it keeps the FROST data (Things → Datastreams → Observations) intact
+    // instead of orphaning it behind a second project. Idempotency no longer hinges on the
+    // version-specific 500 "Failed to store data." string; that path stays only as a race guard.
+    SagaCommandResult existing = findExistingProjectByName(command, projectName);
+    if (existing != null) {
+      return existing;
+    }
+
+    return createNewProject(command, projectName, description);
+  }
+
+  /** POSTs a new private FROST project, with a 500-duplicate race guard. */
+  private SagaCommandResult createNewProject(
+      SagaCommandMessage command, String projectName, String description) {
     Map<String, Object> body = new HashMap<>();
     body.put(KEY_NAME, projectName);
     body.put(KEY_DESCRIPTION, description);
@@ -124,29 +141,8 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
             .apply(client().target(serverUrl).path("Projects").request(MediaType.APPLICATION_JSON))
             .post(Entity.json(body))) {
 
-      // FROST returns HTTP 500 with "Failed to store data." on UNIQUE constraint violations
-      // (duplicate project name) instead of the expected HTTP 409 Conflict.
-      // Fall back to a name lookup so CREATE_PROJECT is idempotent.
       if (response.getStatus() == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
-        String responseBody = response.readEntity(String.class);
-        if (responseBody != null
-            && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA)) {
-          log.info(
-              "FROST returned 500 'Failed to store data.' for CREATE_PROJECT"
-                  + " — checking for existing project with name '{}', saga={}",
-              Encode.forJava(projectName),
-              Encode.forJava(command.sagaId()));
-          return findExistingProjectByName(command, projectName);
-        }
-        // An HTTP 500 that is NOT the known duplicate-name case is a genuine FROST-side failure.
-        // Log the full body at WARN so operators see the real cause — the exception message is
-        // surfaced to the saga but may be truncated/sanitized downstream.
-        log.warn(
-            "FROST returned HTTP 500 for CREATE_PROJECT that is not the known 'Failed to store"
-                + " data.' duplicate case — body: {}, saga={}",
-            Encode.forJava(responseBody),
-            Encode.forJava(command.sagaId()));
-        throw new SagaApiException("CREATE_PROJECT failed: HTTP 500 — " + responseBody, 500);
+        return handleCreateProjectServerError(command, projectName, response);
       }
 
       checkResponse(response, "CREATE_PROJECT");
@@ -167,6 +163,49 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     }
   }
 
+  /**
+   * Handles an HTTP 500 from the CREATE_PROJECT POST. FROST returns 500 "Failed to store data." on
+   * a UNIQUE constraint violation (duplicate project name) instead of 409 Conflict. This is a race
+   * guard: the up-front find-or-create lookup already ran, but a concurrent CREATE may have
+   * inserted the project in between — so re-run the name lookup and reuse the winner.
+   */
+  private SagaCommandResult handleCreateProjectServerError(
+      SagaCommandMessage command, String projectName, Response response) {
+    String responseBody = response.readEntity(String.class);
+    if (responseBody != null && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA)) {
+      log.info(
+          "FROST returned 500 'Failed to store data.' for CREATE_PROJECT"
+              + " — re-checking for existing project with name '{}', saga={}",
+          Encode.forJava(projectName),
+          Encode.forJava(command.sagaId()));
+      SagaCommandResult recovered = findExistingProjectByName(command, projectName);
+      if (recovered != null) {
+        return recovered;
+      }
+      throw new SagaApiException(
+          "CREATE_PROJECT failed: HTTP 500 — Failed to store data."
+              + " (no existing project found with name '"
+              + projectName
+              + "')",
+          500);
+    }
+    // An HTTP 500 that is NOT the known duplicate-name case is a genuine FROST-side failure.
+    // Log the full body at WARN so operators see the real cause — the exception message is
+    // surfaced to the saga but may be truncated/sanitized downstream.
+    log.warn(
+        "FROST returned HTTP 500 for CREATE_PROJECT that is not the known 'Failed to store"
+            + " data.' duplicate case — body: {}, saga={}",
+        Encode.forJava(responseBody),
+        Encode.forJava(command.sagaId()));
+    throw new SagaApiException("CREATE_PROJECT failed: HTTP 500 — " + responseBody, 500);
+  }
+
+  /**
+   * Looks up a project by its globally-unique {@code "{datasetName} ({datasetId})"} name. Returns a
+   * successful {@link SagaCommandResult} bound to the existing project, or {@code null} if none
+   * exists. The datasetId in the name guarantees any match is this dataset's own project, never a
+   * foreign same-display-named one.
+   */
   private SagaCommandResult findExistingProjectByName(SagaCommandMessage command, String name) {
     String escapedName = name.replace("'", "''");
     try (Response response =
@@ -187,12 +226,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       List<Map<String, Object>> projects = (List<Map<String, Object>>) result.get("value");
 
       if (projects == null || projects.isEmpty()) {
-        throw new SagaApiException(
-            "CREATE_PROJECT failed: HTTP 500 — Failed to store data."
-                + " (no existing project found with name '"
-                + name
-                + "')",
-            500);
+        return null;
       }
 
       String projectId = String.valueOf(projects.get(0).get("@iot.id"));
@@ -201,14 +235,9 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
       Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId);
 
-      // Recovery from an HTTP 500 by binding to a PRE-EXISTING project matched by the unique name
-      // "{datasetName} ({datasetId})". Because the name carries the globally-unique datasetId, this
-      // only ever re-binds the dataset to its OWN project (a retried CREATE_PROJECT) — never a
-      // foreign same-display-named one. Kept at WARN so the 500-recovery path stays
-      // operator-visible.
-      log.warn(
-          "FROST CREATE_PROJECT recovered from a 500 by reusing the existing project with the same"
-              + " unique (datasetName + datasetId) name: projectId={}, saga={}",
+      log.info(
+          "FROST CREATE_PROJECT reused the existing project matched by unique name: projectId={},"
+              + " saga={}",
           Encode.forJava(projectId),
           Encode.forJava(command.sagaId()));
 

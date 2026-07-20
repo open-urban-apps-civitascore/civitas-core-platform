@@ -116,6 +116,30 @@ class FlowableTriggerConsumerTest {
   }
 
   @Test
+  void shouldStartDatasetUnreleaseProcessAndDeriveHasPipelines() throws Exception {
+    // A typo in SagaType.DATASET_UNRELEASE's key would deploy fine but silently drop every
+    // unrelease trigger — pin the enum-key-to-process-key mapping here. Also assert hasPipelines is
+    // derived from pipelineIds, since the unrelease process gates DELETE_PIPELINES on it.
+    byte[] trigger =
+        objectMapper.writeValueAsBytes(
+            Map.of(
+                "sagaType",
+                "DATASET_UNRELEASE",
+                "datasetId",
+                "ds-789",
+                "pipelineIds",
+                List.of("pipe-1")));
+
+    TriggerTestSupport.processTrigger(consumer, trigger);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, Object>> varsCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(runtimeService)
+        .startProcessInstanceByKey(eq("dataset-unrelease"), anyString(), varsCaptor.capture());
+    assertEquals(true, varsCaptor.getValue().get("hasPipelines"));
+  }
+
+  @Test
   void shouldGenerateSagaIdIfNotProvided() throws Exception {
     byte[] trigger =
         objectMapper.writeValueAsBytes(

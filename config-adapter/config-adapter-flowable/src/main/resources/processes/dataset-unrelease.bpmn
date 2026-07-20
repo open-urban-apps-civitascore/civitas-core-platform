@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:flowable="http://flowable.org/bpmn" xmlns:xs="http://www.w3.org/2001/XMLSchema" id="Definitions_Unrelease" targetNamespace="http://civitas.de/saga">
+  <error id="stepFailedError" errorCode="STEP_FAILED" name="Step Failed"/>
+  <process id="dataset-unrelease" name="Dataset Unrelease Saga" isExecutable="true">
+    <startEvent id="start" name="Start">
+      <outgoing>flow-start</outgoing>
+    </startEvent>
+    <exclusiveGateway id="pipeline-gateway" name="Has Pipelines?" default="flow-gateway-skip">
+      <incoming>flow-start</incoming>
+      <outgoing>flow-gateway-pipeline</outgoing>
+      <outgoing>flow-gateway-skip</outgoing>
+    </exclusiveGateway>
+    <serviceTask id="delete-pipelines" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Delete Pipelines">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="nifi"/>
+        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DELETE_PIPELINES"/>
+        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="delete-pipelines"/>
+      </extensionElements>
+      <incoming>flow-gateway-pipeline</incoming>
+      <outgoing>flow-pipeline-apisix</outgoing>
+    </serviceTask>
+    <boundaryEvent id="pipeline-error" name="Step Failed" attachedToRef="delete-pipelines">
+      <outgoing>flow-pipeline-error</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_1" errorRef="stepFailedError"/>
+    </boundaryEvent>
+    <serviceTask id="delete-route" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Delete APISIX Route">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="apisix"/>
+        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DELETE_ROUTE"/>
+        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="delete-route"/>
+      </extensionElements>
+      <incoming>flow-gateway-skip</incoming>
+      <incoming>flow-pipeline-apisix</incoming>
+      <incoming>flow-pipeline-error</incoming>
+      <outgoing>flow-apisix-result</outgoing>
+    </serviceTask>
+    <boundaryEvent id="apisix-error" name="Step Failed" attachedToRef="delete-route">
+      <outgoing>flow-apisix-error</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_2" errorRef="stepFailedError"/>
+    </boundaryEvent>
+    <serviceTask id="publish-success" flowable:async="true" flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate" name="Publish Success">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="resultType" stringValue="success"/>
+      </extensionElements>
+      <incoming>flow-result-success</incoming>
+      <outgoing>flow-publish-success-end</outgoing>
+    </serviceTask>
+    <serviceTask id="publish-failure" flowable:async="true" flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate" name="Publish Failure">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="resultType" stringValue="failure"/>
+        <flowable:field xsi:type="xs:anyType" name="supportsCompensation" stringValue="false"/>
+      </extensionElements>
+      <incoming>flow-result-failure</incoming>
+      <outgoing>flow-publish-failure-end</outgoing>
+    </serviceTask>
+    <exclusiveGateway id="result-gateway" name="Has Errors?" default="flow-result-success">
+      <incoming>flow-apisix-result</incoming>
+      <incoming>flow-apisix-error</incoming>
+      <outgoing>flow-result-failure</outgoing>
+      <outgoing>flow-result-success</outgoing>
+    </exclusiveGateway>
+    <endEvent id="end" name="Saga Completed">
+      <incoming>flow-publish-success-end</incoming>
+      <incoming>flow-publish-failure-end</incoming>
+    </endEvent>
+    <sequenceFlow id="flow-start" sourceRef="start" targetRef="pipeline-gateway"/>
+    <sequenceFlow id="flow-gateway-pipeline" name="yes" sourceRef="pipeline-gateway" targetRef="delete-pipelines">
+      <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_1">${hasPipelines == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-gateway-skip" name="no" sourceRef="pipeline-gateway" targetRef="delete-route"/>
+    <sequenceFlow id="flow-pipeline-apisix" sourceRef="delete-pipelines" targetRef="delete-route"/>
+    <sequenceFlow id="flow-pipeline-error" sourceRef="pipeline-error" targetRef="delete-route"/>
+    <sequenceFlow id="flow-apisix-result" sourceRef="delete-route" targetRef="result-gateway"/>
+    <sequenceFlow id="flow-apisix-error" sourceRef="apisix-error" targetRef="result-gateway"/>
+    <sequenceFlow id="flow-result-failure" name="has error" sourceRef="result-gateway" targetRef="publish-failure">
+      <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_2">${execution.getVariable('sagaError') != null}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-result-success" name="ok" sourceRef="result-gateway" targetRef="publish-success"/>
+    <sequenceFlow id="flow-publish-success-end" sourceRef="publish-success" targetRef="end"/>
+    <sequenceFlow id="flow-publish-failure-end" sourceRef="publish-failure" targetRef="end"/>
+  </process>
+</definitions>

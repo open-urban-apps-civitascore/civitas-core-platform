@@ -141,6 +141,27 @@ final class SagaProcessBuilder {
     return flow(step.boundary(), target);
   }
 
+  /**
+   * Builds the terminal result-routing common to every saga process: a result gateway that branches
+   * to a success or failure publish task (the latter with no compensation) and then to the end
+   * event. Returns the result gateway so the caller wires its last step (and that step's error
+   * boundary) into it.
+   */
+  ExclusiveGateway resultRouting() {
+    ExclusiveGateway resultGw =
+        exclusiveGateway(ProcessBuilderUtils.RESULT_GATEWAY_ID, "Has Errors?");
+    ServiceTask publishOk = publishResult(ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "success");
+    ServiceTask publishFail =
+        publishResult(ProcessBuilderUtils.PUBLISH_FAILURE_ID, "failure", false);
+    EndEvent end = endEvent("end");
+
+    flow(resultGw, publishFail).when("${execution.getVariable('sagaError') != null}");
+    flow(resultGw, publishOk).asDefault();
+    flow(publishOk, end);
+    flow(publishFail, end);
+    return resultGw;
+  }
+
   BpmnModel build() {
     return model;
   }

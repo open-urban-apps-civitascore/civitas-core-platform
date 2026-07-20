@@ -10,9 +10,7 @@
 package de.civitascore.configadapter.flowable.coded;
 
 import org.flowable.bpmn.model.BpmnModel;
-import org.flowable.bpmn.model.EndEvent;
 import org.flowable.bpmn.model.ExclusiveGateway;
-import org.flowable.bpmn.model.ServiceTask;
 import org.flowable.bpmn.model.StartEvent;
 
 /**
@@ -50,12 +48,7 @@ public final class DatasetDeleteProcessBuilder {
     SagaStepRef frost =
         saga.sagaStep("delete-project", "Delete FROST Project", "frost", "DELETE_PROJECT");
 
-    ExclusiveGateway resultGw =
-        saga.exclusiveGateway(ProcessBuilderUtils.RESULT_GATEWAY_ID, "Has Errors?");
-    ServiceTask publishOk = saga.publishResult(ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "success");
-    ServiceTask publishFail =
-        saga.publishResult(ProcessBuilderUtils.PUBLISH_FAILURE_ID, "failure", false);
-    EndEvent end = saga.endEvent("end");
+    ExclusiveGateway resultGw = saga.resultRouting();
 
     // Happy path
     saga.flow(start, pipelineGw);
@@ -67,10 +60,6 @@ public final class DatasetDeleteProcessBuilder {
     // GeoServer stops publishing before the PostGIS table it reads is dropped.
     saga.flow(geoserver.task(), sqlSink.task(), frost.task());
     saga.flow(frost.task(), resultGw);
-    saga.flow(resultGw, publishFail).when("${execution.getVariable('sagaError') != null}");
-    saga.flow(resultGw, publishOk).asDefault();
-    saga.flow(publishOk, end);
-    saga.flow(publishFail, end);
 
     // Best-effort: error on any step continues to the next
     saga.errorFlow(pipeline, apisix.task());

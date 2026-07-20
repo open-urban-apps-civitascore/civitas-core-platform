@@ -373,6 +373,83 @@ class BpmnVsCodedEquivalenceTest {
     }
   }
 
+  @ParameterizedTest(name = "{0}: Dataset Unrelease tears down pipeline + route only, keeps sink")
+  @MethodSource("approaches")
+  void datasetUnreleaseKeepsSink(String approach, boolean useBpmn) {
+    SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
+    SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
+    SagaCommandHandler pipeline = FlowableTestSupport.mockHandler("nifi");
+    SagaCommandHandler geoserver = FlowableTestSupport.mockHandler("geoserver");
+    SagaCommandHandler postgis = FlowableTestSupport.mockHandler("postgis");
+
+    when(pipeline.handle(any()))
+        .thenReturn(SagaCommandResult.success("s", "delete-pipelines", Map.of(), Map.of()));
+    // APISIX fails to prove the process is best-effort: teardown still completes.
+    when(apisix.handle(any()))
+        .thenReturn(SagaCommandResult.failure("s", "delete-route", "APISIX down"));
+
+    SagaHandlerRegistry reg =
+        FlowableTestSupport.registry(frost, apisix, pipeline, geoserver, postgis);
+    ProcessEngine engine = createEngine(useBpmn, reg);
+
+    try {
+      Map<String, Object> vars = new HashMap<>();
+      vars.put("sagaId", "s");
+      vars.put("datasetId", "ds");
+      vars.put("serviceId", "s1");
+      vars.put("hasPipelines", true);
+      vars.put("pipelineIds", List.of("p1"));
+
+      ProcessInstance instance =
+          engine.getRuntimeService().startProcessInstanceByKey("dataset-unrelease", vars);
+      FlowableTestSupport.executeAllJobs(engine);
+
+      var inOrder = inOrder(pipeline, apisix);
+      inOrder.verify(pipeline).handle(any());
+      inOrder.verify(apisix).handle(any());
+      // The sink-holding steps must NOT run — the PostGIS table and FROST project survive.
+      verify(frost, never()).handle(any());
+      verify(postgis, never()).handle(any());
+      verify(geoserver, never()).handle(any());
+      FlowableTestSupport.assertProcessFinished(engine.getHistoryService(), instance.getId());
+    } finally {
+      engine.close();
+    }
+  }
+
+  @ParameterizedTest(name = "{0}: Dataset Unrelease without pipelines skips the pipeline step")
+  @MethodSource("approaches")
+  void datasetUnreleaseSkipPipeline(String approach, boolean useBpmn) {
+    SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
+    SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
+    SagaCommandHandler pipeline = FlowableTestSupport.mockHandler("nifi");
+
+    when(apisix.handle(any()))
+        .thenReturn(SagaCommandResult.success("s", "delete-route", Map.of(), Map.of()));
+
+    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, pipeline);
+    ProcessEngine engine = createEngine(useBpmn, reg);
+
+    try {
+      Map<String, Object> vars = new HashMap<>();
+      vars.put("sagaId", "s");
+      vars.put("datasetId", "ds");
+      vars.put("serviceId", "s1");
+      vars.put("hasPipelines", false);
+
+      ProcessInstance instance =
+          engine.getRuntimeService().startProcessInstanceByKey("dataset-unrelease", vars);
+      FlowableTestSupport.executeAllJobs(engine);
+
+      verify(pipeline, never()).handle(any());
+      verify(apisix).handle(any());
+      verify(frost, never()).handle(any());
+      FlowableTestSupport.assertProcessFinished(engine.getHistoryService(), instance.getId());
+    } finally {
+      engine.close();
+    }
+  }
+
   private Map<String, Object> createVariables(boolean hasPipelines) {
     Map<String, Object> vars = new HashMap<>();
     vars.put("sagaId", "s");

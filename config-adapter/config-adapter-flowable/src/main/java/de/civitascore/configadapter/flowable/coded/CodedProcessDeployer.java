@@ -38,7 +38,8 @@ public final class CodedProcessDeployer {
             .addBpmnModel("dataset-create-coded.bpmn", DatasetCreateProcessBuilder.build())
             .addBpmnModel("dataset-update-coded.bpmn", DatasetUpdateProcessBuilder.build())
             .addBpmnModel("dataset-delete-coded.bpmn", DatasetDeleteProcessBuilder.build())
+            .addBpmnModel("dataset-unrelease-coded.bpmn", DatasetUnreleaseProcessBuilder.build())
             .deploy();
-    LOG.info("Deployed 3 coded saga processes (deployment ID: {})", deployment.getId());
+    LOG.info("Deployed 4 coded saga processes (deployment ID: {})", deployment.getId());
   }
 }
