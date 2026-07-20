@@ -271,7 +271,10 @@
     },
     "create": {
       "title": "Neuer Datensatz",
-      "subtitle": "Neue Datensätze sind nur intern sichtbar."
+      "subtitle": "Neue Datensätze sind nur intern sichtbar.",
+      "basicInfo": {
+        "title": "Basisinformation"
+      }
     },
     "overview": {
       "info": {
@@ -952,8 +955,7 @@
       "title": "Neue Datenquelle",
       "subtitle": "Neue Datenquellen sind nur intern sichtbar.",
       "basicInfo": {
-        "title": "Basisinformation",
-        "subtitle": "Der Name kann später angepasst werden."
+        "title": "Basisinformation"
       }
     },
     "edit": {
@@ -1053,8 +1055,7 @@
       "title": "Neue Datenstruktur",
       "subtitle": "Neue Datenstrukturen sind nur intern sichtbar.",
       "basicInfo": {
-        "title": "Basisinformation",
-        "subtitle": "Der Name kann später angepasst werden."
+        "title": "Basisinformation"
       }
     },
     "form": {

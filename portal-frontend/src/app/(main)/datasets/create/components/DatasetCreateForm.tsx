@@ -125,7 +125,7 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
             >
               <DetailsFieldContainer className="pt-0 border-b-0">
                 <SubHeader
-                  title={t('create.title')}
+                  title={t('create.basicInfo.title')}
                   titleClassName="text-2xl leading-none font-bold"
                   subtitle={tCommon('info.creationSubtitle')}
                 />

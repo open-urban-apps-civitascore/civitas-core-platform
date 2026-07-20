@@ -272,7 +272,10 @@
     },
     "create": {
       "title": "New Dataset",
-      "subtitle": "New Datasets are only visible internally."
+      "subtitle": "New Datasets are only visible internally.",
+      "basicInfo": {
+        "title": "Base Information"
+      }
     },
     "overview": {
       "info": {
@@ -960,8 +963,7 @@
       "title": "New Data source",
       "subtitle": "New Data sources are only visible internally.",
       "basicInfo": {
-        "title": "Base Information",
-        "subtitle": "The name can be changed later."
+        "title": "Base Information"
       }
     },
     "edit": {
@@ -1066,8 +1068,7 @@
       "title": "New Data structure",
       "subtitle": "New Data structures are only visible internally.",
       "basicInfo": {
-        "title": "Base Information",
-        "subtitle": "The name can be changed later."
+        "title": "Base Information"
       }
     },
     "form": {
