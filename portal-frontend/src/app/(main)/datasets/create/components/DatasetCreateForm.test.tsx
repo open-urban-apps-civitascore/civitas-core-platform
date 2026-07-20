@@ -64,8 +64,9 @@ describe('DatasetCreateForm', () => {
 
   test('renders title and subtitle', () => {
     setup()
-    expect(screen.getAllByText('create.title')).toHaveLength(2)
+    expect(screen.getByText('create.title')).toBeInTheDocument()
     expect(screen.getByText('create.subtitle')).toBeInTheDocument()
+    expect(screen.getByText('create.basicInfo.title')).toBeInTheDocument()
     expect(screen.getByText('info.creationSubtitle')).toBeInTheDocument()
   })
 
