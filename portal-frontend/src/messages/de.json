@@ -1315,6 +1315,11 @@
       "deleteConfirmTitle": "Pipeline löschen?",
       "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
     },
+    "dataLoss": {
+      "title": "Tabelle neu aufbauen und Daten verwerfen?",
+      "description": "Diese Änderung baut die Tabelle dieses Datasets neu auf. Alle gespeicherten Daten gehen verloren und können nicht wiederhergestellt werden.",
+      "confirm": "Speichern und Daten verwerfen"
+    },
     "header": {
       "saveAll": "Alle speichern",
       "savingAll": "Speichert...",

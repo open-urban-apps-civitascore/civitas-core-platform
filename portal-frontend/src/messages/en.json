@@ -1328,6 +1328,11 @@
       "deleteConfirmTitle": "Delete Pipeline?",
       "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone."
     },
+    "dataLoss": {
+      "title": "Rebuild table and discard data?",
+      "description": "This change rebuilds the table for this dataset. All stored data will be lost and cannot be recovered.",
+      "confirm": "Save and discard data"
+    },
     "header": {
       "saveAll": "Save All",
       "savingAll": "Saving...",

@@ -31,6 +31,8 @@ export type PostgisDataSinkPayload = {
     tableName: string
     dataStructureVersionId: string
   }
+  /** Acknowledges that this update rebuilds the table and discards stored data (see backend guard). */
+  confirmDataLoss?: boolean
 }
 
 export type FrostDataSinkPayload = {
@@ -38,6 +40,8 @@ export type FrostDataSinkPayload = {
   dataSinkType: typeof DATASINK_TYPES.FROST
   /** Empty for passthrough; a mapped pipeline references its final mapping's target structure. */
   configuration: { dataStructureVersionId?: string }
+  /** Acknowledges that this update re-provisions the sink and discards its stored data (see backend guard). */
+  confirmDataLoss?: boolean
 }
 
 export type DataSinkPayload = PostgisDataSinkPayload | FrostDataSinkPayload
