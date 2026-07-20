@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { AxiosError } from 'axios'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -501,6 +502,49 @@ describe('DatasetOverview', () => {
           expect.objectContaining({ name: 'Updated Name', id: 'test-id' }),
         )
       })
+    })
+  })
+
+  describe('Save error handling: scope-violation vs. generic', () => {
+    const axios422 = (type?: string) =>
+      new AxiosError('request failed', undefined, undefined, undefined, {
+        status: 422,
+        statusText: '',
+        headers: {},
+        config: {} as never,
+        data: { detail: 'scope violation', type },
+      })
+
+    it('shows the scope-violation toast when the save fails with a DATASOURCE_SCOPE_VIOLATION 422', async () => {
+      mockPatchDataset.mockRejectedValueOnce(axios422('urn:civitas:error:DATASOURCE_SCOPE_VIOLATION'))
+      renderComponent()
+      clickEditButton()
+
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
+      })
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('messages.datasourceScopeViolation')
+      })
+      expect(toast.error).not.toHaveBeenCalledWith('messages.transitionError')
+    })
+
+    it('shows the generic transition-error toast for any other save failure', async () => {
+      mockPatchDataset.mockRejectedValueOnce(new Error('boom'))
+      renderComponent()
+      clickEditButton()
+
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
+      })
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('messages.transitionError')
+      })
+      expect(toast.error).not.toHaveBeenCalledWith('messages.datasourceScopeViolation')
     })
   })
 

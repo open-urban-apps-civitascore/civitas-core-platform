@@ -513,7 +513,8 @@
       "unstageSuccess": "Der Datensatz wurde erfolgreich auf Entwurf zurückgesetzt.",
       "releaseSuccess": "Der Datensatz wurde erfolgreich freigegeben.",
       "unreleaseSuccess": "Die Freigabe des Datensatzes wurde erfolgreich aufgehoben.",
-      "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut."
+      "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+      "datasourceScopeViolation": "Der Datapool passt nicht zu den Datenquellen dieses Datensatzes. Eine oder mehrere Datenquellen sind für den gewählten Datapool nicht erlaubt."
     },
     "warningModal": {
       "title": "Datensatz löschen?",
