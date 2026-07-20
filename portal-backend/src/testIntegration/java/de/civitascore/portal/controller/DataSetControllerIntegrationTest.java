@@ -1609,11 +1609,12 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("DELETE saga should clear infrastructure and revert to READY")
+    @DisplayName("DELETE saga should clear infrastructure, status already READY")
     void deleteSagaShouldClearInfrastructure() {
       DataSet dataSet = createReleasedDataSet();
       dataSet.setProjectId("proj-test");
       dataSet.setPublicUrl("https://public.example.com/datasets/" + dataSet.getId());
+      dataSet.setDataSetStatus(DataSetStatus.READY);
       dataSet.setPendingSagaType(PendingSagaType.DELETE);
       dataSetRepository.save(dataSet);
       UUID dataSetId = dataSet.getId();
