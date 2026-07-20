@@ -442,12 +442,14 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
     if (pendingType == PendingSagaType.DELETE) {
       dataSet.clearInfrastructureFields();
-      // unrelease already set READY optimistically. Only revert here if the dataset is somehow
-      // still
-      // AVAILABLE (e.g. a teardown not preceded by the optimistic set); if the user meanwhile moved
-      // it on to DRAFT, leave that intent untouched.
-      if (dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE) {
+      // unrelease normally leaves the dataset already READY, so this only flips a still-AVAILABLE
+      // one (teardown not preceded by the optimistic set). DRAFT is the expected other case (user
+      // unstaged mid-teardown) and is left untouched; anything else is unexpected drift.
+      DataSetStatus status = dataSet.getDataSetStatus();
+      if (status == DataSetStatus.AVAILABLE) {
         dataSet.setDataSetStatus(DataSetStatus.READY);
+      } else if (status != DataSetStatus.READY && status != DataSetStatus.DRAFT) {
+        log.warn("Unexpected status {} on DELETE completion for dataset {}", status, datasetId);
       }
       log.info("Saga DELETE completed for dataset {}, infrastructure torn down", datasetId);
     } else if (pendingType == PendingSagaType.CREATE) {
@@ -500,19 +502,26 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           Encode.forJava(error),
           compensated);
     } else if (pendingType == PendingSagaType.DELETE) {
-      // Only undo the optimistic READY if the dataset is still READY; if the user meanwhile moved
-      // it
-      // on to DRAFT, leave that intent untouched (the stale resources are logged either way).
+      // Undo the optimistic READY only if still READY; a user move to DRAFT mid-teardown is
+      // preserved (the stale resources are logged either way).
       if (dataSet.getDataSetStatus() == DataSetStatus.READY) {
         dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
       }
-      log.warn(
+      // An uncompensated teardown failure is confirmed leaked infrastructure, not a transient —
+      // signal it at ERROR so it is not lost among ordinary warnings.
+      String msg =
           "Saga DELETE failed for dataset {}: step={}, error={}, compensated={}. "
-              + "Stale resources may exist",
-          datasetId,
-          Encode.forJava(failedStep),
-          Encode.forJava(error),
-          compensated);
+              + "Stale resources may exist";
+      if (compensated) {
+        log.warn(msg, datasetId, Encode.forJava(failedStep), Encode.forJava(error), true);
+      } else {
+        log.error(msg, datasetId, Encode.forJava(failedStep), Encode.forJava(error), false);
+      }
+    } else {
+      log.warn(
+          "handleSagaFailed: no pending saga for dataset {} (duplicate/late delivery?), skipping",
+          datasetId);
+      return;
     }
 
     dataSet.setPendingSagaType(null);

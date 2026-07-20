@@ -352,6 +352,10 @@ class DataSetServiceTest {
 
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
       assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
+      // Infrastructure fields must survive unrelease so the teardown payload carries the resource
+      // IDs; the completion callback clears them, not unrelease.
+      assertThat(result.getProjectId()).isEqualTo("proj-1");
+      assertThat(result.getServiceId()).isEqualTo("svc-1");
       verify(sagaPublisher).publishDeleteRequested(result);
     }
   }
@@ -927,6 +931,19 @@ class DataSetServiceTest {
       verify(dataSetRepository).save(saved.capture());
       assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
       assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("no pending saga: skips save (duplicate/late delivery)")
+    void noPendingSagaSkipsSave() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(null);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      createService().handleSagaFailed(id, "FROST", "timeout", false);
+
+      verify(dataSetRepository, never()).save(any());
     }
   }
 
