@@ -1341,44 +1341,57 @@ class DataSetControllerIntegrationTest
           .isEqualTo(0);
     }
 
-    @ParameterizedTest
-    @EnumSource(
-        value = DataSetStatus.class,
-        mode = EnumSource.Mode.EXCLUDE,
-        names = {"DRAFT"})
-    @DisplayName("Should fail to delete dataset when not in DRAFT status")
-    void shouldFailToDeleteNonDraftDataSet(DataSetStatus status) {
+    @Test
+    @DisplayName("Should reject deleting an AVAILABLE dataset (unrelease first)")
+    void shouldRejectDeletingAvailableDataSet() {
       DataSet dataSet = createDataSetWithRelationships();
-      dataSet.setDataSetStatus(status);
+      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
       dataSet = dataSetRepository.save(dataSet);
       UUID dataSetId = dataSet.getId();
 
       ResponseEntity<Void> response = performDelete(dataSetId);
 
       assertThat(response.getStatusCode())
-          .as("Should not allow deletion of %s dataset", status)
+          .as("An AVAILABLE dataset must be unreleased before it can be deleted")
           .isEqualTo(HttpStatus.BAD_REQUEST);
 
-      ResponseEntity<DataSetOutputDTO> getResponse = performGetById(dataSetId);
-      assertThat(getResponse.getStatusCode())
-          .as("Dataset should still exist after failed deletion attempt")
+      assertThat(performGetById(dataSetId).getStatusCode())
+          .as("Dataset should still exist after the rejected deletion")
           .isEqualTo(HttpStatus.OK);
+    }
 
-      long pipelineCount =
-          pipelineRepository.findAll().stream()
-              .filter(p -> p.getDataSet() != null && p.getDataSet().getId().equals(dataSetId))
-              .count();
-      assertThat(pipelineCount)
-          .as("Pipelines should still exist after failed deletion attempt")
-          .isEqualTo(2);
+    @Test
+    @DisplayName("Should delete a never-provisioned READY dataset immediately")
+    void shouldDeleteReadyDataSetWhenNotProvisioned() {
+      DataSet dataSet = createDataSetWithRelationships();
+      dataSet.setDataSetStatus(DataSetStatus.READY);
+      dataSet = dataSetRepository.save(dataSet);
+      UUID dataSetId = dataSet.getId();
 
-      long distributionCount =
-          distributionRepository.findAll().stream()
-              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
-              .count();
-      assertThat(distributionCount)
-          .as("Distributions should still exist after failed deletion attempt")
-          .isEqualTo(2);
+      ResponseEntity<Void> response = performDelete(dataSetId);
+
+      assertThat(response.getStatusCode())
+          .as("A READY dataset with no provisioned sink has no infrastructure to tear down")
+          .isEqualTo(HttpStatus.NO_CONTENT);
+      assertThat(performGetById(dataSetId).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should trigger a DELETE saga for a provisioned READY dataset and keep the entity")
+    void shouldTriggerDeleteSagaForProvisionedReadyDataSet() {
+      DataSet dataSet = createDataSetWithRelationships();
+      dataSet.setDataSetStatus(DataSetStatus.READY);
+      dataSet.setProvisioned(true);
+      dataSet.setProjectId("proj-test");
+      dataSet = dataSetRepository.save(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      ResponseEntity<Void> response = performDelete(dataSetId);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+      // The entity survives until the DELETE saga completes; it is now marked pending DELETE.
+      DataSet persisted = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(persisted.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
     }
 
     @Test
@@ -1609,13 +1622,25 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("DELETE saga should clear infrastructure, status already READY")
-    void deleteSagaShouldClearInfrastructure() {
+    @DisplayName("UNRELEASE saga keeps the sink, clears route/pipeline, stays READY")
+    void unreleaseSagaKeepsSink() {
       DataSet dataSet = createReleasedDataSet();
       dataSet.setProjectId("proj-test");
+      dataSet.setFrostBaseUrl("https://frost.example.com/Projects(7)");
+      dataSet.setServiceId("svc-test");
       dataSet.setPublicUrl("https://public.example.com/datasets/" + dataSet.getId());
+      dataSet.setPipelineIds(List.of("pipe-test"));
+      dataSet.setProvisioned(true);
+      // unrelease set READY optimistically before the saga ran.
       dataSet.setDataSetStatus(DataSetStatus.READY);
-      dataSet.setPendingSagaType(PendingSagaType.DELETE);
+      dataSet.setPendingSagaType(PendingSagaType.UNRELEASE);
+      NamedApi namedApi = new NamedApi();
+      namedApi.setName("Things");
+      namedApi.setSlug("things");
+      namedApi.setStandard(ApiStandard.STA);
+      namedApi.setRouteId("route-test");
+      namedApi.setDataSet(dataSet);
+      dataSet.getNamedApis().add(namedApi);
       dataSetRepository.save(dataSet);
       UUID dataSetId = dataSet.getId();
 
@@ -1626,9 +1651,49 @@ class DataSetControllerIntegrationTest
 
       DataSet persisted = dataSetRepository.findById(dataSetId).orElseThrow();
       assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
-      assertThat(persisted.getProjectId()).isNull();
-      assertThat(persisted.getPublicUrl()).isNull();
       assertThat(persisted.getPendingSagaType()).isNull();
+      // Route/consumer-access layer is gone (routes/upstream deleted by DELETE_ROUTE).
+      assertThat(persisted.getPipelineIds()).isNull();
+      assertThat(persisted.getNamedApis()).allMatch(api -> api.getRouteId() == null);
+      assertThat(persisted.getServiceId()).isNull();
+      assertThat(persisted.getPublicUrl()).isNull();
+      // The data-holding sink survives so a re-release reuses it.
+      assertThat(persisted.getProjectId()).isEqualTo("proj-test");
+      assertThat(persisted.getFrostBaseUrl()).isEqualTo("https://frost.example.com/Projects(7)");
+      assertThat(persisted.isProvisioned()).isTrue();
+    }
+
+    @Test
+    @DisplayName("DELETE saga removes the dataset entity after teardown")
+    void deleteSagaRemovesEntity() {
+      DataSet dataSet = createReleasedDataSet();
+      dataSet.setProjectId("proj-test");
+      dataSet.setProvisioned(true);
+      dataSet.setPendingSagaType(PendingSagaType.DELETE);
+      dataSetRepository.save(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              dataSetId.toString(), null, null, null, null, null, null, null, null, null);
+      dataSetService.handleSagaCompleted(dataSetId, result);
+
+      assertThat(dataSetRepository.findById(dataSetId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("CREATE saga marks the dataset provisioned")
+    void createSagaMarksProvisioned() {
+      DataSet dataSet = createReleasedDataSet();
+      UUID dataSetId = dataSet.getId();
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              dataSetId.toString(), "proj-test", null, null, null, null, null, null, null, null);
+      dataSetService.handleSagaCompleted(dataSetId, result);
+
+      DataSet persisted = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(persisted.isProvisioned()).isTrue();
     }
   }
 

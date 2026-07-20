@@ -113,6 +113,22 @@ public class DataSetSagaPublisher {
     sendTrigger(trigger);
   }
 
+  /**
+   * Publishes a {@code DATASET_UNRELEASE} saga trigger. Carries only the route/pipeline fields the
+   * teardown needs — {@code projectId}/{@code frostBaseUrl}/{@code datasinks} are deliberately
+   * omitted because the data-holding sink is kept.
+   */
+  public void publishUnreleaseRequested(DataSet dataset) {
+    var trigger =
+        SagaTrigger.DatasetUnrelease.of(
+            dataset.getId().toString(),
+            buildRouteIds(dataset),
+            dataset.getServiceId(),
+            dataset.getPipelineIds(),
+            buildNamedApis(dataset));
+    sendTrigger(trigger);
+  }
+
   /** Publishes a {@code DATASET_DELETE} saga trigger. */
   public void publishDeleteRequested(DataSet dataset) {
     var trigger =

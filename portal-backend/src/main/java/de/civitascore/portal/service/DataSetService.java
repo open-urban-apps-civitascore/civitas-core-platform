@@ -323,10 +323,11 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   /**
    * Unstages a dataset, reverting it from READY to DRAFT.
    *
-   * <p>An in-flight DELETE saga is allowed: after {@link #unrelease} the dataset is already READY
-   * while its teardown runs, and the frontend chains unrelease + unstage to go AVAILABLE → DRAFT in
-   * one step. The teardown keeps running; its completion callback leaves a DRAFT dataset untouched.
-   * An in-flight CREATE/UPDATE saga is still rejected — READY does not occur during those.
+   * <p>An in-flight UNRELEASE saga is allowed: after {@link #unrelease} the dataset is already
+   * READY while its route/pipeline teardown runs, and the frontend chains unrelease + unstage to go
+   * AVAILABLE → DRAFT in one step. The teardown keeps running; its completion callback leaves a
+   * DRAFT dataset untouched. An in-flight CREATE/UPDATE saga is still rejected — READY does not
+   * occur during those.
    *
    * @param id the dataset ID
    * @return the unstaged dataset
@@ -343,7 +344,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     PendingSagaType pending = dataSet.getPendingSagaType();
-    if (pending != null && pending != PendingSagaType.DELETE) {
+    if (pending != null && pending != PendingSagaType.UNRELEASE) {
       throw new ResourceInUseException(
           "DataSet", id, "Cannot unstage while a saga is in-flight: " + pending);
     }
@@ -393,13 +394,17 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Unreleases a dataset by triggering a DATASET_DELETE saga to tear down infrastructure. The
-   * status transitions to READY optimistically (mirroring {@link #release}, which sets AVAILABLE up
-   * front); the DELETE saga then tears down infrastructure asynchronously. A failed teardown
-   * reverts to AVAILABLE.
+   * Unreleases a dataset by triggering a DATASET_UNRELEASE saga that tears down only the ingest and
+   * consumer-access layer (NiFi pipeline + APISIX route/upstream). The data-holding sink (PostGIS
+   * table, FROST project) is deliberately left intact so a later re-release reuses it.
+   *
+   * <p>The status transitions to READY optimistically (mirroring {@link #release}, which sets
+   * AVAILABLE up front); the UNRELEASE saga then tears the route/pipeline layer down
+   * asynchronously. This lets the frontend chain unrelease + unstage into a single AVAILABLE →
+   * DRAFT move without waiting for the saga. A failed teardown reverts to AVAILABLE.
    *
    * @param id the dataset ID
-   * @return the dataset in READY status with a pending DELETE saga
+   * @return the dataset in READY status with a pending UNRELEASE saga
    * @throws InvalidInputException if dataset is not AVAILABLE
    * @throws ResourceInUseException if a saga is already in-flight
    */
@@ -421,12 +426,10 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     dataSet.setDataSetStatus(DataSetStatus.READY);
-    dataSet.setPendingSagaType(PendingSagaType.DELETE);
+    dataSet.setPendingSagaType(PendingSagaType.UNRELEASE);
     DataSet saved = dataSetRepository.save(dataSet);
 
-    // Publish before the infrastructure fields are cleared (only the completion callback clears
-    // them) so the teardown payload still carries the resource IDs it must deprovision.
-    sagaPublisher.publishDeleteRequested(saved);
+    sagaPublisher.publishUnreleaseRequested(saved);
 
     return saved;
   }
@@ -440,26 +443,42 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     DataSet dataSet = findByIdOrThrow(datasetId);
     PendingSagaType pendingType = dataSet.getPendingSagaType();
 
-    if (pendingType == PendingSagaType.DELETE) {
-      dataSet.clearInfrastructureFields();
-      // unrelease normally leaves the dataset already READY; only a teardown not preceded by the
-      // optimistic set is still AVAILABLE and needs the flip. A user move to DRAFT mid-teardown is
-      // left untouched.
-      if (dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE) {
-        dataSet.setDataSetStatus(DataSetStatus.READY);
-      }
-      log.info("Saga DELETE completed for dataset {}, infrastructure torn down", datasetId);
-    } else if (pendingType == PendingSagaType.CREATE) {
-      applyInfrastructureResult(dataSet, result);
-      log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
-    } else if (pendingType == PendingSagaType.UPDATE) {
-      applyInfrastructureResult(dataSet, result);
-      log.info("Saga UPDATE completed for dataset {}", datasetId);
-    } else {
+    if (pendingType == null) {
       log.warn(
           "handleSagaCompleted: no pending saga for dataset {} (duplicate delivery?), skipping",
           datasetId);
       return;
+    }
+
+    switch (pendingType) {
+      case CREATE -> {
+        applyInfrastructureResult(dataSet, result);
+        dataSet.setProvisioned(true);
+        log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
+      }
+      case UPDATE -> {
+        applyInfrastructureResult(dataSet, result);
+        log.info("Saga UPDATE completed for dataset {}", datasetId);
+      }
+      case UNRELEASE -> {
+        dataSet.clearRouteAndPipelineInfrastructure();
+        // unrelease already set READY optimistically; only flip a teardown not preceded by the
+        // optimistic set (still AVAILABLE). A user move to DRAFT mid-teardown (the AVAILABLE →
+        // DRAFT chain) is left untouched.
+        if (dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE) {
+          dataSet.setDataSetStatus(DataSetStatus.READY);
+        }
+        log.info(
+            "Saga UNRELEASE completed for dataset {}, route/pipeline torn down (sink kept)",
+            datasetId);
+      }
+      case DELETE -> {
+        // Teardown of the full infrastructure (including the sink) succeeded; now remove the
+        // entity itself. Returning here skips the save() below — the row no longer exists.
+        dataSetRepository.delete(dataSet);
+        log.info("Saga DELETE completed for dataset {}, entity removed", datasetId);
+        return;
+      }
     }
 
     dataSet.setPendingSagaType(null);
@@ -483,42 +502,56 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     DataSet dataSet = findByIdOrThrow(datasetId);
     PendingSagaType pendingType = dataSet.getPendingSagaType();
 
-    if (pendingType == PendingSagaType.CREATE) {
-      dataSet.setDataSetStatus(DataSetStatus.READY);
-      log.warn(
-          "Saga CREATE failed for dataset {}: step={}, error={}, compensated={}. Reverted to READY",
-          datasetId,
-          Encode.forJava(failedStep),
-          Encode.forJava(error),
-          compensated);
-    } else if (pendingType == PendingSagaType.UPDATE) {
-      log.warn(
-          "Saga UPDATE failed for dataset {}: step={}, error={}, compensated={}. Staying AVAILABLE",
-          datasetId,
-          Encode.forJava(failedStep),
-          Encode.forJava(error),
-          compensated);
-    } else if (pendingType == PendingSagaType.DELETE) {
-      // Undo the optimistic READY only if still READY; a user move to DRAFT mid-teardown is
-      // preserved (the stale resources are logged either way).
-      if (dataSet.getDataSetStatus() == DataSetStatus.READY) {
-        dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
-      }
-      // An uncompensated teardown failure is confirmed leaked infrastructure, not a transient —
-      // signal it at ERROR so it is not lost among ordinary warnings.
-      String msg =
-          "Saga DELETE failed for dataset {}: step={}, error={}, compensated={}. "
-              + "Stale resources may exist";
-      if (compensated) {
-        log.warn(msg, datasetId, Encode.forJava(failedStep), Encode.forJava(error), true);
-      } else {
-        log.error(msg, datasetId, Encode.forJava(failedStep), Encode.forJava(error), false);
-      }
-    } else {
+    if (pendingType == null) {
       log.warn(
           "handleSagaFailed: no pending saga for dataset {} (duplicate/late delivery?), skipping",
           datasetId);
       return;
+    }
+
+    switch (pendingType) {
+      case CREATE -> {
+        dataSet.setDataSetStatus(DataSetStatus.READY);
+        log.warn(
+            "Saga CREATE failed for dataset {}: step={}, error={}, compensated={}."
+                + " Reverted to READY",
+            datasetId,
+            Encode.forJava(failedStep),
+            Encode.forJava(error),
+            compensated);
+      }
+      case UPDATE ->
+          log.warn(
+              "Saga UPDATE failed for dataset {}: step={}, error={}, compensated={}."
+                  + " Staying AVAILABLE",
+              datasetId,
+              Encode.forJava(failedStep),
+              Encode.forJava(error),
+              compensated);
+      case UNRELEASE -> {
+        // Undo the optimistic READY only if still READY; a user move to DRAFT mid-teardown (the
+        // AVAILABLE → DRAFT chain) is preserved. A failed route/pipeline teardown must not stay
+        // READY — live routes may remain.
+        if (dataSet.getDataSetStatus() == DataSetStatus.READY) {
+          dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+        }
+        logTeardownFailure(
+            "Saga UNRELEASE failed for dataset {}: step={}, error={}, compensated={}."
+                + " Reverted to AVAILABLE — route/pipeline teardown incomplete, stale resources"
+                + " may exist",
+            datasetId,
+            failedStep,
+            error,
+            compensated);
+      }
+      case DELETE ->
+          logTeardownFailure(
+              "Saga DELETE failed for dataset {}: step={}, error={}, compensated={}."
+                  + " Staying AVAILABLE — stale resources may exist",
+              datasetId,
+              failedStep,
+              error,
+              compensated);
     }
 
     dataSet.setPendingSagaType(null);
@@ -526,31 +559,54 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Deletes a DRAFT dataset immediately. READY datasets cannot be deleted — mark as draft first.
-   * For AVAILABLE datasets the controller routes through {@link #triggerDeleteSaga} instead,
-   * returning 202 Accepted for the asynchronous teardown.
+   * Logs a teardown-saga failure. An uncompensated failure is confirmed leaked infrastructure, not
+   * a transient — signal it at ERROR so it is not lost among ordinary warnings.
+   */
+  private void logTeardownFailure(
+      String msg, UUID datasetId, String failedStep, String error, boolean compensated) {
+    if (compensated) {
+      log.warn(msg, datasetId, Encode.forJava(failedStep), Encode.forJava(error), true);
+    } else {
+      log.error(msg, datasetId, Encode.forJava(failedStep), Encode.forJava(error), false);
+    }
+  }
+
+  /**
+   * Deletes a dataset. An AVAILABLE dataset must be unreleased first — its ingest and consumer
+   * access are still live, so it cannot be deleted directly. Otherwise: a dataset that was never
+   * provisioned (no PostGIS table / FROST project) is removed immediately, and a dataset that still
+   * holds a provisioned sink from a prior release goes through a DATASET_DELETE saga that tears
+   * down the full infrastructure including the data-holding sink; the entity is removed once the
+   * saga completes (see {@link #handleSagaCompleted}).
    */
   @Override
   @Transactional
   public void deleteById(UUID id) {
     DataSet dataSet = findByIdOrThrow(id);
 
-    if (dataSet.getDataSetStatus() == DataSetStatus.DRAFT) {
+    if (dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE) {
+      throw new InvalidInputException(
+          "dataSetStatus",
+          id,
+          "Cannot delete an AVAILABLE dataset. Unrelease it first (POST /datasets/{id}/unrelease)");
+    }
+
+    if (!dataSet.isProvisioned()) {
       super.deleteById(id);
       return;
     }
 
-    if (dataSet.getDataSetStatus() == DataSetStatus.READY) {
-      throw new InvalidInputException(
-          "dataSetStatus",
+    if (dataSet.getPendingSagaType() != null) {
+      throw new ResourceInUseException(
+          "DataSet",
           id,
-          "Cannot delete a READY dataset. Unstage it first (POST /datasets/{id}/unstage)");
+          "Cannot delete while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
 
-    throw new InvalidInputException(
-        "dataSetStatus",
-        id,
-        "Cannot delete an AVAILABLE dataset. Unrelease it first (POST /datasets/{id}/unrelease) to tear down infrastructure");
+    dataSet.setPendingSagaType(PendingSagaType.DELETE);
+    DataSet saved = dataSetRepository.save(dataSet);
+
+    sagaPublisher.publishDeleteRequested(saved);
   }
 
   /**
