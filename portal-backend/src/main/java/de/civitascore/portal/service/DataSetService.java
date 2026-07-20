@@ -442,14 +442,11 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
     if (pendingType == PendingSagaType.DELETE) {
       dataSet.clearInfrastructureFields();
-      // unrelease normally leaves the dataset already READY, so this only flips a still-AVAILABLE
-      // one (teardown not preceded by the optimistic set). DRAFT is the expected other case (user
-      // unstaged mid-teardown) and is left untouched; anything else is unexpected drift.
-      DataSetStatus status = dataSet.getDataSetStatus();
-      if (status == DataSetStatus.AVAILABLE) {
+      // unrelease normally leaves the dataset already READY; only a teardown not preceded by the
+      // optimistic set is still AVAILABLE and needs the flip. A user move to DRAFT mid-teardown is
+      // left untouched.
+      if (dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE) {
         dataSet.setDataSetStatus(DataSetStatus.READY);
-      } else if (status != DataSetStatus.READY && status != DataSetStatus.DRAFT) {
-        log.warn("Unexpected status {} on DELETE completion for dataset {}", status, datasetId);
       }
       log.info("Saga DELETE completed for dataset {}, infrastructure torn down", datasetId);
     } else if (pendingType == PendingSagaType.CREATE) {

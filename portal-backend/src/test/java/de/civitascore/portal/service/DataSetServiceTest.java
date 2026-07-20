@@ -835,6 +835,30 @@ class DataSetServiceTest {
     }
 
     @Test
+    @DisplayName(
+        "DELETE: flips a still-AVAILABLE dataset to READY (teardown without optimistic set)")
+    void deleteFlipsAvailableToReady() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService()
+          .handleSagaCompleted(
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      DataSet persisted = saved.getValue();
+      assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+      assertThat(persisted.getPendingSagaType()).isNull();
+      assertThat(persisted.getProjectId()).isNull();
+    }
+
+    @Test
     @DisplayName("DELETE: leaves a user-moved DRAFT status untouched, still clears infrastructure")
     void deleteLeavesDraftUntouched() {
       UUID id = UUID.randomUUID();
