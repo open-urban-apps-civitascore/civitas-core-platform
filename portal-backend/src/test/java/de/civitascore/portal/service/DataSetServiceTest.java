@@ -212,16 +212,31 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("throws ResourceInUseException when a saga is in-flight")
-    void throwsWhenSagaInFlight() {
+    @DisplayName("throws ResourceInUseException when a CREATE saga is in-flight")
+    void throwsWhenCreateSagaInFlight() {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
-      ds.setPendingSagaType(PendingSagaType.DELETE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().unstage(id))
           .isInstanceOf(ResourceInUseException.class)
           .hasMessageContaining("saga is in-flight");
+    }
+
+    @Test
+    @DisplayName("allows unstage while a DELETE saga is in-flight (AVAILABLE -> DRAFT chain)")
+    void allowsUnstageWhileDeleteInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet result = createService().unstage(id);
+
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+      assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
     }
 
     @Test
@@ -816,6 +831,30 @@ class DataSetServiceTest {
     }
 
     @Test
+    @DisplayName("DELETE: leaves a user-moved DRAFT status untouched, still clears infrastructure")
+    void deleteLeavesDraftUntouched() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.DRAFT);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService()
+          .handleSagaCompleted(
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      DataSet persisted = saved.getValue();
+      assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+      assertThat(persisted.getPendingSagaType()).isNull();
+      assertThat(persisted.getProjectId()).isNull();
+    }
+
+    @Test
     @DisplayName("no pending saga: skips save (duplicate delivery)")
     void noPendingSagaSkipsSave() {
       UUID id = UUID.randomUUID();
@@ -869,6 +908,24 @@ class DataSetServiceTest {
       ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
       verify(dataSetRepository).save(saved.capture());
       assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("DELETE failure: leaves a user-moved DRAFT status untouched")
+    void deleteFailureLeavesDraftUntouched() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.DRAFT);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaFailed(id, "FROST", "timeout", false);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
       assertThat(saved.getValue().getPendingSagaType()).isNull();
     }
   }

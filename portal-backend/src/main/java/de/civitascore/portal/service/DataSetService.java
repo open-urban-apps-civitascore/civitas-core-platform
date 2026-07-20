@@ -323,10 +323,15 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   /**
    * Unstages a dataset, reverting it from READY to DRAFT.
    *
+   * <p>An in-flight DELETE saga is allowed: after {@link #unrelease} the dataset is already READY
+   * while its teardown runs, and the frontend chains unrelease + unstage to go AVAILABLE → DRAFT in
+   * one step. The teardown keeps running; its completion callback leaves a DRAFT dataset untouched.
+   * An in-flight CREATE/UPDATE saga is still rejected — READY does not occur during those.
+   *
    * @param id the dataset ID
    * @return the unstaged dataset
    * @throws InvalidInputException if dataset is not in READY status
-   * @throws ResourceInUseException if a saga is already in-flight
+   * @throws ResourceInUseException if a CREATE or UPDATE saga is in-flight
    */
   @Transactional
   public DataSet unstage(UUID id) {
@@ -337,11 +342,10 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "dataSetStatus", id, "DataSet can only be unstaged from READY status");
     }
 
-    if (dataSet.getPendingSagaType() != null) {
+    PendingSagaType pending = dataSet.getPendingSagaType();
+    if (pending != null && pending != PendingSagaType.DELETE) {
       throw new ResourceInUseException(
-          "DataSet",
-          id,
-          "Cannot unstage while a saga is in-flight: " + dataSet.getPendingSagaType());
+          "DataSet", id, "Cannot unstage while a saga is in-flight: " + pending);
     }
 
     dataSet.setDataSetStatus(DataSetStatus.DRAFT);
@@ -438,6 +442,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
     if (pendingType == PendingSagaType.DELETE) {
       dataSet.clearInfrastructureFields();
+      // unrelease already set READY optimistically. Only revert here if the dataset is somehow
+      // still
+      // AVAILABLE (e.g. a teardown not preceded by the optimistic set); if the user meanwhile moved
+      // it on to DRAFT, leave that intent untouched.
+      if (dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE) {
+        dataSet.setDataSetStatus(DataSetStatus.READY);
+      }
       log.info("Saga DELETE completed for dataset {}, infrastructure torn down", datasetId);
     } else if (pendingType == PendingSagaType.CREATE) {
       applyInfrastructureResult(dataSet, result);
@@ -458,8 +469,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   /**
    * Handles a failed saga result. Reverts state as needed based on the pending saga type. CREATE
-   * failures revert to READY and DELETE failures revert to AVAILABLE (undoing the optimistic status
-   * change); UPDATE failures stay AVAILABLE.
+   * failures revert to READY; DELETE failures undo the optimistic status change back to AVAILABLE
+   * only if the dataset is still READY (a user-initiated move to DRAFT is preserved); UPDATE
+   * failures stay AVAILABLE.
    *
    * @param datasetId the dataset ID
    * @param failedStep the saga step that failed
@@ -488,10 +500,15 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           Encode.forJava(error),
           compensated);
     } else if (pendingType == PendingSagaType.DELETE) {
-      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      // Only undo the optimistic READY if the dataset is still READY; if the user meanwhile moved
+      // it
+      // on to DRAFT, leave that intent untouched (the stale resources are logged either way).
+      if (dataSet.getDataSetStatus() == DataSetStatus.READY) {
+        dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      }
       log.warn(
           "Saga DELETE failed for dataset {}: step={}, error={}, compensated={}. "
-              + "Reverted to AVAILABLE — stale resources may exist",
+              + "Stale resources may exist",
           datasetId,
           Encode.forJava(failedStep),
           Encode.forJava(error),
