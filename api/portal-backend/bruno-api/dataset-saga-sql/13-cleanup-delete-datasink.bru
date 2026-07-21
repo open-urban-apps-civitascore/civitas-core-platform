@@ -1,39 +1,73 @@
 meta {
-  name: 13. Cleanup - Delete DataSink
+  name: 13. Verify DELETE saga complete (dataset + sink gone)
   type: http
   seq: 21
 }
 
-delete {
-  url: {{baseUrl}}/datasets/:dataSetId/datasinks/:id
+get {
+  url: {{baseUrl}}/datasets/:id
   body: none
   auth: inherit
 }
 
 params:path {
-  dataSetId: {{sqlDataSetId}}
-  id: {{sqlDataSinkId}}
+  id: {{sqlDataSetId}}
+}
+
+script:pre-request {
+  // Wait for the DATASET_DELETE saga (triggered in step 12) to finish. The teardown of the
+  // NiFi flow, APISIX route/upstream and PostGIS sink runs asynchronously; the DataSet entity
+  // is removed only once the saga completes. Poll GET /datasets/{id} until it returns 404.
+  const axios = require('axios');
+  const baseUrl = bru.getEnvVar('baseUrl');
+  const keycloakUrl = bru.getEnvVar('keycloakUrl');
+  const datasetId = bru.getVar('sqlDataSetId');
+
+  // Bruno's QuickJS sandbox has no URLSearchParams — build the form body by hand.
+  const form = [
+    ['grant_type', 'password'],
+    ['client_id', bru.getEnvVar('clientId')],
+    ['client_secret', bru.getEnvVar('clientSecret')],
+    ['username', bru.getEnvVar('username')],
+    ['password', bru.getEnvVar('password')],
+  ].map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+
+  const tokenResp = await axios.post(
+    `${keycloakUrl}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`,
+    form,
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+  );
+  const token = tokenResp.data.access_token;
+
+  for (let i = 0; i < 30; i++) {
+    const resp = await axios.get(
+      `${baseUrl}/datasets/${datasetId}`,
+      {
+        headers: { 'Authorization': `Bearer ${token}` },
+        validateStatus: () => true,
+      }
+    );
+    if (resp.status === 404) {
+      break;
+    }
+    await new Promise(r => setTimeout(r, 2000));
+  }
 }
 
 tests {
-  test("DataSink deleted or already gone", function() {
-    const status = res.getStatus();
-    // 204=deleted, 404=already gone
-    expect(status === 204 || status === 404).to.be.true;
+  test("DataSet removed after DELETE saga", function() {
+    // The DATASET_DELETE saga tears down the sink + pipeline and removes the entity via
+    // cascade; a 404 proves the full teardown (including the PostGIS table) completed.
+    expect(res.getStatus()).to.equal(404);
   });
 }
 
 docs {
-  **SQL saga step 13** — Delete the POSTGIS DataSink (cleanup).
+  **SQL saga step 13** — Verify the DATASET_DELETE saga completed.
 
-  Removes the DataSink created in step 6. This must run **before** deleting the pipeline (step 14) and the dataset (step 15): `data_sinks.dataset_id` is `NOT NULL` with no `ON DELETE CASCADE`, and `data_sinks.pipeline_id` references the pipeline — deleting either parent first would violate the FK.
+  Polls `GET /datasets/{id}` (up to 60s) until it returns `404`. The DELETE saga triggered in step 12 de-provisions the NiFi flow, APISIX route/upstream and the PostGIS sink table, then removes the DataSet entity together with its sink and pipeline via cascade. The 404 is the assertion that this full teardown — including the data-bearing PostGIS table — has finished.
 
-  **Expected Response:** 204 No Content. 404 if already deleted. 400 if `sqlDataSinkId` is not set (first run).
+  There is no separate manual sink delete anymore: the saga owns the sink teardown, so a lingering orphan PostGIS table can no longer be left behind.
 
-  **System Impact:**
-
-  | Layer | Effect |
-  |---|---|
-  | Backend | DataSink record removed from `portal_backend` DB |
-  | Config Adapter | — (sink table already de-provisioned by the DELETE saga) |
+  **Expected Response:** 404 Not Found (dataset removed after the DELETE saga).
 }
