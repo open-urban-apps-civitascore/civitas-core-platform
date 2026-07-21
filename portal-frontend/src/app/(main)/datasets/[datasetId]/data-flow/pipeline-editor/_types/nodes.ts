@@ -73,9 +73,7 @@ export interface EntityNodeData extends BasePipelineNodeData {
 }
 
 /**
- * Data specific to DataSource nodes. Only the datasource reference is stored here; the display
- * name is intentionally not persisted but resolved from `entityId` at render time (see
- * `usePipelineDatasources`), so a rename in the datasource always reflects here.
+ * Data specific to DataSource nodes.
  */
 export interface DataSourceNodeData extends BasePipelineNodeData {
   entityType: typeof ENTITY_TYPES.Datasource
@@ -116,10 +114,7 @@ export interface GeoPersistenceNodeData extends BasePipelineNodeData {
   /** Table name for geo data storage */
   tableName: string
   /**
-   * "datastructureId/versionId" composite key of the selected data structure version. This
-   * reference is the only datastructure data stored; the name and version number are not
-   * persisted but resolved from it at render time (see `useDatastructureVersionInfo`), so a
-   * rename in the datastructure always reflects here.
+   * "datastructureId/versionId" composite key of the selected data structure version
    */
   dataStructureVersionId?: string
 }

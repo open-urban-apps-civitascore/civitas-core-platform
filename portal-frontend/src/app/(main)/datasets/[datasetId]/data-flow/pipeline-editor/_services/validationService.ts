@@ -909,8 +909,6 @@ const validateMappingChainStructure: ValidationRule = {
       const isSameVersion = !written.version || !read.version || written.version === read.version
       if (written.id === read.id && isSameVersion) return
 
-      // The message identifies the two mapping nodes by label; the datastructure names are not
-      // stored on the node and this synchronous rule cannot fetch them.
       errors.push(
         errorAt(downstream, 'validation.messages.mappingChainStructureMismatch', {
           label: nodeLabel(downstream),

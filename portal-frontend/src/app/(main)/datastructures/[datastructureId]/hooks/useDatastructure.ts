@@ -186,10 +186,8 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     if (shouldUnrelease)
       datastructureResponse = await handleStatusUpdate(parsedValues.id, unreleaseDatastructure.mutateAsync)
 
-    // The datastructure name is denormalized into every version response (`dataStructure.name`),
-    // and those version queries are not covered by the mutation's `['datastructures']`
-    // invalidation. On an actual rename, drop this datastructure's version queries so consumers
-    // reading the name from a version (e.g. the pipeline editor) don't show a stale name.
+    // Invalidation of datastructure version queries on datastructure name change
+    // since the datastructure name is embedded in every version response
     if (datastructureResponse && datastructureResponse.name !== datastructure.name) {
       queryClient.invalidateQueries({ queryKey: [`datastructures/${datastructure.id}/versions`] })
     }
