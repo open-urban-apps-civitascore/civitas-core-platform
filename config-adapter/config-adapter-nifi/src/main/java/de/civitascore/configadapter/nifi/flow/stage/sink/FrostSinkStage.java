@@ -17,6 +17,7 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.model.dataset.DataStructureSchema.ResolvedDefinition;
+import de.civitascore.configadapter.model.dataset.UnresolvableDataStructureException;
 import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
@@ -136,6 +137,12 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     }
     try {
       return new FrostSinkSpec(ctx.frostProjectId(), resolveStaProperties(datasink));
+    } catch (UnresolvableDataStructureException e) {
+      // The one sink-spec defect the modeller can fix themselves (designate a root element in the
+      // data structure) — its dedicated code carries that remedy as the safe external message,
+      // where INVALID_PAYLOAD would only say "Validation failed".
+      throw new FatalAdapterException(
+          AdapterErrorCode.UNRESOLVABLE_DATA_STRUCTURE, e, e.getMessage());
     } catch (IllegalArgumentException e) {
       // e.g. a non-numeric projectId; keep the raw detail internal and publish only the safe
       // external message for the error code.
