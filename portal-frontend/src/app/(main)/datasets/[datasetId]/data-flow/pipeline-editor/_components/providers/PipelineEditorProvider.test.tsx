@@ -1466,6 +1466,42 @@ describe('PipelineEditorProviderComponent', () => {
         expect(mockUpdateDataSinkAsync).not.toHaveBeenCalled()
       })
 
+      it('rejects a second save-all while the data-loss dialog is open, then completes the first', async () => {
+        const mockUpdateDataSinkAsync = vi.fn().mockResolvedValue({})
+        armDestructiveUpdate(mockUpdateDataSinkAsync)
+
+        renderProvider(destructiveUpdateSession())
+
+        let firstSave: Promise<boolean | undefined> | undefined
+        await act(async () => {
+          firstSave = contextRef.current?.saveAllPipelines()
+        })
+        expect(warningModalRef.current?.open).toBe(true)
+
+        // A second trigger while the dialog awaits confirmation must be rejected by the guard,
+        // not reopen the dialog or overwrite the first save's pending resolve.
+        let secondResult: boolean | undefined
+        await act(async () => {
+          secondResult = await contextRef.current?.saveAllPipelines()
+        })
+        expect(secondResult).toBe(false)
+        expect(mockUpdateDataSinkAsync).not.toHaveBeenCalled()
+
+        // The first save's promise is still live and resolves normally once confirmed.
+        let firstResult: boolean | undefined
+        await act(async () => {
+          warningModalRef.current?.onConfirm?.()
+          firstResult = await firstSave
+        })
+        expect(firstResult).toBe(true)
+        expect(mockUpdateDataSinkAsync).toHaveBeenCalledTimes(1)
+        expect(mockUpdateDataSinkAsync).toHaveBeenCalledWith({
+          datasetId: 'dataset-1',
+          dataSinkId: 'existing-sink-id',
+          data: { name: 'sink', confirmDataLoss: true },
+        })
+      })
+
       it('does not open the dialog when the dataset is not provisioned', async () => {
         const mockUpdateDataSinkAsync = vi.fn().mockResolvedValue({})
         armDestructiveUpdate(mockUpdateDataSinkAsync)

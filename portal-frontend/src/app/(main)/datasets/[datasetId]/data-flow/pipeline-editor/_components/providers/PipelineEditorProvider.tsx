@@ -458,18 +458,18 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         )
       })
 
-    if (hasDestructiveChange) {
-      const isConfirmed = await confirmDataLoss()
-      if (!isConfirmed) return false
-    }
-    // Only send confirmDataLoss when the user actually acknowledged the dialog. On a
-    // never-provisioned dataset a destructive change carries no data-loss risk, so the flag stays off.
-    const shouldSendDataLossConfirmation = hasDestructiveChange
-
+    // Claim the guard before awaiting the dialog: the confirmation is async, so without this a
+    // second trigger (double-click, shortcut) would slip past the isSavingAll check above, reopen
+    // the dialog and overwrite the pending resolve — stranding the first save's promise forever.
     setIsSavingAll(true)
     const saveFailedNames: string[] = []
     const scopeViolationNames: string[] = []
     try {
+      if (hasDestructiveChange) {
+        const isConfirmed = await confirmDataLoss()
+        if (!isConfirmed) return false
+      }
+
       // Serialize saves to avoid concurrent mutation state issues
       for (const session of dirtySessions) {
         try {
@@ -490,9 +490,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
               currentPipeline = updateNodeEntityId(currentPipeline, nodeId, response.data.id)
             } else if (hasDataSinkChanged(nodeId, payload, snapshot)) {
               // The destructive-change confirmation was obtained up front; flag the payload so the
-              // backend permits the table rebuild.
+              // backend permits the table rebuild. Only the sinks that are actually destructive
+              // carry the flag — a harmless change in the same save batch does not.
               const data =
-                shouldSendDataLossConfirmation && isDestructiveDataSinkChange(nodeId, payload, snapshot)
+                hasDestructiveChange && isDestructiveDataSinkChange(nodeId, payload, snapshot)
                   ? { ...payload, confirmDataLoss: true }
                   : payload
               await updateDataSinkMutation.mutateAsync({ datasetId, dataSinkId: entityId, data })
