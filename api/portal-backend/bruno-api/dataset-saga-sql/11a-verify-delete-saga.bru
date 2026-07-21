@@ -1,5 +1,5 @@
 meta {
-  name: 11a. Verify DELETE saga complete
+  name: 11a. Verify UNRELEASE saga complete
   type: http
   seq: 19
 }
@@ -15,7 +15,7 @@ params:path {
 }
 
 script:pre-request {
-  // Wait for the DATASET_DELETE saga to finish (pendingSagaType cleared, status READY)
+  // Wait for the DATASET_UNRELEASE saga to finish (pendingSagaType cleared, status READY)
   // before unstaging/deleting. Without this wait, unstage (step 12) and delete (step 15)
   // would 400 with a still-pending saga and the teardown would leak resources.
   const axios = require('axios');

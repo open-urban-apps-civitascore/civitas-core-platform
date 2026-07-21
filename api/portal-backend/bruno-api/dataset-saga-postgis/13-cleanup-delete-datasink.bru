@@ -66,9 +66,11 @@ script:pre-request {
 }
 
 tests {
-  test("DataSet removed after DELETE saga", function() {
-    // The DATASET_DELETE saga tears down the sink + pipeline and removes the entity via
-    // cascade; a 404 proves the full teardown (including the PostGIS table) completed.
+  test("DataSet entity removed after DELETE saga", function() {
+    // The entity is removed only once the DATASET_DELETE saga reports success, so a 404 here
+    // proves the portal DataSet (and its cascaded sink + pipeline rows) is gone. It does NOT
+    // observe the PostGIS DDL itself — the DROP runs in the config-adapter, out of reach of an
+    // HTTP collection. A direct sink-table teardown assertion belongs in the E2E suite.
     expect(res.getStatus()).to.equal(404);
   });
 }
@@ -76,9 +78,11 @@ tests {
 docs {
   **PostGIS saga step 13** — Verify the DATASET_DELETE saga completed.
 
-  Polls `GET /datasets/{id}` (up to 60s) until it returns `404`. The DELETE saga triggered in step 12 de-provisions the NiFi flow, APISIX route/upstream and the PostGIS sink table, then removes the DataSet entity together with its sink and pipeline via cascade. The 404 is the assertion that this full teardown — including the data-bearing PostGIS table — has finished.
+  Polls `GET /datasets/{id}` (up to 60s) until it returns `404`. The DELETE saga triggered in step 12 de-provisions the NiFi flow, APISIX route/upstream and the PostGIS sink table, then removes the DataSet entity together with its sink and pipeline via cascade.
 
-  There is no separate manual sink delete anymore: the saga owns the sink teardown, so a lingering orphan PostGIS table can no longer be left behind.
+  **What the 404 proves — and what it does not.** The entity is removed only once the saga reports success, so the 404 establishes that the portal DataSet and its cascaded sink/pipeline rows are gone. It does **not** independently verify the data-bearing PostGIS table was dropped: that DDL runs inside the config-adapter, and this HTTP collection cannot query PostGIS to confirm it (Bruno's sandbox has only `axios`, no DB client). A premature or erroneous saga-completion result would let this step pass while leaving an orphan sink table behind. A true sink-teardown assertion (querying `information_schema` after the delete) belongs in the shell-based E2E suite, not here.
 
-  **Expected Response:** 404 Not Found (dataset removed after the DELETE saga).
+  There is no separate manual sink delete anymore: the saga owns the sink teardown.
+
+  **Expected Response:** 404 Not Found (dataset entity removed after the DELETE saga).
 }
