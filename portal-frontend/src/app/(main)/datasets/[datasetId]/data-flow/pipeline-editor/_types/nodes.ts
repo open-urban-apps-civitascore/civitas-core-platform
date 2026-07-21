@@ -115,12 +115,13 @@ export interface GeoPersistenceNodeData extends BasePipelineNodeData {
   entityId?: string
   /** Table name for geo data storage */
   tableName: string
-  /** ID of the selected data structure version */
+  /**
+   * "datastructureId/versionId" composite key of the selected data structure version. This
+   * reference is the only datastructure data stored; the name and version number are not
+   * persisted but resolved from it at render time (see `useDatastructureVersionInfo`), so a
+   * rename in the datastructure always reflects here.
+   */
   dataStructureVersionId?: string
-  /** Display name of the selected data structure */
-  dataStructureName?: string
-  /** Version number of the selected data structure version */
-  versionNumber?: string
 }
 
 // ============================================================================
@@ -150,10 +151,8 @@ export interface CronNodeData extends BasePipelineNodeData {
 export interface MappingNodeData extends BasePipelineNodeData {
   sourceDatastructureId?: string
   sourceVersionId?: string
-  sourceName?: string
   targetDatastructureId?: string
   targetVersionId?: string
-  targetName?: string
   /** The single saved artifact produced by the mapping editor. */
   mappingConfig: MappingConfig
   /**

@@ -33,6 +33,7 @@ import { FrostPanel } from '../_components/inspector/panels/FrostPanel'
 import { GeoPersistencePanel } from '../_components/inspector/panels/GeoPersistencePanel'
 import { MappingPanel } from '../_components/inspector/panels/MappingPanel'
 import { emptyMappingConfig } from '../_components/mapping-editor/_types'
+import { MappingSublabel } from '../_components/nodes/MappingSublabel'
 import { NODE_CATEGORIES, type NodeCategory } from '../_constants/nodeCategories'
 import {
   type ControlNodeData,
@@ -100,6 +101,12 @@ export interface PipelineNodeDef<D extends PipelineNodeData = PipelineNodeData> 
    * Most nodes have none; nodes opt in by implementing this.
    */
   getSublabel?: (data: D) => string | undefined
+  /**
+   * Optional component rendering the canvas sublabel for configured nodes. Use instead of
+   * {@link getSublabel} when the sublabel must be resolved asynchronously (e.g. fetched from
+   * the backend). Takes precedence over {@link getSublabel}.
+   */
+  SublabelComponent?: ComponentType<{ data: PipelineNodeData }>
 
   /** Inspector panel rendered when a node of this type is selected. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- panels are typed per-node; the union is widened here
@@ -253,10 +260,7 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
       mappingConfig: emptyMappingConfig(),
     }),
     isData: (data): data is MappingNodeData => 'mappingConfig' in data,
-    getSublabel: data => {
-      const d = data as MappingNodeData
-      return d.sourceName && d.targetName ? `${d.sourceName} → ${d.targetName}` : undefined
-    },
+    SublabelComponent: MappingSublabel,
     InspectorPanel: MappingPanel,
   },
 ]

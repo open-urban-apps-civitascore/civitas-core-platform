@@ -1236,7 +1236,8 @@
       "changeDataStructure": "Change Data Structure",
       "details": "Data Structure Details",
       "dataStructureName": "Data Structure",
-      "versionNumber": "Version"
+      "versionNumber": "Version",
+      "anonymousDataStructure": "Anonymous Data Structure"
     },
     "mappingPanel": {
       "hint": "Define your data transformation mapping using YAML or JSON format.",
@@ -1305,7 +1306,7 @@
         "mappingNotOnPath": "{label} is not on the data path between the data source and the data sink",
         "cronTriggerCapacity": "{label} is an additional schedule trigger on the data source; its trigger port holds at most one",
         "edgeFormIncompatible": "{label} cannot consume {form} from {upstreamLabel}; it accepts: {accepted}",
-        "mappingChainStructureMismatch": "{label} does not continue the mapping chain: {upstreamLabel} outputs {expected}, but {label} reads {actual}"
+        "mappingChainStructureMismatch": "The output data structure in mapping node {upstreamLabel} and the input data structure in mapping node {label} are incompatible"
       }
     },
     "toolbar": {

@@ -1223,7 +1223,8 @@
       "changeDataStructure": "Datenstruktur ändern",
       "details": "Datenstruktur-Details",
       "dataStructureName": "Datenstruktur",
-      "versionNumber": "Version"
+      "versionNumber": "Version",
+      "anonymousDataStructure": "Anonyme Datenstruktur"
     },
     "mappingPanel": {
       "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
@@ -1292,7 +1293,7 @@
         "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datensenke",
         "cronTriggerCapacity": "{label} ist ein zusätzlicher Zeitplan-Trigger an der Datenquelle; der Trigger-Port fasst höchstens einen",
         "edgeFormIncompatible": "{label} kann {form} von {upstreamLabel} nicht verarbeiten; akzeptiert wird: {accepted}",
-        "mappingChainStructureMismatch": "{label} setzt die Mapping-Kette nicht fort: {upstreamLabel} gibt {expected} aus, aber {label} liest {actual}"
+        "mappingChainStructureMismatch": "Die Output-Datenstruktur in Mapping-Node {upstreamLabel} und die Input-Datenstruktur in Mapping-Node {label} sind inkompatibel"
       }
     },
     "toolbar": {
