@@ -40,7 +40,9 @@ import org.owasp.encoder.Encode;
  * <p>Compensation operations: {@code DELETE_PROJECT} to compensate a {@code CREATE_PROJECT}, {@code
  * RESTORE_PROJECT} to compensate an {@code UPDATE_PROJECT}.
  */
-@SuppressWarnings("PMD.TooManyMethods") // One method per saga operation plus focused helpers
+// One method per saga operation (CREATE/UPDATE/DELETE/RESTORE_PROJECT) plus focused helpers — the
+// method count and coupling are inherent to a per-operation dispatch handler, not a God Class.
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.GodClass"})
 public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "frost";
