@@ -457,11 +457,12 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     switch (pendingType) {
       case CREATE -> {
         applyInfrastructureResult(dataSet, result);
-        dataSet.setProvisioned(true);
+        markProvisionedIfSinkExists(dataSet);
         log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
       }
       case UPDATE -> {
         applyInfrastructureResult(dataSet, result);
+        markProvisionedIfSinkExists(dataSet);
         log.info("Saga UPDATE completed for dataset {}", datasetId);
       }
       case UNRELEASE -> {
@@ -644,6 +645,19 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * redelivery to retry indefinitely without the orchestrator being able to compensate. Real
    * compensation (fail-saga + cleanup) is not yet implemented.
    */
+  /**
+   * Marks the dataset provisioned once a data-holding sink physically exists. Bound to the presence
+   * of a FROST {@code projectId} (the sink identifier {@link #applyInfrastructureResult} writes)
+   * rather than to the saga type, so any provisioning path — not just the first CREATE — sets the
+   * flag. Never resets it: the flag survives an unrelease and is only dropped when the row is
+   * removed on DELETE.
+   */
+  private void markProvisionedIfSinkExists(DataSet dataSet) {
+    if (dataSet.getProjectId() != null) {
+      dataSet.setProvisioned(true);
+    }
+  }
+
   private void applyInfrastructureResult(DataSet dataSet, SagaResultPayload result) {
     if (result.projectId() != null) {
       dataSet.setProjectId(result.projectId());

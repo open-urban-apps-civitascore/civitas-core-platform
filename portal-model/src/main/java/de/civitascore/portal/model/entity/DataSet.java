@@ -169,11 +169,12 @@ public class DataSet extends BaseDataEntity {
 
   /**
    * Whether the data-holding sink has been physically provisioned at least once (PostGIS table
-   * exists / FROST project created). Set on CREATE-saga completion and left untouched by unrelease
-   * — the sink survives an unrelease. (There is no reset path: the row is removed on DELETE-saga
-   * completion.) Distinguishes "never released, no table yet" from "table exists, holds data" so a
-   * destructive sink edit only warns once a table is actually at risk. This is an indicator for the
-   * data-loss warning, NOT a lifecycle gate.
+   * exists / FROST project created). Set on any provisioning saga's completion once a sink
+   * identifier is present, and left untouched by unrelease — the sink survives an unrelease. (There
+   * is no reset path: the row is removed on DELETE-saga completion.) Distinguishes "never released,
+   * no table yet" from "table exists, holds data" so a destructive sink edit only warns once a
+   * table is actually at risk. This is an indicator for the data-loss warning, NOT a lifecycle
+   * gate.
    */
   @Column(name = "provisioned", nullable = false)
   private boolean provisioned = false;

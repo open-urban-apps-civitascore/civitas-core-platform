@@ -571,6 +571,38 @@ class DataSetServiceTest {
       assertThat(persisted.getPublicUrl()).isEqualTo("https://public.example.com");
       assertThat(persisted.getPipelineIds()).containsExactly("pipe-1");
       assertThat(persisted.getPendingSagaType()).isNull();
+      assertThat(persisted.isProvisioned()).isTrue();
+    }
+
+    @Test
+    @DisplayName("UPDATE: a completion that yields a project id marks the dataset provisioned")
+    void updateMarksProvisionedWhenSinkExists() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().isProvisioned()).isTrue();
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
     }
 
     @Test
