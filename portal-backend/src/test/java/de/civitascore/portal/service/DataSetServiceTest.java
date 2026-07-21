@@ -871,7 +871,7 @@ class DataSetServiceTest {
       assertThat(persisted.getPublicUrl()).isNull();
       // Data-holding sink references survive so a re-release reuses the existing data.
       assertThat(persisted.getProjectId()).isEqualTo("proj-1");
-      assertThat(persisted.getFrostBaseUrl()).isEqualTo(ds.getFrostBaseUrl());
+      assertThat(persisted.getFrostBaseUrl()).isEqualTo("https://frost.example.com/Projects(1)");
       verify(dataSetRepository, never()).delete(any(DataSet.class));
     }
 
