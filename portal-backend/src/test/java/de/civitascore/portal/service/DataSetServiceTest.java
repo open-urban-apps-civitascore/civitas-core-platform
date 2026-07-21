@@ -28,6 +28,7 @@ import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -54,6 +55,7 @@ import org.springframework.security.access.AccessDeniedException;
 class DataSetServiceTest {
 
   @Mock private DataSetRepository dataSetRepository;
+  @Mock private DataSinkRepository dataSinkRepository;
   @Mock private DataSetMapper dataSetMapper;
   @Mock private DataPoolRepository dataPoolRepository;
   @Mock private AssignmentFactory assignmentFactory;
@@ -67,6 +69,7 @@ class DataSetServiceTest {
     lenient().when(allowedScopesProvider.getObject()).thenReturn(wildcardScopes());
     return new DataSetService(
         dataSetRepository,
+        dataSinkRepository,
         dataSetMapper,
         dataPoolRepository,
         assignmentFactory,

@@ -14,6 +14,7 @@ import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -51,6 +52,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   private static final String DRIFT_UNEXPECTED_ROUTEIDS = "unexpected-routeids";
 
   private final DataSetRepository dataSetRepository;
+  private final DataSinkRepository dataSinkRepository;
   private final DataSetMapper dataSetMapper;
   private final DataPoolRepository dataPoolRepository;
 
@@ -62,12 +64,14 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   public DataSetService(
       DataSetRepository dataSetRepository,
+      DataSinkRepository dataSinkRepository,
       DataSetMapper dataSetMapper,
       DataPoolRepository dataPoolRepository,
       AssignmentFactory assignmentFactory,
       DataSetSagaPublisher sagaPublisher,
       ObjectProvider<AllowedScopes> allowedScopesProvider) {
     this.dataSetRepository = dataSetRepository;
+    this.dataSinkRepository = dataSinkRepository;
     this.dataSetMapper = dataSetMapper;
     this.dataPoolRepository = dataPoolRepository;
     this.assignmentFactory = assignmentFactory;
@@ -475,7 +479,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       case DELETE -> {
         // Teardown of the full infrastructure (including the sink) succeeded; now remove the
         // entity itself. Returning here skips the save() below — the row no longer exists.
-        dataSetRepository.delete(dataSet);
+        deleteWithSinks(dataSet);
         log.info("Saga DELETE completed for dataset {}, entity removed", datasetId);
         return;
       }
@@ -592,7 +596,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     if (!dataSet.isProvisioned()) {
-      super.deleteById(id);
+      deleteWithSinks(dataSet);
       return;
     }
 
@@ -607,6 +611,25 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     DataSet saved = dataSetRepository.save(dataSet);
 
     sagaPublisher.publishDeleteRequested(saved);
+  }
+
+  /**
+   * Removes a dataset together with its DataSinks. A DataSink is owned by the dataset (its {@code
+   * dataset_id} FK is non-null) but the dataset has no cascading collection for it, and a released
+   * sink additionally carries a {@code pipeline_id} FK into one of the cascade-removed pipelines.
+   * Deleting the sinks first — after detaching them from their pipeline — clears both FKs before
+   * the dataset delete cascades into the pipelines, avoiding the FK violation that would otherwise
+   * roll the transaction back.
+   */
+  private void deleteWithSinks(DataSet dataSet) {
+    dataSinkRepository
+        .findByDataSetId(dataSet.getId())
+        .forEach(
+            sink -> {
+              sink.setPipeline(null);
+              dataSinkRepository.delete(sink);
+            });
+    dataSetRepository.delete(dataSet);
   }
 
   /**

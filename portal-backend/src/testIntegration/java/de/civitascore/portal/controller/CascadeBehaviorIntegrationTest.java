@@ -34,6 +34,7 @@ import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.StyleRepository;
+import de.civitascore.portal.service.DataSetService;
 import de.civitascore.portal.service.GroupService;
 import de.civitascore.portal.util.ResourceInUseException;
 import jakarta.persistence.EntityManager;
@@ -69,6 +70,7 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private LayerRepository layerRepository;
   @Autowired private StyleRepository styleRepository;
   @Autowired private GroupService groupService;
+  @Autowired private DataSetService dataSetService;
 
   private static String uniqueName(String prefix) {
     return prefix + "-" + UUID.randomUUID().toString().substring(0, 8);
@@ -297,6 +299,27 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
       entityManager.flush();
 
       assertThat(assignmentRepository.findById(assignmentId)).isEmpty();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("Deleting DataSet via service removes a Pipeline-linked DataSink without FK error")
+    void deletingDataSetViaService_removesPipelineLinkedDataSink() {
+      DataSet dataSet = createDataSet();
+      Pipeline pipeline = createPipeline(dataSet);
+      DataSink dataSink = createDataSink(dataSet, pipeline);
+      UUID sinkId = dataSink.getId();
+      UUID pipelineId = pipeline.getId();
+
+      entityManager.flush();
+      entityManager.clear();
+
+      dataSetService.deleteById(dataSet.getId());
+      entityManager.flush();
+
+      assertThat(dataSetRepository.findById(dataSet.getId())).isEmpty();
+      assertThat(dataSinkRepository.findById(sinkId)).isEmpty();
+      assertThat(pipelineRepository.findById(pipelineId)).isEmpty();
     }
   }
 

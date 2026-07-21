@@ -137,7 +137,11 @@ public class DataSetSagaPublisher {
             dataset.getProjectId(),
             dataset.getFrostBaseUrl(),
             buildRouteIds(dataset),
-            dataset.getServiceId(),
+            // The APISIX serviceId is deterministically the dataset id (the adapter returns it as
+            // such on CREATE). Deriving it here instead of reading the persisted cache field lets
+            // DELETE_ROUTE address the routes/upstream even after an unrelease cleared serviceId —
+            // the delete is 404-tolerant, so an already-torn-down route is a clean no-op.
+            dataset.getId().toString(),
             dataset.getPipelineIds(),
             buildDatasinks(dataset),
             buildNamedApis(dataset));
