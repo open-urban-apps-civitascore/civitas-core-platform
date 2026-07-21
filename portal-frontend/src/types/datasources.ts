@@ -140,6 +140,7 @@ export const DatasourceCreateFormSchema = z.object({
     .trim()
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
+  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
 })
 
 export type DatasourceCreateData = z.infer<typeof DatasourceCreateFormSchema>

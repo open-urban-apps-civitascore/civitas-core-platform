@@ -114,7 +114,8 @@
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
-      "descriptionHint": "max. 150 Zeichen"
+      "descriptionHint": "max. 150 Zeichen",
+      "creationSubtitle": "Im ersten Schritt ist nur ein Name erforderlich. Weitere Basisinformationen können später ergänzt werden."
     },
     "success": {
       "statusChangeSuccess": "Der Verfügbarkeitsstatus wurde erfolgreich aktualisiert.",
@@ -271,7 +272,10 @@
     },
     "create": {
       "title": "Neuer Datensatz",
-      "subtitle": "Neue Datensätze sind nur intern sichtbar."
+      "subtitle": "Neue Datensätze sind nur intern sichtbar.",
+      "basicInfo": {
+        "title": "Basisinformation"
+      }
     },
     "overview": {
       "info": {
@@ -952,8 +956,7 @@
       "title": "Neue Datenquelle",
       "subtitle": "Neue Datenquellen sind nur intern sichtbar.",
       "basicInfo": {
-        "title": "Basisinformation",
-        "subtitle": "Der Name kann später angepasst werden."
+        "title": "Basisinformation"
       }
     },
     "edit": {
@@ -1053,8 +1056,7 @@
       "title": "Neue Datenstruktur",
       "subtitle": "Neue Datenstrukturen sind nur intern sichtbar.",
       "basicInfo": {
-        "title": "Basisinformation",
-        "subtitle": "Der Name kann später angepasst werden."
+        "title": "Basisinformation"
       }
     },
     "form": {
