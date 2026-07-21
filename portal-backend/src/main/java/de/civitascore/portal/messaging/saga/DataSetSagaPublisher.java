@@ -187,6 +187,8 @@ public class DataSetSagaPublisher {
         resolveNativeName(layer),
         layer.getCrs(),
         layer.getGeometryColumnRef(),
+        layer.getNativeBoundingBox(),
+        layer.getLatLonBoundingBox(),
         layer.getDefaultStyle() != null ? layer.getDefaultStyle().getName() : null,
         buildAlternativeStyleNames(layer));
   }

@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.geoserver;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -100,7 +101,62 @@ class GeoServerSagaHandlerTest {
         assertEquals("ds_abc", result.resultData().get("workspaceName"));
         assertNotNull(result.resultData().get("wfsUrl"));
         assertEquals("ds_abc", result.compensationData().get("workspaceName"));
-        verify(mockBuilder, times(1)).post(any(Entity.class));
+
+        // The workspace is created isolated: reachable only via its virtual OWS services (matching
+        // globalServices=false) with its own namespace, so the WMS service resolves its layers for
+        // anonymous (APISIX-gated) requests and same-named layers across datasets don't collide.
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(1)).post(captor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> workspace =
+            (Map<String, Object>)
+                ((Map<String, Object>) captor.getValue().getEntity()).get("workspace");
+        assertEquals("ds_abc", workspace.get("name"));
+        assertEquals(Boolean.TRUE, workspace.get("isolated"));
+
+        // Only the per-workspace WMS service is enabled (and titled with the workspace name), so
+        // the
+        // workspace shows up as a named service in map clients. WFS is deliberately not enabled per
+        // workspace (flat feature-type list, and a REST-created WFSInfo has a null serviceLevel
+        // that
+        // breaks WFS GetCapabilities).
+        assertTrue(capturedPaths().contains("/rest/services/wms/workspaces/ds_abc/settings"));
+        assertFalse(capturedPaths().contains("/rest/services/wfs/workspaces/ds_abc/settings"));
+        ArgumentCaptor<Entity> putCaptor = ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(1)).put(putCaptor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> svc =
+            (Map<String, Object>)
+                ((Map<String, Object>) putCaptor.getValue().getEntity()).get("wms");
+        assertEquals(Boolean.TRUE, svc.get("enabled"));
+        assertEquals("ds_abc", svc.get("title"));
+      }
+    }
+
+    @Test
+    void titlesWorkspaceServicesWithDatasetName() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        // With a datasetName in the trigger, the workspace WMS/WFS services are titled with the
+        // human-facing dataset name (not the technical workspace name).
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "CREATE_WORKSPACE",
+                    Map.of("datasetId", "ds-abc", "datasetName", "Bewohnerparkzonen Bielefeld")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        ArgumentCaptor<Entity> putCaptor = ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(1)).put(putCaptor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> svc =
+            (Map<String, Object>)
+                ((Map<String, Object>) putCaptor.getValue().getEntity()).get("wms");
+        assertEquals("Bewohnerparkzonen Bielefeld", svc.get("title"));
       }
     }
 
@@ -271,6 +327,81 @@ class GeoServerSagaHandlerTest {
         Map<String, Object> featureType = postedFeatureType();
         assertEquals("EPSG:4326", featureType.get("srs"));
         assertEquals("EPSG:25832", featureType.get("nativeCRS"));
+      }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void forwardsNativeBoundingBoxTaggedWithNativeCrsAndReprojectsLatLon() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", Map.of("geom", "EPSG:25832"))),
+                        "layers",
+                        List.of(
+                            Map.of(
+                                "layerName",
+                                "roads",
+                                "crs",
+                                "EPSG:4326",
+                                "nativeBoundingBox",
+                                Map.of(
+                                    "minX", 239323.44,
+                                    "minY", 4290145.58,
+                                    "maxX", 761545.65,
+                                    "maxY", 9365801.91,
+                                    "crs", ""))))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // Native box is mapped to GeoServer field names and tagged with the resolved native CRS
+        // (the portal box's own crs is ignored — it may be blank).
+        Map<String, Object> bbox =
+            (Map<String, Object>) postedFeatureType().get("nativeBoundingBox");
+        assertEquals(239323.44, bbox.get("minx"));
+        assertEquals(4290145.58, bbox.get("miny"));
+        assertEquals(761545.65, bbox.get("maxx"));
+        assertEquals(9365801.91, bbox.get("maxy"));
+        assertEquals("EPSG:25832", bbox.get("crs"));
+        // With a native box supplied, only the lat/lon box is reprojected — no data-driven
+        // recompute.
+        verify(mockPathTarget).queryParam("recalculate", "latlonbbox");
+      }
+    }
+
+    @Test
+    void computesBothBoxesFromDataWhenNoNativeBoundingBoxGiven() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", Map.of("geom", "EPSG:25832"))),
+                        "layers",
+                        List.of(Map.of("layerName", "roads", "crs", "EPSG:4326")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertNull(postedFeatureType().get("nativeBoundingBox"));
+        verify(mockPathTarget).queryParam("recalculate", "nativebbox,latlonbbox");
       }
     }
 
@@ -1326,6 +1457,13 @@ class GeoServerSagaHandlerTest {
     when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
     when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
     when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
+    // Lenient default so the best-effort per-workspace WMS/WFS service-settings PUTs (issued after
+    // a
+    // fresh workspace CREATE) don't NPE in tests that don't stub put themselves; tests that assert
+    // specific put behaviour override this.
+    Response okPut = mock(Response.class);
+    when(okPut.getStatus()).thenReturn(200);
+    when(mockBuilder.put(any(Entity.class))).thenReturn(okPut);
 
     handler.setTestClient(mockClient);
     return handler;

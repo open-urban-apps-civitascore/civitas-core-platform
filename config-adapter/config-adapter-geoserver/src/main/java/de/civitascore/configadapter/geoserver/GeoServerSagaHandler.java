@@ -161,7 +161,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   private SagaCommandResult handleCreateWorkspace(SagaCommandMessage command) {
     String workspaceName = resolveWorkspaceName(command);
-    createWorkspace(workspaceName);
+    createWorkspace(workspaceName, resolveServiceTitle(command, workspaceName));
 
     log.info(
         "GeoServer workspace created: workspaceName={}, saga={}",
@@ -205,7 +205,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     String workspaceName = resolveWorkspaceName(command);
     String datastoreName = datastoreName(workspaceName);
 
-    createWorkspace(workspaceName);
+    createWorkspace(workspaceName, resolveServiceTitle(command, workspaceName));
     createDatastore(workspaceName, datastoreName);
     processLayers(command, workspaceName, datastoreName, false);
 
@@ -229,7 +229,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     // be the first time geo is provisioned for a dataset (e.g. a geo sink added on a later update),
     // in which case neither exists yet and a plain feature-type POST would 404. Both creates are
     // idempotent (HTTP 409 = already exists).
-    createWorkspace(workspaceName);
+    createWorkspace(workspaceName, resolveServiceTitle(command, workspaceName));
     createDatastore(workspaceName, datastoreName);
 
     // Create or update feature types from the new layers
@@ -342,16 +342,78 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   // ============== HELPERS ==============
 
   /** Creates the workspace idempotently: HTTP 409 (already exists) is treated as success. */
-  private void createWorkspace(String workspaceName) {
+  private void createWorkspace(String workspaceName, String serviceTitle) {
+    // Create the workspace isolated: its content is reachable only through the per-workspace
+    // virtual OWS services (matching geoserver.web.globalServices=false) and it gets its own
+    // namespace. This is what makes the WMS service resolve the workspace's layers for
+    // (APISIX-gated) anonymous requests — a non-isolated workspace shares the global namespace,
+    // where the WMS layer-by-name lookup fails to resolve/hides the layer and same-named layers
+    // across datasets collide. WFS is unaffected either way; WMS needs the isolation.
+    int status;
     try (Response response =
         auth.apply(
                 client()
                     .target(serverUrl)
                     .path("/rest/workspaces")
                     .request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(Map.of("workspace", Map.of("name", workspaceName))))) {
-      if (response.getStatus() != 201 && response.getStatus() != 409) {
+            .post(
+                Entity.json(
+                    Map.of("workspace", Map.of("name", workspaceName, "isolated", true))))) {
+      status = response.getStatus();
+      if (status != 201 && status != 409) {
         checkResponse(response, "CREATE_WORKSPACE/" + workspaceName);
+        return;
+      }
+    }
+    // On fresh creation, enable the per-workspace WMS virtual service so a map client (QGIS, …)
+    // shows the dataset as the named service (the capabilities root layer) above the layers.
+    if (status == 201) {
+      enableWorkspaceWmsService(workspaceName, serviceTitle);
+    }
+  }
+
+  /**
+   * Enables the per-workspace WMS virtual service, titled with {@code serviceTitle} (the dataset's
+   * display name), so the workspace surfaces as a named service in clients (consistent with {@code
+   * globalServices=false} + isolated workspaces). Best-effort: a failure is logged but does not
+   * fail workspace provisioning — the layer stays reachable, only the service title would be unset.
+   *
+   * <p>WFS is deliberately NOT enabled per-workspace: a WFS capabilities document has a flat
+   * feature type list (no root-layer node to title, unlike WMS), so it gains nothing in a client;
+   * and a workspace-local {@code WFSInfo} created via REST has a null {@code serviceLevel}, which
+   * makes WFS GetCapabilities fail with a 500/400. WFS keeps using the global service defaults.
+   */
+  private void enableWorkspaceWmsService(String workspaceName, String serviceTitle) {
+    putWorkspaceServiceSettings(workspaceName, serviceTitle, "wms", "WMS");
+  }
+
+  /**
+   * Upserts the workspace-local settings for a single OWS service ({@code wms}/{@code wfs}):
+   * enables it and sets its title to {@code serviceTitle} via {@code PUT
+   * /rest/services/{service}/workspaces/{workspace}/settings}.
+   */
+  private void putWorkspaceServiceSettings(
+      String workspaceName, String serviceTitle, String service, String serviceName) {
+    Map<String, Object> settings = new LinkedHashMap<>();
+    settings.put("workspace", Map.of("name", workspaceName));
+    settings.put("enabled", true);
+    settings.put("name", serviceName);
+    settings.put("title", serviceTitle);
+    try (Response response =
+        auth.apply(
+                client()
+                    .target(serverUrl)
+                    .path(
+                        "/rest/services/" + service + "/workspaces/" + workspaceName + "/settings")
+                    .request(MediaType.APPLICATION_JSON))
+            .put(Entity.json(Map.of(service, settings)))) {
+      if (response.getStatus() != 200 && response.getStatus() != 201) {
+        log.warn(
+            "Could not enable {} service for workspace {} (status {}); the layer stays reachable,"
+                + " only the workspace service title is unset",
+            serviceName,
+            Encode.forJava(workspaceName),
+            response.getStatus());
       }
     }
   }
@@ -429,6 +491,10 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       // invalid under REPROJECT_TO_DECLARED.
       String nativeCrs =
           resolveNativeCrs(layer, layerName, crs, sinkDataStructures.get(nativeName));
+      // Forward the portal's native bounding box (tagged with the native CRS) so the published
+      // layer has a usable extent; absent → GeoServer computes it itself.
+      Map<String, Object> nativeBBox =
+          geoServerNativeBoundingBox(mapValue(layer, "nativeBoundingBox"), nativeCrs);
       // Validate style refs before publishing this layer (with the name checks above). Not a
       // global no-side-effects guarantee — styles were already uploaded and earlier layers may be
       // published — it just avoids publishing this layer with a ref that would then fail.
@@ -441,9 +507,11 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
         requireSafeName(alternativeStyle, "alternativeStyle");
       }
       if (upsert) {
-        upsertFeatureType(workspaceName, datastoreName, layerName, nativeName, crs, nativeCrs);
+        upsertFeatureType(
+            workspaceName, datastoreName, layerName, nativeName, crs, nativeCrs, nativeBBox);
       } else {
-        createFeatureType(workspaceName, datastoreName, layerName, nativeName, crs, nativeCrs);
+        createFeatureType(
+            workspaceName, datastoreName, layerName, nativeName, crs, nativeCrs, nativeBBox);
       }
       if ((defaultStyle != null && !defaultStyle.isBlank()) || !alternativeStyles.isEmpty()) {
         assignLayerStyles(workspaceName, layerName, defaultStyle, alternativeStyles);
@@ -609,24 +677,65 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
+   * Maps a portal bounding-box map ({@code {minX,minY,maxX,maxY}}) to the GeoServer feature-type
+   * shape ({@code {minx,miny,maxx,maxy,crs}}), tagging it with the native CRS (the portal box's own
+   * {@code crs} is ignored — it may be blank). Returns null when the box is absent or any corner is
+   * missing, so GeoServer computes the extent itself.
+   */
+  private static Map<String, Object> geoServerNativeBoundingBox(
+      Map<String, Object> portalBox, String nativeCrs) {
+    if (portalBox == null || portalBox.isEmpty()) {
+      return null;
+    }
+    Object minX = portalBox.get("minX");
+    Object minY = portalBox.get("minY");
+    Object maxX = portalBox.get("maxX");
+    Object maxY = portalBox.get("maxY");
+    if (minX == null || minY == null || maxX == null || maxY == null) {
+      return null;
+    }
+    return Map.of("minx", minX, "miny", minY, "maxx", maxX, "maxy", maxY, "crs", nativeCrs);
+  }
+
+  /**
    * Builds the GeoServer {@code featureType} REST body. The published layer is named {@code name};
    * {@code nativeName} is the underlying PostGIS table. GeoServer derives columns, primary key and
-   * geometry from the table itself, so only naming, the declared SRS, the native CRS and the
-   * projection policy are mapped. The native CRS is set explicitly (read from the data structure's
-   * geometry) rather than relying on GeoServer to auto-detect it on REST creation — which it does
-   * not do, leaving the feature type invalid under {@code REPROJECT_TO_DECLARED}.
+   * geometry from the table itself, so only naming, the declared SRS, the native CRS, the native
+   * bounding box and the projection policy are mapped. The native CRS is set explicitly (read from
+   * the data structure's geometry) rather than relying on GeoServer to auto-detect it on REST
+   * creation — which it does not do, leaving the feature type invalid under {@code
+   * REPROJECT_TO_DECLARED}. When {@code nativeBBox} is present it is sent so the layer advertises a
+   * usable extent (GeoServer would otherwise compute it against the still-empty sink table at
+   * provisioning time and never refresh it); the lat/lon box is left to GeoServer to reproject (see
+   * the {@code recalculate} parameter on the request).
    */
   private static Map<String, Object> featureTypePayload(
-      String name, String nativeName, String crs, String nativeCrs) {
-    return Map.of(
-        "featureType",
-        Map.of(
-            "name", name,
-            "nativeName", nativeName,
-            "title", name,
-            "srs", crs,
-            "nativeCRS", nativeCrs,
-            "projectionPolicy", DEFAULT_PROJECTION_POLICY));
+      String name,
+      String nativeName,
+      String crs,
+      String nativeCrs,
+      Map<String, Object> nativeBBox) {
+    Map<String, Object> featureType = new LinkedHashMap<>();
+    featureType.put("name", name);
+    featureType.put("nativeName", nativeName);
+    featureType.put("title", name);
+    featureType.put("srs", crs);
+    featureType.put("nativeCRS", nativeCrs);
+    featureType.put("projectionPolicy", DEFAULT_PROJECTION_POLICY);
+    if (nativeBBox != null) {
+      featureType.put("nativeBoundingBox", nativeBBox);
+    }
+    return Map.of("featureType", featureType);
+  }
+
+  /**
+   * The {@code recalculate} query value: when the caller supplies a native bounding box, keep it
+   * and only reproject the lat/lon box ({@code latlonbbox}) — a pure coordinate transform, no data
+   * query. Without a native box, let GeoServer compute both from the store ({@code
+   * nativebbox,latlonbbox}).
+   */
+  private static String recalculateFor(Map<String, Object> nativeBBox) {
+    return nativeBBox != null ? "latlonbbox" : "nativebbox,latlonbbox";
   }
 
   /** Creates a feature type idempotently: HTTP 409 (already exists) is treated as success. */
@@ -636,14 +745,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       String name,
       String nativeName,
       String crs,
-      String nativeCrs) {
+      String nativeCrs,
+      Map<String, Object> nativeBBox) {
     try (Response response =
         auth.apply(
                 client()
                     .target(serverUrl)
                     .path(featureTypesPath(workspaceName, datastoreName))
+                    .queryParam("recalculate", recalculateFor(nativeBBox))
                     .request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(featureTypePayload(name, nativeName, crs, nativeCrs)))) {
+            .post(Entity.json(featureTypePayload(name, nativeName, crs, nativeCrs, nativeBBox)))) {
       if (response.getStatus() != 201 && response.getStatus() != 409) {
         checkResponse(response, "create-featuretype/" + name);
       }
@@ -661,13 +772,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       String name,
       String nativeName,
       String crs,
-      String nativeCrs) {
-    Map<String, Object> payload = featureTypePayload(name, nativeName, crs, nativeCrs);
+      String nativeCrs,
+      Map<String, Object> nativeBBox) {
+    Map<String, Object> payload = featureTypePayload(name, nativeName, crs, nativeCrs, nativeBBox);
+    String recalculate = recalculateFor(nativeBBox);
     try (Response createResponse =
         auth.apply(
                 client()
                     .target(serverUrl)
                     .path(featureTypesPath(workspaceName, datastoreName))
+                    .queryParam("recalculate", recalculate)
                     .request(MediaType.APPLICATION_JSON))
             .post(Entity.json(payload))) {
       if (createResponse.getStatus() == 201) {
@@ -683,6 +797,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
                 client()
                     .target(serverUrl)
                     .path(featureTypesPath(workspaceName, datastoreName) + "/" + name)
+                    .queryParam("recalculate", recalculate)
                     .request(MediaType.APPLICATION_JSON))
             .put(Entity.json(payload))) {
       checkResponse(updateResponse, "update-featuretype/" + name);
@@ -1032,6 +1147,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       return workspaceName;
     }
     return toWorkspaceName(requireString(command, "datasetId"));
+  }
+
+  /**
+   * Human-facing title for the workspace-local OWS services: the dataset's display name from the
+   * saga trigger ({@code datasetName}), falling back to the workspace name when it is absent or
+   * blank (e.g. a step that carries only {@code datasetId}).
+   */
+  private static String resolveServiceTitle(SagaCommandMessage command, String workspaceName) {
+    String datasetName = stringValue(command.payload(), "datasetName");
+    return datasetName != null && !datasetName.isBlank() ? datasetName : workspaceName;
   }
 
   static String toWorkspaceName(String datasetId) {

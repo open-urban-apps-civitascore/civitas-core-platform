@@ -648,6 +648,27 @@ class ApisixSagaHandlerTest {
         @SuppressWarnings("unchecked")
         List<String> remove = (List<String>) headers.get("remove");
         assertTrue(remove.contains("X-Allowed-Scope-Ids"));
+        // Accept-Encoding is stripped so GeoServer returns an uncompressed capabilities body the
+        // response-rewrite filter below can match.
+        assertTrue(
+            remove.contains("Accept-Encoding"),
+            "OWS route strips Accept-Encoding so the response-rewrite filter sees a plain body");
+
+        // GeoServer advertises the internal /geoserver/{ws}/{service} path in its capabilities; a
+        // response-rewrite filter maps it back to this route's external endpoint so map clients can
+        // follow the advertised GetMap/GetFeature URLs through the gateway.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> responseRewrite =
+            (Map<String, Object>) pluginsOf(routeBody).get("response-rewrite");
+        assertNotNull(responseRewrite, "OWS route rewrites GeoServer's self-referential URLs");
+        Object[] filters = (Object[]) responseRewrite.get("filters");
+        assertEquals(1, filters.length);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> filter = (Map<String, Object>) filters[0];
+        assertEquals("global", filter.get("scope"));
+        assertEquals(
+            "https?://[^/]+/geoserver/ds_001/(wfs|wms|wcs|wps|wmts|ows|gwc)", filter.get("regex"));
+        assertEquals("https://api.example.test/v1/datasets/ds-001/map", filter.get("replace"));
       }
     }
 
@@ -972,6 +993,19 @@ class ApisixSagaHandlerTest {
         Map<String, Object> labels = (Map<String, Object>) routeBody.get("labels");
         assertFalse(labels.containsKey("civitas-frost-upstream-auth-header"));
         assertEquals("OWS", labels.get("civitas-named-api-standard"));
+        // Re-applying the state also (re-)installs the capabilities URL rewrite, so a route created
+        // before this feature is healed on the next UPDATE/RESTORE.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> responseRewrite =
+            (Map<String, Object>) pluginsOf(routeBody).get("response-rewrite");
+        assertNotNull(
+            responseRewrite, "toggling an OWS route (re-)installs the capabilities rewrite");
+        Object[] filters = (Object[]) responseRewrite.get("filters");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> filter = (Map<String, Object>) filters[0];
+        assertEquals(
+            "https?://[^/]+/geoserver/ds_001/(wfs|wms|wcs|wps|wmts|ows|gwc)", filter.get("regex"));
+        assertEquals("https://api.example.test/v1/datasets/ds-001/map", filter.get("replace"));
       }
     }
   }
@@ -2285,11 +2319,16 @@ class ApisixSagaHandlerTest {
     return handler;
   }
 
+  /** Extracts the {@code plugins} block from a captured route body. */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> pluginsOf(Map<String, Object> routeBody) {
+    return (Map<String, Object>) routeBody.get("plugins");
+  }
+
   /** Extracts the {@code plugins.proxy-rewrite} block from a captured route body. */
   @SuppressWarnings("unchecked")
   private static Map<String, Object> proxyRewriteOf(Map<String, Object> routeBody) {
-    Map<String, Object> plugins = (Map<String, Object>) routeBody.get("plugins");
-    return (Map<String, Object>) plugins.get("proxy-rewrite");
+    return (Map<String, Object>) pluginsOf(routeBody).get("proxy-rewrite");
   }
 
   /**
