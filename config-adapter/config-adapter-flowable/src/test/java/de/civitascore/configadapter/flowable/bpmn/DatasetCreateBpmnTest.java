@@ -141,6 +141,7 @@ class DatasetCreateBpmnTest {
     stubFrostSuccess();
     stubApisixSuccess();
     stubPipelineFailure("Pipeline deployment failed");
+    stubPipelineCompensationSuccess();
     stubApisixCompensationSuccess();
     stubFrostCompensationSuccess();
 
@@ -278,6 +279,7 @@ class DatasetCreateBpmnTest {
     stubFrostSuccess();
     stubApisixSuccess();
     stubPipelineFailure("Pipeline deployment failed");
+    stubPipelineCompensationSuccess();
     stubApisixCompensationSuccess();
     stubFrostCompensationSuccess();
 
@@ -430,6 +432,12 @@ class DatasetCreateBpmnTest {
   private void stubApisixCompensationSuccess() {
     when(apisixHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "create-route"));
+  }
+
+  private void stubPipelineCompensationSuccess() {
+    when(pipelineHandler.handle(
+            argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "deploy-pipelines"));
   }
 
   private void stubPostgisSuccess() {

@@ -142,6 +142,9 @@ class DatasetUpdateBpmnTest {
     stubFrostSuccess();
     stubApisixSuccess();
     stubPipelineFailure("Pipeline update failed");
+    when(pipelineHandler.handle(
+            argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "update-pipelines"));
     when(apisixHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "update-route"));
     when(frostHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))

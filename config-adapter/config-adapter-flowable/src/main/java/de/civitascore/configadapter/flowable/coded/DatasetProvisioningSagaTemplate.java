@@ -159,6 +159,12 @@ final class DatasetProvisioningSagaTemplate {
     ServiceTask compApisix =
         saga.compensation("compensate-apisix", apisix, v.apisixCompensationOp());
     ServiceTask compFrost = saga.compensation("compensate-frost", frost, v.frostCompensationOp());
+    // Undoes the pipelines already deployed by this saga run before the failing one; reads the
+    // deploy step's compensationData (its pipelineIds), so a per-pipeline deleteFlowByName tears
+    // down exactly the process groups this run created. DELETE_PIPELINES is idempotent, so an empty
+    // list (first pipeline failed) is a no-op.
+    ServiceTask compPipelines =
+        saga.compensation("compensate-pipelines", pipeline, "DELETE_PIPELINES");
 
     ServiceTask publishOk = saga.publishResult(ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "success");
     ServiceTask publishFail = saga.publishResult(ProcessBuilderUtils.PUBLISH_FAILURE_ID, "failure");
@@ -186,11 +192,13 @@ final class DatasetProvisioningSagaTemplate {
     for (SagaStepRef geo : geoSteps) {
       saga.errorFlow(geo, compGeoserver);
     }
-    // A pipeline failure compensates the GeoServer branch only if it actually ran (hasGeoSink);
-    // otherwise it skips straight to the APISIX/FROST compensation — no spurious DELETE_WORKSPACE.
+    // A pipeline failure first tears down the sibling pipelines it already deployed, then
+    // compensates the GeoServer branch only if it actually ran (hasGeoSink); otherwise it skips
+    // straight to the APISIX/FROST compensation — no spurious DELETE_WORKSPACE.
     ExclusiveGateway pipelineCompGw =
         saga.exclusiveGateway("pipeline-comp-gateway", "Compensate GeoServer?");
-    saga.errorFlow(pipeline, pipelineCompGw);
+    saga.errorFlow(pipeline, compPipelines);
+    saga.flow(compPipelines, pipelineCompGw);
     saga.flow(pipelineCompGw, compGeoserver).when(HAS_GEO_SINK_CONDITION);
     saga.flow(pipelineCompGw, compApisix).asDefault();
     if (compSql != null) {
