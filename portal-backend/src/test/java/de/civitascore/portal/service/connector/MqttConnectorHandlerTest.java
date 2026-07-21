@@ -122,6 +122,42 @@ class MqttConnectorHandlerTest {
   }
 
   @Nested
+  @DisplayName("Single-topic constraint")
+  class SingleTopicTests {
+
+    @Test
+    @DisplayName("Should accept a single wildcard topic filter on release")
+    void shouldAcceptSingleWildcardTopic() {
+      assertThat(
+              handler.validate(release(List.of("sensors/+/temp")), Default.class, OnRelease.class))
+          .isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should reject more than one topic on release")
+    void shouldRejectMultipleTopics() {
+      List<String> errors =
+          handler.validate(release(List.of("foo/bar", "baz/qux")), Default.class, OnRelease.class);
+      assertThat(errors).hasSize(1);
+      assertThat(errors.get(0)).contains("exactly one topic filter");
+    }
+
+    @Test
+    @DisplayName("Should not enforce the single-topic constraint on a draft (type-only validation)")
+    void shouldNotEnforceOnDraft() {
+      assertThat(handler.validate(release(List.of("foo/bar", "baz/qux")), Default.class)).isEmpty();
+    }
+
+    private Map<String, Object> release(List<String> topics) {
+      Map<String, Object> config = new HashMap<>();
+      config.put("urls", List.of("tcp://broker:1883"));
+      config.put("topics", topics);
+      config.put("qos", 1);
+      return config;
+    }
+  }
+
+  @Nested
   @DisplayName("normalizeAndValidate")
   class NormalizeTests {
 
