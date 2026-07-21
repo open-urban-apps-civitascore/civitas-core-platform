@@ -125,7 +125,8 @@ final class RouteAuthConfigurer {
    * variant.
    */
   void applyAuthState(Map<String, Object> route) {
-    boolean sta = readUpstreamKind(route) == RouteUpstreamKind.STA;
+    RouteUpstreamKind kind = readUpstreamKind(route);
+    boolean sta = kind == RouteUpstreamKind.STA;
 
     // FROST upstream credential is tracked via a route label so a re-apply can clean a stale entry
     // left behind by a different auth scheme, a renamed API key header, or a route that no longer
@@ -159,7 +160,7 @@ final class RouteAuthConfigurer {
 
     // OWS routes additionally rewrite GeoServer's self-referential capabilities URLs to this
     // route's external endpoint so map clients can follow them back through the gateway.
-    if (!sta) {
+    if (kind == RouteUpstreamKind.OWS) {
       OwsCapabilitiesRewrite.apply(route, plugins, proxyRewrite, settings.apiHost());
     }
   }
