@@ -1205,7 +1205,8 @@
       "description": "Beschreibung",
       "tags": "Tags",
       "showDataStructure": "Datenstruktur anzeigen",
-      "noPermission": "Keine Berechtigung zum Lesen von Datenquellen"
+      "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
+      "anonymousName": "Anonyme Datenquelle"
     },
     "frostPanel": {
       "details": "Sensordaten-Speicher Details",

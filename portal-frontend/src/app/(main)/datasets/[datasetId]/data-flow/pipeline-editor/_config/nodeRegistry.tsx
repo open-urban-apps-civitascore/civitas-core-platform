@@ -33,6 +33,7 @@ import { FrostPanel } from '../_components/inspector/panels/FrostPanel'
 import { GeoPersistencePanel } from '../_components/inspector/panels/GeoPersistencePanel'
 import { MappingPanel } from '../_components/inspector/panels/MappingPanel'
 import { emptyMappingConfig } from '../_components/mapping-editor/_types'
+import { DataSourceSublabel } from '../_components/nodes/DataSourceSublabel'
 import { MappingSublabel } from '../_components/nodes/MappingSublabel'
 import { NODE_CATEGORIES, type NodeCategory } from '../_constants/nodeCategories'
 import {
@@ -180,10 +181,7 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     }),
     isData: (data): data is DataSourceNodeData =>
       'entityType' in data && (data as DataSourceNodeData).entityType === ENTITY_TYPES.Datasource,
-    getSublabel: data => {
-      const d = data as DataSourceNodeData
-      return d.entityId !== undefined ? d.entityName : undefined
-    },
+    SublabelComponent: DataSourceSublabel,
     InspectorPanel: DataSourcePanel,
   },
 

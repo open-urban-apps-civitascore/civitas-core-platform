@@ -73,13 +73,13 @@ export interface EntityNodeData extends BasePipelineNodeData {
 }
 
 /**
- * Data specific to DataSource nodes.
- *
+ * Data specific to DataSource nodes. Only the datasource reference is stored here; the display
+ * name is intentionally not persisted but resolved from `entityId` at render time (see
+ * `usePipelineDatasources`), so a rename in the datasource always reflects here.
  */
 export interface DataSourceNodeData extends BasePipelineNodeData {
   entityType: typeof ENTITY_TYPES.Datasource
   entityId?: string
-  entityName?: string
   entityMetadata?: {
     connector?: string
     connection?: string

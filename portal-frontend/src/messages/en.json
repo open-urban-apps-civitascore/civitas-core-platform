@@ -1218,7 +1218,8 @@
       "description": "Description",
       "tags": "Tags",
       "showDataStructure": "Show Data Structure",
-      "noPermission": "No permission to read datasources"
+      "noPermission": "No permission to read datasources",
+      "anonymousName": "Anonymous Data Source"
     },
     "frostPanel": {
       "details": "Sensor Data Storage Details",
