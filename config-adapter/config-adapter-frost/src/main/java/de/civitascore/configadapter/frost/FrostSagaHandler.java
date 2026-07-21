@@ -330,7 +330,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     // Parse (and thereby validate) the provisioned ids before anything is deleted — a malformed
     // payload must fail the step up front, not after the Things are already gone.
     Map<String, List<String>> provisionedEntities = provisionedEntities(command);
-    cleanup.deleteProjectThings(projectId, compensating);
+    cleanup.deleteProjectThings(projectId);
     cleanup.deleteProvisionedEntities(provisionedEntities);
 
     try (Response response =
@@ -342,17 +342,17 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
                     .request(MediaType.APPLICATION_JSON))
             .delete()) {
 
-      // Idempotent compensation: a 404 means the project is already gone — which is exactly the
-      // goal state of a DELETE_PROJECT rollback. Treat it as success on a compensation re-run
-      // (retry / partial earlier cleanup) rather than failing the saga rollback. A forward delete
-      // keeps the stricter checkResponse so genuine drift stays visible.
-      if (compensating && response.getStatus() == 404) {
+      // A 404 means the project is already gone — the exact goal state of a DELETE_PROJECT, in both
+      // directions. A forward delete of a dataset whose project a prior run (or a failed saga's
+      // compensation) already removed must succeed too, not strand the delete saga on the 404.
+      if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
         log.info(
-            "DELETE_PROJECT compensation: project {} already absent (404) — treating as success."
-                + " saga={}",
+            "DELETE_PROJECT: project {} already absent (404) — treating as success. saga={}",
             Encode.forJava(projectId),
             Encode.forJava(command.sagaId()));
-        return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
+        return compensating
+            ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
+            : SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
       }
 
       checkResponse(response, "DELETE_PROJECT");
