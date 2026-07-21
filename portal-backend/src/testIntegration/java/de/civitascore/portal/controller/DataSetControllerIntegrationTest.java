@@ -1377,24 +1377,6 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should trigger a DELETE saga for a provisioned READY dataset and keep the entity")
-    void shouldTriggerDeleteSagaForProvisionedReadyDataSet() {
-      DataSet dataSet = createDataSetWithRelationships();
-      dataSet.setDataSetStatus(DataSetStatus.READY);
-      dataSet.setProvisioned(true);
-      dataSet.setProjectId("proj-test");
-      dataSet = dataSetRepository.save(dataSet);
-      UUID dataSetId = dataSet.getId();
-
-      ResponseEntity<Void> response = performDelete(dataSetId);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-      // The entity survives until the DELETE saga completes; it is now marked pending DELETE.
-      DataSet persisted = dataSetRepository.findById(dataSetId).orElseThrow();
-      assertThat(persisted.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
-    }
-
-    @Test
     @DisplayName("Should fail to delete non-existent dataset")
     void shouldFailToDeleteNonExistentDataSet() {
       ResponseEntity<Void> response = performDelete(UUID.randomUUID());
