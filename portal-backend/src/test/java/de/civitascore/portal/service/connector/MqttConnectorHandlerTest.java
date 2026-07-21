@@ -129,7 +129,7 @@ class MqttConnectorHandlerTest {
     @DisplayName("Should accept a single wildcard topic filter on release")
     void shouldAcceptSingleWildcardTopic() {
       assertThat(
-              handler.validate(release(List.of("sensors/+/temp")), Default.class, OnRelease.class))
+              handler.validate(config(List.of("sensors/+/temp")), Default.class, OnRelease.class))
           .isEmpty();
     }
 
@@ -137,18 +137,26 @@ class MqttConnectorHandlerTest {
     @DisplayName("Should reject more than one topic on release")
     void shouldRejectMultipleTopics() {
       List<String> errors =
-          handler.validate(release(List.of("foo/bar", "baz/qux")), Default.class, OnRelease.class);
+          handler.validate(config(List.of("foo/bar", "baz/qux")), Default.class, OnRelease.class);
       assertThat(errors).hasSize(1);
       assertThat(errors.get(0)).contains("exactly one topic filter");
     }
 
     @Test
-    @DisplayName("Should not enforce the single-topic constraint on a draft (type-only validation)")
-    void shouldNotEnforceOnDraft() {
-      assertThat(handler.validate(release(List.of("foo/bar", "baz/qux")), Default.class)).isEmpty();
+    @DisplayName("Should reject an empty topic list on release via @NotEmpty")
+    void shouldRejectEmptyTopicList() {
+      List<String> errors = handler.validate(config(List.of()), Default.class, OnRelease.class);
+      assertThat(errors).hasSize(1);
+      assertThat(errors.get(0)).contains("required and must be a non-empty list");
     }
 
-    private Map<String, Object> release(List<String> topics) {
+    @Test
+    @DisplayName("Should not enforce the single-topic constraint on a draft (type-only validation)")
+    void shouldNotEnforceOnDraft() {
+      assertThat(handler.validate(config(List.of("foo/bar", "baz/qux")), Default.class)).isEmpty();
+    }
+
+    private Map<String, Object> config(List<String> topics) {
       Map<String, Object> config = new HashMap<>();
       config.put("urls", List.of("tcp://broker:1883"));
       config.put("topics", topics);
