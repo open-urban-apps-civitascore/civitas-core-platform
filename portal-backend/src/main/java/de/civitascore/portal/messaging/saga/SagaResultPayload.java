@@ -26,4 +26,30 @@ public record SagaResultPayload(
     // SAGA_FAILED fields
     String failedStep,
     String error,
-    Boolean compensated) {}
+    Boolean compensated,
+    Map<String, Object> pipelineStatus) {
+  public SagaResultPayload(
+      String datasetId,
+      String projectId,
+      String baseUrl,
+      Map<String, String> routeIds,
+      String serviceId,
+      String publicUrl,
+      List<String> pipelineIds,
+      String failedStep,
+      String error,
+      Boolean compensated) {
+    this(
+        datasetId,
+        projectId,
+        baseUrl,
+        routeIds,
+        serviceId,
+        publicUrl,
+        pipelineIds,
+        failedStep,
+        error,
+        compensated,
+        null);
+  }
+}

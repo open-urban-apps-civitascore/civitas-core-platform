@@ -1,3 +1,6 @@
+pipeline:
+  status-topic: ${PIPELINE_STATUS_TOPIC:de.civitascore.pipeline.status}
+
 logging:
   level:
     root: INFO

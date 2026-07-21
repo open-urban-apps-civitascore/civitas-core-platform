@@ -302,7 +302,12 @@
           "pipelines": {
             "title": "Pipeline(s)",
             "empty": "Noch keine Pipeline vorhanden",
-            "addButton": "Pipeline hinzufügen"
+            "addButton": "Pipeline hinzufügen",
+            "unknownError": "Unbekannter Fehler.",
+            "pipelineError": "Pipelinefehler",
+            "errorLabel": "Fehler",
+            "errorDetails": "Fehlerdetails für {name}",
+            "errorToast": "Pipeline „{name}“: {message}"
           },
           "apis": {
             "title": "APIs",
@@ -434,7 +439,7 @@
               },
               "style": {
                 "sectionTitle": "Layer-Stil",
-                "sectionSubtitle": "Stile werden im Tab \u201EStile\u201C erstellt und hier Layern zugewiesen",
+                "sectionSubtitle": "Stile werden im Tab „Stile“ erstellt und hier Layern zugewiesen",
                 "standardStyle": "Standardanzeige",
                 "default": "Standard (Geoserver default)",
                 "alternativeStyles": "Alternative Stile",
@@ -767,8 +772,7 @@
       "GROUP": "Gruppe",
       "PERMISSION": "Berechtigung",
       "ROLE": "Rolle",
-      "USER": "Benutzer",
-      "DATASET_DASHBOARD": "Datensatz-Dashboard"
+      "USER": "Benutzer"
     }
   },
   "roles": {
@@ -1358,7 +1362,6 @@
         "description": "{count, plural, one {# Transformation ist} other {# Transformationen sind}} nicht mit dem Ausgang verbunden und {count, plural, one {wird} other {werden}} beim Verlassen des Editors entfernt.",
         "confirm": "Verlassen und entfernen"
       },
-
       "categories": {
         "literal": "Literal",
         "recordPathFunctions": "RecordPath-Funktionen",
