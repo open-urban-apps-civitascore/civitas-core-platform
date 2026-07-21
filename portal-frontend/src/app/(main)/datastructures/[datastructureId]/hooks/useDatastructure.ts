@@ -1,6 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -41,6 +42,7 @@ interface UseDatastructureProps {
 
 export const useDatastructure = ({ datastructure, assignedGroups, initialAssignments }: UseDatastructureProps) => {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
   const { handleFormValidationError } = useError()
@@ -183,6 +185,14 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
       datastructureResponse = await handleStatusUpdate(parsedValues.id, releaseDatastructure.mutateAsync)
     if (shouldUnrelease)
       datastructureResponse = await handleStatusUpdate(parsedValues.id, unreleaseDatastructure.mutateAsync)
+
+    // The datastructure name is denormalized into every version response (`dataStructure.name`),
+    // and those version queries are not covered by the mutation's `['datastructures']`
+    // invalidation. On an actual rename, drop this datastructure's version queries so consumers
+    // reading the name from a version (e.g. the pipeline editor) don't show a stale name.
+    if (datastructureResponse && datastructureResponse.name !== datastructure.name) {
+      queryClient.invalidateQueries({ queryKey: [`datastructures/${datastructure.id}/versions`] })
+    }
 
     const updatedFormValues = datastructureResponse
       ? mapDatastructureApiToFormData(datastructureResponse)
