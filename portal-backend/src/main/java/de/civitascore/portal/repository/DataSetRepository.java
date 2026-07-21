@@ -16,7 +16,14 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> {
 
-  @EntityGraph(attributePaths = {"owner", "pipelines", "distributions", "namedApis"})
+  @EntityGraph(
+      attributePaths = {
+        "owner",
+        "pipelines",
+        "pipelines.runtimeStatus",
+        "distributions",
+        "namedApis"
+      })
   @Override
   @NonNull Optional<DataSet> findById(@NonNull UUID id);
 

@@ -101,6 +101,9 @@ public class SagaStepDelegate extends AbstractAdapterCallDelegate {
           Encode.forJava(result.sagaId()),
           Encode.forJava(step));
     } else {
+      if (result.resultData() != null) {
+        result.resultData().forEach(execution::setVariable);
+      }
       recordFailureAndThrow(execution, step, result.error());
     }
   }

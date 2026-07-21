@@ -9,13 +9,25 @@
  */
 package de.civitascore.configadapter.flowable.common;
 
+import java.util.Map;
 import java.util.Objects;
 
 /** Immutable container for saga failure details, used by {@link SagaResultPublisher}. */
 public record SagaFailure(
-    String sagaId, String datasetId, String failedStep, String error, boolean compensated) {
+    String sagaId,
+    String datasetId,
+    String failedStep,
+    String error,
+    boolean compensated,
+    Map<String, Object> pipelineStatus) {
+  public SagaFailure(
+      String sagaId, String datasetId, String failedStep, String error, boolean compensated) {
+    this(sagaId, datasetId, failedStep, error, compensated, null);
+  }
+
   public SagaFailure {
     Objects.requireNonNull(sagaId, "sagaId");
+    pipelineStatus = pipelineStatus == null ? null : Map.copyOf(pipelineStatus);
     // datasetId, failedStep and error may be null on some failure paths (e.g. delete best-effort).
   }
 }

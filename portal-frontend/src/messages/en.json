@@ -303,7 +303,12 @@
           "pipelines": {
             "title": "Pipeline(s)",
             "empty": "No pipeline available yet",
-            "addButton": "Add pipeline"
+            "addButton": "Add pipeline",
+            "unknownError": "Unknown error.",
+            "pipelineError": "Pipeline error",
+            "errorLabel": "Error",
+            "errorDetails": "Error details for {name}",
+            "errorToast": "Pipeline \"{name}\": {message}"
           },
           "apis": {
             "title": "APIs",
@@ -774,8 +779,7 @@
       "GROUP": "Group",
       "PERMISSION": "Permission",
       "ROLE": "Role",
-      "USER": "User",
-      "DATASET_DASHBOARD": "Dataset Dashboard"
+      "USER": "User"
     }
   },
   "roles": {
@@ -1371,7 +1375,6 @@
         "description": "{count, plural, one {# transform is} other {# transforms are}} not connected to the output and will be removed when you leave the editor.",
         "confirm": "Leave and remove"
       },
-
       "categories": {
         "literal": "Literal",
         "recordPathFunctions": "RecordPath Functions",

@@ -23,6 +23,17 @@ export const DatasetStatusSchema = enumFromConst(DATASET_STATUS_TYPES)
 export type PipelineBasicInfo = {
   id: string
   name: string
+  description?: string
+  runtimeStatus?: PipelineRuntimeStatus
+}
+
+export type PipelineRuntimeStatus = {
+  state: 'OK' | 'ERROR' | 'UNKNOWN'
+  message?: string | null
+  sanitizedStacktrace?: string | null
+  occurredAt?: string | null
+  source?: 'DEPLOYMENT' | 'RUNTIME' | null
+  lastEventId?: string | null
 }
 
 // BACKEND COMMUNICATION
@@ -38,7 +49,23 @@ export const DatasetApiResponseSchema = z.object({
   description: z.string(),
   dataSetStatus: DatasetStatusSchema,
   openDataAccess: z.boolean(),
-  pipelines: z.array(z.object({ id: z.string(), name: z.string() })),
+  pipelines: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      description: z.string().optional(),
+      runtimeStatus: z
+        .object({
+          state: z.enum(['OK', 'ERROR', 'UNKNOWN']),
+          message: z.string().nullable().optional(),
+          sanitizedStacktrace: z.string().nullable().optional(),
+          occurredAt: z.string().nullable().optional(),
+          source: z.enum(['DEPLOYMENT', 'RUNTIME']).nullable().optional(),
+          lastEventId: z.string().nullable().optional(),
+        })
+        .optional(),
+    }),
+  ),
   namedApis: z.array(NamedApiSchema).optional(),
   datapool: DatapoolItemSchema.nullable(),
 })

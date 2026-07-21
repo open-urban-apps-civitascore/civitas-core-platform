@@ -71,7 +71,10 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
       handlers.values().forEach(registry::register);
 
       resultPublisher =
-          new FlowableResultPublisher(FlowableInfrastructureFactory.createKafkaProducer(config));
+          new FlowableResultPublisher(
+              FlowableInfrastructureFactory.createKafkaProducer(config),
+              config.getProperty("pipeline.status-topic", "de.civitascore.pipeline.status"));
+      handlers.values().forEach(handler -> handler.setPipelineStatusPublisher(resultPublisher));
 
       processEngine =
           FlowableEngineFactory.create(
