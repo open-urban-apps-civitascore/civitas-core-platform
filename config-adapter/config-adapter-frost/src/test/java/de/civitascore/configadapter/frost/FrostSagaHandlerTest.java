@@ -115,6 +115,8 @@ class FrostSagaHandlerTest {
         assertEquals("42", result.resultData().get("projectId"));
         assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
+        // A freshly created project flags created=true so its compensation may safely delete it.
+        assertEquals(true, result.compensationData().get("created"));
       }
     }
 
@@ -191,6 +193,8 @@ class FrostSagaHandlerTest {
         assertEquals("42", result.resultData().get("projectId"));
         assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
+        // Reuse must flag created=false so its compensation skips the destructive delete.
+        assertEquals(false, result.compensationData().get("created"));
         verify(mockBuilder, never()).post(any(Entity.class));
       }
     }
@@ -910,6 +914,49 @@ class FrostSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "compensating a REUSED project (created=false) preserves it — no Things enumeration, no"
+            + " delete")
+    void shouldNotDeleteReusedProjectOnCompensation() {
+      try (FrostSagaHandler handler = createHandler()) {
+        // The CREATE_PROJECT reuse path stamps created=false into compensationData; on compensation
+        // that map becomes the command payload. Deleting here would destroy the data re-release is
+        // meant to reuse — the whole point of #1923's sink-preserving unrelease.
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "42", "created", false));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        // Neither the Things enumeration GET nor the project DELETE may be issued.
+        verify(mockBuilder, never()).delete();
+        verify(mockTarget, never()).path("Projects(42)/Things");
+      }
+    }
+
+    @Test
+    @DisplayName("compensating a freshly CREATED project (created=true) still deletes it")
+    void shouldDeleteCreatedProjectOnCompensation() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response emptyThingsPage = thingsPage(null);
+        when(mockBuilder.get()).thenReturn(emptyThingsPage);
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "42", "created", true));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        verify(mockBuilder, times(1)).delete();
       }
     }
 

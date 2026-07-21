@@ -30,7 +30,9 @@ import org.owasp.encoder.Encode;
  *   <li>{@code CREATE_PROJECT} — POST /Projects
  *   <li>{@code UPDATE_PROJECT} — PATCH /Projects({projectId})
  *   <li>{@code DELETE_PROJECT} — DELETE all Things of the project (cascades to their Datastreams
- *       and Observations), then DELETE /Projects({projectId})
+ *       and Observations), then DELETE /Projects({projectId}). As a CREATE_PROJECT compensation it
+ *       is a no-op when the create only reused a pre-existing project ({@code created=false}), so a
+ *       later step's failure cannot destroy the data the unrelease flow preserves.
  *   <li>{@code RESTORE_PROJECT} — PATCH /Projects({projectId}) with previous state (update
  *       compensation)
  * </ul>
@@ -44,6 +46,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   private static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
   private static final String KEY_PROJECT_ID = "projectId";
+  private static final String KEY_CREATED = "created";
   private static final String KEY_NAME = "name";
   private static final String KEY_DESCRIPTION = "description";
   private static final String KEY_PUBLIC = "public";
@@ -151,7 +154,8 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       String baseUrl = projectBaseUrl(projectId);
 
       Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
-      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId);
+      // created=true: this execution POSTed the project, so its compensation may safely DELETE it.
+      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId, KEY_CREATED, true);
 
       log.info(
           "FROST project created: projectId={}, saga={}",
@@ -233,7 +237,10 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       String baseUrl = projectBaseUrl(projectId);
 
       Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
-      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId);
+      // created=false: this project pre-existed and holds data the unrelease flow intentionally
+      // preserves — a CREATE_PROJECT compensation must NOT delete it, or a later step's failure
+      // would destroy exactly the storage re-release is meant to reuse.
+      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId, KEY_CREATED, false);
 
       log.info(
           "FROST CREATE_PROJECT reused the existing project matched by unique name: projectId={},"
@@ -324,6 +331,17 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   private SagaCommandResult handleDeleteProject(SagaCommandMessage command) {
     String projectId = requireString(command, KEY_PROJECT_ID);
     boolean compensating = "COMPENSATE_STEP".equals(command.type());
+
+    // created=false marks a reused, data-bearing project; deleting it as a CREATE_PROJECT
+    // compensation would destroy the storage re-release reuses. Forward deletes omit the flag.
+    if (compensating && Boolean.FALSE.equals(command.payload().get(KEY_CREATED))) {
+      log.info(
+          "DELETE_PROJECT compensation skipped: project {} was reused, not created by this saga —"
+              + " preserving its data. saga={}",
+          Encode.forJava(projectId),
+          Encode.forJava(command.sagaId()));
+      return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
+    }
 
     FrostProjectCleanup cleanup =
         new FrostProjectCleanup(client(), authStrategy, serverUrl, command.sagaId());
