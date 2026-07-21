@@ -32,23 +32,34 @@ script:pre-request {
     ['password', bru.getEnvVar('password')],
   ].map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
 
-  const tokenResp = await axios.post(
-    `${keycloakUrl}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`,
-    form,
-    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-  );
-  const token = tokenResp.data.access_token;
-
+  // This is a wait-for-saga poll, not an assertion: a transient token or GET error must retry,
+  // never abort the run. validateStatus keeps every response in-band; the tests block below is
+  // what actually asserts the 404 end state.
   for (let i = 0; i < 30; i++) {
-    const resp = await axios.get(
-      `${baseUrl}/datasets/${datasetId}`,
-      {
-        headers: { 'Authorization': `Bearer ${token}` },
-        validateStatus: () => true,
+    try {
+      const tokenResp = await axios.post(
+        `${keycloakUrl}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`,
+        form,
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          validateStatus: () => true,
+        }
+      );
+      const token = tokenResp.data && tokenResp.data.access_token;
+      if (token) {
+        const resp = await axios.get(
+          `${baseUrl}/datasets/${datasetId}`,
+          {
+            headers: { 'Authorization': `Bearer ${token}` },
+            validateStatus: () => true,
+          }
+        );
+        if (resp.status === 404) {
+          break;
+        }
       }
-    );
-    if (resp.status === 404) {
-      break;
+    } catch (e) {
+      // Ignore and retry — the assertion lives in the tests block.
     }
     await new Promise(r => setTimeout(r, 2000));
   }
