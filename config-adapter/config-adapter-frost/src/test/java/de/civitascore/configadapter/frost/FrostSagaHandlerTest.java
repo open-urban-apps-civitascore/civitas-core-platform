@@ -873,7 +873,7 @@ class FrostSagaHandlerTest {
 
     @Test
     @DisplayName("fails a forward delete already at a 404 Thing enumeration, before any delete")
-    void shouldFailForwardDeleteWhenProjectAbsent() {
+    void shouldSucceedForwardDeleteWhenProjectAbsent() {
       try (FrostSagaHandler handler = createHandler()) {
         Response notFound = mock(Response.class);
         when(notFound.getStatus()).thenReturn(404);
@@ -885,10 +885,12 @@ class FrostSagaHandlerTest {
             handler.handle(
                 createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "999")));
 
-        // Only compensations may treat 404 as "already gone" — a forward delete must surface it.
-        assertEquals("STEP_FAILED", result.type());
-        assertNotNull(result.error());
-        verify(mockBuilder, never()).delete();
+        // A 404 is the goal state of a delete in both directions: a forward delete of a project a
+        // prior run already removed (re-delete / re-release of a preserved sink) must be
+        // idempotent,
+        // not fail the delete saga on the missing project.
+        assertEquals("STEP_COMPLETED", result.type());
+        assertNull(result.error());
       }
     }
 
