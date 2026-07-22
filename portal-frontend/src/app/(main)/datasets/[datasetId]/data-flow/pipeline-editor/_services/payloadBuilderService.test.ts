@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
+import { DATASINK_TYPES, type DataSinkPayload } from '@/types/datasinks'
+
 import type { Pipeline, PipelineEdge, PipelineNode } from '../_types/pipeline'
-import { buildDataSinkPayloads } from './payloadBuilderService'
+import { buildDataSinkPayloads, type DataSinkSnapshot, isDestructiveDataSinkChange } from './payloadBuilderService'
 
 /**
  * Pins the FROST sink payload derivation — the seam that lets the deploy engine resolve the
@@ -86,5 +88,43 @@ describe('buildDataSinkPayloads — FROST target structure reference', () => {
     // before this state can be released.
     const p = pipeline([mappingNode('map-1'), frostNode], [{ source: 'map-1', target: 'frost-1' }])
     expect(frostPayload(p)?.configuration).toEqual({})
+  })
+})
+
+describe('isDestructiveDataSinkChange', () => {
+  const postgisPayload = (tableName: string, dataStructureVersionId: string): DataSinkPayload => ({
+    id: 'sink-1',
+    dataSinkType: DATASINK_TYPES.POSTGIS,
+    configuration: { tableName, dataStructureVersionId },
+  })
+
+  const snapshotFor = (payload: DataSinkPayload, entityId: string | null): DataSinkSnapshot => {
+    const { id: _id, ...comparable } = payload
+    return { 'node-1': { entityId, configJson: JSON.stringify(comparable) } }
+  }
+
+  it('flags a tableName change on an existing sink', () => {
+    const snapshot = snapshotFor(postgisPayload('old', 'v1'), 'sink-1')
+    expect(isDestructiveDataSinkChange('node-1', postgisPayload('new', 'v1'), snapshot)).toBe(true)
+  })
+
+  it('flags a dataStructureVersionId change on an existing sink', () => {
+    const snapshot = snapshotFor(postgisPayload('t', 'v1'), 'sink-1')
+    expect(isDestructiveDataSinkChange('node-1', postgisPayload('t', 'v2'), snapshot)).toBe(true)
+  })
+
+  it('does not flag an unchanged sink', () => {
+    const snapshot = snapshotFor(postgisPayload('t', 'v1'), 'sink-1')
+    expect(isDestructiveDataSinkChange('node-1', postgisPayload('t', 'v1'), snapshot)).toBe(false)
+  })
+
+  it('does not flag a brand-new sink (no entity, no table to lose)', () => {
+    // Not in the snapshot at all → new node.
+    expect(isDestructiveDataSinkChange('node-1', postgisPayload('t', 'v1'), {})).toBe(false)
+  })
+
+  it('does not flag a sink whose snapshot entry has no entityId', () => {
+    const snapshot = snapshotFor(postgisPayload('old', 'v1'), null)
+    expect(isDestructiveDataSinkChange('node-1', postgisPayload('new', 'v1'), snapshot)).toBe(false)
   })
 })

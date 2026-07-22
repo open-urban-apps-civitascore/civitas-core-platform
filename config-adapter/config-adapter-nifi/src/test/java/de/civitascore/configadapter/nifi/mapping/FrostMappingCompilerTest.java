@@ -62,10 +62,10 @@ class FrostMappingCompilerTest {
   private static MappingConfig lookupOnlyWithObservationMapping() {
     return mapping(
         "$.properties.reference", new CopyNode("$.ref"),
-        "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
-        "$.Datastreams[].Observations[].result",
+        "$.datastreams[].properties.reference", new CopyNode("$.ref"),
+        "$.datastreams[].observations[].result",
             new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null),
-        "$.Datastreams[].Observations[].phenomenonTime", new CopyNode("$.ts"));
+        "$.datastreams[].observations[].phenomenonTime", new CopyNode("$.ts"));
   }
 
   // ─── Body templates ─────────────────────────────────────────────────────────
@@ -190,12 +190,12 @@ class FrostMappingCompilerTest {
             "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
             "$.Datastreams[].Observations[].result",
                 new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null),
-            "$.Datastreams[].Observations[].FeatureOfInterest.name", new ConstNode("foi", null),
-            "$.Datastreams[].Observations[].FeatureOfInterest.description",
+            "$.Datastreams[].Observations[].featureOfInterest.name", new ConstNode("foi", null),
+            "$.Datastreams[].Observations[].featureOfInterest.description",
                 new ConstNode("d", null),
-            "$.Datastreams[].Observations[].FeatureOfInterest.encodingType",
+            "$.Datastreams[].Observations[].featureOfInterest.encodingType",
                 new ConstNode("application/geo+json", null),
-            "$.Datastreams[].Observations[].FeatureOfInterest.feature",
+            "$.Datastreams[].Observations[].featureOfInterest.feature",
                 new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")));
 
     FrostCompilation compilation = compiler.compile(mapping, KEYS);
@@ -256,13 +256,13 @@ class FrostMappingCompilerTest {
     fields.put("$.Datastreams[].unitOfMeasurement.name", new ConstNode("Degree Celsius", null));
     fields.put("$.Datastreams[].unitOfMeasurement.symbol", new ConstNode("°C", null));
     fields.put("$.Datastreams[].unitOfMeasurement.definition", new ConstNode("ucum:Cel", null));
-    fields.put("$.Datastreams[].Sensor.name", new ConstNode("DHT22", null));
-    fields.put("$.Datastreams[].Sensor.description", new ConstNode("sensor", null));
-    fields.put("$.Datastreams[].Sensor.encodingType", new ConstNode("application/pdf", null));
-    fields.put("$.Datastreams[].Sensor.metadata", new ConstNode("https://x/d.pdf", null));
-    fields.put("$.Datastreams[].ObservedProperty.name", new ConstNode("Temperature", null));
-    fields.put("$.Datastreams[].ObservedProperty.definition", new ConstNode("http://t", null));
-    fields.put("$.Datastreams[].ObservedProperty.description", new ConstNode("temp", null));
+    fields.put("$.Datastreams[].sensor.name", new ConstNode("DHT22", null));
+    fields.put("$.Datastreams[].sensor.description", new ConstNode("sensor", null));
+    fields.put("$.Datastreams[].sensor.encodingType", new ConstNode("application/pdf", null));
+    fields.put("$.Datastreams[].sensor.metadata", new ConstNode("https://x/d.pdf", null));
+    fields.put("$.Datastreams[].observedProperty.name", new ConstNode("Temperature", null));
+    fields.put("$.Datastreams[].observedProperty.definition", new ConstNode("http://t", null));
+    fields.put("$.Datastreams[].observedProperty.description", new ConstNode("temp", null));
     fields.put("$.Datastreams[].properties.reference", new CopyNode("$.ref"));
     fields.put(
         "$.Datastreams[].Observations[].result",
@@ -308,10 +308,48 @@ class FrostMappingCompilerTest {
         List.of("sta_0_reference", "sta_1_reference", "sta_2_result", "sta_3_phenomenontime"),
         compilation.plan().flatKeys());
     assertEquals(4, compilation.flatProperties().size());
-    assertEquals("/sta_0_reference", compilation.flatProperties().get(0).recordPath());
+    assertEquals("/sta_0_reference", compilation.flatProperties().getFirst().recordPath());
   }
 
   // ─── Validation ─────────────────────────────────────────────────────────────
+
+  @Test
+  void acceptsUserModelledRelationshipCapitalizationAndRendersCanonicalFrostBody()
+      throws Exception {
+    MappingConfig mapping =
+        mapping(
+            "$.properties.reference", new CopyNode("$.ref"),
+            "$.datastream[].properties.reference", new CopyNode("$.ref"),
+            "$.datastream[].observation[].result", new CopyNode("$.temp"));
+
+    FrostCompilation compilation = compiler.compile(mapping, KEYS);
+
+    assertEquals(
+        List.of(new FilterTerm("properties/reference", "sta_1_reference")),
+        compilation.plan().datastreamFilter());
+    assertTrue(compilation.plan().observationBody().contains("\"Datastream\""));
+    assertEquals(
+        List.of("sta_0_reference", "sta_1_reference", "sta_2_result"),
+        compilation.plan().flatKeys());
+  }
+
+  @Test
+  void preservesFreePropertiesAttributesNamedLikeNavigationEdges() throws Exception {
+    StaProperties properties =
+        new StaProperties(
+            List.of(new KeyAttribute("reference"), new FreeAttribute("sensor", StaJsonType.ANY)),
+            List.of(new KeyAttribute("reference")));
+
+    FrostCompilation compilation =
+        compiler.compile(
+            mapping(
+                "$.properties.reference", new CopyNode("$.ref"),
+                "$.properties.sensor", new CopyNode("$.sensor")),
+            properties);
+
+    assertEquals(List.of("sta_0_reference", "sta_1_sensor"), compilation.plan().flatKeys());
+    assertEquals("/sta_1_sensor", compilation.flatProperties().get(1).recordPath());
+  }
 
   @Test
   void rejectsAPathOutsideTheCatalog() {

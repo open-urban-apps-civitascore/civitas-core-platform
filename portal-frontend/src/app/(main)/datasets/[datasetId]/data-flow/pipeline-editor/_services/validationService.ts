@@ -913,8 +913,6 @@ const validateMappingChainStructure: ValidationRule = {
         errorAt(downstream, 'validation.messages.mappingChainStructureMismatch', {
           label: nodeLabel(downstream),
           upstreamLabel: nodeLabel(upstream),
-          expected: upstream.data.targetName || written.id,
-          actual: downstream.data.sourceName || read.id,
         }),
       )
     })

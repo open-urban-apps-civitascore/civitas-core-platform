@@ -74,12 +74,10 @@ export interface EntityNodeData extends BasePipelineNodeData {
 
 /**
  * Data specific to DataSource nodes.
- *
  */
 export interface DataSourceNodeData extends BasePipelineNodeData {
   entityType: typeof ENTITY_TYPES.Datasource
   entityId?: string
-  entityName?: string
   entityMetadata?: {
     connector?: string
     connection?: string
@@ -115,12 +113,10 @@ export interface GeoPersistenceNodeData extends BasePipelineNodeData {
   entityId?: string
   /** Table name for geo data storage */
   tableName: string
-  /** ID of the selected data structure version */
+  /**
+   * "datastructureId/versionId" composite key of the selected data structure version
+   */
   dataStructureVersionId?: string
-  /** Display name of the selected data structure */
-  dataStructureName?: string
-  /** Version number of the selected data structure version */
-  versionNumber?: string
 }
 
 // ============================================================================
@@ -150,10 +146,8 @@ export interface CronNodeData extends BasePipelineNodeData {
 export interface MappingNodeData extends BasePipelineNodeData {
   sourceDatastructureId?: string
   sourceVersionId?: string
-  sourceName?: string
   targetDatastructureId?: string
   targetVersionId?: string
-  targetName?: string
   /** The single saved artifact produced by the mapping editor. */
   mappingConfig: MappingConfig
   /**

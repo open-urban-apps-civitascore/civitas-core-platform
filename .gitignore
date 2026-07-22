@@ -32,4 +32,6 @@ dev-environment/nifi/drivers/*.jar
 /docs/claude
 /.playwright-mcp
 
+/graphify-out/
+
 .github/**

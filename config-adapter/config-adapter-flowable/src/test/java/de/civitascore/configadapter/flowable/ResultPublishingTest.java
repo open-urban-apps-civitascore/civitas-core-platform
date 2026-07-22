@@ -22,19 +22,16 @@ import static org.mockito.Mockito.when;
 import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
-import de.civitascore.configadapter.flowable.coded.CodedProcessDeployer;
 import de.civitascore.configadapter.flowable.common.SagaFailure;
 import de.civitascore.configadapter.flowable.common.kafka.FlowableResultPublisher;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 import org.flowable.engine.ProcessEngine;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class ResultPublishingTest {
@@ -45,7 +42,8 @@ class ResultPublishingTest {
   private SagaCommandHandler apisixHandler;
   private SagaCommandHandler pipelineHandler;
 
-  void setUp(boolean useBpmn) {
+  @BeforeEach
+  void setUp() {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
     pipelineHandler = FlowableTestSupport.mockHandler("nifi");
@@ -59,11 +57,7 @@ class ResultPublishingTest {
                 "resultPublisher",
                 resultPublisher));
 
-    if (useBpmn) {
-      BpmnProcessDeployer.deploy(processEngine.getRepositoryService());
-    } else {
-      CodedProcessDeployer.deploy(processEngine.getRepositoryService());
-    }
+    BpmnProcessDeployer.deploy(processEngine.getRepositoryService());
   }
 
   @AfterEach
@@ -73,16 +67,10 @@ class ResultPublishingTest {
     }
   }
 
-  static Stream<Arguments> approaches() {
-    return Stream.of(Arguments.of("BPMN", true), Arguments.of("Coded", false));
-  }
-
   @Nested
   class Create {
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("de.civitascore.configadapter.flowable.ResultPublishingTest#approaches")
-    void success_publishesCompleted(String label, boolean useBpmn) {
-      setUp(useBpmn);
+    @Test
+    void success_publishesCompleted() {
       stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
       stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
 
@@ -91,10 +79,8 @@ class ResultPublishingTest {
       verify(resultPublisher).publishCompleted(eq("saga-c1"), any());
     }
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("de.civitascore.configadapter.flowable.ResultPublishingTest#approaches")
-    void failure_publishesFailed(String label, boolean useBpmn) {
-      setUp(useBpmn);
+    @Test
+    void failure_publishesFailed() {
       stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1"));
       stubFailure(apisixHandler, "timeout");
       stubCompensation(frostHandler);
@@ -106,10 +92,8 @@ class ResultPublishingTest {
               argThat(f -> "saga-c2".equals(f.sagaId()) && "ds-1".equals(f.datasetId())));
     }
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("de.civitascore.configadapter.flowable.ResultPublishingTest#approaches")
-    void success_doesNotPublishFailed(String label, boolean useBpmn) {
-      setUp(useBpmn);
+    @Test
+    void success_doesNotPublishFailed() {
       stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
       stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
 
@@ -118,10 +102,8 @@ class ResultPublishingTest {
       verify(resultPublisher, never()).publishFailed(any(SagaFailure.class));
     }
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("de.civitascore.configadapter.flowable.ResultPublishingTest#approaches")
-    void threeStepSuccess_publishesResultKeysFromAllSteps(String label, boolean useBpmn) {
-      setUp(useBpmn);
+    @Test
+    void threeStepSuccess_publishesResultKeysFromAllSteps() {
       stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
       stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
       stubSuccess(pipelineHandler, "deploy-pipelines", Map.of("pipelineIds", List.of("pl1")));
@@ -141,14 +123,11 @@ class ResultPublishingTest {
       assertTrue(results.containsKey("pipelineIds"), "Pipeline result key missing");
     }
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("de.civitascore.configadapter.flowable.ResultPublishingTest#approaches")
-    void slugKeyedRouteIdsMapSurvivesResultRoundTrip(String label, boolean useBpmn) {
-      setUp(useBpmn);
+    @Test
+    void slugKeyedRouteIdsMapSurvivesResultRoundTrip() {
       stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
       // The per-named-API APISIX handler returns a nested slug→routeId map (issue #1368). Assert it
-      // survives storage as a Flowable process variable and the result aggregation untouched, for
-      // both the BPMN and coded deployment approaches.
+      // survives storage as a Flowable process variable and the result aggregation untouched.
       Map<String, Object> routeIds = Map.of("traffic", "rid-traffic", "weather", "rid-weather");
       stubSuccess(apisixHandler, "create-route", Map.of("routeIds", routeIds, "serviceId", "ds-1"));
 
@@ -166,10 +145,8 @@ class ResultPublishingTest {
 
   @Nested
   class Update {
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("de.civitascore.configadapter.flowable.ResultPublishingTest#approaches")
-    void success_publishesCompleted(String label, boolean useBpmn) {
-      setUp(useBpmn);
+    @Test
+    void success_publishesCompleted() {
       stubSuccess(frostHandler, "update-project", Map.of());
       stubSuccess(apisixHandler, "update-route", Map.of());
 
@@ -178,10 +155,8 @@ class ResultPublishingTest {
       verify(resultPublisher).publishCompleted(eq("saga-u1"), any());
     }
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("de.civitascore.configadapter.flowable.ResultPublishingTest#approaches")
-    void failure_publishesFailed(String label, boolean useBpmn) {
-      setUp(useBpmn);
+    @Test
+    void failure_publishesFailed() {
       stubSuccess(frostHandler, "update-project", Map.of());
       stubFailure(apisixHandler, "timeout");
       stubCompensation(frostHandler);
@@ -196,10 +171,8 @@ class ResultPublishingTest {
 
   @Nested
   class Delete {
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("de.civitascore.configadapter.flowable.ResultPublishingTest#approaches")
-    void allSuccess_publishesCompleted(String label, boolean useBpmn) {
-      setUp(useBpmn);
+    @Test
+    void allSuccess_publishesCompleted() {
       when(apisixHandler.handle(any()))
           .thenReturn(SagaCommandResult.success("s", "delete-route", Map.of(), Map.of()));
       when(frostHandler.handle(any()))
@@ -210,10 +183,8 @@ class ResultPublishingTest {
       verify(resultPublisher).publishCompleted(eq("saga-d1"), any());
     }
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("de.civitascore.configadapter.flowable.ResultPublishingTest#approaches")
-    void partialFailure_publishesFailed(String label, boolean useBpmn) {
-      setUp(useBpmn);
+    @Test
+    void partialFailure_publishesFailed() {
       when(apisixHandler.handle(any()))
           .thenReturn(SagaCommandResult.failure("s", "delete-route", "down"));
       when(frostHandler.handle(any()))
@@ -230,10 +201,8 @@ class ResultPublishingTest {
                           && f.compensated() == false));
     }
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("de.civitascore.configadapter.flowable.ResultPublishingTest#approaches")
-    void allFail_publishesFailed(String label, boolean useBpmn) {
-      setUp(useBpmn);
+    @Test
+    void allFail_publishesFailed() {
       when(apisixHandler.handle(any()))
           .thenReturn(SagaCommandResult.failure("s", "delete-route", "down"));
       when(frostHandler.handle(any()))

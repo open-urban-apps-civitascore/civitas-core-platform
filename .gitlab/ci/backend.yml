@@ -324,6 +324,7 @@ api-test-backend:
     # The NiFi + GeoServer adapters are wired into the CI stack, so the dataset-saga Bruno
     # lifecycles run as the end-to-end acceptance gate.
     - |
+      set +e
       docker exec bruno-runner sh -c '
         npm install -g @usebruno/cli 2>/dev/null
         cd /tests
@@ -332,7 +333,17 @@ api-test-backend:
         cat /tests/bruno-output.txt
         exit $RESULT
       '
-    - docker cp bruno-runner:/tests/bruno-output.txt bruno-results.txt || true
+      BRUNO_EXIT=$?
+      set -e
+      docker cp bruno-runner:/tests/bruno-output.txt bruno-results.txt || true
+      # On bruno failure, dump service logs so we can diagnose 500s etc.
+      if [ "$BRUNO_EXIT" != "0" ]; then
+        for svc in portal-backend config-adapter kafka apisix frost; do
+          echo "=== $svc logs (last 300 lines) ==="
+          docker compose -p api-test $COMPOSE_FILES logs --tail=300 --no-color "$svc" 2>&1 | tee "${svc}-logs.txt" || true
+        done
+      fi
+      exit ${BRUNO_EXIT:-0}
   after_script:
     - docker rm -f bruno-runner 2>/dev/null || true
     - docker compose -p api-test -f dev-environment/ci/docker-compose.api-test.yml down -v 2>/dev/null || true
@@ -340,6 +351,11 @@ api-test-backend:
     when: always
     paths:
       - bruno-results.txt
+      - portal-backend-logs.txt
+      - config-adapter-logs.txt
+      - kafka-logs.txt
+      - apisix-logs.txt
+      - frost-logs.txt
     expire_in: 30 days
 
 report-test-backend:

@@ -854,15 +854,13 @@ describe('validateEdgeCompatibility', () => {
 describe('validateMappingChainStructure', () => {
   const CHAIN_KEY = 'mappingChainStructureMismatch'
 
-  const writes = (targetId: string, targetVersion: string, targetName?: string) => ({
+  const writes = (targetId: string, targetVersion: string) => ({
     targetDatastructureId: targetId,
     targetVersionId: targetVersion,
-    targetName,
   })
-  const reads = (sourceId: string, sourceVersion: string, sourceName?: string) => ({
+  const reads = (sourceId: string, sourceVersion: string) => ({
     sourceDatastructureId: sourceId,
     sourceVersionId: sourceVersion,
-    sourceName,
   })
 
   const chain = (first: TestNode, second: TestNode): Pipeline =>
@@ -880,16 +878,13 @@ describe('validateMappingChainStructure', () => {
     expect(errorsFor(pipeline, CHAIN_KEY)).toEqual([])
   })
 
-  it('rejects a broken chain at the downstream mapping, naming both datastructures', () => {
-    const pipeline = chain(
-      mappingAt('map-1', writes('ds-b', 'v1', 'Structure B')),
-      mappingAt('map-2', reads('ds-c', 'v1', 'Structure C')),
-    )
+  it('rejects a broken chain at the downstream mapping, naming both mapping nodes', () => {
+    const pipeline = chain(mappingAt('map-1', writes('ds-b', 'v1')), mappingAt('map-2', reads('ds-c', 'v1')))
     const errors = errorsFor(pipeline, CHAIN_KEY)
     expect(errors).toHaveLength(1)
     expect(errors[0].elementId).toBe('map-2')
-    expect(errors[0].messageParams?.expected).toBe('Structure B')
-    expect(errors[0].messageParams?.actual).toBe('Structure C')
+    expect(errors[0].messageParams?.upstreamLabel).toBe('map-1')
+    expect(errors[0].messageParams?.label).toBe('map-2')
   })
 
   it('rejects a version mismatch on the same datastructure', () => {

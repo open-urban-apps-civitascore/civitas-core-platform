@@ -250,7 +250,9 @@ public class DataSetController
   }
 
   /**
-   * Deletes a DRAFT dataset. READY or released datasets must be unstaged/unreleased first.
+   * Deletes a dataset. An AVAILABLE dataset must be unreleased first. A never-provisioned dataset
+   * is removed immediately; a dataset that still holds a provisioned sink is torn down
+   * asynchronously via a DELETE saga and removed once the saga completes.
    *
    * @param id the UUID of the dataset to delete
    */
@@ -259,9 +261,10 @@ public class DataSetController
   @Operation(
       summary = "Delete a dataset",
       description =
-          "Deletes a DRAFT dataset immediately (204 No Content). "
-              + "READY datasets cannot be deleted — unstage first (POST /{id}/unstage). "
-              + "AVAILABLE datasets cannot be deleted directly — unrelease first (POST /{id}/unrelease) to tear down infrastructure, then delete.")
+          "Deletes a dataset (204 No Content). A never-provisioned dataset is removed immediately. "
+              + "A dataset that still holds a provisioned sink is torn down asynchronously via a "
+              + "DELETE saga and removed once the saga completes. An AVAILABLE dataset cannot be "
+              + "deleted directly — unrelease it first (POST /{id}/unrelease).")
   public void delete(@PathVariable UUID id) {
     dataSetService.deleteById(id);
   }

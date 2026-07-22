@@ -1,11 +1,11 @@
 meta {
-  name: 12. Unstage DataSet
+  name: 12. Delete DataSet (triggers DELETE saga)
   type: http
   seq: 20
 }
 
-post {
-  url: {{baseUrl}}/datasets/:id/unstage
+delete {
+  url: {{baseUrl}}/datasets/:id
   body: none
   auth: inherit
 }
@@ -15,27 +15,29 @@ params:path {
 }
 
 tests {
-  test("Unstaged", function() {
+  test("DataSet delete accepted or already gone", function() {
     const status = res.getStatus();
-    // 200=unstaged (READY → DRAFT); 11a already cleared the saga, so a non-200 is a real failure.
-    expect(status).to.equal(200);
+    // 204=DELETE saga triggered; 404 if a previous run already removed the dataset.
+    expect(status === 204 || status === 404).to.be.true;
   });
 }
 
 docs {
-  **SQL saga step 12** — Unstage the dataset before deleting it.
+  **SQL saga step 12** — Delete the dataset, triggering the DATASET_DELETE saga.
 
-  Transitions the dataset from `READY` back to `DRAFT`. Must be called after the DATASET_DELETE saga (step 11/11a) has completed.
+  After the unrelease (step 11/11a) the dataset is `READY` with its PostGIS sink still provisioned. Deleting a provisioned dataset now runs the DATASET_DELETE saga, which tears down the full infrastructure — including the data-bearing PostGIS table — and the DataSet entity (with its sink and pipeline via cascade) is removed once the saga completes.
 
-  **Precondition:** `sqlDataSetId` is set; dataset is in `READY` state (DELETE saga complete).
+  Because the saga owns the teardown, the sink and pipeline no longer need to be deleted by hand; the later cleanup steps only remain as safety nets for a never-provisioned or partially built run.
 
-  **Expected Response:** 200 OK (status `DRAFT`). 400 if a saga is still pending or already `DRAFT`.
+  **Precondition:** `sqlDataSetId` is set; dataset is provisioned and in `READY` (unrelease saga complete).
+
+  **Expected Response:** 204 No Content (DELETE saga triggered). 404 if a previous run already deleted it.
 
   **System Impact:**
 
   | Layer | Effect |
   |---|---|
-  | Backend | DataSet status → `DRAFT` |
-  | Config Adapter | — |
-  | External System | — |
+  | Backend | DELETE saga triggered; DataSet + sink + pipeline removed after completion |
+  | Config Adapter | Full teardown: NiFi flow, APISIX route/upstream, PostGIS table de-provisioned |
+  | External System | PostGIS sink table dropped |
 }
