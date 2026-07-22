@@ -61,7 +61,7 @@ public class Application {
 
   /**
    * Seam constructor for tests: lets a test inject a no-op {@link SagaComponentFactory} so
-   * consumer-wiring tests don't pay for a real Flowable engine bootstrap (H2 + coded-process
+   * consumer-wiring tests don't pay for a real Flowable engine bootstrap (H2 + BPMN-process
    * deployment) on every case. Production always uses the no-arg factory via {@link
    * #Application(String)}.
    *

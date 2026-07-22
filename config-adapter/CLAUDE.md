@@ -54,7 +54,7 @@ config-adapter-api          ← Pure interfaces & models, no impl dependencies
     ├── config-adapter-geoserver      ← GeoServer REST API adapter (JAX-RS/Jersey)
     ├── config-adapter-examples       ← DummyLogAdapter (logging reference impl)
     ├── config-adapter-postgis        ← PostgreSQL/PostGIS DDL adapter (tables, schemas, roles+grants; JDBC + HikariCP) + PostgisSagaHandler
-    └── config-adapter-flowable       ← Flowable saga engine (embedded, PostgreSQL state; coded by default, BPMN optional). Sole saga orchestrator — the legacy custom config-adapter-orchestrator has been removed.
+    └── config-adapter-flowable       ← Flowable saga engine (embedded, PostgreSQL state; BPMN 2.0 process definitions). Sole saga orchestrator — the legacy custom config-adapter-orchestrator has been removed.
     ↑
 config-adapter-application  ← Bootstrap, ServiceLoader discovery, health checks, shade JAR
 ```
