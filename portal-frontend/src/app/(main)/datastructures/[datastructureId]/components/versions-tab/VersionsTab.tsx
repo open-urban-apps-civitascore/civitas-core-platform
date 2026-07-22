@@ -21,7 +21,7 @@ interface VersionsTabProps {
   rowCount: number
   isDirty: boolean
   isLoading: boolean
-  onSave: () => Promise<boolean>
+  onSave: (shouldRefresh?: boolean) => Promise<boolean>
 }
 
 export const VersionsTab = (props: VersionsTabProps) => {
@@ -62,7 +62,7 @@ export const VersionsTab = (props: VersionsTabProps) => {
   }
 
   const handleSaveAndNavigate = async () => {
-    const isSaved = await onSave()
+    const isSaved = await onSave(false)
     if (isSaved && isUnsavedChangesModalOpen) {
       router.push(pathToNavigate)
     }
