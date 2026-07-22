@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
@@ -16,6 +17,7 @@ import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.InvalidInputException;
@@ -57,6 +59,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final DataSetRepository dataSetRepository;
   private final DataSinkRepository dataSinkRepository;
+  private final LayerRepository layerRepository;
   private final DataSetMapper dataSetMapper;
   private final DataPoolRepository dataPoolRepository;
 
@@ -73,6 +76,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   public DataSetService(
       DataSetRepository dataSetRepository,
       DataSinkRepository dataSinkRepository,
+      LayerRepository layerRepository,
       DataSetMapper dataSetMapper,
       DataPoolRepository dataPoolRepository,
       AssignmentFactory assignmentFactory,
@@ -82,6 +86,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       DataSourceDatapoolScopeValidator datapoolScopeValidator) {
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
+    this.layerRepository = layerRepository;
     this.dataSetMapper = dataSetMapper;
     this.dataPoolRepository = dataPoolRepository;
     this.assignmentFactory = assignmentFactory;
@@ -247,8 +252,32 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
         }
       }
       entity.getNamedApis().removeIf(api -> !incomingSlugs.contains(api.getSlug()));
+      cleanUpOrphanedOwsLayers(entity);
     }
     return super.postConvertToEntity(entity, input);
+  }
+
+  /**
+   * A {@link de.civitascore.portal.model.entity.Layer Layer} is an OWS-only published view, served
+   * through the dataset's OWS {@link NamedApi}s. Once no OWS NamedApi remains — regardless of how
+   * many there were — nothing publishes the layers, so they are removed. Keyed on the
+   * post-reconcile state rather than on the removed entry, so removing one of several OWS APIs, or
+   * replacing an OWS API with a differently-slugged one, keeps the layers.
+   *
+   * <p>Deletes via the repository rather than clearing {@code entity.getLayers()}: the update path
+   * loads the dataset without the {@code layers} graph, so the collection is an uninitialised lazy
+   * proxy and a {@code clear()} would not trigger orphan removal.
+   */
+  private void cleanUpOrphanedOwsLayers(DataSet entity) {
+    // A create has no persisted layers yet, so only the update path (non-null id) can orphan any.
+    if (entity.getId() == null) {
+      return;
+    }
+    boolean hasOwsApi =
+        entity.getNamedApis().stream().anyMatch(api -> api.getStandard() == ApiStandard.OWS);
+    if (!hasOwsApi) {
+      layerRepository.deleteByDataSetId(entity.getId());
+    }
   }
 
   /**
