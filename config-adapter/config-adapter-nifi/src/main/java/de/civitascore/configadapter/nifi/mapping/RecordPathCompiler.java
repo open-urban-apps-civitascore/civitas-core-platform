@@ -33,6 +33,14 @@ import java.util.Map;
 public class RecordPathCompiler {
 
   /**
+   * NiFi's RecordPath {@code toString(subject, charset)} requires the charset argument even though
+   * it only affects {@code bytes} subjects; for any other subject the argument is inert. The
+   * RecordPath parser rejects a single-argument call at compile time regardless of subject type, so
+   * a fixed charset is always passed.
+   */
+  private static final String TO_STRING_CHARSET = "UTF-8";
+
+  /**
    * The NiFi {@code UpdateRecord} "Replacement Value Strategy" for a property. A {@code const} uses
    * {@code literal-value} (a bare RecordPath literal is not evaluated as a value by UpdateRecord);
    * everything else is a {@code record-path-value} expression. A single processor allows only one
@@ -204,7 +212,7 @@ public class RecordPathCompiler {
     return switch (convert.op()) {
       case TO_DATE -> "toDate(" + inner + ", " + quote(convert.pattern()) + ")";
       case FORMAT -> "format(" + inner + ", " + quote(convert.pattern()) + ")";
-      case TO_STRING -> "toString(" + inner + ")";
+      case TO_STRING -> "toString(" + inner + ", " + quote(TO_STRING_CHARSET) + ")";
       case TO_INT, TO_FLOAT -> inner;
     };
   }

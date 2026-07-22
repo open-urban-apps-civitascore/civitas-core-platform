@@ -20,7 +20,10 @@ import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecord
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.nifi.record.path.RecordPath;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class RecordPathCompilerTest {
 
@@ -95,7 +98,8 @@ class RecordPathCompilerTest {
                     + " \"inputs\": [\"$.items[].code\","
                     + " { \"op\": \"toString\", \"input\": \"$.items[].number\" }] } }"));
 
-    assertEquals("concat(../code, '-', toString(../number))", props.get("/items[*]/label").value());
+    assertEquals(
+        "concat(../code, '-', toString(../number, 'UTF-8'))", props.get("/items[*]/label").value());
   }
 
   @Test
@@ -221,6 +225,16 @@ class RecordPathCompilerTest {
   }
 
   @Test
+  void toStringBecomesRecordPathFunctionWithCharsetArgument() throws Exception {
+    var props = byPath(compile("{ \"$.s\": { \"op\": \"toString\", \"input\": \"$.n\" } }"));
+
+    UpdateRecordProperty p = props.get("/s");
+    // NiFi's toString requires the charset arg; a single-arg call fails to parse at deploy time.
+    assertEquals("toString(/n, 'UTF-8')", p.value());
+    assertEquals(ReplacementStrategy.RECORD_PATH_VALUE, p.strategy());
+  }
+
+  @Test
   void toIntIsTransparentAndDefersToSchemaCoercion() throws Exception {
     var props = byPath(compile("{ \"$.count\": { \"op\": \"toInt\", \"input\": \"$.n\" } }"));
 
@@ -306,5 +320,37 @@ class RecordPathCompilerTest {
                     + " \"inputs\": [ \"$.a\", \"$.b\" ] } }"));
 
     assertEquals("concat(/a, '\\'', /b)", props.get("/k").value());
+  }
+
+  /**
+   * A compiled value expression is only a string here; NiFi rejects an ill-formed one (wrong arity,
+   * unknown function) at flow deploy, not at compile time in this adapter. Parsing each emitted
+   * expression with NiFi's own RecordPath grammar catches that whole class of errors — including
+   * #1924's single-arg {@code toString} — at unit time instead. Every op that renders a
+   * record-path-value expression is covered.
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "{ \"$.t\": \"$.n\" }",
+        "{ \"$.items[].name\": \"$.items[].sourceName\" }",
+        "{ \"$.s\": { \"op\": \"toString\", \"input\": \"$.n\" } }",
+        "{ \"$.d\": { \"op\": \"toDate\", \"input\": \"$.ts\", \"pattern\": \"yyyy-MM-dd\" } }",
+        "{ \"$.f\": { \"op\": \"format\", \"input\": \"$.d\", \"pattern\": \"yyyy\" } }",
+        "{ \"$.i\": { \"op\": \"toInt\", \"input\": \"$.n\" } }",
+        "{ \"$.label\": { \"op\": \"concat\", \"separator\": \"-\","
+            + " \"inputs\": [ \"$.a\", { \"op\": \"toString\", \"input\": \"$.n\" } ] } }",
+        "{ \"$.geo\": { \"op\": \"geoPoint\", \"lon\": \"$.lon\", \"lat\": \"$.lat\" } }"
+      })
+  void emittedRecordPathValuesParseWithNifiGrammar(String fields) throws Exception {
+    // Both encodings: geoPoint renders differently per sink (WKT concat vs GeoJSON-string concat),
+    // so each shape must parse — FROST deploys the GEOJSON one.
+    for (GeometryEncoding encoding : GeometryEncoding.values()) {
+      for (UpdateRecordProperty p : compile(fields, encoding)) {
+        if (p.strategy() == ReplacementStrategy.RECORD_PATH_VALUE) {
+          RecordPath.compile(p.value());
+        }
+      }
+    }
   }
 }

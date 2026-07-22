@@ -281,6 +281,12 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     JsonNode observation = observations(dsMapId).get(0);
     assertTrue(observation.path("result").isNumber(), "toFloat result must serialize unquoted");
     assertEquals(21.5, observation.path("result").asDouble(), 1e-9);
+    // toString needs NiFi's two-arg form; a single-arg call fails RecordPath compile at deploy and
+    // the flow never produces this observation. resultQuality arriving as the quoted temp proves
+    // the emitted toString(subject, charset) parses and runs against a real NiFi.
+    JsonNode resultQuality = observation.path("resultQuality");
+    assertTrue(resultQuality.isTextual(), "toString must serialize the numeric temp as a string");
+    assertEquals("21.5", resultQuality.asText());
     assertTrue(
         observation.path("phenomenonTime").asText().startsWith("2026-01-01T00:00:00"),
         "phenomenonTime must survive as the mapped ISO instant");
@@ -316,7 +322,11 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         "Point",
         observation.path("FeatureOfInterest").path("feature").path("type").asText(),
         "the FeatureOfInterest feature must be the geoPoint-rendered GeoJSON object");
-    assertEquals("good", observation.path("resultQuality").asText(), "resultQuality must survive");
+    JsonNode foiResultQuality = observation.path("resultQuality");
+    assertTrue(
+        foiResultQuality.isTextual(), "toString must serialize the numeric temp as a string");
+    assertEquals(
+        "18.0", foiResultQuality.asText(), "resultQuality must carry the toString-converted temp");
     String validTime = observation.path("validTime").asText();
     assertTrue(
         validTime.contains("/") && validTime.contains("2026-02-01T00:00:00"),
@@ -521,7 +531,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
           "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
           "$.Datastreams[].Observations[].phenomenonTime": "$.ts",
           "$.Datastreams[].Observations[].validTime": { "op": "concat", "separator": "/", "inputs": ["$.ts", "$.ts"] },
-          "$.Datastreams[].Observations[].resultQuality": { "op": "const", "value": "good" },
+          "$.Datastreams[].Observations[].resultQuality": { "op": "toString", "input": "$.temp" },
           "$.Datastreams[].Observations[].FeatureOfInterest.name": { "op": "const", "value": "Sampling point" },
           "$.Datastreams[].Observations[].FeatureOfInterest.description": { "op": "const", "value": "Where the reading was taken" },
           "$.Datastreams[].Observations[].FeatureOfInterest.encodingType": { "op": "const", "value": "application/geo+json" },

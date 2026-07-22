@@ -47,7 +47,7 @@ class FrontendMappingFixtureTest {
     assertEquals(ReplacementStrategy.RECORD_PATH_VALUE, byPath.get("/titel").strategy());
 
     // toString over a nested path
-    assertEquals("toString(/klasse/offen)", byPath.get("/groups/boolean").value());
+    assertEquals("toString(/klasse/offen, 'UTF-8')", byPath.get("/groups/boolean").value());
 
     // toDate with pattern
     assertEquals("toDate(/klasse/Stufe, 'yyyy-MM-dd')", byPath.get("/groups/datum").value());
