@@ -1318,7 +1318,7 @@
     "dataLoss": {
       "title": "Gespeicherte Daten verwerfen und neu erzeugen?",
       "description": "Diese Änderung verwirft alle gespeicherten Daten dieses Datensatzes. Die Daten werden beim nächsten Ausführen der Pipeline neu erzeugt. Alle bisher gespeicherten Daten gehen dauerhaft verloren.",
-      "confirm": "Speichern und Daten verwerfen"
+      "confirm": "Gespeicherte Daten verwerfen"
     },
     "header": {
       "saveAll": "Alle speichern",
