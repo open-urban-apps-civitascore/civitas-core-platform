@@ -68,6 +68,26 @@ class FrostSinkStageTest {
   }
 
   @Test
+  void resolvesDatastreamBagThroughLowercaseRelationshipName() throws Exception {
+    Map<String, Object> datasink =
+        datasinkWith(
+            "\"reference\": { \"type\": \"string\" }", "\"reference\": { \"type\": \"string\" }");
+    @SuppressWarnings("unchecked")
+    Map<String, Object> schema = (Map<String, Object>) datasink.get("dataStructure");
+    @SuppressWarnings("unchecked")
+    Map<String, Object> defs = (Map<String, Object>) schema.get("$defs");
+    @SuppressWarnings("unchecked")
+    Map<String, Object> thing = (Map<String, Object>) defs.get("Thing");
+    @SuppressWarnings("unchecked")
+    Map<String, Object> properties = (Map<String, Object>) thing.get("properties");
+    properties.put("datastream", properties.remove("Datastreams"));
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertEquals(List.of("reference"), spec.staProperties().datastreamKeys());
+  }
+
+  @Test
   void primaryKeyMarkerWinsOverACoexistingReferenceAttribute() throws Exception {
     FrostSinkSpec spec =
         stage.parseSpec(
