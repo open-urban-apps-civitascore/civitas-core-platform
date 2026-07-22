@@ -1329,8 +1329,8 @@
       "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone."
     },
     "dataLoss": {
-      "title": "Rebuild table and discard data?",
-      "description": "This change rebuilds the table for this dataset. All stored data will be lost and cannot be recovered.",
+      "title": "Discard stored data and rebuild it?",
+      "description": "This change discards all stored data for this Dataset. The data will be recreated the next time the pipeline runs. All previously stored data will be permanently lost.",
       "confirm": "Save and discard data"
     },
     "header": {

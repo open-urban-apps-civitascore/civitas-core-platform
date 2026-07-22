@@ -31,7 +31,7 @@ export type PostgisDataSinkPayload = {
     tableName: string
     dataStructureVersionId: string
   }
-  /** Acknowledges that this update rebuilds the table and discards stored data (see backend guard). */
+  /** Acknowledges that this update discards the sink's stored data, rebuilt on the next release (see backend guard). */
   confirmDataLoss?: boolean
 }
 

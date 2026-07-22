@@ -113,8 +113,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Data-loss confirmation dialog =====
   // A destructive sink change (tableName / dataStructureVersionId) on an already-provisioned
-  // dataset rebuilds the table and discards its data. Save-All pauses on such a change and awaits
-  // an explicit confirmation via this promise before sending confirmDataLoss to the backend.
+  // dataset discards its stored data (the sink's storage is rebuilt on the next release).
+  // Save-All pauses on such a change and awaits an explicit confirmation via this promise before
+  // sending confirmDataLoss to the backend.
   const [isDataLossDialogOpen, setIsDataLossDialogOpen] = useState(false)
   const dataLossResolveRef = useRef<((confirmed: boolean) => void) | null>(null)
 
