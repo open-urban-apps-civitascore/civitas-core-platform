@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -419,11 +420,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Creates the PostGIS datastore, or updates it via PUT if it already exists (HTTP 409). A plain
-   * POST returns 409 for an existing datastore and would otherwise leave its connection parameters
-   * untouched — so a re-provision or update against changed config (e.g. PostGIS host/credentials)
-   * would report success while keeping stale data. Updating on 409 converges it to the desired
-   * state.
+   * Creates the PostGIS datastore, or updates it via PUT if it already exists. A plain POST for an
+   * existing datastore leaves its connection parameters untouched — so a re-provision or update
+   * against changed config (e.g. PostGIS host/credentials) would report success while keeping stale
+   * data. Updating converges it to the desired state.
+   *
+   * <p>An existing datastore surfaces two ways depending on the GeoServer version: some return HTTP
+   * 409, but the REST API also reports it as HTTP 500 with a {@code "Store '…' already exists"}
+   * body. Both must route to the PUT — treating the 500 as a hard failure lets a re-release (which
+   * finds the datastore left behind by an unrelease) fail and its compensation drop the PostGIS
+   * table, destroying the very data the sink-preserving unrelease kept.
    */
   private void createDatastore(String workspaceName, String datastoreName) {
     // The datastore's schema is the workspace name: both derive from datasetId, so GeoServer reads
@@ -436,12 +442,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
                     .path("/rest/workspaces/" + workspaceName + "/datastores")
                     .request(MediaType.APPLICATION_JSON))
             .post(Entity.json(datastoreBody))) {
-      if (createResponse.getStatus() == 201) {
+      int status = createResponse.getStatus();
+      if (status == 201) {
         return;
       }
-      if (createResponse.getStatus() != 409) {
-        checkResponse(createResponse, "CREATE_DATASTORE/" + datastoreName);
-        return;
+      // The body is single-read, so buffer it once and branch on it: an "already exists" signal
+      // (409, or a 500 whose body says so) falls through to the PUT; anything else is a real error.
+      String body = createResponse.readEntity(String.class);
+      if (!datastoreAlreadyExists(status, body)) {
+        throw new SagaApiException(
+            "CREATE_DATASTORE/" + datastoreName + " failed: HTTP " + status + " — " + body, status);
       }
     }
     try (Response updateResponse =
@@ -453,6 +463,18 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
             .put(Entity.json(datastoreBody))) {
       checkResponse(updateResponse, "CREATE_DATASTORE/update/" + datastoreName);
     }
+  }
+
+  /**
+   * Whether a datastore POST failed only because the datastore already exists. GeoServer signals
+   * this either as HTTP 409, or as HTTP 500 with an {@code "already exists"} message body — both
+   * mean "converge via PUT", not "abort".
+   */
+  private static boolean datastoreAlreadyExists(int status, String body) {
+    return status == Response.Status.CONFLICT.getStatusCode()
+        || (status == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()
+            && body != null
+            && body.toLowerCase(Locale.ROOT).contains("already exists"));
   }
 
   /**

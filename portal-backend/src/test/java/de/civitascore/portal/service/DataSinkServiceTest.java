@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -21,6 +23,7 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Collection;
 import java.util.Map;
@@ -50,9 +53,11 @@ class DataSinkServiceTest {
   private DataStructureVersion dataStructureVersion(UUID id) {
     DataStructure structure = new DataStructure();
     structure.setId(UUID.randomUUID());
+    structure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
     DataStructureVersion dsv = new DataStructureVersion();
     dsv.setId(id);
     dsv.setDataStructure(structure);
+    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     return dsv;
   }
 
@@ -322,6 +327,135 @@ class DataSinkServiceTest {
 
       assertThatThrownBy(() -> dataSinkService.create(input))
           .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
+    @DisplayName("Should reject a DataStructureVersion that is not AVAILABLE")
+    void shouldRejectNonAvailableVersion() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSinkInputDTO input = basePostgisInput(dataSetId);
+      input.setConfiguration(
+          Map.of("tableName", "sensor_readings", "dataStructureVersionId", dsvId.toString()));
+
+      DataStructureVersion draft = dataStructureVersion(dsvId);
+      draft.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+
+      stubDataSet(dataSetId);
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(draft));
+
+      assertThatThrownBy(() -> dataSinkService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("AVAILABLE");
+    }
+  }
+
+  @Nested
+  @DisplayName("data-loss confirmation on update")
+  class DataLossConfirmation {
+
+    private DataSink existingPostgisSink(boolean provisioned) {
+      DataSet ds = dataSet(UUID.randomUUID());
+      ds.setProvisioned(provisioned);
+      DataSink sink = new DataSink();
+      sink.setId(UUID.randomUUID());
+      sink.setDataSet(ds);
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      sink.setConfiguration(
+          new java.util.HashMap<>(
+              Map.of("tableName", "old_table", "dataStructureVersionId", "v1")));
+      return sink;
+    }
+
+    private DataSinkInputDTO updateInput(String tableName, String dsvId, boolean confirmDataLoss) {
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.POSTGIS);
+      input.setConfiguration(Map.of("tableName", tableName, "dataStructureVersionId", dsvId));
+      input.setConfirmDataLoss(confirmDataLoss);
+      return input;
+    }
+
+    private DataSink existingFrostSink(boolean provisioned, String dsvId) {
+      DataSet ds = dataSet(UUID.randomUUID());
+      ds.setProvisioned(provisioned);
+      DataSink sink = new DataSink();
+      sink.setId(UUID.randomUUID());
+      sink.setDataSet(ds);
+      sink.setDataSinkType(DataSinkType.FROST);
+      sink.setConfiguration(new java.util.HashMap<>(Map.of("dataStructureVersionId", dsvId)));
+      return sink;
+    }
+
+    @Test
+    @DisplayName("rejects a FROST dataStructureVersionId change on a provisioned dataset")
+    void rejectsFrostVersionChangeWithoutConfirmation() {
+      DataSink sink = existingFrostSink(true, "v1");
+      when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.FROST);
+      input.setConfiguration(Map.of("dataStructureVersionId", "v2"));
+      input.setConfirmDataLoss(false);
+
+      assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("confirmDataLoss");
+    }
+
+    @Test
+    @DisplayName("rejects a destructive change on a provisioned dataset without confirmDataLoss")
+    void rejectsDestructiveChangeWithoutConfirmation() {
+      DataSink sink = existingPostgisSink(true);
+      when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
+
+      DataSinkInputDTO input = updateInput("new_table", "v1", false);
+
+      assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("confirmDataLoss");
+    }
+
+    // The "allows" cases assert only that the data-loss GUARD does not reject: update() continues
+    // past preProcessUpdateInput into the mapper/postConvertToEntity stage, which fails on the
+    // mocked collaborators for unrelated reasons — that later failure must never be the
+    // confirmDataLoss 409.
+
+    @Test
+    @DisplayName("does not raise the data-loss guard when confirmDataLoss is set")
+    void allowsDestructiveChangeWhenConfirmed() {
+      DataSink sink = existingPostgisSink(true);
+      when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
+
+      DataSinkInputDTO input = updateInput("new_table", "v1", true);
+
+      assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
+          .isNotInstanceOf(ResourceInUseException.class);
+    }
+
+    @Test
+    @DisplayName("does not raise the data-loss guard on a never-provisioned dataset")
+    void allowsDestructiveChangeWhenNotProvisioned() {
+      DataSink sink = existingPostgisSink(false);
+      when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
+
+      DataSinkInputDTO input = updateInput("new_table", "v1", false);
+
+      assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
+          .isNotInstanceOf(ResourceInUseException.class);
+    }
+
+    @Test
+    @DisplayName("does not raise the data-loss guard for a non-destructive change")
+    void allowsNonDestructiveChange() {
+      DataSink sink = existingPostgisSink(true);
+      when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
+
+      // Same tableName and version → no data loss.
+      DataSinkInputDTO input = updateInput("old_table", "v1", false);
+
+      assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
+          .isNotInstanceOf(ResourceInUseException.class);
     }
   }
 }

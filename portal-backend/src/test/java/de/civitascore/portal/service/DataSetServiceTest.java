@@ -28,6 +28,7 @@ import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -54,6 +55,7 @@ import org.springframework.security.access.AccessDeniedException;
 class DataSetServiceTest {
 
   @Mock private DataSetRepository dataSetRepository;
+  @Mock private DataSinkRepository dataSinkRepository;
   @Mock private DataSetMapper dataSetMapper;
   @Mock private DataPoolRepository dataPoolRepository;
   @Mock private AssignmentFactory assignmentFactory;
@@ -67,6 +69,7 @@ class DataSetServiceTest {
     lenient().when(allowedScopesProvider.getObject()).thenReturn(wildcardScopes());
     return new DataSetService(
         dataSetRepository,
+        dataSinkRepository,
         dataSetMapper,
         dataPoolRepository,
         assignmentFactory,
@@ -103,6 +106,7 @@ class DataSetServiceTest {
     DataSet ds = readyDataSet(id);
     ds.setDataSetStatus(DataSetStatus.AVAILABLE);
     ds.setProjectId("proj-1");
+    ds.setFrostBaseUrl("https://frost.example.com/Projects(1)");
     ds.getNamedApis().forEach(api -> api.setRouteId("route-1"));
     ds.setServiceId("svc-1");
     ds.setPublicUrl("https://example.com");
@@ -225,18 +229,18 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("allows unstage while a DELETE saga is in-flight (AVAILABLE -> DRAFT chain)")
-    void allowsUnstageWhileDeleteInFlight() {
+    @DisplayName("allows unstage while an UNRELEASE saga is in-flight (AVAILABLE -> DRAFT chain)")
+    void allowsUnstageWhileUnreleaseInFlight() {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
-      ds.setPendingSagaType(PendingSagaType.DELETE);
+      ds.setPendingSagaType(PendingSagaType.UNRELEASE);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSet result = createService().unstage(id);
 
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
-      assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
+      assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.UNRELEASE);
     }
 
     @Test
@@ -340,8 +344,8 @@ class DataSetServiceTest {
 
     @Test
     @DisplayName(
-        "optimistically sets status to READY, pendingSagaType to DELETE, publishes trigger")
-    void setsReadyAndPendingDeleteAndPublishes() {
+        "optimistically sets status to READY, pendingSagaType to UNRELEASE, publishes trigger")
+    void setsReadyAndPendingUnreleaseAndPublishes() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
@@ -351,12 +355,12 @@ class DataSetServiceTest {
       DataSet result = service.unrelease(id);
 
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
-      assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
+      assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.UNRELEASE);
       // Infrastructure fields must survive unrelease so the teardown payload carries the resource
-      // IDs; the completion callback clears them, not unrelease.
+      // IDs; the completion callback clears route/pipeline, not unrelease.
       assertThat(result.getProjectId()).isEqualTo("proj-1");
       assertThat(result.getServiceId()).isEqualTo("svc-1");
-      verify(sagaPublisher).publishDeleteRequested(result);
+      verify(sagaPublisher).publishUnreleaseRequested(result);
     }
   }
 
@@ -567,6 +571,38 @@ class DataSetServiceTest {
       assertThat(persisted.getPublicUrl()).isEqualTo("https://public.example.com");
       assertThat(persisted.getPipelineIds()).containsExactly("pipe-1");
       assertThat(persisted.getPendingSagaType()).isNull();
+      assertThat(persisted.isProvisioned()).isTrue();
+    }
+
+    @Test
+    @DisplayName("UPDATE: a completion that yields a project id marks the dataset provisioned")
+    void updateMarksProvisionedWhenSinkExists() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().isProvisioned()).isTrue();
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
     }
 
     @Test
@@ -807,12 +843,13 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("DELETE: clears infrastructure fields, status already READY")
-    void deleteClearsInfrastructure() {
+    @DisplayName("UNRELEASE: clears only route/pipeline fields, keeps the sink, stays READY")
+    void unreleaseClearsRouteAndPipelineKeepsSink() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
+      // unrelease set READY optimistically before the saga ran.
       ds.setDataSetStatus(DataSetStatus.READY);
-      ds.setPendingSagaType(PendingSagaType.DELETE);
+      ds.setPendingSagaType(PendingSagaType.UNRELEASE);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -827,44 +864,25 @@ class DataSetServiceTest {
       DataSet persisted = saved.getValue();
       assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
       assertThat(persisted.getPendingSagaType()).isNull();
-      assertThat(persisted.getProjectId()).isNull();
-      assertThat(persisted.getServiceId()).isNull();
-      assertThat(persisted.getPublicUrl()).isNull();
+      // Route/consumer-access layer torn down (routes/upstream deleted by DELETE_ROUTE).
       assertThat(persisted.getPipelineIds()).isNull();
       assertThat(persisted.getNamedApis()).allMatch(api -> api.getRouteId() == null);
+      assertThat(persisted.getServiceId()).isNull();
+      assertThat(persisted.getPublicUrl()).isNull();
+      // Data-holding sink references survive so a re-release reuses the existing data.
+      assertThat(persisted.getProjectId()).isEqualTo("proj-1");
+      assertThat(persisted.getFrostBaseUrl()).isEqualTo("https://frost.example.com/Projects(1)");
+      verify(dataSetRepository, never()).delete(any(DataSet.class));
     }
 
     @Test
-    @DisplayName(
-        "DELETE: flips a still-AVAILABLE dataset to READY (teardown without optimistic set)")
-    void deleteFlipsAvailableToReady() {
+    @DisplayName("UNRELEASE: leaves a user-moved DRAFT status untouched")
+    void unreleaseLeavesDraftUntouched() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
-      ds.setPendingSagaType(PendingSagaType.DELETE);
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
-      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-      createService()
-          .handleSagaCompleted(
-              id,
-              new SagaResultPayload(
-                  id.toString(), null, null, null, null, null, null, null, null, null));
-
-      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
-      verify(dataSetRepository).save(saved.capture());
-      DataSet persisted = saved.getValue();
-      assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
-      assertThat(persisted.getPendingSagaType()).isNull();
-      assertThat(persisted.getProjectId()).isNull();
-    }
-
-    @Test
-    @DisplayName("DELETE: leaves a user-moved DRAFT status untouched, still clears infrastructure")
-    void deleteLeavesDraftUntouched() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = availableDataSet(id);
+      // AVAILABLE -> DRAFT chain moved the dataset on to DRAFT while the teardown was running.
       ds.setDataSetStatus(DataSetStatus.DRAFT);
-      ds.setPendingSagaType(PendingSagaType.DELETE);
+      ds.setPendingSagaType(PendingSagaType.UNRELEASE);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -876,10 +894,47 @@ class DataSetServiceTest {
 
       ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
       verify(dataSetRepository).save(saved.capture());
-      DataSet persisted = saved.getValue();
-      assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
-      assertThat(persisted.getPendingSagaType()).isNull();
-      assertThat(persisted.getProjectId()).isNull();
+      assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("DELETE: removes the entity after teardown, without a status save")
+    void deleteRemovesEntity() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      createService()
+          .handleSagaCompleted(
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
+
+      verify(dataSetRepository).delete(ds);
+      verify(dataSetRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CREATE: marks the dataset provisioned")
+    void createMarksProvisioned() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      ds.setProvisioned(false);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService()
+          .handleSagaCompleted(
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().isProvisioned()).isTrue();
     }
 
     @Test
@@ -922,34 +977,35 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("DELETE failure: reverts status to AVAILABLE")
-    void deleteFailureRevertsToAvailable() {
+    @DisplayName("UNRELEASE failure: reverts optimistic READY to AVAILABLE, pending cleared")
+    void unreleaseFailureRevertsToAvailable() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setDataSetStatus(DataSetStatus.READY);
-      ds.setPendingSagaType(PendingSagaType.DELETE);
+      ds.setPendingSagaType(PendingSagaType.UNRELEASE);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      createService().handleSagaFailed(id, "FROST", "timeout", false);
+      createService().handleSagaFailed(id, "delete-route", "APISIX down", false);
 
       ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
       verify(dataSetRepository).save(saved.capture());
+      // A failed teardown must NOT stay READY — live routes may remain, so undo the optimistic set.
       assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
       assertThat(saved.getValue().getPendingSagaType()).isNull();
     }
 
     @Test
-    @DisplayName("DELETE failure: leaves a user-moved DRAFT status untouched")
-    void deleteFailureLeavesDraftUntouched() {
+    @DisplayName("UNRELEASE failure: leaves a user-moved DRAFT status untouched")
+    void unreleaseFailureLeavesDraftUntouched() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setDataSetStatus(DataSetStatus.DRAFT);
-      ds.setPendingSagaType(PendingSagaType.DELETE);
+      ds.setPendingSagaType(PendingSagaType.UNRELEASE);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      createService().handleSagaFailed(id, "FROST", "timeout", false);
+      createService().handleSagaFailed(id, "delete-route", "APISIX down", false);
 
       ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
       verify(dataSetRepository).save(saved.capture());
@@ -958,14 +1014,49 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("no pending saga: skips save (duplicate/late delivery)")
+    @DisplayName("DELETE failure: stays AVAILABLE, pending cleared, entity kept")
+    void deleteFailureStaysAvailable() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaFailed(id, "deprovision-sink", "PostGIS down", false);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
+      verify(dataSetRepository, never()).delete(any(DataSet.class));
+    }
+
+    @Test
+    @DisplayName("UPDATE failure: stays AVAILABLE, pending cleared")
+    void updateFailureStaysAvailable() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaFailed(id, "update-route", "APISIX timeout", false);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("no pending saga: skips save (duplicate delivery)")
     void noPendingSagaSkipsSave() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(null);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
-      createService().handleSagaFailed(id, "FROST", "timeout", false);
+      createService().handleSagaFailed(id, "any", "any", false);
 
       verify(dataSetRepository, never()).save(any());
     }

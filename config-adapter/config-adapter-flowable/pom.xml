@@ -13,7 +13,7 @@
 	<packaging>jar</packaging>
 
 	<name>Config Adapter Flowable Orchestrator</name>
-	<description>Flowable-based saga orchestrator for multi-adapter provisioning workflows. Provides both BPMN XML and Java-coded workflow definitions for comparison.</description>
+	<description>Flowable-based saga orchestrator for multi-adapter provisioning workflows. Saga workflows are defined as BPMN 2.0 process definitions.</description>
 
 	<dependencies>
 		<!-- Internal -->

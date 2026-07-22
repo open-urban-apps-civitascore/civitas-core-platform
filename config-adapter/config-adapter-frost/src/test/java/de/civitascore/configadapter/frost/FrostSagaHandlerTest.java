@@ -115,6 +115,8 @@ class FrostSagaHandlerTest {
         assertEquals("42", result.resultData().get("projectId"));
         assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
+        // A freshly created project flags created=true so its compensation may safely delete it.
+        assertEquals(true, result.compensationData().get("created"));
       }
     }
 
@@ -171,16 +173,10 @@ class FrostSagaHandlerTest {
     }
 
     @Test
-    @DisplayName(
-        "returns success when FROST signals duplicate via 500 'Failed to store data.' and project exists")
-    void shouldReturnSuccessWhenFrostSignalsDuplicateAndProjectExists() {
+    @DisplayName("reuses an existing project found by name and skips the POST (find-or-create)")
+    void shouldReuseExistingProjectAndSkipPost() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response postResponse = mock(Response.class);
-        when(postResponse.getStatus()).thenReturn(500);
-        when(postResponse.readEntity(String.class))
-            .thenReturn("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
-
+        // Up-front lookup finds the dataset's own project → reuse it, never POST.
         Response getResponse = mock(Response.class);
         when(getResponse.getStatus()).thenReturn(200);
         when(getResponse.readEntity(Map.class))
@@ -197,12 +193,52 @@ class FrostSagaHandlerTest {
         assertEquals("42", result.resultData().get("projectId"));
         assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
+        // Reuse must flag created=false so its compensation skips the destructive delete.
+        assertEquals(false, result.compensationData().get("created"));
+        verify(mockBuilder, never()).post(any(Entity.class));
       }
     }
 
     @Test
     @DisplayName(
-        "returns failure when FROST signals duplicate via 500 'Failed to store data.' but no project found by name")
+        "recovers via the 500 'Failed to store data.' race guard when a concurrent create won and"
+            + " the second lookup finds the project")
+    void shouldReturnSuccessWhenFrostSignalsDuplicateAndProjectExists() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response postResponse = mock(Response.class);
+        when(postResponse.getStatus()).thenReturn(500);
+        when(postResponse.readEntity(String.class))
+            .thenReturn("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
+
+        // First lookup: empty (POST is attempted). After the POST's 500, the recovery lookup finds
+        // the project a concurrent create inserted in between.
+        Response emptyLookup = mock(Response.class);
+        when(emptyLookup.getStatus()).thenReturn(200);
+        when(emptyLookup.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
+        Response foundLookup = mock(Response.class);
+        when(foundLookup.getStatus()).thenReturn(200);
+        when(foundLookup.readEntity(Map.class))
+            .thenReturn(Map.of("value", List.of(Map.of("@iot.id", 42))));
+        when(mockBuilder.get()).thenReturn(emptyLookup, foundLookup);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Existing Dataset"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("42", result.resultData().get("projectId"));
+        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
+        assertEquals("42", result.compensationData().get("projectId"));
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "returns failure when the POST fails with 500 'Failed to store data.' but no project is"
+            + " found by name")
     void shouldReturnFailureWhenFrostSignalsDuplicateButProjectNotFound() {
       try (FrostSagaHandler handler = createHandler()) {
         Response postResponse = mock(Response.class);
@@ -211,11 +247,7 @@ class FrostSagaHandlerTest {
             .thenReturn("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}");
         when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
 
-        Response getResponse = mock(Response.class);
-        when(getResponse.getStatus()).thenReturn(200);
-        when(getResponse.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
-        when(mockBuilder.get()).thenReturn(getResponse);
-
+        // Both the up-front and the recovery lookup return empty (default from setup).
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Ghost Dataset"));
 
@@ -845,7 +877,7 @@ class FrostSagaHandlerTest {
 
     @Test
     @DisplayName("fails a forward delete already at a 404 Thing enumeration, before any delete")
-    void shouldFailForwardDeleteWhenProjectAbsent() {
+    void shouldSucceedForwardDeleteWhenProjectAbsent() {
       try (FrostSagaHandler handler = createHandler()) {
         Response notFound = mock(Response.class);
         when(notFound.getStatus()).thenReturn(404);
@@ -857,10 +889,12 @@ class FrostSagaHandlerTest {
             handler.handle(
                 createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "999")));
 
-        // Only compensations may treat 404 as "already gone" — a forward delete must surface it.
-        assertEquals("STEP_FAILED", result.type());
-        assertNotNull(result.error());
-        verify(mockBuilder, never()).delete();
+        // A 404 is the goal state of a delete in both directions: a forward delete of a project a
+        // prior run already removed (re-delete / re-release of a preserved sink) must be
+        // idempotent,
+        // not fail the delete saga on the missing project.
+        assertEquals("STEP_COMPLETED", result.type());
+        assertNull(result.error());
       }
     }
 
@@ -880,6 +914,49 @@ class FrostSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "compensating a REUSED project (created=false) preserves it — no Things enumeration, no"
+            + " delete")
+    void shouldNotDeleteReusedProjectOnCompensation() {
+      try (FrostSagaHandler handler = createHandler()) {
+        // The CREATE_PROJECT reuse path stamps created=false into compensationData; on compensation
+        // that map becomes the command payload. Deleting here would destroy the data re-release is
+        // meant to reuse — the whole point of #1923's sink-preserving unrelease.
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "42", "created", false));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        // Neither the Things enumeration GET nor the project DELETE may be issued.
+        verify(mockBuilder, never()).delete();
+        verify(mockTarget, never()).path("Projects(42)/Things");
+      }
+    }
+
+    @Test
+    @DisplayName("compensating a freshly CREATED project (created=true) still deletes it")
+    void shouldDeleteCreatedProjectOnCompensation() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response emptyThingsPage = thingsPage(null);
+        when(mockBuilder.get()).thenReturn(emptyThingsPage);
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "42", "created", true));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        verify(mockBuilder, times(1)).delete();
       }
     }
 
@@ -1203,6 +1280,14 @@ class FrostSagaHandlerTest {
     when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
     when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
     when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
+
+    // CREATE_PROJECT is now find-or-create: it always issues a name-lookup GET before the POST.
+    // Default that lookup to "no existing project" so the POST path is exercised; tests that assert
+    // reuse override mockBuilder.get() with a non-empty result.
+    Response emptyLookup = mock(Response.class);
+    when(emptyLookup.getStatus()).thenReturn(200);
+    when(emptyLookup.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
+    when(mockBuilder.get()).thenReturn(emptyLookup);
 
     handler.setTestClient(mockClient);
     return handler;

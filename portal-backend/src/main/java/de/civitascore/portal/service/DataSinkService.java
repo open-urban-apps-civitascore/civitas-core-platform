@@ -2,6 +2,8 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -16,6 +18,7 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -106,7 +109,47 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
       throw new InvalidInputException(
           getEntityName(), existingEntity.getId(), "dataSinkType cannot be changed after creation");
     }
+    requireDataLossConfirmation(input, existingEntity);
     return input;
+  }
+
+  /**
+   * A change to {@code tableName} or {@code dataStructureVersionId} rebuilds the sink's backing
+   * storage on the next release, discarding all stored data — for POSTGIS a table drop+recreate (no
+   * ALTER TABLE), for FROST a re-provisioning of the target entities. If the parent dataset has
+   * been provisioned (storage actually exists), such a change requires explicit {@code
+   * confirmDataLoss=true}; otherwise the update is rejected with 409. Comparing ids alone is
+   * sufficient because the AVAILABLE-only invariant makes a version's model immutable for the
+   * sink's lifetime (see {@link #requireExistingDataStructureVersion}).
+   */
+  private void requireDataLossConfirmation(DataSinkInputDTO input, DataSink existingEntity) {
+    if (input.isConfirmDataLoss() || !existingEntity.getDataSet().isProvisioned()) {
+      return;
+    }
+
+    Map<String, Object> incoming = input.getConfiguration();
+    if (incoming == null) {
+      return;
+    }
+    Map<String, Object> current = existingEntity.getConfiguration();
+
+    boolean destructiveChange =
+        fieldChanged(incoming, current, "tableName")
+            || fieldChanged(incoming, current, "dataStructureVersionId");
+    if (destructiveChange) {
+      throw new ResourceInUseException(
+          getEntityName(),
+          existingEntity.getId(),
+          "This change rebuilds the sink's table and discards all stored data;"
+              + " set confirmDataLoss=true to proceed");
+    }
+  }
+
+  private static boolean fieldChanged(
+      Map<String, Object> incoming, Map<String, Object> current, String key) {
+    Object newValue = incoming.get(key);
+    Object oldValue = current == null ? null : current.get(key);
+    return !Objects.equals(String.valueOf(newValue), String.valueOf(oldValue));
   }
 
   /**
@@ -240,6 +283,17 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
           ScopeType.DATASTRUCTURE, Set.of(dsv.getDataStructure().getId()));
     } catch (AccessDeniedException e) {
       throw versionNotAvailable();
+    }
+
+    // A sink may only reference an AVAILABLE version. This makes the referenced model immutable for
+    // the sink's lifetime (an AVAILABLE version cannot go back to DRAFT while a sink uses it), so a
+    // same-id reference always means the same model — the data-loss diff can compare ids alone.
+    if (dsv.getDataStructureVersionStatus() != DataStructureVersionStatus.AVAILABLE
+        || dsv.getDataStructure().getDataStructureStatus() != DataStructureStatus.AVAILABLE) {
+      throw new InvalidInputException(
+          "DataSink",
+          "configuration.dataStructureVersionId",
+          "Referenced DataStructureVersion must be in AVAILABLE status");
     }
   }
 

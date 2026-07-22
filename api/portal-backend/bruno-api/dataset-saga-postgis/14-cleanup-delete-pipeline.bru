@@ -1,5 +1,5 @@
 meta {
-  name: 14. Cleanup - Delete Pipeline
+  name: 14. Cleanup - Delete Pipeline (safety net)
   type: http
   seq: 22
 }
@@ -16,24 +16,18 @@ params:path {
 }
 
 tests {
-  test("Pipeline deleted or already gone", function() {
+  test("Pipeline already gone or deleted", function() {
     const status = res.getStatus();
-    // 204=deleted, 404=already gone
+    // After the DELETE saga (steps 12/13) the pipeline is already cascade-removed → 404.
+    // 204 only occurs as a safety net for a never-provisioned / partially built run.
     expect(status === 204 || status === 404).to.be.true;
   });
 }
 
 docs {
-  **PostGIS saga step 14** — Delete the pipeline (cleanup).
+  **PostGIS saga step 14** — Delete the pipeline (safety net).
 
-  Removes the pipeline created in step 7. The DataSink (step 13) must already be deleted, since it references `pipeline_id`. The DATASET_DELETE saga (step 11) has already undeployed the NiFi flow.
+  With the new delete contract this step is normally a no-op: the DATASET_DELETE saga (steps 12/13) already undeployed the NiFi flow and removed the pipeline via cascade, so this usually returns `404`. It remains only as a safety net for a run that never reached provisioning (e.g. a partially built dataset), where the pipeline record may still exist and returns `204`.
 
-  **Expected Response:** 204 No Content. 404 if already deleted. 400 if `pgPipelineId` is not set (first run).
-
-  **System Impact:**
-
-  | Layer | Effect |
-  |---|---|
-  | Backend | Pipeline record removed from `portal_backend` DB |
-  | Pipeline engine | Pipeline already undeployed by the DATASET_DELETE saga |
+  **Expected Response:** 404 Not Found (already removed by the DELETE saga). 204 only for a never-provisioned run.
 }
