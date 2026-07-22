@@ -192,42 +192,47 @@ public class FrostMappingCompiler {
       throws FatalAdapterException {
     validateKeyNames(properties);
     Map<String, StaTarget> targetsByPath = targetsByPath(properties);
-    validate(mapping, properties, targetsByPath);
+    MappingConfig normalizedMapping = normalizeTargetPaths(mapping);
+    validate(normalizedMapping, properties, targetsByPath);
 
     Map<String, String> flatKeyByPath = new LinkedHashMap<>();
     int index = 0;
-    for (String path : mapping.fields().keySet()) {
+    for (String path : normalizedMapping.fields().keySet()) {
       flatKeyByPath.put(path, "sta_" + index + "_" + leafOf(path));
       index++;
     }
 
     List<UpdateRecordProperty> flatProperties = new ArrayList<>();
-    for (Map.Entry<String, ValueNode> field : mapping.fields().entrySet()) {
+    for (Map.Entry<String, ValueNode> field : normalizedMapping.fields().entrySet()) {
       flatProperties.add(
           recordPathCompiler.compileField(
               "/" + flatKeyByPath.get(field.getKey()), field.getValue()));
     }
 
-    boolean thingCreatable = hasCompleteCreateSet(mapping, StaEntity.THING);
-    boolean datastreamCreatable = hasCompleteCreateSet(mapping, StaEntity.DATASTREAM);
-    boolean observationMapped = touches(mapping, StaEntity.OBSERVATION);
+    boolean thingCreatable = hasCompleteCreateSet(normalizedMapping, StaEntity.THING);
+    boolean datastreamCreatable = hasCompleteCreateSet(normalizedMapping, StaEntity.DATASTREAM);
+    boolean observationMapped = touches(normalizedMapping, StaEntity.OBSERVATION);
 
     EntityBodies thingBodies =
-        renderThingBodies(thingCreatable, mapping, properties, flatKeyByPath, targetsByPath);
+        renderThingBodies(
+            thingCreatable, normalizedMapping, properties, flatKeyByPath, targetsByPath);
     String locationBody =
-        touches(mapping, StaEntity.LOCATION)
-            ? renderEntityBody(mapping, StaEntity.LOCATION, List.of(), flatKeyByPath, targetsByPath)
+        touches(normalizedMapping, StaEntity.LOCATION)
+            ? renderEntityBody(
+                normalizedMapping, StaEntity.LOCATION, List.of(), flatKeyByPath, targetsByPath)
             : null;
     DatastreamBodies datastreamBodies =
         renderDatastreamBodies(
-            datastreamCreatable, mapping, properties, flatKeyByPath, targetsByPath);
+            datastreamCreatable, normalizedMapping, properties, flatKeyByPath, targetsByPath);
     String observationBody =
-        observationMapped ? renderObservationBody(mapping, flatKeyByPath, targetsByPath) : null;
+        observationMapped
+            ? renderObservationBody(normalizedMapping, flatKeyByPath, targetsByPath)
+            : null;
 
     List<FilterTerm> thingFilter =
         filterTerms(properties.thingKeys(), StaEntity.THING, flatKeyByPath);
     List<FilterTerm> datastreamFilter =
-        touchesDatastreamTier(mapping)
+        touchesDatastreamTier(normalizedMapping)
             ? filterTerms(properties.datastreamKeys(), StaEntity.DATASTREAM, flatKeyByPath)
             : List.of();
 
@@ -281,6 +286,81 @@ public class FrostMappingCompiler {
 
   private record DatastreamBodies(
       String create, String update, String sensor, String observedProperty) {}
+
+  // ─── Mapping normalization ──────────────────────────────────────────────────
+
+  /**
+   * Model schemas commonly expose relationship edges in lower camel case (for example, {@code
+   * datastreams} or {@code featureOfInterest}), while the SensorThings/FROST payload vocabulary
+   * uses PascalCase navigation names ({@code Datastreams} and {@code FeatureOfInterest}). Normalize
+   * only those edge labels before catalog validation so the mapping follows the model without
+   * requiring model authors to know the FROST casing.
+   */
+  private MappingConfig normalizeTargetPaths(MappingConfig mapping) throws FatalAdapterException {
+    Map<String, ValueNode> normalizedFields = new LinkedHashMap<>();
+    for (Map.Entry<String, ValueNode> field : mapping.fields().entrySet()) {
+      String normalizedPath = normalizeTargetPath(field.getKey());
+      if (normalizedFields.putIfAbsent(normalizedPath, field.getValue()) != null) {
+        throw reject(
+            "multiple FROST mapping target paths resolve to the same target: '"
+                + normalizedPath
+                + "'");
+      }
+    }
+    return new MappingConfig(mapping.source(), mapping.target(), normalizedFields);
+  }
+
+  private String normalizeTargetPath(String path) {
+    StringBuilder normalized = new StringBuilder(path.length());
+    int segmentStart = 0;
+    boolean inPropertiesBag = false;
+    for (int i = 0; i <= path.length(); i++) {
+      if (i != path.length() && path.charAt(i) != '.') {
+        continue;
+      }
+      String segment = path.substring(segmentStart, i);
+      if (!inPropertiesBag && isEdgeSegment(segment)) {
+        segment = normalizeEdgeSegment(segment);
+      }
+      if ("properties".equals(segment)) {
+        inPropertiesBag = true;
+      }
+      if (!normalized.isEmpty()) {
+        normalized.append('.');
+      }
+      normalized.append(segment);
+      segmentStart = i + 1;
+    }
+    return normalized.toString();
+  }
+
+  /**
+   * Maps model relationship labels to the canonical SensorThings navigation names. Models may
+   * expose either the singular edge name (for example {@code datastream[]}) or the plural name
+   * ({@code datastreams[]}); both refer to the same FROST collection.
+   */
+  private String normalizeEdgeSegment(String segment) {
+    boolean array = segment.endsWith("[]");
+    String name = array ? segment.substring(0, segment.length() - 2) : segment;
+    String canonical =
+        switch (name.toLowerCase(Locale.ROOT)) {
+          case "location", "locations" -> "Locations";
+          case "datastream", "datastreams" -> "Datastreams";
+          case "observation", "observations" -> "Observations";
+          case "sensor" -> "Sensor";
+          case "observedproperty" -> "ObservedProperty";
+          case "featureofinterest" -> "FeatureOfInterest";
+          default -> Character.toUpperCase(name.charAt(0)) + name.substring(1);
+        };
+    return array ? canonical + "[]" : canonical;
+  }
+
+  private boolean isEdgeSegment(String segment) {
+    return (segment.endsWith("[]") && segment.length() > 2)
+        || "sensor".equals(segment)
+        || "observedProperty".equals(segment)
+        || "featureOfInterest".equals(segment);
+  }
 
   // ─── Validation ─────────────────────────────────────────────────────────────
 
