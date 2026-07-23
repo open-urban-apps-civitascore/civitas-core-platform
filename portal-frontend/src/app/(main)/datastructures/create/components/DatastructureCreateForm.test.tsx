@@ -45,6 +45,12 @@ vi.mock('@/components/form/fields/TextField', () => ({
   TextField: ({ placeholder }: { placeholder: string }) => <input aria-label="name" placeholder={placeholder} />,
 }))
 
+vi.mock('@/components/form/fields/FormTextArea', () => ({
+  FormTextArea: ({ placeholder }: { placeholder: string }) => (
+    <textarea aria-label="description" placeholder={placeholder} />
+  ),
+}))
+
 vi.mock('@/components/loading-spinner/LoadingSpinner', () => ({
   LoadingSpinner: () => <div data-testid="loadingSpinner" />,
 }))
@@ -63,8 +69,8 @@ describe('DatastructureCreateForm', () => {
     setup()
     expect(screen.getByTestId('createDatastructurePage')).toBeInTheDocument()
     expect(screen.getByTestId('datastructureCreateForm')).toBeInTheDocument()
-    expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
-    expect(screen.getByTestId('submitButton')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'actions.cancel' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'actions.saveAndContinue' })).toBeInTheDocument()
   })
 
   test('renders title and subtitle', () => {
@@ -75,7 +81,7 @@ describe('DatastructureCreateForm', () => {
 
   test('submit button is disabled when form is not dirty', () => {
     setup()
-    expect(screen.getByTestId('submitButton')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'actions.saveAndContinue' })).toBeDisabled()
   })
 
   test('submit button is enabled after changing form values', () => {
@@ -83,12 +89,12 @@ describe('DatastructureCreateForm', () => {
 
     setup()
 
-    expect(screen.getByTestId('submitButton')).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'actions.saveAndContinue' })).toBeEnabled()
   })
 
   test('cancel button navigates back to datastructures list', () => {
     setup()
-    fireEvent.click(screen.getByTestId('cancelButton'))
+    fireEvent.click(screen.getByRole('button', { name: 'actions.cancel' }))
     expect(mockPush).toHaveBeenCalledWith('/datastructures?page=1')
   })
 
@@ -97,7 +103,7 @@ describe('DatastructureCreateForm', () => {
     mockSaveDatastructure.mockResolvedValue({ id: 'test-id' })
 
     setup()
-    fireEvent.click(screen.getByTestId('submitButton'))
+    fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
 
     await waitFor(() => {
       expect(mockSaveDatastructure).toHaveBeenCalledTimes(1)
@@ -110,7 +116,7 @@ describe('DatastructureCreateForm', () => {
     mockSaveDatastructure.mockResolvedValue({ id: 'test-id' })
 
     setup()
-    fireEvent.click(screen.getByTestId('submitButton'))
+    fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
 
     await waitFor(() => {
       expect(mockSaveDatastructure).toHaveBeenCalledTimes(1)
@@ -123,7 +129,7 @@ describe('DatastructureCreateForm', () => {
     mockSaveDatastructure.mockResolvedValue(undefined)
 
     setup()
-    fireEvent.click(screen.getByTestId('submitButton'))
+    fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
 
     await waitFor(() => {
       expect(mockSaveDatastructure).toHaveBeenCalledTimes(1)
@@ -145,7 +151,7 @@ describe('DatastructureCreateForm loading state', () => {
 
     expect(screen.getByTestId('loadingSpinner')).toBeInTheDocument()
     expect(screen.queryByPlaceholderText('form.namePlaceholder')).not.toBeInTheDocument()
-    expect(screen.getByTestId('submitButton')).toBeDisabled()
-    expect(screen.getByTestId('cancelButton')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'actions.saveAndContinue' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'actions.cancel' })).toBeDisabled()
   })
 })

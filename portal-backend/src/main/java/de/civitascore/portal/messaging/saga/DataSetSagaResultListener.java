@@ -1,7 +1,12 @@
 package de.civitascore.portal.messaging.saga;
 
+import de.civitascore.portal.model.embedded.PipelineRuntimeSource;
+import de.civitascore.portal.model.embedded.PipelineRuntimeState;
 import de.civitascore.portal.model.embedded.SagaResultType;
 import de.civitascore.portal.service.DataSetService;
+import de.civitascore.portal.service.PipelineRuntimeStatusService;
+import java.time.DateTimeException;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -26,10 +31,15 @@ public class DataSetSagaResultListener {
 
   private final DataSetService dataSetService;
   private final ObjectMapper objectMapper;
+  private final PipelineRuntimeStatusService pipelineRuntimeStatusService;
 
-  public DataSetSagaResultListener(DataSetService dataSetService, ObjectMapper objectMapper) {
+  public DataSetSagaResultListener(
+      DataSetService dataSetService,
+      ObjectMapper objectMapper,
+      PipelineRuntimeStatusService pipelineRuntimeStatusService) {
     this.dataSetService = dataSetService;
     this.objectMapper = objectMapper;
+    this.pipelineRuntimeStatusService = pipelineRuntimeStatusService;
   }
 
   /**
@@ -126,6 +136,40 @@ public class DataSetSagaResultListener {
         result.failedStep(),
         result.error(),
         result.compensated() != null && result.compensated());
+    applyPipelineStatus(result.pipelineStatus());
+  }
+
+  private void applyPipelineStatus(Map<String, Object> status) {
+    if (status == null || status.get("pipelineId") == null) {
+      return;
+    }
+    try {
+      applyPipelineStatusUnchecked(status);
+    } catch (IllegalArgumentException | DateTimeException e) {
+      // The pipeline-status enrichment is an optional side effect of a failed saga; a malformed
+      // field must not abort the saga-result handling itself, so it is logged and skipped here
+      // rather than propagated up to handleSagaResult.
+      log.warn(
+          "Ignoring invalid pipeline status in saga result: {}", Encode.forJava(e.getMessage()));
+    }
+  }
+
+  private void applyPipelineStatusUnchecked(Map<String, Object> status) {
+    pipelineRuntimeStatusService.apply(
+        UUID.fromString(String.valueOf(status.get("pipelineId"))),
+        PipelineRuntimeState.valueOf(String.valueOf(status.get("status"))),
+        PipelineRuntimeSource.valueOf(String.valueOf(status.get("source"))),
+        (String) status.get("message"),
+        (String) status.get("stacktrace"),
+        status.get("occurredAt") == null
+            ? null
+            : Instant.parse(String.valueOf(status.get("occurredAt"))),
+        status.get("correlationId") == null
+            ? null
+            : UUID.fromString(String.valueOf(status.get("correlationId"))),
+        status.get("eventId") == null
+            ? null
+            : UUID.fromString(String.valueOf(status.get("eventId"))));
   }
 
   private UUID parseDatasetId(String datasetIdStr) {

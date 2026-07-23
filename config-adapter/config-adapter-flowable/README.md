@@ -18,17 +18,6 @@ Kafka Trigger → FlowableTriggerConsumer → Flowable Engine (in-process)
 
 The backend does not need any changes — same trigger topic, same result topic, same message format.
 
-## Two Approaches (for comparison)
-
-The module implements the same workflows in two ways:
-
-| Approach | Description | Files |
-|----------|-------------|-------|
-| **BPMN XML** (default) | Standard BPMN 2.0 `.bpmn` files | `src/main/resources/processes/` |
-| **Java Coded** | Programmatic `BpmnModel` builders | `src/main/java/.../coded/` |
-
-Both use the same delegates, same handlers, same Kafka integration. An equivalence test proves identical behavior.
-
 ## Configuration
 
 ### Environment Variables
@@ -40,7 +29,6 @@ All properties support automatic environment variable override (dots → undersc
 | `flowable.jdbc.url` | `FLOWABLE_JDBC_URL` | **Yes** | — | PostgreSQL JDBC URL |
 | `flowable.jdbc.username` | `FLOWABLE_JDBC_USERNAME` | **Yes** | — | Database username |
 | `flowable.jdbc.password` | `FLOWABLE_JDBC_PASSWORD` | **Yes** | — | Database password |
-| `flowable.approach` | `FLOWABLE_APPROACH` | No | `bpmn` | `bpmn` (XML files) or `coded` (Java builders) |
 | `flowable.kafka.group.id` | `FLOWABLE_KAFKA_GROUP_ID` | No | `config-adapter-flowable-group` | Kafka consumer group |
 | `kafka.bootstrap.servers` | `KAFKA_BOOTSTRAP_SERVERS` | No | `localhost:9092` | Shared with other adapters |
 
@@ -145,8 +133,7 @@ resolved lazily per step. Therefore:
 - A saga that *does* carry pipelines but finds no pipeline handler **fails gracefully** — the step
   raises a saga failure routed through the normal compensation/failure path, not an opaque crash.
 
-This keeps the engine runnable in deployments where the pipeline adapter (`nifi`) is absent. Both the
-BPMN and coded variants share this behavior (enforced by the equivalence tests).
+This keeps the engine runnable in deployments where the pipeline adapter (`nifi`) is absent.
 
 The **geoserver** adapter is conditional in the same way: its steps run only when a trigger carries a
 `POSTGIS` data sink (`hasGeoSink`), so it is **not** in `REQUIRED_HANDLERS` and a deployment without
@@ -159,9 +146,6 @@ The module is organized into three top-level packages:
 
 - `common` — engine bootstrap, infrastructure factories, saga handler registry, JavaDelegate base classes, and the Kafka trigger/result bridge.
 - `bpmn` — deployment of the XML-based BPMN process definitions from `src/main/resources/processes/`.
-- `coded` — deployment of the programmatically built equivalents (`BpmnModel`-builder).
-
-Both `bpmn` and `coded` produce equivalent process definitions and share the delegates in `common`. An equivalence test enforces this.
 
 ### Key Design Decisions
 

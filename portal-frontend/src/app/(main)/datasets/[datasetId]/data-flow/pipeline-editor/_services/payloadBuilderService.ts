@@ -358,6 +358,30 @@ export const hasDataSinkChanged = (nodeId: string, payload: DataSinkPayload, sna
 }
 
 /**
+ * Whether saving this sink would rebuild its backing storage, discarding stored data. For a POSTGIS
+ * sink any change to `tableName` or the referenced `element` is destructive (PostGIS has no ALTER
+ * TABLE — a column change is drop+recreate); for a FROST sink only `element` applies (there is no
+ * `tableName`). Only an UPDATE of an existing sink (present in the snapshot) can lose data — a
+ * brand-new sink has no storage yet, so it never triggers the warning.
+ */
+export const isDestructiveDataSinkChange = (
+  nodeId: string,
+  payload: DataSinkPayload,
+  snapshot: DataSinkSnapshot,
+): boolean => {
+  const entry = snapshot[nodeId]
+  if (!entry || entry.entityId == null) return false // new sink, no table to lose
+
+  const previous = JSON.parse(entry.configJson) as Omit<DataSinkPayload, 'id'>
+  return elementOf(payload) !== elementOf(previous) || tableNameOf(payload) !== tableNameOf(previous)
+}
+
+const tableNameOf = (payload: Pick<DataSinkPayload, 'configuration'>): string | undefined =>
+  'tableName' in payload.configuration ? payload.configuration.tableName : undefined
+
+const elementOf = (payload: Pick<DataSinkPayload, 'configuration'>): string | undefined => payload.configuration.element
+
+/**
  * Finds data sink IDs that were in the snapshot but no longer exist in the current pipeline.
  */
 export const getRemovedDataSinkIds = (pipeline: Pipeline, snapshot: DataSinkSnapshot): string[] => {

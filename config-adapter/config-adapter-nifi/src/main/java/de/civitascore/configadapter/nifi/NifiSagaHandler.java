@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi;
 
 import de.civitascore.configadapter.adapter.AbstractSagaCommandHandler;
+import de.civitascore.configadapter.adapter.PipelineStatusPublisher;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
@@ -50,11 +51,13 @@ import jakarta.ws.rs.client.ClientBuilder;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -116,6 +119,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   private NifiRestClient nifiClient;
   // Dedicated (cert-validating) client for the Keycloak token endpoint; see oidcTokenProvider().
   private Client oidcClient;
+  private NifiRuntimeMonitor runtimeMonitor;
 
   /** No-arg constructor for ServiceLoader discovery. Call {@link #initialize} before use. */
   public NifiSagaHandler() {
@@ -168,6 +172,9 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       setClient(jaxrs);
       this.nifiClient = new NifiRestClient(url, oidcTokenProvider(), jaxrs);
     }
+    this.runtimeMonitor =
+        new NifiRuntimeMonitor(
+            nifiClient, Long.parseLong(getProperty("runtime-monitor.interval-ms", "5000")));
     log.info("NifiSagaHandler initialized for: {}", Encode.forJava(url));
   }
 
@@ -251,6 +258,13 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   @Override
+  public void setPipelineStatusPublisher(PipelineStatusPublisher publisher) {
+    if (runtimeMonitor != null) {
+      runtimeMonitor.setPublisher(publisher);
+    }
+  }
+
+  @Override
   protected SagaCommandResult doHandle(SagaCommandMessage command) {
     return switch (command.operation()) {
       case OP_DEPLOY -> handleDeploy(command);
@@ -262,6 +276,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleDeploy(SagaCommandMessage command) {
+    String currentPipelineId = null;
     try {
       List<Datasource> datasources = extractDatasources(command);
       List<Map<String, Object>> datasinks = extractMaps(command, FIELD_DATASINKS);
@@ -272,6 +287,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
 
       for (Map<String, Object> pipeline : extractMaps(command, FIELD_DATA_PIPELINES)) {
         String id = requireString(pipeline, FIELD_ID);
+        currentPipelineId = id;
         processGroupIds.add(
             deployPipeline(id, pipeline, datasources, datasinks, projectId, datasetId));
         pipelineIds.add(id);
@@ -281,12 +297,13 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
           Map.of(FIELD_PIPELINE_IDS, pipelineIds, FIELD_PROCESS_GROUP_IDS, processGroupIds);
       return SagaCommandResult.success(command.sagaId(), command.stepId(), data, data);
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      return pipelineError(command, OP_DEPLOY, false, e);
+      return pipelineError(command, OP_DEPLOY, false, currentPipelineId, e);
     }
   }
 
   private SagaCommandResult handleUpdate(SagaCommandMessage command) {
     boolean isCompensation = TYPE_COMPENSATE.equals(command.type());
+    String currentPipelineId = null;
     try {
       List<Datasource> datasources = extractDatasources(command);
       List<Map<String, Object>> datasinks = extractMaps(command, FIELD_DATASINKS);
@@ -295,6 +312,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       List<String> processedIds = new ArrayList<>();
 
       for (Map<String, Object> pipeline : extractMaps(command, FIELD_DATA_PIPELINES)) {
+        currentPipelineId = requireString(pipeline, FIELD_ID);
         processedIds.add(
             applyPipelineAction(pipeline, datasources, datasinks, projectId, datasetId));
       }
@@ -302,7 +320,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> data = Map.of(FIELD_PIPELINE_IDS, processedIds);
       return SagaCommandResult.success(command.sagaId(), command.stepId(), data, data);
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      return pipelineError(command, OP_UPDATE, isCompensation, e);
+      return pipelineError(command, OP_UPDATE, isCompensation, currentPipelineId, e);
     }
   }
 
@@ -323,7 +341,12 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     switch (action) {
       case ACTION_ADD, ACTION_UPDATE ->
           deployPipeline(id, pipeline, datasources, datasinks, projectId, datasetId);
-      case ACTION_DELETE -> nifiClient.deleteFlowByName(processGroupName(id));
+      case ACTION_DELETE -> {
+        nifiClient.deleteFlowByName(processGroupName(id));
+        if (runtimeMonitor != null) {
+          runtimeMonitor.unregister(id);
+        }
+      }
       default ->
           throw new FatalAdapterException(
               AdapterErrorCode.INVALID_PAYLOAD, "Unknown pipeline action: " + action);
@@ -333,37 +356,38 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
 
   private SagaCommandResult handleDelete(SagaCommandMessage command) {
     boolean isCompensation = TYPE_COMPENSATE.equals(command.type());
+    String currentPipelineId = null;
     try {
       for (String id : extractStrings(command, FIELD_PIPELINE_IDS)) {
+        currentPipelineId = id;
         nifiClient.deleteFlowByName(processGroupName(id));
+        if (runtimeMonitor != null) {
+          runtimeMonitor.unregister(id);
+        }
       }
       if (isCompensation) {
         return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
       }
       return SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      return pipelineError(command, OP_DELETE, isCompensation, e);
+      return pipelineError(command, OP_DELETE, isCompensation, currentPipelineId, e);
     }
   }
 
   private SagaCommandResult handleRestore(SagaCommandMessage command) {
+    String currentPipelineId = null;
     try {
       List<Datasource> datasources = extractDatasources(command);
       List<Map<String, Object>> datasinks = extractMaps(command, FIELD_DATASINKS);
       String projectId = optionalProjectId(command);
       String datasetId = optionalDatasetId(command);
       for (Map<String, Object> pipeline : extractMaps(command, FIELD_DATA_PIPELINES)) {
-        deployPipeline(
-            requireString(pipeline, FIELD_ID),
-            pipeline,
-            datasources,
-            datasinks,
-            projectId,
-            datasetId);
+        currentPipelineId = requireString(pipeline, FIELD_ID);
+        deployPipeline(currentPipelineId, pipeline, datasources, datasinks, projectId, datasetId);
       }
       return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      return pipelineError(command, OP_RESTORE, true, e);
+      return pipelineError(command, OP_RESTORE, true, currentPipelineId, e);
     }
   }
 
@@ -422,7 +446,11 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       // external message for the error code.
       throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
     }
-    return nifiClient.deployFlow(planner.plan(request));
+    String processGroupId = nifiClient.deployFlow(planner.plan(request));
+    if (runtimeMonitor != null) {
+      runtimeMonitor.register(id, datasetId, processGroupId);
+    }
+    return processGroupId;
   }
 
   /** The saga's FROST project id from the command payload, or null when absent. */
@@ -664,7 +692,11 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult pipelineError(
-      SagaCommandMessage command, String operation, boolean isCompensation, AdapterException e) {
+      SagaCommandMessage command,
+      String operation,
+      boolean isCompensation,
+      String pipelineId,
+      AdapterException e) {
     // The published failure event crosses the trust boundary, so it must carry only the safe
     // external message — never e.getInternalMessage(), which for HTTP failures includes NiFi's raw
     // response body (hostnames, the DB URL, validation detail). The full internal text stays in the
@@ -678,13 +710,32 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
         Encode.forJava(command.sagaId()),
         Encode.forJava(e.getInternalMessage()),
         e);
+    Map<String, Object> status = new LinkedHashMap<>();
+    if (pipelineId != null) {
+      status.put("type", "PIPELINE_STATUS_CHANGED");
+      status.put("eventId", UUID.randomUUID().toString());
+      status.put("datasetId", optionalDatasetId(command));
+      status.put("pipelineId", pipelineId);
+      status.put("status", "ERROR");
+      status.put("source", "DEPLOYMENT");
+      status.put("message", e.getSafeExternalMessage());
+      status.put("stacktrace", PipelineMessageSanitizer.sanitize(e.getInternalMessage()));
+      status.put("occurredAt", Instant.now().toString());
+      status.put("correlationId", command.sagaId());
+    }
+    Map<String, Object> resultData =
+        pipelineId == null ? Map.of() : Map.of("pipelineStatus", status);
     return isCompensation
-        ? SagaCommandResult.compensationFailure(command.sagaId(), command.stepId(), error)
-        : SagaCommandResult.failure(command.sagaId(), command.stepId(), error);
+        ? SagaCommandResult.compensationFailure(
+            command.sagaId(), command.stepId(), resultData, error)
+        : SagaCommandResult.failure(command.sagaId(), command.stepId(), resultData, error);
   }
 
   @Override
   public void close() {
+    if (runtimeMonitor != null) {
+      runtimeMonitor.close();
+    }
     if (credentialResolver != null) {
       credentialResolver.close();
     }

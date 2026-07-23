@@ -19,6 +19,7 @@ import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -114,7 +115,54 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
       throw new InvalidInputException(
           getEntityName(), existingEntity.getId(), "dataSinkType cannot be changed after creation");
     }
+    requireDataLossConfirmation(input, existingEntity);
     return input;
+  }
+
+  /**
+   * A change to {@code tableName} or the referenced {@code element} rebuilds the sink's backing
+   * storage on the next release, discarding all stored data — for POSTGIS a table drop+recreate (no
+   * ALTER TABLE), for FROST a re-provisioning of the target entities. If the parent dataset has
+   * been provisioned (storage actually exists), such a change requires explicit {@code
+   * confirmDataLoss=true}; otherwise the update is rejected with 409. The current configuration is
+   * read back from the Model Forge registry (the sink no longer stores it on the entity). Comparing
+   * the {@code element} URN alone is sufficient because it is a versioned CORE URN whose content is
+   * immutable — a different model always yields a different URN.
+   */
+  private void requireDataLossConfirmation(DataSinkInputDTO input, DataSink existingEntity) {
+    if (input.isConfirmDataLoss() || !existingEntity.getDataSet().isProvisioned()) {
+      return;
+    }
+
+    Map<String, Object> incoming = input.getConfiguration();
+    if (incoming == null) {
+      return;
+    }
+    Map<String, Object> current =
+        existingEntity.getConfigurationUrn() == null
+            ? null
+            : modelRegistryGateway
+                .fetchPayload(existingEntity.getConfigurationUrn())
+                .map(ModelRegistryGateway.RegistryDocument::content)
+                .orElse(null);
+
+    boolean destructiveChange =
+        fieldChanged(incoming, current, "tableName")
+            || fieldChanged(incoming, current, "element");
+    if (destructiveChange) {
+      throw new ResourceInUseException(
+          getEntityName(),
+          existingEntity.getId(),
+          "This change rebuilds the sink's table and discards all stored data;"
+              + " set confirmDataLoss=true to proceed");
+    }
+  }
+
+  private static boolean fieldChanged(
+      Map<String, Object> incoming, Map<String, Object> current, String key) {
+    Object newValue = incoming.get(key);
+    Object oldValue = current == null ? null : current.get(key);
+    return !Objects.equals(String.valueOf(newValue), String.valueOf(oldValue));
   }
 
   /**

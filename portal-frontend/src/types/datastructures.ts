@@ -171,6 +171,7 @@ export const DatastructureCreateFormSchema = z.object({
     .trim()
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
+  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
 })
 
 export const DatastructureCreateDataSchema = z.object({
@@ -180,7 +181,7 @@ export const DatastructureCreateDataSchema = z.object({
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
   createdFromDataSource: z.boolean(),
-  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
+  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   dataStructureVersionIds: z.array(z.string()).optional(),
   assignments: z.array(AssignmentSchema).optional(),
 })

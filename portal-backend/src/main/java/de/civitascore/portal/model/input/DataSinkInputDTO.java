@@ -23,5 +23,12 @@ public class DataSinkInputDTO extends BaseInputDTO {
   @NotNull @Schema(oneOf = {PostgisConfiguration.class, FrostConfiguration.class})
   private Map<String, Object> configuration;
 
+  @Schema(
+      description =
+          "Acknowledges that this update rebuilds the sink's table and discards all stored data."
+              + " Required (true) when tableName or the referenced element changes on a"
+              + " provisioned dataset; ignored otherwise.")
+  private boolean confirmDataLoss;
+
   @JsonIgnore private UUID dataSetId;
 }

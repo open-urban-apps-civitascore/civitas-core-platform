@@ -13,7 +13,6 @@ import com.zaxxer.hikari.HikariDataSource;
 import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
-import de.civitascore.configadapter.flowable.coded.CodedProcessDeployer;
 import de.civitascore.configadapter.flowable.common.kafka.FlowableResultPublisher;
 import de.civitascore.configadapter.flowable.common.kafka.FlowableTriggerConsumer;
 import java.util.ArrayList;
@@ -30,14 +29,11 @@ import org.slf4j.LoggerFactory;
  * DatasetSagaOrchestrator}.
  *
  * <p>Infrastructure creation (DataSource, Kafka clients) is delegated to {@link
- * FlowableInfrastructureFactory}. Process deployment is delegated to {@link BpmnProcessDeployer} or
- * {@link CodedProcessDeployer}.
+ * FlowableInfrastructureFactory}. Process deployment is delegated to {@link BpmnProcessDeployer}.
  */
 public class FlowableSagaOrchestrator implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(FlowableSagaOrchestrator.class);
-
-  private static final String PROP_APPROACH = "flowable.approach";
 
   // Only the unconditional saga steps require a handler at startup. The pipeline adapter
   // (pipeline/nifi) is conditional — it runs only when hasPipelines==true — so it is resolved
@@ -71,7 +67,10 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
       handlers.values().forEach(registry::register);
 
       resultPublisher =
-          new FlowableResultPublisher(FlowableInfrastructureFactory.createKafkaProducer(config));
+          new FlowableResultPublisher(
+              FlowableInfrastructureFactory.createKafkaProducer(config),
+              config.getProperty("pipeline.status-topic", "de.civitascore.pipeline.status"));
+      handlers.values().forEach(handler -> handler.setPipelineStatusPublisher(resultPublisher));
 
       processEngine =
           FlowableEngineFactory.create(
@@ -84,11 +83,8 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
           new FlowableTriggerConsumer(
               processEngine.getRuntimeService(), processEngine.getHistoryService());
 
-      DeploymentApproach approach =
-          DeploymentApproach.fromConfig(config.getProperty(PROP_APPROACH));
       LOG.info(
-          "FlowableSagaOrchestrator initialized (approach={}, handlers={})",
-          approach,
+          "FlowableSagaOrchestrator initialized (handlers={})",
           Encode.forJava(String.valueOf(handlers.keySet())));
     } catch (Exception e) {
       LOG.error("Initialization failed, cleaning up partially created resources", e);
@@ -175,11 +171,6 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
   }
 
   private void deployProcesses() {
-    DeploymentApproach approach = DeploymentApproach.fromConfig(config.getProperty(PROP_APPROACH));
-    if (approach == DeploymentApproach.CODED) {
-      CodedProcessDeployer.deploy(processEngine.getRepositoryService());
-    } else {
-      BpmnProcessDeployer.deploy(processEngine.getRepositoryService());
-    }
+    BpmnProcessDeployer.deploy(processEngine.getRepositoryService());
   }
 }

@@ -30,7 +30,9 @@ import org.owasp.encoder.Encode;
  *   <li>{@code CREATE_PROJECT} — POST /Projects
  *   <li>{@code UPDATE_PROJECT} — PATCH /Projects({projectId})
  *   <li>{@code DELETE_PROJECT} — DELETE all Things of the project (cascades to their Datastreams
- *       and Observations), then DELETE /Projects({projectId})
+ *       and Observations), then DELETE /Projects({projectId}). As a CREATE_PROJECT compensation it
+ *       is a no-op when the create only reused a pre-existing project ({@code created=false}), so a
+ *       later step's failure cannot destroy the data the unrelease flow preserves.
  *   <li>{@code RESTORE_PROJECT} — PATCH /Projects({projectId}) with previous state (update
  *       compensation)
  * </ul>
@@ -38,12 +40,15 @@ import org.owasp.encoder.Encode;
  * <p>Compensation operations: {@code DELETE_PROJECT} to compensate a {@code CREATE_PROJECT}, {@code
  * RESTORE_PROJECT} to compensate an {@code UPDATE_PROJECT}.
  */
-@SuppressWarnings("PMD.TooManyMethods") // One method per saga operation plus focused helpers
+// One method per saga operation (CREATE/UPDATE/DELETE/RESTORE_PROJECT) plus focused helpers — the
+// method count and coupling are inherent to a per-operation dispatch handler, not a God Class.
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.GodClass"})
 public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
   private static final String KEY_PROJECT_ID = "projectId";
+  private static final String KEY_CREATED = "created";
   private static final String KEY_NAME = "name";
   private static final String KEY_DESCRIPTION = "description";
   private static final String KEY_PUBLIC = "public";
@@ -109,6 +114,23 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
 
     String projectName = frostProjectName(datasetName, datasetId);
+
+    // Find-or-create: the project name carries the globally-unique datasetId, so a pre-existing
+    // project can only be this dataset's own — a prior CREATE_PROJECT that already ran (re-release,
+    // retried saga). Reusing it keeps the FROST data (Things → Datastreams → Observations) intact
+    // instead of orphaning it behind a second project. Idempotency no longer hinges on the
+    // version-specific 500 "Failed to store data." string; that path stays only as a race guard.
+    SagaCommandResult existing = findExistingProjectByName(command, projectName);
+    if (existing != null) {
+      return existing;
+    }
+
+    return createNewProject(command, projectName, description);
+  }
+
+  /** POSTs a new private FROST project, with a 500-duplicate race guard. */
+  private SagaCommandResult createNewProject(
+      SagaCommandMessage command, String projectName, String description) {
     Map<String, Object> body = new HashMap<>();
     body.put(KEY_NAME, projectName);
     body.put(KEY_DESCRIPTION, description);
@@ -124,29 +146,8 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
             .apply(client().target(serverUrl).path("Projects").request(MediaType.APPLICATION_JSON))
             .post(Entity.json(body))) {
 
-      // FROST returns HTTP 500 with "Failed to store data." on UNIQUE constraint violations
-      // (duplicate project name) instead of the expected HTTP 409 Conflict.
-      // Fall back to a name lookup so CREATE_PROJECT is idempotent.
       if (response.getStatus() == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
-        String responseBody = response.readEntity(String.class);
-        if (responseBody != null
-            && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA)) {
-          log.info(
-              "FROST returned 500 'Failed to store data.' for CREATE_PROJECT"
-                  + " — checking for existing project with name '{}', saga={}",
-              Encode.forJava(projectName),
-              Encode.forJava(command.sagaId()));
-          return findExistingProjectByName(command, projectName);
-        }
-        // An HTTP 500 that is NOT the known duplicate-name case is a genuine FROST-side failure.
-        // Log the full body at WARN so operators see the real cause — the exception message is
-        // surfaced to the saga but may be truncated/sanitized downstream.
-        log.warn(
-            "FROST returned HTTP 500 for CREATE_PROJECT that is not the known 'Failed to store"
-                + " data.' duplicate case — body: {}, saga={}",
-            Encode.forJava(responseBody),
-            Encode.forJava(command.sagaId()));
-        throw new SagaApiException("CREATE_PROJECT failed: HTTP 500 — " + responseBody, 500);
+        return handleCreateProjectServerError(command, projectName, response);
       }
 
       checkResponse(response, "CREATE_PROJECT");
@@ -155,7 +156,8 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       String baseUrl = projectBaseUrl(projectId);
 
       Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
-      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId);
+      // created=true: this execution POSTed the project, so its compensation may safely DELETE it.
+      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId, KEY_CREATED, true);
 
       log.info(
           "FROST project created: projectId={}, saga={}",
@@ -167,6 +169,49 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     }
   }
 
+  /**
+   * Handles an HTTP 500 from the CREATE_PROJECT POST. FROST returns 500 "Failed to store data." on
+   * a UNIQUE constraint violation (duplicate project name) instead of 409 Conflict. This is a race
+   * guard: the up-front find-or-create lookup already ran, but a concurrent CREATE may have
+   * inserted the project in between — so re-run the name lookup and reuse the winner.
+   */
+  private SagaCommandResult handleCreateProjectServerError(
+      SagaCommandMessage command, String projectName, Response response) {
+    String responseBody = response.readEntity(String.class);
+    if (responseBody != null && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA)) {
+      log.info(
+          "FROST returned 500 'Failed to store data.' for CREATE_PROJECT"
+              + " — re-checking for existing project with name '{}', saga={}",
+          Encode.forJava(projectName),
+          Encode.forJava(command.sagaId()));
+      SagaCommandResult recovered = findExistingProjectByName(command, projectName);
+      if (recovered != null) {
+        return recovered;
+      }
+      throw new SagaApiException(
+          "CREATE_PROJECT failed: HTTP 500 — Failed to store data."
+              + " (no existing project found with name '"
+              + projectName
+              + "')",
+          500);
+    }
+    // An HTTP 500 that is NOT the known duplicate-name case is a genuine FROST-side failure.
+    // Log the full body at WARN so operators see the real cause — the exception message is
+    // surfaced to the saga but may be truncated/sanitized downstream.
+    log.warn(
+        "FROST returned HTTP 500 for CREATE_PROJECT that is not the known 'Failed to store"
+            + " data.' duplicate case — body: {}, saga={}",
+        Encode.forJava(responseBody),
+        Encode.forJava(command.sagaId()));
+    throw new SagaApiException("CREATE_PROJECT failed: HTTP 500 — " + responseBody, 500);
+  }
+
+  /**
+   * Looks up a project by its globally-unique {@code "{datasetName} ({datasetId})"} name. Returns a
+   * successful {@link SagaCommandResult} bound to the existing project, or {@code null} if none
+   * exists. The datasetId in the name guarantees any match is this dataset's own project, never a
+   * foreign same-display-named one.
+   */
   private SagaCommandResult findExistingProjectByName(SagaCommandMessage command, String name) {
     String escapedName = name.replace("'", "''");
     try (Response response =
@@ -187,28 +232,21 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       List<Map<String, Object>> projects = (List<Map<String, Object>>) result.get("value");
 
       if (projects == null || projects.isEmpty()) {
-        throw new SagaApiException(
-            "CREATE_PROJECT failed: HTTP 500 — Failed to store data."
-                + " (no existing project found with name '"
-                + name
-                + "')",
-            500);
+        return null;
       }
 
       String projectId = String.valueOf(projects.get(0).get("@iot.id"));
       String baseUrl = projectBaseUrl(projectId);
 
       Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
-      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId);
+      // created=false: this project pre-existed and holds data the unrelease flow intentionally
+      // preserves — a CREATE_PROJECT compensation must NOT delete it, or a later step's failure
+      // would destroy exactly the storage re-release is meant to reuse.
+      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId, KEY_CREATED, false);
 
-      // Recovery from an HTTP 500 by binding to a PRE-EXISTING project matched by the unique name
-      // "{datasetName} ({datasetId})". Because the name carries the globally-unique datasetId, this
-      // only ever re-binds the dataset to its OWN project (a retried CREATE_PROJECT) — never a
-      // foreign same-display-named one. Kept at WARN so the 500-recovery path stays
-      // operator-visible.
-      log.warn(
-          "FROST CREATE_PROJECT recovered from a 500 by reusing the existing project with the same"
-              + " unique (datasetName + datasetId) name: projectId={}, saga={}",
+      log.info(
+          "FROST CREATE_PROJECT reused the existing project matched by unique name: projectId={},"
+              + " saga={}",
           Encode.forJava(projectId),
           Encode.forJava(command.sagaId()));
 
@@ -296,12 +334,23 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String projectId = requireString(command, KEY_PROJECT_ID);
     boolean compensating = "COMPENSATE_STEP".equals(command.type());
 
+    // created=false marks a reused, data-bearing project; deleting it as a CREATE_PROJECT
+    // compensation would destroy the storage re-release reuses. Forward deletes omit the flag.
+    if (compensating && Boolean.FALSE.equals(command.payload().get(KEY_CREATED))) {
+      log.info(
+          "DELETE_PROJECT compensation skipped: project {} was reused, not created by this saga —"
+              + " preserving its data. saga={}",
+          Encode.forJava(projectId),
+          Encode.forJava(command.sagaId()));
+      return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
+    }
+
     FrostProjectCleanup cleanup =
         new FrostProjectCleanup(client(), authStrategy, serverUrl, command.sagaId());
     // Parse (and thereby validate) the provisioned ids before anything is deleted — a malformed
     // payload must fail the step up front, not after the Things are already gone.
     Map<String, List<String>> provisionedEntities = provisionedEntities(command);
-    cleanup.deleteProjectThings(projectId, compensating);
+    cleanup.deleteProjectThings(projectId);
     cleanup.deleteProvisionedEntities(provisionedEntities);
 
     try (Response response =
@@ -313,17 +362,17 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
                     .request(MediaType.APPLICATION_JSON))
             .delete()) {
 
-      // Idempotent compensation: a 404 means the project is already gone — which is exactly the
-      // goal state of a DELETE_PROJECT rollback. Treat it as success on a compensation re-run
-      // (retry / partial earlier cleanup) rather than failing the saga rollback. A forward delete
-      // keeps the stricter checkResponse so genuine drift stays visible.
-      if (compensating && response.getStatus() == 404) {
+      // A 404 means the project is already gone — the exact goal state of a DELETE_PROJECT, in both
+      // directions. A forward delete of a dataset whose project a prior run (or a failed saga's
+      // compensation) already removed must succeed too, not strand the delete saga on the 404.
+      if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
         log.info(
-            "DELETE_PROJECT compensation: project {} already absent (404) — treating as success."
-                + " saga={}",
+            "DELETE_PROJECT: project {} already absent (404) — treating as success. saga={}",
             Encode.forJava(projectId),
             Encode.forJava(command.sagaId()));
-        return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
+        return compensating
+            ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
+            : SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
       }
 
       checkResponse(response, "DELETE_PROJECT");

@@ -10,27 +10,17 @@
 
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { DataModelImportModal } from '@/app/(main)/datasources/[datasourceId]/components/datastructure-tab/DataModelImportModal'
-import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+import { parseCompositeKey, useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
 import { usePipelinePermissions } from '../../../_hooks/use-pipeline-permissions'
 import type { GeoPersistenceNodeData } from '../../../_types/nodes'
 import { EntityMetadata } from '../components/EntityMetadata'
-
-/**
- * Parses the composite selection key from DataModelImportModal.
- * The key format is "datastructureId/versionId".
- */
-const parseCompositeKey = (key: string): { datastructureId: string; versionId: string } | null => {
-  const parts = key.split('/')
-  if (parts.length !== 2) return null
-  return { datastructureId: parts[0], versionId: parts[1] }
-}
 
 interface GeoPersistencePanelProps {
   data: GeoPersistenceNodeData
@@ -42,28 +32,8 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canReadDatastructures } = usePipelinePermissions(datasetId)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
-  const [pendingKey, setPendingKey] = useState<string | null>(null)
 
-  const parsed = useMemo(() => (pendingKey ? parseCompositeKey(pendingKey) : null), [pendingKey])
-
-  const { data: versionResponse } = useGetDatastructureVersion({
-    datastructureId: parsed?.datastructureId ?? '',
-    versionId: parsed?.versionId ?? '',
-    isEnabled: !!parsed,
-  })
-
-  useEffect(() => {
-    if (!versionResponse?.data || !pendingKey) return
-
-    const { dataStructure, version } = versionResponse.data
-    onUpdate({
-      dataStructureVersionId: pendingKey,
-      dataStructureName: dataStructure?.name ?? '',
-      versionNumber: version ?? '',
-      configured: data.tableName.trim().length > 0,
-    })
-    setPendingKey(null)
-  }, [versionResponse?.data, pendingKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const { name: dataStructureName, versionNumber } = useDatastructureVersionInfo(data.dataStructureVersionId)
 
   const handleTableNameChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,13 +46,19 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
     [data.dataStructureVersionId, onUpdate],
   )
 
-  const handleSelectVersion = useCallback((selection: Record<string, boolean>) => {
-    const selectedKey = Object.keys(selection).find(key => selection[key])
-    if (selectedKey && parseCompositeKey(selectedKey)) {
-      setPendingKey(selectedKey)
-    }
-    setIsImportModalOpen(false)
-  }, [])
+  const handleSelectVersion = useCallback(
+    (selection: Record<string, boolean>) => {
+      const selectedKey = Object.keys(selection).find(key => selection[key])
+      if (selectedKey && parseCompositeKey(selectedKey)) {
+        onUpdate({
+          dataStructureVersionId: selectedKey,
+          configured: data.tableName.trim().length > 0,
+        })
+      }
+      setIsImportModalOpen(false)
+    },
+    [data.tableName, onUpdate],
+  )
 
   return (
     <div className="space-y-4 p-4">
@@ -110,8 +86,8 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
           <EntityMetadata
             title={t('geoPersistencePanel.details')}
             items={[
-              { label: t('geoPersistencePanel.dataStructureName'), value: data.dataStructureName },
-              { label: t('geoPersistencePanel.versionNumber'), value: data.versionNumber },
+              { label: t('geoPersistencePanel.dataStructureName'), value: dataStructureName },
+              { label: t('geoPersistencePanel.versionNumber'), value: versionNumber },
             ]}
           />
           {canReadDatastructures && parseCompositeKey(data.dataStructureVersionId) && (

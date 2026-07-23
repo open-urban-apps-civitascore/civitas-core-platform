@@ -53,8 +53,8 @@ describe('DatasourceCreateForm', () => {
     setup()
     expect(screen.getByTestId('createDatasourcePage')).toBeInTheDocument()
     expect(screen.getByTestId('datasourceCreateForm')).toBeInTheDocument()
-    expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
-    expect(screen.getByTestId('submitButton')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'actions.cancel' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'actions.saveAndContinue' })).toBeInTheDocument()
   })
 
   test('renders title and subtitle', () => {
@@ -65,35 +65,45 @@ describe('DatasourceCreateForm', () => {
 
   test('submit button is disabled when form is not dirty', () => {
     setup()
-    expect(screen.getByTestId('submitButton')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'actions.saveAndContinue' })).toBeDisabled()
   })
 
   test('submit button is enabled after changing form values', () => {
     setup()
-    const nameInput = screen.getByRole('textbox')
-    fireEvent.change(nameInput, { target: { value: 'Test Datasource' } })
-    expect(screen.getByTestId('submitButton')).toBeEnabled()
+    fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Datasource' } })
+    expect(screen.getByRole('button', { name: 'actions.saveAndContinue' })).toBeEnabled()
+  })
+
+  test('renders the description field', () => {
+    setup()
+    expect(screen.getByTestId('descriptionTextArea')).toBeInTheDocument()
   })
 
   test('cancel button navigates back to datasources list', () => {
     setup()
-    fireEvent.click(screen.getByTestId('cancelButton'))
+    fireEvent.click(screen.getByRole('button', { name: 'actions.cancel' }))
     expect(mockPush).toHaveBeenCalledWith('/datasources?page=1')
   })
 
   test('calls createDatasource mutation on form submission and shows success toast', async () => {
     setup()
-    const nameInput = screen.getByRole('textbox')
-    fireEvent.change(nameInput, { target: { value: 'Test Datasource' } })
-    fireEvent.click(screen.getByTestId('submitButton'))
+    fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Datasource' } })
+    fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Test Datasource',
-        }),
-      )
+      expect(mockMutateAsync).toHaveBeenCalledWith({ name: 'Test Datasource', description: '' })
       expect(toast.success).toHaveBeenCalled()
+    })
+  })
+
+  test('includes description in mutation when filled in', async () => {
+    setup()
+    fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Datasource' } })
+    fireEvent.change(screen.getByTestId('descriptionTextArea'), { target: { value: 'A description' } })
+    fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith({ name: 'Test Datasource', description: 'A description' })
     })
   })
 
@@ -101,9 +111,8 @@ describe('DatasourceCreateForm', () => {
     mockMutateAsync.mockRejectedValueOnce(new Error('Unexpected error'))
 
     setup()
-    const nameInput = screen.getByRole('textbox')
-    fireEvent.change(nameInput, { target: { value: 'Test Datasource' } })
-    fireEvent.click(screen.getByTestId('submitButton'))
+    fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Datasource' } })
+    fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('errors.creationError')

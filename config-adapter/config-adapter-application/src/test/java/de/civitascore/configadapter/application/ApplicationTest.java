@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>These tests target consumer / event-handler wiring, not saga bootstrap. The successful cases
  * inject {@link #NO_SAGA_BOOTSTRAP} so they don't each spin up a real Flowable engine on H2 and
- * deploy the coded saga processes (~5s per case). The real saga bootstrap is still exercised once
+ * deploy the BPMN saga processes (~5s per case). The real saga bootstrap is still exercised once
  * here by {@link #testDefaultConfigurationFile()} (which uses the production no-arg constructor)
  * and end-to-end by {@code EndToEndIntegrationTest}. The failure cases use the production
  * constructor on purpose: they throw at the consumer-factory stage, before any saga bootstrap, so

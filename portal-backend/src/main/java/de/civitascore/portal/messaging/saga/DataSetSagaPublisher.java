@@ -116,6 +116,22 @@ public class DataSetSagaPublisher {
     sendTrigger(trigger);
   }
 
+  /**
+   * Publishes a {@code DATASET_UNRELEASE} saga trigger. Carries only the route/pipeline fields the
+   * teardown needs — {@code projectId}/{@code frostBaseUrl}/{@code datasinks} are deliberately
+   * omitted because the data-holding sink is kept.
+   */
+  public void publishUnreleaseRequested(DataSet dataset) {
+    var trigger =
+        SagaTrigger.DatasetUnrelease.of(
+            dataset.getId().toString(),
+            buildRouteIds(dataset),
+            dataset.getServiceId(),
+            dataset.getPipelineIds(),
+            buildNamedApis(dataset));
+    sendTrigger(trigger);
+  }
+
   /** Publishes a {@code DATASET_DELETE} saga trigger. */
   public void publishDeleteRequested(DataSet dataset) {
     var trigger =
@@ -124,7 +140,11 @@ public class DataSetSagaPublisher {
             dataset.getProjectId(),
             dataset.getFrostBaseUrl(),
             buildRouteIds(dataset),
-            dataset.getServiceId(),
+            // The APISIX serviceId is deterministically the dataset id (the adapter returns it as
+            // such on CREATE). Deriving it here instead of reading the persisted cache field lets
+            // DELETE_ROUTE address the routes/upstream even after an unrelease cleared serviceId —
+            // the delete is 404-tolerant, so an already-torn-down route is a clean no-op.
+            dataset.getId().toString(),
             dataset.getPipelineIds(),
             buildDatasinks(dataset),
             buildNamedApis(dataset));
@@ -221,6 +241,8 @@ public class DataSetSagaPublisher {
         resolveNativeName(layer),
         layer.getCrs(),
         layer.getGeometryColumnRef(),
+        layer.getNativeBoundingBox(),
+        layer.getLatLonBoundingBox(),
         layer.getDefaultStyle() != null ? layer.getDefaultStyle().getName() : null,
         buildAlternativeStyleNames(layer));
   }

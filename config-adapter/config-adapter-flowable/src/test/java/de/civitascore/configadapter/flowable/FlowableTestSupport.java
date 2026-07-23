@@ -33,10 +33,7 @@ import org.flowable.job.api.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Shared test utilities for Flowable process tests. Eliminates duplication across BPMN and coded
- * test classes.
- */
+/** Shared test utilities for Flowable process tests. */
 public final class FlowableTestSupport {
 
   private static final Logger LOG = LoggerFactory.getLogger(FlowableTestSupport.class);

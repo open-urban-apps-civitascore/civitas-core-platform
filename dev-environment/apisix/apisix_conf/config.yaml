@@ -46,3 +46,9 @@ plugins:
   - openid-connect
   - opa
   - request-id
+  # Rewrites GeoServer's self-referential OWS capabilities URLs (internal
+  # /geoserver/{workspace}/{wfs|wms|…}) to the external dataset endpoint on OWS routes, so map
+  # clients (QGIS, …) can follow the advertised GetMap/GetFeature URLs back through the gateway.
+  # The saga's OWS route body carries a response-rewrite plugin; APISIX rejects a route referencing
+  # a plugin absent from this enabled list, which would roll back the whole route provisioning.
+  - response-rewrite

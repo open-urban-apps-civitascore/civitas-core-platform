@@ -115,7 +115,8 @@
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
       "commaSeparated": "comma-separated",
       "requiredInAvailable": "This field is required in the available mode.",
-      "descriptionHint": "max. 150 characters"
+      "descriptionHint": "max. 150 characters",
+      "creationSubtitle": "Only a name is required in the first step. Additional basic information can be added later."
     },
     "success": {
       "statusChangeSuccess": "The availability status has been successfully updated.",
@@ -272,7 +273,10 @@
     },
     "create": {
       "title": "New Dataset",
-      "subtitle": "New Datasets are only visible internally."
+      "subtitle": "New Datasets are only visible internally.",
+      "basicInfo": {
+        "title": "Base Information"
+      }
     },
     "overview": {
       "info": {
@@ -299,7 +303,12 @@
           "pipelines": {
             "title": "Pipeline(s)",
             "empty": "No pipeline available yet",
-            "addButton": "Add pipeline"
+            "addButton": "Add pipeline",
+            "unknownError": "Unknown error.",
+            "pipelineError": "Pipeline error",
+            "errorLabel": "Error",
+            "errorDetails": "Error details for {name}",
+            "errorToast": "Pipeline \"{name}\": {message}"
           },
           "apis": {
             "title": "APIs",
@@ -770,8 +779,7 @@
       "GROUP": "Group",
       "PERMISSION": "Permission",
       "ROLE": "Role",
-      "USER": "User",
-      "DATASET_DASHBOARD": "Dataset Dashboard"
+      "USER": "User"
     }
   },
   "roles": {
@@ -960,8 +968,7 @@
       "title": "New Data source",
       "subtitle": "New Data sources are only visible internally.",
       "basicInfo": {
-        "title": "Base Information",
-        "subtitle": "The name can be changed later."
+        "title": "Base Information"
       }
     },
     "edit": {
@@ -1066,8 +1073,7 @@
       "title": "New Data structure",
       "subtitle": "New Data structures are only visible internally.",
       "basicInfo": {
-        "title": "Base Information",
-        "subtitle": "The name can be changed later."
+        "title": "Base Information"
       }
     },
     "form": {
@@ -1218,7 +1224,8 @@
       "description": "Description",
       "tags": "Tags",
       "showDataStructure": "Show Data Structure",
-      "noPermission": "No permission to read datasources"
+      "noPermission": "No permission to read datasources",
+      "anonymousName": "Anonymous Data Source"
     },
     "frostPanel": {
       "details": "Sensor Data Storage Details",
@@ -1236,7 +1243,8 @@
       "changeDataStructure": "Change Data Structure",
       "details": "Data Structure Details",
       "dataStructureName": "Data Structure",
-      "versionNumber": "Version"
+      "versionNumber": "Version",
+      "anonymousDataStructure": "Anonymous Data Structure"
     },
     "mappingPanel": {
       "hint": "Define your data transformation mapping using YAML or JSON format.",
@@ -1305,7 +1313,7 @@
         "mappingNotOnPath": "{label} is not on the data path between the data source and the data sink",
         "cronTriggerCapacity": "{label} is an additional schedule trigger on the data source; its trigger port holds at most one",
         "edgeFormIncompatible": "{label} cannot consume {form} from {upstreamLabel}; it accepts: {accepted}",
-        "mappingChainStructureMismatch": "{label} does not continue the mapping chain: {upstreamLabel} outputs {expected}, but {label} reads {actual}"
+        "mappingChainStructureMismatch": "The output data structure in mapping node {upstreamLabel} and the input data structure in mapping node {label} are incompatible"
       }
     },
     "toolbar": {
@@ -1319,6 +1327,11 @@
       "deletePipeline": "Delete Pipeline",
       "deleteConfirmTitle": "Delete Pipeline?",
       "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone."
+    },
+    "dataLoss": {
+      "title": "Discard stored data and rebuild it?",
+      "description": "This change discards all stored data for this Dataset. The data will be recreated the next time the pipeline runs. All previously stored data will be permanently lost.",
+      "confirm": "Discard stored data"
     },
     "header": {
       "saveAll": "Save All",
@@ -1369,7 +1382,6 @@
         "description": "{count, plural, one {# transform is} other {# transforms are}} not connected to the output and will be removed when you leave the editor.",
         "confirm": "Leave and remove"
       },
-
       "categories": {
         "literal": "Literal",
         "recordPathFunctions": "RecordPath Functions",

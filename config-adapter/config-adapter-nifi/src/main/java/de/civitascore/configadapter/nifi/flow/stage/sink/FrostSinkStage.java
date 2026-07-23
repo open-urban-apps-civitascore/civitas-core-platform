@@ -170,11 +170,30 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     }
     Map<String, Object> schema = (Map<String, Object>) ds;
     ResolvedDefinition thing = DataStructureSchema.resolveDefinitionAt(schema, List.of());
+    String datastreamsProperty = entityPropertyName(thing.properties(), "Datastreams");
     List<StaBagAttribute> datastreamBag =
-        thing.properties().containsKey("Datastreams")
-            ? entityBag(schema, List.of("Datastreams"))
-            : List.of();
+        datastreamsProperty != null ? entityBag(schema, List.of(datastreamsProperty)) : List.of();
     return new StaProperties(entityBag(schema, List.of()), datastreamBag);
+  }
+
+  /** Finds an entity collection exported from a labelled or an unlabelled UML relationship. */
+  private static String entityPropertyName(Map<String, Object> properties, String expected) {
+    if (properties.containsKey(expected)) {
+      return expected;
+    }
+    String singular =
+        expected.endsWith("s") ? expected.substring(0, expected.length() - 1) : expected;
+    String match = null;
+    for (String property : properties.keySet()) {
+      if (!property.equalsIgnoreCase(expected) && !property.equalsIgnoreCase(singular)) {
+        continue;
+      }
+      if (match != null) {
+        return null;
+      }
+      match = property;
+    }
+    return match;
   }
 
   @SuppressWarnings("unchecked")

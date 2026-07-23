@@ -114,7 +114,8 @@
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
-      "descriptionHint": "max. 150 Zeichen"
+      "descriptionHint": "max. 150 Zeichen",
+      "creationSubtitle": "Im ersten Schritt ist nur ein Name erforderlich. Weitere Basisinformationen können später ergänzt werden."
     },
     "success": {
       "statusChangeSuccess": "Der Verfügbarkeitsstatus wurde erfolgreich aktualisiert.",
@@ -271,7 +272,10 @@
     },
     "create": {
       "title": "Neuer Datensatz",
-      "subtitle": "Neue Datensätze sind nur intern sichtbar."
+      "subtitle": "Neue Datensätze sind nur intern sichtbar.",
+      "basicInfo": {
+        "title": "Basisinformation"
+      }
     },
     "overview": {
       "info": {
@@ -298,7 +302,12 @@
           "pipelines": {
             "title": "Pipeline(s)",
             "empty": "Noch keine Pipeline vorhanden",
-            "addButton": "Pipeline hinzufügen"
+            "addButton": "Pipeline hinzufügen",
+            "unknownError": "Unbekannter Fehler.",
+            "pipelineError": "Pipelinefehler",
+            "errorLabel": "Fehler",
+            "errorDetails": "Fehlerdetails für {name}",
+            "errorToast": "Pipeline „{name}“: {message}"
           },
           "apis": {
             "title": "APIs",
@@ -430,7 +439,7 @@
               },
               "style": {
                 "sectionTitle": "Layer-Stil",
-                "sectionSubtitle": "Stile werden im Tab \u201EStile\u201C erstellt und hier Layern zugewiesen",
+                "sectionSubtitle": "Stile werden im Tab „Stile“ erstellt und hier Layern zugewiesen",
                 "standardStyle": "Standardanzeige",
                 "default": "Standard (Geoserver default)",
                 "alternativeStyles": "Alternative Stile",
@@ -763,8 +772,7 @@
       "GROUP": "Gruppe",
       "PERMISSION": "Berechtigung",
       "ROLE": "Rolle",
-      "USER": "Benutzer",
-      "DATASET_DASHBOARD": "Datensatz-Dashboard"
+      "USER": "Benutzer"
     }
   },
   "roles": {
@@ -952,8 +960,7 @@
       "title": "Neue Datenquelle",
       "subtitle": "Neue Datenquellen sind nur intern sichtbar.",
       "basicInfo": {
-        "title": "Basisinformation",
-        "subtitle": "Der Name kann später angepasst werden."
+        "title": "Basisinformation"
       }
     },
     "edit": {
@@ -1053,8 +1060,7 @@
       "title": "Neue Datenstruktur",
       "subtitle": "Neue Datenstrukturen sind nur intern sichtbar.",
       "basicInfo": {
-        "title": "Basisinformation",
-        "subtitle": "Der Name kann später angepasst werden."
+        "title": "Basisinformation"
       }
     },
     "form": {
@@ -1205,7 +1211,8 @@
       "description": "Beschreibung",
       "tags": "Tags",
       "showDataStructure": "Datenstruktur anzeigen",
-      "noPermission": "Keine Berechtigung zum Lesen von Datenquellen"
+      "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
+      "anonymousName": "Anonyme Datenquelle"
     },
     "frostPanel": {
       "details": "Sensordaten-Speicher Details",
@@ -1223,7 +1230,8 @@
       "changeDataStructure": "Datenstruktur ändern",
       "details": "Datenstruktur-Details",
       "dataStructureName": "Datenstruktur",
-      "versionNumber": "Version"
+      "versionNumber": "Version",
+      "anonymousDataStructure": "Anonyme Datenstruktur"
     },
     "mappingPanel": {
       "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
@@ -1292,7 +1300,7 @@
         "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datensenke",
         "cronTriggerCapacity": "{label} ist ein zusätzlicher Zeitplan-Trigger an der Datenquelle; der Trigger-Port fasst höchstens einen",
         "edgeFormIncompatible": "{label} kann {form} von {upstreamLabel} nicht verarbeiten; akzeptiert wird: {accepted}",
-        "mappingChainStructureMismatch": "{label} setzt die Mapping-Kette nicht fort: {upstreamLabel} gibt {expected} aus, aber {label} liest {actual}"
+        "mappingChainStructureMismatch": "Die Output-Datenstruktur in Mapping-Node {upstreamLabel} und die Input-Datenstruktur in Mapping-Node {label} sind inkompatibel"
       }
     },
     "toolbar": {
@@ -1306,6 +1314,11 @@
       "deletePipeline": "Pipeline löschen",
       "deleteConfirmTitle": "Pipeline löschen?",
       "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "dataLoss": {
+      "title": "Gespeicherte Daten verwerfen und neu erzeugen?",
+      "description": "Diese Änderung verwirft alle gespeicherten Daten dieses Datensatzes. Die Daten werden beim nächsten Ausführen der Pipeline neu erzeugt. Alle bisher gespeicherten Daten gehen dauerhaft verloren.",
+      "confirm": "Gespeicherte Daten verwerfen"
     },
     "header": {
       "saveAll": "Alle speichern",
@@ -1356,7 +1369,6 @@
         "description": "{count, plural, one {# Transformation ist} other {# Transformationen sind}} nicht mit dem Ausgang verbunden und {count, plural, one {wird} other {werden}} beim Verlassen des Editors entfernt.",
         "confirm": "Verlassen und entfernen"
       },
-
       "categories": {
         "literal": "Literal",
         "recordPathFunctions": "RecordPath-Funktionen",

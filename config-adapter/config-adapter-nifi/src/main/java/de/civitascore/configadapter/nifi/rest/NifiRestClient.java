@@ -29,11 +29,15 @@ import jakarta.ws.rs.core.Response;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Supplier;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
@@ -87,6 +91,162 @@ public class NifiRestClient implements AutoCloseable {
 
   /** A reference to a NiFi process group with its optimistic-locking revision. */
   public record ProcessGroupRef(String id, long version) {}
+
+  public record ManagedProcessGroup(String pipelineId, String processGroupId) {}
+
+  public List<ManagedProcessGroup> listManagedProcessGroups()
+      throws FatalAdapterException, RetryableAdapterException {
+    if (token == null) {
+      authenticate();
+    }
+    String rootId = getRootProcessGroupId();
+    JsonNode groups =
+        getJson(API + "/flow/process-groups/" + rootId, "list process groups")
+            .path("processGroupFlow")
+            .path("flow")
+            .path("processGroups");
+    List<ManagedProcessGroup> result = new ArrayList<>();
+    for (JsonNode group : groups) {
+      String name = group.path("component").path("name").asText();
+      if (!name.startsWith("pipeline-")) {
+        continue;
+      }
+      String pipelineId = name.substring("pipeline-".length());
+      try {
+        UUID.fromString(pipelineId);
+        result.add(new ManagedProcessGroup(pipelineId, group.path("id").asText()));
+      } catch (IllegalArgumentException ignored) {
+        // Integration/test flows may use readable names; only managed UUID pipelines are tracked.
+      }
+    }
+    return result;
+  }
+
+  /** Runtime information collected from processors and the NiFi bulletin board. */
+  public record RuntimeStatus(
+      boolean healthy, String message, String stacktrace, Instant occurredAt) {}
+
+  private record ProcessorInspection(RuntimeStatus status, Set<String> processorIds) {}
+
+  public RuntimeStatus readRuntimeStatus(String processGroupId)
+      throws FatalAdapterException, RetryableAdapterException {
+    return readRuntimeStatus(processGroupId, readBulletins());
+  }
+
+  public RuntimeStatus readRuntimeStatus(String processGroupId, JsonNode bulletins)
+      throws FatalAdapterException, RetryableAdapterException {
+    if (token == null) {
+      authenticate();
+    }
+    ProcessorInspection inspection = readProcessorStatus(processGroupId);
+    if (inspection.status() != null) {
+      return inspection.status();
+    }
+    RuntimeStatus bulletinStatus =
+        readBulletinStatus(processGroupId, inspection.processorIds(), bulletins);
+    return bulletinStatus == null
+        ? new RuntimeStatus(true, null, null, Instant.now())
+        : bulletinStatus;
+  }
+
+  public JsonNode readBulletins() throws FatalAdapterException, RetryableAdapterException {
+    if (token == null) {
+      authenticate();
+    }
+    return getJson(API + "/flow/bulletin-board", "list bulletins")
+        .path("bulletinBoard")
+        .path("bulletins");
+  }
+
+  private ProcessorInspection readProcessorStatus(String processGroupId)
+      throws FatalAdapterException, RetryableAdapterException {
+    JsonNode processors = processorNodes(processGroupId);
+    Set<String> processorIds = new HashSet<>();
+    for (JsonNode processor : processors) {
+      processorIds.add(processor.path("id").asText());
+      JsonNode component = processor.path("component");
+      String name = component.path("name").asText("processor");
+      String validation = component.path("validationStatus").asText();
+      String runStatus = processor.path("status").path("runStatus").asText();
+      if ("INVALID".equals(validation)) {
+        return new ProcessorInspection(
+            new RuntimeStatus(
+                false,
+                "Processor '" + name + "' is invalid",
+                validationErrors(component),
+                Instant.now()),
+            processorIds);
+      }
+      if ("Stopped".equals(runStatus) || "Disabled".equals(runStatus)) {
+        return new ProcessorInspection(
+            new RuntimeStatus(
+                false,
+                "Processor '" + name + "' is " + runStatus,
+                name + " runStatus=" + runStatus,
+                Instant.now()),
+            processorIds);
+      }
+    }
+
+    return new ProcessorInspection(null, processorIds);
+  }
+
+  private JsonNode processorNodes(String processGroupId)
+      throws FatalAdapterException, RetryableAdapterException {
+    try {
+      return getJson(
+              API + "/flow/process-groups/" + processGroupId + "/processors", "list processors")
+          .path("processors");
+    } catch (FatalAdapterException e) {
+      if (!e.getInternalMessage().contains("HTTP 404")) {
+        throw e;
+      }
+      return getJson(API + "/flow/process-groups/" + processGroupId, "read process group")
+          .path("processGroupFlow")
+          .path("flow")
+          .path("processors");
+    }
+  }
+
+  private RuntimeStatus readBulletinStatus(
+      String processGroupId, Set<String> processorIds, JsonNode bulletins) {
+    for (JsonNode entry : bulletins) {
+      JsonNode bulletin = entry.path("bulletin");
+      if (!matchesPipeline(bulletin, processGroupId, processorIds)) {
+        continue;
+      }
+      String level = bulletin.path("level").asText();
+      String message = bulletin.path("message").asText();
+      if (isRuntimeFailure(level, message)) {
+        String timestamp = bulletin.path("timestamp").asText();
+        Instant occurredAt;
+        try {
+          occurredAt = timestamp.isBlank() ? Instant.now() : Instant.parse(timestamp);
+        } catch (DateTimeParseException ignored) {
+          occurredAt = Instant.now();
+        }
+        return new RuntimeStatus(
+            false,
+            message.isBlank() ? "NiFi reported a pipeline error" : message,
+            message,
+            occurredAt);
+      }
+    }
+    return null;
+  }
+
+  private static boolean matchesPipeline(
+      JsonNode bulletin, String processGroupId, Set<String> processorIds) {
+    return processGroupId.equals(bulletin.path("groupId").asText())
+        || processorIds.contains(bulletin.path("sourceId").asText());
+  }
+
+  private static boolean isRuntimeFailure(String level, String message) {
+    return "ERROR".equalsIgnoreCase(level)
+        || ("WARN".equalsIgnoreCase(level)
+            && message.matches(
+                "(?is).*\\b(error|failed|exception|connection refused|unable to connect|yielding)\\b.*"));
+  }
 
   /** A reference to a controller service with its type and revision. */
   public record ControllerServiceRef(String id, String type, long version) {}

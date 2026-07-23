@@ -64,8 +64,10 @@ describe('DatasetCreateForm', () => {
 
   test('renders title and subtitle', () => {
     setup()
-    expect(screen.getAllByText('create.title')).toHaveLength(2)
-    expect(screen.getAllByText('create.subtitle')).toHaveLength(2)
+    expect(screen.getByText('create.title')).toBeInTheDocument()
+    expect(screen.getByText('create.subtitle')).toBeInTheDocument()
+    expect(screen.getByText('create.basicInfo.title')).toBeInTheDocument()
+    expect(screen.getByText('info.creationSubtitle')).toBeInTheDocument()
   })
 
   test('submit button is disabled when form is not dirty', () => {
@@ -93,7 +95,23 @@ describe('DatasetCreateForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalledWith({ name: 'Test Dataset' })
+      expect(mockMutateAsync).toHaveBeenCalledWith({ name: 'Test Dataset', description: '' })
+    })
+  })
+
+  test('renders the description field', () => {
+    setup()
+    expect(screen.getByTestId('descriptionTextArea')).toBeInTheDocument()
+  })
+
+  test('calls createDataset mutation with description when filled in', async () => {
+    setup()
+    fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Dataset' } })
+    fireEvent.change(screen.getByTestId('descriptionTextArea'), { target: { value: 'A description' } })
+    fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith({ name: 'Test Dataset', description: 'A description' })
     })
   })
 

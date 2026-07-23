@@ -1,6 +1,7 @@
 package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.entity.base.NamedEntity;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import java.util.HashSet;
@@ -66,4 +68,10 @@ public class Pipeline extends NamedEntity {
   @Column(name = "version", nullable = false)
   @Builder.Default
   private long version = 1L;
+
+  // Eager by necessity: the parent side of a @OneToOne can only be lazy with bytecode
+  // enhancement, which this project does not run — declaring LAZY here would be misleading. The
+  // dataset overview fetches it via an @EntityGraph anyway.
+  @OneToOne(mappedBy = "pipeline", cascade = CascadeType.ALL, orphanRemoval = true)
+  private PipelineRuntimeStatus runtimeStatus;
 }

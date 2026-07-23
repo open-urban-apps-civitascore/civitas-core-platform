@@ -9,10 +9,12 @@ import { toast } from 'sonner'
 import { useCreateDatasource } from '@/app/services/api/datasources/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
+import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
+import { PageHeader } from '@/components/page-header/PageHeader'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
@@ -36,12 +38,13 @@ export const DatasourceCreateForm = () => {
     resolver: zodResolver(DatasourceCreateFormSchema),
     defaultValues: {
       name: '',
+      description: '',
     },
   })
 
   const handleCreateDatasource = async (formData: DatasourceCreateData): Promise<boolean> => {
     try {
-      const { data } = await createDatasource.mutateAsync({ name: formData.name! })
+      const { data } = await createDatasource.mutateAsync({ name: formData.name, description: formData.description })
       toast.success(tCommon('messages.createSuccess', { item: tCommon('items.datasource') }))
       router.push(`/datasources/${data.id}?mode=edit`)
       return true
@@ -73,39 +76,26 @@ export const DatasourceCreateForm = () => {
     router.push(`/datasources?${searchParams.toString()}`)
   }
 
+  const customElementCreateMode = (
+    <div className="flex items-center gap-4 mr-3.5">
+      <Button onClick={() => handleCancel()} type="button" variant="ghost" disabled={isLoading}>
+        {tCommon('actions.cancel')}
+      </Button>
+
+      <Button type="submit" form="datasource-create-form" disabled={!form.formState.isDirty || isLoading}>
+        {tCommon('actions.saveAndContinue')}
+      </Button>
+    </div>
+  )
+
   return (
     <PageContainer testId="createDatasourcePage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
-      <div className="w-full flex flex-col h-[var(--title-height)] py-[var(--layout-padding)] border-b-1">
-        <div className="flex items-center justify-between px-[var(--layout-padding)]">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-3xl font-bold truncate max-w-full min-w-0">{t('create.title')}</h1>
-            <p className="mt-2 text-muted-foreground">{t('create.subtitle')}</p>
-          </div>
-          <div className="flex items-center gap-4 flex-shrink-0">
-            <Button
-              data-testid="cancelButton"
-              type="button"
-              variant="ghost"
-              onClick={handleCancel}
-              disabled={isLoading}
-            >
-              {tCommon('actions.cancel')}
-            </Button>
-            <Button
-              data-testid="submitButton"
-              type="button"
-              onClick={handleSave}
-              disabled={!form.formState.isDirty || isLoading}
-            >
-              {tCommon('actions.saveAndContinue')}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <PageHeader title={t('create.title')} subtitle={t('create.subtitle')} customElement={customElementCreateMode} />
       <PageBackground className="overflow-y-auto">
-        <ContentCard className={cn('h-full overflow-auto')}>
+        <ContentCard className={cn('overflow-auto')}>
           <Form {...form}>
             <form
+              id="datasource-create-form"
               data-testid="datasourceCreateForm"
               aria-label={`${tCommon('form')} ${t('create.basicInfo.title')}`}
               onSubmit={e => {
@@ -118,22 +108,36 @@ export const DatasourceCreateForm = () => {
                 <SubHeader
                   title={t('create.basicInfo.title')}
                   titleClassName="text-2xl leading-none font-bold"
-                  subtitle={t('create.basicInfo.subtitle')}
+                  subtitle={tCommon('info.creationSubtitle')}
                 />
               </DetailsFieldContainer>
               {isLoading ? (
                 <LoadingSpinner className="h-[120px]" />
               ) : (
-                <DetailsFieldContainer className="max-w-300">
-                  <TextField
-                    id="datasourceName"
-                    form={form}
-                    label={t('form.name')}
-                    name="name"
-                    placeholder={t('form.namePlaceholder')}
-                    required
-                  />
-                </DetailsFieldContainer>
+                <>
+                  <DetailsFieldContainer className="max-w-300">
+                    <TextField
+                      id="datasourceName"
+                      form={form}
+                      label={t('form.name')}
+                      name="name"
+                      placeholder={t('form.namePlaceholder')}
+                      required
+                    />
+                  </DetailsFieldContainer>
+                  <DetailsFieldContainer className="max-w-300" hasBorder={false}>
+                    <FormTextArea
+                      form={form}
+                      name="description"
+                      label={t('form.description')}
+                      placeholder={t('form.description')}
+                      hint={tCommon('info.descriptionHint')}
+                      maxLength={150}
+                      hasCharacterCount
+                      className="min-h-[100px] resize-none"
+                    />
+                  </DetailsFieldContainer>
+                </>
               )}
             </form>
           </Form>

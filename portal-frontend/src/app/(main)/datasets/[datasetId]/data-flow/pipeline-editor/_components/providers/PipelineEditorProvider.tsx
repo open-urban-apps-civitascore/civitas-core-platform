@@ -15,6 +15,7 @@ import { useTranslations } from 'next-intl'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
+import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
@@ -27,6 +28,7 @@ import {
   useGetPipelines,
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { isDatapoolScopeViolationError } from '@/utils/errors'
 
@@ -40,6 +42,7 @@ import {
   type DataSinkSnapshot,
   getRemovedDataSinkIds,
   hasDataSinkChanged,
+  isDestructiveDataSinkChange,
   updateNodeData,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
@@ -100,6 +103,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Backend API Hooks =====
   const pipelinesQuery = useGetPipelines(datasetId)
+  const datasetQuery = useGetDataset({ id: datasetId })
   const createPipelineMutation = useCreatePipeline(datasetId)
   const updatePipelineMutation = useUpdatePipeline(datasetId)
   const deletePipelineMutation = useDeletePipeline(datasetId)
@@ -111,6 +115,27 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
+
+  // ===== Data-loss confirmation dialog =====
+  // A destructive sink change (tableName / referenced element) on an already-provisioned
+  // dataset discards its stored data (the sink's storage is rebuilt on the next release).
+  // Save-All pauses on such a change and awaits an explicit confirmation via this promise before
+  // sending confirmDataLoss to the backend.
+  const [isDataLossDialogOpen, setIsDataLossDialogOpen] = useState(false)
+  const dataLossResolveRef = useRef<((confirmed: boolean) => void) | null>(null)
+
+  const resolveDataLossDialog = useCallback((isConfirmed: boolean) => {
+    setIsDataLossDialogOpen(false)
+    dataLossResolveRef.current?.(isConfirmed)
+    dataLossResolveRef.current = null
+  }, [])
+
+  const confirmDataLoss = useCallback((): Promise<boolean> => {
+    setIsDataLossDialogOpen(true)
+    return new Promise<boolean>(resolve => {
+      dataLossResolveRef.current = resolve
+    })
+  }, [])
 
   // ===== Load pipelines from backend on mount =====
   useEffect(() => {
@@ -428,10 +453,29 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       return false
     }
 
+    // A destructive sink change only risks data once the dataset's table physically exists.
+    const isProvisioned = datasetQuery.data?.data?.provisioned ?? false
+    const hasDestructiveChange =
+      isProvisioned &&
+      dirtySessions.some(session => {
+        const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
+        return buildDataSinkPayloads(session.pipeline).some(({ nodeId, payload }) =>
+          isDestructiveDataSinkChange(nodeId, payload, snapshot),
+        )
+      })
+
+    // Claim the guard before awaiting the dialog: the confirmation is async, so without this a
+    // second trigger (double-click, shortcut) would slip past the isSavingAll check above, reopen
+    // the dialog and overwrite the pending resolve — stranding the first save's promise forever.
     setIsSavingAll(true)
     const saveFailedNames: string[] = []
     const scopeViolationNames: string[] = []
     try {
+      if (hasDestructiveChange) {
+        const isConfirmed = await confirmDataLoss()
+        if (!isConfirmed) return false
+      }
+
       // Serialize saves to avoid concurrent mutation state issues
       for (const session of dirtySessions) {
         try {
@@ -455,10 +499,17 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
                 configurationUrn: response.data?.configurationUrn,
               })
             } else if (hasDataSinkChanged(nodeId, payload, snapshot)) {
+              // The destructive-change confirmation was obtained up front; flag the payload so the
+              // backend permits the table rebuild. Only the sinks that are actually destructive
+              // carry the flag — a harmless change in the same save batch does not.
+              const data =
+                hasDestructiveChange && isDestructiveDataSinkChange(nodeId, payload, snapshot)
+                  ? { ...payload, confirmDataLoss: true }
+                  : payload
               const response = await updateDataSinkMutation.mutateAsync({
                 datasetId,
                 dataSinkId: entityId,
-                data: payload,
+                data,
               })
               currentPipeline = updateNodeData(currentPipeline, nodeId, {
                 configurationUrn: response?.data?.configurationUrn,
@@ -532,6 +583,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     createMappingMutation,
     updateMappingMutation,
     datasetId,
+    datasetQuery.data,
+    confirmDataLoss,
     t,
   ])
 
@@ -629,5 +682,20 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     ],
   )
 
-  return <ActivePipelineProvider value={contextValue}>{children}</ActivePipelineProvider>
+  return (
+    <ActivePipelineProvider value={contextValue}>
+      {children}
+      <WarningModal
+        open={isDataLossDialogOpen}
+        onOpenChange={open => {
+          if (!open) resolveDataLossDialog(false)
+        }}
+        title={t('dataLoss.title')}
+        description={t('dataLoss.description')}
+        confirmButtonTitle={t('dataLoss.confirm')}
+        onConfirm={() => resolveDataLossDialog(true)}
+        onDiscard={() => resolveDataLossDialog(false)}
+      />
+    </ActivePipelineProvider>
+  )
 }

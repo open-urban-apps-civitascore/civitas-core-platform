@@ -20,6 +20,9 @@
         <wiremock.version>3.9.2</wiremock.version>
         <archunit.version>1.4.2</archunit.version>
         <paho.version>1.2.5</paho.version>
+        <!-- Must track the NiFi version the flows are deployed to (apache/nifi:2.9.0), so the
+             compiler's emitted RecordPath is parse-checked against the same grammar that runs it. -->
+        <nifi-record-path.version>2.9.0</nifi-record-path.version>
     </properties>
 
     <dependencies>
@@ -159,6 +162,15 @@
             <groupId>com.tngtech.archunit</groupId>
             <artifactId>archunit-junit5</artifactId>
             <version>${archunit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- NiFi's own RecordPath parser: lets the compiler tests assert the emitted expression
+             actually parses, catching arity/signature errors at unit time instead of flow deploy. -->
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-record-path</artifactId>
+            <version>${nifi-record-path.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

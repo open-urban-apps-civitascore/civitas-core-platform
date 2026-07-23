@@ -20,22 +20,19 @@ import static org.mockito.Mockito.when;
 import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
-import de.civitascore.configadapter.flowable.coded.CodedProcessDeployer;
 import de.civitascore.configadapter.flowable.common.SagaFailure;
 import de.civitascore.configadapter.flowable.common.kafka.FlowableResultPublisher;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Stream;
 import org.flowable.engine.ProcessEngine;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Verifies that the pipeline adapter (pipeline) is optional: the engine runs without it, a
  * pipeline-free saga completes, and a saga that does need it fails gracefully (saga failure +
- * compensation) instead of crashing. Run across both the BPMN-XML and coded process variants.
+ * compensation) instead of crashing.
  */
 class OptionalPipelineAdapterTest {
 
@@ -44,12 +41,9 @@ class OptionalPipelineAdapterTest {
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
 
-  static Stream<Arguments> approaches() {
-    return Stream.of(Arguments.of("BPMN", true), Arguments.of("Coded", false));
-  }
-
   /** Builds an engine with ONLY frost + apisix registered — no pipeline/pipeline handler. */
-  void setUp(boolean useBpmn) {
+  @BeforeEach
+  void setUp() {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
     resultPublisher = mock(FlowableResultPublisher.class);
@@ -62,11 +56,7 @@ class OptionalPipelineAdapterTest {
                 "resultPublisher",
                 resultPublisher));
 
-    if (useBpmn) {
-      BpmnProcessDeployer.deploy(processEngine.getRepositoryService());
-    } else {
-      CodedProcessDeployer.deploy(processEngine.getRepositoryService());
-    }
+    BpmnProcessDeployer.deploy(processEngine.getRepositoryService());
   }
 
   @AfterEach
@@ -76,10 +66,8 @@ class OptionalPipelineAdapterTest {
     }
   }
 
-  @ParameterizedTest(name = "{0}")
-  @MethodSource("de.civitascore.configadapter.flowable.OptionalPipelineAdapterTest#approaches")
-  void noPipelineSaga_completesWithoutPipelineHandler(String label, boolean useBpmn) {
-    setUp(useBpmn);
+  @Test
+  void noPipelineSaga_completesWithoutPipelineHandler() {
     stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
     stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
 
@@ -89,10 +77,8 @@ class OptionalPipelineAdapterTest {
     verify(resultPublisher, never()).publishFailed(any(SagaFailure.class));
   }
 
-  @ParameterizedTest(name = "{0}")
-  @MethodSource("de.civitascore.configadapter.flowable.OptionalPipelineAdapterTest#approaches")
-  void pipelineSaga_withoutPipelineHandler_failsGracefully(String label, boolean useBpmn) {
-    setUp(useBpmn);
+  @Test
+  void pipelineSaga_withoutPipelineHandler_failsGracefully() {
     stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
     stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
     // compensations succeed so the rollback path can complete

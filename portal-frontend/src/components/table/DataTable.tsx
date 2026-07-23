@@ -100,15 +100,19 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
             !isPaginationHidden && 'max-h-[calc(100%-var(--pagination-height))]',
           )}
         >
-          <ShadCnTable aria-labelledby="subheading" {...tableProps}>
-            <TableHeader>
+          <ShadCnTable
+            aria-labelledby="subheading"
+            tableContainerProps={{ className: 'overflow-x-visible overflow-y-visible' }}
+            {...tableProps}
+          >
+            <TableHeader className="sticky top-0 z-10 bg-white [&_tr]:border-b-0">
               {table.getHeaderGroups().map(group => (
                 <TableRow key={group.id}>
                   {group.headers.map(header => (
                     <TableHead
                       key={header.id}
                       scope="col"
-                      className="text-primary-light px-3"
+                      className="text-primary-light bg-white px-3 shadow-[inset_0_-1px_0_0_var(--color-border)]"
                       aria-sort={getAriaSort(header.column.getIsSorted())}
                       style={header.column.columnDef.meta?.style}
                     >
@@ -120,14 +124,14 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
             </TableHeader>
             <TableBody>
               {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map(row => (
+                table.getRowModel().rows.map((row, index) => (
                   <TableRow
                     className={cn(
                       `group h-16 ${onRowClick && isRowClickable(row) ? 'cursor-pointer' : ''} ${row.depth > 0 ? 'border-0' : 'border-0 border-t-1'}`,
                     )}
                     key={row.id}
                     onClick={onRowClick && isRowClickable(row) ? () => onRowClick(row) : () => null}
-                    style={{ borderWidth: 0, borderTopWidth: row.depth === 0 ? 1 : 0 }}
+                    style={{ borderWidth: 0, borderTopWidth: row.depth === 0 && index > 0 ? 1 : 0 }}
                   >
                     {row.getVisibleCells().map(cell => (
                       <TableCell

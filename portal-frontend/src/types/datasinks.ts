@@ -41,6 +41,8 @@ export type PostgisDataSinkPayload = {
      */
     element?: string
   }
+  /** Acknowledges that this update discards the sink's stored data, rebuilt on the next release (see backend guard). */
+  confirmDataLoss?: boolean
 }
 
 export type FrostDataSinkPayload = {
@@ -52,6 +54,8 @@ export type FrostDataSinkPayload = {
    * Model-Forge soft reference — not the raw version id).
    */
   configuration: { element?: string }
+  /** Acknowledges that this update re-provisions the sink and discards its stored data (see backend guard). */
+  confirmDataLoss?: boolean
 }
 
 export type DataSinkPayload = PostgisDataSinkPayload | FrostDataSinkPayload

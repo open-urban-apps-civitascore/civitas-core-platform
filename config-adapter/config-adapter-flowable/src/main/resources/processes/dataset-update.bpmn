@@ -69,8 +69,17 @@
       <outgoing>flow-pipeline-error</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_3" errorRef="stepFailedError"/>
     </boundaryEvent>
-    <exclusiveGateway id="pipeline-comp-gateway" name="Compensate GeoServer?" default="flow-pipeline-comp-apisix">
+    <serviceTask id="compensate-pipelines" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Delete NiFi Pipelines">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="nifi"/>
+        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DELETE_PIPELINES"/>
+        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="update-pipelines"/>
+      </extensionElements>
       <incoming>flow-pipeline-error</incoming>
+      <outgoing>flow-comp-pipelines-gateway</outgoing>
+    </serviceTask>
+    <exclusiveGateway id="pipeline-comp-gateway" name="Compensate GeoServer?" default="flow-pipeline-comp-apisix">
+      <incoming>flow-comp-pipelines-gateway</incoming>
       <outgoing>flow-pipeline-comp-geo</outgoing>
       <outgoing>flow-pipeline-comp-apisix</outgoing>
     </exclusiveGateway>
@@ -143,7 +152,8 @@
     <sequenceFlow id="flow-frost-error" sourceRef="frost-error" targetRef="publish-failure"/>
     <sequenceFlow id="flow-apisix-error" sourceRef="apisix-error" targetRef="compensate-frost"/>
     <sequenceFlow id="flow-workspace-error" sourceRef="workspace-error" targetRef="compensate-geoserver"/>
-    <sequenceFlow id="flow-pipeline-error" sourceRef="pipeline-error" targetRef="pipeline-comp-gateway"/>
+    <sequenceFlow id="flow-pipeline-error" sourceRef="pipeline-error" targetRef="compensate-pipelines"/>
+    <sequenceFlow id="flow-comp-pipelines-gateway" sourceRef="compensate-pipelines" targetRef="pipeline-comp-gateway"/>
     <sequenceFlow id="flow-pipeline-comp-geo" sourceRef="pipeline-comp-gateway" targetRef="compensate-geoserver">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_3">${execution.getVariable('hasGeoSink') == true}</conditionExpression>
     </sequenceFlow>
@@ -207,6 +217,12 @@
         <dc:Bounds height="50.0" width="50.0" x="845.0" y="280.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_PipelineComp" labelStyle="BPMNLabelStyle_1">
           <dc:Bounds height="28.0" width="76.0" x="832.0" y="330.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_compensate_pipelines" bpmnElement="compensate-pipelines">
+        <dc:Bounds height="50.0" width="110.0" x="943.0" y="390.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_CompPipelines" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="42.0" width="110.0" x="943.0" y="394.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_6" bpmnElement="compensate-apisix">
@@ -353,11 +369,16 @@
         <di:waypoint xsi:type="dc:Point" x="1144.0" y="175.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_26"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_13" bpmnElement="flow-pipeline-error" sourceElement="BPMNShape_BoundaryEvent_4" targetElement="BPMNShape_PipelineCompGateway">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_13" bpmnElement="flow-pipeline-error" sourceElement="BPMNShape_BoundaryEvent_4" targetElement="BPMNShape_compensate_pipelines">
         <di:waypoint xsi:type="dc:Point" x="998.0" y="218.0"/>
-        <di:waypoint xsi:type="dc:Point" x="998.0" y="305.0"/>
-        <di:waypoint xsi:type="dc:Point" x="895.0" y="305.0"/>
+        <di:waypoint xsi:type="dc:Point" x="998.0" y="390.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_27"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_CompPipelinesGateway" bpmnElement="flow-comp-pipelines-gateway" sourceElement="BPMNShape_compensate_pipelines" targetElement="BPMNShape_PipelineCompGateway">
+        <di:waypoint xsi:type="dc:Point" x="943.0" y="415.0"/>
+        <di:waypoint xsi:type="dc:Point" x="870.0" y="415.0"/>
+        <di:waypoint xsi:type="dc:Point" x="870.0" y="330.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_CompPipelinesGatewayEdge"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_PipelineCompGeo" bpmnElement="flow-pipeline-comp-geo" sourceElement="BPMNShape_PipelineCompGateway" targetElement="BPMNShape_ServiceTask_5">
         <di:waypoint xsi:type="dc:Point" x="845.0" y="305.0"/>

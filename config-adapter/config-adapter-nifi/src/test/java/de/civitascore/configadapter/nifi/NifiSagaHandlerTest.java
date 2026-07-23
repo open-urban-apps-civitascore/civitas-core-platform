@@ -294,6 +294,26 @@ class NifiSagaHandlerTest {
     verify(restClient).deleteFlowByName(eq("pipeline-p-2"));
   }
 
+  @Test
+  void compensationTearsDownEveryDeployedPipeline() throws Exception {
+    // The saga replays the deploy step's compensationData (its pipelineIds) as a COMPENSATE_STEP;
+    // the sibling pipelines a failed deploy already deployed must all be removed (issue #1842).
+    Map<String, Object> payload =
+        map(
+            """
+            { "type": "COMPENSATE_STEP", "sagaId": "s", "stepId": "deploy-pipelines",
+              "adapter": "nifi", "operation": "DELETE_PIPELINES",
+              "pipelineIds": ["p-1", "p-2", "p-3"] }
+            """);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("COMPENSATION_COMPLETED", result.type());
+    verify(restClient).deleteFlowByName(eq("pipeline-p-1"));
+    verify(restClient).deleteFlowByName(eq("pipeline-p-2"));
+    verify(restClient).deleteFlowByName(eq("pipeline-p-3"));
+  }
+
   /**
    * A FROST-sink command: the shared payload of the FROST deploy tests. {@code projectIdField} is a
    * raw JSON member line (e.g. {@code "projectId": "5",}) or empty for an absent id.

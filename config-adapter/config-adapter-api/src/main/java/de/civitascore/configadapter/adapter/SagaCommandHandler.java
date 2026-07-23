@@ -63,6 +63,9 @@ public interface SagaCommandHandler extends AutoCloseable {
     return Map.of();
   }
 
+  /** Injects the application-owned publisher for asynchronous pipeline runtime events. */
+  default void setPipelineStatusPublisher(PipelineStatusPublisher publisher) {}
+
   @Override
   default void close() {}
 }

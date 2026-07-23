@@ -3,6 +3,7 @@ import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios
 import React from 'react'
 import { toast } from 'sonner'
 
+import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
@@ -23,6 +24,7 @@ import {
   buildMappingArtifacts,
   getRemovedDataSinkIds,
   hasDataSinkChanged,
+  isDestructiveDataSinkChange,
   updateNodeData,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
@@ -58,6 +60,10 @@ vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useDeletePipeline: vi.fn(),
 }))
 
+vi.mock('@/app/services/api/datasets/clientRequests', () => ({
+  useGetDataset: vi.fn(),
+}))
+
 vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useCreateDataSink: vi.fn(),
   useDeleteDataSink: vi.fn(),
@@ -67,6 +73,18 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
 vi.mock('@/app/services/api/mappings/clientRequests', () => ({
   useCreateMapping: vi.fn(),
   useUpdateMapping: vi.fn(),
+}))
+
+// Capture the latest WarningModal props so tests can drive the data-loss dialog (confirm/discard).
+const warningModalRef = vi.hoisted(() => ({
+  current: null as { open?: boolean; onConfirm?: () => void; onDiscard?: () => void } | null,
+}))
+
+vi.mock('@/components/modals/warning-modal/WarningModal', () => ({
+  WarningModal: (props: { open?: boolean; onConfirm?: () => void; onDiscard?: () => void }) => {
+    warningModalRef.current = props
+    return null
+  },
 }))
 
 vi.mock('../../_services/validationService', () => ({
@@ -89,6 +107,7 @@ vi.mock('../../_services/payloadBuilderService', () => ({
   createDataSinkSnapshot: vi.fn().mockReturnValue({}),
   getRemovedDataSinkIds: vi.fn().mockReturnValue([]),
   hasDataSinkChanged: vi.fn().mockReturnValue(false),
+  isDestructiveDataSinkChange: vi.fn().mockReturnValue(false),
   updateNodeData: vi.fn().mockImplementation((pipeline: unknown) => pipeline),
   updateNodeEntityId: vi.fn().mockImplementation((pipeline: unknown) => pipeline),
 }))
@@ -186,6 +205,11 @@ beforeEach(() => {
     data: undefined,
     isLoading: false,
   } as unknown as ReturnType<typeof useGetPipelines>)
+
+  vi.mocked(useGetDataset).mockReturnValue({
+    data: { data: { provisioned: false } },
+    isLoading: false,
+  } as unknown as ReturnType<typeof useGetDataset>)
 
   vi.mocked(useCreatePipeline).mockReturnValue({
     mutate: vi.fn(),
@@ -1389,6 +1413,141 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       expect(result).toBe(false)
+    })
+
+    describe('data-loss confirmation', () => {
+      const destructiveUpdateSession = () =>
+        makeSession({
+          isDirty: true,
+          pipeline: {
+            ...createEmptyPipeline('Test'),
+            id: 'pipeline-1',
+            nodes: [makeGeoPersistenceNode('persist-existing', 'existing-sink-id')],
+          },
+        })
+
+      const armDestructiveUpdate = (mockUpdateDataSinkAsync: ReturnType<typeof vi.fn>) => {
+        vi.mocked(useUpdateDataSink).mockReturnValue({
+          mutate: vi.fn(),
+          mutateAsync: mockUpdateDataSinkAsync,
+          isPending: false,
+        } as unknown as ReturnType<typeof useUpdateDataSink>)
+        vi.mocked(useGetDataset).mockReturnValue({
+          data: { data: { provisioned: true } },
+          isLoading: false,
+        } as unknown as ReturnType<typeof useGetDataset>)
+        vi.mocked(buildDataSinkPayloads).mockReturnValue([
+          { nodeId: 'persist-existing', entityId: 'existing-sink-id', payload: { name: 'sink' } as never },
+        ])
+        vi.mocked(hasDataSinkChanged).mockReturnValue(true)
+        vi.mocked(isDestructiveDataSinkChange).mockReturnValue(true)
+      }
+
+      it('confirms the dialog and sends confirmDataLoss on a destructive change', async () => {
+        const mockUpdateDataSinkAsync = vi.fn().mockResolvedValue({})
+        armDestructiveUpdate(mockUpdateDataSinkAsync)
+
+        renderProvider(destructiveUpdateSession())
+
+        let savePromise: Promise<boolean | undefined> | undefined
+        await act(async () => {
+          savePromise = contextRef.current?.saveAllPipelines()
+        })
+        // Dialog is now open, awaiting the user's decision.
+        expect(warningModalRef.current?.open).toBe(true)
+
+        await act(async () => {
+          warningModalRef.current?.onConfirm?.()
+          await savePromise
+        })
+
+        expect(mockUpdateDataSinkAsync).toHaveBeenCalledWith({
+          datasetId: 'dataset-1',
+          dataSinkId: 'existing-sink-id',
+          data: { name: 'sink', confirmDataLoss: true },
+        })
+      })
+
+      it('cancels the dialog and saves nothing on a destructive change', async () => {
+        const mockUpdateDataSinkAsync = vi.fn().mockResolvedValue({})
+        armDestructiveUpdate(mockUpdateDataSinkAsync)
+
+        renderProvider(destructiveUpdateSession())
+
+        let savePromise: Promise<boolean | undefined> | undefined
+        await act(async () => {
+          savePromise = contextRef.current?.saveAllPipelines()
+        })
+        expect(warningModalRef.current?.open).toBe(true)
+
+        let result: boolean | undefined
+        await act(async () => {
+          warningModalRef.current?.onDiscard?.()
+          result = await savePromise
+        })
+
+        expect(result).toBe(false)
+        expect(mockUpdateDataSinkAsync).not.toHaveBeenCalled()
+      })
+
+      it('rejects a second save-all while the data-loss dialog is open, then completes the first', async () => {
+        const mockUpdateDataSinkAsync = vi.fn().mockResolvedValue({})
+        armDestructiveUpdate(mockUpdateDataSinkAsync)
+
+        renderProvider(destructiveUpdateSession())
+
+        let firstSave: Promise<boolean | undefined> | undefined
+        await act(async () => {
+          firstSave = contextRef.current?.saveAllPipelines()
+        })
+        expect(warningModalRef.current?.open).toBe(true)
+
+        // A second trigger while the dialog awaits confirmation must be rejected by the guard,
+        // not reopen the dialog or overwrite the first save's pending resolve.
+        let secondResult: boolean | undefined
+        await act(async () => {
+          secondResult = await contextRef.current?.saveAllPipelines()
+        })
+        expect(secondResult).toBe(false)
+        expect(mockUpdateDataSinkAsync).not.toHaveBeenCalled()
+
+        // The first save's promise is still live and resolves normally once confirmed.
+        let firstResult: boolean | undefined
+        await act(async () => {
+          warningModalRef.current?.onConfirm?.()
+          firstResult = await firstSave
+        })
+        expect(firstResult).toBe(true)
+        expect(mockUpdateDataSinkAsync).toHaveBeenCalledTimes(1)
+        expect(mockUpdateDataSinkAsync).toHaveBeenCalledWith({
+          datasetId: 'dataset-1',
+          dataSinkId: 'existing-sink-id',
+          data: { name: 'sink', confirmDataLoss: true },
+        })
+      })
+
+      it('does not open the dialog when the dataset is not provisioned', async () => {
+        const mockUpdateDataSinkAsync = vi.fn().mockResolvedValue({})
+        armDestructiveUpdate(mockUpdateDataSinkAsync)
+        // Override: never provisioned → no table at risk → no dialog, no confirmDataLoss flag.
+        vi.mocked(useGetDataset).mockReturnValue({
+          data: { data: { provisioned: false } },
+          isLoading: false,
+        } as unknown as ReturnType<typeof useGetDataset>)
+
+        renderProvider(destructiveUpdateSession())
+
+        await act(async () => {
+          await contextRef.current?.saveAllPipelines()
+        })
+
+        expect(warningModalRef.current?.open).toBeFalsy()
+        expect(mockUpdateDataSinkAsync).toHaveBeenCalledWith({
+          datasetId: 'dataset-1',
+          dataSinkId: 'existing-sink-id',
+          data: { name: 'sink' },
+        })
+      })
     })
   })
 

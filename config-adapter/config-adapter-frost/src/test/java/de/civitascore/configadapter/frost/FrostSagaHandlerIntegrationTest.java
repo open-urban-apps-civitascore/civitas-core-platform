@@ -122,18 +122,14 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
   /**
    * CREATE_PROJECT must be idempotent: calling it a second time with the same name must succeed and
    * return the same projectId as the first call.
-   *
-   * <p>This test currently fails because FrostSagaHandler propagates the HTTP 500 from FROST as a
-   * STEP_FAILED result instead of recognising it as a duplicate and returning the existing project.
    */
   @Test
   void createProjectIsIdempotentWhenProjectAlreadyExists() {
     String datasetName = "Idempotent-" + UUID.randomUUID();
     String datasetId = "ds-" + UUID.randomUUID();
     // Same datasetId on both calls → same unique FROST project name "name (datasetId)" → the second
-    // call hits FROST's 500-duplicate and recovers to the SAME project (P1: recovery binds a
-    // dataset
-    // only to its OWN project).
+    // call's find-or-create lookup finds the existing project and reuses it (P1: recovery binds a
+    // dataset only to its OWN project).
     SagaCommandMessage command =
         new SagaCommandMessage(
             "EXECUTE_STEP",

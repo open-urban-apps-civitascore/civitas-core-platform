@@ -955,6 +955,32 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
+    @DisplayName("DatasetUnrelease trigger carries route/pipeline fields but omits the sink")
+    void unreleaseTriggerOmitsSinkFields() {
+      DataSet dataSet = datasetWithNamedApis("route-1", "route-2");
+      dataSet.setProjectId("proj-1");
+      dataSet.setFrostBaseUrl("https://frost/Projects(1)");
+      dataSet.setServiceId("svc-1");
+      dataSet.setPipelineIds(java.util.List.of("pipe-1"));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUnreleaseRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.get("sagaType").asString()).isEqualTo("DATASET_UNRELEASE");
+      // Route/pipeline teardown fields are present.
+      assertThat(payload.get("serviceId").asString()).isEqualTo("svc-1");
+      assertThat(payload.get("routeIds").size()).isEqualTo(2);
+      assertThat(payload.get("pipelineIds")).isNotNull();
+      assertNamedApisInPayload(jsonCaptor.getValue());
+      // The sink-holding fields must NOT leak into an unrelease trigger — otherwise the adapter
+      // could tear down the PostGIS table / FROST project (the bug #1923 fixes).
+      assertThat(payload.has("projectId")).as("projectId must be omitted").isFalse();
+      assertThat(payload.has("frostBaseUrl")).as("frostBaseUrl must be omitted").isFalse();
+      assertThat(payload.has("datasinks")).as("datasinks must be omitted").isFalse();
+    }
+
+    @Test
     @DisplayName("DELETE trigger routeIds map omits entries with null routeId (partial release)")
     void deleteTriggerOmitsEntriesWithoutRouteId() {
       // Half-released dataset: traffic was provisioned, weather was not. The DELETE saga must
