@@ -147,8 +147,7 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
                 .orElse(null);
 
     boolean destructiveChange =
-        fieldChanged(incoming, current, "tableName")
-            || fieldChanged(incoming, current, "element");
+        fieldChanged(incoming, current, "tableName") || fieldChanged(incoming, current, "element");
     if (destructiveChange) {
       throw new ResourceInUseException(
           getEntityName(),

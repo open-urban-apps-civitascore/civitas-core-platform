@@ -490,7 +490,8 @@ class DataSinkServiceTest {
       return sink;
     }
 
-    private DataSinkInputDTO updateInput(String tableName, String element, boolean confirmDataLoss) {
+    private DataSinkInputDTO updateInput(
+        String tableName, String element, boolean confirmDataLoss) {
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.POSTGIS);
       input.setConfiguration(Map.of("tableName", tableName, "element", element));
