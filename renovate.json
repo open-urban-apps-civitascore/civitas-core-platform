@@ -29,7 +29,7 @@
       "matchFileNames": ["portal-backend/**"],
       "dependencyDashboardApproval": false,
       "commitMessagePrefix": "chore(backend):",
-      "reviewers": ["franklex", "fm41", "jonasfrz", "lukas.wydra"],
+      "reviewers": ["franklex", "jonasfrz"],
       "reviewersSampleSize": 1,
       "addLabels": ["cop backend", "team data mgmt"]
     },
