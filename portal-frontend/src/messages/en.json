@@ -116,7 +116,8 @@
       "commaSeparated": "comma-separated",
       "requiredInAvailable": "This field is required in the available mode.",
       "descriptionHint": "max. 150 characters",
-      "creationSubtitle": "Only a name is required in the first step. Additional basic information can be added later."
+      "creationSubtitle": "Only a name is required in the first step. Additional basic information can be added later.",
+      "notAvailable": "Not available"
     },
     "success": {
       "statusChangeSuccess": "The availability status has been successfully updated.",
