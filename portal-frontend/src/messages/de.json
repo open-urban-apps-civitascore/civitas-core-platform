@@ -979,7 +979,7 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
-      "accessManagement": "Zugriffsberechtigungen",
+      "accessManagement": "Zugriff",
       "datapools": "Datenpools"
     },
     "connectorTab": {
@@ -1071,7 +1071,7 @@
     },
     "tabs": {
       "basicInfo": "Basisinformationen",
-      "accessManagement": "Zugriffsberechtigungen",
+      "accessManagement": "Zugriff",
       "versions": "Versionen"
     },
     "edit": {

@@ -982,7 +982,7 @@
       "basicInfo": "Base Information",
       "connector": "Connector",
       "dataStructure": "Data structure",
-      "accessManagement": "Access Management",
+      "accessManagement": "Access",
       "datapools": "Data pools"
     },
     "form": {
@@ -1084,7 +1084,7 @@
     },
     "tabs": {
       "basicInfo": "Base Information",
-      "accessManagement": "Access Management",
+      "accessManagement": "Access",
       "versions": "Versions"
     },
     "edit": {
