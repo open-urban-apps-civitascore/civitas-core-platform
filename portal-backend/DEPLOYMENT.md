@@ -278,7 +278,7 @@ One-time migration switch that reconciles the members of already-synced groups (
 |---|---|---|
 | `KEYCLOAK_GROUP_MEMBER_BACKFILL` | `false` | When `true`, reconcile already-synced groups' members into Keycloak on startup |
 
-Enable for a single rollout deploy, confirm the log summary (`Group-member backfill completed: processed N group(s)`), then set back to `false`. The reconcile is idempotent; there is no run-once marker, so the flag must be turned off after rollout.
+Enable for a single rollout deploy, then check the completion log — `Group-member backfill completed: N succeeded, M failed, K skipped (of T candidates)` — and re-run while the flag is on if `M > 0` (failures are also logged individually at `ERROR`). Once it reports `0 failed`, set the flag back to `false`. The reconcile is idempotent; there is no run-once marker, so the flag must be turned off after rollout.
 
 ---
 

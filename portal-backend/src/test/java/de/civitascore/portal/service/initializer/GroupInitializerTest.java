@@ -408,6 +408,58 @@ class GroupInitializerTest {
           .publishGroupUpdated(eq("test-realm"), any(GroupConfig.class));
       assertThat(hanging.isCancelled()).isTrue();
     }
+
+    @Test
+    @DisplayName("skips a corrupt group (blank name) and still backfills the rest")
+    void shouldSkipCorruptGroupAndContinue() {
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+      when(groupRepository.findByExternalIdIsNotNull())
+          .thenReturn(List.of(syncedGroup("", "kc-blank"), syncedGroup("Ok", "kc-ok")));
+      // buildGroupConfig throws for the blank-named group, so only the valid one is published.
+      when(configEventPublisher.publishGroupUpdated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-ok")));
+
+      backfillOnInitializer().initialize();
+
+      verify(configEventPublisher, times(1))
+          .publishGroupUpdated(eq("test-realm"), any(GroupConfig.class));
+    }
+
+    @Test
+    @DisplayName("does not fail when a backfill result is FAILURE or null")
+    void shouldTolerateFailureAndNullResults() {
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+      when(groupRepository.findByExternalIdIsNotNull())
+          .thenReturn(List.of(syncedGroup("Failing", "kc-fail"), syncedGroup("Null", "kc-null")));
+      when(configEventPublisher.publishGroupUpdated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(failureResult("KEYCLOAK_GROUP_ERROR")))
+          .thenReturn(CompletableFuture.completedFuture(null));
+
+      backfillOnInitializer().initialize();
+
+      // Both are attempted; neither a FAILURE status nor a null result throws or persists anything.
+      verify(configEventPublisher, times(2))
+          .publishGroupUpdated(eq("test-realm"), any(GroupConfig.class));
+      verify(groupRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("propagates the parent's externalId as parentId for a child group")
+    void shouldIncludeParentIdForChildGroup() {
+      Group parent = syncedGroup("Parent", "kc-parent");
+      Group child = syncedGroup("Child", "kc-child");
+      child.setParentGroup(parent);
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+      when(groupRepository.findByExternalIdIsNotNull()).thenReturn(List.of(child));
+      when(configEventPublisher.publishGroupUpdated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-child")));
+
+      backfillOnInitializer().initialize();
+
+      ArgumentCaptor<GroupConfig> captor = ArgumentCaptor.forClass(GroupConfig.class);
+      verify(configEventPublisher).publishGroupUpdated(eq("test-realm"), captor.capture());
+      assertThat(captor.getValue().getParentId()).isEqualTo("kc-parent");
+    }
   }
 
   @Nested

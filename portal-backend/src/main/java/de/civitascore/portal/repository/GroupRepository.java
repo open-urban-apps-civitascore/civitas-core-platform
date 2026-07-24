@@ -25,16 +25,15 @@ public interface GroupRepository extends NamedEntityRepository<Group, UUID> {
   List<Group> findByExternalIdIsNull();
 
   /**
-   * Find all groups that have already been synced to Keycloak, with {@code members} eagerly
-   * fetched. Used by the one-shot group-member backfill, which re-emits GROUP_UPDATED per group
-   * outside any surrounding transaction, so {@code members} must be loaded up front to avoid a
-   * {@link org.hibernate.LazyInitializationException}. {@code parentGroup} is not fetched: an
-   * update-only payload reconciles members against the existing Keycloak group and never touches
-   * the parent.
+   * Find all groups that have already been synced to Keycloak, with {@code members} and {@code
+   * parentGroup} eagerly fetched. Used by the one-shot group-member backfill, which builds each
+   * {@code GROUP_UPDATED} payload outside any surrounding transaction; {@code
+   * GroupService#buildGroupConfig} reads both associations, so fetching them up front avoids a
+   * {@link org.hibernate.LazyInitializationException} and a per-group lazy-load.
    *
    * @return groups that already have an externalId
    */
-  @EntityGraph(attributePaths = {"members"})
+  @EntityGraph(attributePaths = {"parentGroup", "members"})
   List<Group> findByExternalIdIsNotNull();
 
   /**

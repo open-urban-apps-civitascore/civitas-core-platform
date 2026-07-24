@@ -15,10 +15,8 @@ import org.springframework.validation.annotation.Validated;
  * @param realm the Keycloak realm used for authenticating incoming requests
  * @param enforceOtp whether newly created users must configure TOTP (the {@code CONFIGURE_TOTP}
  *     required action). Bound from {@code KEYCLOAK_ENFORCE_OTP} and defaults to {@code true}.
- * @param groupMemberBackfill one-shot switch: when {@code true}, startup re-emits GROUP_UPDATED for
- *     every already-synced group so their members are reconciled into Keycloak. Default {@code
- *     false}. Turn it on for a single rollout deploy, then off again — the reconcile is idempotent,
- *     but leaving it on makes every boot re-publish for all synced groups.
+ * @param groupMemberBackfill one-shot switch (default {@code false}); when {@code true}, startup
+ *     reconciles already-synced groups' members into Keycloak
  */
 @Validated
 @ConfigurationProperties(prefix = "keycloak")
