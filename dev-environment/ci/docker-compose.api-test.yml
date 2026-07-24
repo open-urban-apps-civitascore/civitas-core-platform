@@ -166,7 +166,7 @@ services:
     build:
       context: ../apisix/apisix_conf
       dockerfile_inline: |
-        FROM apache/apisix:3.14.0-debian
+        FROM apache/apisix:3.17.0-debian
         COPY config.yaml /usr/local/apisix/conf/config.yaml
         USER root
         RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
@@ -219,9 +219,6 @@ services:
         COPY lib /staging/helpers
         COPY providers /staging/providers
         COPY data/backends /staging/data/backends
-        # Null out all permission values for allow-all mode (CI only)
-        RUN find /staging/data/backends -name '*.json' \
-            -exec sed -i 's/: *"[A-Z][A-Z_]*"/: null/g; s/: *\[.*\]/: null/g' {} +
         RUN mkdir -p /staging/data/config && \
             printf '{"authz_repository_url":"http://authz-repository:8091/api/v1/user-context","dataset_pool_membership_url":"http://authz-repository:8091/api/v1/dataset-pool","authz_cache_duration_seconds":0}\n'\
             > /staging/data/config/config.json
@@ -636,7 +633,7 @@ services:
         RUN apk add --no-cache curl bash
         COPY seed-routes.sh /seed-routes.sh
         RUN chmod +x /seed-routes.sh
-    entrypoint: ["bash", "/seed-routes.sh", "--allowall"]
+    entrypoint: ["bash", "/seed-routes.sh"]
     environment:
       APISIX_ADMIN_URL: http://apisix:9180
       APISIX_ADMIN_KEY: edd1c9f034335f136f87ad84b625c8f1
