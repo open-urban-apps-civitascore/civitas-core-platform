@@ -164,11 +164,13 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     frostDb.start();
 
     frost =
-        new GenericContainer<>(DockerImageName.parse("hylkevds/frost-http-projects:latest"))
+        new GenericContainer<>(DockerImageName.parse("fraunhoferiosb/frost-server-http:2.7.3"))
             .withNetwork(network)
             .withNetworkAliases("frost")
             .withExposedPorts(8080)
             .withEnv("serviceRootUrl", "http://frost:8080" + FROST_PATH + "/")
+            .withEnv("plugins_projects_enable", "true")
+            .withEnv("plugins_projects_enableDefaultRules", "false")
             .withEnv("plugins_modelLoader_enable", "true")
             .withEnv("plugins_multiDatastream_enable", "false")
             .withEnv("plugins_actuation_enable", "false")
@@ -177,8 +179,6 @@ class NifiFrostMappingIT extends AbstractNifiIT {
             .withEnv("persistence_db_username", "sensorthings")
             .withEnv("persistence_db_password", "ChangeMe")
             .withEnv("persistence_autoUpdateDatabase", "true")
-            .withEnv("plugins_modelLoader_securityPath", "")
-            .withEnv("plugins_modelLoader_securityFiles", "")
             .waitingFor(
                 Wait.forHttp(FROST_PATH + "/Things")
                     .forStatusCode(200)

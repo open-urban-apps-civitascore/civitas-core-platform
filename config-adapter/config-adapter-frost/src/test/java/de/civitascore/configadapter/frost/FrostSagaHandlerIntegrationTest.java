@@ -88,11 +88,12 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
   }
 
   /**
-   * Documents that FROST returns HTTP 500 (not 409) when a project with the same name already
-   * exists. This is a quirk of the FROST Projects plugin that the handler must work around.
+   * Documents that FROST-Server core &gt;= 2.7.0 returns HTTP 409 (not 500) when a project with the
+   * same name already exists — {@code FrostSagaHandler}'s duplicate-name race guard must handle
+   * both statuses (older cores still answer 500).
    */
   @Test
-  void frostReturnsHttp500WhenCreatingProjectWithDuplicateName() {
+  void frostReturnsHttp409WhenCreatingProjectWithDuplicateName() {
     String projectName = "Duplicate-" + UUID.randomUUID();
     Map<String, Object> projectBody = Map.of("name", projectName, "description", "");
 
@@ -112,10 +113,10 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
             .request(MediaType.APPLICATION_JSON)
             .post(Entity.json(projectBody))) {
       assertEquals(
-          500,
+          409,
           second.getStatus(),
-          "FROST returns 500 (not 409) for duplicate project name — if this fails, FROST behaviour"
-              + " changed and the idempotence workaround in FrostSagaHandler can be simplified");
+          "FROST returns 409 for duplicate project name on core >= 2.7.0 — if this fails, FROST"
+              + " behaviour changed again and the race guard in FrostSagaHandler needs revisiting");
     }
   }
 
