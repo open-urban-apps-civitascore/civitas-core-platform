@@ -13,14 +13,15 @@ import org.springframework.stereotype.Repository;
 public interface GroupRepository extends NamedEntityRepository<Group, UUID> {
 
   /**
-   * Find all groups that have not yet been synced to Keycloak, with {@code parentGroup} eagerly
-   * fetched. The Keycloak catch-up sync traverses the parent chain (for depth ordering and to read
-   * the parent's externalId) outside any surrounding transaction, so the association must be loaded
-   * up front to avoid a {@link org.hibernate.LazyInitializationException}.
+   * Find all groups that have not yet been synced to Keycloak, with {@code parentGroup} and {@code
+   * members} eagerly fetched. The Keycloak catch-up sync traverses the parent chain (for depth
+   * ordering and to read the parent's externalId) and reads members (to sync memberships) outside
+   * any surrounding transaction, so both associations must be loaded up front to avoid a {@link
+   * org.hibernate.LazyInitializationException}.
    *
    * @return groups without an externalId
    */
-  @EntityGraph(attributePaths = {"parentGroup"})
+  @EntityGraph(attributePaths = {"parentGroup", "members"})
   List<Group> findByExternalIdIsNull();
 
   /**

@@ -114,7 +114,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
                 new RoleResourceHandler(keycloakClient, objectMapper, resultPublisher),
             ResourceType.GROUP,
                 new GroupResourceHandler(
-                    keycloakClient, objectMapper, resultPublisher, roleSyncHelper));
+                    keycloakClient,
+                    objectMapper,
+                    resultPublisher,
+                    roleSyncHelper,
+                    groupSyncHelper));
 
     logger.info(
         "Keycloak adapter '{}' initialized for: {}",

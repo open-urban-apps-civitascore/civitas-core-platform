@@ -133,6 +133,15 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
     }
   }
 
+  protected List<UserRepresentation> findKeycloakGroupMembers(String groupExternalId) {
+    try {
+      return keycloakAdminClient.realm("civitas-core").groups().group(groupExternalId).members();
+    } catch (Exception e) {
+      log.error("Failed to list Keycloak group members: {}", e.getMessage());
+      return List.of();
+    }
+  }
+
   // Unlike cleanupKeycloakUsers, this deletes every group unconditionally: the civitas-core realm
   // is created empty per test run (ensureCivitasCoreRealmExists) and only ever holds groups synced
   // by the tests, so there is no non-test group to preserve. Test group names are heterogeneous
