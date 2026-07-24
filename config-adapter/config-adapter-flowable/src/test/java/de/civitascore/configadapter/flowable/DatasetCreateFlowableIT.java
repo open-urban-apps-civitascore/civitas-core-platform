@@ -76,11 +76,13 @@ class DatasetCreateFlowableIT {
   @SuppressWarnings("resource")
   @Container
   static GenericContainer<?> frost =
-      new GenericContainer<>(DockerImageName.parse("hylkevds/frost-http-projects:latest"))
+      new GenericContainer<>(DockerImageName.parse("fraunhoferiosb/frost-server-http:2.7.3"))
           .withNetwork(network)
           .withExposedPorts(8080)
           .dependsOn(postgis)
           .withEnv("serviceRootUrl", "http://localhost:8080/FROST-Server/")
+          .withEnv("plugins_projects_enable", "true")
+          .withEnv("plugins_projects_enableDefaultRules", "false")
           .withEnv("plugins_modelLoader_enable", "true")
           .withEnv("plugins_multiDatastream_enable", "false")
           .withEnv("plugins_actuation_enable", "false")
@@ -89,8 +91,6 @@ class DatasetCreateFlowableIT {
           .withEnv("persistence_db_username", "sensorthings")
           .withEnv("persistence_db_password", "ChangeMe")
           .withEnv("persistence_autoUpdateDatabase", "true")
-          .withEnv("plugins_modelLoader_securityPath", "")
-          .withEnv("plugins_modelLoader_securityFiles", "")
           .waitingFor(
               Wait.forHttp("/FROST-Server/v1.1/Projects")
                   .forStatusCode(200)

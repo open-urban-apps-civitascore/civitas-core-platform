@@ -128,7 +128,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     return createNewProject(command, projectName, description);
   }
 
-  /** POSTs a new private FROST project, with a 500-duplicate race guard. */
+  /** POSTs a new private FROST project, with a duplicate-name race guard (409 or 500). */
   private SagaCommandResult createNewProject(
       SagaCommandMessage command, String projectName, String description) {
     Map<String, Object> body = new HashMap<>();
@@ -146,8 +146,10 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
             .apply(client().target(serverUrl).path("Projects").request(MediaType.APPLICATION_JSON))
             .post(Entity.json(body))) {
 
-      if (response.getStatus() == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
-        return handleCreateProjectServerError(command, projectName, response);
+      int status = response.getStatus();
+      if (status == Response.Status.CONFLICT.getStatusCode()
+          || status == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
+        return handleCreateProjectConflict(command, projectName, response);
       }
 
       checkResponse(response, "CREATE_PROJECT");
@@ -170,18 +172,28 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Handles an HTTP 500 from the CREATE_PROJECT POST. FROST returns 500 "Failed to store data." on
-   * a UNIQUE constraint violation (duplicate project name) instead of 409 Conflict. This is a race
-   * guard: the up-front find-or-create lookup already ran, but a concurrent CREATE may have
-   * inserted the project in between — so re-run the name lookup and reuse the winner.
+   * Handles an HTTP 409 or 500 from the CREATE_PROJECT POST. This is a race guard: the up-front
+   * find-or-create lookup already ran, but a concurrent CREATE may have inserted the project in
+   * between — so re-run the name lookup and reuse the winner.
+   *
+   * <p>FROST-Server core &gt;= 2.7.0 answers a UNIQUE constraint violation (duplicate project name)
+   * with 409 Conflict; earlier cores answer 500 with a {@code "Failed to store data."} body, which
+   * is otherwise indistinguishable from a genuine server error and must be checked for before
+   * treating it as a duplicate.
    */
-  private SagaCommandResult handleCreateProjectServerError(
+  private SagaCommandResult handleCreateProjectConflict(
       SagaCommandMessage command, String projectName, Response response) {
+    int status = response.getStatus();
     String responseBody = response.readEntity(String.class);
-    if (responseBody != null && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA)) {
+    boolean isDuplicate =
+        status == Response.Status.CONFLICT.getStatusCode()
+            || (responseBody != null
+                && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA));
+    if (isDuplicate) {
       log.info(
-          "FROST returned 500 'Failed to store data.' for CREATE_PROJECT"
-              + " — re-checking for existing project with name '{}', saga={}",
+          "FROST returned {} for CREATE_PROJECT — re-checking for existing project with name"
+              + " '{}', saga={}",
+          status,
           Encode.forJava(projectName),
           Encode.forJava(command.sagaId()));
       SagaCommandResult recovered = findExistingProjectByName(command, projectName);
@@ -189,11 +201,12 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
         return recovered;
       }
       throw new SagaApiException(
-          "CREATE_PROJECT failed: HTTP 500 — Failed to store data."
-              + " (no existing project found with name '"
+          "CREATE_PROJECT failed: HTTP "
+              + status
+              + " — no existing project found with name '"
               + projectName
-              + "')",
-          500);
+              + "'",
+          status);
     }
     // An HTTP 500 that is NOT the known duplicate-name case is a genuine FROST-side failure.
     // Log the full body at WARN so operators see the real cause — the exception message is

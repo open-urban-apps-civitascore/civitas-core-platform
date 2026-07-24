@@ -25,7 +25,7 @@ import org.testcontainers.utility.MountableFile;
 @Slf4j
 abstract class AbstractSagaIntegrationTest extends BaseKeycloakIntegrationTest {
 
-  static final String FROST_IMAGE = "hylkevds/frost-http-projects:latest";
+  static final String FROST_IMAGE = "fraunhoferiosb/frost-server-http:2.7.3";
   static final String KAFKA_IMAGE = "apache/kafka:3.8.0";
   static final String REDPANDA_CONNECT_IMAGE = "redpandadata/connect:4";
   static final String POSTGIS_IMAGE = "postgis/postgis:16-3.4-alpine";
@@ -87,6 +87,8 @@ abstract class AbstractSagaIntegrationTest extends BaseKeycloakIntegrationTest {
         .withExposedPorts(8080)
         .dependsOn(postgis)
         .withEnv("serviceRootUrl", "http://localhost:8080/FROST-Server/")
+        .withEnv("plugins_projects_enable", "true")
+        .withEnv("plugins_projects_enableDefaultRules", "false")
         .withEnv("plugins_modelLoader_enable", "true")
         .withEnv("plugins_multiDatastream_enable", "false")
         .withEnv("plugins_actuation_enable", "false")
@@ -95,8 +97,6 @@ abstract class AbstractSagaIntegrationTest extends BaseKeycloakIntegrationTest {
         .withEnv("persistence_db_username", "sensorthings")
         .withEnv("persistence_db_password", "ChangeMe")
         .withEnv("persistence_autoUpdateDatabase", "true")
-        .withEnv("plugins_modelLoader_securityPath", "")
-        .withEnv("plugins_modelLoader_securityFiles", "")
         .waitingFor(
             Wait.forHttp("/FROST-Server/v1.1/Projects")
                 .forStatusCode(200)

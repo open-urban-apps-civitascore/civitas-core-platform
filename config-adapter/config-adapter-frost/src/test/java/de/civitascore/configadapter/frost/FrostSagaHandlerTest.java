@@ -237,6 +237,65 @@ class FrostSagaHandlerTest {
 
     @Test
     @DisplayName(
+        "recovers via the 409 race guard when a concurrent create won and the second lookup finds"
+            + " the project")
+    void shouldReturnSuccessWhenFrostReturns409AndProjectExists() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response postResponse = mock(Response.class);
+        when(postResponse.getStatus()).thenReturn(409);
+        when(postResponse.readEntity(String.class))
+            .thenReturn(
+                "{\"code\":409,\"type\":\"error\",\"message\":\"Data violates constraints.\"}");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
+
+        // First lookup: empty (POST is attempted). After the POST's 409, the recovery lookup finds
+        // the project a concurrent create inserted in between.
+        Response emptyLookup = mock(Response.class);
+        when(emptyLookup.getStatus()).thenReturn(200);
+        when(emptyLookup.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
+        Response foundLookup = mock(Response.class);
+        when(foundLookup.getStatus()).thenReturn(200);
+        when(foundLookup.readEntity(Map.class))
+            .thenReturn(Map.of("value", List.of(Map.of("@iot.id", 42))));
+        when(mockBuilder.get()).thenReturn(emptyLookup, foundLookup);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Existing Dataset"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("42", result.resultData().get("projectId"));
+        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
+        assertEquals("42", result.compensationData().get("projectId"));
+      }
+    }
+
+    @Test
+    @DisplayName("returns failure when the POST fails with 409 but no project is found by name")
+    void shouldReturnFailureWhenFrostReturns409ButProjectNotFound() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response postResponse = mock(Response.class);
+        when(postResponse.getStatus()).thenReturn(409);
+        when(postResponse.readEntity(String.class))
+            .thenReturn(
+                "{\"code\":409,\"type\":\"error\",\"message\":\"Data violates constraints.\"}");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
+
+        // Both the up-front and the recovery lookup return empty (default from setup).
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Ghost Dataset"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+      }
+    }
+
+    @Test
+    @DisplayName(
         "returns failure when the POST fails with 500 'Failed to store data.' but no project is"
             + " found by name")
     void shouldReturnFailureWhenFrostSignalsDuplicateButProjectNotFound() {

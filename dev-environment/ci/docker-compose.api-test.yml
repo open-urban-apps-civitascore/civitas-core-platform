@@ -260,11 +260,13 @@ services:
   # ── FROST SensorThings API ──────────────────────────────
 
   frost:
-    image: hylkevds/frost-http-projects:latest
+    image: fraunhoferiosb/frost-server-http:2.7.3
     platform: linux/amd64
     hostname: civitas-frost
     environment:
       - serviceRootUrl=http://apisix:9080/FROST-Server/
+      - plugins_projects_enable=true
+      - plugins_projects_enableDefaultRules=false
       - plugins_modelLoader_enable=true
       - plugins_multiDatastream_enable=false
       - plugins_actuation_enable=false
@@ -275,7 +277,6 @@ services:
       - persistence_db_username=sensorthings
       - persistence_db_password=frost-ci-password
       - persistence_autoUpdateDatabase=true
-      - plugins_modelLoader_securityPath=
     depends_on:
       postgres-frost:
         condition: service_healthy
