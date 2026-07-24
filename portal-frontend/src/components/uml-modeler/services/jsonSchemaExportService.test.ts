@@ -33,7 +33,7 @@ const baseDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
             {
               id: 'a2',
               name: 'temperature',
-              type: 'Double',
+              type: 'Number',
               multiplicity: '0..1',
             },
             {
@@ -554,7 +554,7 @@ describe('exportToJsonSchema', () => {
               id: 'elem-2',
               name: 'Reading',
               type: 'class',
-              attributes: [{ id: 'a1', name: 'value', type: 'Double' }],
+              attributes: [{ id: 'a1', name: 'value', type: 'Number' }],
               operations: [],
             },
             label: 'Reading',
@@ -604,7 +604,7 @@ describe('exportToJsonSchema', () => {
         id: 'elem-2',
         name: 'Reading',
         type: 'class' as const,
-        attributes: [{ id: 'a1', name: 'value', type: 'Double' as const }],
+        attributes: [{ id: 'a1', name: 'value', type: 'Number' as const }],
         operations: [],
       },
       label: 'Reading',

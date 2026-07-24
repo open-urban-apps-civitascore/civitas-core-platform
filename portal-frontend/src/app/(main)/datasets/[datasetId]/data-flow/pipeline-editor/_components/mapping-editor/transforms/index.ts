@@ -67,9 +67,10 @@ const conversion = (
  * type constants so the two stay in sync automatically.
  * Each option uses the UML type name as its unique value.
  */
-export const LITERAL_TYPE_OPTIONS = [...Object.keys(UML_PRIMITIVE_TYPES), ...Object.keys(UML_GEOMETRY_TYPES)].map(
-  name => ({ label: name, value: name }),
-)
+export const LITERAL_TYPE_OPTIONS = [...UML_PRIMITIVE_TYPES, ...UML_GEOMETRY_TYPES].map(name => ({
+  label: name,
+  value: name,
+}))
 
 /** Default UML type name for a freshly-dropped Literal node. */
 export const LITERAL_DEFAULT_TYPE = 'String'

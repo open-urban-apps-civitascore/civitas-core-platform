@@ -48,23 +48,20 @@ export const createClassTemplate = (name?: string): UMLClass => ({
   operations: [],
 })
 
-// Default UML Interface template
+// Default UML Interface template. Operations are unsupported for the first release
+// and hidden from the editor; since the interface model carries no other members,
+// a new interface starts empty.
 export const createInterfaceTemplate = (name?: string): UMLInterface => ({
   id: generateId(),
   name: name || getNextElementName('interface'),
   type: 'interface',
   stereotype: '<<interface>>',
-  operations: [
-    {
-      id: generateId(),
-      name: 'operation',
-      parameters: [],
-      returnType: 'void',
-    },
-  ],
+  operations: [],
 })
 
-// Default UML Abstract Class template
+// Default UML Abstract Class template. Operations are unsupported for the first
+// release and hidden from the editor, so a new abstract class starts with a single
+// attribute and no operation.
 export const createAbstractClassTemplate = (name?: string): UMLAbstractClass => ({
   id: generateId(),
   name: name || getNextElementName('abstractClass'),
@@ -76,15 +73,7 @@ export const createAbstractClassTemplate = (name?: string): UMLAbstractClass => 
       type: 'String',
     },
   ],
-  operations: [
-    {
-      id: generateId(),
-      name: 'abstractOperation',
-      isAbstract: true,
-      parameters: [],
-      returnType: 'void',
-    },
-  ],
+  operations: [],
 })
 
 // Default UML Enumeration template

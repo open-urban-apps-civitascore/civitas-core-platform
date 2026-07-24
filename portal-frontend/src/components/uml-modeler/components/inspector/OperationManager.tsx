@@ -24,7 +24,6 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
         id: crypto.randomUUID(),
         name: 'neueOperation',
         parameters: [],
-        returnType: 'void',
       }
       updateNode(nodeId, {
         operations: [...element.operations, newOperation],
@@ -186,7 +185,7 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
                             : operation.returnType?.name || 'void'
                         }
                         onChange={e =>
-                          updateOperation(operation.id, { returnType: e.target.value as UMLPrimitiveType | 'void' })
+                          updateOperation(operation.id, { returnType: e.target.value as UMLPrimitiveType })
                         }
                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                         disabled={isReadOnly}
