@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { Assignment } from '@/types/assignments'
-
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
+import { Assignment } from '@/types/assignments'
 
 import { hasAssignmentChanges, mapAssignmentApiResponseToTable } from './assignments'
 
