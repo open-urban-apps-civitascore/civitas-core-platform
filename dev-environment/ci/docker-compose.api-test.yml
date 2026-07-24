@@ -494,7 +494,6 @@ services:
       APP_URL: http://portal-backend:8089
       SERVER_PORT: 8089
       SPRING_PROFILES_ACTIVE: local,postgres,init
-      SPRING_KAFKA_PRODUCER_PROPERTIES_COMPRESSION_TYPE: lz4
     depends_on:
       postgres-portal:
         condition: service_healthy
