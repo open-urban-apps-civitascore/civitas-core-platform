@@ -10,6 +10,44 @@ get {
   auth: inherit
 }
 
+script:pre-request {
+  // OPA authorization data for a freshly provisioned dataset propagates asynchronously, so an
+  // immediate call can transiently 401/403. Poll the discovery endpoint until it returns 200
+  // (max 30s) so the assertions below don't race OPA propagation.
+  const axios = require('axios');
+  const apiUrl = bru.getEnvVar('apisixApiUrl');
+  const datasetId = bru.getVar('sagaDataSetId');
+
+  try {
+    const tokenUrl = `${bru.getEnvVar('keycloakUrl')}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`;
+    // Build the form body by hand: the Bruno CLI runs scripts in a QuickJS sandbox that has no
+    // URLSearchParams. encodeURIComponent is standard ECMAScript and is available.
+    const form = [
+      'grant_type=password',
+      `username=${encodeURIComponent(bru.getEnvVar('username'))}`,
+      `password=${encodeURIComponent(bru.getEnvVar('password'))}`,
+      `client_id=${encodeURIComponent(bru.getEnvVar('clientId'))}`,
+      `client_secret=${encodeURIComponent(bru.getEnvVar('clientSecret') || '')}`,
+    ].join('&');
+    const tokenResp = await axios.post(tokenUrl, form, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      validateStatus: () => true,
+    });
+    const accessToken = tokenResp.data && tokenResp.data.access_token;
+
+    for (let i = 0; accessToken && i < 15; i++) {
+      const resp = await axios.get(`${apiUrl}/v1/datasets/${datasetId}/apis`, {
+        headers: { Authorization: `Bearer ${accessToken}`, 'X-Allowed-Scope-Ids': '*' },
+        validateStatus: () => true,
+      });
+      if (resp.status === 200) break;
+      await bru.sleep(2000);
+    }
+  } catch (e) {
+    // Best-effort readiness wait; the request below still runs with its own inherited auth.
+  }
+}
+
 tests {
   // Discovery endpoint GET /v1/datasets/{id}/apis (#1596, concept #1379) — a portal-backend
   // management endpoint, reached through the gateway's /v1/* management catch-all. No dedicated
@@ -66,6 +104,7 @@ docs {
   `NamedApiAllowedSlugValidator`) so no named API can shadow this path.
 
   **Precondition:** released dataset with named API `things` (steps 4-9); bearer token has DATASET_READ.
+  The pre-request polls up to 30s to absorb asynchronous OPA authorization propagation.
 
   **Expected:** 200 OK, JSON array of named APIs including slug `things`.
 }

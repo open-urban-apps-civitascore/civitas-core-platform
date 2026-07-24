@@ -9,6 +9,7 @@
  */
 package de.civitascore.event.handler.kafka;
 
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -20,7 +21,7 @@ abstract class AbstractKafkaIntegrationTest {
 
   @SuppressWarnings("resource")
   protected static final ConfluentKafkaContainer KAFKA =
-      new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.3"))
+      new ConfluentKafkaContainer(DockerImageName.parse(TestContainerImages.KAFKA))
           .withReuse(false);
 
   static {

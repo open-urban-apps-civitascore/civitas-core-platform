@@ -21,6 +21,7 @@ import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import jakarta.ws.rs.core.Response;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -78,7 +79,7 @@ class NifiDataFlowIT extends AbstractNifiIT {
     network = Network.newNetwork();
 
     mosquitto =
-        new GenericContainer<>(DockerImageName.parse("eclipse-mosquitto:2.0"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.MOSQUITTO))
             .withNetwork(network)
             .withNetworkAliases("mqtt")
             .withExposedPorts(1883)
@@ -87,7 +88,7 @@ class NifiDataFlowIT extends AbstractNifiIT {
     mosquitto.start();
 
     sink =
-        new GenericContainer<>(DockerImageName.parse("wiremock/wiremock:3.9.2"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.WIREMOCK))
             .withNetwork(network)
             .withNetworkAliases("sink")
             .withExposedPorts(8080)

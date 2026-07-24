@@ -29,6 +29,7 @@ import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import jakarta.ws.rs.core.Response;
 import java.io.File;
 import java.net.URI;
@@ -144,7 +145,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     network = Network.newNetwork();
 
     mosquitto =
-        new GenericContainer<>(DockerImageName.parse("eclipse-mosquitto:2.0"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.MOSQUITTO))
             .withNetwork(network)
             .withNetworkAliases("mqtt")
             .withExposedPorts(1883)
@@ -153,7 +154,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     mosquitto.start();
 
     frostDb =
-        new GenericContainer<>(DockerImageName.parse("postgis/postgis:16-3.4-alpine"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.POSTGIS))
             .withNetwork(network)
             .withNetworkAliases("database")
             .withEnv("POSTGRES_DB", "sensorthings")
@@ -164,7 +165,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     frostDb.start();
 
     frost =
-        new GenericContainer<>(DockerImageName.parse("fraunhoferiosb/frost-server-http:2.7.3"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.FROST))
             .withNetwork(network)
             .withNetworkAliases("frost")
             .withExposedPorts(8080)
@@ -187,7 +188,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
 
     srcdb =
         new PostgreSQLContainer<>(
-                DockerImageName.parse("postgres:16-alpine").asCompatibleSubstituteFor("postgres"))
+                DockerImageName.parse(TestContainerImages.POSTGRES)
+                    .asCompatibleSubstituteFor("postgres"))
             .withNetwork(network)
             .withNetworkAliases("srcdb")
             .withDatabaseName(SRC_DB)

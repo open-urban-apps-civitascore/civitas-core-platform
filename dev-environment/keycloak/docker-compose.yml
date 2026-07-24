@@ -1,6 +1,6 @@
 services:
   postgres-keycloak:
-    image: postgres:18.1-alpine
+    image: postgres:16-alpine
     container_name: civitas-postgres-keycloak
     environment:
       POSTGRES_DB: keycloak
@@ -19,7 +19,7 @@ services:
       retries: 10
 
   keycloak:
-    image: quay.io/keycloak/keycloak:latest
+    image: quay.io/keycloak/keycloak:26.6.4
     container_name: civitas-keycloak
     hostname: civitas-keycloak.local
     command: start-dev --import-realm
@@ -63,7 +63,7 @@ services:
   # so they can be inspected at http://localhost:8025.
   # The realm-export.json configures Keycloak SMTP to point to mailpit:1025.
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.28
     container_name: civitas-mailpit
     ports:
       - "8025:8025"   # Web UI

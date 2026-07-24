@@ -24,6 +24,7 @@ import de.civitascore.configadapter.configuration.AppConfig;
 import de.civitascore.configadapter.configuration.ApplicationConfig;
 import de.civitascore.configadapter.messaging.EventPublisher;
 import de.civitascore.configadapter.model.ConfigResultEvent;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -61,7 +62,7 @@ abstract class AbstractApisixIntegrationTest {
 
   static {
     ETCD =
-        new GenericContainer<>(DockerImageName.parse("quay.io/coreos/etcd:v3.6.6"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.ETCD))
             .withNetwork(NETWORK)
             .withNetworkAliases("etcd")
             .withExposedPorts(2379, 2380)
@@ -74,7 +75,7 @@ abstract class AbstractApisixIntegrationTest {
     ETCD.start();
 
     APISIX =
-        new GenericContainer<>(DockerImageName.parse("apache/apisix:3.14.0-debian"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.APISIX))
             .withNetwork(NETWORK)
             .withNetworkAliases("apisix")
             .dependsOn(ETCD)

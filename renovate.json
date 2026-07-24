@@ -146,6 +146,19 @@
   "gitlabci": {
     "enabled": true
   },
+  "customManagers": [
+    {
+      "description": "Track Docker image versions declared as Testcontainers Java constants. Lines annotated with '// renovate: datasource=docker' immediately above a 'public static final String NAME = \"image:tag\"' constant are matched. The existing pinDigests rule additionally appends @sha256: digests for full reproducibility.",
+      "customType": "regex",
+      "fileMatch": [
+        "portal-backend/src/testIntegration/.*TestContainerImages\\.java$",
+        "config-adapter/.*/src/test/.*TestContainerImages\\.java$"
+      ],
+      "matchStrings": [
+        "// renovate: datasource=(?<datasource>[^\\n]+)\\n\\s+public static final String \\w+ = \"(?<depName>[^:\"]+):(?<currentValue>[^\"]+)\";"
+      ]
+    }
+  ],
   "postUpdateOptions": [
     "npmDedupe"
   ]
