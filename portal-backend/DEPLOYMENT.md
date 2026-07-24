@@ -272,13 +272,13 @@ SECURITY_PERMIT_PATHS_2=/api-docs/**
 
 ### 2.8 Group-Member Backfill (one-shot)
 
-One-time migration switch that reconciles the members of **already-synced** groups (those with a Keycloak `externalId`) into Keycloak. It closes the gap for groups whose `group_members` rows predate the group-side member sync and were therefore never pushed. On startup, after the normal catch-up sync, it re-emits `GROUP_UPDATED` per already-synced group; the config-adapter reconciles membership diff-based.
+One-time migration switch that reconciles the members of already-synced groups (those with a Keycloak `externalId`) into Keycloak, covering groups whose `group_members` rows predate the group-side member sync. On startup, after the catch-up sync, it re-emits `GROUP_UPDATED` per already-synced group; the config-adapter reconciles membership diff-based.
 
 | Property / Env Var | Default | Description |
 |---|---|---|
-| `KEYCLOAK_GROUP_MEMBER_BACKFILL` | `false` | When `true`, backfill already-synced groups' members into Keycloak on startup |
+| `KEYCLOAK_GROUP_MEMBER_BACKFILL` | `false` | When `true`, reconcile already-synced groups' members into Keycloak on startup |
 
-**Operational procedure:** enable it for a **single** rollout deploy, confirm the backfill summary in the logs (`Group-member backfill completed: processed N group(s)`), then set it back to `false`. The reconcile is idempotent, so an accidental extra run is harmless — but leaving the flag on makes every boot re-publish `GROUP_UPDATED` for all synced groups. There is no persisted run-once marker by design; the flag is the control.
+Enable for a single rollout deploy, confirm the log summary (`Group-member backfill completed: processed N group(s)`), then set back to `false`. The reconcile is idempotent; there is no run-once marker, so the flag must be turned off after rollout.
 
 ---
 
