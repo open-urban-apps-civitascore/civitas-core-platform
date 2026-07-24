@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import { Assignment } from '@/types/assignments'
 
-import { mapAssignmentApiResponseToTable } from './assignments'
+import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
+
+import { hasAssignmentChanges, mapAssignmentApiResponseToTable } from './assignments'
 
 describe('assignments utils', () => {
   it('maps assignments with group description from API response', () => {
@@ -84,5 +86,31 @@ describe('assignments utils', () => {
       { roleId: 'r1', roleName: 'Role 1' },
       { roleId: 'r2', roleName: 'Role 2' },
     ])
+  })
+
+  describe('hasAssignmentChanges', () => {
+    it('detects an added group that has no roles yet', () => {
+      const initial: GroupRoleAssignmentTable[] = []
+      const current: GroupRoleAssignmentTable[] = [{ groupId: 'g1', groupName: 'Group 1', assignedRoles: [] }]
+
+      expect(hasAssignmentChanges(current, initial)).toBe(true)
+    })
+
+    it('detects an added group with a role assignment', () => {
+      const initial: GroupRoleAssignmentTable[] = []
+      const current: GroupRoleAssignmentTable[] = [
+        { groupId: 'g1', groupName: 'Group 1', assignedRoles: [{ roleId: 'r1', roleName: 'Role 1' }] },
+      ]
+
+      expect(hasAssignmentChanges(current, initial)).toBe(true)
+    })
+
+    it('reports no changes for identical role assignments', () => {
+      const assignments: GroupRoleAssignmentTable[] = [
+        { groupId: 'g1', groupName: 'Group 1', assignedRoles: [{ roleId: 'r1', roleName: 'Role 1' }] },
+      ]
+
+      expect(hasAssignmentChanges(assignments, assignments)).toBe(false)
+    })
   })
 })

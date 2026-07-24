@@ -188,7 +188,8 @@
     },
     "infoBoxes": {
       "firstBox": "Groups with platform-wide permissions on all Data-related elements have access.",
-      "secondBox": "By removing your own group-role assignment, you may lose your permissions."
+      "secondBox": "By removing your own group-role assignment, you may lose your permissions.",
+      "atLeastOne": "At least one role is required"
     },
     "messages": {
       "updateSuccess": "Permissions have been successfully updated.",

@@ -187,7 +187,8 @@
     },
     "infoBoxes": {
       "firstBox": "Gruppen, die plattformweite Berechtigungen an allen datenbezogenen Elementen besitzen, haben Zugriff.",
-      "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen."
+      "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen.",
+      "atLeastOne": "Mindestens eine Rolle erforderlich"
     },
     "messages": {
       "updateSuccess": "Berechtigungen wurden erfolgreich aktualisiert.",
