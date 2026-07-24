@@ -113,6 +113,11 @@ public class GroupInitializer {
         properties ->
             txTemplate.executeWithoutResult(status -> createGroupsFromConfig(properties)));
     syncUnsyncedGroups();
+    // Run after the create sweep so newly-synced groups aren't reprocessed — they already got
+    // their members via the create path.
+    if (keycloakProperties.groupMemberBackfill()) {
+      backfillMemberships();
+    }
   }
 
   private void createGroupsFromConfig(InitProperties properties) {
@@ -217,6 +222,90 @@ public class GroupInitializer {
     }
 
     log.info("Group catch-up sync completed");
+  }
+
+  /**
+   * One-shot backfill of already-synced groups' members into Keycloak. Closes the gap for groups
+   * synced before the group-side member sync existed, whose {@code group_members} rows were never
+   * pushed. Gated by {@code keycloak.group-member-backfill} (default off) and safe to re-run: the
+   * adapter reconcile is diff-based and idempotent. Mirrors the create sweep (independent
+   * transactions, parallel publish, per-group timeout handling, boot-non-blocking) but publishes
+   * GROUP_UPDATED and never persists an externalId — these groups already have one.
+   */
+  private void backfillMemberships() {
+    // Build the payloads inside the read-only transaction so members (and the parentGroup proxy
+    // that buildGroupConfig reads) are resolved before the out-of-transaction publish.
+    List<GroupConfig> configs =
+        txTemplate.execute(
+            status -> {
+              List<Group> syncedGroups = groupRepository.findByExternalIdIsNotNull();
+              List<GroupConfig> built = new ArrayList<>(syncedGroups.size());
+              for (Group group : syncedGroups) {
+                try {
+                  built.add(GroupService.buildGroupConfig(group));
+                } catch (IllegalStateException e) {
+                  // Corrupt row (null/blank name) — skip it so one bad group can't abort the sweep.
+                  log.error(
+                      "Backfill skipping group id={} — invalid state: {}",
+                      group.getId(),
+                      e.getMessage());
+                }
+              }
+              return built;
+            });
+
+    if (configs == null || configs.isEmpty()) {
+      log.info("Group-member backfill: no already-synced groups to reconcile — skipping");
+      return;
+    }
+
+    log.warn(
+        "Group-member backfill ENABLED: reconciling members of {} already-synced group(s). "
+            + "Disable keycloak.group-member-backfill after this rollout deploy.",
+        configs.size());
+
+    List<CompletableFuture<ConfigResultEvent>> pending = new ArrayList<>(configs.size());
+    for (GroupConfig config : configs) {
+      pending.add(
+          configEventPublisher.publishGroupUpdated(keycloakProperties.targetRealm(), config));
+    }
+
+    for (int i = 0; i < configs.size(); i++) {
+      handleBackfillResult(configs.get(i), pending.get(i));
+    }
+
+    log.info("Group-member backfill completed: processed {} group(s)", configs.size());
+  }
+
+  private void handleBackfillResult(
+      GroupConfig config, CompletableFuture<ConfigResultEvent> future) {
+    try {
+      ConfigResultEvent result =
+          future.get(eventProperties.configAdapterTimeoutSeconds(), TimeUnit.SECONDS);
+      if (result != null && result.status() == ConfigResultEvent.Status.SUCCESS) {
+        log.info(
+            "Backfilled members for group '{}' (externalId={})", config.getName(), config.getId());
+      } else if (result != null) {
+        log.error(
+            "Member backfill for group '{}' failed: status={}, message={}, errorCode={}",
+            config.getName(),
+            result.status(),
+            result.message(),
+            result.errorCode());
+      } else {
+        log.error("Member backfill for group '{}' returned null result", config.getName());
+      }
+    } catch (TimeoutException e) {
+      // Cancel so the publisher's correlation map cleans up; a late response is then dropped.
+      future.cancel(true);
+      log.error("Timeout waiting for member backfill for group '{}'", config.getName());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      future.cancel(true);
+      log.error("Interrupted while waiting for member backfill for group '{}'", config.getName());
+    } catch (ExecutionException e) {
+      log.error("Failed to backfill members for group '{}'", config.getName(), e);
+    }
   }
 
   private void syncLayerInParallel(int depth, List<Group> groupsAtDepth) {

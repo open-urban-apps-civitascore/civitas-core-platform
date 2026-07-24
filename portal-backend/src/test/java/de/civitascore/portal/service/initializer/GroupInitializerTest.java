@@ -46,7 +46,9 @@ class GroupInitializerTest {
   private static final String TARGET_REALM = "test-realm";
   private static final String AUTH_SERVER_URL = "http://keycloak:8080";
   private static final KeycloakProperties KEYCLOAK_PROPERTIES =
-      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, true);
+      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, true, false);
+  private static final KeycloakProperties KEYCLOAK_PROPERTIES_BACKFILL_ON =
+      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, true, true);
   private static final int CONFIG_ADAPTER_TIMEOUT_SECONDS = 1;
 
   private GroupInitializer initializer;
@@ -319,6 +321,92 @@ class GroupInitializerTest {
       // If the cycle guard is missing, this call hangs in depth() and the test times out.
       org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
           java.time.Duration.ofSeconds(2), () -> initializer.initialize());
+    }
+  }
+
+  @Nested
+  @DisplayName("backfillMemberships")
+  class BackfillMemberships {
+
+    private GroupInitializer backfillOnInitializer() {
+      return new GroupInitializer(
+          groupRepository,
+          roleRepository,
+          assignmentRepository,
+          configEventPublisher,
+          Optional.empty(),
+          KEYCLOAK_PROPERTIES_BACKFILL_ON,
+          new EventProperties(CONFIG_ADAPTER_TIMEOUT_SECONDS),
+          transactionManager);
+    }
+
+    private Group syncedGroup(String name, String externalId) {
+      Group g = group(name);
+      g.setExternalId(externalId);
+      return g;
+    }
+
+    @Test
+    @DisplayName("publishes GROUP_UPDATED once per already-synced group when the flag is on")
+    void shouldPublishUpdatePerSyncedGroupWhenEnabled() {
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+      when(groupRepository.findByExternalIdIsNotNull())
+          .thenReturn(List.of(syncedGroup("Engineers", "kc-eng"), syncedGroup("Ops", "kc-ops")));
+      when(configEventPublisher.publishGroupUpdated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-eng")))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-ops")));
+
+      backfillOnInitializer().initialize();
+
+      verify(configEventPublisher, times(2))
+          .publishGroupUpdated(eq("test-realm"), any(GroupConfig.class));
+      verify(configEventPublisher, never()).publishGroupCreated(any(), any());
+    }
+
+    @Test
+    @DisplayName("never persists an externalId — these groups already have one")
+    void shouldNotPersistExternalIdDuringBackfill() {
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+      when(groupRepository.findByExternalIdIsNotNull())
+          .thenReturn(List.of(syncedGroup("Engineers", "kc-eng")));
+      when(configEventPublisher.publishGroupUpdated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-eng")));
+
+      backfillOnInitializer().initialize();
+
+      verify(groupRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("is a no-op when the flag is off")
+    void shouldNotBackfillWhenDisabled() {
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+
+      // Default `initializer` is built with the flag off.
+      initializer.initialize();
+
+      verify(configEventPublisher, never()).publishGroupUpdated(any(), any());
+      verify(groupRepository, never()).findByExternalIdIsNotNull();
+    }
+
+    @Test
+    @DisplayName("continues to the next group when one backfill publish times out")
+    void shouldContinueAfterTimeout() {
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+      when(groupRepository.findByExternalIdIsNotNull())
+          .thenReturn(List.of(syncedGroup("Slow", "kc-slow"), syncedGroup("Fast", "kc-fast")));
+
+      CompletableFuture<ConfigResultEvent> hanging = new CompletableFuture<>();
+      when(configEventPublisher.publishGroupUpdated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(hanging)
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-fast")));
+
+      backfillOnInitializer().initialize();
+
+      // Both groups are still published (parallel), and the hung one is cancelled on timeout.
+      verify(configEventPublisher, times(2))
+          .publishGroupUpdated(eq("test-realm"), any(GroupConfig.class));
+      assertThat(hanging.isCancelled()).isTrue();
     }
   }
 
