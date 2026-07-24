@@ -155,6 +155,7 @@ const datastructure = {
   name: 'Test Datastructure',
   description: 'A test datastructure',
   dataStructureStatus: 'DRAFT' as const,
+  createdFromDataSource: false,
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
   dataStructureVersions: [],
@@ -163,8 +164,6 @@ const datastructure = {
 const defaultProps = {
   datastructure,
   initialAssignments: [],
-  groups: [],
-  roles: [],
 }
 
 const mockCurrentUser = (permissions: PermissionName[]) => {
