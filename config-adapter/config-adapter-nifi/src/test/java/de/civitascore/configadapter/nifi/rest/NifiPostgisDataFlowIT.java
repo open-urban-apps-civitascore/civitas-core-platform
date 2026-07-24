@@ -23,6 +23,7 @@ import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -79,7 +80,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     network = Network.newNetwork();
 
     mosquitto =
-        new GenericContainer<>(DockerImageName.parse("eclipse-mosquitto:2.0"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.MOSQUITTO))
             .withNetwork(network)
             .withNetworkAliases("mqtt")
             .withExposedPorts(1883)
@@ -89,7 +90,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
 
     postgres =
         new PostgreSQLContainer<>(
-                DockerImageName.parse("postgis/postgis:16-3.4-alpine")
+                DockerImageName.parse(TestContainerImages.POSTGIS)
                     .asCompatibleSubstituteFor("postgres"))
             .withNetwork(network)
             .withNetworkAliases("postgres")

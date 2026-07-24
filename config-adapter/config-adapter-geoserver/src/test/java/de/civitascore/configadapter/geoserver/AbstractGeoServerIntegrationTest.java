@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.geoserver;
 
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.time.Duration;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
@@ -53,7 +54,7 @@ abstract class AbstractGeoServerIntegrationTest {
 
   static {
     POSTGIS =
-        new GenericContainer<>(DockerImageName.parse("imresamu/postgis:17-3.5"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.POSTGIS_GEOSERVER))
             .withNetwork(NETWORK)
             .withNetworkAliases(POSTGIS_HOST_ALIAS, "geodatabase")
             .withEnv("POSTGRES_DB", POSTGIS_DB)
@@ -69,7 +70,7 @@ abstract class AbstractGeoServerIntegrationTest {
     POSTGIS.start();
 
     RABBITMQ =
-        new GenericContainer<>(DockerImageName.parse("rabbitmq:3.13.3-alpine"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.RABBITMQ))
             .withNetwork(NETWORK)
             .withNetworkAliases("rabbitmq")
             .waitingFor(

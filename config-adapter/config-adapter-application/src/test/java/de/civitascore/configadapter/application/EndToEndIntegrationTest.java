@@ -30,6 +30,7 @@ import de.civitascore.configadapter.model.Payload;
 import de.civitascore.configadapter.model.idm.IdmConfigValue;
 import de.civitascore.configadapter.model.idm.RealmConfig;
 import de.civitascore.configadapter.model.idm.UserConfig;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import de.civitascore.event.handler.kafka.KafkaEventHandler;
 import de.civitascore.event.handler.kafka.ObjectMapperFactory;
 import io.cloudevents.CloudEvent;
@@ -82,16 +83,16 @@ class EndToEndIntegrationTest {
   @SuppressWarnings("resource")
   @Container
   static ConfluentKafkaContainer kafka =
-      new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.3"))
+      new ConfluentKafkaContainer(DockerImageName.parse(TestContainerImages.KAFKA))
           .withReuse(false);
 
   @SuppressWarnings("resource")
   @Container
   static GenericContainer<?> keycloak =
-      new GenericContainer<>(DockerImageName.parse("quay.io/keycloak/keycloak:23.0"))
+      new GenericContainer<>(DockerImageName.parse(TestContainerImages.KEYCLOAK))
           .withExposedPorts(8080)
-          .withEnv("KEYCLOAK_ADMIN", "admin")
-          .withEnv("KEYCLOAK_ADMIN_PASSWORD", "admin")
+          .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
+          .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin")
           .withCommand("start-dev")
           .withReuse(false);
 

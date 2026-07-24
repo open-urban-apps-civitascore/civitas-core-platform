@@ -26,6 +26,7 @@ import de.civitascore.configadapter.flowable.common.FlowableEngineFactory;
 import de.civitascore.configadapter.flowable.common.SagaHandlerRegistry;
 import de.civitascore.configadapter.flowable.common.kafka.FlowableResultPublisher;
 import de.civitascore.configadapter.frost.FrostSagaHandler;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.core.MediaType;
@@ -65,7 +66,7 @@ class DatasetCreateFlowableIT {
   @SuppressWarnings("resource")
   @Container
   static GenericContainer<?> postgis =
-      new GenericContainer<>(DockerImageName.parse("postgis/postgis:16-3.4-alpine"))
+      new GenericContainer<>(DockerImageName.parse(TestContainerImages.POSTGIS))
           .withNetwork(network)
           .withNetworkAliases("database")
           .withEnv("POSTGRES_DB", "sensorthings")
@@ -76,7 +77,7 @@ class DatasetCreateFlowableIT {
   @SuppressWarnings("resource")
   @Container
   static GenericContainer<?> frost =
-      new GenericContainer<>(DockerImageName.parse("fraunhoferiosb/frost-server-http:2.7.3"))
+      new GenericContainer<>(DockerImageName.parse(TestContainerImages.FROST))
           .withNetwork(network)
           .withExposedPorts(8080)
           .dependsOn(postgis)

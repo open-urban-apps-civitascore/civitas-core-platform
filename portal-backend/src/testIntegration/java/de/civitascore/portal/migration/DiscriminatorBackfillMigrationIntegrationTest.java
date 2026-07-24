@@ -1,5 +1,6 @@
 package de.civitascore.portal.migration;
 
+import de.civitascore.portal.util.TestContainerImages;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Disabled;
@@ -27,7 +28,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class DiscriminatorBackfillMigrationIntegrationTest {
 
   @Container
-  static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+  static final PostgreSQLContainer<?> POSTGRES =
+      new PostgreSQLContainer<>(TestContainerImages.POSTGRES);
 
   @Test
   @Disabled("activated in slice 2 once V1_1_2 migration SQL exists")

@@ -26,6 +26,7 @@ import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -79,7 +80,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
 
     postgres =
         new PostgreSQLContainer<>(
-                DockerImageName.parse("postgis/postgis:16-3.4-alpine")
+                DockerImageName.parse(TestContainerImages.POSTGIS)
                     .asCompatibleSubstituteFor("postgres"))
             .withNetwork(network)
             .withNetworkAliases("postgres")

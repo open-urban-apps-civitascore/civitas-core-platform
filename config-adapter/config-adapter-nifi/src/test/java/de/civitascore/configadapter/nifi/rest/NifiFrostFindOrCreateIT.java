@@ -20,6 +20,7 @@ import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import jakarta.ws.rs.core.Response;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -113,7 +114,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     network = Network.newNetwork();
 
     mosquitto =
-        new GenericContainer<>(DockerImageName.parse("eclipse-mosquitto:2.0"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.MOSQUITTO))
             .withNetwork(network)
             .withNetworkAliases("mqtt")
             .withExposedPorts(1883)
@@ -122,7 +123,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     mosquitto.start();
 
     postgis =
-        new GenericContainer<>(DockerImageName.parse("postgis/postgis:16-3.4-alpine"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.POSTGIS))
             .withNetwork(network)
             .withNetworkAliases("database")
             .withEnv("POSTGRES_DB", "sensorthings")
@@ -133,7 +134,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     postgis.start();
 
     frost =
-        new GenericContainer<>(DockerImageName.parse("fraunhoferiosb/frost-server-http:2.7.3"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.FROST))
             .withNetwork(network)
             .withNetworkAliases("frost")
             .withExposedPorts(8080)

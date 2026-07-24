@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.frost;
 
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.time.Duration;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
@@ -29,7 +30,7 @@ abstract class AbstractFrostIntegrationTest {
 
   static {
     POSTGIS =
-        new GenericContainer<>(DockerImageName.parse("postgis/postgis:16-3.4-alpine"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.POSTGIS))
             .withNetwork(NETWORK)
             .withNetworkAliases("database")
             .withEnv("POSTGRES_DB", "sensorthings")
@@ -40,7 +41,7 @@ abstract class AbstractFrostIntegrationTest {
     POSTGIS.start();
 
     FROST =
-        new GenericContainer<>(DockerImageName.parse("fraunhoferiosb/frost-server-http:2.7.3"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.FROST))
             .withNetwork(NETWORK)
             .withExposedPorts(8080)
             .dependsOn(POSTGIS)

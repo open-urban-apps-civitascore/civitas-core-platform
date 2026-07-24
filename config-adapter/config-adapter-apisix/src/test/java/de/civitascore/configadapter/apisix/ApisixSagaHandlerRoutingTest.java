@@ -20,6 +20,7 @@ import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AppConfig;
 import de.civitascore.configadapter.model.dataset.NamedApiHelper;
 import de.civitascore.configadapter.model.dataset.WorkspaceNames;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -80,7 +81,7 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
 
   static {
     STUB_UPSTREAM =
-        new GenericContainer<>(DockerImageName.parse("mendhak/http-https-echo:34"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.HTTP_ECHO))
             .withNetwork(NETWORK)
             .withNetworkAliases(STUB_ALIAS)
             .withEnv("HTTP_PORT", String.valueOf(STUB_PORT))

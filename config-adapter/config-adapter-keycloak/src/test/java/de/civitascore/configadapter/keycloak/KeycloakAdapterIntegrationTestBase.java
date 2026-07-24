@@ -25,6 +25,7 @@ import de.civitascore.configadapter.model.Metadata;
 import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.Payload;
 import de.civitascore.configadapter.model.idm.IdmConfigValue;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -58,19 +59,19 @@ abstract class KeycloakAdapterIntegrationTestBase {
 
   static {
     MAILPIT =
-        new GenericContainer<>(DockerImageName.parse("axllent/mailpit:latest"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.MAILPIT))
             .withNetwork(NETWORK)
             .withNetworkAliases("mailpit")
             .withExposedPorts(1025, 8025);
     MAILPIT.start();
 
     KEYCLOAK =
-        new GenericContainer<>(DockerImageName.parse("quay.io/keycloak/keycloak:23.0"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.KEYCLOAK))
             .withNetwork(NETWORK)
             .withNetworkAliases("keycloak")
             .withExposedPorts(8080)
-            .withEnv("KEYCLOAK_ADMIN", "admin")
-            .withEnv("KEYCLOAK_ADMIN_PASSWORD", "admin")
+            .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
+            .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin")
             .withCommand("start-dev")
             .withReuse(false);
     KEYCLOAK.start();
