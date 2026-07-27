@@ -162,6 +162,15 @@ final class ApisixAdminOperations {
     }
 
     String body = response.readEntity(String.class);
+    if (operation == AdapterOperation.UPSTREAM_DELETE
+        && UpstreamReferenceCheck.isStaleRouteReference(status, body)) {
+      // Not a client error: the referencing route may already be deleted and merely still visible
+      // in the gateway's route cache. Retryable so the framework's backoff re-attempts it, rather
+      // than DLQ-ing the delete and leaving the upstream orphaned.
+      LOG.warn("APISIX upstream still referenced by a route during {}", operation.getDescription());
+      throw new RetryableAdapterException(
+          AdapterErrorCode.SERVICE_UNAVAILABLE, ApisixAdapter.ADAPTER_NAME, status);
+    }
     if (status >= Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
       LOG.warn(
           "APISIX server error during {}: {} {}",
