@@ -125,17 +125,21 @@ final class ApisixAdminClient {
             Encode.forJava(upstreamId),
             attempt,
             UPSTREAM_DELETE_MAX_ATTEMPTS);
-        sleep(UPSTREAM_DELETE_BACKOFF.calculate(attempt));
+        boolean interruptedWhileWaiting = false;
+        try {
+          Thread.sleep(UPSTREAM_DELETE_BACKOFF.calculate(attempt));
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          ex.addSuppressed(interrupted);
+          interruptedWhileWaiting = true;
+        }
+        if (interruptedWhileWaiting) {
+          // Stop retrying, but surface the gateway rejection rather than the interruption: the
+          // failed delete is what the saga needs to see, and it names the referencing route. The
+          // interruption rides along as a suppressed cause.
+          throw ex;
+        }
       }
-    }
-  }
-
-  private static void sleep(long millis) {
-    try {
-      Thread.sleep(millis);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      throw new SagaApiException("Interrupted while waiting to retry the upstream delete", 500);
     }
   }
 
