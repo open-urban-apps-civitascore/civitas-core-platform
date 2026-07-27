@@ -9,6 +9,7 @@ import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Distribution;
@@ -17,7 +18,9 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import de.civitascore.portal.model.input.validation.NamedApiAllowedSlugValidator;
+import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
@@ -1114,6 +1117,83 @@ class DataSetControllerIntegrationTest
           .extracting(PipelineSummaryDTO::getId)
           .containsExactlyInAnyOrderElementsOf(originalPipelineIds);
       assertThat(output.getDataSetStatus()).as("Status should remain unchanged").isEqualTo(status);
+    }
+
+    private UUID createTestGroup() {
+      return portalData.group(b -> b.description("Test group for assignments")).getId();
+    }
+
+    private UUID createTestRole() {
+      return portalData
+          .role(b -> b.description("Test role for assignments").roleType(RoleType.DATA))
+          .getId();
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+        value = DataSetStatus.class,
+        mode = EnumSource.Mode.EXCLUDE,
+        names = {"DRAFT"})
+    @DisplayName("Should replace assignments on released dataset via /released/meta endpoint")
+    void shouldReplaceAssignmentsOnReleasedDatasetViaReleasedEndpoint(DataSetStatus status) {
+      UUID groupId1 = createTestGroup();
+      UUID groupId2 = createTestGroup();
+      UUID roleId = createTestRole();
+
+      DataSet dataSet = createDataSetWithRelationships();
+      UUID dataSetId = dataSet.getId();
+
+      AssignmentScopedInputDTO initialAssignment = new AssignmentScopedInputDTO();
+      initialAssignment.setGroupId(groupId1);
+      initialAssignment.setRoleId(roleId);
+
+      DataSetInputDTO seedInput = createUpdateInput();
+      seedInput.setAssignments(Set.of(initialAssignment));
+      ResponseEntity<DataSetOutputDTO> seedResponse = performUpdate(dataSetId, seedInput);
+      assertThat(seedResponse.getStatusCode())
+          .as("Seeding the initial assignment on the DRAFT dataset should succeed")
+          .isEqualTo(HttpStatus.OK);
+
+      dataSet = dataSetRepository.findById(dataSetId).orElseThrow();
+      dataSet.setDataSetStatus(status);
+      dataSetRepository.save(dataSet);
+
+      AssignmentScopedInputDTO replacementAssignment = new AssignmentScopedInputDTO();
+      replacementAssignment.setGroupId(groupId2);
+      replacementAssignment.setRoleId(roleId);
+
+      DataSetInputDTO releasedUpdateInput = new DataSetInputDTO();
+      releasedUpdateInput.setName("Updated Released Dataset With New Assignment");
+      releasedUpdateInput.setDescription("Updated description for released dataset");
+      releasedUpdateInput.setOpenDataAccess(false);
+      releasedUpdateInput.setAssignments(Set.of(replacementAssignment));
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSetId + "/released/meta",
+              org.springframework.http.HttpMethod.PUT,
+              createAuthHeaders(),
+              releasedUpdateInput,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("Should return OK status for %s dataset", status)
+          .isEqualTo(HttpStatus.OK);
+
+      ResponseEntity<List<AssignmentOutputDTO>> assignmentsResponse =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + dataSetId + "/assignments",
+              org.springframework.http.HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(assignmentsResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(assignmentsResponse.getBody())
+          .as("Old assignment should be replaced, not appended, for %s dataset", status)
+          .hasSize(1);
+      assertThat(assignmentsResponse.getBody().getFirst().getGroup().getId())
+          .as("Assignment should now point to the new group for %s dataset", status)
+          .isEqualTo(groupId2);
     }
 
     @Test
