@@ -48,6 +48,7 @@ script:pre-request {
   try {
     const tok = await axios.post(`${kc}/realms/${realm}/protocol/openid-connect/token`, form, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: 10000,
     });
     bearer = tok.data && tok.data.access_token;
   } catch (e) {
@@ -61,7 +62,7 @@ script:pre-request {
   for (let i = 0; i < 30; i++) {
     let pending = 'unknown'; // sentinel: a failed read stays "not settled", never breaks the loop
     try {
-      const r = await axios.get(`${base}/datasets/${id}`, { headers: { Authorization: `Bearer ${bearer}` } });
+      const r = await axios.get(`${base}/datasets/${id}`, { headers: { Authorization: `Bearer ${bearer}` }, timeout: 10000 });
       pending = r.data.pendingSagaType;
     } catch (e) { /* transient; retry */ }
     if (pending === null || pending === undefined) { settled = true; break; }

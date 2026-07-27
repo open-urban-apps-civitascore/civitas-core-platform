@@ -9,6 +9,9 @@
  */
 package de.civitascore.configadapter.apisix;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -38,16 +41,18 @@ class ApisixUpstreamReferenceIntegrationTest extends AbstractApisixIntegrationTe
     createRouteDirectly(
         routeId, Map.of("uri", "/reference-check/" + suffix, "upstream_id", upstreamId));
 
-    HttpResponse<String> response = deleteUpstream(upstreamId);
+    try {
+      HttpResponse<String> response = deleteUpstream(upstreamId);
 
-    assertEquals(400, response.statusCode(), "the gateway must refuse a referenced upstream");
-    assertTrue(
-        UpstreamReferenceCheck.isStaleRouteReference(response.statusCode(), response.body()),
-        "route-reference rejection not recognized — the Admin API wording changed: "
-            + response.body());
-
-    deleteRoute(routeId);
-    deleteUpstream(upstreamId);
+      assertEquals(400, response.statusCode(), "the gateway must refuse a referenced upstream");
+      assertTrue(
+          UpstreamReferenceCheck.isStaleRouteReference(response.statusCode(), response.body()),
+          "route-reference rejection not recognized — the Admin API wording changed: "
+              + response.body());
+    } finally {
+      deleteRoute(routeId);
+      awaitUpstreamDeleted(upstreamId);
+    }
   }
 
   @Test
@@ -58,18 +63,38 @@ class ApisixUpstreamReferenceIntegrationTest extends AbstractApisixIntegrationTe
     String serviceId = "test-service-" + suffix;
     createServiceDirectly(serviceId, Map.of("upstream_id", upstreamId));
 
-    HttpResponse<String> response = deleteUpstream(upstreamId);
+    try {
+      HttpResponse<String> response = deleteUpstream(upstreamId);
 
-    // The gateway reuses one message for every referencing kind, so the trailing phrase alone
-    // would match here too. A service reference is static configuration that waiting never
-    // clears, so it must fail on the first attempt rather than burn the retry budget.
-    assertEquals(400, response.statusCode(), "the gateway must refuse a referenced upstream");
-    assertFalse(
-        UpstreamReferenceCheck.isStaleRouteReference(response.statusCode(), response.body()),
-        "a service reference must not be retried as route-cache lag: " + response.body());
+      // The gateway reuses one message for every referencing kind, so the trailing phrase alone
+      // would match here too. A service reference is static configuration that waiting never
+      // clears, so it must fail on the first attempt rather than burn the retry budget.
+      assertEquals(400, response.statusCode(), "the gateway must refuse a referenced upstream");
+      assertFalse(
+          UpstreamReferenceCheck.isStaleRouteReference(response.statusCode(), response.body()),
+          "a service reference must not be retried as route-cache lag: " + response.body());
+    } finally {
+      deleteService(serviceId);
+      awaitUpstreamDeleted(upstreamId);
+    }
+  }
 
-    deleteService(serviceId);
-    deleteUpstream(upstreamId);
+  /**
+   * Deletes the upstream once the gateway stops reporting a reference to it. Teardown races the
+   * very cache lag these tests provoke, so a single delete can be refused and leak the upstream
+   * into the container the whole suite shares.
+   */
+  private void awaitUpstreamDeleted(String upstreamId) {
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(250, MILLISECONDS)
+        .untilAsserted(
+            () -> {
+              HttpResponse<String> response = deleteUpstream(upstreamId);
+              assertTrue(
+                  response.statusCode() < 300 || response.statusCode() == 404,
+                  "upstream " + upstreamId + " not torn down: " + response.body());
+            });
   }
 
   private HttpResponse<String> deleteUpstream(String upstreamId) throws Exception {

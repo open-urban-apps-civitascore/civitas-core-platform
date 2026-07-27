@@ -36,6 +36,7 @@ script:pre-request {
     try {
       const tokenResp = await axios.post(tokenUrl, form, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: 10000,
       });
       accessToken = tokenResp.data && tokenResp.data.access_token;
     } catch (e) {
@@ -53,6 +54,7 @@ script:pre-request {
     try {
       const resp = await axios.get(`${apiUrl}/v1/datasets/${datasetId}/apis`, {
         headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: 10000,
       });
       authorized = resp.status === 200;
     } catch (e) { /* transient 401/403 while OPA data propagates; retry */ }
