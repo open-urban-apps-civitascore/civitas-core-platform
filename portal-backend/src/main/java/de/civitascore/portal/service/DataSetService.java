@@ -63,6 +63,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final DataSetSagaPublisher sagaPublisher;
 
+  private final PipelineRuntimeStatusService pipelineRuntimeStatusService;
+
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
@@ -74,6 +76,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       DataPoolRepository dataPoolRepository,
       AssignmentFactory assignmentFactory,
       DataSetSagaPublisher sagaPublisher,
+      PipelineRuntimeStatusService pipelineRuntimeStatusService,
       ObjectProvider<AllowedScopes> allowedScopesProvider,
       DataSourceDatapoolScopeValidator datapoolScopeValidator) {
     this.dataSetRepository = dataSetRepository;
@@ -82,6 +85,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     this.dataPoolRepository = dataPoolRepository;
     this.assignmentFactory = assignmentFactory;
     this.sagaPublisher = sagaPublisher;
+    this.pipelineRuntimeStatusService = pipelineRuntimeStatusService;
     this.allowedScopesProvider = allowedScopesProvider;
     this.datapoolScopeValidator = datapoolScopeValidator;
   }
@@ -501,11 +505,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       case CREATE -> {
         applyInfrastructureResult(dataSet, result);
         markProvisionedIfSinkExists(dataSet);
+        pipelineRuntimeStatusService.markDeploymentSucceeded(result.pipelineIds());
         log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
       }
       case UPDATE -> {
         applyInfrastructureResult(dataSet, result);
         markProvisionedIfSinkExists(dataSet);
+        pipelineRuntimeStatusService.markDeploymentSucceeded(result.pipelineIds());
         log.info("Saga UPDATE completed for dataset {}", datasetId);
       }
       case UNRELEASE -> {

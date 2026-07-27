@@ -63,6 +63,7 @@ class DataSetServiceTest {
   @Mock private DataPoolRepository dataPoolRepository;
   @Mock private AssignmentFactory assignmentFactory;
   @Mock private DataSetSagaPublisher sagaPublisher;
+  @Mock private PipelineRuntimeStatusService pipelineRuntimeStatusService;
   @Mock private ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   private DataSetService createService() {
@@ -77,6 +78,7 @@ class DataSetServiceTest {
         dataPoolRepository,
         assignmentFactory,
         sagaPublisher,
+        pipelineRuntimeStatusService,
         allowedScopesProvider,
         new DataSourceDatapoolScopeValidator());
   }
@@ -751,6 +753,80 @@ class DataSetServiceTest {
       verify(dataSetRepository).save(saved.capture());
       assertThat(saved.getValue().isProvisioned()).isTrue();
       assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("CREATE: marks the deployed pipelines as successfully deployed")
+    void createMarksPipelinesDeployed() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1", "pipe-2"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      verify(pipelineRuntimeStatusService).markDeploymentSucceeded(List.of("pipe-1", "pipe-2"));
+    }
+
+    @Test
+    @DisplayName("UPDATE: marks the deployed pipelines as successfully deployed")
+    void updateMarksPipelinesDeployed() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      verify(pipelineRuntimeStatusService).markDeploymentSucceeded(List.of("pipe-1"));
+    }
+
+    @Test
+    @DisplayName("UNRELEASE: torn-down pipelines are not marked as deployed")
+    void unreleaseDoesNotMarkPipelinesDeployed() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UNRELEASE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(), null, null, null, null, null, List.of("pipe-1"), null, null, null);
+
+      createService().handleSagaCompleted(id, result);
+
+      verify(pipelineRuntimeStatusService, never()).markDeploymentSucceeded(any());
     }
 
     @Test
