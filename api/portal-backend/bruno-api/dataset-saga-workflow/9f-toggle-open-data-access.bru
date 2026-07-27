@@ -42,22 +42,34 @@ script:pre-request {
     '&username=' + encodeURIComponent(bru.getEnvVar('username')) +
     '&password=' + encodeURIComponent(bru.getEnvVar('password'));
 
+  // Fail loudly if readiness can't be proven: without a token every poll below 401s, `pending`
+  // never leaves its sentinel, and the loop would fall through as if the saga had settled —
+  // sending the PUT into the 409 race this guard exists to remove.
   let bearer = '';
   try {
     const tok = await axios.post(`${kc}/realms/${realm}/protocol/openid-connect/token`, form, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     bearer = tok.data && tok.data.access_token;
-  } catch (e) { /* token fetch failed; the PUT below will surface a clear error */ }
+  } catch (e) {
+    throw new Error(`Settle-check token fetch failed: ${e.message}`);
+  }
+  if (!bearer) {
+    throw new Error('Settle-check token fetch returned no access_token');
+  }
 
+  let settled = false;
   for (let i = 0; i < 30; i++) {
-    let pending = 'unknown';
+    let pending = 'unknown'; // sentinel: a failed read stays "not settled", never breaks the loop
     try {
       const r = await axios.get(`${base}/datasets/${id}`, { headers: { Authorization: `Bearer ${bearer}` } });
       pending = r.data.pendingSagaType;
     } catch (e) { /* transient; retry */ }
-    if (pending === null || pending === undefined) break;
+    if (pending === null || pending === undefined) { settled = true; break; }
     await new Promise(res => setTimeout(res, 2000));
+  }
+  if (!settled) {
+    throw new Error('Dataset did not settle (pendingSagaType still set) — refusing to update during an active saga');
   }
 }
 
