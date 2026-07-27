@@ -1290,8 +1290,8 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("update with null datapoolId unassigns the DataPool from the entity")
-    void updateWithNullDatapoolIdUnassignsDataPool() {
+    @DisplayName("update with an omitted datapoolId leaves the DataPool untouched")
+    void updateWithOmittedDatapoolIdKeepsDataPool() {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       DataPool existingPool = new DataPool();
@@ -1305,8 +1305,60 @@ class DataSetServiceTest {
       input.setName("updated name");
 
       DataSet result = createService().update(id, input);
+      assertThat(result.getDataPool()).isSameAs(existingPool);
+      verify(dataPoolRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("update with an explicit null datapoolId unassigns the DataPool")
+    void updateWithExplicitNullDatapoolIdUnassignsDataPool() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSet(id);
+      DataPool existingPool = new DataPool();
+      existingPool.setId(UUID.randomUUID());
+      ds.setDataPool(existingPool);
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+      input.setDatapoolId(null);
+
+      DataSet result = createService().update(id, input);
       assertThat(result.getDataPool()).isNull();
       verify(dataPoolRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("a rename-only update does not trip the scope guard on a pooled dataset")
+    void renameOnlyUpdateKeepsPoolAndPassesScopeGuard() {
+      UUID id = UUID.randomUUID();
+      UUID poolId = UUID.randomUUID();
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+
+      DataSet entity = draftDataSet(id);
+      entity.setDataPool(pool);
+
+      DataSource specificToPool = new DataSource();
+      specificToPool.setId(UUID.randomUUID());
+      specificToPool.setDatapoolScopeType(DatapoolScopeType.SPECIFIC);
+      specificToPool.setScopedDataPools(new HashSet<>(Set.of(pool)));
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSources(new HashSet<>(Set.of(specificToPool)));
+      entity.setPipelines(new HashSet<>(Set.of(pipeline)));
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      // No datapoolId in the body: the pool must survive, so the SPECIFIC source stays in scope
+      // instead of being validated against a pool-less dataset.
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("renamed");
+
+      DataSet result = createService().update(id, input);
+      assertThat(result.getDataPool()).isSameAs(pool);
     }
 
     @Test

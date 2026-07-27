@@ -196,13 +196,15 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
         authorizeTargetPool(input.getDatapoolId());
       }
       entity.setDataPool(dataPool);
-    } else {
+    } else if (input.isDatapoolIdPresent()) {
+      // Only an explicit null clears the pool. An omitted field leaves it untouched, so a partial
+      // write (a rename via PUT) cannot drop the dataset out of its pool as a side effect.
       entity.setDataPool(null);
     }
 
-    // Re-assert scope against the resolved pool unconditionally: it is idempotent and cheap, so
-    // decoupling it from the pool-change decision keeps the guard from silently lapsing if any
-    // future mutation path is added here. The pool-change condition gates only authorization above.
+    // Re-assert scope against the resolved pool unconditionally: decoupling it from the pool-change
+    // decision keeps the guard from silently lapsing if any future mutation path is added here. The
+    // pool-change condition gates only authorization above.
     revalidatePipelineDataSourcesAgainstPool(entity);
 
     List<NamedApiInputDTO> incoming = input.getNamedApis();
