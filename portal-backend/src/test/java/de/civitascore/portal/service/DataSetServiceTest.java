@@ -18,6 +18,7 @@ import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
@@ -30,6 +31,8 @@ import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -74,7 +77,8 @@ class DataSetServiceTest {
         dataPoolRepository,
         assignmentFactory,
         sagaPublisher,
-        allowedScopesProvider);
+        allowedScopesProvider,
+        new DataSourceDatapoolScopeValidator());
   }
 
   private static AllowedScopes wildcardScopes() {
@@ -137,7 +141,7 @@ class DataSetServiceTest {
       p.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(p);
 
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSet result = createService().stage(id);
@@ -151,7 +155,7 @@ class DataSetServiceTest {
       DataSet ds = draftDataSet(id);
       ds.getPipelines().add(new Pipeline());
 
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
@@ -164,7 +168,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
 
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
@@ -182,7 +186,7 @@ class DataSetServiceTest {
       api.setStandard(ApiStandard.STA);
       ds.setNamedApis(new HashSet<>(Set.of(api)));
 
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSet result = createService().stage(id);
@@ -314,6 +318,113 @@ class DataSetServiceTest {
   }
 
   @Nested
+  @DisplayName("datapool scope re-validation (backstop)")
+  class DatapoolScopeRevalidationTests {
+
+    private DataPool pool(UUID id) {
+      DataPool p = new DataPool();
+      p.setId(id);
+      return p;
+    }
+
+    private DataSource dataSource(UUID id, DatapoolScopeType scopeType, DataPool... scopedPools) {
+      DataSource ds = new DataSource();
+      ds.setId(id);
+      ds.setDatapoolScopeType(scopeType);
+      ds.setScopedDataPools(new HashSet<>(Set.of(scopedPools)));
+      return ds;
+    }
+
+    private void addPipelineWithSource(DataSet dataSet, DataSource source) {
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(Set.of(source)));
+      dataSet.getPipelines().add(p);
+    }
+
+    @Test
+    @DisplayName(
+        "release rejects when a pipeline datasource is out of scope for the dataset's pool")
+    void releaseRejectsOutOfScopeDataSource() {
+      UUID id = UUID.randomUUID();
+      DataPool poolB = pool(UUID.randomUUID());
+      DataSet ds = readyDataSet(id);
+      ds.setDataPool(poolB);
+      // SPECIFIC-scoped to a DIFFERENT pool than the dataset now sits in.
+      UUID offendingId = UUID.randomUUID();
+      addPipelineWithSource(
+          ds, dataSource(offendingId, DatapoolScopeType.SPECIFIC, pool(UUID.randomUUID())));
+
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(offendingId));
+      verify(sagaPublisher, never()).publishCreateRequested(any());
+    }
+
+    @Test
+    @DisplayName("release passes when the pipeline datasource is in scope for the dataset's pool")
+    void releasePassesInScopeDataSource() {
+      UUID id = UUID.randomUUID();
+      DataPool poolB = pool(UUID.randomUUID());
+      DataSet ds = readyDataSet(id);
+      ds.setDataPool(poolB);
+      addPipelineWithSource(ds, dataSource(UUID.randomUUID(), DatapoolScopeType.SPECIFIC, poolB));
+
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet result = createService().release(id);
+
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
+      verify(sagaPublisher).publishCreateRequested(result);
+    }
+
+    @Test
+    @DisplayName("stage rejects when a pipeline datasource is out of scope for the dataset's pool")
+    void stageRejectsOutOfScopeDataSource() {
+      UUID id = UUID.randomUUID();
+      DataPool poolB = pool(UUID.randomUUID());
+      DataSet ds = draftDataSet(id);
+      ds.setName("name");
+      ds.setDescription("desc");
+      ds.setDataPool(poolB);
+      UUID offendingId = UUID.randomUUID();
+      addPipelineWithSource(
+          ds, dataSource(offendingId, DatapoolScopeType.SPECIFIC, pool(UUID.randomUUID())));
+
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().stage(id))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(offendingId));
+    }
+
+    @Test
+    @DisplayName("release rejects a pool-less dataset carrying a SPECIFIC-scoped datasource")
+    void releaseRejectsSpecificSourceInPoolLessDataset() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataPool(null);
+      UUID offendingId = UUID.randomUUID();
+      addPipelineWithSource(
+          ds, dataSource(offendingId, DatapoolScopeType.SPECIFIC, pool(UUID.randomUUID())));
+
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(DataSourceScopeViolationException.class);
+      verify(sagaPublisher, never()).publishCreateRequested(any());
+    }
+  }
+
+  @Nested
   @DisplayName("unrelease()")
   class UnreleaseTests {
 
@@ -437,6 +548,43 @@ class DataSetServiceTest {
 
       DataSet result = createService().updateReleasedMeta(id, input);
       assertThat(result).isNotNull();
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+
+    @Test
+    @DisplayName("rejects a released-dataset pool switch to a pool a pipeline datasource is not in")
+    void rejectsReleasedPoolSwitchWithOutOfScopeDataSource() {
+      UUID id = UUID.randomUUID();
+      UUID poolAId = UUID.randomUUID();
+      UUID poolBId = UUID.randomUUID();
+      DataPool poolA = new DataPool();
+      poolA.setId(poolAId);
+      DataPool poolB = new DataPool();
+      poolB.setId(poolBId);
+
+      DataSet ds = readyDataSet(id);
+      ds.setDataPool(poolA);
+      UUID offendingId = UUID.randomUUID();
+      DataSource specificToA = new DataSource();
+      specificToA.setId(offendingId);
+      specificToA.setDatapoolScopeType(DatapoolScopeType.SPECIFIC);
+      specificToA.setScopedDataPools(new HashSet<>(Set.of(poolA)));
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(Set.of(specificToA)));
+      ds.getPipelines().add(p);
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataPoolRepository.findById(poolBId)).thenReturn(Optional.of(poolB));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setDatapoolId(poolBId);
+
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(offendingId));
       verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
     }
 
@@ -1142,8 +1290,8 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("update with null datapoolId unassigns the DataPool from the entity")
-    void updateWithNullDatapoolIdUnassignsDataPool() {
+    @DisplayName("update with an omitted datapoolId leaves the DataPool untouched")
+    void updateWithOmittedDatapoolIdKeepsDataPool() {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       DataPool existingPool = new DataPool();
@@ -1157,8 +1305,153 @@ class DataSetServiceTest {
       input.setName("updated name");
 
       DataSet result = createService().update(id, input);
+      assertThat(result.getDataPool()).isSameAs(existingPool);
+      verify(dataPoolRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("update with an explicit null datapoolId unassigns the DataPool")
+    void updateWithExplicitNullDatapoolIdUnassignsDataPool() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSet(id);
+      DataPool existingPool = new DataPool();
+      existingPool.setId(UUID.randomUUID());
+      ds.setDataPool(existingPool);
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+      input.setDatapoolId(null);
+
+      DataSet result = createService().update(id, input);
       assertThat(result.getDataPool()).isNull();
       verify(dataPoolRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("a rename-only update does not trip the scope guard on a pooled dataset")
+    void renameOnlyUpdateKeepsPoolAndPassesScopeGuard() {
+      UUID id = UUID.randomUUID();
+      UUID poolId = UUID.randomUUID();
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+
+      DataSet entity = draftDataSet(id);
+      entity.setDataPool(pool);
+
+      DataSource specificToPool = new DataSource();
+      specificToPool.setId(UUID.randomUUID());
+      specificToPool.setDatapoolScopeType(DatapoolScopeType.SPECIFIC);
+      specificToPool.setScopedDataPools(new HashSet<>(Set.of(pool)));
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSources(new HashSet<>(Set.of(specificToPool)));
+      entity.setPipelines(new HashSet<>(Set.of(pipeline)));
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      // No datapoolId in the body: the pool must survive, so the SPECIFIC source stays in scope
+      // instead of being validated against a pool-less dataset.
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("renamed");
+
+      DataSet result = createService().update(id, input);
+      assertThat(result.getDataPool()).isSameAs(pool);
+    }
+
+    @Test
+    @DisplayName(
+        "switching a dataset to a pool its pipeline's SPECIFIC datasource is not scoped for is"
+            + " rejected")
+    void poolSwitchRejectsOutOfScopePipelineDataSource() {
+      UUID poolAId = UUID.randomUUID();
+      UUID poolBId = UUID.randomUUID();
+      DataPool poolA = new DataPool();
+      poolA.setId(poolAId);
+      DataPool poolB = new DataPool();
+      poolB.setId(poolBId);
+
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      entity.setDataPool(poolA);
+      UUID offendingId = UUID.randomUUID();
+      DataSource specificToA = new DataSource();
+      specificToA.setId(offendingId);
+      specificToA.setDatapoolScopeType(DatapoolScopeType.SPECIFIC);
+      specificToA.setScopedDataPools(new HashSet<>(Set.of(poolA)));
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(Set.of(specificToA)));
+      entity.getPipelines().add(p);
+
+      when(dataPoolRepository.findById(poolBId)).thenReturn(Optional.of(poolB));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setDatapoolId(poolBId);
+
+      assertThatThrownBy(() -> createService().postConvertToEntity(entity, input))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(offendingId));
+    }
+
+    @Test
+    @DisplayName("switching pool leaves an ALL-scoped pipeline datasource accepted")
+    void poolSwitchAcceptsAllScopedPipelineDataSource() {
+      UUID poolAId = UUID.randomUUID();
+      UUID poolBId = UUID.randomUUID();
+      DataPool poolA = new DataPool();
+      poolA.setId(poolAId);
+      DataPool poolB = new DataPool();
+      poolB.setId(poolBId);
+
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      entity.setDataPool(poolA);
+      DataSource allScoped = new DataSource();
+      allScoped.setId(UUID.randomUUID());
+      allScoped.setDatapoolScopeType(DatapoolScopeType.ALL);
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(Set.of(allScoped)));
+      entity.getPipelines().add(p);
+
+      when(dataPoolRepository.findById(poolBId)).thenReturn(Optional.of(poolB));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setDatapoolId(poolBId);
+
+      DataSet result = createService().postConvertToEntity(entity, input);
+      assertThat(result.getDataPool()).isSameAs(poolB);
+    }
+
+    @Test
+    @DisplayName("an update that leaves the pool unchanged accepts an in-scope bound datasource")
+    void poolUnchangedAcceptsInScopeBoundDataSource() {
+      UUID poolId = UUID.randomUUID();
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      entity.setDataPool(pool);
+      DataSource specificToPool = new DataSource();
+      specificToPool.setId(UUID.randomUUID());
+      specificToPool.setDatapoolScopeType(DatapoolScopeType.SPECIFIC);
+      specificToPool.setScopedDataPools(new HashSet<>(Set.of(pool)));
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(Set.of(specificToPool)));
+      entity.getPipelines().add(p);
+
+      when(dataPoolRepository.findById(poolId)).thenReturn(Optional.of(pool));
+
+      // A PATCH re-sends the existing datapoolId (no pool change); the re-validation must accept
+      // the
+      // still-in-scope bound datasource rather than reject a legitimate metadata edit.
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setDatapoolId(poolId);
+
+      DataSet result = createService().postConvertToEntity(entity, input);
+      assertThat(result.getDataPool()).isSameAs(pool);
     }
   }
 }

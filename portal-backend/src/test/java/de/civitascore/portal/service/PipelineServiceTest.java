@@ -22,6 +22,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +50,8 @@ class PipelineServiceTest {
   @Mock private DataSinkService dataSinkService;
   @Mock private DataSinkRepository dataSinkRepository;
   @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
+
+  @Spy private DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
   @InjectMocks private PipelineService pipelineService;
 

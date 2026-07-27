@@ -44,6 +44,7 @@ import {
   DatasetUpdateApiData,
   DatasetUpdateApiSchema,
 } from '@/types/datasets'
+import { isDatapoolScopeViolationError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { mapDatasetToFormData } from '../../../utils/mappers'
@@ -248,8 +249,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       form.reset(formData)
       router.refresh()
       return true
-    } catch {
-      toast.error(t('messages.transitionError'))
+    } catch (error) {
+      if (isDatapoolScopeViolationError(error)) {
+        toast.error(t('messages.datasourceScopeViolation'))
+      } else {
+        toast.error(t('messages.transitionError'))
+      }
       return false
     }
   }

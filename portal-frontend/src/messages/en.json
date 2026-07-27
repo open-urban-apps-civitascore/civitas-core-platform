@@ -516,7 +516,8 @@
       "unstageSuccess": "Dataset has been successfully reverted to draft.",
       "releaseSuccess": "Dataset has been successfully released.",
       "unreleaseSuccess": "Dataset has been successfully unreleased.",
-      "transitionError": "An error occurred while changing the Dataset status. Please try again."
+      "transitionError": "An error occurred while changing the Dataset status. Please try again.",
+      "datasourceScopeViolation": "The selected Data pool is not compatible with the Data sources used by this Dataset. One or more Data sources are not approved for the selected Data pool."
     },
     "warningModal": {
       "title": "Delete Dataset?",

@@ -33,7 +33,9 @@ export const isPermissionsError = (error: unknown) => {
 
 export const isDatapoolScopeViolationError = (error: unknown) => {
   if (!isAxiosError(error)) return false
-  return error.status === 422
+  if (error.status !== 422 || !error.response) return false
+  const apiError = error.response.data as ApiError
+  return typeof apiError?.type === 'string' && apiError.type.endsWith('DATASOURCE_SCOPE_VIOLATION')
 }
 
 export const isLayerNameError = (error: unknown) => {

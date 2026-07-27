@@ -1350,7 +1350,10 @@ describe('PipelineEditorProviderComponent', () => {
           statusText: 'Unprocessable Entity',
           headers: new AxiosHeaders(),
           config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
-          data: { detail: 'DataSource "My DS" is not permitted for this datapool' },
+          data: {
+            detail: 'DataSource "My DS" is not permitted for this datapool',
+            type: 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
+          },
         },
       )
       mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
@@ -1376,7 +1379,10 @@ describe('PipelineEditorProviderComponent', () => {
           statusText: 'Unprocessable Entity',
           headers: new AxiosHeaders(),
           config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
-          data: { detail: 'DataSource "My DS" is not permitted for this datapool' },
+          data: {
+            detail: 'DataSource "My DS" is not permitted for this datapool',
+            type: 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
+          },
         },
       )
       mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
