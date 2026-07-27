@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -989,8 +990,33 @@ class DataSourceServiceTest {
     }
 
     @Test
-    @DisplayName("Should reject changing DSV on AVAILABLE data source")
-    void shouldRejectChangingDsvWhenAvailable() {
+    @DisplayName("Should reject changing DSV on an in-use AVAILABLE data source")
+    void shouldRejectChangingDsvWhenAvailableAndInUse() {
+      UUID id = UUID.randomUUID();
+      DataStructureVersion existingDsv = createDataStructureVersion();
+
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setConnectorType(ConnectorType.MQTT);
+      entity.setDataStructureVersion(existingDsv);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("updated");
+      input.setConnectorType(ConnectorType.MQTT);
+      input.setDataStructureVersionId(UUID.randomUUID());
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(true);
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("data structure version");
+    }
+
+    @Test
+    @DisplayName("Should reject changing DSV on an AVAILABLE data source via the generic route")
+    void shouldRejectChangingDsvWhenAvailableViaGenericUpdate() {
       UUID id = UUID.randomUUID();
       DataStructureVersion existingDsv = createDataStructureVersion();
 
@@ -1009,31 +1035,7 @@ class DataSourceServiceTest {
 
       assertThatThrownBy(() -> dataSourceService.update(id, input))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("Cannot change data structure version");
-    }
-
-    @Test
-    @DisplayName("Should reject removing DSV from AVAILABLE data source")
-    void shouldRejectRemovingDsvWhenAvailable() {
-      UUID id = UUID.randomUUID();
-      DataStructureVersion existingDsv = createDataStructureVersion();
-
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      entity.setConnectorType(ConnectorType.MQTT);
-      entity.setDataStructureVersion(existingDsv);
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("updated");
-      input.setConnectorType(ConnectorType.MQTT);
-      input.setDataStructureVersionId(null);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-
-      assertThatThrownBy(() -> dataSourceService.update(id, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("Cannot remove data structure version");
+          .hasMessageContaining("can only be updated in DRAFT status");
     }
 
     @Test
@@ -1075,8 +1077,8 @@ class DataSourceServiceTest {
   class UpdateTests {
 
     @Test
-    @DisplayName("Should prevent changing connector type of AVAILABLE data source")
-    void shouldPreventChangingConnectorTypeWhenAvailable() {
+    @DisplayName("Should prevent changing connector type of an in-use AVAILABLE data source")
+    void shouldPreventChangingConnectorTypeWhenAvailableAndInUse() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -1088,10 +1090,58 @@ class DataSourceServiceTest {
       input.setConnectorType(ConnectorType.SQL);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(true);
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("connector type");
+    }
+
+    @Test
+    @DisplayName("Should reject the generic update route for an AVAILABLE data source")
+    void shouldRejectGenericUpdateWhenAvailable() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("updated");
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
       assertThatThrownBy(() -> dataSourceService.update(id, input))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("connector type");
+          .hasMessageContaining("can only be updated in DRAFT status");
+
+      verify(dataSourceRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should reject narrowing the datapool scope of an AVAILABLE source via update")
+    void shouldRejectScopeNarrowingViaGenericUpdate() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setDatapoolScopeType(DatapoolScopeType.ALL);
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.NONE);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("updated");
+      input.setDatapoolScope(scope);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+
+      assertThatThrownBy(() -> dataSourceService.update(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("can only be updated in DRAFT status");
+
+      // The scope must not have been applied before the guard rejected the call.
+      assertThat(entity.getDatapoolScopeType()).isEqualTo(DatapoolScopeType.ALL);
+      verify(dataSourceRepository, never()).save(any());
     }
 
     @Test

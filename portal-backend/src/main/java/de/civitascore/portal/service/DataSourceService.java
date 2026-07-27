@@ -100,6 +100,34 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   }
 
   /**
+   * Restricts the generic CRUD update to DRAFT data sources. A released (AVAILABLE) data source may
+   * only be changed through {@link #updateReleasedMeta(UUID, DataSourceInputDTO)}, which is the
+   * single point that enforces the in-use constraints and re-asserts the DataSource→DataPool scope
+   * rule for the datasets the source already feeds. Without this restriction the generic route
+   * would reach {@link #postConvertToEntity} — which applies a new datapool scope unconditionally —
+   * and silently bypass both guards.
+   *
+   * @param id the data source ID
+   * @param input the update input
+   * @return the updated data source
+   * @throws InvalidInputException if the data source is not in DRAFT status
+   */
+  @Override
+  @Transactional
+  public DataSource update(UUID id, DataSourceInputDTO input) {
+    DataSource existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataSourceStatus() != DataSourceStatus.DRAFT) {
+      throw new InvalidInputException(
+          getEntityName(),
+          id,
+          "DataSource can only be updated in DRAFT status, current status: "
+              + existingEntity.getDataSourceStatus()
+              + ". Use the released metadata endpoint instead.");
+    }
+    return super.update(id, input);
+  }
+
+  /**
    * Links the data structure version to the data source after DTO-to-entity conversion. Validates
    * that the referenced version is in AVAILABLE status and its parent data structure is also
    * AVAILABLE.
