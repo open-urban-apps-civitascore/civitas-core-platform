@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.apisix;
 
 import jakarta.ws.rs.core.Response;
+import java.util.regex.Pattern;
 
 /**
  * Recognizes the APISIX Admin API's "upstream still referenced by a route" rejection.
@@ -25,15 +26,16 @@ import jakarta.ws.rs.core.Response;
 final class UpstreamReferenceCheck {
 
   /**
-   * Markers in the Admin API's 400 body. The message is {@code <kind> [<id>] is still using it now}
-   * for any referencing kind (route, service, plugin_config, consumer, ...), so both markers are
-   * required: only a route reference is cache lag, and a service or plugin_config reference is
-   * static configuration that waiting never clears. {@code route [} also matches {@code plugin in
-   * route [...]}.
+   * The rejection as the Admin API words it: {@code <kind> [<id>] is still using it now}, also
+   * reached as {@code plugin in <kind> [<id>] ...}. Matching the message is the only option — the
+   * Admin API reports failures as an {@code error_msg} string with no machine-readable code.
+   *
+   * <p>Pinning {@code route} inside the pattern is what makes the match correct, not just precise:
+   * the same wording covers service, plugin_config and consumer references, and those are static
+   * configuration that waiting never clears, so they must not be mistaken for cache lag.
    */
-  private static final String STILL_REFERENCED = "is still using it now";
-
-  private static final String ROUTE_REFERENCE = "route [";
+  private static final Pattern ROUTE_STILL_REFERENCING =
+      Pattern.compile("route \\[[^\\]]*\\] is still using it now");
 
   private UpstreamReferenceCheck() {}
 
@@ -41,7 +43,6 @@ final class UpstreamReferenceCheck {
   static boolean isStaleRouteReference(int status, String body) {
     return status == Response.Status.BAD_REQUEST.getStatusCode()
         && body != null
-        && body.contains(STILL_REFERENCED)
-        && body.contains(ROUTE_REFERENCE);
+        && ROUTE_STILL_REFERENCING.matcher(body).find();
   }
 }
