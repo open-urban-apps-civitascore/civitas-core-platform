@@ -13,13 +13,12 @@ import org.springframework.stereotype.Component;
  * whose datapool it is scoped for. This is an access-control guard, not mere data hygiene — a
  * DataPool is an assignment scope ({@code ScopeType.DATAPOOL}), so the pool a dataset sits in
  * decides which users' grants can reach the data flowing through it. Letting a DataSource enter a
- * pool it is not scoped for would widen that data's audience to grants it was never meant for.
- * Unlike {@code ScopeAccessAuthorizer} (which authorizes the caller of a request), this guards the
- * data relationship regardless of who establishes it.
+ * pool it is not scoped for would widen that data's audience to grants it was never meant for. The
+ * guard applies to the data relationship itself, regardless of who establishes it — it is not an
+ * authorization check on the caller of a request.
  *
  * <p>It is the single source of truth for the rule, shared by every path that can establish or
- * invalidate the relationship — a pipeline write, a dataset's datapool switch, and a narrowing of a
- * DataSource's own scope.
+ * invalidate the relationship.
  */
 @Component
 public class DataSourceDatapoolScopeValidator {
