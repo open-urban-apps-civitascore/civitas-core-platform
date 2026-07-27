@@ -491,6 +491,9 @@
               },
               "persistence": {
                 "required": "Persistenz ist erforderlich"
+              },
+              "title": {
+                "tooLong": "Titel darf maximal 80 Zeichen lang sein"
               }
             }
           }

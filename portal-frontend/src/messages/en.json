@@ -492,6 +492,9 @@
               },
               "persistence": {
                 "required": "Persistence is required"
+              },
+              "title": {
+                "tooLong": "Title must be at most 80 characters"
               }
             }
           }

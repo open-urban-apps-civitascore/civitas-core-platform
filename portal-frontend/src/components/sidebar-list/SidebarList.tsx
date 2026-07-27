@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 export type SidebarListItem = {
@@ -28,20 +29,25 @@ export const SidebarList = ({
 }: SidebarListProps) => {
   return (
     <div className="flex w-52 shrink-0 flex-col gap-2 mt-6">
-      <ul className="flex flex-col gap-1">
+      <ul className="flex flex-col gap-2">
         {items.map((item, index) => (
           <li key={item.value}>
-            <button
-              type="button"
-              onClick={() => onSelectItem(index)}
-              className={cn(
-                'w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm hover:bg-accent',
-                selectedItemIndex === index && 'bg-accent font-medium',
-                item.hasError && 'text-destructive',
-              )}
-            >
-              {item.displayTitle}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => onSelectItem(index)}
+                  className={cn(
+                    'w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm hover:bg-accent line-clamp-2 max-h-14 overflow-hidden',
+                    selectedItemIndex === index && 'bg-accent font-medium',
+                    item.hasError && 'text-destructive',
+                  )}
+                >
+                  {item.displayTitle}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent variant="secondary">{item.displayTitle}</TooltipContent>
+            </Tooltip>
           </li>
         ))}
       </ul>
