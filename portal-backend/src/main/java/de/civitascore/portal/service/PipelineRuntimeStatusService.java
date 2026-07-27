@@ -7,7 +7,7 @@ import de.civitascore.portal.model.entity.PipelineRuntimeStatus;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.PipelineRuntimeStatusRepository;
 import java.time.Instant;
-import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -83,7 +83,7 @@ public class PipelineRuntimeStatusService {
    *     are skipped
    */
   @Transactional
-  public void markDeploymentSucceeded(Collection<String> pipelineIds) {
+  public void markDeploymentSucceeded(List<String> pipelineIds) {
     if (pipelineIds == null) {
       return;
     }
