@@ -1184,8 +1184,10 @@ class ApisixSagaHandlerTest {
                     "DELETE_ROUTE",
                     payload));
 
-        // A reference that outlives the retry budget is a genuine dangling route, not a cache lag.
+        // A reference that outlives the retry budget is surfaced, not waited out.
         assertEquals("STEP_FAILED", result.type());
+        // 1 route + exactly 3 upstream attempts: pins the budget, which STEP_FAILED alone does not.
+        verify(mockBuilder, times(4)).delete();
       }
     }
 

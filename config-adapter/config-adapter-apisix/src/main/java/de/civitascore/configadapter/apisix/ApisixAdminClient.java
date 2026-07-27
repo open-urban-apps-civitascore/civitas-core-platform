@@ -106,8 +106,9 @@ final class ApisixAdminClient {
 
   /**
    * See {@link #delete(String, String)}, plus a bounded retry while the gateway still reports a
-   * stale route reference ({@link UpstreamReferenceCheck}). A reference that outlives the budget is
-   * a real dangling route, not cache lag, and still fails the step.
+   * stale route reference ({@link UpstreamReferenceCheck}): three attempts give the route cache
+   * ~750ms to catch up. A reference still reported after that is surfaced rather than waited out,
+   * since a route outliving its dataset must not be hidden by retrying longer.
    */
   boolean deleteUpstream(String upstreamId, String operationDesc) {
     for (int attempt = 1; ; attempt++) {
@@ -134,9 +135,8 @@ final class ApisixAdminClient {
           interruptedWhileWaiting = true;
         }
         if (interruptedWhileWaiting) {
-          // Stop retrying, but surface the gateway rejection rather than the interruption: the
-          // failed delete is what the saga needs to see, and it names the referencing route. The
-          // interruption rides along as a suppressed cause.
+          // Surface the gateway rejection, not the interruption: it names the referencing route,
+          // which is what the saga needs. The interruption rides along as a suppressed cause.
           throw ex;
         }
       }

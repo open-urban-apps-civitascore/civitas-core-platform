@@ -40,9 +40,8 @@ script:pre-request {
     '&username=' + encodeURIComponent(bru.getEnvVar('username')) +
     '&password=' + encodeURIComponent(bru.getEnvVar('password'));
 
-  // Fail loudly if readiness can't be proven: without a token every poll below 401s, `pending`
-  // never leaves its sentinel, and the loop would fall through as if the saga had settled —
-  // sending the PUT into the 409 race this guard exists to remove.
+  // Fail loudly if readiness can't be proven — otherwise every poll below 401s, `pending` never
+  // leaves its sentinel, and the PUT hits the very 409 race this guard exists to remove.
   let bearer = '';
   try {
     const tok = await axios.post(`${kc}/realms/${realm}/protocol/openid-connect/token`, form, {

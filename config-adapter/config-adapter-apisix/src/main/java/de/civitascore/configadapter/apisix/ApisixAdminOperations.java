@@ -167,7 +167,11 @@ final class ApisixAdminOperations {
       // Not a client error: the referencing route may already be deleted and merely still visible
       // in the gateway's route cache. Retryable so the framework's backoff re-attempts it, rather
       // than DLQ-ing the delete and leaving the upstream orphaned.
-      LOG.warn("APISIX upstream still referenced by a route during {}", operation.getDescription());
+      LOG.warn(
+          "APISIX upstream still referenced by a route during {}: {} {}",
+          operation.getDescription(),
+          status,
+          Encode.forJava(body));
       throw new RetryableAdapterException(
           AdapterErrorCode.SERVICE_UNAVAILABLE, ApisixAdapter.ADAPTER_NAME, status);
     }

@@ -24,8 +24,16 @@ import jakarta.ws.rs.core.Response;
  */
 final class UpstreamReferenceCheck {
 
-  /** Marker in the Admin API's 400 body identifying the rejection. */
-  private static final String STALE_ROUTE_REFERENCE = "is still using it now";
+  /**
+   * Markers in the Admin API's 400 body. The message is {@code <kind> [<id>] is still using it now}
+   * for any referencing kind (route, service, plugin_config, consumer, ...), so both markers are
+   * required: only a route reference is cache lag, and a service or plugin_config reference is
+   * static configuration that waiting never clears. {@code route [} also matches {@code plugin in
+   * route [...]}.
+   */
+  private static final String STILL_REFERENCED = "is still using it now";
+
+  private static final String ROUTE_REFERENCE = "route [";
 
   private UpstreamReferenceCheck() {}
 
@@ -33,6 +41,7 @@ final class UpstreamReferenceCheck {
   static boolean isStaleRouteReference(int status, String body) {
     return status == Response.Status.BAD_REQUEST.getStatusCode()
         && body != null
-        && body.contains(STALE_ROUTE_REFERENCE);
+        && body.contains(STILL_REFERENCED)
+        && body.contains(ROUTE_REFERENCE);
   }
 }

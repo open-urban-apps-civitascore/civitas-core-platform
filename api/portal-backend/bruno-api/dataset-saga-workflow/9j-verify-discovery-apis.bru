@@ -29,9 +29,8 @@ script:pre-request {
     `client_secret=${encodeURIComponent(bru.getEnvVar('clientSecret') || '')}`,
   ].join('&');
 
-  // The token fetch is retried and its failure is fatal. Letting it fall through would leave
-  // accessToken empty, skip every poll iteration, and expose the assertions to the exact OPA
-  // propagation race this guard exists to absorb — silently, as if readiness had been proven.
+  // Fail loudly if no token can be obtained — otherwise the poll below is skipped entirely and
+  // the assertions run straight into the OPA propagation race this guard exists to absorb.
   let accessToken = '';
   for (let i = 0; i < 3 && !accessToken; i++) {
     try {
@@ -47,10 +46,8 @@ script:pre-request {
     throw new Error('Discovery readiness token fetch failed — refusing to assert without a proven-ready endpoint');
   }
 
-  // Poll until discovery is authorized. Each attempt is individually guarded: the QuickJS sandbox
-  // does not honour a validateStatus function across the VM boundary, so a 401/403 rejects the
-  // promise rather than returning a status — an unguarded call would abort the loop on the first
-  // transient denial.
+  // Guard each attempt separately: the QuickJS sandbox does not honour validateStatus across the
+  // VM boundary, so a 401/403 rejects the promise and would otherwise abort the whole loop.
   let authorized = false;
   for (let i = 0; i < 15 && !authorized; i++) {
     try {
