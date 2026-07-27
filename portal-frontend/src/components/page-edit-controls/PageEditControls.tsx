@@ -22,6 +22,7 @@ type PageEditControlsProps<T extends StatusTypes> = ActionButtonsProps & {
   statusOptions: T[]
   canEdit?: boolean
   statusHint?: string
+  availableHint?: string
 }
 
 const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>): JSX.Element => {
@@ -40,6 +41,7 @@ const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>
     statusOptions,
     canEdit = true,
     statusHint,
+    availableHint,
     ...actionButtonsProps
   } = props
 
@@ -61,6 +63,7 @@ const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>
         canRelease={canRelease}
         isReadOnly={isReadOnly}
         statusHint={statusHint}
+        availableHint={availableHint}
       />
 
       <div>

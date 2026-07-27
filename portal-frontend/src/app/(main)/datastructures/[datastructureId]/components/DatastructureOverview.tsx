@@ -107,8 +107,9 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     canSetDraft,
     setSelectedTab,
     statusHint,
+    statusAvailableHint,
     datastructureStatus,
-  } = useDatastructure({ datastructure, assignedGroups, initialAssignments })
+  } = useDatastructure({ datastructure, assignedGroups, initialAssignments, canRelease })
 
   const hasUnsavedChanges = datastructureForm.formState.isDirty || areAssignmentsDirty
 
@@ -196,6 +197,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             canStage={canStage}
             canRelease={canRelease}
             statusHint={statusHint}
+            availableHint={statusAvailableHint}
             confirmButtonType="button"
             onConfirmClick={handleSave}
             isConfirmButtonDisabled={isConfirmButtonDisabled}

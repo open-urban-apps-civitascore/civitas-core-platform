@@ -109,7 +109,8 @@
       "updateSuccess": "{item} has been successfully updated",
       "updateError": "An error occurred while updating {item}.",
       "createSuccess": "{item} has been successfully created",
-      "deleteSuccess": "{item} has been successfully deleted"
+      "deleteSuccess": "{item} has been successfully deleted",
+      "releasePermissionRequiredHint": "The Release permission is required. Contact a Data Owner."
     },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",

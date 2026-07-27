@@ -405,6 +405,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       statusOptions={Object.values(DATASET_STATUS_TYPES)}
       canStage={canStage}
       canRelease={canRelease}
+      availableHint={!canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined}
       confirmButtonType="submit"
       formId="dataset-form"
       isConfirmButtonDisabled={!hasUnsavedChanges || isLoading}

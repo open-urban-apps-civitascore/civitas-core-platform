@@ -38,9 +38,15 @@ interface UseDatastructureProps {
   datastructure: Datastructure
   assignedGroups: GroupRoleAssignmentTable[]
   initialAssignments: GroupRoleAssignmentTable[]
+  canRelease: boolean
 }
 
-export const useDatastructure = ({ datastructure, assignedGroups, initialAssignments }: UseDatastructureProps) => {
+export const useDatastructure = ({
+  datastructure,
+  assignedGroups,
+  initialAssignments,
+  canRelease,
+}: UseDatastructureProps) => {
   const router = useRouter()
   const queryClient = useQueryClient()
   const t = useTranslations('datastructures')
@@ -224,7 +230,8 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     form.reset(defaultValues)
   }
 
-  const statusHint = !canSetDraft ? t('messages.isInUseStatusHint') : undefined
+  const statusDraftHint = !canSetDraft ? t('messages.isInUseStatusHint') : undefined
+  const statusAvailableHint = !canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined
 
   const isConfirmButtonDisabled = useMemo(
     () =>
@@ -244,7 +251,8 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     isConfirmButtonDisabled,
     isLoading,
     saveDatastructure,
-    statusHint,
+    statusHint: statusDraftHint,
+    statusAvailableHint,
     datastructureStatus,
     selectedTab,
     handleStatusChange,
