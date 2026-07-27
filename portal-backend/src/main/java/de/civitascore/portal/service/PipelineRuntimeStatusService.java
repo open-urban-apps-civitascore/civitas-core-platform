@@ -95,16 +95,17 @@ public class PipelineRuntimeStatusService {
         log.warn("Ignoring malformed pipeline id in saga result: {}", Encode.forJava(pipelineId));
         continue;
       }
-      apply(
-          id,
-          PipelineRuntimeState.OK,
-          PipelineRuntimeSource.DEPLOYMENT,
-          null,
-          null,
-          null,
-          null,
-          null);
+      applyPlainStatus(id, PipelineRuntimeState.OK, PipelineRuntimeSource.DEPLOYMENT);
     }
+  }
+
+  /**
+   * Replaces any existing status with a fresh state/source record carrying no error detail, so a
+   * message, stacktrace or correlation left by an earlier status does not survive the new one.
+   */
+  private void applyPlainStatus(
+      UUID pipelineId, PipelineRuntimeState state, PipelineRuntimeSource source) {
+    apply(pipelineId, state, source, null, null, null, null, null);
   }
 
   private static String sanitize(String value) {
