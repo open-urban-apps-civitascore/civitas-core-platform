@@ -18,33 +18,52 @@ script:pre-request {
   const apiUrl = bru.getEnvVar('apisixApiUrl');
   const datasetId = bru.getVar('sagaDataSetId');
 
-  try {
-    const tokenUrl = `${bru.getEnvVar('keycloakUrl')}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`;
-    // Build the form body by hand: the Bruno CLI runs scripts in a QuickJS sandbox that has no
-    // URLSearchParams. encodeURIComponent is standard ECMAScript and is available.
-    const form = [
-      'grant_type=password',
-      `username=${encodeURIComponent(bru.getEnvVar('username'))}`,
-      `password=${encodeURIComponent(bru.getEnvVar('password'))}`,
-      `client_id=${encodeURIComponent(bru.getEnvVar('clientId'))}`,
-      `client_secret=${encodeURIComponent(bru.getEnvVar('clientSecret') || '')}`,
-    ].join('&');
-    const tokenResp = await axios.post(tokenUrl, form, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      validateStatus: () => true,
-    });
-    const accessToken = tokenResp.data && tokenResp.data.access_token;
+  // Build the form body by hand: the Bruno CLI runs scripts in a QuickJS sandbox that has no
+  // URLSearchParams. encodeURIComponent is standard ECMAScript and is available.
+  const tokenUrl = `${bru.getEnvVar('keycloakUrl')}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`;
+  const form = [
+    'grant_type=password',
+    `username=${encodeURIComponent(bru.getEnvVar('username'))}`,
+    `password=${encodeURIComponent(bru.getEnvVar('password'))}`,
+    `client_id=${encodeURIComponent(bru.getEnvVar('clientId'))}`,
+    `client_secret=${encodeURIComponent(bru.getEnvVar('clientSecret') || '')}`,
+  ].join('&');
 
-    for (let i = 0; accessToken && i < 15; i++) {
-      const resp = await axios.get(`${apiUrl}/v1/datasets/${datasetId}/apis`, {
-        headers: { Authorization: `Bearer ${accessToken}`, 'X-Allowed-Scope-Ids': '*' },
-        validateStatus: () => true,
+  // Fail loudly if no token can be obtained — otherwise the poll below is skipped entirely and
+  // the assertions run straight into the OPA propagation race this guard exists to absorb.
+  let accessToken = '';
+  for (let i = 0; i < 3 && !accessToken; i++) {
+    try {
+      const tokenResp = await axios.post(tokenUrl, form, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: 10000,
       });
-      if (resp.status === 200) break;
-      await bru.sleep(2000);
+      accessToken = tokenResp.data && tokenResp.data.access_token;
+    } catch (e) {
+      await new Promise(res => setTimeout(res, 1000));
     }
-  } catch (e) {
-    // Best-effort readiness wait; the request below still runs with its own inherited auth.
+  }
+  if (!accessToken) {
+    throw new Error('Discovery readiness token fetch failed — refusing to assert without a proven-ready endpoint');
+  }
+
+  // Guard each attempt separately: the QuickJS sandbox does not honour validateStatus across the
+  // VM boundary, so a 401/403 rejects the promise and would otherwise abort the whole loop.
+  let authorized = false;
+  for (let i = 0; i < 15 && !authorized; i++) {
+    try {
+      const resp = await axios.get(`${apiUrl}/v1/datasets/${datasetId}/apis`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: 10000,
+      });
+      authorized = resp.status === 200;
+    } catch (e) { /* transient 401/403 while OPA data propagates; retry */ }
+    if (!authorized) {
+      await new Promise(res => setTimeout(res, 2000));
+    }
+  }
+  if (!authorized) {
+    throw new Error('Discovery endpoint never became authorized within 30s — OPA authorization did not propagate');
   }
 }
 
