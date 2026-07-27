@@ -59,4 +59,18 @@ class KafkaEventConfigTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("brotli");
   }
+
+  @Test
+  @DisplayName("validation checks the codec the producer actually uses (properties map wins)")
+  void validationHonoursProducerPropertiesPrecedence() {
+    KafkaProperties properties = new KafkaProperties();
+    properties.getProducer().setCompressionType("lz4");
+    properties.getProducer().getProperties().put("compression.type", "brotli");
+
+    // The bean would be built with the invalid map value, so validation must reject it at boot
+    // rather than passing on the valid typed field and failing later at the first send().
+    assertThatThrownBy(() -> new KafkaEventConfig(properties).validateCompressionType())
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("brotli");
+  }
 }
