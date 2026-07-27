@@ -45,11 +45,13 @@ public interface PipelineRepository extends NamedEntityRepository<Pipeline, UUID
    * Find every pipeline referencing the given datasource, with each pipeline's parent dataset, that
    * dataset's datapool, and the datasource set eagerly fetched — so the DataPool scope rule can be
    * re-validated across all datasets a datasource feeds when the datasource's own scope is
-   * narrowed, without a lazy-load per pipeline.
+   * narrowed, without a lazy-load per pipeline. {@code runtimeStatus} is fetched too: it is the
+   * parent side of a {@code @OneToOne} and therefore eager regardless, so leaving it out of the
+   * graph would cost one extra select per hydrated pipeline.
    *
    * @param dataSourceId the datasource ID
    * @return the referencing pipelines
    */
-  @EntityGraph(attributePaths = {"dataSet", "dataSet.dataPool", "dataSources"})
+  @EntityGraph(attributePaths = {"dataSet", "dataSet.dataPool", "dataSources", "runtimeStatus"})
   List<Pipeline> findByDataSourcesId(UUID dataSourceId);
 }
