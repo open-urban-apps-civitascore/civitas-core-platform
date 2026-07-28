@@ -1,6 +1,7 @@
 package de.civitascore.portal.repository.specification;
 
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.base.BaseEntity;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
@@ -54,13 +55,54 @@ public final class ScopeFilteringSpecification {
    * @return specification combining both access paths
    */
   public static Specification<DataSet> dataSetByScopeOrPool(Set<UUID> scopeIds, Set<UUID> poolIds) {
+    return scopeOrPool(
+        scopeIds, poolIds, (root, query, cb) -> root.get("dataPool").get("id").in(poolIds));
+  }
+
+  /**
+   * Filter data sources by directly scoped IDs OR by assignment to an authorized datapool.
+   *
+   * <p>The pool branch matches the data sources <em>assigned</em> to an authorized pool. An
+   * unrestricted data source is assigned to no pool in particular and is therefore not reached this
+   * way — only through a direct scope id.
+   *
+   * <p>The scoped-pool membership test is a correlated EXISTS subquery rather than a join, so a
+   * data source confined to several authorized pools still yields a single row in paginated
+   * results.
+   *
+   * <p>When neither set has entries the caller can see nothing, so a match-nothing disjunction is
+   * returned (fail-secure, consistent with {@link #baseEntityById}).
+   *
+   * @param scopeIds directly authorized data source IDs (may be empty)
+   * @param poolIds authorized datapool IDs whose data sources are visible (may be empty)
+   * @return specification combining both access paths
+   */
+  public static Specification<DataSource> dataSourceByScopeOrPool(
+      Set<UUID> scopeIds, Set<UUID> poolIds) {
+    return scopeOrPool(
+        scopeIds,
+        poolIds,
+        (root, query, cb) ->
+            DataSourceDatapoolUsability.confinedToAnyPool(root, query, cb, poolIds));
+  }
+
+  /**
+   * Combines the direct-scope branch with an entity-specific pool branch, ORed.
+   *
+   * <p>Holds the fail-secure default in one place: a caller with neither scope IDs nor pool IDs can
+   * see nothing, so an empty match is returned rather than an unfiltered query.
+   *
+   * @param poolBranch how this entity type relates to an authorized datapool
+   */
+  private static <E extends BaseEntity> Specification<E> scopeOrPool(
+      Set<UUID> scopeIds, Set<UUID> poolIds, Specification<E> poolBranch) {
     return (root, query, cb) -> {
       List<Predicate> orPredicates = new ArrayList<>();
       if (scopeIds != null && !scopeIds.isEmpty()) {
         orPredicates.add(root.get("id").in(scopeIds));
       }
       if (poolIds != null && !poolIds.isEmpty()) {
-        orPredicates.add(root.get("dataPool").get("id").in(poolIds));
+        orPredicates.add(poolBranch.toPredicate(root, query, cb));
       }
       if (orPredicates.isEmpty()) {
         return cb.disjunction();

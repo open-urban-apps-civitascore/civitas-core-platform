@@ -286,12 +286,12 @@ scope_has_permission(perm, target_scope_id) if {
 	assignment.scopeId == target_scope_id
 }
 
-# DATAPOOL scope IDs the user may use for the dataset COLLECTION (Epic 1 union).
+# DATAPOOL scope IDs the user may use for the requested route.
 # Single source of truth: permission_eval.qualifying_datapool_ids (a pool must
 # carry ALL required permissions), so the X-Allowed-Pool-Ids header and the
-# allow-decision can never diverge. The backend ORs these into its list filter
-# (datapool_id IN (...)), so OPA passes only the small set of granted pool ids —
-# never an enumerated list of dataset ids.
+# allow-decision can never diverge. The backend ORs these into its filter, so OPA
+# passes only the small set of granted pool ids — never an enumerated list of
+# entity ids. Covers dataset and data source routes, collection and resource alike.
 allowed_pool_ids := permission_eval.qualifying_datapool_ids
 
 # Generate the header value based on user's scopes
@@ -308,9 +308,9 @@ allowed_scope_ids_header := concat(",", sort(specific_scope_ids)) if {
 	count(specific_scope_ids) > 0
 }
 
-# X-Allowed-Pool-Ids header (Epic 1 union, collection filtering).
-# Present only when the user has dataset-relevant DATAPOOL grants; the backend
-# ORs it into the collection filter as `datapool_id IN (<ids>)`. Built as a
+# X-Allowed-Pool-Ids header (Epic 1 union).
+# Present only when the user has DATAPOOL grants relevant to the requested route;
+# the backend ORs it into its scope filter. Built as a
 # separate object so the header is OMITTED ENTIRELY when there are no pool grants.
 # This omission is security-relevant: emitting an empty "X-Allowed-Pool-Ids: ""
 # instead would cause AllowedScopesFilter to mark the request scoped, flipping a

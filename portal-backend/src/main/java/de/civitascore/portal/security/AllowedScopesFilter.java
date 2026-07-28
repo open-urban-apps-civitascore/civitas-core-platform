@@ -36,7 +36,7 @@ public class AllowedScopesFilter extends OncePerRequestFilter {
   /** Header name set by OPA via APISIX send_headers_upstream. */
   public static final String HEADER_NAME = "X-Allowed-Scope-Ids";
 
-  /** Datapool header set by OPA for dataset collection filtering (Epic 1 union). */
+  /** Datapool header set by OPA for pool-inherited filtering, on collection and single reads. */
   public static final String HEADER_NAME_POOL = "X-Allowed-Pool-Ids";
 
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;

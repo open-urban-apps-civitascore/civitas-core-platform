@@ -180,6 +180,47 @@ test_and_permission_split_across_pools_denied if {
 	result.reason == "permission_denied"
 }
 
+# The same invariant on a COLLECTION route, where the qualifying-pool set both decides and
+# populates X-Allowed-Pool-Ids. The route is synthesized because the shipped collection
+# endpoints each require a single permission; a pool carrying one of two must neither grant
+# nor reach the header, or the backend would filter on an over-broad set.
+and_permission_collection := {"_collection": true, "GET": ["DATASET_READ", "DATASET_RELEASE"]}
+
+# pool-a carries READ, pool-b carries RELEASE — each one of the two the route requires.
+mock_collection_split(req) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASET_READ"], "scope_type": "DATAPOOL", "scope_id": "pool-a"},
+	{"perms": ["DATASET_RELEASE"], "scope_type": "DATAPOOL", "scope_id": "pool-b"},
+])} if {
+	contains(req.url, "user-context")
+}
+
+test_and_permission_split_across_pools_denied_on_collection if {
+	result := authz.decision with http.send as mock_collection_split
+		with data.config as mock_http.mock_config
+		with data.backends.portal_backend.endpoints["/v1/datasets"] as and_permission_collection
+		with input as portal_request("GET", "/v1/datasets")
+	result.allow == false
+	not result.headers["X-Allowed-Pool-Ids"]
+}
+
+# ... while one pool carrying BOTH permissions grants and reaches the header.
+mock_pool_union(req) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([{
+	"perms": ["DATASET_READ", "DATASET_RELEASE"],
+	"scope_type": "DATAPOOL",
+	"scope_id": "pool-a",
+}])} if {
+	contains(req.url, "user-context")
+}
+
+test_and_permission_in_one_pool_granted_on_collection if {
+	result := authz.decision with http.send as mock_pool_union
+		with data.config as mock_http.mock_config
+		with data.backends.portal_backend.endpoints["/v1/datasets"] as and_permission_collection
+		with input as portal_request("GET", "/v1/datasets")
+	result.allow == true
+	result.headers["X-Allowed-Pool-Ids"] == "pool-a"
+}
+
 # =============================================================================
 # 6. MALFORMED X-USERINFO FAILS SECURE
 # =============================================================================
