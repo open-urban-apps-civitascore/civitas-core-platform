@@ -82,16 +82,16 @@ public final class MappingNodeType implements TransformNodeType {
       }
       List<MappingConfig> intermediate = mappingConfigs.subList(0, mappingConfigs.size() - 1);
       for (MappingConfig config : intermediate) {
-        units.add(new CompiledMapping(recordPathCompiler.compile(config, sink.geometryEncoding())));
+        units.add(recordPathCompiler.compile(config, sink.geometryEncoding()));
       }
       FrostMappingCompiler.FrostCompilation compilation =
           frostMappingCompiler.compile(
               mappingConfigs.get(mappingConfigs.size() - 1), frost.staProperties());
-      units.add(new CompiledMapping(compilation.flatProperties()));
+      units.add(new CompiledMapping(compilation.flatProperties(), compilation.fork()));
       return new Compilation(units, compilation.plan());
     }
     for (MappingConfig config : mappingConfigs) {
-      units.add(new CompiledMapping(recordPathCompiler.compile(config, sink.geometryEncoding())));
+      units.add(recordPathCompiler.compile(config, sink.geometryEncoding()));
     }
     return new Compilation(units, null);
   }

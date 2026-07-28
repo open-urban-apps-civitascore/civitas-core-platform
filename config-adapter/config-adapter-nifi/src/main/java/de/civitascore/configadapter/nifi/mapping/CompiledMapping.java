@@ -18,8 +18,11 @@ import java.util.List;
  * compiled properties separate so the processors materialize per node, in flow order.
  *
  * @param properties the node's {@code UpdateRecord} properties, in mapping order
+ * @param fork the array fan-out this node needs ahead of its own properties; the properties are
+ *     already compiled against the post-fork record shape
  */
-public record CompiledMapping(List<UpdateRecordProperty> properties) implements CompiledTransform {
+public record CompiledMapping(List<UpdateRecordProperty> properties, ForkPlan fork)
+    implements CompiledTransform {
   public CompiledMapping {
     properties = List.copyOf(properties);
   }

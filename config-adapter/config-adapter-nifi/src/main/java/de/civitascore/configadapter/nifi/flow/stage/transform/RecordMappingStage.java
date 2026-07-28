@@ -34,6 +34,15 @@ public final class RecordMappingStage implements TransformStage {
 
   private static final String STRATEGY_PROPERTY = "Replacement Value Strategy";
 
+  /**
+   * ForkRecord takes the fork target as a dynamic property whose VALUE is the RecordPath — the
+   * opposite of UpdateRecord, where the property name is the path. The name is therefore free and
+   * only needs to be stable, since it is part of the flow snapshot.
+   */
+  private static final String FORK_PATH_PROPERTY = "fan-out";
+
+  private static final String FORK_DISCRIMINATOR = "FORK";
+
   private final CompiledMapping mapping;
   private final int chainIndex;
 
@@ -59,6 +68,9 @@ public final class RecordMappingStage implements TransformStage {
       byStrategy.computeIfAbsent(property.strategy(), k -> new ArrayList<>()).add(property);
     }
     List<Processor> result = new ArrayList<>();
+    if (mapping.fork().required()) {
+      result.add(buildFork(ctx));
+    }
     for (Map.Entry<ReplacementStrategy, List<UpdateRecordProperty>> group : byStrategy.entrySet()) {
       String discriminator =
           chainIndex == 0 ? group.getKey().name() : group.getKey().name() + ":" + chainIndex;
@@ -68,6 +80,25 @@ public final class RecordMappingStage implements TransformStage {
       result.add(processor);
     }
     return new StageResult(result, result);
+  }
+
+  /**
+   * The fan-out ahead of this node's own properties: one record per source array element, so the
+   * mapping's paths — compiled against the post-fork shape — resolve element-wise.
+   *
+   * <p>Its id seed is deliberately independent of the strategy discriminators used below, so adding
+   * a fan-out to a mapping leaves the ids of the existing {@code UpdateRecord}s untouched and a
+   * redeploy still matches them to the same live NiFi components.
+   *
+   * <p>Output leaves on {@code fork}, not {@code success} — {@code original} carries the unforked
+   * input and is auto-terminated by the fragment.
+   */
+  private Processor buildFork(BuildContext ctx) throws FatalAdapterException {
+    String discriminator =
+        chainIndex == 0 ? FORK_DISCRIMINATOR : FORK_DISCRIMINATOR + ":" + chainIndex;
+    Processor fork = ctx.loadProcessor(Fragment.FORK_RECORD, "fork", discriminator);
+    BuildContext.setProp(fork, FORK_PATH_PROPERTY, mapping.fork().recordPath());
+    return fork;
   }
 
   private void applyMapping(

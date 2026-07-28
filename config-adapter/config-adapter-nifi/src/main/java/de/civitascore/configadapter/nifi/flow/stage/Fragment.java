@@ -22,6 +22,7 @@ public enum Fragment {
   QUERY_DATABASE_TABLE_RECORD("query_database_table_record"),
   CONVERT_RECORD("convert_record"),
   UPDATE_RECORD("update_record"),
+  FORK_RECORD("fork_record"),
   PUT_DATABASE_RECORD("put_database_record"),
   INVOKE_HTTP("invoke_http"),
   LOG_MESSAGE("log_message"),

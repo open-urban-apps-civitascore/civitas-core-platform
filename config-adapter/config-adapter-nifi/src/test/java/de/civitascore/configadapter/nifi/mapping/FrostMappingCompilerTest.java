@@ -85,6 +85,34 @@ class FrostMappingCompilerTest {
   }
 
   @Test
+  void anArraySourceFansOutEvenThoughEveryTargetPathCarriesEntityTierSelectors() throws Exception {
+    // Every FROST target is compiled into a flat sta_* field, so the [] in Datastreams[]/
+    // Observations[] are tier markers rather than arrays to preserve. Reading them as "the target
+    // keeps its array level" would suppress the fan-out and the compile would fail on the array
+    // source instead — the observations of one message must still explode into one record each.
+    MappingConfig mapping =
+        mapping(
+            "$.properties.reference", new CopyNode("$.ref"),
+            "$.datastreams[].properties.reference", new CopyNode("$.ref"),
+            "$.datastreams[].observations[].result",
+                new ConvertNode(
+                    ConversionOp.TO_FLOAT,
+                    new CopyNode("$.measurements[].measuredValues[].value"),
+                    null),
+            "$.datastreams[].observations[].phenomenonTime",
+                new CopyNode("$.measurements[].measuredValues[].ts"));
+
+    FrostCompilation compilation = compiler.compile(mapping, KEYS);
+
+    assertEquals("/measurements[*]/measuredValues", compilation.fork().recordPath());
+    // The array-sourced fields read the forked element directly; the root-level one stays absolute.
+    // Keyed on the rendered value rather than the flat key, whose index is an internal detail.
+    List<String> values = compilation.flatProperties().stream().map(p -> p.value()).toList();
+    assertTrue(values.contains("/ts"), "the timestamp must read the forked element: " + values);
+    assertTrue(values.contains("/ref"), "the root-level reference must stay absolute: " + values);
+  }
+
+  @Test
   void lookupOnlyThingHasNoBodyButAFilter() throws Exception {
     FrostCompilation compilation = compiler.compile(lookupOnlyWithObservationMapping(), KEYS);
 

@@ -37,8 +37,11 @@ class RecordPathCompilerTest {
 
   private List<UpdateRecordProperty> compile(String fieldsJson, GeometryEncoding encoding)
       throws Exception {
-    MappingConfig mc = parser.parse(mapper.readTree("{ \"fields\": " + fieldsJson + " }"));
-    return compiler.compile(mc, encoding);
+    return compiler.compile(parse(fieldsJson), encoding).properties();
+  }
+
+  private MappingConfig parse(String fieldsJson) throws Exception {
+    return parser.parse(mapper.readTree("{ \"fields\": " + fieldsJson + " }"));
   }
 
   private Map<String, UpdateRecordProperty> byPath(List<UpdateRecordProperty> props) {
@@ -104,6 +107,11 @@ class RecordPathCompilerTest {
 
   @Test
   void differentArrayContextsAreRejectedInsteadOfBeingPositionallyGuessed() throws Exception {
+    // The target keeps its own array level, so no fan-out applies: a fork flattens one element per
+    // record, which is precisely what a target that stays an array does not want. Pairing the two
+    // levels element-wise is not expressible either — UpdateRecord assigns a multi-value selection
+    // to every match rather than matching by position, so the result would be silently wrong data
+    // instead of an error.
     FatalAdapterException error =
         assertThrows(
             FatalAdapterException.class,
@@ -113,12 +121,88 @@ class RecordPathCompilerTest {
   }
 
   @Test
-  void arraySelectionCannotBeAssignedToAScalarTarget() throws Exception {
+  void arraySourceOnAFlatTargetFansOutAndReadsTheElementDirectly() throws Exception {
+    // An array source on a flat target is the fan-out case: an upstream ForkRecord turns each
+    // element into its own record, so the path below the array becomes a plain root-level selection
+    // — no wildcard, and no relative '../' walk, both of which would re-introduce the multi-value
+    // selection the fork exists to avoid.
+    CompiledMapping compiled =
+        compiler.compile(parse("{ \"$.name\": \"$.items[].name\" }"), GeometryEncoding.WKT);
+
+    assertEquals("/items", compiled.fork().recordPath());
+    assertEquals("/name", byPath(compiled.properties()).get("/name").value());
+  }
+
+  @Test
+  void nestedArraysOnOnePathForkTheInnermostOne() throws Exception {
+    // Two array levels on one hierarchical line are a single fan-out over the innermost array; the
+    // outer level rides along as a parent field, which is why its path also flattens to root level.
+    CompiledMapping compiled =
+        compiler.compile(
+            parse(
+                "{ \"$.station\": \"$.stations[].name\","
+                    + " \"$.value\": \"$.stations[].readings[].value\" }"),
+            GeometryEncoding.WKT);
+
+    assertEquals("/stations[*]/readings", compiled.fork().recordPath());
+    Map<String, UpdateRecordProperty> props = byPath(compiled.properties());
+    assertEquals("/name", props.get("/station").value());
+    assertEquals("/value", props.get("/value").value());
+  }
+
+  @Test
+  void anArrayTargetKeepsTheInPlaceFormAndDoesNotFanOut() throws Exception {
+    // Source and target share one array context, so the mapping rewrites fields WITHIN each element
+    // and the element count is unchanged. Forking here would flatten the array away and leave the
+    // '/items[*]/name' target pointing at nothing — the fan-out must stay limited to flat targets.
+    CompiledMapping compiled =
+        compiler.compile(
+            parse(
+                "{ \"$.stationid\": \"$.stationid\","
+                    + " \"$.items[].name\": \"$.items[].sourceName\" }"),
+            GeometryEncoding.WKT);
+
+    assertEquals(false, compiled.fork().required(), "an array-to-array mapping must not fan out");
+    assertEquals("../sourceName", byPath(compiled.properties()).get("/items[*]/name").value());
+  }
+
+  @Test
+  void anArrayOfValuesIsRejectedRatherThanFannedOutIntoNothing() throws Exception {
+    // ForkRecord's extract mode emits only RECORD elements and skips values silently — an array of
+    // scalars would deploy a flow that runs cleanly and writes nothing. Rejecting at compile time
+    // keeps that from looking like a working pipeline.
     FatalAdapterException error =
-        assertThrows(
-            FatalAdapterException.class, () -> compile("{ \"$.name\": \"$.items[].name\" }"));
+        assertThrows(FatalAdapterException.class, () -> compile("{ \"$.temp\": \"$.temps[]\" }"));
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+  }
+
+  @Test
+  void independentSiblingArraysCannotFeedTheSameFlatTarget() throws Exception {
+    // Two source arrays of unrelated length pair no elements: 3 measurements and 2 alarms is
+    // neither 3, 2 nor 6 rows. This must stay rejected once array sources are allowed to fan out —
+    // the fan-out has exactly one array context, and a cross product would be silently expensive.
+    FatalAdapterException error =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compile(
+                    "{ \"$.ts\": \"$.measurements[].ts\"," + " \"$.code\": \"$.alarms[].code\" }"));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+  }
+
+  @Test
+  void severalFieldsFromOneArrayShareASingleContext() throws Exception {
+    // Several fields drawn from the SAME array are one fan-out, not several — the normal case from
+    // the report, and the counterpart to the sibling case above that must stay rejected. Asserting
+    // the context rather than the throw keeps this test meaningful after the fan-out fix, when the
+    // compile itself starts to succeed.
+    JsonPaths.ParsedPath ts = JsonPaths.parse("$.measurements[].ts");
+    JsonPaths.ParsedPath value = JsonPaths.parse("$.measurements[].value");
+
+    assertEquals(ts.arrayContext(), value.arrayContext());
+    assertEquals(List.of("measurements[]"), ts.arrayContext());
   }
 
   @Test

@@ -25,11 +25,13 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
+import de.civitascore.configadapter.nifi.mapping.ForkPlan;
 import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan;
 import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan.FilterTerm;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.Test;
 
 class NifiFlowBuilderTest {
@@ -187,6 +189,48 @@ class NifiFlowBuilderTest {
         hasConnection(flow, sinkId, logId, "failure"), "sink failure must route to the log sink");
     assertTrue(
         hasConnection(flow, sinkId, logId, "retry"), "sink retry must route to the log sink");
+  }
+
+  @Test
+  void frostFanoutPutsTheForkAheadOfTheMappingAndFeedsTheRecordSplit() throws Exception {
+    // The fan-out has to happen before the entity bodies are rendered: those are static EL
+    // templates over sta_* attributes and cannot multiply themselves. So ForkRecord must sit at the
+    // head of the mapping unit, leave on its own 'fork' relationship, and the N records it writes
+    // must reach the pre-region's SplitJson — that is what turns N records into N FlowFiles and
+    // therefore N observations.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithFanoutMapping());
+
+    JsonNode fork = component(flow, "processors", "ForkRecord");
+    assertEquals("/measurements[*]/measuredValues", fork.get("properties").get("fan-out").asText());
+    assertEquals("extract", fork.get("properties").get("Mode").asText());
+    assertEquals("true", fork.get("properties").get("Include Parent Fields").asText());
+
+    // 'original' must be auto-terminated, otherwise the unforked input queues up forever
+    assertTrue(
+        StreamSupport.stream(fork.get("autoTerminatedRelationships").spliterator(), false)
+            .anyMatch(r -> "original".equals(r.asText())),
+        "the unforked original must be auto-terminated");
+
+    String forkId = fork.get("identifier").asText();
+    JsonNode update = component(flow, "processors", "UpdateRecord");
+    assertEquals(
+        update.get("identifier").asText(),
+        destinationOf(flow, forkId, "fork"),
+        "the fork must feed the mapping over its 'fork' relationship");
+  }
+
+  /** The destination component id of the connection leaving {@code sourceId} on {@code rel}. */
+  private String destinationOf(JsonNode flow, String sourceId, String rel) {
+    for (JsonNode connection : flow.get("flowContents").get("connections")) {
+      boolean matches =
+          sourceId.equals(connection.path("source").path("id").asText())
+              && StreamSupport.stream(connection.get("selectedRelationships").spliterator(), false)
+                  .anyMatch(r -> rel.equals(r.asText()));
+      if (matches) {
+        return connection.path("destination").path("id").asText();
+      }
+    }
+    return null;
   }
 
   @Test
@@ -395,7 +439,9 @@ class NifiFlowBuilderTest {
             single.sourceProperties(),
             single.sinkType(),
             single.sinkProperties(),
-            List.of(new CompiledMapping(mapping()), new CompiledMapping(mapping())),
+            List.of(
+                new CompiledMapping(mapping(), ForkPlan.NONE),
+                new CompiledMapping(mapping(), ForkPlan.NONE)),
             single.controllerServiceProperties(),
             null,
             null);
