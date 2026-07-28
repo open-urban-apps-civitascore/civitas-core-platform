@@ -198,11 +198,9 @@ test-config-adapter:
     - job: setup-version-config-adapter
     - job: build-config-adapter
       artifacts: true
-  # The dind daemon starts with an empty image cache, so Docker Hub pulls go via the mirror.
   services:
     - name: docker:27-dind
       alias: docker
-      command: ['--registry-mirror=https://docker-mirror01.extern.frachtwerk.de']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_HOST: tcp://docker:2375
