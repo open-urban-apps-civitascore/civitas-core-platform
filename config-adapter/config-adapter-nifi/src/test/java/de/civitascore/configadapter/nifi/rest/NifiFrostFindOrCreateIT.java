@@ -234,14 +234,18 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
               });
 
       // A changed record with the same reference must PATCH the existing Thing, never create a
-      // duplicate. Republishing each poll replaces the hand-rolled publish/sleep retry loop.
+      // duplicate. Deliberate pacing dwell: the no-duplicate assertion is negative, so it only
+      // means something once every delivery has been processed. The sleep spaces the five
+      // deliveries out to guarantee that; an await here would return on the first success.
+      for (int i = 0; i < 5; i++) {
+        publisher.publish(TOPIC, UPDATED_ENVELOPE);
+        Thread.sleep(Duration.ofSeconds(2).toMillis());
+      }
       await()
-          .atMost(Duration.ofSeconds(70))
+          .atMost(Duration.ofSeconds(60))
           .pollInterval(Duration.ofSeconds(2))
-          .ignoreExceptions()
           .untilAsserted(
               () -> {
-                publisher.publish(TOPIC, UPDATED_ENVELOPE);
                 assertEquals(1, countThings(REFERENCE), "upsert must not duplicate the Thing");
                 assertEquals(
                     "Station IT 1 updated",
