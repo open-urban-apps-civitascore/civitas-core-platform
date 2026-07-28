@@ -188,7 +188,9 @@ test-config-adapter:
 # -pl is used without -am: config-adapter-application depends on every adapter, so -am pulls the
 # whole reactor into a shard, and failsafe runs in every reactor module — that shard would re-run the
 # full IT suite. build-config-adapter installs the modules so a restricted reactor resolves.
-integration-test-config-adapter:
+# Each shard is a separate job rather than a parallel:matrix, so that other jobs can reference it in
+# needs: by plain name — a matrix generates names of the form "job: [value]" instead.
+.integration-test-config-adapter:
   extends: .only-config-adapter-changes
   image: maven:3.9-eclipse-temurin-25
   stage: build-package
@@ -196,14 +198,6 @@ integration-test-config-adapter:
     - job: setup-version-config-adapter
     - job: build-config-adapter
       artifacts: true
-  parallel:
-    matrix:
-      - SHARD: nifi
-        MODULES: config-adapter-nifi
-      - SHARD: gateway-idm
-        MODULES: config-adapter-apisix,config-adapter-keycloak
-      - SHARD: data-services
-        MODULES: config-adapter-frost,config-adapter-geoserver,config-adapter-postgis,config-adapter-flowable,event-handler-kafka,config-adapter-application
   services:
     - name: docker:27-dind
       alias: docker
@@ -232,6 +226,21 @@ integration-test-config-adapter:
     reports:
       junit:
         - config-adapter/*/target/failsafe-reports/TEST-*.xml
+
+integration-test-config-adapter-nifi:
+  extends: .integration-test-config-adapter
+  variables:
+    MODULES: config-adapter-nifi
+
+integration-test-config-adapter-gateway-idm:
+  extends: .integration-test-config-adapter
+  variables:
+    MODULES: config-adapter-apisix,config-adapter-keycloak
+
+integration-test-config-adapter-data-services:
+  extends: .integration-test-config-adapter
+  variables:
+    MODULES: config-adapter-frost,config-adapter-geoserver,config-adapter-postgis,config-adapter-flowable,event-handler-kafka,config-adapter-application
 
 build-config-adapter:
   extends: .only-config-adapter-changes
@@ -281,7 +290,9 @@ publish-config-adapter:
         - job: build-config-adapter
           optional: true
         - job: test-config-adapter
-        - job: integration-test-config-adapter
+        - job: integration-test-config-adapter-nifi
+        - job: integration-test-config-adapter-gateway-idm
+        - job: integration-test-config-adapter-data-services
     # Tags/main/develop: publish only after tests pass
     - if: $CI_COMMIT_TAG
       needs:
@@ -289,7 +300,9 @@ publish-config-adapter:
         - job: build-config-adapter
           optional: true
         - job: test-config-adapter
-        - job: integration-test-config-adapter
+        - job: integration-test-config-adapter-nifi
+        - job: integration-test-config-adapter-gateway-idm
+        - job: integration-test-config-adapter-data-services
 
     - if: $CI_COMMIT_BRANCH == "main"
       needs:
@@ -297,14 +310,18 @@ publish-config-adapter:
         - job: build-config-adapter
           optional: true
         - job: test-config-adapter
-        - job: integration-test-config-adapter
+        - job: integration-test-config-adapter-nifi
+        - job: integration-test-config-adapter-gateway-idm
+        - job: integration-test-config-adapter-data-services
     - if: $CI_COMMIT_BRANCH == "develop"
       needs:
         - job: setup-version-config-adapter
         - job: build-config-adapter
           optional: true
         - job: test-config-adapter
-        - job: integration-test-config-adapter
+        - job: integration-test-config-adapter-nifi
+        - job: integration-test-config-adapter-gateway-idm
+        - job: integration-test-config-adapter-data-services
     # MR: publish immediately after build (test runs in parallel)
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -342,7 +359,9 @@ build-config-adapter-image:
     - job: publish-config-adapter
     - job: build-config-adapter
     - job: test-config-adapter
-    - job: integration-test-config-adapter
+    - job: integration-test-config-adapter-nifi
+    - job: integration-test-config-adapter-gateway-idm
+    - job: integration-test-config-adapter-data-services
     - job: api-test-backend
       optional: true
   services:
