@@ -1,6 +1,7 @@
 package de.civitascore.portal.config;
 
 import de.civitascore.portal.configuration.KeycloakProperties;
+import jakarta.ws.rs.NotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
@@ -51,7 +52,9 @@ public class ConfigAdapterTestConfiguration {
         admin.realm(realmName).toRepresentation();
         log.debug("{} realm already exists", realmName);
         return;
-      } catch (Exception e) {
+      } catch (NotFoundException e) {
+        // Only a missing realm is recoverable here; auth or connectivity failures must surface so
+        // context startup fails with the real cause instead of a realm-less context.
         log.info("Creating {} realm in Keycloak", realmName);
       }
       RealmRepresentation realm = new RealmRepresentation();
@@ -60,8 +63,6 @@ public class ConfigAdapterTestConfiguration {
       realm.setDisplayName("Civitas Core Test Realm");
       realm.setEditUsernameAllowed(true);
       admin.realms().create(realm);
-    } catch (Exception e) {
-      log.error("Failed to ensure {} realm exists: {}", realmName, e.getMessage(), e);
     }
   }
 }

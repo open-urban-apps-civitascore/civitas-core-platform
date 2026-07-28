@@ -554,8 +554,8 @@ Total stack startup: ~60–120s.
 > the adapter's current implementation. Unit tests still verify the JSON body shape.
 
 ```bash
-# Run only the integration test (requires Docker)
-mvn verify -pl config-adapter-geoserver -Dit.test=GeoServerAdapterIT
+# Run only the integration test (requires Docker); -Dtest=none skips the unit tests
+mvn verify -pl config-adapter-geoserver -Dit.test=GeoServerAdapterIT -Dtest=none -DfailIfNoTests=false
 ```
 
 ## Troubleshooting

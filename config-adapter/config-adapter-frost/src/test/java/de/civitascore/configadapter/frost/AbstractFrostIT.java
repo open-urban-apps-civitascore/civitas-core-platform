@@ -61,8 +61,10 @@ abstract class AbstractFrostIT {
             .withEnv("persistence_db_username", "sensorthings")
             .withEnv("persistence_db_password", "ChangeMe")
             .withEnv("persistence_autoUpdateDatabase", "true")
+            // Probing Projects also proves the projects plugin is loaded, which the core entity
+            // endpoints alone do not show.
             .waitingFor(
-                Wait.forHttp("/FROST-Server/v1.1/Things")
+                Wait.forHttp("/FROST-Server/v1.1/Projects")
                     .forStatusCode(200)
                     .withStartupTimeout(Duration.ofMinutes(2)));
     FROST.start();

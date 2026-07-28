@@ -9,8 +9,6 @@
  */
 package de.civitascore.configadapter.frost;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -56,8 +54,6 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
         "http://" + FROST.getHost() + ":" + FROST.getMappedPort(8080) + "/FROST-Server/v1.1";
     httpClient = ClientBuilder.newClient();
     objectMapper = new ObjectMapper();
-
-    waitForFrostReady(frostBaseUrl);
 
     Map<String, Object> props = new HashMap<>();
     props.put("frost.url", frostBaseUrl);
@@ -447,19 +443,5 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
           response.getStatus(),
           () -> entityPath + " expected HTTP " + expectedStatus + " at server root");
     }
-  }
-
-  private void waitForFrostReady(String baseUrl) {
-    await()
-        .atMost(60, SECONDS)
-        .pollInterval(2, SECONDS)
-        .ignoreExceptions()
-        .untilAsserted(
-            () -> {
-              try (Response response =
-                  httpClient.target(baseUrl).path("Projects").request().get()) {
-                assertEquals(200, response.getStatus());
-              }
-            });
   }
 }
