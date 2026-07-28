@@ -17,8 +17,8 @@ const sourceTree: SchemaTree = {
     { path: '$.id', name: 'id', type: 'int', portType: 'scalar' },
     { path: '$.suffix', name: 'suffix', type: 'str', portType: 'scalar' },
     { path: '$.name', name: 'name', type: 'str', portType: 'scalar' },
-    { path: '$.longitude', name: 'longitude', type: 'float', portType: 'scalar' },
-    { path: '$.latitude', name: 'latitude', type: 'float', portType: 'scalar' },
+    { path: '$.longitude', name: 'longitude', type: 'number', portType: 'scalar' },
+    { path: '$.latitude', name: 'latitude', type: 'number', portType: 'scalar' },
   ],
 }
 

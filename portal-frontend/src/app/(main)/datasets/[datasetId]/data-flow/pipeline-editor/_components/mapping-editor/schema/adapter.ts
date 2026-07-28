@@ -17,14 +17,9 @@ export { GEOMETRY }
 
 export const PRIMITIVE: Record<string, FieldType> = {
   String: 'str',
-  Character: 'str',
-  Uuid: 'str',
+  Uuid: 'uuid',
   Integer: 'int',
-  Long: 'int',
-  Short: 'int',
-  Byte: 'int',
-  Float: 'float',
-  Double: 'float',
+  Number: 'number',
   Boolean: 'bool',
   Date: 'date',
 }

@@ -64,7 +64,7 @@ describe('datastructure-model contract fixtures', () => {
     expect(tree.fields[0]).toMatchObject({ path: '$', name: 'Reading' })
     expect(tree.fields[0].children?.map(f => ({ name: f.name, type: f.type, required: f.required ?? false }))).toEqual([
       { name: 'shadowed', type: 'str', required: true },
-      { name: 'current', type: 'float', required: false },
+      { name: 'current', type: 'number', required: false },
     ])
   })
 

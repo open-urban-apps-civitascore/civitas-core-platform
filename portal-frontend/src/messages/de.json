@@ -1399,10 +1399,10 @@
           "description": "beliebiger Skalar → str"
         },
         "toInt": {
-          "description": "str / float → int"
+          "description": "str / number → int"
         },
         "toFloat": {
-          "description": "str / int → float"
+          "description": "str / int → number"
         },
         "toDate": {
           "description": "str → date",

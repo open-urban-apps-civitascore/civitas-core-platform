@@ -62,7 +62,7 @@ describe('modelToSchemaTree', () => {
       }),
       'fallback',
     )
-    expect(tree.fields[0].children?.map(f => f.type)).toEqual(['date', 'str', 'float', 'bool'])
+    expect(tree.fields[0].children?.map(f => f.type)).toEqual(['date', 'uuid', 'number', 'bool'])
   })
 
   it('maps geojson $refs to concrete geometry types', () => {
@@ -104,7 +104,7 @@ describe('modelToSchemaTree', () => {
     expect(unit.children).toEqual([{ path: '$.unit.symbol', name: 'symbol', type: 'str', portType: 'scalar' }])
     expect(readings).toMatchObject({ path: '$.readings', type: 'array', portType: 'array' })
     expect(readings.children).toEqual([
-      { path: '$.readings[].value', name: 'value', type: 'float', portType: 'scalar' },
+      { path: '$.readings[].value', name: 'value', type: 'number', portType: 'scalar' },
     ])
   })
 

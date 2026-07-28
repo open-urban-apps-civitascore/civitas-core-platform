@@ -32,9 +32,11 @@ const patternField: ConfigField = {
 
 /**
  * Build a conversion node definition.
- * @param inLabel  Human-readable label for the input port (e.g. "str/float")
+ * @param inLabel  Human-readable label for the input port (e.g. "str/int")
  * @param inSubtype  The actual primitive subtype for type-matching (undefined = accepts any scalar)
  * @param outSubtype The actual primitive subtype produced
+ * @param label  Display label for the node; defaults to the op name. Decoupled from `op` so the
+ *   UI can show a different name (e.g. "toNumber") while the wire op stays the backend contract token.
  */
 const conversion = (
   type: ConversionOp,
@@ -43,10 +45,11 @@ const conversion = (
   outSubtype: string,
   icon: LucideIcon,
   config: ConfigField[] = [],
+  label: string = type,
 ): MappingTransformDef => ({
   type,
   category: 'categories.conversionFunctions',
-  label: type,
+  label,
   description: `transforms.${type}.description`,
   icon,
   inputs: [scalar('in', inLabel, inSubtype)],
@@ -152,7 +155,7 @@ const geoPoint: MappingTransformDef = {
   label: 'geoPoint',
   description: 'transforms.geoPoint.description',
   icon: MapPin,
-  inputs: [scalar('lon', 'longitude', 'float'), scalar('lat', 'latitude', 'float')],
+  inputs: [scalar('lon', 'longitude', 'number'), scalar('lat', 'latitude', 'number')],
   outputs: [geometry('out', 'Point', 'Point')],
   config: [],
   op: 'geoPoint',
@@ -171,10 +174,11 @@ const geoPoint: MappingTransformDef = {
 const conversions: MappingTransformDef[] = [
   // toString: accepts any scalar (no subtype restriction on input), produces str
   conversion('toString', 'any scalar', undefined, 'str', Type),
-  // toInt: accepts str or float (no subtype restriction — conversion node wires freely), produces int
-  conversion('toInt', 'str / float', undefined, 'int', Binary),
-  // toFloat: accepts str or int, produces float
-  conversion('toFloat', 'str / int', undefined, 'float', Binary),
+  // toInt: accepts str or number (no subtype restriction — conversion node wires freely), produces int
+  conversion('toInt', 'str / number', undefined, 'int', Binary),
+  // toFloat: accepts str or int, produces number. Wire op stays 'toFloat' (backend contract);
+  // only the display label is 'toNumber'.
+  conversion('toFloat', 'str / int', undefined, 'number', Binary, [], 'toNumber'),
   // toDate: accepts str, produces date
   conversion('toDate', 'str', 'str', 'date', Calendar, [patternField]),
   // format: accepts date, produces str — reuse patternField but with the format-specific translation key

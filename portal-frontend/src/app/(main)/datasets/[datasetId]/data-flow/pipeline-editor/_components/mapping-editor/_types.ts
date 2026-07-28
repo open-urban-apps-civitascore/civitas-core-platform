@@ -20,7 +20,7 @@ export type GeometryType =
   | 'MultiPolygon'
   | 'GeometryCollection'
 
-export type FieldType = 'str' | 'int' | 'float' | 'bool' | 'date' | GeometryType | 'array' | 'object'
+export type FieldType = 'str' | 'int' | 'number' | 'bool' | 'date' | 'uuid' | GeometryType | 'array' | 'object'
 
 export const GEOMETRY: ReadonlySet<GeometryType> = new Set<GeometryType>([
   'Point',
@@ -88,8 +88,8 @@ export interface SchemaTree {
 /**
  * Conversion ops aligned with Apache NiFi RecordPath functions:
  *  toString  → NiFi toString(field, charset)   — any scalar → string
- *  toInt     → NiFi type coercion to INT        — str/float → int
- *  toFloat   → NiFi type coercion to FLOAT      — str/int → float
+ *  toInt     → NiFi type coercion to INT        — str/number → int
+ *  toFloat   → NiFi type coercion to FLOAT      — str/int → number
  *  toDate    → NiFi toDate(field, format)       — str → date
  *  format    → NiFi format(field, format)       — date → str
  */
