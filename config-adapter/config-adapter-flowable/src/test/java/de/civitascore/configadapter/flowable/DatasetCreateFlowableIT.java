@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.awaitility.Awaitility;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.ProcessEngine;
 import org.flowable.engine.RuntimeService;
@@ -60,6 +61,12 @@ import org.testcontainers.utility.DockerImageName;
 
 @Testcontainers
 class DatasetCreateFlowableIT {
+
+  static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+  }
 
   static Network network = Network.newNetwork();
 

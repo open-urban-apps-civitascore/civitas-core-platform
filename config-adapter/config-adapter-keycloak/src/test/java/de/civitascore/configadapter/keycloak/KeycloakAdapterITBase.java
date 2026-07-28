@@ -9,8 +9,6 @@
  */
 package de.civitascore.configadapter.keycloak;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import de.civitascore.configadapter.Topics;
@@ -26,6 +24,7 @@ import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.Payload;
 import de.civitascore.configadapter.model.idm.IdmConfigValue;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,20 +33,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.configuration2.MapConfiguration;
-import org.awaitility.core.ThrowingRunnable;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 /**
  * Base class for KeycloakAdapter integration tests. Uses the singleton container pattern so
  * Keycloak and Mailpit start only once per JVM, shared across all subclasses.
  */
-abstract class KeycloakAdapterIntegrationTestBase {
+abstract class KeycloakAdapterITBase {
 
   protected static final Network NETWORK = Network.newNetwork();
 
@@ -58,6 +58,10 @@ abstract class KeycloakAdapterIntegrationTestBase {
   protected static final GenericContainer<?> KEYCLOAK;
 
   static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+
     MAILPIT =
         new GenericContainer<>(DockerImageName.parse(TestContainerImages.MAILPIT))
             .withNetwork(NETWORK)
@@ -73,6 +77,13 @@ abstract class KeycloakAdapterIntegrationTestBase {
             .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
             .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin")
             .withCommand("start-dev")
+            // Realm-endpoint readiness gates container start, so it is checked once per JVM instead
+            // of per test method. The timeout allows for a cold CI runner.
+            .waitingFor(
+                Wait.forHttp("/realms/master")
+                    .forPort(8080)
+                    .forStatusCode(200)
+                    .withStartupTimeout(Duration.ofMinutes(2)))
             .withReuse(false);
     KEYCLOAK.start();
 
@@ -95,7 +106,6 @@ abstract class KeycloakAdapterIntegrationTestBase {
   @BeforeEach
   void setUp() {
     String keycloakUrl = "http://" + KEYCLOAK.getHost() + ":" + KEYCLOAK.getMappedPort(8080);
-    waitForKeycloakReady(keycloakUrl);
 
     Map<String, Object> props = new HashMap<>();
     props.put("keycloak.url", keycloakUrl);
@@ -222,21 +232,6 @@ abstract class KeycloakAdapterIntegrationTestBase {
 
   protected String getMailpitApiUrl() {
     return "http://" + MAILPIT.getHost() + ":" + MAILPIT.getMappedPort(8025) + "/api/v1/messages";
-  }
-
-  private void waitForKeycloakReady(String keycloakUrl) {
-    ThrowingRunnable assertion =
-        () -> {
-          try (Keycloak testClient =
-              Keycloak.getInstance(keycloakUrl, "master", "admin", "admin", "admin-cli")) {
-            testClient.serverInfo().getInfo();
-          }
-        };
-    await()
-        .atMost(30, SECONDS)
-        .pollInterval(1, SECONDS)
-        .ignoreExceptions()
-        .untilAsserted(assertion);
   }
 
   static class TestEventPublisher implements EventPublisher {

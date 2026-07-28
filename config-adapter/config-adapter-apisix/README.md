@@ -517,7 +517,10 @@ Tests cover:
 Run integration tests with real APISIX and etcd containers:
 
 ```bash
-mvn test -Dtest=ApisixAdapterIntegrationTest
+# All integration tests in this module
+mvn verify -pl config-adapter-apisix
+# A single one
+mvn verify -pl config-adapter-apisix -Dit.test=ApisixRouteIT
 ```
 
 Integration tests use:
@@ -1431,7 +1434,8 @@ kafka-console-consumer --bootstrap-server localhost:9092 \
 When adding new features:
 
 1. **Add unit tests** in `ApisixAdapterTest`
-2. **Add integration tests** in `ApisixAdapterIntegrationTest`
+2. **Add integration tests** in a `*IT` class extending `AbstractApisixIT` — the `*IT` suffix is what
+   routes them to Failsafe instead of Surefire, keeping `mvn test` Docker-free
 3. **Update this README** with new configuration options
 4. **Follow existing patterns** for consistency
 5. **Test with real APISIX** using integration tests

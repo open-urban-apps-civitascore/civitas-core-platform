@@ -522,7 +522,7 @@ Tests cover:
 
 ### Integration Tests
 
-`GeoServerAdapterIntegrationTest` runs the adapter against a real **GeoServer Cloud
+`GeoServerAdapterIT` runs the adapter against a real **GeoServer Cloud
 2.28.3.0** stack started with Testcontainers. The setup mirrors
 [`dev-environment/geoserver/docker-compose.yaml`](../../dev-environment/geoserver/docker-compose.yaml)
 and exercises the same provisioning flow as the Bruno collection
@@ -555,7 +555,7 @@ Total stack startup: ~60–120s.
 
 ```bash
 # Run only the integration test (requires Docker)
-mvn test -pl config-adapter-geoserver -Dtest=GeoServerAdapterIntegrationTest
+mvn verify -pl config-adapter-geoserver -Dit.test=GeoServerAdapterIT
 ```
 
 ## Troubleshooting

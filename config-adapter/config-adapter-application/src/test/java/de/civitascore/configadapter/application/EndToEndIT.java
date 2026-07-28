@@ -56,6 +56,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.awaitility.Awaitility;
 import org.awaitility.core.ThrowingRunnable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,7 +79,13 @@ import org.testcontainers.utility.DockerImageName;
  */
 @Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class EndToEndIntegrationTest {
+class EndToEndIT {
+
+  static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+  }
 
   @SuppressWarnings("resource")
   @Container

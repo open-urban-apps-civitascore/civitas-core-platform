@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Integration tests for ApisixAdapter serverless-pre-function and serverless-post-function plugins.
  */
-class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationTest {
+class ApisixServerlessFunctionIT extends AbstractApisixIT {
 
   // ============== SERVERLESS-POST-FUNCTION ==============
 

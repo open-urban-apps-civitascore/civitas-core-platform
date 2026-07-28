@@ -139,7 +139,7 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
+                <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
                     <!-- JDK 21+ requires add-opens for Jersey PATCH method support via reflection -->
                     <argLine>@{argLine} --add-opens java.base/java.net=ALL-UNNAMED</argLine>

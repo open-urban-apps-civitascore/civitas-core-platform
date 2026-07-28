@@ -255,17 +255,18 @@ class NifiFrostMappingIT extends AbstractNifiIT {
       // idempotency holds through the rebuilt envelope, not just the raw one) — but each delivery
       // MUST append one observation: the found ("re-delivered") path has to reach the observation
       // POST, not just resolve the Thing and stop. Guards against silent steady-state data loss.
+      // Exactly five re-deliveries, so the observation count is asserted against a known delta;
+      // the await below absorbs the pipeline latency the publish/sleep loop used to pad out.
       int observationsBefore = observations(dsMapId).size();
       for (int i = 0; i < 5; i++) {
         publisher.publish(TOPIC, payload);
-        Thread.sleep(Duration.ofSeconds(2).toMillis());
       }
-      assertEquals(1, countThings(REF_MAP), "re-delivered message must reuse the Thing");
       await()
-          .atMost(Duration.ofSeconds(30))
+          .atMost(Duration.ofSeconds(40))
           .pollInterval(Duration.ofSeconds(2))
           .ignoreExceptions()
           .until(() -> observations(dsMapId).size() >= observationsBefore + 5);
+      assertEquals(1, countThings(REF_MAP), "re-delivered message must reuse the Thing");
     }
 
     // Injection hardening: the tenant-supplied name (data path) and const description (mapping
@@ -468,7 +469,9 @@ class NifiFrostMappingIT extends AbstractNifiIT {
                 publisher.publish(TOPIC, payload);
                 return countThings(REF_BADTS) >= 1;
               });
-      // give the observation leg ample time to (wrongly) post before asserting it never did
+      // Deliberate dwell: gives the observation leg ample time to (wrongly) post before asserting
+      // it
+      // never did — an absence has no condition that can complete early.
       Thread.sleep(Duration.ofSeconds(10).toMillis());
     }
     assertEquals(

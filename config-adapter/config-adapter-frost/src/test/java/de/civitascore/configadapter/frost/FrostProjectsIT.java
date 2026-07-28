@@ -53,7 +53,7 @@ import org.junit.jupiter.api.Test;
  * Integration test for FrostAdapter using Testcontainers with a real FROST-Server and PostGIS
  * database. Tests FROST Projects extension: Project CRUD and project-scoped entity creation.
  */
-class FrostProjectsIntegrationTest extends AbstractFrostIntegrationTest {
+class FrostProjectsIT extends AbstractFrostIT {
 
   private FrostAdapter adapter;
   private TestEventPublisher eventPublisher;

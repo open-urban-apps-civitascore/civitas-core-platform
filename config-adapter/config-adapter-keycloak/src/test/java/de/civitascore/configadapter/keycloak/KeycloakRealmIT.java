@@ -26,7 +26,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.keycloak.representations.idm.RealmRepresentation;
 
-class KeycloakRealmIntegrationTest extends KeycloakAdapterIntegrationTestBase {
+class KeycloakRealmIT extends KeycloakAdapterITBase {
 
   @Test
   void shouldCreateRealm() throws FatalAdapterException, RetryableAdapterException {

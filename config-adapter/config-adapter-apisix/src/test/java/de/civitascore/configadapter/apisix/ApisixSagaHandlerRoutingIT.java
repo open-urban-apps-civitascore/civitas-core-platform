@@ -61,7 +61,7 @@ import org.testcontainers.utility.DockerImageName;
  * #sendGatewayRequest} throws {@link IllegalArgumentException}: {@code restricted header name:
  * "Host"}.
  */
-class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
+class ApisixSagaHandlerRoutingIT extends AbstractApisixIT {
 
   private static final String API_HOST = "api.example.test";
   private static final String API_PUBLIC_URL = "https://api.example.test";

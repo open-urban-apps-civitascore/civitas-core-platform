@@ -234,16 +234,14 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
               });
 
       // A changed record with the same reference must PATCH the existing Thing, never create a
-      // duplicate.
-      for (int i = 0; i < 5; i++) {
-        publisher.publish(TOPIC, UPDATED_ENVELOPE);
-        Thread.sleep(Duration.ofSeconds(2).toMillis());
-      }
+      // duplicate. Republishing each poll replaces the hand-rolled publish/sleep retry loop.
       await()
-          .atMost(Duration.ofSeconds(60))
+          .atMost(Duration.ofSeconds(70))
           .pollInterval(Duration.ofSeconds(2))
+          .ignoreExceptions()
           .untilAsserted(
               () -> {
+                publisher.publish(TOPIC, UPDATED_ENVELOPE);
                 assertEquals(1, countThings(REFERENCE), "upsert must not duplicate the Thing");
                 assertEquals(
                     "Station IT 1 updated",
@@ -341,6 +339,8 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     // create one, so an unmatched reference is dropped to the error sink, not written.
     String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
     try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-frost-nods")) {
+      // Deliberate dwell: this proves an absence, so there is no condition that can complete early
+      // and shortening the window would only narrow the chance to observe the Datastream appearing.
       for (int i = 0; i < 10; i++) {
         publisher.publish(NO_DS_TOPIC, OBS_ENVELOPE_UNKNOWN_DS);
         Thread.sleep(3000);

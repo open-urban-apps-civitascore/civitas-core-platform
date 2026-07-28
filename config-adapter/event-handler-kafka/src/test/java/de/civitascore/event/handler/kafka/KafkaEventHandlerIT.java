@@ -59,7 +59,7 @@ import org.junit.jupiter.api.Test;
  * Integration test for KafkaEventHandler using Testcontainers. Tests the full flow: Kafka ->
  * Handler -> Adapter -> Publisher -> Kafka
  */
-class KafkaEventHandlerIntegrationTest extends AbstractKafkaIntegrationTest {
+class KafkaEventHandlerIT extends AbstractKafkaIT {
 
   private KafkaEventHandler handler;
   private TestAdapter testAdapter;

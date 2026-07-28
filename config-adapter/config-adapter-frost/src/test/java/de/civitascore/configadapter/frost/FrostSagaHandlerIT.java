@@ -43,7 +43,7 @@ import org.junit.jupiter.api.Test;
  * duplicate project name, FROST returns HTTP 500 with body {@code {"message":"Failed to store
  * data."}}. The handler must treat this as an idempotent success.
  */
-class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
+class FrostSagaHandlerIT extends AbstractFrostIT {
 
   private FrostSagaHandler handler;
   private Client httpClient;

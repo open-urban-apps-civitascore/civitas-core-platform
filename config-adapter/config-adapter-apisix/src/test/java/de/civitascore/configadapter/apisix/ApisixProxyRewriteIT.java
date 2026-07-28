@@ -33,7 +33,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /** Integration tests for ApisixAdapter proxy-rewrite plugin. */
-class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
+class ApisixProxyRewriteIT extends AbstractApisixIT {
 
   @Test
   void createRouteWithProxyRewriteStaticUri() throws Exception {

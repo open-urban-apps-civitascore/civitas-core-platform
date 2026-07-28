@@ -33,7 +33,7 @@ import org.testcontainers.utility.DockerImageName;
  * subclasses to avoid the ~60–90s GeoServer Cloud startup cost on every test class.
  */
 @SuppressWarnings("resource")
-abstract class AbstractGeoServerIntegrationTest {
+abstract class AbstractGeoServerIT {
 
   protected static final String GEOSERVER_CLOUD_VERSION = "2.28.3.0";
   protected static final String ADMIN_USER = "admin";

@@ -28,6 +28,7 @@ import java.util.function.Consumer;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import org.awaitility.Awaitility;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.FixedHostPortGenericContainer;
 import org.testcontainers.containers.GenericContainer;
@@ -85,6 +86,10 @@ abstract class AbstractNifiIT {
   private static boolean infraReady;
 
   static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+
     KEYCLOAK =
         new FixedHostPortGenericContainer<>(TestContainerImages.KEYCLOAK)
             .withFixedExposedPort(KEYCLOAK_PORT, 8080)

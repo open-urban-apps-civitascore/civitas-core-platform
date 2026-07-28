@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
  * saga retry and the retryable classification depend on. A gateway upgrade that rewords the message
  * would otherwise disable them silently.
  */
-class ApisixUpstreamReferenceIntegrationTest extends AbstractApisixIntegrationTest {
+class ApisixUpstreamReferenceIT extends AbstractApisixIT {
 
   @Test
   @DisplayName("a route reference is recognized as the retryable stale-reference rejection")

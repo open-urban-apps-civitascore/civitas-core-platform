@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.keycloak.admin.client.resource.RoleResource;
 import org.keycloak.representations.idm.RoleRepresentation;
 
-class KeycloakRoleIntegrationTest extends KeycloakAdapterIntegrationTestBase {
+class KeycloakRoleIT extends KeycloakAdapterITBase {
 
   @Test
   void shouldCreateRole() throws FatalAdapterException, RetryableAdapterException {

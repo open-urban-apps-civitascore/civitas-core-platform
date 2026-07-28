@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
  * and the /v1/datasets/{id} URI prefix so APISIX can dispatch published-data requests
  * deterministically (issue #1368).
  */
-class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
+class ApisixSagaHandlerIT extends AbstractApisixIT {
 
   private static final String API_HOST = "api.example.test";
   private static final String API_PUBLIC_URL = "https://api.example.test";

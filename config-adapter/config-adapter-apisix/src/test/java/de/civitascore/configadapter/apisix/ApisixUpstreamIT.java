@@ -31,7 +31,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /** Integration tests for ApisixAdapter upstream operations. */
-class ApisixUpstreamIntegrationTest extends AbstractApisixIntegrationTest {
+class ApisixUpstreamIT extends AbstractApisixIT {
 
   @Test
   void createUpstream() throws Exception {

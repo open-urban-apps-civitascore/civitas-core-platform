@@ -40,7 +40,7 @@ import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 
-class KeycloakUserIntegrationTest extends KeycloakAdapterIntegrationTestBase {
+class KeycloakUserIT extends KeycloakAdapterITBase {
 
   @Test
   void shouldCreateUser() throws FatalAdapterException, RetryableAdapterException {

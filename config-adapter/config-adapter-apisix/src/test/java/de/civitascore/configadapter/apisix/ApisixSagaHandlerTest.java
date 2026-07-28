@@ -2261,9 +2261,8 @@ class ApisixSagaHandlerTest {
      * Documents/pins the SHAPE of the path-rewrite regex the handler is expected to emit — it
      * re-implements the pattern locally and is NOT wired to {@code buildRouteBody}'s actual output.
      * Treat it as executable documentation of the rewrite contract; the genuine end-to-end coverage
-     * that the produced route really rewrites correctly lives in {@code
-     * ApisixSagaHandlerRoutingTest} (real APISIX via Testcontainers). If the production regex
-     * changes, update both.
+     * that the produced route really rewrites correctly lives in {@code ApisixSagaHandlerRoutingIT}
+     * (real APISIX via Testcontainers). If the production regex changes, update both.
      */
     private String applyRewrite(String datasetId, String upstreamPath, String requestPath) {
       String regex = "^/v1/datasets/" + datasetId + "(/.*)?$";
