@@ -25,6 +25,7 @@ import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -156,12 +157,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """);
 
-    Datasource source = new Datasource();
-    source.setId("ds-pg-it");
-    source.setType("MQTT");
-    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
-    source.handleUnknownProperty("topics", List.of(TOPIC));
-    source.handleUnknownProperty("client_id", source.getId());
+    Datasource source = mqttSource("ds-pg-it", TOPIC);
 
     FlowDeploymentPlanner planner =
         NifiTestFixtures.planner(
@@ -216,12 +212,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """);
 
-    Datasource source = new Datasource();
-    source.setId("ds-pg-array-it");
-    source.setType("MQTT");
-    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
-    source.handleUnknownProperty("topics", List.of(ARRAY_TOPIC));
-    source.handleUnknownProperty("client_id", source.getId());
+    Datasource source = mqttSource("ds-pg-array-it", ARRAY_TOPIC);
 
     FlowDeploymentPlanner planner =
         NifiTestFixtures.planner(
@@ -256,26 +247,14 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
 
   @Test
   void deployedFlowWritesOneRowPerSourceArrayElement() throws Exception {
-    // The reported defect: an array source mapped onto a flat target must fan out — one row per
-    // element — with the parent-level fields repeated on every row. Today the compiler rejects an
-    // array source whose target has no array context, so no flow is deployed at all.
+    // An array source mapped onto a flat target must fan out — one row per element — with the
+    // parent-level fields repeated on every row.
     Map<String, Object> graph =
-        map(
+        fanoutGraph(
             """
-            { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.stationid": "$.stationid",
-                                "$.measured_at": "$.measurements[].ts",
-                                "$.value": "$.measurements[].value" } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
-              "edges": [
-                { "id": "e1", "source": "s", "target": "src" },
-                { "id": "e2", "source": "src", "target": "m" },
-                { "id": "e3", "source": "m", "target": "k" },
-                { "id": "e4", "source": "k", "target": "e" } ] }
+            { "$.stationid": "$.stationid",
+              "$.measured_at": "$.measurements[].ts",
+              "$.value": "$.measurements[].value" }
             """);
 
     deployAndPublishOnce(
@@ -340,15 +319,18 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
           if (rowCount("upsert_fanout_observation", "stationid = 'S10'") < 3) {
             return false;
           }
-          // deliver the identical payload again; the row count must stay at 3
+          // deliver the identical payload again; the assertion after the poll checks the outcome.
+          // Asserting inside the predicate would be swallowed by ignoreExceptions() and retried
+          // until the timeout, turning a real mismatch into a bare ConditionTimeoutException.
           publisher.publishOnce(UPSERT_FANOUT_TOPIC, payload);
           Thread.sleep(Duration.ofSeconds(6).toMillis());
-          assertEquals(
-              3,
-              rowCount("upsert_fanout_observation", "stationid = 'S10'"),
-              "a redelivery must upsert the same rows, neither duplicate nor collapse them");
           return true;
         });
+
+    assertEquals(
+        3,
+        rowCount("upsert_fanout_observation", "stationid = 'S10'"),
+        "a redelivery must upsert the same rows, neither duplicate nor collapse them");
   }
 
   @Test
@@ -499,16 +481,16 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         new PostgisSinkSpec("chained_fanout_observation"),
         "{\"stationid\":\"S18\",\"measurements\":["
             + "{\"ts\":\"2026-08-01T00:00:00Z\"},{\"ts\":\"2026-08-01T00:15:00Z\"}]}",
-        publisher -> {
-          if (rowCount("chained_fanout_observation", "stationid = 'S18'") < 2) {
-            return false;
-          }
-          assertEquals(
-              2,
-              rowCount("chained_fanout_observation", "stationid = 'S18'"),
-              "a second mapping node must not fork the array again");
-          return true;
-        });
+        publisher -> rowCount("chained_fanout_observation", "stationid = 'S18'") >= 2);
+
+    // Asserted after the poll, not inside it: a predicate that waits for '>= 2' and then asserts
+    // '== 2' can never see the over-fork it exists to catch, since the extra rows only make the
+    // guard pass sooner. Settling first and then counting does.
+    Thread.sleep(Duration.ofSeconds(6).toMillis());
+    assertEquals(
+        2,
+        rowCount("chained_fanout_observation", "stationid = 'S18'"),
+        "a second mapping node must not fork the array again");
   }
 
   @Test
@@ -536,12 +518,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """);
 
-    Datasource source = new Datasource();
-    source.setId("ds-pg-geo-it");
-    source.setType("MQTT");
-    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
-    source.handleUnknownProperty("topics", List.of(GEO_TOPIC));
-    source.handleUnknownProperty("client_id", source.getId());
+    Datasource source = mqttSource("ds-pg-geo-it", GEO_TOPIC);
 
     FlowDeploymentPlanner planner =
         NifiTestFixtures.planner(
@@ -595,12 +572,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """);
 
-    Datasource source = new Datasource();
-    source.setId("ds-pg-geo25832-it");
-    source.setType("MQTT");
-    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
-    source.handleUnknownProperty("topics", List.of(GEO_25832_TOPIC));
-    source.handleUnknownProperty("client_id", source.getId());
+    Datasource source = mqttSource("ds-pg-geo25832-it", GEO_25832_TOPIC);
 
     FlowDeploymentPlanner planner =
         NifiTestFixtures.planner(
@@ -661,71 +633,10 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
   }
 
   /**
-   * Deploys the graph against the given table and polls until {@code step} reports success. Shared
-   * by the fan-out scenarios, whose only differences are the graph, the payload and the assertion.
-   */
-  private void deployAndPublish(
-      String sourceId,
-      String pipelineId,
-      String topic,
-      Map<String, Object> graph,
-      String tableName,
-      String payload,
-      PollStep step)
-      throws Exception {
-    deployAndPublish(
-        sourceId, pipelineId, topic, graph, new PostgisSinkSpec(tableName), payload, step);
-  }
-
-  private void deployAndPublish(
-      String sourceId,
-      String pipelineId,
-      String topic,
-      Map<String, Object> graph,
-      PostgisSinkSpec sinkSpec,
-      String payload,
-      PollStep step)
-      throws Exception {
-    Datasource source = new Datasource();
-    source.setId(sourceId);
-    source.setType("MQTT");
-    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
-    source.handleUnknownProperty("topics", List.of(topic));
-    // Every flow needs its OWN MQTT client id: the fragment ships a fixed one, and a broker
-    // evicts the existing connection whenever a second client presents the same id — so shared
-    // ids make concurrently deployed flows knock each other offline.
-    source.handleUnknownProperty("client_id", sourceId);
-
-    FlowDeploymentPlanner planner =
-        NifiTestFixtures.planner(
-            new CredentialResolver(new byte[0]),
-            SqlSourceProbe.NO_OP,
-            new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
-            null);
-    DeploymentPlan plan =
-        planner.plan(new PipelineDeploymentRequest(pipelineId, graph, source, sinkSpec));
-
-    client.deployFlow(plan);
-
-    String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
-    try (MqttPublisher publisher = new MqttPublisher(brokerUrl)) {
-      await()
-          .atMost(Duration.ofSeconds(120))
-          .pollInterval(Duration.ofSeconds(3))
-          .ignoreExceptions()
-          .until(
-              () -> {
-                publisher.publish(topic, payload);
-                return step.check(publisher);
-              });
-    }
-  }
-
-  /**
    * Deploys and delivers the payload exactly once <em>into the flow</em>, then polls the assertion.
-   * Required wherever the expected row count is exact: the republish-per-attempt variant above
-   * grows the table on every poll, which turns any count into a lower bound and lets a cross
-   * product pass.
+   * Required wherever the expected row count is exact: republishing on every poll attempt would
+   * grow the table each time, which turns any count into a lower bound and lets a cross product
+   * pass.
    */
   private void deployAndPublishOnce(
       String sourceId,
@@ -736,15 +647,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
       String payload,
       PollStep step)
       throws Exception {
-    Datasource source = new Datasource();
-    source.setId(sourceId);
-    source.setType("MQTT");
-    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
-    source.handleUnknownProperty("topics", List.of(topic));
-    // Every flow needs its OWN MQTT client id: the fragment ships a fixed one, and a broker
-    // evicts the existing connection whenever a second client presents the same id — so shared
-    // ids make concurrently deployed flows knock each other offline.
-    source.handleUnknownProperty("client_id", sourceId);
+    Datasource source = mqttSource(sourceId, topic);
 
     FlowDeploymentPlanner planner =
         NifiTestFixtures.planner(
@@ -771,6 +674,21 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
           .ignoreExceptions()
           .until(() -> step.check(publisher));
     }
+  }
+
+  /**
+   * An MQTT datasource for one flow. Every flow needs its OWN client id: the fragment ships a fixed
+   * one, and a broker evicts the existing connection whenever a second client presents the same id
+   * — so shared ids make concurrently deployed flows knock each other offline.
+   */
+  private static Datasource mqttSource(String sourceId, String topic) {
+    Datasource source = new Datasource();
+    source.setId(sourceId);
+    source.setType("MQTT");
+    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
+    source.handleUnknownProperty("topics", List.of(topic));
+    source.handleUnknownProperty("client_id", sourceId);
+    return source;
   }
 
   private static int rowCount(String table, String where) throws Exception {
@@ -932,11 +850,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     }
 
     void publish(String topic, String payload) throws Exception {
-      MqttMessage message =
-          new MqttMessage(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-      message.setQos(1);
-      message.setRetained(true);
-      mqtt.publish(topic, message);
+      publish(topic, payload, true);
     }
 
     /**
@@ -946,9 +860,13 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
      * duration.
      */
     void publishOnce(String topic, String payload) throws Exception {
-      MqttMessage message =
-          new MqttMessage(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      publish(topic, payload, false);
+    }
+
+    private void publish(String topic, String payload, boolean retained) throws Exception {
+      MqttMessage message = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
       message.setQos(1);
+      message.setRetained(retained);
       mqtt.publish(topic, message);
     }
 

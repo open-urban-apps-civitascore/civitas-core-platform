@@ -72,9 +72,9 @@ public final class RecordMappingStage implements TransformStage {
       result.add(buildFork(ctx));
     }
     for (Map.Entry<ReplacementStrategy, List<UpdateRecordProperty>> group : byStrategy.entrySet()) {
-      String discriminator =
-          chainIndex == 0 ? group.getKey().name() : group.getKey().name() + ":" + chainIndex;
-      Processor processor = ctx.loadProcessor(Fragment.UPDATE_RECORD, "success", discriminator);
+      Processor processor =
+          ctx.loadProcessor(
+              Fragment.UPDATE_RECORD, "success", discriminator(group.getKey().name()));
       applyMapping(
           (ObjectNode) processor.node().get("properties"), group.getKey(), group.getValue());
       result.add(processor);
@@ -94,11 +94,14 @@ public final class RecordMappingStage implements TransformStage {
    * input and is auto-terminated by the fragment.
    */
   private Processor buildFork(BuildContext ctx) throws FatalAdapterException {
-    String discriminator =
-        chainIndex == 0 ? FORK_DISCRIMINATOR : FORK_DISCRIMINATOR + ":" + chainIndex;
-    Processor fork = ctx.loadProcessor(Fragment.FORK_RECORD, "fork", discriminator);
+    Processor fork =
+        ctx.loadProcessor(Fragment.FORK_RECORD, "fork", discriminator(FORK_DISCRIMINATOR));
     BuildContext.setProp(fork, FORK_PATH_PROPERTY, mapping.fork().recordPath());
     return fork;
+  }
+
+  private String discriminator(String seed) {
+    return chainIndex == 0 ? seed : seed + ":" + chainIndex;
   }
 
   private void applyMapping(

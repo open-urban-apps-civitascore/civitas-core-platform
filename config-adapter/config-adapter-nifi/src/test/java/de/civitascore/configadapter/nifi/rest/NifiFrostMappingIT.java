@@ -607,7 +607,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     // >= 1, not == 1: the per-second cron can re-read row 1 and race a second first-sight message
     // into a duplicate Thing before the first commits (see mappedMqtt…). The invariant is that the
     // chain reached FROST, not an exact dedup count under concurrent first contact.
-    assertTrue(countThings(REF_SQL) >= 1, "the first row's Thing must exist");
+    int thingsAfterFirstRow = countThings(REF_SQL);
+    assertTrue(thingsAfterFirstRow >= 1, "the first row's Thing must exist");
 
     // Row 2 (same reference) now makes every batch a 2-record array: its observation can only
     // appear if the $[*] split really turns the record-writer array into individual STA elements.
@@ -627,9 +628,14 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         .ignoreExceptions()
         .until(() -> resultValues(dsSqlId).contains(31.5));
 
-    // both rows share the reference — steady-state re-reads must not keep minting Things (the
-    // count stabilises once the first Thing is committed; >= 1 tolerates only the initial race).
-    assertTrue(countThings(REF_SQL) >= 1, "same-reference rows must share the Thing(s)");
+    // Both rows share the reference, and by now the first Thing is long committed — so the lookup
+    // hits and the second row must mint NO further Thing. Compared against the earlier count rather
+    // than a literal: the initial first-contact race may have produced more than one, but once past
+    // it the count must stop growing, which a bare '>= 1' would never notice.
+    assertEquals(
+        thingsAfterFirstRow,
+        countThings(REF_SQL),
+        "a same-reference row must reuse the existing Thing instead of minting another");
   }
 
   // ─── Deployment ─────────────────────────────────────────────────────────────
