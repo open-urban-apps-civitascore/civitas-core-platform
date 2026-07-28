@@ -34,6 +34,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
@@ -353,16 +354,12 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         new PostgisSinkSpec("collision_fanout_observation"),
         "{\"stationid\":\"S12\",\"id\":\"PARENT\",\"measurements\":["
             + "{\"id\":\"CHILD-A\"},{\"id\":\"CHILD-B\"}]}",
-        publisher -> {
-          if (rowCount("collision_fanout_observation", "stationid = 'S12'") < 2) {
-            return false;
-          }
-          assertEquals(
-              2,
-              rowCount("collision_fanout_observation", "stationid = 'S12' AND id LIKE 'CHILD-%'"),
-              "the element's id must win over the identically named parent field");
-          return true;
-        });
+        publisher -> rowCount("collision_fanout_observation", "stationid = 'S12'") >= 2);
+
+    assertEquals(
+        2,
+        rowCount("collision_fanout_observation", "stationid = 'S12' AND id LIKE 'CHILD-%'"),
+        "the element's id must win over the identically named parent field");
   }
 
   @Test
@@ -378,6 +375,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
               "$.measured_at": "$.measurements[].ts" }
             """);
 
+    AtomicBoolean probeSent = new AtomicBoolean();
     deployAndPublishOnce(
         "ds-pg-sparse-it",
         "pg-sparse-it",
@@ -391,15 +389,17 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
               < 1) {
             return false;
           }
-          // the flow must still be running afterwards
-          publisher.publishOnce(
-              SPARSE_FANOUT_TOPIC,
-              "{\"stationid\":\"S14\",\"measurements\":[{\"ts\":\"2026-04-02T00:00:00Z\"}]}");
-          await()
-              .atMost(Duration.ofSeconds(60))
-              .pollInterval(Duration.ofSeconds(3))
-              .ignoreExceptions()
-              .until(() -> rowCount("sparse_fanout_observation", "stationid = 'S14'") >= 1);
+          // The liveness probe: a flow killed by the null element would never deliver S14. Sent
+          // once, then awaited by this same predicate on its next attempt — a nested await inside
+          // the poll would resend it on every attempt and hide a flow that only limps.
+          if (rowCount("sparse_fanout_observation", "stationid = 'S14'") < 1) {
+            if (probeSent.compareAndSet(false, true)) {
+              publisher.publishOnce(
+                  SPARSE_FANOUT_TOPIC,
+                  "{\"stationid\":\"S14\",\"measurements\":[{\"ts\":\"2026-04-02T00:00:00Z\"}]}");
+            }
+            return false;
+          }
           return true;
         });
   }
@@ -427,24 +427,21 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         "{\"stationid\":\"S17\",\"measurements\":["
             + "{\"ts\":\"2026-07-01T00:00:00Z\",\"lon\":8.1,\"lat\":49.1},"
             + "{\"ts\":\"2026-07-01T00:15:00Z\",\"lon\":8.2,\"lat\":49.2}]}",
-        publisher -> {
-          if (rowCount("geo_fanout_observation", "stationid = 'S17' AND geom IS NOT NULL") < 2) {
-            return false;
-          }
-          try (Connection c = dbConnection();
-              Statement st = c.createStatement();
-              ResultSet rs =
-                  st.executeQuery(
-                      "SELECT ST_X(geom) AS x FROM geo_fanout_observation"
-                          + " WHERE stationid = 'S17' ORDER BY x")) {
-            List<Double> xs = new ArrayList<>();
-            while (rs.next()) {
-              xs.add(rs.getDouble("x"));
-            }
-            assertEquals(List.of(8.1, 8.2), xs, "each row's geometry must use its own element");
-          }
-          return true;
-        });
+        publisher ->
+            rowCount("geo_fanout_observation", "stationid = 'S17' AND geom IS NOT NULL") >= 2);
+
+    try (Connection c = dbConnection();
+        Statement st = c.createStatement();
+        ResultSet rs =
+            st.executeQuery(
+                "SELECT ST_X(geom) AS x FROM geo_fanout_observation"
+                    + " WHERE stationid = 'S17' ORDER BY x")) {
+      List<Double> xs = new ArrayList<>();
+      while (rs.next()) {
+        xs.add(rs.getDouble("x"));
+      }
+      assertEquals(List.of(8.1, 8.2), xs, "each row's geometry must use its own element");
+    }
   }
 
   @Test
@@ -662,12 +659,21 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
 
     // Retention is not an option here: ConsumeMQTT re-receives a retained message on every
     // resubscribe, so one publish would keep producing rows for the whole poll window and inflate
-    // every exact-count assertion. The trade-off is that a non-retained publish is dropped by the
-    // broker while no subscriber exists, and deployFlow only waits for NiFi to report the processor
-    // RUNNING, which precedes the MQTT CONNECT/SUBSCRIBE — so a delivery can be lost outright.
+    // every exact-count assertion. But a non-retained publish is discarded by the broker while no
+    // subscriber exists, and deployFlow only waits for NiFi to report the processor RUNNING, which
+    // precedes the MQTT CONNECT/SUBSCRIBE — so the first delivery can be lost outright.
+    //
+    // Republishing only while the sink is still empty resolves both: a lost delivery is retried
+    // until the subscription exists, and once any row has landed no further payload is sent, so the
+    // count stays exact. Bounded, because a flow that never delivers must fail rather than hang.
     String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
     try (MqttPublisher publisher = new MqttPublisher(brokerUrl)) {
-      publisher.publishOnce(topic, payload);
+      for (int attempt = 0;
+          attempt < 20 && rowCount(sinkSpec.tableName(), "true") == 0;
+          attempt++) {
+        publisher.publishOnce(topic, payload);
+        Thread.sleep(Duration.ofSeconds(3).toMillis());
+      }
       await()
           .atMost(Duration.ofSeconds(120))
           .pollInterval(Duration.ofSeconds(3))

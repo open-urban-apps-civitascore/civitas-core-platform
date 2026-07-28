@@ -607,7 +607,11 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     // >= 1, not == 1: the per-second cron can re-read row 1 and race a second first-sight message
     // into a duplicate Thing before the first commits (see mappedMqtt…). The invariant is that the
     // chain reached FROST, not an exact dedup count under concurrent first contact.
-    int thingsAfterFirstRow = countThings(REF_SQL);
+    //
+    // Sampled only once the count holds still across several cron ticks: a create still in flight
+    // would otherwise land after the sample and fail the comparison below even though row 2
+    // correctly reused the Thing.
+    int thingsAfterFirstRow = settledThingCount(REF_SQL);
     assertTrue(thingsAfterFirstRow >= 1, "the first row's Thing must exist");
 
     // Row 2 (same reference) now makes every batch a 2-record array: its observation can only
@@ -981,6 +985,22 @@ class NifiFrostMappingIT extends AbstractNifiIT {
 
   private int countThings(String reference) throws Exception {
     return thingsByReference(reference).size();
+  }
+
+  /**
+   * The Thing count once it has stopped changing, so a create still in flight cannot land after the
+   * caller sampled it. The per-second cron keeps re-reading the source, so "no more Things appear"
+   * can only be established by observing several ticks, never from a single read.
+   */
+  private int settledThingCount(String reference) throws Exception {
+    int previous = -1;
+    for (int stableTicks = 0; stableTicks < 4; ) {
+      Thread.sleep(Duration.ofSeconds(3).toMillis());
+      int current = countThings(reference);
+      stableTicks = current == previous ? stableTicks + 1 : 0;
+      previous = current;
+    }
+    return previous;
   }
 
   private JsonNode thingByReference(String reference) throws Exception {
