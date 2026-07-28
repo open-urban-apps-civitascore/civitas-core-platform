@@ -150,8 +150,10 @@ integration-test-backend:
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
+    # The dind daemon starts with an empty image cache, so Docker Hub pulls go via the mirror.
   services:
     - name: docker:27-dind
+      command: ['--registry-mirror=https://docker-mirror01.extern.frachtwerk.de']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_DRIVER: overlay2
@@ -208,8 +210,10 @@ saga-e2e-test-backend:
         - portal-model/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/backend.yml
+    # The dind daemon starts with an empty image cache, so Docker Hub pulls go via the mirror.
   services:
     - name: docker:27-dind
+      command: ['--registry-mirror=https://docker-mirror01.extern.frachtwerk.de']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_DRIVER: overlay2
@@ -270,8 +274,10 @@ api-test-backend:
         - .gitlab-ci.yml
         - .gitlab/ci/backend.yml
 
+    # The dind daemon starts with an empty image cache, so Docker Hub pulls go via the mirror.
   services:
     - name: docker:27-dind
+      command: ['--registry-mirror=https://docker-mirror01.extern.frachtwerk.de']
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_HOST: tcp://docker:2375
