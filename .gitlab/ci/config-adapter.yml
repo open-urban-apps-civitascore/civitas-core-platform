@@ -261,9 +261,10 @@ build-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    # Installs to the local repo so the integration shards resolve inter-module dependencies with a
-    # restricted reactor.
-    - mvn install -DskipTests -Drevision=$CONFIG_ADAPTER_VERSION -Pdist
+    # The artifacts must land in the local repo, because the integration shards resolve inter-module
+    # dependencies from it with a restricted reactor. install:install is invoked as a goal so the
+    # verify-phase checks (pmd, spotbugs, spotless) stay out of this job.
+    - mvn package install:install -DskipTests -Drevision=$CONFIG_ADAPTER_VERSION -Pdist
   artifacts:
     when: on_success
     paths:
