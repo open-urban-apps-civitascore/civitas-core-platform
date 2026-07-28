@@ -28,9 +28,13 @@ import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.ForkPlan;
 import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan;
 import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan.FilterTerm;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.Test;
 
@@ -211,12 +215,48 @@ class NifiFlowBuilderTest {
             .anyMatch(r -> "original".equals(r.asText())),
         "the unforked original must be auto-terminated");
 
+    // Selected by strategy, not by first-match: the fixture mixes a const rule with copies, so the
+    // flow holds a literal-value AND a record-path-value UpdateRecord and the fork feeds the
+    // latter.
+    JsonNode update =
+        componentByProperty(
+            flow, "UpdateRecord", "Replacement Value Strategy", "record-path-value");
     String forkId = fork.get("identifier").asText();
-    JsonNode update = component(flow, "processors", "UpdateRecord");
     assertEquals(
         update.get("identifier").asText(),
         destinationOf(flow, forkId, "fork"),
         "the fork must feed the mapping over its 'fork' relationship");
+
+    // The forked records must reach the pre-region's SplitJson — that is what turns N records into
+    // N FlowFiles and therefore N observations. Without it the fan-out would produce one FlowFile
+    // carrying N records, and the static entity bodies would render only the first.
+    String splitId =
+        componentByProperty(flow, "SplitJson", "JsonPath Expression", "$[*]")
+            .get("identifier")
+            .asText();
+    assertTrue(
+        reaches(flow, forkId, splitId), "the forked records must reach the pre-region's SplitJson");
+  }
+
+  /** Whether any chain of connections leads from {@code sourceId} to {@code targetId}. */
+  private boolean reaches(JsonNode flow, String sourceId, String targetId) {
+    Set<String> seen = new HashSet<>();
+    Deque<String> pending = new ArrayDeque<>(List.of(sourceId));
+    while (!pending.isEmpty()) {
+      String current = pending.pop();
+      if (!seen.add(current)) {
+        continue;
+      }
+      if (current.equals(targetId)) {
+        return true;
+      }
+      for (JsonNode connection : flow.get("flowContents").get("connections")) {
+        if (current.equals(connection.path("source").path("id").asText())) {
+          pending.push(connection.path("destination").path("id").asText());
+        }
+      }
+    }
+    return false;
   }
 
   /** The destination component id of the connection leaving {@code sourceId} on {@code rel}. */
@@ -455,6 +495,29 @@ class NifiFlowBuilderTest {
     // live NiFi map back to the same component on redeploy (redeploy idempotency).
     assertEquals(singleIds.get(0), chainedIds.get(0));
     assertFalse(chainedIds.get(0).equals(chainedIds.get(1)));
+  }
+
+  @Test
+  void addingAFanOutLeavesTheUpdateRecordIdsUntouched() throws Exception {
+    // The fork's id seed is deliberately independent of the strategy discriminators, so a mapping
+    // that gains a fan-out keeps its UpdateRecord ids and a redeploy still matches them to the live
+    // NiFi components. If the fork joined that seed instead, every existing UpdateRecord would get
+    // a
+    // new id and the redeploy would orphan the deployed ones — invisible in every other assertion.
+    FlowBuildSpec withoutFork = mqttToPostgis(mapping());
+    FlowBuildSpec withFork =
+        new FlowBuildSpec(
+            withoutFork.processGroupName(),
+            withoutFork.sourceType(),
+            withoutFork.sourceProperties(),
+            withoutFork.sinkType(),
+            withoutFork.sinkProperties(),
+            List.of(new CompiledMapping(mapping(), new ForkPlan("/items"))),
+            withoutFork.controllerServiceProperties(),
+            null,
+            null);
+
+    assertEquals(updateRecordIds(build(withoutFork)), updateRecordIds(build(withFork)));
   }
 
   private List<String> updateRecordIds(JsonNode flow) {
@@ -918,6 +981,35 @@ class NifiFlowBuilderTest {
     assertTrue(
         hasConnection(flow, patchId, dsGetId, "Original"),
         "the PATCHed existing Thing must feed the Datastream GET");
+  }
+
+  @Test
+  void aCreatedEntityContinuesOnOriginalBecauseTheResponseIsCapturedIntoAnAttribute()
+      throws Exception {
+    // Two settings on the entity POST are coupled, and nothing else asserts it: capturing the
+    // response body into an attribute makes InvokeHTTP suppress the response FlowFile on success,
+    // so
+    // 'Response' never fires and only 'Original' carries the 2xx onwards. Chaining 'Response' would
+    // strand every newly created entity — the POST succeeds, FROST stores it, and the FlowFile
+    // vanishes with no error, no failure route and no bulletin. A first delivery then writes no
+    // observation at all while a redelivery hides it by taking the lookup-hit path.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithThingOnlyMapping());
+
+    JsonNode post = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "POST");
+    assertFalse(
+        post.path("properties").path("Response Body Attribute Name").asText().isEmpty(),
+        "the entity POST must capture the response body, so a 4xx can be logged with its cause");
+    assertFalse(
+        autoTerminates(post, "Original"),
+        "the created entity leaves on 'Original' and must not be discarded there");
+    assertTrue(
+        autoTerminates(post, "Response"),
+        "'Response' never fires while the body is captured, so it must stay terminated");
+
+    String postId = post.get("identifier").asText();
+    assertTrue(
+        destinationOf(flow, postId, "Original") != null,
+        "the created entity must be chained onwards from 'Original'");
   }
 
   @Test
