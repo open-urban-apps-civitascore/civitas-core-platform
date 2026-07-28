@@ -124,8 +124,8 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     setIsExitModalOpen(false)
   }
 
-  const handleSave = async (): Promise<boolean> => {
-    const isSaved = await saveDatastructure()
+  const handleSave = async (shouldRefresh = true): Promise<boolean> => {
+    const isSaved = await saveDatastructure(shouldRefresh)
     if (isSaved) {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
     }
@@ -146,7 +146,9 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     else exitEditMode()
   }
 
-  useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
+  // shouldRefresh === false when navigating away. The router refresh is done by the
+  // UnsavedChangesProvider after the push (a refresh before the push would cancel the navigation).
+  useRegisterUnsavedChanges(hasUnsavedChanges, () => handleSave(false), true)
 
   const renderTabContent = () => {
     switch (selectedTab) {
@@ -159,9 +161,6 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             versions={mapDatastructureVersionsApiToListData(datastructure.dataStructureVersions)}
             rowCount={datastructure.dataStructureVersions.length}
             isReadOnly={isReadOnly}
-            isDirty={datastructureForm.formState.isDirty}
-            isLoading={isLoading}
-            onSave={saveDatastructure}
           />
         )
       case 'accessManagement':
@@ -199,7 +198,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             statusHint={statusHint}
             availableHint={statusAvailableHint}
             confirmButtonType="button"
-            onConfirmClick={handleSave}
+            onConfirmClick={() => handleSave()}
             isConfirmButtonDisabled={isConfirmButtonDisabled}
             isCancelButtonDisabled={isLoading}
             onCancelClick={handleExit}

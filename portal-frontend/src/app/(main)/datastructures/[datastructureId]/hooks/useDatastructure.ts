@@ -176,7 +176,7 @@ export const useDatastructure = ({
     }
   }
 
-  const handleUpdateDatastructure = async (parsedValues: DatastructureFormDraft) => {
+  const handleUpdateDatastructure = async (parsedValues: DatastructureFormDraft, shouldRefresh = true) => {
     const dirtyFields = form.formState.dirtyFields
 
     const fieldsToUpdate = pickDirtyValues(parsedValues, dirtyFields)
@@ -203,10 +203,10 @@ export const useDatastructure = ({
       : parsedValues
 
     form.reset(updatedFormValues)
-    router.refresh()
+    if (shouldRefresh) router.refresh()
   }
 
-  const saveDatastructure = async () => {
+  const saveDatastructure = async (shouldRefresh = true) => {
     const values = form.getValues()
     const parsed = isDraftMode
       ? DatastructureFormDraftSchema.safeParse(values)
@@ -217,7 +217,7 @@ export const useDatastructure = ({
     }
 
     try {
-      await handleUpdateDatastructure(parsed.data)
+      await handleUpdateDatastructure(parsed.data, shouldRefresh)
       return true
     } catch (error) {
       console.error('An error occurred while submitting datastructure data.', (error as AxiosError).message)
