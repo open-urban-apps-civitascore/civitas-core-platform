@@ -48,6 +48,12 @@ export interface FieldNode {
   children?: FieldNode[]
 }
 
+/**
+ * Source subtypes a numeric conversion input (toInt/toNumber) accepts. Everything else — uuid, bool,
+ * date, geometry — has no meaningful numeric coercion and is rejected. Used as a port's `accepts` set.
+ */
+export const NUMERIC_SUBTYPES: readonly FieldType[] = ['str', 'int', 'number']
+
 /** The port category is a pure function of the field type. */
 export const portTypeFor = (type: FieldType): PortType => {
   if (type === 'array') return 'array'

@@ -1,0 +1,22 @@
+import { describe, expect, it } from 'vitest'
+
+import { NUMERIC_SUBTYPES } from '../_types'
+import { mappingRegistry } from './index'
+
+describe('numeric conversion inputs', () => {
+  it('NUMERIC_SUBTYPES lists only numerically-parseable scalars', () => {
+    expect([...NUMERIC_SUBTYPES]).toEqual(['str', 'int', 'number'])
+    expect(NUMERIC_SUBTYPES).not.toContain('uuid')
+    expect(NUMERIC_SUBTYPES).not.toContain('bool')
+    expect(NUMERIC_SUBTYPES).not.toContain('date')
+  })
+
+  it('toInt and toNumber input ports accept only NUMERIC_SUBTYPES so uuid/bool/date are rejected', () => {
+    expect(mappingRegistry.byType['toInt'].inputs[0].accepts).toEqual(NUMERIC_SUBTYPES)
+    expect(mappingRegistry.byType['toFloat'].inputs[0].accepts).toEqual(NUMERIC_SUBTYPES)
+  })
+
+  it('toString stays permissive (any scalar → str): no accepts set', () => {
+    expect(mappingRegistry.byType['toString'].inputs[0].accepts).toBeUndefined()
+  })
+})

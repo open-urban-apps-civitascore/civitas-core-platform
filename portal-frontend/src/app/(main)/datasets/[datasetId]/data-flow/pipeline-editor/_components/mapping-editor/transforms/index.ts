@@ -6,6 +6,7 @@ import { buildRegistry } from '@/components/node-editor/types'
 import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '@/components/uml-modeler/constants/umlTypes'
 
 import type { ConversionOp, OpNode, ValueNode } from '../_types'
+import { NUMERIC_SUBTYPES } from '../_types'
 import { GEOMETRY, PRIMITIVE } from '../schema/adapter'
 
 /** A registry entry: the single source of truth for a node's ports, config and compiled op. */
@@ -37,6 +38,8 @@ const patternField: ConfigField = {
  * @param outSubtype The actual primitive subtype produced
  * @param label  Display label for the node; defaults to the op name. Decoupled from `op` so the
  *   UI can show a different name (e.g. "toNumber") while the wire op stays the backend contract token.
+ * @param accepts  When set, the input port accepts exactly these source subtypes (membership test)
+ *   instead of the exact-match on `inSubtype` — e.g. numeric conversions accept str/int/number only.
  */
 const conversion = (
   type: ConversionOp,
@@ -46,13 +49,14 @@ const conversion = (
   icon: LucideIcon,
   config: ConfigField[] = [],
   label: string = type,
+  accepts?: readonly string[],
 ): MappingTransformDef => ({
   type,
   category: 'categories.conversionFunctions',
   label,
   description: `transforms.${type}.description`,
   icon,
-  inputs: [scalar('in', inLabel, inSubtype)],
+  inputs: [{ ...scalar('in', inLabel, inSubtype), ...(accepts ? { accepts } : {}) }],
   outputs: [scalar('out', outSubtype, outSubtype)],
   config,
   op: type,
@@ -174,11 +178,11 @@ const geoPoint: MappingTransformDef = {
 const conversions: MappingTransformDef[] = [
   // toString: accepts any scalar (no subtype restriction on input), produces str
   conversion('toString', 'any scalar', undefined, 'str', Type),
-  // toInt: accepts str or number (no subtype restriction — conversion node wires freely), produces int
-  conversion('toInt', 'str / number', undefined, 'int', Binary),
-  // toFloat: accepts str or int, produces number. Wire op stays 'toFloat' (backend contract);
-  // only the display label is 'toNumber'.
-  conversion('toFloat', 'str / int', undefined, 'number', Binary, [], 'toNumber'),
+  // toInt: accepts only numerically-parseable scalars (str/int/number), produces int
+  conversion('toInt', 'str / number', undefined, 'int', Binary, [], 'toInt', NUMERIC_SUBTYPES),
+  // toFloat: accepts only numerically-parseable scalars (str/int/number), produces number. Wire op
+  // stays 'toFloat' (backend contract); only the display label is 'toNumber'.
+  conversion('toFloat', 'str / int', undefined, 'number', Binary, [], 'toNumber', NUMERIC_SUBTYPES),
   // toDate: accepts str, produces date
   conversion('toDate', 'str', 'str', 'date', Calendar, [patternField]),
   // format: accepts date, produces str — reuse patternField but with the format-specific translation key
