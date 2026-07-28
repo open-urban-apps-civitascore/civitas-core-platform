@@ -84,9 +84,8 @@ public record ForkPlan(String recordPath) {
     List<String> sourcePaths = new ArrayList<>();
     for (Map.Entry<String, ValueNode> field : mapping.fields().entrySet()) {
       if (targetsKeepTheirShape && keepsItsArrayLevel(field.getKey())) {
-        // An in-place rule rewrites fields within each element and needs its array to survive, so
-        // it asks for no fan-out. Whether it can tolerate one derived from the other rules is
-        // decided below, once the fan-out is known.
+        // Only collected, not decided: whether an in-place rule survives depends on the fan-out the
+        // remaining rules produce, which is not known until they have all been read.
         inPlaceTargets.add(field.getKey());
         continue;
       }
@@ -97,10 +96,8 @@ public record ForkPlan(String recordPath) {
     }
 
     List<String> innermost = innermostSharedContext(contexts);
-    // A fan-out anywhere in the mapping rewrites the record shape for every rule, so an in-place
-    // rule cannot survive it: forking its own array flattens the level its target addresses, and
-    // forking a different one repeats the whole array across the fanned-out records and rewrites it
-    // once per record. Both are silent — a vanished field or duplicated data, with no bulletin.
+    // Rejected even when the fork is over a different array: that one repeats the in-place array
+    // into every fanned-out record, so the rewrite runs once per record and each copy is written.
     if (!inPlaceTargets.isEmpty()) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_MAPPING_ERROR,
@@ -118,9 +115,7 @@ public record ForkPlan(String recordPath) {
 
   /**
    * The innermost of several array contexts, which must all lie on one hierarchical line — the
-   * outer levels then ride along as parent fields. Independent sibling arrays are rejected: pairing
-   * 3 measurements with 2 alarms yields neither 3, 2 nor 6 records, so any choice would be a silent
-   * guess.
+   * outer levels then ride along as parent fields.
    */
   private static List<String> innermostSharedContext(Set<List<String>> contexts)
       throws FatalAdapterException {
@@ -140,11 +135,7 @@ public record ForkPlan(String recordPath) {
     return innermost;
   }
 
-  /**
-   * Rejects two sources that read different payload fields but the same post-fork one. The fork
-   * hoists an element field over an ancestor field of the same name, so both rules would resolve to
-   * the element value and the author's two distinct fields would silently carry one value.
-   */
+  /** Rejects two sources that read different payload fields but the same post-fork one. */
   private void rejectCollidingSources(List<String> sourcePaths) throws FatalAdapterException {
     Map<String, String> originBySelection = new LinkedHashMap<>();
     for (String sourcePath : sourcePaths) {

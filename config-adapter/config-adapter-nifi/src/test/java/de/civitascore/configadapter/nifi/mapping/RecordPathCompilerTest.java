@@ -169,10 +169,8 @@ class RecordPathCompilerTest {
 
   @Test
   void anInPlaceRuleCannotShareAMappingWithAFanOutOverItsOwnArray() throws Exception {
-    // The in-place rule asks for no fan-out, but the flat rule reading the same array forces one.
-    // The fork then flattens '/items' away and the surviving '/items[*]/name' target addresses
-    // nothing — an UpdateRecord no-op that drops the rule with no bulletin and no bad row. Only a
-    // whole-mapping decision can see this; a per-rule veto cannot.
+    // Accepted, the fork would flatten '/items' away and '/items[*]/name' would address nothing —
+    // an UpdateRecord no-op that drops the rule with no bulletin and no bad row.
     FatalAdapterException error =
         assertThrows(
             FatalAdapterException.class,
@@ -186,10 +184,8 @@ class RecordPathCompilerTest {
 
   @Test
   void anInPlaceRuleCannotShareAMappingWithAFanOutOverAnotherArray() throws Exception {
-    // Worse than the vanished rule above: the fork over '$.measurements[]' repeats the whole
-    // '$.items' array into every fanned-out record, so the in-place rewrite runs once per record
-    // and
-    // each copy is written as its own row. One authored rewrite becomes N rows of duplicated data.
+    // Accepted, the fork would repeat '$.items' into every fanned-out record, so one authored
+    // rewrite would silently become N rows of duplicated data.
     FatalAdapterException error =
         assertThrows(
             FatalAdapterException.class,
@@ -203,9 +199,8 @@ class RecordPathCompilerTest {
 
   @Test
   void twoSourcesCollapsingOntoOnePostForkPathAreRejected() throws Exception {
-    // ForkRecord hoists the element field over the ancestor field of the same name, so both rules
-    // would read '/id' and carry the identical value. The author asked for two distinct fields;
-    // silently serving one twice is the same class of guess the sibling-array case rejects.
+    // ForkRecord hoists the element field over the ancestor one, so both rules would read '/id' and
+    // silently carry the same value where the author asked for two distinct fields.
     FatalAdapterException error =
         assertThrows(
             FatalAdapterException.class,
@@ -216,8 +211,8 @@ class RecordPathCompilerTest {
 
   @Test
   void theSameSourceReadTwiceIsNotACollision() throws Exception {
-    // The collision check keys on the post-fork path, so two rules legitimately reading the SAME
-    // source must not trip it — only two DIFFERENT sources collapsing onto one path do.
+    // The collision check keys on the post-fork path, so it must not fire on two rules that
+    // legitimately read the same source.
     CompiledMapping compiled =
         compiler.compile(
             parse("{ \"$.a\": \"$.items[].v\", \"$.b\": \"$.items[].v\" }"), GeometryEncoding.WKT);
@@ -230,9 +225,8 @@ class RecordPathCompilerTest {
 
   @Test
   void aNestedAncestorObjectStaysAddressableThroughItsOwnField() throws Exception {
-    // ForkRecord copies each ancestor field up under its own name and keeps its value shape, so a
-    // nested ancestor object is read through it — '/gateway/id', not '/id'. Dropping the ancestor
-    // segments would resolve to nothing and write a silent NULL.
+    // ForkRecord copies ancestor fields up under their own name and keeps their value shape, so
+    // dropping the ancestor segments would resolve to nothing and write a silent NULL.
     CompiledMapping compiled =
         compiler.compile(
             parse("{ \"$.gw\": \"$.gateway.id\", \"$.v\": \"$.items[].value\" }"),
@@ -243,8 +237,7 @@ class RecordPathCompilerTest {
 
   @Test
   void aConcreteArrayIndexIsNoFanOut() throws Exception {
-    // '[0]' selects one element rather than all of them, so it multiplies nothing and must not
-    // trigger a fork. The derivation keys on the '[]' selector alone, and that has to stay true.
+    // The derivation keys on the '[]' selector alone; a concrete index multiplies nothing.
     CompiledMapping compiled =
         compiler.compile(parse("{ \"$.v\": \"$.items[0].value\" }"), GeometryEncoding.WKT);
 
