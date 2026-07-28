@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -63,6 +64,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final DataSetSagaPublisher sagaPublisher;
 
+  private final PipelineRuntimeStatusService pipelineRuntimeStatusService;
+
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
@@ -74,6 +77,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       DataPoolRepository dataPoolRepository,
       AssignmentFactory assignmentFactory,
       DataSetSagaPublisher sagaPublisher,
+      PipelineRuntimeStatusService pipelineRuntimeStatusService,
       ObjectProvider<AllowedScopes> allowedScopesProvider,
       DataSourceDatapoolScopeValidator datapoolScopeValidator) {
     this.dataSetRepository = dataSetRepository;
@@ -82,6 +86,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     this.dataPoolRepository = dataPoolRepository;
     this.assignmentFactory = assignmentFactory;
     this.sagaPublisher = sagaPublisher;
+    this.pipelineRuntimeStatusService = pipelineRuntimeStatusService;
     this.allowedScopesProvider = allowedScopesProvider;
     this.datapoolScopeValidator = datapoolScopeValidator;
   }
@@ -501,11 +506,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       case CREATE -> {
         applyInfrastructureResult(dataSet, result);
         markProvisionedIfSinkExists(dataSet);
+        pipelineRuntimeStatusService.markDeploymentSucceeded(deployedPipelineIds(dataSet, result));
         log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
       }
       case UPDATE -> {
         applyInfrastructureResult(dataSet, result);
         markProvisionedIfSinkExists(dataSet);
+        pipelineRuntimeStatusService.markDeploymentSucceeded(deployedPipelineIds(dataSet, result));
         log.info("Saga UPDATE completed for dataset {}", datasetId);
       }
       case UNRELEASE -> {
@@ -699,6 +706,24 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     if (dataSet.getProjectId() != null) {
       dataSet.setProvisioned(true);
     }
+  }
+
+  /**
+   * The pipeline ids a completed saga reports, narrowed to those still attached to the dataset. An
+   * UPDATE result also carries the ids the same saga tore down, and marking a removed pipeline as
+   * successfully deployed would leave a permanently healthy status on a flow that no longer exists.
+   */
+  private List<String> deployedPipelineIds(DataSet dataSet, SagaResultPayload result) {
+    if (result.pipelineIds() == null) {
+      return List.of();
+    }
+    Set<String> attached =
+        dataSet.getPipelines().stream()
+            .map(Pipeline::getId)
+            .filter(Objects::nonNull)
+            .map(UUID::toString)
+            .collect(Collectors.toSet());
+    return result.pipelineIds().stream().filter(attached::contains).toList();
   }
 
   private void applyInfrastructureResult(DataSet dataSet, SagaResultPayload result) {
