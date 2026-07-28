@@ -234,7 +234,9 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
               });
 
       // A changed record with the same reference must PATCH the existing Thing, never create a
-      // duplicate.
+      // duplicate. Deliberate pacing dwell: the no-duplicate assertion is negative, so it only
+      // means something once every delivery has been processed. The sleep spaces the five
+      // deliveries out to guarantee that; an await here would return on the first success.
       for (int i = 0; i < 5; i++) {
         publisher.publish(TOPIC, UPDATED_ENVELOPE);
         Thread.sleep(Duration.ofSeconds(2).toMillis());
@@ -341,6 +343,8 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     // create one, so an unmatched reference is dropped to the error sink, not written.
     String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
     try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-frost-nods")) {
+      // Deliberate dwell: this proves an absence, so there is no condition that can complete early
+      // and shortening the window would only narrow the chance to observe the Datastream appearing.
       for (int i = 0; i < 10; i++) {
         publisher.publish(NO_DS_TOPIC, OBS_ENVELOPE_UNKNOWN_DS);
         Thread.sleep(3000);

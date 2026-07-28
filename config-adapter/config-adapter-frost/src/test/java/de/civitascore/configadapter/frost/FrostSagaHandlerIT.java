@@ -9,8 +9,6 @@
  */
 package de.civitascore.configadapter.frost;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -43,7 +41,7 @@ import org.junit.jupiter.api.Test;
  * duplicate project name, FROST returns HTTP 500 with body {@code {"message":"Failed to store
  * data."}}. The handler must treat this as an idempotent success.
  */
-class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
+class FrostSagaHandlerIT extends AbstractFrostIT {
 
   private FrostSagaHandler handler;
   private Client httpClient;
@@ -56,8 +54,6 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
         "http://" + FROST.getHost() + ":" + FROST.getMappedPort(8080) + "/FROST-Server/v1.1";
     httpClient = ClientBuilder.newClient();
     objectMapper = new ObjectMapper();
-
-    waitForFrostReady(frostBaseUrl);
 
     Map<String, Object> props = new HashMap<>();
     props.put("frost.url", frostBaseUrl);
@@ -447,19 +443,5 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
           response.getStatus(),
           () -> entityPath + " expected HTTP " + expectedStatus + " at server root");
     }
-  }
-
-  private void waitForFrostReady(String baseUrl) {
-    await()
-        .atMost(60, SECONDS)
-        .pollInterval(2, SECONDS)
-        .ignoreExceptions()
-        .untilAsserted(
-            () -> {
-              try (Response response =
-                  httpClient.target(baseUrl).path("Projects").request().get()) {
-                assertEquals(200, response.getStatus());
-              }
-            });
   }
 }

@@ -29,7 +29,7 @@ import org.keycloak.admin.client.resource.RolesResource;
 import org.keycloak.representations.idm.GroupRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 
-class KeycloakGroupIntegrationTest extends KeycloakAdapterIntegrationTestBase {
+class KeycloakGroupIT extends KeycloakAdapterITBase {
 
   @Test
   void createGroup_whenValidConfig_shouldCreateGroupInRealm()

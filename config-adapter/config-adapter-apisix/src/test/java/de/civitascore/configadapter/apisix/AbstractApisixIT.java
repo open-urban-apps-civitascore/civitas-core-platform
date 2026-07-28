@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration2.MapConfiguration;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.testcontainers.containers.GenericContainer;
@@ -49,7 +50,7 @@ import org.testcontainers.utility.MountableFile;
  * APISIX start only once per JVM.
  */
 @SuppressWarnings("resource")
-abstract class AbstractApisixIntegrationTest {
+abstract class AbstractApisixIT {
 
   protected static final String ADMIN_API_KEY = "edd1c9f034335f136f87ad84b625c8f1";
   protected static final Network NETWORK = Network.newNetwork();
@@ -61,6 +62,10 @@ abstract class AbstractApisixIntegrationTest {
   protected static final GenericContainer<?> APISIX;
 
   static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+
     ETCD =
         new GenericContainer<>(DockerImageName.parse(TestContainerImages.ETCD))
             .withNetwork(NETWORK)
@@ -83,16 +88,19 @@ abstract class AbstractApisixIntegrationTest {
             .withCopyFileToContainer(
                 MountableFile.forClasspathResource("apisix-test-config.yaml", 0644),
                 "/usr/local/apisix/conf/config.yaml")
+            // Admin-API readiness gates container start, so it is checked once per JVM instead of
+            // per test method. The timeout allows for a cold CI runner.
             .waitingFor(
                 Wait.forHttp("/apisix/admin/upstreams")
                     .forPort(9180)
                     .withHeader("X-API-KEY", ADMIN_API_KEY)
-                    .forStatusCode(200))
+                    .forStatusCode(200)
+                    .withStartupTimeout(Duration.ofMinutes(2)))
             .withReuse(false);
     APISIX.start();
 
     // Singleton container pattern: containers are shared across all subclasses of
-    // AbstractApisixIntegrationTest for performance (one startup instead of six).
+    // AbstractApisixIT for performance (one startup instead of six).
     // @AfterAll cannot be used here because it runs after EACH subclass — the first
     // @AfterAll would stop the containers and break all subsequent subclasses.
     // A JVM shutdown hook ensures cleanup regardless of test execution order.
@@ -115,8 +123,6 @@ abstract class AbstractApisixIntegrationTest {
   @BeforeEach
   void setUp() {
     adminApiUrl = "http://" + APISIX.getHost() + ":" + APISIX.getMappedPort(9180);
-
-    waitForApisixReady(adminApiUrl);
 
     Map<String, Object> props = new HashMap<>();
     props.put("apisix.admin.url", adminApiUrl);
@@ -455,28 +461,6 @@ abstract class AbstractApisixIntegrationTest {
     }
 
     return objectMapper.readTree(response.body());
-  }
-
-  private void waitForApisixReady(String adminUrl) {
-    await()
-        .atMost(60, SECONDS)
-        .pollInterval(2, SECONDS)
-        .ignoreExceptions()
-        .untilAsserted(
-            () -> {
-              HttpRequest request =
-                  HttpRequest.newBuilder()
-                      .uri(URI.create(adminUrl + "/apisix/admin/upstreams"))
-                      .header("X-API-KEY", ADMIN_API_KEY)
-                      .GET()
-                      .timeout(Duration.ofSeconds(5))
-                      .build();
-
-              HttpResponse<String> response =
-                  HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
-
-              assertEquals(200, response.statusCode());
-            });
   }
 
   static class TestEventPublisher implements EventPublisher {

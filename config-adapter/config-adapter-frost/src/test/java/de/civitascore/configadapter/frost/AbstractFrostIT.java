@@ -11,6 +11,7 @@ package de.civitascore.configadapter.frost;
 
 import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.time.Duration;
+import org.awaitility.Awaitility;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -21,7 +22,7 @@ import org.testcontainers.utility.DockerImageName;
  * FROST-Server start only once per JVM.
  */
 @SuppressWarnings("resource")
-abstract class AbstractFrostIntegrationTest {
+abstract class AbstractFrostIT {
 
   protected static final Network NETWORK = Network.newNetwork();
 
@@ -29,6 +30,10 @@ abstract class AbstractFrostIntegrationTest {
   protected static final GenericContainer<?> FROST;
 
   static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+
     POSTGIS =
         new GenericContainer<>(DockerImageName.parse(TestContainerImages.POSTGIS))
             .withNetwork(NETWORK)
@@ -56,14 +61,16 @@ abstract class AbstractFrostIntegrationTest {
             .withEnv("persistence_db_username", "sensorthings")
             .withEnv("persistence_db_password", "ChangeMe")
             .withEnv("persistence_autoUpdateDatabase", "true")
+            // Probing Projects also proves the projects plugin is loaded, which the core entity
+            // endpoints alone do not show.
             .waitingFor(
-                Wait.forHttp("/FROST-Server/v1.1/Things")
+                Wait.forHttp("/FROST-Server/v1.1/Projects")
                     .forStatusCode(200)
                     .withStartupTimeout(Duration.ofMinutes(2)));
     FROST.start();
 
     // Singleton container pattern: containers are shared across all subclasses of
-    // AbstractFrostIntegrationTest for performance (one startup instead of two).
+    // AbstractFrostIT for performance (one startup instead of two).
     // A JVM shutdown hook ensures cleanup regardless of test execution order.
     Runtime.getRuntime()
         .addShutdownHook(

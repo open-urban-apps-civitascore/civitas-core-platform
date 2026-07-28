@@ -9,11 +9,8 @@
  */
 package de.civitascore.configadapter.frost;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,9 +49,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Integration test for FrostAdapter using Testcontainers with a real FROST-Server and PostGIS
- * database. Tests standard FROST entity CRUD operations: Things, Locations, and Sensors.
+ * database. Tests FROST Projects extension: Project CRUD and project-scoped entity creation.
  */
-class FrostAdapterIntegrationTest extends AbstractFrostIntegrationTest {
+class FrostProjectsIT extends AbstractFrostIT {
 
   private FrostAdapter adapter;
   private TestEventPublisher eventPublisher;
@@ -69,8 +66,6 @@ class FrostAdapterIntegrationTest extends AbstractFrostIntegrationTest {
     httpClient = ClientBuilder.newClient();
     objectMapper = new ObjectMapper();
 
-    waitForFrostReady(frostBaseUrl);
-
     Map<String, Object> props = new HashMap<>();
     props.put("frost.url", frostBaseUrl);
     props.put("frost.api.key", "test-api-key");
@@ -79,11 +74,10 @@ class FrostAdapterIntegrationTest extends AbstractFrostIntegrationTest {
         "frost.topics",
         String.join(
             ",",
-            Topics.THING_CREATED.toString(),
-            Topics.THING_UPDATED.toString(),
-            Topics.THING_DELETED.toString(),
-            Topics.LOCATION_CREATED.toString(),
-            Topics.SENSOR_CREATED.toString()));
+            Topics.FROST_PROJECT_CREATED.toString(),
+            Topics.FROST_PROJECT_UPDATED.toString(),
+            Topics.FROST_PROJECT_DELETED.toString(),
+            Topics.THING_CREATED.toString()));
     AppConfig config = new AppConfig(new MapConfiguration(props));
 
     adapter = new FrostAdapter();
@@ -113,13 +107,113 @@ class FrostAdapterIntegrationTest extends AbstractFrostIntegrationTest {
   }
 
   @Test
-  void createThingReturnsSuccessAndEntityExists() throws Exception {
+  void createProjectReturnsSuccessAndEntityExists() throws Exception {
+    Map<String, Object> projectData =
+        Map.of(
+            "name", "Smart City Project",
+            "description", "A test project for smart city sensors");
+
+    ConfigEvent event = createConfigEvent(Operation.CREATE, "Projects", projectData);
+
+    adapter.processConfigEvent(Topics.FROST_PROJECT_CREATED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent result = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS,
+        result.status(),
+        () -> "Create failed: " + result.message() + " (errorCode: " + result.errorCode() + ")");
+    assertNotNull(result.resourceId());
+
+    JsonNode entity = getEntityFromFrost("Projects", result.resourceId());
+    assertEquals("Smart City Project", entity.get("name").asText());
+    assertEquals("A test project for smart city sensors", entity.get("description").asText());
+  }
+
+  @Test
+  void updateProjectReturnsSuccessAndEntityIsModified() throws Exception {
+    String projectId =
+        createEntityDirectly(
+            "Projects",
+            Map.of("name", "Original Project", "description", "Original project description"));
+
+    Map<String, Object> updateData = Map.of("description", "Updated project description");
+    ConfigEvent event = createConfigEvent(Operation.UPDATE, "Projects/" + projectId, updateData);
+
+    adapter.processConfigEvent(Topics.FROST_PROJECT_UPDATED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent result = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS,
+        result.status(),
+        () -> "Update failed: " + result.message() + " (errorCode: " + result.errorCode() + ")");
+    assertEquals(projectId, result.resourceId());
+
+    JsonNode entity = getEntityFromFrost("Projects", projectId);
+    assertEquals("Updated project description", entity.get("description").asText());
+    assertEquals("Original Project", entity.get("name").asText());
+  }
+
+  @Test
+  void deleteProjectReturnsSuccessAndEntityIsRemoved()
+      throws FatalAdapterException, RetryableAdapterException {
+    String projectId =
+        createEntityDirectly(
+            "Projects", Map.of("name", "Project To Delete", "description", "Will be deleted"));
+
+    ConfigEvent event = createConfigEvent(Operation.DELETE, "Projects/" + projectId, null);
+
+    adapter.processConfigEvent(Topics.FROST_PROJECT_DELETED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent result = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+
+    try (Response response =
+        httpClient
+            .target(frostBaseUrl)
+            .path("Projects(" + projectId + ")")
+            .request(MediaType.APPLICATION_JSON)
+            .get()) {
+      assertEquals(404, response.getStatus());
+    }
+  }
+
+  @Test
+  void createProjectTwiceWithSameNameReturnsSuccessForBoth() throws Exception {
+    String projectName = "Idempotent-" + UUID.randomUUID();
+    Map<String, Object> projectData = Map.of("name", projectName, "description", "");
+
+    ConfigEvent firstEvent = createConfigEvent(Operation.CREATE, "Projects", projectData);
+    adapter.processConfigEvent(Topics.FROST_PROJECT_CREATED.toString(), firstEvent);
+
+    ConfigEvent secondEvent = createConfigEvent(Operation.CREATE, "Projects", projectData);
+    adapter.processConfigEvent(Topics.FROST_PROJECT_CREATED.toString(), secondEvent);
+
+    List<ConfigResultEvent> results = eventPublisher.getPublishedEvents();
+    assertEquals(2, results.size());
+    assertEquals(ConfigResultEvent.Status.SUCCESS, results.get(0).status());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS,
+        results.get(1).status(),
+        () -> "Second create (idempotent) failed: " + results.get(1).message());
+  }
+
+  @Test
+  void createThingScopedToProjectReturnsSuccessAndEntityExists() throws Exception {
+    String projectId =
+        createEntityDirectly(
+            "Projects",
+            Map.of("name", "Scoped Project", "description", "Project for scoped thing test"));
+
     Map<String, Object> thingData =
         Map.of(
-            "name", "Integration Test Thing",
-            "description", "A thing created by integration test");
+            "name", "Project-Scoped Thing",
+            "description", "A thing created within a project scope");
 
-    ConfigEvent event = createConfigEvent(Operation.CREATE, "Things", thingData);
+    ConfigEvent event =
+        createConfigEvent(Operation.CREATE, "Projects/" + projectId + "/Things", thingData);
 
     adapter.processConfigEvent(Topics.THING_CREATED.toString(), event);
 
@@ -129,111 +223,7 @@ class FrostAdapterIntegrationTest extends AbstractFrostIntegrationTest {
     assertNotNull(result.resourceId());
 
     JsonNode entity = getEntityFromFrost("Things", result.resourceId());
-    assertEquals("Integration Test Thing", entity.get("name").asText());
-    assertEquals("A thing created by integration test", entity.get("description").asText());
-  }
-
-  @Test
-  void createLocationReturnsSuccessAndEntityExists() throws Exception {
-    Map<String, Object> locationData =
-        Map.of(
-            "name", "Integration Test Location",
-            "description", "A test location with GeoJSON",
-            "encodingType", "application/geo+json",
-            "location", Map.of("type", "Point", "coordinates", List.of(8.4037, 49.0069)));
-
-    ConfigEvent event = createConfigEvent(Operation.CREATE, "Locations", locationData);
-
-    adapter.processConfigEvent(Topics.LOCATION_CREATED.toString(), event);
-
-    assertEquals(1, eventPublisher.getPublishedEvents().size());
-    ConfigResultEvent result = eventPublisher.getPublishedEvents().getFirst();
-    assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
-    assertNotNull(result.resourceId());
-
-    JsonNode entity = getEntityFromFrost("Locations", result.resourceId());
-    assertEquals("Integration Test Location", entity.get("name").asText());
-    assertEquals("application/geo+json", entity.get("encodingType").asText());
-  }
-
-  @Test
-  void createSensorReturnsSuccessAndEntityExists() throws Exception {
-    Map<String, Object> sensorData =
-        Map.of(
-            "name", "Integration Test Sensor",
-            "description", "A test sensor",
-            "encodingType", "text/html",
-            "metadata", "https://example.com/sensor");
-
-    ConfigEvent event = createConfigEvent(Operation.CREATE, "Sensors", sensorData);
-
-    adapter.processConfigEvent(Topics.SENSOR_CREATED.toString(), event);
-
-    assertEquals(1, eventPublisher.getPublishedEvents().size());
-    ConfigResultEvent result = eventPublisher.getPublishedEvents().getFirst();
-    assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
-    assertNotNull(result.resourceId());
-
-    JsonNode entity = getEntityFromFrost("Sensors", result.resourceId());
-    assertEquals("Integration Test Sensor", entity.get("name").asText());
-  }
-
-  @Test
-  void updateThingReturnsSuccessAndEntityIsModified() throws Exception {
-    String thingId =
-        createEntityDirectly(
-            "Things", Map.of("name", "Original Thing", "description", "Original description"));
-
-    Map<String, Object> updateData = Map.of("description", "Updated description");
-    ConfigEvent event = createConfigEvent(Operation.UPDATE, "Things/" + thingId, updateData);
-
-    adapter.processConfigEvent(Topics.THING_UPDATED.toString(), event);
-
-    assertEquals(1, eventPublisher.getPublishedEvents().size());
-    ConfigResultEvent result = eventPublisher.getPublishedEvents().getFirst();
-    assertEquals(
-        ConfigResultEvent.Status.SUCCESS,
-        result.status(),
-        () -> "Update failed: " + result.message() + " (errorCode: " + result.errorCode() + ")");
-    assertEquals(thingId, result.resourceId());
-
-    JsonNode entity = getEntityFromFrost("Things", thingId);
-    assertEquals("Updated description", entity.get("description").asText());
-    assertEquals("Original Thing", entity.get("name").asText());
-  }
-
-  @Test
-  void deleteThingReturnsSuccessAndEntityIsRemoved()
-      throws FatalAdapterException, RetryableAdapterException {
-    String thingId =
-        createEntityDirectly(
-            "Things", Map.of("name", "Thing To Delete", "description", "Will be deleted"));
-
-    ConfigEvent event = createConfigEvent(Operation.DELETE, "Things/" + thingId, null);
-
-    adapter.processConfigEvent(Topics.THING_DELETED.toString(), event);
-
-    assertEquals(1, eventPublisher.getPublishedEvents().size());
-    ConfigResultEvent result = eventPublisher.getPublishedEvents().getFirst();
-    assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
-
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path("Things(" + thingId + ")")
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
-      assertEquals(404, response.getStatus());
-    }
-  }
-
-  @Test
-  void createWithInvalidDataThrowsFatalException() {
-    ConfigEvent event = createConfigEvent(Operation.CREATE, "Things", Map.of());
-
-    assertThrows(
-        FatalAdapterException.class,
-        () -> adapter.processConfigEvent(Topics.THING_CREATED.toString(), event));
+    assertEquals("Project-Scoped Thing", entity.get("name").asText());
   }
 
   // --- Helper methods ---
@@ -245,11 +235,14 @@ class FrostAdapterIntegrationTest extends AbstractFrostIntegrationTest {
             .path(entityType)
             .request(MediaType.APPLICATION_JSON)
             .post(Entity.json(data))) {
-      assertEquals(201, response.getStatus(), "Failed to create " + entityType + " directly");
+      String body = response.readEntity(String.class);
+      assertEquals(
+          201, response.getStatus(), "Failed to create " + entityType + " directly: " + body);
       String locationHeader = response.getHeaderString("Location");
       int start = locationHeader.lastIndexOf('(');
       int end = locationHeader.lastIndexOf(')');
-      return locationHeader.substring(start + 1, end);
+      String id = locationHeader.substring(start + 1, end);
+      return id.replace("'", "");
     }
   }
 
@@ -264,19 +257,6 @@ class FrostAdapterIntegrationTest extends AbstractFrostIntegrationTest {
       String body = response.readEntity(String.class);
       return objectMapper.readTree(body);
     }
-  }
-
-  private void waitForFrostReady(String baseUrl) {
-    await()
-        .atMost(60, SECONDS)
-        .pollInterval(2, SECONDS)
-        .ignoreExceptions()
-        .untilAsserted(
-            () -> {
-              try (Response response = httpClient.target(baseUrl).path("Things").request().get()) {
-                assertEquals(200, response.getStatus());
-              }
-            });
   }
 
   private ConfigEvent createConfigEvent(

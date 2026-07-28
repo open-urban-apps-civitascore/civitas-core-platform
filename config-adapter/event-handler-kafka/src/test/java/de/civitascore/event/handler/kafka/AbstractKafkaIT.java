@@ -10,6 +10,8 @@
 package de.civitascore.event.handler.kafka;
 
 import de.civitascore.configadapter.testsupport.TestContainerImages;
+import java.time.Duration;
+import org.awaitility.Awaitility;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -17,7 +19,7 @@ import org.testcontainers.utility.DockerImageName;
  * Base class for Kafka integration tests. Uses the singleton container pattern so the Kafka
  * container starts only once per JVM.
  */
-abstract class AbstractKafkaIntegrationTest {
+abstract class AbstractKafkaIT {
 
   @SuppressWarnings("resource")
   protected static final ConfluentKafkaContainer KAFKA =
@@ -25,6 +27,10 @@ abstract class AbstractKafkaIntegrationTest {
           .withReuse(false);
 
   static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+
     KAFKA.start();
 
     Runtime.getRuntime().addShutdownHook(new Thread(KAFKA::stop));

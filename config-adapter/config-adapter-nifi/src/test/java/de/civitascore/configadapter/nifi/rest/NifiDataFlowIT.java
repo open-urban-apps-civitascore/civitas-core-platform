@@ -136,6 +136,8 @@ class NifiDataFlowIT extends AbstractNifiIT {
     // The lookup resolves an existing @iot.id, so the Thing must NOT be re-created.
     publishUntil(
         "civitas/it/thing-exists", "civitas-it-exists", () -> getReceived(thingsPath(basePath)));
+    // Deliberate dwell: once the lookup has landed there is no positive signal for "no POST
+    // followed", so the elapsed time is what gives a wrong POST a chance to show up.
     Thread.sleep(Duration.ofSeconds(5).toMillis());
     assertFalse(
         postedTo(thingsPath(basePath)), "an existing Thing must not be POSTed again (idempotency)");

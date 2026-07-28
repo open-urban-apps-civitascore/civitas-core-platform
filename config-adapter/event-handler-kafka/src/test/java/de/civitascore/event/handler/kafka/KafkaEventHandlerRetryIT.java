@@ -71,7 +71,7 @@ import org.junit.jupiter.api.Test;
  *   <li>DLQ message format (no stack traces, safe messages)
  * </ul>
  */
-class KafkaEventHandlerRetryIntegrationTest extends AbstractKafkaIntegrationTest {
+class KafkaEventHandlerRetryIT extends AbstractKafkaIT {
 
   private KafkaEventHandler handler;
   private RetryTestAdapter testAdapter;

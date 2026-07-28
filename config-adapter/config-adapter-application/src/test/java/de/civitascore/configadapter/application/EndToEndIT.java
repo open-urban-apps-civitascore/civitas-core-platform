@@ -9,8 +9,6 @@
  */
 package de.civitascore.configadapter.application;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,7 +54,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.awaitility.core.ThrowingRunnable;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
@@ -67,6 +65,7 @@ import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
@@ -78,7 +77,13 @@ import org.testcontainers.utility.DockerImageName;
  */
 @Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class EndToEndIntegrationTest {
+class EndToEndIT {
+
+  static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+  }
 
   @SuppressWarnings("resource")
   @Container
@@ -94,6 +99,13 @@ class EndToEndIntegrationTest {
           .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
           .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin")
           .withCommand("start-dev")
+          // The management-port health endpoints are not enabled on this container, so the master
+          // realm endpoint is the readiness signal.
+          .waitingFor(
+              Wait.forHttp("/realms/master")
+                  .forPort(8080)
+                  .forStatusCode(200)
+                  .withStartupTimeout(Duration.ofMinutes(2)))
           .withReuse(false);
 
   private KafkaEventHandler consumer;
@@ -108,8 +120,6 @@ class EndToEndIntegrationTest {
     objectMapper = ObjectMapperFactory.createObjectMapper();
 
     String keycloakUrl = "http://" + keycloak.getHost() + ":" + keycloak.getMappedPort(8080);
-
-    waitForKeycloakReady(keycloakUrl);
 
     Map<String, Object> props = new HashMap<>();
     props.put("kafka.bootstrap.servers", kafka.getBootstrapServers());
@@ -383,21 +393,6 @@ class EndToEndIntegrationTest {
     users = keycloakClient.realm("seq-test-realm").users().search("sequser");
     assertEquals(1, users.size());
     assertEquals("Updated", users.get(0).getFirstName());
-  }
-
-  private void waitForKeycloakReady(String keycloakUrl) {
-    ThrowingRunnable assertion =
-        () -> {
-          try (Keycloak testClient =
-              Keycloak.getInstance(keycloakUrl, "master", "admin", "admin", "admin-cli")) {
-            testClient.serverInfo().getInfo();
-          }
-        };
-    await()
-        .atMost(30, SECONDS)
-        .pollInterval(1, SECONDS)
-        .ignoreExceptions()
-        .untilAsserted(assertion);
   }
 
   /** Creates a ConfigEvent with a config value - demonstrates how developers use the API. */

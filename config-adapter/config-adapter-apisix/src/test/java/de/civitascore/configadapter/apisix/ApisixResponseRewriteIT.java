@@ -34,7 +34,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /** Integration tests for ApisixAdapter response-rewrite plugin. */
-class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest {
+class ApisixResponseRewriteIT extends AbstractApisixIT {
 
   @Test
   void createRouteWithResponseRewriteSetHeaders() throws Exception {

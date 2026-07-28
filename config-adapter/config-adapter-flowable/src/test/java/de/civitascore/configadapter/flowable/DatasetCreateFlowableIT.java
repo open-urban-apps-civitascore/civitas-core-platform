@@ -9,8 +9,6 @@
  */
 package de.civitascore.configadapter.flowable;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -41,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.awaitility.Awaitility;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.ProcessEngine;
 import org.flowable.engine.RuntimeService;
@@ -60,6 +59,12 @@ import org.testcontainers.utility.DockerImageName;
 
 @Testcontainers
 class DatasetCreateFlowableIT {
+
+  static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+  }
 
   static Network network = Network.newNetwork();
 
@@ -109,7 +114,6 @@ class DatasetCreateFlowableIT {
     frostBaseUrl =
         "http://" + frost.getHost() + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
     httpClient = ClientBuilder.newClient();
-    waitForFrostReady();
 
     apisixRequestPaths = Collections.synchronizedList(new ArrayList<>());
     apisixMock = HttpServer.create(new InetSocketAddress(0), 0);
@@ -326,20 +330,6 @@ class DatasetCreateFlowableIT {
     try (OutputStream os = exchange.getResponseBody()) {
       os.write(response);
     }
-  }
-
-  private void waitForFrostReady() {
-    await()
-        .atMost(60, SECONDS)
-        .pollInterval(2, SECONDS)
-        .ignoreExceptions()
-        .untilAsserted(
-            () -> {
-              try (Response response =
-                  httpClient.target(frostBaseUrl).path("Projects").request().get()) {
-                assertEquals(200, response.getStatus());
-              }
-            });
   }
 
   private AdapterConfig mapConfig(Map<String, String> props) {

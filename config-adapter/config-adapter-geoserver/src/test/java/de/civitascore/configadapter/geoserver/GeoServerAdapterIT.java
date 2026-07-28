@@ -77,7 +77,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
  * adapter's current implementation.
  */
 @TestInstance(Lifecycle.PER_CLASS)
-class GeoServerAdapterIntegrationTest extends AbstractGeoServerIntegrationTest {
+class GeoServerAdapterIT extends AbstractGeoServerIT {
 
   private static final String WORKSPACE = "it_workspace_001";
   private static final String DATASTORE = "postgis";

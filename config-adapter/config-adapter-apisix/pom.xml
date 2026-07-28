@@ -137,39 +137,12 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <executions>
-                    <!-- Default test execution: everything except ApisixSagaHandlerRoutingTest.
-                         Runs with the stock JVM arguments so the Host-header restriction stays in
-                         place for unrelated tests (principle of least privilege). -->
-                    <execution>
-                        <id>default-test</id>
-                        <goals>
-                            <goal>test</goal>
-                        </goals>
-                        <configuration>
-                            <excludes>
-                                <exclude>**/ApisixSagaHandlerRoutingTest.java</exclude>
-                            </excludes>
-                        </configuration>
-                    </execution>
-                    <!-- Dedicated execution for the host-isolation integration test only — this is
-                         the single place that needs to set a custom Host header via the JDK HTTP
-                         client, which refuses restricted header names by default. Scoped tightly
-                         so the flag is not silently applied to the rest of the module. -->
-                    <execution>
-                        <id>host-isolation-test</id>
-                        <goals>
-                            <goal>test</goal>
-                        </goals>
-                        <configuration>
-                            <includes>
-                                <include>**/ApisixSagaHandlerRoutingTest.java</include>
-                            </includes>
-                            <argLine>-Djdk.httpclient.allowRestrictedHeaders=host</argLine>
-                        </configuration>
-                    </execution>
-                </executions>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <!-- ApisixSagaHandlerRoutingIT sets a custom Host header via the JDK HTTP
+                         client, which refuses restricted header names by default. -->
+                    <argLine>@{argLine} -Djdk.httpclient.allowRestrictedHeaders=host</argLine>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>com.github.spotbugs</groupId>

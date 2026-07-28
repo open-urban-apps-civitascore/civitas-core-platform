@@ -26,7 +26,7 @@ import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.representations.idm.ClientRepresentation;
 
-class KeycloakClientIntegrationTest extends KeycloakAdapterIntegrationTestBase {
+class KeycloakClientIT extends KeycloakAdapterITBase {
 
   @Test
   void shouldCreateClient() throws FatalAdapterException, RetryableAdapterException {

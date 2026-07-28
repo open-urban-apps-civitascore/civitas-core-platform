@@ -35,7 +35,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /** Integration tests for ApisixAdapter route operations. */
-class ApisixRouteIntegrationTest extends AbstractApisixIntegrationTest {
+class ApisixRouteIT extends AbstractApisixIT {
 
   @Test
   void createRoute() throws Exception {
