@@ -97,8 +97,8 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
   }
 
   // Unlike cleanupKeycloakUsers, this deletes every group unconditionally: the target realm is a
-  // test-only realm that holds nothing but groups synced by the tests, so there is no non-test group
-  // to preserve. Test group names are heterogeneous ("Init Test Admins", "syncgrp<ms>",
+  // test-only realm holding nothing but groups synced by the tests, so no non-test group exists to
+  // preserve. Test group names are heterogeneous ("Init Test Admins", "syncgrp<ms>",
   // "Test Group <ms>", ...) with no common prefix, so scoping by name would silently leak groups
   // whenever a new test introduces a new naming pattern.
   private void cleanupKeycloakGroups() {
