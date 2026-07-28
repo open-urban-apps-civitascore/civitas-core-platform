@@ -560,7 +560,11 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
     Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", disc + "Body");
     setProp(renderBody, "Replacement Value", body);
-    Processor post = loadFrostHttp(ctx, "Response", disc + "Post");
+    // Continues on 'Original', not 'Response': capturing the body into an attribute (below)
+    // suppresses the response FlowFile on success, so InvokeHTTP transfers only the request
+    // FlowFile — to 'Original' on 2xx and to Retry/No Retry otherwise. Chaining 'Response' here
+    // would strand every created entity, since that relationship never receives a FlowFile.
+    Processor post = loadFrostHttp(ctx, "Original", disc + "Post");
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", postUrl);
     setProp(post, "Request Content-Type", "application/json");
@@ -588,7 +592,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     }
     ctx.addConnection(route, renderBody, "new");
     ctx.addChainConnection(renderBody, post);
-    removeAutoTerminated(post, "Response");
+    removeAutoTerminated(post, "Original");
     ctx.addChainConnection(post, reGet);
     removeAutoTerminated(reGet, "Response");
     ctx.addChainConnection(reGet, reId);
