@@ -7,8 +7,6 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Pins the contract for the V1_1_2 connector-configuration discriminator backfill.
@@ -22,49 +20,54 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * BaseKeycloakIntegrationTest}) because the goal is to apply migrations to a partial schema
  * (target=1.1.1, insert legacy rows, then target=1.1.2). Spring Boot's auto-Flyway would
  * short-circuit this by always migrating to head on context startup.
+ *
+ * <p>The Postgres container is started inside the test method rather than via {@code @Container} so
+ * that no container is booted while the test is disabled. Note that {@code 1.1.2} is now taken by
+ * {@code V1_1_2__drop_pipeline_apis.sql}: whoever activates this test has to retarget both Flyway
+ * calls at the version pair that actually surrounds the backfill migration.
  */
-@Testcontainers
 @DisplayName("V1_1_2 discriminator backfill — characterization (activated in slice 2)")
 class DiscriminatorBackfillMigrationIntegrationTest {
 
-  @Container
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>(TestContainerImages.POSTGRES);
-
   @Test
-  @Disabled("activated in slice 2 once V1_1_2 migration SQL exists")
+  @Disabled("activated in slice 2 once the discriminator backfill migration SQL exists")
   @DisplayName("Backfills @type from connector_type for legacy rows")
   void backfillsTypeDiscriminator() throws Exception {
-    // Step A: migrate to V1.1.1 only — the schema just before the discriminator migration.
-    Flyway.configure()
-        .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-        .locations("classpath:db/migration")
-        .target(MigrationVersion.fromVersion("1.1.1"))
-        .load()
-        .migrate();
+    try (PostgreSQLContainer<?> postgres =
+        new PostgreSQLContainer<>(TestContainerImages.POSTGRES)) {
+      postgres.start();
 
-    // Step B: insert representative legacy rows directly via JDBC. Each row exercises a
-    // characterization case for the V1_1_2 backfill:
-    //   - SQL row     — configuration JSONB without "@type", connector_type = SQL
-    //   - MQTT row    — configuration JSONB without "@type", connector_type = MQTT
-    //   - already-tagged row — configuration JSONB already contains "@type" (idempotency)
-    //   - null-config row    — configuration IS NULL (pin whether migration touches it)
-    //   - garbage-config row — configuration is non-object JSON (pin failure-or-skip behavior)
-    // TODO[slice 2]: implement the inserts using a fresh JDBC Connection against POSTGRES.
+      // Step A: migrate to V1.1.1 only — the schema just before the discriminator migration.
+      Flyway.configure()
+          .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+          .locations("classpath:db/migration")
+          .target(MigrationVersion.fromVersion("1.1.1"))
+          .load()
+          .migrate();
 
-    // Step C: apply V1.1.2 — runs the discriminator backfill migration.
-    Flyway.configure()
-        .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-        .locations("classpath:db/migration")
-        .target(MigrationVersion.fromVersion("1.1.2"))
-        .load()
-        .migrate();
+      // Step B: insert representative legacy rows directly via JDBC. Each row exercises a
+      // characterization case for the backfill:
+      //   - SQL row     — configuration JSONB without "@type", connector_type = SQL
+      //   - MQTT row    — configuration JSONB without "@type", connector_type = MQTT
+      //   - already-tagged row — configuration JSONB already contains "@type" (idempotency)
+      //   - null-config row    — configuration IS NULL (pin whether migration touches it)
+      //   - garbage-config row — configuration is non-object JSON (pin failure-or-skip behavior)
+      // TODO[slice 2]: implement the inserts using a fresh JDBC Connection against postgres.
 
-    // Step D: assert each row's resulting JSONB matches expectations:
-    //   - SQL/MQTT rows now have configuration ->> '@type' equal to the connector_type value
-    //   - already-tagged row is unchanged (idempotency holds)
-    //   - null-config row remains NULL (or asserts the documented behavior)
-    //   - garbage-config row behaves as documented (skipped, or migration fails fast)
-    // TODO[slice 2]: implement the assertions.
+      // Step C: apply V1.1.2 — runs the discriminator backfill migration.
+      Flyway.configure()
+          .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+          .locations("classpath:db/migration")
+          .target(MigrationVersion.fromVersion("1.1.2"))
+          .load()
+          .migrate();
+
+      // Step D: assert each row's resulting JSONB matches expectations:
+      //   - SQL/MQTT rows now have configuration ->> '@type' equal to the connector_type value
+      //   - already-tagged row is unchanged (idempotency holds)
+      //   - null-config row remains NULL (or asserts the documented behavior)
+      //   - garbage-config row behaves as documented (skipped, or migration fails fast)
+      // TODO[slice 2]: implement the assertions.
+    }
   }
 }
