@@ -17,6 +17,8 @@ import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.CopyNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.GeoPointNode;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,28 +29,24 @@ import java.util.Set;
  * that each element becomes its own record and therefore its own row or entity.
  *
  * <p>How many records a payload carries is a question only the <em>source</em> side can answer, and
- * only the mapping as a whole — never a single rule. A target array selector is no multiplier: for
- * FROST it marks an entity tier and for PostGIS the table is flat.
+ * only the mapping as a whole — never a single rule. A target array selector multiplies nothing:
+ * for FROST it merely marks an entity tier, and for PostGIS it selects into an array the record
+ * already carries.
  *
- * <p>The target side still has one veto. A rule whose target keeps its own array level is an
- * in-place rewrite within each element, rendered relative ({@code ../field}); flattening that array
- * would leave its target addressing nothing. Such a rule therefore contributes no fan-out — which
- * is also why a mapping can pair an array-to-array rule with plain root-level ones.
+ * <p>The target side contributes no fan-out of its own. A rule whose target keeps its array level
+ * is an in-place rewrite within each element, rendered relative ({@code ../field}), and its own
+ * source array must therefore survive rather than be flattened. Such a rule can only coexist with a
+ * fan-out derived from elsewhere in the mapping if that fan-out leaves it intact — which no fan-out
+ * does, so mixing the two is rejected.
  *
  * <p>Several source paths sharing one hierarchical line (for example {@code stations[].name} and
- * {@code stations[].measurements[].value}) are a single fan-out over the innermost array — the
- * outer levels come along as parent fields. Independent sibling arrays are rejected instead:
- * pairing 3 measurements with 2 alarms yields neither 3, 2 nor 6 records, so any choice would be a
- * silent guess.
+ * {@code stations[].measurements[].value}) are a single fan-out over the innermost array. Sources
+ * on independent lines are rejected, as are two sources that collapse onto the same post-fork path.
  */
-public record ForkPlan(String recordPath, List<String> arrayContext) {
+public record ForkPlan(String recordPath) {
 
   /** The plan for a mapping that reads no array and therefore needs no fan-out. */
-  public static final ForkPlan NONE = new ForkPlan(null, List.of());
-
-  public ForkPlan {
-    arrayContext = List.copyOf(arrayContext);
-  }
+  public static final ForkPlan NONE = new ForkPlan(null);
 
   /** Whether the mapping needs a fan-out at all. */
   public boolean required() {
@@ -61,7 +59,9 @@ public record ForkPlan(String recordPath, List<String> arrayContext) {
    * @param mapping the parsed mapping
    * @return the plan, or a plan with {@link #required()} {@code false} if no source selects an
    *     array
-   * @throws FatalAdapterException if the sources span independent arrays, which cannot be paired
+   * @throws FatalAdapterException if the sources span independent arrays, if a rule rewrites an
+   *     array in place that the fan-out would destroy, or if two sources collapse onto one
+   *     post-fork path — none of which can be resolved without guessing
    */
   public static ForkPlan forMapping(MappingConfig mapping) throws FatalAdapterException {
     return forMapping(mapping, true);
@@ -80,19 +80,52 @@ public record ForkPlan(String recordPath, List<String> arrayContext) {
   public static ForkPlan forMapping(MappingConfig mapping, boolean targetsKeepTheirShape)
       throws FatalAdapterException {
     Set<List<String>> contexts = new LinkedHashSet<>();
+    List<String> inPlaceTargets = new ArrayList<>();
+    List<String> sourcePaths = new ArrayList<>();
     for (Map.Entry<String, ValueNode> field : mapping.fields().entrySet()) {
       if (targetsKeepTheirShape && keepsItsArrayLevel(field.getKey())) {
-        // An in-place rule: forking would flatten the very array its target still addresses.
+        // An in-place rule rewrites fields within each element and needs its array to survive, so
+        // it asks for no fan-out. Whether it can tolerate one derived from the other rules is
+        // decided below, once the fan-out is known.
+        inPlaceTargets.add(field.getKey());
         continue;
       }
-      collectArrayContexts(field.getValue(), contexts);
+      collectArrayContexts(field.getValue(), contexts, sourcePaths);
     }
     if (contexts.isEmpty()) {
       return NONE;
     }
 
+    List<String> innermost = innermostSharedContext(contexts);
+    // A fan-out anywhere in the mapping rewrites the record shape for every rule, so an in-place
+    // rule cannot survive it: forking its own array flattens the level its target addresses, and
+    // forking a different one repeats the whole array across the fanned-out records and rewrites it
+    // once per record. Both are silent — a vanished field or duplicated data, with no bulletin.
+    if (!inPlaceTargets.isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_MAPPING_ERROR,
+          "cannot combine the in-place array target '"
+              + inPlaceTargets.get(0)
+              + "' with the fan-out over source array '"
+              + describe(innermost)
+              + "': the fan-out flattens each record to one element, leaving no array for that"
+              + " target to rewrite; map the array-valued rule in its own mapping node instead");
+    }
+    ForkPlan plan = new ForkPlan(forkRecordPath(innermost));
+    plan.rejectCollidingSources(sourcePaths);
+    return plan;
+  }
+
+  /**
+   * The innermost of several array contexts, which must all lie on one hierarchical line — the
+   * outer levels then ride along as parent fields. Independent sibling arrays are rejected: pairing
+   * 3 measurements with 2 alarms yields neither 3, 2 nor 6 records, so any choice would be a silent
+   * guess.
+   */
+  private static List<String> innermostSharedContext(Set<List<String>> contexts)
+      throws FatalAdapterException {
     List<String> innermost =
-        contexts.stream().max(java.util.Comparator.comparingInt(List::size)).orElseThrow();
+        contexts.stream().max(Comparator.comparingInt(List::size)).orElseThrow();
     for (List<String> context : contexts) {
       if (!isPrefixOf(context, innermost)) {
         throw new FatalAdapterException(
@@ -104,24 +137,57 @@ public record ForkPlan(String recordPath, List<String> arrayContext) {
                 + "' onto one target: their elements pair in no defined order");
       }
     }
-    return new ForkPlan(forkRecordPath(innermost), innermost);
+    return innermost;
+  }
+
+  /**
+   * Rejects two sources that read different payload fields but the same post-fork one. The fork
+   * hoists an element field over an ancestor field of the same name, so both rules would resolve to
+   * the element value and the author's two distinct fields would silently carry one value.
+   */
+  private void rejectCollidingSources(List<String> sourcePaths) throws FatalAdapterException {
+    Map<String, String> originBySelection = new LinkedHashMap<>();
+    for (String sourcePath : sourcePaths) {
+      String selection = rewriteSource(parse(sourcePath));
+      String collides = originBySelection.putIfAbsent(selection, sourcePath);
+      if (collides != null && !collides.equals(sourcePath)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_MAPPING_ERROR,
+            "sources '"
+                + collides
+                + "' and '"
+                + sourcePath
+                + "' both read '"
+                + selection
+                + "' after the fan-out over '"
+                + recordPath
+                + "': the element field hides the ancestor one, so both rules would carry the same"
+                + " value; rename one of them in the payload or drop one rule");
+      }
+    }
   }
 
   /**
    * Rewrites a source path so it resolves against an already forked record. {@code ForkRecord} in
-   * extract mode flattens the element's own fields and, with parent fields included, every ancestor
-   * level onto the record root — so whatever a path selects below its own innermost array is
-   * exactly what remains addressable.
+   * extract mode promotes the element's own fields to the record root and, with parent fields
+   * included, copies each ancestor field up under its own name — values keep their shape, so a
+   * nested ancestor object stays addressable through it. Only the array levels themselves are gone,
+   * which is why the segments below a path's innermost array are exactly what remains.
    *
-   * <p>Flattening is lossy where an element field and an ancestor field share a name: the element
+   * <p>The copy is skipped where an element field and an ancestor field share a name: the element
    * wins and the ancestor value is no longer reachable under any path. Reading both is therefore
    * not expressible after a fan-out, and the element value is the defensible one — it is the more
    * specific of the two.
    *
    * @param source the parsed source path
    * @return the RecordPath to read after the fan-out
+   * @throws IllegalStateException if there is no fan-out, since the rewrite would then silently
+   *     strip the array levels a path still has to traverse
    */
   public String rewriteSource(JsonPaths.ParsedPath source) {
+    if (!required()) {
+      throw new IllegalStateException("no fan-out to rewrite against");
+    }
     return "/"
         + String.join("/", source.suffixWithinArray().stream().map(ForkPlan::allElements).toList());
   }
@@ -137,10 +203,12 @@ public record ForkPlan(String recordPath, List<String> arrayContext) {
     return "/" + String.join("/", segments.stream().map(ForkPlan::allElements).toList());
   }
 
-  private static void collectArrayContexts(ValueNode node, Set<List<String>> contexts)
+  private static void collectArrayContexts(
+      ValueNode node, Set<List<String>> contexts, List<String> sourcePaths)
       throws FatalAdapterException {
     switch (node) {
       case CopyNode copy -> {
+        sourcePaths.add(copy.sourcePath());
         JsonPaths.ParsedPath path = parse(copy.sourcePath());
         if (path.hasArrayContext()) {
           if (path.suffixWithinArray().isEmpty()) {
@@ -162,13 +230,13 @@ public record ForkPlan(String recordPath, List<String> arrayContext) {
       }
       case ConcatNode concat -> {
         for (ValueNode input : concat.inputs()) {
-          collectArrayContexts(input, contexts);
+          collectArrayContexts(input, contexts, sourcePaths);
         }
       }
-      case ConvertNode convert -> collectArrayContexts(convert.input(), contexts);
+      case ConvertNode convert -> collectArrayContexts(convert.input(), contexts, sourcePaths);
       case GeoPointNode geoPoint -> {
-        collectArrayContexts(geoPoint.lon(), contexts);
-        collectArrayContexts(geoPoint.lat(), contexts);
+        collectArrayContexts(geoPoint.lon(), contexts, sourcePaths);
+        collectArrayContexts(geoPoint.lat(), contexts, sourcePaths);
       }
     }
   }

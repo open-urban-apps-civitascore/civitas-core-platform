@@ -17,11 +17,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan.FilterTerm;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.FreeAttribute;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.FrostCompilation;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.KeyAttribute;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
+import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaJsonType;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConstNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
@@ -107,9 +109,43 @@ class FrostMappingCompilerTest {
     assertEquals("/measurements[*]/measuredValues", compilation.fork().recordPath());
     // The array-sourced fields read the forked element directly; the root-level one stays absolute.
     // Keyed on the rendered value rather than the flat key, whose index is an internal detail.
-    List<String> values = compilation.flatProperties().stream().map(p -> p.value()).toList();
+    List<String> values =
+        compilation.flatProperties().stream().map(UpdateRecordProperty::value).toList();
     assertTrue(values.contains("/ts"), "the timestamp must read the forked element: " + values);
     assertTrue(values.contains("/ref"), "the root-level reference must stay absolute: " + values);
+  }
+
+  @Test
+  void independentSiblingArraysAreRejectedOnTheFrostRouteToo() throws Exception {
+    // FROST disables the target-side veto, so MORE rules reach the array-context collection than on
+    // the record-shaped route — which makes sibling arrays strictly more likely here, not less. The
+    // rejection must not live only on the PostGIS path.
+    MappingConfig mapping =
+        mapping(
+            "$.properties.reference", new CopyNode("$.ref"),
+            "$.datastreams[].observations[].phenomenonTime", new CopyNode("$.measurements[].ts"),
+            "$.datastreams[].observations[].result", new CopyNode("$.alarms[].code"));
+
+    FatalAdapterException error =
+        assertThrows(FatalAdapterException.class, () -> compiler.compile(mapping, KEYS));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+  }
+
+  @Test
+  void anArrayOfScalarsIsRejectedOnTheFrostRouteToo() throws Exception {
+    // The natural user error on this route: pointing an Observation result at a bare scalar array.
+    // ForkRecord's extract mode emits only RECORD elements and skips values silently, so accepting
+    // this would deploy a flow that runs clean and writes nothing.
+    MappingConfig mapping =
+        mapping(
+            "$.properties.reference", new CopyNode("$.ref"),
+            "$.datastreams[].observations[].result", new CopyNode("$.temps[]"));
+
+    FatalAdapterException error =
+        assertThrows(FatalAdapterException.class, () -> compiler.compile(mapping, KEYS));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
   }
 
   @Test

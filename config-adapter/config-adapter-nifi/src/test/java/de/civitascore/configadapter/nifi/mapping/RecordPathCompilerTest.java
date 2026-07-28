@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi.mapping;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -162,8 +163,93 @@ class RecordPathCompilerTest {
                     + " \"$.items[].name\": \"$.items[].sourceName\" }"),
             GeometryEncoding.WKT);
 
-    assertEquals(false, compiled.fork().required(), "an array-to-array mapping must not fan out");
+    assertFalse(compiled.fork().required(), "an array-to-array mapping must not fan out");
     assertEquals("../sourceName", byPath(compiled.properties()).get("/items[*]/name").value());
+  }
+
+  @Test
+  void anInPlaceRuleCannotShareAMappingWithAFanOutOverItsOwnArray() throws Exception {
+    // The in-place rule asks for no fan-out, but the flat rule reading the same array forces one.
+    // The fork then flattens '/items' away and the surviving '/items[*]/name' target addresses
+    // nothing — an UpdateRecord no-op that drops the rule with no bulletin and no bad row. Only a
+    // whole-mapping decision can see this; a per-rule veto cannot.
+    FatalAdapterException error =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compile(
+                    "{ \"$.value\": \"$.items[].value\","
+                        + " \"$.items[].name\": \"$.items[].sourceName\" }"));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+  }
+
+  @Test
+  void anInPlaceRuleCannotShareAMappingWithAFanOutOverAnotherArray() throws Exception {
+    // Worse than the vanished rule above: the fork over '$.measurements[]' repeats the whole
+    // '$.items' array into every fanned-out record, so the in-place rewrite runs once per record
+    // and
+    // each copy is written as its own row. One authored rewrite becomes N rows of duplicated data.
+    FatalAdapterException error =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compile(
+                    "{ \"$.items[].name\": \"$.items[].sourceName\","
+                        + " \"$.ts\": \"$.measurements[].ts\" }"));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+  }
+
+  @Test
+  void twoSourcesCollapsingOntoOnePostForkPathAreRejected() throws Exception {
+    // ForkRecord hoists the element field over the ancestor field of the same name, so both rules
+    // would read '/id' and carry the identical value. The author asked for two distinct fields;
+    // silently serving one twice is the same class of guess the sibling-array case rejects.
+    FatalAdapterException error =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compile("{ \"$.a\": \"$.id\", \"$.b\": \"$.readings[].id\" }"));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+  }
+
+  @Test
+  void theSameSourceReadTwiceIsNotACollision() throws Exception {
+    // The collision check keys on the post-fork path, so two rules legitimately reading the SAME
+    // source must not trip it — only two DIFFERENT sources collapsing onto one path do.
+    CompiledMapping compiled =
+        compiler.compile(
+            parse("{ \"$.a\": \"$.items[].v\", \"$.b\": \"$.items[].v\" }"), GeometryEncoding.WKT);
+
+    assertEquals("/items", compiled.fork().recordPath());
+    Map<String, UpdateRecordProperty> props = byPath(compiled.properties());
+    assertEquals("/v", props.get("/a").value());
+    assertEquals("/v", props.get("/b").value());
+  }
+
+  @Test
+  void aNestedAncestorObjectStaysAddressableThroughItsOwnField() throws Exception {
+    // ForkRecord copies each ancestor field up under its own name and keeps its value shape, so a
+    // nested ancestor object is read through it — '/gateway/id', not '/id'. Dropping the ancestor
+    // segments would resolve to nothing and write a silent NULL.
+    CompiledMapping compiled =
+        compiler.compile(
+            parse("{ \"$.gw\": \"$.gateway.id\", \"$.v\": \"$.items[].value\" }"),
+            GeometryEncoding.WKT);
+
+    assertEquals("/gateway/id", byPath(compiled.properties()).get("/gw").value());
+  }
+
+  @Test
+  void aConcreteArrayIndexIsNoFanOut() throws Exception {
+    // '[0]' selects one element rather than all of them, so it multiplies nothing and must not
+    // trigger a fork. The derivation keys on the '[]' selector alone, and that has to stay true.
+    CompiledMapping compiled =
+        compiler.compile(parse("{ \"$.v\": \"$.items[0].value\" }"), GeometryEncoding.WKT);
+
+    assertFalse(compiled.fork().required(), "a concrete index must not fan out");
+    assertEquals("/items[0]/value", byPath(compiled.properties()).get("/v").value());
   }
 
   @Test
