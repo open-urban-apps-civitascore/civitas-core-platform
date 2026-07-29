@@ -11,6 +11,7 @@ package de.civitascore.configadapter.nifi.flow.stage.transform;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
@@ -82,44 +83,82 @@ class MappingNodeTypeTest {
     assertEquals(2, compilation.units().size());
   }
 
+  private FatalAdapterException compileExpectingRejection(GraphNode... nodes) {
+    return assertThrows(
+        FatalAdapterException.class,
+        () ->
+            mappingNodeType.compile(
+                List.of(nodes),
+                envelopeSink,
+                new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of()))));
+  }
+
   @Test
   void aChainWhoseNeighboursDisagreeOnTheStructureBetweenThemIsRejected() {
-    // The second node was authored against the structure the first one no longer writes, so its
-    // paths resolve against a shape the chain never produces: fields silently become NULL, and an
-    // array selector makes the fan-out target an array the incoming record has lost, dropping every
-    // record without a bulletin.
     GraphNode first = mappingNode("m1", STRUCTURE_A, STRUCTURE_B, Map.of("$.name", "$.raw"));
     GraphNode last =
         mappingNode("m2", STRUCTURE_A, STRUCTURE_B, Map.of("$.properties.reference", "$.name"));
 
-    FatalAdapterException ex =
-        assertThrows(
-            FatalAdapterException.class,
-            () ->
-                mappingNodeType.compile(
-                    List.of(first, last),
-                    envelopeSink,
-                    new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of()))));
+    FatalAdapterException ex = compileExpectingRejection(first, last);
+
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+    // Asserted on the message, not the code alone: four other compilers share NIFI_MAPPING_ERROR,
+    // so the code by itself would stay green if this check were dropped entirely.
+    assertTrue(ex.getMessage().contains("mapping node 'm2'"), ex.getMessage());
   }
 
   @Test
   void aNewStructureVersionBetweenTwoNodesIsRejected() {
-    // A version bump is a different shape, so matching everything but the version must not pass —
-    // the stale node's paths are exactly as unanchored as against an unrelated structure.
+    // A version bump is a different shape, so a comparison that ignored the version would pass.
     GraphNode first = mappingNode("m1", STRUCTURE_A, STRUCTURE_B_V2, Map.of("$.name", "$.raw"));
     GraphNode last =
         mappingNode("m2", STRUCTURE_B, STRUCTURE_A, Map.of("$.properties.reference", "$.name"));
 
-    FatalAdapterException ex =
-        assertThrows(
-            FatalAdapterException.class,
-            () ->
-                mappingNodeType.compile(
-                    List.of(first, last),
-                    envelopeSink,
-                    new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of()))));
+    FatalAdapterException ex = compileExpectingRejection(first, last);
+
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+    assertTrue(ex.getMessage().contains("mapping node 'm2'"), ex.getMessage());
+  }
+
+  @Test
+  void aBreakInTheSecondPairOfAThreeNodeChainIsRejected() {
+    // The first pair matching must not end the walk, and the reported node must be the offending
+    // one — a loop that only ever checks pair one stays green on every two-node fixture.
+    GraphNode first = mappingNode("m1", STRUCTURE_A, STRUCTURE_B, Map.of("$.name", "$.raw"));
+    GraphNode second = mappingNode("m2", STRUCTURE_B, STRUCTURE_A, Map.of("$.label", "$.name"));
+    GraphNode third =
+        mappingNode("m3", STRUCTURE_B, STRUCTURE_A, Map.of("$.properties.reference", "$.label"));
+
+    FatalAdapterException ex = compileExpectingRejection(first, second, third);
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+    assertTrue(ex.getMessage().contains("mapping node 'm3'"), ex.getMessage());
+  }
+
+  @Test
+  void aDownstreamNodeWithoutASourceStructureIsRejectedWhenTheUpstreamDeclaresOne() {
+    // The editor writes both URNs or neither, so a half-declared pair is a corrupt payload, not a
+    // legacy one — and its paths are as unverifiable as an outright mismatch.
+    GraphNode first = mappingNode("m1", STRUCTURE_A, STRUCTURE_B, Map.of("$.name", "$.raw"));
+    GraphNode last = mappingNode("m2", Map.of("$.properties.reference", "$.name"));
+
+    FatalAdapterException ex = compileExpectingRejection(first, last);
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+    assertTrue(ex.getMessage().contains("no source structure"), ex.getMessage());
+  }
+
+  @Test
+  void anUpstreamNodeWithoutATargetStructureIsRejectedWhenTheDownstreamDeclaresOne() {
+    // The mirror case, which a single null-check on the downstream side alone would let through.
+    GraphNode first = mappingNode("m1", Map.of("$.name", "$.raw"));
+    GraphNode last =
+        mappingNode("m2", STRUCTURE_B, STRUCTURE_A, Map.of("$.properties.reference", "$.name"));
+
+    FatalAdapterException ex = compileExpectingRejection(first, last);
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+    assertTrue(ex.getMessage().contains("no target structure"), ex.getMessage());
   }
 
   @Test
@@ -139,8 +178,7 @@ class MappingNodeTypeTest {
 
   @Test
   void aChainWithoutDeclaredStructuresStillCompiles() throws Exception {
-    // The URNs are optional on a mapping, so a chain that declares none must keep deploying —
-    // the check guards a stale declaration, it does not introduce a new requirement.
+    // The URNs are optional on a mapping, so a chain that declares none must keep deploying.
     GraphNode first = mappingNode("m1", Map.of("$.stationName", "$.raw"));
     GraphNode last = mappingNode("m2", Map.of("$.properties.reference", "$.stationName"));
 

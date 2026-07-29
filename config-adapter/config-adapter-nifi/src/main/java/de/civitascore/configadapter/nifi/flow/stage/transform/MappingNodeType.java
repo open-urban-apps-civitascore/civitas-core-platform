@@ -66,7 +66,7 @@ public final class MappingNodeType implements TransformNodeType {
   public Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink, SinkSpec sinkSpec)
       throws FatalAdapterException {
     List<MappingConfig> mappingConfigs = parse(ownNodes);
-    requireChainedStructures(mappingConfigs);
+    requireChainedStructures(ownNodes, mappingConfigs);
     if (sink.mappingSupport() == MappingSupport.NONE) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, sink.mappingRejectionMessage());
@@ -98,36 +98,57 @@ public final class MappingNodeType implements TransformNodeType {
   }
 
   /**
-   * Rejects a chain whose neighbours disagree on the structure between them: node N+1 reads the
-   * records node N writes, so N+1's source URN must be N's target URN — version included, since a
-   * new version is a different shape.
+   * Rejects a chain whose neighbours disagree on the structure between them. Each node compiles
+   * against the paths it was authored with, never against the shape its predecessor actually emits,
+   * so a stale declaration is not recoverable at runtime: paths resolve against nothing, and an
+   * array selector makes the fan-out target an array the record no longer has.
    *
-   * <p>Each node compiles against the paths it was authored with, never against the shape its
-   * predecessor actually emits. A stale source therefore yields paths that resolve against nothing:
-   * a field silently becomes NULL, and an array selector makes the fan-out target an array the
-   * incoming record no longer has, dropping every record without a bulletin.
+   * <p>The URNs are compared verbatim — a new structure version is a different shape.
    *
-   * <p>A node that declares neither URN is left alone — they are optional on the mapping, so
-   * requiring them here would reject flows that deploy correctly today.
+   * <p>A pair that declares neither URN is left alone: they are optional on a mapping. Only one
+   * side declaring is a corrupt payload rather than a legacy one, since the editor writes both or
+   * neither.
    */
-  private static void requireChainedStructures(List<MappingConfig> configs)
-      throws FatalAdapterException {
+  private static void requireChainedStructures(
+      List<GraphNode> ownNodes, List<MappingConfig> configs) throws FatalAdapterException {
     for (int i = 1; i < configs.size(); i++) {
       String upstreamTarget = configs.get(i - 1).target();
       String ownSource = configs.get(i).source();
-      if (upstreamTarget == null || ownSource == null || upstreamTarget.equals(ownSource)) {
+      if (upstreamTarget == null && ownSource == null) {
         continue;
       }
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_MAPPING_ERROR,
-          "mapping node "
-              + (i + 1)
-              + " reads structure '"
-              + ownSource
-              + "' but the preceding node writes '"
-              + upstreamTarget
-              + "': its paths would resolve against a shape the chain never produces; re-open the"
-              + " mapping and rebuild it against the current structure");
+      if (upstreamTarget == null || ownSource == null) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_MAPPING_ERROR,
+            "mapping node '"
+                + ownNodes.get(i).id()
+                + "' declares "
+                + (ownSource == null
+                    ? "no source structure"
+                    : "source structure '" + ownSource + "'")
+                + " while the preceding node '"
+                + ownNodes.get(i - 1).id()
+                + "' declares "
+                + (upstreamTarget == null
+                    ? "no target structure"
+                    : "target structure '" + upstreamTarget + "'")
+                + ": the handover between them cannot be verified; re-open both mappings and save"
+                + " them again");
+      }
+      if (!upstreamTarget.equals(ownSource)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_MAPPING_ERROR,
+            "mapping node '"
+                + ownNodes.get(i).id()
+                + "' reads structure '"
+                + ownSource
+                + "' but the preceding node '"
+                + ownNodes.get(i - 1).id()
+                + "' writes '"
+                + upstreamTarget
+                + "': its paths would resolve against a shape the chain never produces; re-open the"
+                + " mapping and rebuild it against the current structure");
+      }
     }
   }
 
