@@ -66,6 +66,7 @@ public final class MappingNodeType implements TransformNodeType {
   public Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink, SinkSpec sinkSpec)
       throws FatalAdapterException {
     List<MappingConfig> mappingConfigs = parse(ownNodes);
+    requireChainedStructures(mappingConfigs);
     if (sink.mappingSupport() == MappingSupport.NONE) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, sink.mappingRejectionMessage());
@@ -94,6 +95,40 @@ public final class MappingNodeType implements TransformNodeType {
       units.add(recordPathCompiler.compile(config, sink.geometryEncoding()));
     }
     return new Compilation(units, null);
+  }
+
+  /**
+   * Rejects a chain whose neighbours disagree on the structure between them: node N+1 reads the
+   * records node N writes, so N+1's source URN must be N's target URN — version included, since a
+   * new version is a different shape.
+   *
+   * <p>Each node compiles against the paths it was authored with, never against the shape its
+   * predecessor actually emits. A stale source therefore yields paths that resolve against nothing:
+   * a field silently becomes NULL, and an array selector makes the fan-out target an array the
+   * incoming record no longer has, dropping every record without a bulletin.
+   *
+   * <p>A node that declares neither URN is left alone — they are optional on the mapping, so
+   * requiring them here would reject flows that deploy correctly today.
+   */
+  private static void requireChainedStructures(List<MappingConfig> configs)
+      throws FatalAdapterException {
+    for (int i = 1; i < configs.size(); i++) {
+      String upstreamTarget = configs.get(i - 1).target();
+      String ownSource = configs.get(i).source();
+      if (upstreamTarget == null || ownSource == null || upstreamTarget.equals(ownSource)) {
+        continue;
+      }
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_MAPPING_ERROR,
+          "mapping node "
+              + (i + 1)
+              + " reads structure '"
+              + ownSource
+              + "' but the preceding node writes '"
+              + upstreamTarget
+              + "': its paths would resolve against a shape the chain never produces; re-open the"
+              + " mapping and rebuild it against the current structure");
+    }
   }
 
   /** Parses each node's config, in flow order. */
