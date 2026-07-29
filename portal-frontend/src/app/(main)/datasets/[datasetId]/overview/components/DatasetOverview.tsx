@@ -102,7 +102,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const router = useRouter()
   const { handleFormValidationError } = useError()
-  const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
+  const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit' || !canUpdate)
   const [dataSetStatus, setDataSetStatus] = useState<DatasetStatusTypes>(
     dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT,
   )

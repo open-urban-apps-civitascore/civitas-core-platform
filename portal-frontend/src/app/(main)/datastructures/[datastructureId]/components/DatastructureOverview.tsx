@@ -70,13 +70,16 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     datastructure.id,
   )
 
+  const canEdit =
+    datastructure.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE ? canUpdate && canRelease : canUpdate
+
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
-  const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')
+  const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit' || !canEdit)
   const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
 
   useEffect(() => {
-    setIsReadOnly(searchParams.get('mode') !== 'edit')
-  }, [searchParams])
+    setIsReadOnly(searchParams.get('mode') !== 'edit' || !canEdit)
+  }, [searchParams, canEdit])
 
   const updateMode = useCallback(
     (isEditing: boolean) => {
@@ -206,11 +209,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             isCancelButtonDisabled={isLoading}
             onCancelClick={handleExit}
             hasCard={false}
-            canEdit={
-              datastructure.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
-                ? canUpdate && canRelease
-                : canUpdate
-            }
+            canEdit={canEdit}
             isReadOnly={isReadOnly}
             onEditClick={() => updateMode(true)}
             cancelButtonTitle={tCommon('actions.exit')}

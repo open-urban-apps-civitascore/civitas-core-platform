@@ -242,5 +242,19 @@ describe('DatastructureOverview', () => {
       expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
       expect(mockReplace).toHaveBeenCalledWith('/datastructures/test-id?mode=edit', { scroll: false })
     })
+
+    it('starts in edit mode when mode=edit param is present', () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      render(<DatastructureOverview {...defaultProps} />)
+      expect(screen.getByTestId('basicInfoTab')).toHaveAttribute('data-readonly', 'false')
+    })
+
+    it('stays in read-only mode when mode=edit param is present but the user lacks DATASTRUCTURE_UPDATE', () => {
+      mockCurrentUser([])
+      mockSearchParams = new URLSearchParams('mode=edit')
+      render(<DatastructureOverview {...defaultProps} />)
+      expect(screen.getByTestId('basicInfoTab')).toHaveAttribute('data-readonly', 'true')
+      expect(screen.queryByTestId('cancelButton')).not.toBeInTheDocument()
+    })
   })
 })
