@@ -172,7 +172,12 @@ lint-authz:
 dependency-prune-authz:
   extends: .only-authz-changes
   image: maven:3.9-eclipse-temurin-25-alpine
-  stage: lint
+  stage: test
+  needs:
+    - job: setup-version-portal-model
+      artifacts: true
+    - job: publish-portal-model
+      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -184,10 +189,7 @@ dependency-prune-authz:
       - .m2/repository
   script:
     - cd authz/repository
-    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -DfailOnWarning=true -DignoreNonCompile=false -DignoredDependencies=org.springframework.boot:*,org.springframework.security:*,org.springframework:*,jakarta.*,org.springdoc:*,org.slf4j:*
-  allow_failure:
-    exit_codes:
-      - 1
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Dportal-model.version=$PORTAL_MODEL_VERSION -DfailOnWarning=true -DignoreNonCompile=false -s ci_settings.xml
 
 test-authz:
   extends: .only-authz-changes
@@ -240,7 +242,6 @@ build-authz:
     - job: setup-version-portal-model
       artifacts: true
     - lint-authz
-    - dependency-prune-authz
     - job: publish-portal-model
       optional: true
   variables:
