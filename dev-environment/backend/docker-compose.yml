@@ -88,7 +88,7 @@ services:
       APISIX_SERVICE_ID: svc-frost-server
       # Headers the saga's route-level proxy-rewrite must strip in lieu of plugin_config 1
       # (Route-over-PluginConfig precedence overrides plugin_config's proxy-rewrite).
-      APISIX_PROXY_REWRITE_HEADERS_REMOVE: X-Allowed-Scope-Ids
+      APISIX_PROXY_REWRITE_HEADERS_REMOVE: X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
       # FROST upstream auth APISIX injects when proxying private dataset routes.
       APISIX_FROST_API_KEY: dev-frost-api-key
       APISIX_FROST_API_KEY_HEADER: X-API-Key

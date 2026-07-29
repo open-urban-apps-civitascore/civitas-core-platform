@@ -12,8 +12,10 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.saga.DataSinkPayload;
 import de.civitascore.portal.model.saga.LayerPayload;
+import de.civitascore.portal.model.saga.StylePayload;
 import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -68,21 +70,24 @@ public class DataSetSagaPublisher {
   }
 
   /**
-   * Publishes a {@code DATASET_CREATE} saga trigger. See {@link SagaTrigger} for the contract. The
-   * dataset's {@code openDataAccess} flag is propagated downstream: FROST sets it as the project's
-   * {@code public} flag (anonymous read access) and APISIX attaches the auth plugin only for
-   * protected datasets.
+   * Publishes a {@code DATASET_CREATE} saga trigger. See {@link SagaTrigger} for the contract.
+   *
+   * <p>{@code openDataAccess} is intentionally NOT part of the saga payload: routes are always
+   * provisioned protected and the FROST project is always private. Open data access is decided by
+   * OPA at request time from the persisted {@code openDataAccess} flag (read via the AuthZ
+   * Repository), not by saga-time route/FROST configuration.
    */
   public void publishCreateRequested(DataSet dataset) {
+    verifyLayerStyleReferences(dataset);
     var trigger =
         SagaTrigger.DatasetCreate.of(
             dataset.getId().toString(),
             dataset.getName(),
             dataset.getDescription(),
-            dataset.getOpenDataAccess(),
             buildDatasources(dataset),
             buildDatasinks(dataset),
             buildLayers(dataset),
+            buildStyles(dataset),
             buildPipelines(dataset.getPipelines(), PipelineAction.ADD),
             buildNamedApis(dataset),
             buildDashboards(dataset));
@@ -91,16 +96,16 @@ public class DataSetSagaPublisher {
 
   /**
    * Publishes a {@code DATASET_UPDATE} saga trigger with a pipeline diff against {@code
-   * previousPipelines}. Toggling {@code openDataAccess} re-applies the FROST {@code public} flag
-   * and the APISIX auth-plugin attachment.
+   * previousPipelines}. Toggling {@code openDataAccess} does not trigger any route/FROST change —
+   * it only changes what OPA reads per request (see {@link #publishCreateRequested}).
    */
   public void publishUpdateRequested(DataSet dataset, Set<Pipeline> previousPipelines) {
+    verifyLayerStyleReferences(dataset);
     var trigger =
         SagaTrigger.DatasetUpdate.of(
             dataset.getId().toString(),
             dataset.getName(),
             dataset.getDescription(),
-            dataset.getOpenDataAccess(),
             dataset.getProjectId(),
             buildRouteIds(dataset),
             dataset.getServiceId(),
@@ -108,9 +113,26 @@ public class DataSetSagaPublisher {
             buildDatasources(dataset),
             buildDatasinks(dataset),
             buildLayers(dataset),
+            buildStyles(dataset),
             buildPipelineDiff(previousPipelines, dataset.getPipelines()),
             buildNamedApis(dataset),
             buildDashboards(dataset));
+    sendTrigger(trigger);
+  }
+
+  /**
+   * Publishes a {@code DATASET_UNRELEASE} saga trigger. Carries only the route/pipeline fields the
+   * teardown needs — {@code projectId}/{@code frostBaseUrl}/{@code datasinks} are deliberately
+   * omitted because the data-holding sink is kept.
+   */
+  public void publishUnreleaseRequested(DataSet dataset) {
+    var trigger =
+        SagaTrigger.DatasetUnrelease.of(
+            dataset.getId().toString(),
+            buildRouteIds(dataset),
+            dataset.getServiceId(),
+            dataset.getPipelineIds(),
+            buildNamedApis(dataset));
     sendTrigger(trigger);
   }
 
@@ -122,7 +144,11 @@ public class DataSetSagaPublisher {
             dataset.getProjectId(),
             dataset.getFrostBaseUrl(),
             buildRouteIds(dataset),
-            dataset.getServiceId(),
+            // The APISIX serviceId is deterministically the dataset id (the adapter returns it as
+            // such on CREATE). Deriving it here instead of reading the persisted cache field lets
+            // DELETE_ROUTE address the routes/upstream even after an unrelease cleared serviceId —
+            // the delete is 404-tolerant, so an already-torn-down route is a clean no-op.
+            dataset.getId().toString(),
             dataset.getPipelineIds(),
             buildDatasinks(dataset),
             buildNamedApis(dataset));
@@ -183,7 +209,79 @@ public class DataSetSagaPublisher {
 
   private LayerPayload toLayerPayload(Layer layer) {
     return new LayerPayload(
-        layer.getId().toString(), layer.getLayerName(), resolveNativeName(layer), layer.getCrs());
+        layer.getId().toString(),
+        layer.getLayerName(),
+        resolveNativeName(layer),
+        layer.getCrs(),
+        layer.getGeometryColumnRef(),
+        layer.getNativeBoundingBox(),
+        layer.getLatLonBoundingBox(),
+        layer.getDefaultStyle() != null ? layer.getDefaultStyle().getName() : null,
+        buildAlternativeStyleNames(layer));
+  }
+
+  /**
+   * Sorted list of style names a layer references in addition to its default. Sorted so the JSON
+   * output is stable across runs (the underlying {@link java.util.Set} has no defined iteration
+   * order). Returns {@code null} when empty so {@code @JsonInclude(NON_NULL)} drops the field.
+   */
+  private List<String> buildAlternativeStyleNames(Layer layer) {
+    if (layer.getAlternativeStyles() == null || layer.getAlternativeStyles().isEmpty()) {
+      return null;
+    }
+    return layer.getAlternativeStyles().stream().map(Style::getName).sorted().toList();
+  }
+
+  /**
+   * All SLD styles attached to the dataset, mapped to the payload shape. Carried once at the
+   * dataset level; layers reference these by name. Returns {@code null} when the dataset has no
+   * styles so {@code @JsonInclude(NON_NULL)} drops the field — keeps {@code hasStyles=false} on the
+   * consumer side.
+   */
+  private List<StylePayload> buildStyles(DataSet dataset) {
+    if (dataset.getStyles() == null || dataset.getStyles().isEmpty()) {
+      return null;
+    }
+    return dataset.getStyles().stream()
+        .map(s -> new StylePayload(s.getName(), s.getSldContent()))
+        .toList();
+  }
+
+  /**
+   * Fails the publish if a layer references a style that is not owned by the same dataset. Identity
+   * is checked by {@code Style.id} (not name) so a layer cannot pick up a style from another
+   * dataset that happens to share a name. The DB does not enforce this cross-table invariant, so
+   * this check is defense-in-depth. Failing here propagates as an {@link InvalidInputException}
+   * before the trigger is serialized or sent to Kafka.
+   */
+  private void verifyLayerStyleReferences(DataSet dataset) {
+    if (dataset.getLayers() == null || dataset.getLayers().isEmpty()) {
+      return;
+    }
+    Set<UUID> ownedStyleIds =
+        dataset.getStyles() == null
+            ? Set.of()
+            : dataset.getStyles().stream().map(Style::getId).collect(Collectors.toSet());
+    for (Layer layer : dataset.getLayers()) {
+      if (layer.getDefaultStyle() != null) {
+        checkStyleOwnership(layer, layer.getDefaultStyle(), ownedStyleIds, "defaultStyle");
+      }
+      if (layer.getAlternativeStyles() != null) {
+        for (Style s : layer.getAlternativeStyles()) {
+          checkStyleOwnership(layer, s, ownedStyleIds, "alternativeStyles");
+        }
+      }
+    }
+  }
+
+  private void checkStyleOwnership(
+      Layer layer, Style style, Set<UUID> ownedStyleIds, String field) {
+    if (style.getId() == null || !ownedStyleIds.contains(style.getId())) {
+      throw new InvalidInputException(
+          "Layer",
+          field,
+          "Layer " + layer.getId() + " references style not owned by dataset: " + style.getName());
+    }
   }
 
   /**
@@ -205,20 +303,33 @@ public class DataSetSagaPublisher {
 
   /**
    * Resolves the sink's referenced data-structure model (JSON Schema) persisted on the {@code
-   * DataStructureVersion}. {@code null} when no version is referenced (e.g. FROST); throws {@link
-   * InvalidInputException} if a referenced version is missing or carries no model, failing the
-   * publish. The id is already validated at sink save time.
+   * DataStructureVersion}: the table schema for PostGIS, the mapping's Thing-shaped target for a
+   * mapped FROST sink. {@code null} when no version is referenced (FROST passthrough); throws
+   * {@link InvalidInputException} if a referenced version is missing or carries no model, failing
+   * the publish. The id is already validated at sink save time.
    */
   private Map<String, Object> resolveDataStructure(DataSink sink) {
     if (sink.getConfiguration() == null) {
       return null;
     }
-    UUID dsvId =
-        objectMapper
-            .convertValue(sink.getConfiguration(), PostgisConfiguration.class)
-            .getDataStructureVersionId();
-    if (dsvId == null) {
-      return null; // e.g. FROST sink — no data-structure version
+    // Read the shared key from the raw map: every sink type that references a structure names it
+    // 'dataStructureVersionId', and a typed detour through one sink's config class would couple
+    // the others to its shape.
+    Object dsvIdRaw = sink.getConfiguration().get("dataStructureVersionId");
+    if (dsvIdRaw == null) {
+      return null; // e.g. FROST passthrough sink — no data-structure version
+    }
+    UUID dsvId;
+    try {
+      dsvId = UUID.fromString(String.valueOf(dsvIdRaw));
+    } catch (IllegalArgumentException e) {
+      // Validated at sink save time, so this is unreachable in practice — but a corrupt raw value
+      // must still fail like its sibling checks (a controlled 400) rather than escaping as an
+      // unhandled 500 that echoes the malformed value.
+      throw new InvalidInputException(
+          "DataSink",
+          "configuration.dataStructureVersionId",
+          "dataStructureVersionId on sink " + sink.getId() + " is not a valid UUID");
     }
     var version =
         dataStructureVersionRepository
@@ -261,7 +372,9 @@ public class DataSetSagaPublisher {
 
     for (UUID id : previousIds) {
       if (!currentMap.containsKey(id)) {
-        result.add(new DataPipeline(id.toString(), "0", PipelineAction.DELETE.name(), null));
+        result.add(
+            new DataPipeline(
+                id.toString(), "0", PipelineAction.DELETE.name(), null, List.of(), List.of()));
       }
     }
 
@@ -344,11 +457,29 @@ public class DataSetSagaPublisher {
   }
 
   private DataPipeline toPipelineEntry(Pipeline pipeline, PipelineAction action) {
+    // The relation is a @Builder.Default set and Hibernate never loads it as null (empty for a
+    // pipeline without sources), so null can only mean a corrupted entity reached the publisher —
+    // fail loud rather than publish a silently empty association.
+    if (pipeline.getDataSources() == null) {
+      throw invariant("pipeline %s has a null dataSources relation", pipeline.getId());
+    }
+    List<String> dataSourceIds =
+        pipeline.getDataSources().stream().map(ds -> ds.getId().toString()).sorted().toList();
     return new DataPipeline(
         pipeline.getId().toString(),
         String.valueOf(pipeline.getVersion()),
         action.name(),
-        pipeline.getModel());
+        // `model` holds the editor-built, engine-neutral pipeline graph (React-Flow nodes/edges +
+        // inline mappingConfig) and is forwarded to the config-adapter as-is (the engine-neutral
+        // contract / intermediate representation). The config-adapter (NiFi) is the only place
+        // engine specifics appear.
+        pipeline.getModel(),
+        // Sorted so the payload is deterministic — the entity relations are unordered sets.
+        dataSourceIds,
+        dataSinkRepository.findByPipelineId(pipeline.getId()).stream()
+            .map(sink -> sink.getId().toString())
+            .sorted()
+            .toList());
   }
 
   /**

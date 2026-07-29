@@ -14,7 +14,8 @@
 #   - Tests mock http.send() using OPA's `with http.send as mock_fn` syntax
 #
 # main.rego uses these rules to produce final allow/deny decisions with reasons.
-# Public endpoints are handled at APISIX level (never reach OPA).
+# Open data is NOT an APISIX-level bypass anymore: routes are always protected and anonymous
+# requests reach OPA (openid-connect unauth_action=pass), where open_data.rego decides them.
 
 # [R-021] Why no roles in this code?
 # The AuthZ Repository's /user-context/{externalId} endpoint returns PRE-FLATTENED
@@ -29,6 +30,7 @@ package civitas.authz.permission_eval
 
 import rego.v1
 
+import data.civitas.authz.dataset_pool_fetcher
 import data.civitas.authz.resource_mapping
 import data.civitas.authz.user_context_fetcher
 
@@ -238,6 +240,90 @@ user_has_permission(permission) if {
 	some assignment in group.assignments
 	permission in assignment.permissions
 	is_unscoped(assignment)
+}
+
+# =============================================================================
+# DATAPOOL UNION INHERITANCE (Epic 1)
+# =============================================================================
+# A DATAPOOL-scoped grant applies to every dataset in that pool, in addition to
+# direct dataset assignments (effective permissions are the UNION of the two).
+#
+# pool_of() (an http.send) only binds for DATAPOOL-scoped assignments, so a user
+# with no DATAPOOL assignment never triggers the lookup. NOTE: OPA does not
+# guarantee conjunct evaluation order, and a user who holds ANY DATAPOOL
+# assignment on a dataset resource endpoint may trigger the lookup even when that
+# grant lacks the requested permission. The lookup returns a single pool id,
+# never a list, so cost is independent of pool size.
+#
+# Fail-secure: if the dataset-pool membership service is unavailable, pool_of()
+# is undefined and this branch does not grant — direct/TENANT grants still apply.
+# main.rego reports the resulting deny as the generic "permission_denied", so an
+# outage is indistinguishable from a real lack of grant in the decision (see the
+# observability note in main.rego).
+#
+# SCOPE NOTE (Epic-faithful, see Epics 1+2): collection classification is
+# path-based and therefore method-agnostic, so the collection rule below also
+# grants writes (e.g. POST /v1/datasets) to a qualifying pool grant. Per Epic 2,
+# dataset create/edit follows "existing product rules" and the target datapool is
+# an editable field — there is currently NO target-pool authorization on writes.
+# This mirrors the pre-existing DATASET-scoped collection-create behavior. If
+# stricter write semantics are desired, that is a deliberate decision beyond the
+# current Epic spec.
+
+# Resource endpoint: access to a single dataset is granted if the user holds the
+# permission on the dataset's pool.
+user_has_permission(permission) if {
+	resource_mapping.is_resource_endpoint
+	resource_mapping.expected_scope_type == "DATASET"
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission in assignment.permissions
+	assignment.scopeType == "DATAPOOL"
+	assignment.scopeId == dataset_pool_fetcher.pool_of(resource_mapping.resource_id)
+}
+
+# Collection endpoint: granted when a single datapool carries ALL required
+# permissions (qualifying_datapool_ids). WHICH datasets are visible is narrowed
+# by the X-Allowed-Pool-Ids header (main.rego), built from the SAME set — so the
+# allow decision is always faithfully filterable, including for AND-permission
+# endpoints.
+user_has_permission(permission) if {
+	resource_mapping.is_collection_endpoint
+	some pool_id in qualifying_datapool_ids
+	datapool_has_permission(permission, pool_id)
+}
+
+# DATAPOOL scope IDs that carry ALL required permissions for a dataset endpoint
+# (Epic 1 union). Single source of truth shared with main.rego's X-Allowed-Pool-Ids
+# header, so the allow-decision and the backend filter can never diverge (e.g. a
+# perm split across two pools must not grant unfiltered access).
+#
+# Computed for BOTH collection AND resource dataset endpoints: a resource request
+# (e.g. GET /datasets/{id}/apis) granted purely via DATAPOOL inheritance must also
+# carry the pool header, otherwise the backend's scope-OR-pool filter sees no pool
+# id and 404s a dataset the user is legitimately allowed to read.
+qualifying_datapool_ids contains pool_id if {
+	count(required_permissions) > 0
+	resource_mapping.expected_scope_type == "DATASET"
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	assignment.scopeType == "DATAPOOL"
+	pool_id := assignment.scopeId
+	pool_id != null
+
+	# Only include this pool if it alone carries ALL required permissions
+	every perm in required_permissions {
+		datapool_has_permission(perm, pool_id)
+	}
+}
+
+# Helper: does a DATAPOOL-scoped assignment for target_pool_id carry perm?
+datapool_has_permission(perm, target_pool_id) if {
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	perm in assignment.permissions
+	assignment.scopeType == "DATAPOOL"
+	assignment.scopeId == target_pool_id
 }
 
 # =============================================================================

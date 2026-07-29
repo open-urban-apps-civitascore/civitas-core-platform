@@ -88,6 +88,33 @@ describe('DynamicFormField (integration)', () => {
     expect(screen.getByRole('checkbox')).toBeInTheDocument()
   })
 
+  it('renders a masked password input for type=input with inputType=password', () => {
+    renderWithForm({
+      type: 'input',
+      inputType: 'password',
+      name: 'name',
+      label: 'Password',
+      placeholder: 'secret',
+      shouldShowErrors: false,
+    })
+    const field = screen.getByTestId('nameTextField')
+    expect(field).toHaveAttribute('type', 'password')
+    expect(field).toHaveAttribute('autocomplete', 'new-password')
+  })
+
+  it('renders a plain input without password masking or autocomplete for type=input', () => {
+    renderWithForm({
+      type: 'input',
+      name: 'name',
+      label: 'Input',
+      placeholder: 'Max Mustermann',
+      shouldShowErrors: false,
+    })
+    const field = screen.getByTestId('nameTextField')
+    expect(field).not.toHaveAttribute('type', 'password')
+    expect(field).not.toHaveAttribute('autocomplete')
+  })
+
   it('renders select for type=select', () => {
     renderWithForm({
       type: 'select',

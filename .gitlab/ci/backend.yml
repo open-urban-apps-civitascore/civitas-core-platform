@@ -2,6 +2,8 @@
 # All backend jobs should extend this
 .only-backend-changes:
   rules:
+    # Always run on the nightly scheduled pipeline so the full build/scan runs
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
     # Always run on main and develop branch
@@ -16,6 +18,7 @@
         - .gitlab/ci/backend.yml
         - .gitlab/ci/portal-model.yml # Also run when portal-model changes since backend depends on it
 
+
 # Generate maven dependency graph JSON for license scanning
 # This must always run (needs: []) to ensure dependency scanning has the graph
 # even when the build job is skipped due to no changes
@@ -24,6 +27,8 @@ generate-graph-backend:
   stage: lint
   needs: []
   rules:
+    # Always run on the nightly scheduled pipeline
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
     # Always run on main and develop branch
@@ -31,6 +36,7 @@ generate-graph-backend:
     - if: $CI_COMMIT_BRANCH == "develop"
     # Always run on MR pipelines
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -175,7 +181,8 @@ integration-test-backend:
       junit: portal-backend/target/failsafe-reports/TEST-*.xml
 
 # Saga E2E integration tests — cross-module tests validating the full dataset saga workflow
-# (portal-backend + config-adapter orchestrator in-process, with real FROST, Kafka, Redpanda Connect).
+# (portal-backend + Flowable saga engine in-process, with real FROST, Kafka, Redpanda Connect —
+#  pipeline-engine migration to NiFi still pending, see WI 1622).
 # Auto-runs on main/develop, manual trigger on MRs (heavy: ~2 min, 6+ containers).
 saga-e2e-test-backend:
   image: maven:3.9-eclipse-temurin-25
@@ -191,6 +198,7 @@ saga-e2e-test-backend:
       optional: true
     - job: publish-portal-model
   rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "develop"
@@ -207,6 +215,7 @@ saga-e2e-test-backend:
     DOCKER_DRIVER: overlay2
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ''
+
   cache:
     key:
       prefix: backend-maven
@@ -246,6 +255,7 @@ api-test-backend:
       artifacts: true
       optional: true
   rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "develop"
@@ -259,6 +269,7 @@ api-test-backend:
         - dev-environment/apisix/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/backend.yml
+
   services:
     - name: docker:27-dind
   variables:
@@ -310,17 +321,29 @@ api-test-backend:
     # Run Bruno API tests from a container on the same Compose network
     - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
     - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/
-    # Skip saga steps tagged requires-nifi while the pipeline adapter is unavailable.
+    # The NiFi + GeoServer adapters are wired into the CI stack, so the dataset-saga Bruno
+    # lifecycles run as the end-to-end acceptance gate.
     - |
+      set +e
       docker exec bruno-runner sh -c '
         npm install -g @usebruno/cli 2>/dev/null
         cd /tests
-        npx @usebruno/cli run --env ci --exclude-tags=requires-nifi > /tests/bruno-output.txt 2>&1
+        npx @usebruno/cli run --env ci > /tests/bruno-output.txt 2>&1
         RESULT=$?
         cat /tests/bruno-output.txt
         exit $RESULT
       '
-    - docker cp bruno-runner:/tests/bruno-output.txt bruno-results.txt || true
+      BRUNO_EXIT=$?
+      set -e
+      docker cp bruno-runner:/tests/bruno-output.txt bruno-results.txt || true
+      # On bruno failure, dump service logs so we can diagnose 500s etc.
+      if [ "$BRUNO_EXIT" != "0" ]; then
+        for svc in portal-backend config-adapter kafka apisix frost; do
+          echo "=== $svc logs (last 300 lines) ==="
+          docker compose -p api-test $COMPOSE_FILES logs --tail=300 --no-color "$svc" 2>&1 | tee "${svc}-logs.txt" || true
+        done
+      fi
+      exit ${BRUNO_EXIT:-0}
   after_script:
     - docker rm -f bruno-runner 2>/dev/null || true
     - docker compose -p api-test -f dev-environment/ci/docker-compose.api-test.yml down -v 2>/dev/null || true
@@ -328,6 +351,11 @@ api-test-backend:
     when: always
     paths:
       - bruno-results.txt
+      - portal-backend-logs.txt
+      - config-adapter-logs.txt
+      - kafka-logs.txt
+      - apisix-logs.txt
+      - frost-logs.txt
     expire_in: 30 days
 
 report-test-backend:
@@ -411,6 +439,12 @@ build-backend-image:
     DOCKER_BUILDKIT: 1
   before_script:
     - docker info
+    # Register QEMU emulators so the linux/arm64 cross-build runs on the amd64 runner.
+    # The runner host's binfmt registration is not dependable — when arm64 drops off it,
+    # buildx silently loses the platform and the emulated `apk add` dies with
+    # "Invalid ELF image for this architecture". Registering here makes the job
+    # self-contained. Image is pinned (tag + digest) so the privileged run is auditable.
+    - docker run --privileged --rm tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0 --install all
     - |
       cat > /tmp/buildkitd.toml <<'EOF'
       [registry."docker.io"]
@@ -480,6 +514,12 @@ deploy-backend:
       if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
         docker buildx imagetools create $CI_REGISTRY_IMAGE/backend-portal:$REVISION --tag $CI_REGISTRY_IMAGE/backend-portal:$CI_COMMIT_BRANCH
       fi
+    # Nightly build: additionally tag with <branch>-nightly-<YYYYMMDD>
+    - |
+      if [ "$IS_NIGHTLY" = "true" ] && [ -n "$NIGHTLY_IMAGE_TAG" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/backend-portal:$REVISION --tag $CI_REGISTRY_IMAGE/backend-portal:$NIGHTLY_IMAGE_TAG
+      fi
+
 
 sbom-backend-image:
   extends: .only-backend-changes

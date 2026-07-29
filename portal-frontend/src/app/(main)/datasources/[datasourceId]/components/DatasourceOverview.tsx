@@ -136,7 +136,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     selectedConnectorType,
     hasStatusChanged,
     handleStatusChange,
-    canSetAvailable,
+    canStage,
     completedTabs,
     submitDatasource,
     resetToInitialState: resetDatasourceToInitialState,
@@ -280,8 +280,9 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             status={dataSourceStatus}
             onStatusChange={handleStatusChange}
             statusOptions={Object.values(DATASOURCE_STATUS_TYPES)}
-            canSetAvailable={canSetAvailable}
+            canStage={canStage}
             canRelease={canRelease}
+            availableHint={!canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined}
             confirmButtonType="button"
             onConfirmClick={handleSave}
             isConfirmButtonDisabled={isConfirmButtonDisabled}

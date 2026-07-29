@@ -15,4 +15,6 @@ export const DATASET_FILTER_PARAMS = {
 
 export const DATASOURCE_FILTER_PARAMS = {
   datapoolId: 'datapoolId',
+  datapoolScopeType: 'datapoolScopeType',
+  dataSourceStatus: 'dataSourceStatus',
 } as const

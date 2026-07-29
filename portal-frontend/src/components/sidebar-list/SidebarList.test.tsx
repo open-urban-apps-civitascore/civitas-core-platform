@@ -65,7 +65,7 @@ describe('SidebarList', () => {
         items: [makeItem({ displayTitle: 'Layer 1' })],
         selectedItemIndex: 0,
       })
-      expect(screen.getByRole('button', { name: 'Layer 1' })).toHaveClass('bg-muted', 'font-medium')
+      expect(screen.getByRole('button', { name: 'Layer 1' })).toHaveClass('bg-accent', 'font-medium')
     })
 
     it('does not apply active styles to non-selected item buttons', () => {
@@ -73,7 +73,7 @@ describe('SidebarList', () => {
         items: [makeItem({ value: '1', displayTitle: 'Layer 1' }), makeItem({ value: '2', displayTitle: 'Layer 2' })],
         selectedItemIndex: 0,
       })
-      expect(screen.getByRole('button', { name: 'Layer 2' })).not.toHaveClass('bg-muted')
+      expect(screen.getByRole('button', { name: 'Layer 2' })).not.toHaveClass('bg-accent')
       expect(screen.getByRole('button', { name: 'Layer 2' })).not.toHaveClass('font-medium')
     })
 
@@ -82,7 +82,7 @@ describe('SidebarList', () => {
         items: [makeItem({ displayTitle: 'Layer 1' })],
         selectedItemIndex: null,
       })
-      expect(screen.getByRole('button', { name: 'Layer 1' })).not.toHaveClass('bg-muted')
+      expect(screen.getByRole('button', { name: 'Layer 1' })).not.toHaveClass('bg-accent')
     })
   })
 

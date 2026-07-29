@@ -1,5 +1,5 @@
 # LOCAL-ONLY override (do NOT commit) — re-enables the redpanda pipeline adapter so the
-# dataset-saga-workflow Bruno lifecycle (the requires-nifi-tagged per-slug route guards) can
+# dataset-saga-workflow Bruno lifecycle (the per-slug route guards) can
 # complete end-to-end. The nifi pipeline adapter is not yet implemented in the config-adapter,
 # so without a pipeline handler a dataset never reaches AVAILABLE and the route guards are
 # unreachable. This restores the working pre-568d52bc ("replaces redpanda with nifi") setup.

@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef } from 'react'
 
 import { useUnsavedChanges } from '@/contexts/unsaved-changes/UnsavedChangesContext'
 
-export const useRegisterUnsavedChanges = (isDirty: boolean, saveHandler?: () => Promise<boolean>) => {
+export const useRegisterUnsavedChanges = (
+  isDirty: boolean,
+  saveHandler?: () => Promise<boolean>,
+  shouldRefreshAfterNavigate = false,
+) => {
   const { setHasUnsavedChanges, setSaveHandler } = useUnsavedChanges()
   const saveHandlerRef = useRef<typeof saveHandler>(saveHandler)
   const hasSaveHandler = !!saveHandler
@@ -25,9 +29,9 @@ export const useRegisterUnsavedChanges = (isDirty: boolean, saveHandler?: () => 
 
   useEffect(() => {
     if (!hasSaveHandler) return
-    setSaveHandler(stableSaveHandler)
+    setSaveHandler(stableSaveHandler, shouldRefreshAfterNavigate)
     return () => setSaveHandler(null)
-  }, [hasSaveHandler, setSaveHandler, stableSaveHandler])
+  }, [hasSaveHandler, setSaveHandler, stableSaveHandler, shouldRefreshAfterNavigate])
 
   useEffect(() => {
     return () => {

@@ -12,15 +12,17 @@ import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { NoDataCard } from '@/components/no-data/no-data-card/NoDataCard'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { SidebarList } from '@/components/sidebar-list/SidebarList'
+import { AlertBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
 import { FormItem, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { UMLAttribute, UMLClass } from '@/components/uml-modeler/types/uml'
 import { crsOptions } from '@/const/crs'
 import { cn } from '@/lib/utils'
-import { Datasink } from '@/types/datasinks'
+import { DataSink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
-import { OwsApiFormData, Style } from '@/types/namedApis'
+import { OwsApiFormData } from '@/types/namedApis'
+import { Style } from '@/types/styles'
 import { getEmptyLabelIndex, isNewItem } from '@/utils/common'
 
 import { BoundingBoxConfig } from './BoundingBoxConfig'
@@ -28,7 +30,7 @@ import { BoundingBoxConfig } from './BoundingBoxConfig'
 interface LayerConfigProps {
   form: UseFormReturn<OwsApiFormData>
   styles: Style[]
-  postgisDatasinks: Datasink[]
+  postgisDataSinks: DataSink[]
   postGisDatastructures: DatastructureVersion[]
   selectedLayerIndex: number | null
   isReadOnly: boolean
@@ -36,7 +38,7 @@ interface LayerConfigProps {
   onSelectLayer: (index: number) => void
   onAddLayer: () => void
   onDeleteLayer?: () => Promise<void>
-  onTableChange: (datasinkId: string) => void
+  onTableChange: (dataSinkId: string) => void
 }
 
 const getUmlClass = (
@@ -52,7 +54,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
   const {
     form,
     styles,
-    postgisDatasinks,
+    postgisDataSinks,
     postGisDatastructures,
     selectedLayerIndex,
     isReadOnly,
@@ -107,15 +109,16 @@ export const LayerConfig = (props: LayerConfigProps) => {
 
   const nativeCRSLabel =
     crsOptions.find(o => o.value === selectedLayer?.nativeCRS)?.label ?? selectedLayer?.nativeCRS ?? ''
+  const isNativeCrsMissing = !!tableWatch && !selectedLayer?.nativeCRS
 
   const styleOptions = styles.map(style => ({ value: style.id, label: style.name }))
 
-  const tableOptions = postgisDatasinks?.map(datasink => ({
-    value: datasink.id,
-    label: datasink.configuration.tableName,
+  const tableOptions = postgisDataSinks?.map(dataSink => ({
+    value: dataSink.id,
+    label: dataSink.configuration.tableName,
   }))
 
-  const currentDatastructureVersion = postgisDatasinks?.find(datasink => datasink.id === tableWatch)?.configuration
+  const currentDatastructureVersion = postgisDataSinks?.find(dataSink => dataSink.id === tableWatch)?.configuration
     .dataStructureVersion
 
   const umlClass = getUmlClass(postGisDatastructures, currentDatastructureVersion?.id)
@@ -264,7 +267,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                     formItemProps={wideField}
                   />
                 </DetailsFieldContainer>
-                <DetailsFieldContainer className="border-b-0 py-2">
+                <DetailsFieldContainer className="border-b-0 py-2 flex flex-col gap-2">
                   <FormItem className={cn('grid', wideField.className)}>
                     <FormLabel>{t('geometry.nativeCrs')}</FormLabel>
                     <Input
@@ -274,7 +277,9 @@ export const LayerConfig = (props: LayerConfigProps) => {
                       className="disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
                     />
                   </FormItem>
+                  {isNativeCrsMissing && <AlertBox text={t('geometry.nativeCrsMissingWarning')} />}
                 </DetailsFieldContainer>
+
                 <DetailsFieldContainer className="border-b-0 py-2 pb-6 flex flex-col gap-2">
                   <FormSelect
                     form={form}
@@ -310,7 +315,11 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 </DetailsFieldContainer>
 
                 <DetailsFieldContainer isTitleField>
-                  <SubHeader title={t('style.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
+                  <SubHeader
+                    title={t('style.sectionTitle')}
+                    subtitle={t('style.sectionSubtitle')}
+                    titleClassName="mb-1"
+                  />
                 </DetailsFieldContainer>
                 <DetailsFieldContainer className="border-b-0 py-2 pt-6">
                   <FormSelect

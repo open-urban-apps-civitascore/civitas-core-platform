@@ -1,0 +1,40 @@
+meta {
+  name: 9g3. Verify open data is payload-only (anonymous discovery → 401)
+  type: http
+  seq: 28
+  tags: [
+    requires-nifi
+  ]
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/apis
+  body: none
+  auth: none
+}
+
+tests {
+  test("Anonymous discovery is denied (401) even though the dataset is open — open data is payload-only", function() {
+    // At this step the dataset is OPEN (9g confirmed anonymous PAYLOAD read → 200). The discovery
+    // endpoint /v1/datasets/{id}/apis returns management metadata (named APIs, previewUrls) and is
+    // NOT part of open data: it is not marked `_open_data` in OPA, and portal-backend authenticates
+    // it independently. So an anonymous request is denied at BOTH layers. OPA denies first (no
+    // userinfo → missing_user_context → 401), so the gateway answers 401, never reaching the backend.
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  **Saga step 9g3** — Open Data Access is **payload-only**.
+
+  This is the counterpart to 9g (anonymous PAYLOAD read of an open dataset → 200): the **discovery**
+  endpoint `GET /v1/datasets/{id}/apis` (and likewise the metadata detail `GET /v1/datasets/{id}`)
+  is **not** opened, because those DTOs carry internal fields (pipelines, createdBy, pendingSagaType).
+  They stay authenticated even for an open dataset, double-secured: OPA does not grant them (no
+  `_open_data` marker) **and** portal-backend requires authentication. An anonymous request is denied
+  with 401.
+
+  **Precondition:** runs while the dataset is open (after 9f, before 9h).
+
+  **Expected:** 401 Unauthorized — open data does not extend to discovery/metadata.
+}

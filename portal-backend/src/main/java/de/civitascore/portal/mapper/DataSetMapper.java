@@ -39,6 +39,7 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "publicUrl", ignore = true)
   @Mapping(target = "pipelineIds", ignore = true)
   @Mapping(target = "pendingSagaType", ignore = true)
+  @Mapping(target = "provisioned", ignore = true)
   @Mapping(target = "assignments", ignore = true)
   // namedApis is reconciled by DataSetService.postConvertToEntity (slug-keyed replace).
   @Mapping(target = "namedApis", ignore = true)
@@ -79,6 +80,7 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "publicUrl", ignore = true)
   @Mapping(target = "pipelineIds", ignore = true)
   @Mapping(target = "pendingSagaType", ignore = true)
+  @Mapping(target = "provisioned", ignore = true)
   @Mapping(target = "namedApis", ignore = true)
   @Mapping(target = "dataPool", ignore = true)
   @Override

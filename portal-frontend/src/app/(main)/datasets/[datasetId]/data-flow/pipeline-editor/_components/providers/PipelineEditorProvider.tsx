@@ -15,17 +15,34 @@ import { useTranslations } from 'next-intl'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
+import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
+import {
+  useCreateDataSink,
+  useDeleteDataSink,
+  useUpdateDataSink,
+} from '@/app/services/api/datasets/datasinks/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
   useGetPipelines,
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { isDatapoolScopeViolationError } from '@/utils/errors'
 
+import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
-import { buildPipelinePayload, syncDatasinkIds } from '../../_services/payloadBuilderService'
+import {
+  buildDataSinkPayloads,
+  buildPipelinePayload,
+  createDataSinkSnapshot,
+  type DataSinkSnapshot,
+  getRemovedDataSinkIds,
+  hasDataSinkChanged,
+  isDestructiveDataSinkChange,
+  updateNodeEntityId,
+} from '../../_services/payloadBuilderService'
 import {
   createEmptyPipeline,
   getPipelineStats,
@@ -42,7 +59,7 @@ import {
   type ValidationResultWithNodeStatus,
 } from '../../_services/validationService'
 import type { ActivePipelineContextValue, PipelineStats } from '../../_types/context'
-import { createDefaultNodeData, type PipelineNodeData } from '../../_types/nodes'
+import type { PipelineNodeData } from '../../_types/nodes'
 import type { NodeCreationContext, Pipeline, PipelineEdge, PipelineNode, PipelineNodeType } from '../../_types/pipeline'
 import type { UsePipelineSessionReturn } from '../../_types/session'
 
@@ -83,9 +100,37 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Backend API Hooks =====
   const pipelinesQuery = useGetPipelines(datasetId)
+  const datasetQuery = useGetDataset({ id: datasetId })
   const createPipelineMutation = useCreatePipeline(datasetId)
   const updatePipelineMutation = useUpdatePipeline(datasetId)
   const deletePipelineMutation = useDeletePipeline(datasetId)
+  const createDataSinkMutation = useCreateDataSink()
+  const deleteDataSinkMutation = useDeleteDataSink()
+  const updateDataSinkMutation = useUpdateDataSink()
+
+  // ===== Data sink snapshot for change detection =====
+  const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
+
+  // ===== Data-loss confirmation dialog =====
+  // A destructive sink change (tableName / dataStructureVersionId) on an already-provisioned
+  // dataset discards its stored data (the sink's storage is rebuilt on the next release).
+  // Save-All pauses on such a change and awaits an explicit confirmation via this promise before
+  // sending confirmDataLoss to the backend.
+  const [isDataLossDialogOpen, setIsDataLossDialogOpen] = useState(false)
+  const dataLossResolveRef = useRef<((confirmed: boolean) => void) | null>(null)
+
+  const resolveDataLossDialog = useCallback((isConfirmed: boolean) => {
+    setIsDataLossDialogOpen(false)
+    dataLossResolveRef.current?.(isConfirmed)
+    dataLossResolveRef.current = null
+  }, [])
+
+  const confirmDataLoss = useCallback((): Promise<boolean> => {
+    setIsDataLossDialogOpen(true)
+    return new Promise<boolean>(resolve => {
+      dataLossResolveRef.current = resolve
+    })
+  }, [])
 
   // ===== Load pipelines from backend on mount =====
   useEffect(() => {
@@ -109,6 +154,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
     // Load all sessions into the session manager
     sessionManager.loadSessions(sessions, activeSessionId)
+
+    // Create initial data sink snapshots for change detection
+    for (const session of sessions) {
+      dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(session.pipeline)
+    }
   }, [pipelinesQuery.data, sessionManager, requestedPipelineId])
 
   // ===== Validation State =====
@@ -122,7 +172,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // Pipeline can be saved when: isDirty && validation passed (no errors) && validation has been run
   const canSave = useMemo(() => {
     const isDirty = activeSession?.isDirty || false
-    const hasErrors = validationResult?.errors?.length ?? 0 > 0
+    const hasErrors = (validationResult?.errors?.length ?? 0) > 0
     return isDirty && !isValidationRequired && !hasErrors
   }, [activeSession?.isDirty, validationResult?.errors?.length, isValidationRequired])
 
@@ -159,8 +209,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     (action: PipelineReducerAction) => {
       if (!activeSession) return
 
-      const updatedPipeline = pipelineReducerWithReactFlow(activeSession.pipeline, action)
-      sessionManager.updateSessionPipeline(activeSession.id, updatedPipeline)
+      // Apply the reducer against the latest pipeline via an updater rather than the
+      // closure-captured value. This lets multiple synchronous dispatches compose — e.g.
+      // deleting a connected node makes React Flow emit an edge-removal change followed by a
+      // node-removal change, and both must build on each other instead of overwriting.
+      sessionManager.updateSessionPipeline(activeSession.id, previous => pipelineReducerWithReactFlow(previous, action))
 
       // Mark as dirty for most actions
       if (action.type !== 'MARK_CLEAN') {
@@ -175,7 +228,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // ===== Node Operations =====
   const addNode = useCallback(
     (context: NodeCreationContext) => {
-      const nodeData = createDefaultNodeData(context.nodeType)
+      const def = getNodeDef(context.nodeType)
+      if (!def) return
+      const nodeData = def.createDefaultData()
       const newNode: PipelineNode = {
         id: crypto.randomUUID(),
         type: context.nodeType as PipelineNodeType,
@@ -393,40 +448,75 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       return false
     }
 
+    // A destructive sink change only risks data once the dataset's table physically exists.
+    const isProvisioned = datasetQuery.data?.data?.provisioned ?? false
+    const hasDestructiveChange =
+      isProvisioned &&
+      dirtySessions.some(session => {
+        const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
+        return buildDataSinkPayloads(session.pipeline).some(({ nodeId, payload }) =>
+          isDestructiveDataSinkChange(nodeId, payload, snapshot),
+        )
+      })
+
+    // Claim the guard before awaiting the dialog: the confirmation is async, so without this a
+    // second trigger (double-click, shortcut) would slip past the isSavingAll check above, reopen
+    // the dialog and overwrite the pending resolve — stranding the first save's promise forever.
     setIsSavingAll(true)
     const saveFailedNames: string[] = []
     const scopeViolationNames: string[] = []
     try {
+      if (hasDestructiveChange) {
+        const isConfirmed = await confirmDataLoss()
+        if (!isConfirmed) return false
+      }
+
       // Serialize saves to avoid concurrent mutation state issues
       for (const session of dirtySessions) {
         try {
-          const payload = buildPipelinePayload(session.pipeline)
-          const pipelineId = session.pipeline.id
+          let currentPipeline = session.pipeline
+          const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
 
-          let savedPipeline: Pipeline
-          if (pipelineId) {
-            const response = await updatePipelineMutation.mutateAsync({ pipelineId, data: payload })
-            savedPipeline = session.pipeline
-            const { pipeline: synced, hasChanges } = syncDatasinkIds(savedPipeline, response.data.dataSinks ?? [])
-            if (hasChanges) {
-              await updatePipelineMutation.mutateAsync({ pipelineId, data: buildPipelinePayload(synced) })
-              savedPipeline = synced
-            }
-          } else {
-            const response = await createPipelineMutation.mutateAsync(payload)
-            savedPipeline = { ...session.pipeline, id: response.data.id }
-            const { pipeline: synced, hasChanges } = syncDatasinkIds(savedPipeline, response.data.dataSinks ?? [])
-            if (hasChanges) {
-              await updatePipelineMutation.mutateAsync({
-                pipelineId: response.data.id,
-                data: buildPipelinePayload(synced),
-              })
-              savedPipeline = synced
+          // Step 1: Delete data sinks for removed persistence nodes
+          const removedDataSinkIds = getRemovedDataSinkIds(currentPipeline, snapshot)
+          for (const dataSinkId of removedDataSinkIds) {
+            await deleteDataSinkMutation.mutateAsync({ datasetId, dataSinkId: dataSinkId })
+          }
+
+          // Step 2: Save data sinks (create new / update changed)
+          const dataSinkPayloads = buildDataSinkPayloads(currentPipeline)
+          for (const { nodeId, entityId, payload } of dataSinkPayloads) {
+            if (!entityId) {
+              const response = await createDataSinkMutation.mutateAsync({ datasetId, data: payload })
+              currentPipeline = updateNodeEntityId(currentPipeline, nodeId, response.data.id)
+            } else if (hasDataSinkChanged(nodeId, payload, snapshot)) {
+              // The destructive-change confirmation was obtained up front; flag the payload so the
+              // backend permits the table rebuild. Only the sinks that are actually destructive
+              // carry the flag — a harmless change in the same save batch does not.
+              const data =
+                hasDestructiveChange && isDestructiveDataSinkChange(nodeId, payload, snapshot)
+                  ? { ...payload, confirmDataLoss: true }
+                  : payload
+              await updateDataSinkMutation.mutateAsync({ datasetId, dataSinkId: entityId, data })
             }
           }
-          sessionManager.updateSessionPipeline(session.id, { ...savedPipeline, isDirty: false })
+
+          // Step 3: Save pipeline (with updated entityIds from step 1)
+          const pipelinePayload = buildPipelinePayload(currentPipeline)
+          const pipelineId = currentPipeline.id
+
+          if (pipelineId) {
+            await updatePipelineMutation.mutateAsync({ pipelineId, data: pipelinePayload })
+          } else {
+            const response = await createPipelineMutation.mutateAsync(pipelinePayload)
+            currentPipeline = { ...currentPipeline, id: response.data.id }
+          }
+
+          // Step 4: Update session state and snapshot
+          sessionManager.updateSessionPipeline(session.id, { ...currentPipeline, isDirty: false })
           sessionManager.markSessionClean(session.id)
-          toast.success(t('header.saveSucces'))
+          dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(currentPipeline)
+          toast.success(t('header.saveSuccess', { name: currentPipeline.name }))
         } catch (error) {
           if (isDatapoolScopeViolationError(error)) {
             scopeViolationNames.push(session.name)
@@ -450,7 +540,19 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     } finally {
       setIsSavingAll(false)
     }
-  }, [isSavingAll, sessionManager, createPipelineMutation, updatePipelineMutation, t])
+  }, [
+    isSavingAll,
+    sessionManager,
+    createPipelineMutation,
+    updatePipelineMutation,
+    createDataSinkMutation,
+    deleteDataSinkMutation,
+    updateDataSinkMutation,
+    datasetId,
+    datasetQuery.data,
+    confirmDataLoss,
+    t,
+  ])
 
   useRegisterUnsavedChanges(hasAnyDirtySession, saveAllPipelines)
 
@@ -546,5 +648,20 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     ],
   )
 
-  return <ActivePipelineProvider value={contextValue}>{children}</ActivePipelineProvider>
+  return (
+    <ActivePipelineProvider value={contextValue}>
+      {children}
+      <WarningModal
+        open={isDataLossDialogOpen}
+        onOpenChange={open => {
+          if (!open) resolveDataLossDialog(false)
+        }}
+        title={t('dataLoss.title')}
+        description={t('dataLoss.description')}
+        confirmButtonTitle={t('dataLoss.confirm')}
+        onConfirm={() => resolveDataLossDialog(true)}
+        onDiscard={() => resolveDataLossDialog(false)}
+      />
+    </ActivePipelineProvider>
+  )
 }

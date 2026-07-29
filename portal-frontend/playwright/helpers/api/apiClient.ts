@@ -326,7 +326,6 @@ export class ApiClient {
     data: {
       version: string
       description?: string
-      modelAtlasUri: string
       modelName: string
       model: string
     },

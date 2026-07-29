@@ -119,6 +119,13 @@ describe('ApiConfigForm', () => {
       expect(preview.querySelector('strong')).toHaveTextContent('my-slug')
     })
 
+    test('does not update while the slug field is typed, only reflects the urlPreviewSlug prop', () => {
+      render(<Wrapper apiType={API_TYPE_QUERY.SENSORTHINGS} urlPreviewSlug="sta" />)
+      const slug = screen.getByTestId('slugTextField')
+      fireEvent.change(slug, { target: { value: 'typed-slug' } })
+      expect(screen.getByTestId('apiUrlPreview').querySelector('strong')).toHaveTextContent('sta')
+    })
+
     test('calls onSlugBlur when slug field is blurred', () => {
       const onSlugBlur = vi.fn()
       render(<Wrapper apiType={API_TYPE_QUERY.SENSORTHINGS} onSlugBlur={onSlugBlur} />)
@@ -126,6 +133,28 @@ describe('ApiConfigForm', () => {
       fireEvent.change(slug, { target: { value: 'newslug' } })
       fireEvent.blur(slug)
       expect(onSlugBlur).toHaveBeenCalled()
+    })
+  })
+
+  describe('Slug blur behavior', () => {
+    test('does not show a validation error before the slug field is blurred', async () => {
+      render(<Wrapper apiType={API_TYPE_QUERY.SENSORTHINGS} />)
+      const slug = screen.getByTestId('slugTextField')
+      fireEvent.change(slug, { target: { value: '' } })
+      await waitFor(() => {
+        expect(slug).toHaveValue('')
+      })
+      expect(screen.queryByTestId('slugFormMessage')).not.toBeInTheDocument()
+    })
+
+    test('shows the validation error once the slug field is blurred', async () => {
+      render(<Wrapper apiType={API_TYPE_QUERY.SENSORTHINGS} />)
+      const slug = screen.getByTestId('slugTextField')
+      fireEvent.change(slug, { target: { value: '' } })
+      fireEvent.blur(slug)
+      await waitFor(() => {
+        expect(screen.getByTestId('slugFormMessage')).toHaveTextContent('apis.config.errors.slug.required')
+      })
     })
   })
 

@@ -243,12 +243,13 @@ describe('DatapoolOverview', () => {
       })
     })
 
-    it('returns to read-only mode after a successful save', async () => {
+    it('stays in edit mode after a successful save', async () => {
       renderInEditMode()
       await editAndSave('Updated Name')
       await waitFor(() => {
-        expect(mockRouterReplace).toHaveBeenCalledWith('/datapools/dp1', { scroll: false })
+        expect(toast.success).toHaveBeenCalledWith('messages.updateSuccess')
       })
+      expect(mockRouterReplace).not.toHaveBeenCalledWith('/datapools/dp1', { scroll: false })
     })
   })
 
@@ -352,7 +353,7 @@ describe('DatapoolOverview', () => {
       })
     })
 
-    it('saves and closes the modal when Save is clicked in the exit warning modal', async () => {
+    it('saves, exits edit mode and closes the modal when Save is clicked in the exit warning modal', async () => {
       renderInEditMode()
       fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Changed Name' } })
       await waitFor(() => expect(screen.getByTestId('nameTextField')).toHaveValue('Changed Name'))
@@ -366,6 +367,7 @@ describe('DatapoolOverview', () => {
         )
         expect(toast.success).toHaveBeenCalledWith('messages.updateSuccess')
         expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
+        expect(mockRouterReplace).toHaveBeenCalledWith('/datapools/dp1', { scroll: false })
       })
     })
   })

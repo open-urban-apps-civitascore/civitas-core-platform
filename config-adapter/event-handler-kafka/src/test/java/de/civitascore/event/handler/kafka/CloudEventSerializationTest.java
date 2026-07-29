@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Tests to understand CloudEventSerializer and CloudEventDeserializer behavior. This helps debug
- * why EndToEndIntegrationTest receives NULL events.
+ * why EndToEndIT receives NULL events.
  */
 class CloudEventSerializationTest {
 

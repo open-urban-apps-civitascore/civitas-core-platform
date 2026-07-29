@@ -12,16 +12,9 @@ import { useCreateStyle, useUpdateStyle } from '@/app/services/api/datasets/styl
 import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { Dataset } from '@/types/datasets'
-import {
-  API_TYPE_QUERY,
-  LayerApiPayload,
-  LayerFormData,
-  NamedApi,
-  NamedApiPayload,
-  OwsApiFormData,
-  StaApiFormData,
-  StyleFormData,
-} from '@/types/namedApis'
+import { LayerApiPayload, LayerFormData } from '@/types/layers'
+import { API_TYPE_QUERY, NamedApi, NamedApiPayload, OwsApiFormData, StaApiFormData } from '@/types/namedApis'
+import { StyleFormData } from '@/types/styles'
 import { isLayerNameError, LayerSaveError } from '@/utils/errors'
 import { hasDirtyField } from '@/utils/form'
 import { buildOwsPayload, buildStaPayloadData, mapFormLayerToPayload, mapFormStyleToPayload } from '@/utils/namedApis'
@@ -80,6 +73,7 @@ export const useApiConfig = <TFormData extends FormData>({
 
   const isDirty = form.formState.isDirty
   const dirtyFields = form.formState.dirtyFields
+  const isValid = form.formState.isValid
 
   const updateMode = useCallback(
     (isEditing: boolean) => {
@@ -99,6 +93,10 @@ export const useApiConfig = <TFormData extends FormData>({
   const handleSaveBaseInfo = async (data: TFormData) => {
     if (!isCreate && !hasDirtyField(dirtyFields.baseInfo)) return
     const newApi = buildPayloadData(data)
+    const redirectUrl = `/datasets/${dataset.id}/apis/${newApi.slug}`
+
+    setUrlPreviewSlug(newApi.slug)
+
     if (isCreate) {
       await createNamedApi.mutateAsync({
         datasetId: dataset.id,
@@ -106,7 +104,8 @@ export const useApiConfig = <TFormData extends FormData>({
         existingApis: otherNamedApis,
       })
       toast.success(t('messages.createSuccess'))
-      router.push(`/datasets/${dataset.id}/apis/${newApi.slug}?mode=edit`)
+      router.replace(`${redirectUrl}?mode=edit`)
+      router.refresh()
     } else {
       const otherInputs: NamedApiPayload[] = otherNamedApis.map(a => ({
         name: a.name,
@@ -118,8 +117,11 @@ export const useApiConfig = <TFormData extends FormData>({
       await updateDataset.mutateAsync({ id: dataset.id, namedApis: [...otherInputs, newApi] })
       toast.success(t('messages.updateSuccess'))
       form.reset(data)
-      router.refresh()
       updateMode(false)
+      if (newApi.slug !== initialSlug) {
+        router.push(redirectUrl)
+      }
+      router.refresh()
     }
   }
 
@@ -191,15 +193,6 @@ export const useApiConfig = <TFormData extends FormData>({
   }
 
   const handleSave = async (): Promise<boolean> => {
-    const dirtyLayers = (form.formState.dirtyFields as Partial<Record<keyof OwsApiFormData, unknown>>).layers
-    const layerValues = (form.getValues as () => OwsApiFormData)().layers
-    console.log(
-      '[dirty layer fields]',
-      (dirtyLayers as Record<string, unknown>[] | undefined)?.map((dirty, i) => ({
-        layerName: layerValues?.[i]?.layerName,
-        dirtyFields: dirty,
-      })),
-    )
     let isSaved = false
     await form.handleSubmit(
       async data => {
@@ -225,18 +218,15 @@ export const useApiConfig = <TFormData extends FormData>({
     return isSaved
   }
 
-  const handleSlugBlur = (_event: FocusEvent<HTMLInputElement>) => {
-    setUrlPreviewSlug((form.getValues as (name: 'slug') => string)('slug'))
-  }
-
   const handleExit = () => {
-    if (isDirty) {
+    if (isDirty && isValid) {
       setIsExitModalOpen(true)
       return
     }
     if (isCreate) {
       router.push(`/datasets/${dataset.id}`)
     } else {
+      form.reset(initialFormData)
       updateMode(false)
     }
   }
@@ -262,6 +252,10 @@ export const useApiConfig = <TFormData extends FormData>({
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     void handleSave()
+  }
+
+  const handleSlugBlur = (_event: FocusEvent<HTMLInputElement>) => {
+    setUrlPreviewSlug(form.getValues('baseInfo.slug' as Path<TFormData>) as string)
   }
 
   useRegisterUnsavedChanges(isDirty, handleSave)

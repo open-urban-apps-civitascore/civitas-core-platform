@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
-import { CreateLayerInput, Layer, UpdateLayerInput } from '@/types/namedApis'
+import { CreateLayerInput, Layer, UpdateLayerInput } from '@/types/layers'
 
 const key = 'layers'
 

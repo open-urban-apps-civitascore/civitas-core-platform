@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import { STATUS_TYPES } from '@/types/common'
-import { Datasink, DATASINK_TYPES } from '@/types/datasinks'
+import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
-import { LayerFormData } from '@/types/namedApis'
+import { LayerFormData } from '@/types/layers'
 
-import { getNativeCRSFromDatasink, mapFormLayerToPayload } from './namedApis'
+import { getNativeCRSFromDataSink, mapFormLayerToPayload } from './namedApis'
 
 const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   id: '00000000-0000-0000-0000-000000000001',
@@ -27,7 +27,7 @@ const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   ...overrides,
 })
 
-const makeDatasink = (): Datasink => ({
+const makeDataSink = (): DataSink => ({
   id: '00000000-0000-0000-0000-000000000010',
   datasetId: '00000000-0000-0000-0000-000000000020',
   pipelineId: '00000000-0000-0000-0000-000000000030',
@@ -49,44 +49,71 @@ const makeDatasink = (): Datasink => ({
   modifiedAt: '2026-01-01T00:00:00',
 })
 
-const makeDatastructureVersion = (styles: DatastructureVersion['styles'] = null): DatastructureVersion => ({
+const makeDatastructureVersion = (model: DatastructureVersion['model'] = null): DatastructureVersion => ({
   id: '00000000-0000-0000-0000-000000000040',
   version: '1.0.0',
   description: null,
   dataStructureVersionStatus: STATUS_TYPES.AVAILABLE,
   dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
   modelName: null,
-  model: null,
-  styles,
+  model,
+  styles: null,
   inUse: true,
   dataStructure: { id: '00000000-0000-0000-0000-000000000050', name: 'Structure 1' },
   createdAt: '2026-01-01T00:00:00',
   modifiedAt: '2026-01-01T00:00:00',
 })
 
-const stylesWithCRS = {
-  nodes: [
+const modelWithCRS = {
+  properties: {
+    geom: { $ref: 'https://geojson.org/schema/Point.json', crs: 'EPSG:25832' },
+  },
+} as unknown as DatastructureVersion['model']
+
+const modelWithCRSInDefs = {
+  properties: {
+    location: { $ref: '#/$defs/MyClass' },
+  },
+  $defs: {
+    MyClass: {
+      type: 'object',
+      properties: {
+        geom: { $ref: 'https://geojson.org/schema/Point.json', crs: 'EPSG:25832' },
+      },
+    },
+  },
+} as unknown as DatastructureVersion['model']
+
+const modelWithCRSInRootAllOf = {
+  allOf: [
+    { $ref: '#/$defs/BaseClass' },
     {
-      data: {
-        element: {
-          type: 'class' as const,
-          id: '00000000-0000-0000-0000-000000000060',
-          name: 'MyClass',
-          attributes: [
-            {
-              id: '00000000-0000-0000-0000-000000000070',
-              name: 'geom',
-              type: { name: 'Geometry' },
-              visibility: 'public' as const,
-              meta: { gisInfo: { crs: 'EPSG:25832' } },
-            },
-          ],
-          operations: [],
-        },
+      type: 'object',
+      properties: {
+        geom: { $ref: 'https://geojson.org/schema/Point.json', crs: 'EPSG:25832' },
       },
     },
   ],
-} as unknown as DatastructureVersion['styles']
+} as unknown as DatastructureVersion['model']
+
+const modelWithCRSInDefsAllOf = {
+  properties: {
+    location: { $ref: '#/$defs/MyClass' },
+  },
+  $defs: {
+    MyClass: {
+      allOf: [
+        { $ref: '#/$defs/BaseClass' },
+        {
+          type: 'object',
+          properties: {
+            geom: { $ref: 'https://geojson.org/schema/Point.json', crs: 'EPSG:25832' },
+          },
+        },
+      ],
+    },
+  },
+} as unknown as DatastructureVersion['model']
 
 describe('mapFormLayerToPayload', () => {
   it('computes latLonBoundingBox from nativeBoundingBox and CRS', () => {
@@ -131,58 +158,68 @@ describe('mapFormLayerToPayload', () => {
   })
 })
 
-describe('getNativeCRSFromDatasink', () => {
-  it('returns the CRS from the matching datasink and datastructure', () => {
-    const result = getNativeCRSFromDatasink(
+describe('getNativeCRSFromDataSink', () => {
+  it('returns the CRS from the matching data sink and datastructure model', () => {
+    const result = getNativeCRSFromDataSink(
       '00000000-0000-0000-0000-000000000010',
-      [makeDatasink()],
-      [makeDatastructureVersion(stylesWithCRS)],
+      [makeDataSink()],
+      [makeDatastructureVersion(modelWithCRS)],
     )
     expect(result).toBe('EPSG:25832')
   })
 
-  it('returns empty string when datasinkId has no match', () => {
-    const result = getNativeCRSFromDatasink(
+  it('returns the CRS from a $defs entry when the root properties have none', () => {
+    const result = getNativeCRSFromDataSink(
+      '00000000-0000-0000-0000-000000000010',
+      [makeDataSink()],
+      [makeDatastructureVersion(modelWithCRSInDefs)],
+    )
+    expect(result).toBe('EPSG:25832')
+  })
+
+  it('returns the CRS from an allOf branch on the root schema (inheritance)', () => {
+    const result = getNativeCRSFromDataSink(
+      '00000000-0000-0000-0000-000000000010',
+      [makeDataSink()],
+      [makeDatastructureVersion(modelWithCRSInRootAllOf)],
+    )
+    expect(result).toBe('EPSG:25832')
+  })
+
+  it('returns the CRS from an allOf branch inside a $defs entry (inheritance)', () => {
+    const result = getNativeCRSFromDataSink(
+      '00000000-0000-0000-0000-000000000010',
+      [makeDataSink()],
+      [makeDatastructureVersion(modelWithCRSInDefsAllOf)],
+    )
+    expect(result).toBe('EPSG:25832')
+  })
+
+  it('returns empty string when dataSinkId has no match', () => {
+    const result = getNativeCRSFromDataSink(
       '00000000-0000-0000-0000-000000000099',
-      [makeDatasink()],
-      [makeDatastructureVersion(stylesWithCRS)],
+      [makeDataSink()],
+      [makeDatastructureVersion(modelWithCRS)],
     )
     expect(result).toBe('')
   })
 
-  it('returns empty string when no datastructure matches the datasink', () => {
-    const result = getNativeCRSFromDatasink('00000000-0000-0000-0000-000000000010', [makeDatasink()], [])
+  it('returns empty string when no datastructure matches the data sink', () => {
+    const result = getNativeCRSFromDataSink('00000000-0000-0000-0000-000000000010', [makeDataSink()], [])
     expect(result).toBe('')
   })
 
-  it('returns empty string when no attribute has a CRS', () => {
-    const stylesWithoutCRS = {
-      nodes: [
-        {
-          data: {
-            element: {
-              type: 'class' as const,
-              id: '00000000-0000-0000-0000-000000000060',
-              name: 'MyClass',
-              attributes: [
-                {
-                  id: '00000000-0000-0000-0000-000000000070',
-                  name: 'name',
-                  type: { name: 'String' },
-                  visibility: 'public' as const,
-                },
-              ],
-              operations: [],
-            },
-          },
-        },
-      ],
-    } as unknown as DatastructureVersion['styles']
+  it('returns empty string when no property has a CRS', () => {
+    const modelWithoutCRS = {
+      properties: {
+        name: { type: 'string' },
+      },
+    } as unknown as DatastructureVersion['model']
 
-    const result = getNativeCRSFromDatasink(
+    const result = getNativeCRSFromDataSink(
       '00000000-0000-0000-0000-000000000010',
-      [makeDatasink()],
-      [makeDatastructureVersion(stylesWithoutCRS)],
+      [makeDataSink()],
+      [makeDatastructureVersion(modelWithoutCRS)],
     )
     expect(result).toBe('')
   })

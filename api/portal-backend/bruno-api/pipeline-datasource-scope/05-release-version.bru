@@ -1,0 +1,28 @@
+meta {
+  name: 05. Release DataStructure Version
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{scopeDataStructureId}}
+  versionId: {{scopeVersionId}}
+}
+
+tests {
+  test("Released or already released", function() {
+    const status = res.getStatus();
+    // 200=released, 400=already released
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  A version must be released before its parent DataStructure can be released (step 06).
+}

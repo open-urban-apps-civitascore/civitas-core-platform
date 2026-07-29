@@ -22,9 +22,12 @@ export const UnsavedChangesProvider = ({ children }: UnsavedChangesProviderProps
   const [isSaving, setIsSaving] = useState(false)
   const isNavigatingRef = useRef(false)
   const saveHandlerRef = useRef<(() => Promise<boolean>) | null>(null)
+  const refreshAfterNavigateRef = useRef(false)
+  const pendingRefreshRef = useRef(false)
 
-  const setSaveHandler = useCallback((handler: (() => Promise<boolean>) | null) => {
+  const setSaveHandler = useCallback((handler: (() => Promise<boolean>) | null, shouldRefreshAfterNavigate = false) => {
     saveHandlerRef.current = handler
+    refreshAfterNavigateRef.current = shouldRefreshAfterNavigate
   }, [])
 
   const requestNavigation = useCallback(
@@ -67,7 +70,11 @@ export const UnsavedChangesProvider = ({ children }: UnsavedChangesProviderProps
     setIsSaving(true)
     const hasSuccess = await saveHandlerRef.current()
     setIsSaving(false)
-    if (hasSuccess) navigate()
+    if (!hasSuccess) return
+    // Refresh only after the route change (see effect below); refreshing around the push cancels it.
+    pendingRefreshRef.current = refreshAfterNavigateRef.current
+    // Defer so the save's state updates commit first, otherwise the re-render discards the push.
+    setTimeout(navigate, 0)
   }, [navigate])
 
   const cancelNavigation = useCallback(() => {
@@ -88,7 +95,12 @@ export const UnsavedChangesProvider = ({ children }: UnsavedChangesProviderProps
 
   useEffect(() => {
     isNavigatingRef.current = false
-  }, [pathname, searchParams])
+    // Route change done: safe to invalidate the router cache now so the source route is fresh on return.
+    if (pendingRefreshRef.current) {
+      pendingRefreshRef.current = false
+      router.refresh()
+    }
+  }, [pathname, searchParams, router])
 
   const contextValue = useMemo(
     () => ({

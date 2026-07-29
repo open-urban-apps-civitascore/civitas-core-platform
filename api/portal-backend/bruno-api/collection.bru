@@ -2,6 +2,10 @@ auth {
   mode: oauth2
 }
 
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
 auth:oauth2 {
   grant_type: password
   access_token_url: {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
@@ -17,4 +21,11 @@ auth:oauth2 {
   token_header_prefix: Bearer
   auto_fetch_token: true
   auto_refresh_token: false
+}
+
+docs {
+  Requests run directly against the backend (baseUrl), bypassing APISIX/OPA. The backend's
+  body-reference scope guard denies when no X-Allowed-Scope-Ids header is present, so the
+  collection sends the wildcard the tenant-wide test user (dev@civitas.local) would receive
+  from OPA. Individual requests that need a narrower scope override this header locally.
 }

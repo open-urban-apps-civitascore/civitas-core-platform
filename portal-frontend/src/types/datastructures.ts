@@ -61,9 +61,19 @@ export const DatastructureVersionSummaryApiResponseSchema = z.object({
   dataStructureId: z.string(),
 })
 
+// Three-segment SemVer, mirroring the URN grammar: the version becomes the trailing
+// segment of the model's $id URN, whose validation rejects any other shape at release.
+export const VERSION_PATTERN = /^\d+\.\d+\.\d+$/
+
+const versionSchema = z
+  .string()
+  .trim()
+  .min(1, 'common.errors.required')
+  .regex(VERSION_PATTERN, 'datastructureVersions.errors.versionFormat')
+
 export const DatastructureVersionFormDraftSchema = z.object({
   id: z.string(),
-  version: z.string().trim().min(1, 'common.errors.required'),
+  version: versionSchema,
   description: z.string().trim(),
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum,
@@ -81,7 +91,7 @@ export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormD
 })
 
 export const DatastructureVersionCreateSchema = z.object({
-  version: z.string().trim().min(1, 'common.errors.required'),
+  version: versionSchema,
   description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum.optional(),
@@ -159,6 +169,7 @@ export const DatastructureCreateFormSchema = z.object({
     .trim()
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
+  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
 })
 
 export const DatastructureCreateDataSchema = z.object({
@@ -168,7 +179,7 @@ export const DatastructureCreateDataSchema = z.object({
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
   createdFromDataSource: z.boolean(),
-  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
+  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   dataStructureVersionIds: z.array(z.string()).optional(),
   assignments: z.array(AssignmentSchema).optional(),
 })

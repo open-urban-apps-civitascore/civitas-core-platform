@@ -36,14 +36,26 @@ setup-version:
     - REVISION=$(git describe --tags --always)
     - echo "REVISION=$REVISION" > version.env
     - echo "Setting REVISION=$REVISION"
+    # Nightly builds (triggered by a scheduled pipeline with IS_NIGHTLY=true) get a
+    # dedicated, date-stamped image tag: <branch>-nightly-<YYYYMMDD>
+    # (e.g. develop-nightly-20260617).
+    - |
+      if [ "$IS_NIGHTLY" = "true" ]; then
+        NIGHTLY_IMAGE_TAG="${CI_COMMIT_REF_SLUG}-nightly-$(date -u +%Y%m%d)"
+        echo "NIGHTLY_IMAGE_TAG=$NIGHTLY_IMAGE_TAG" >> version.env
+        echo "Setting NIGHTLY_IMAGE_TAG=$NIGHTLY_IMAGE_TAG"
+      fi
   artifacts:
     reports:
       # Pass to other jobs
       # https://docs.gitlab.com/ci/yaml/artifacts_reports/#artifactsreportsdotenv
       dotenv: version.env
 
+
 workflow:
   rules:
+    # Run on the nightly scheduled pipeline (schedule must set IS_NIGHTLY=true)
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on main and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "develop"
@@ -51,6 +63,7 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     # Run on tag events
     - if: $CI_COMMIT_TAG
+
 
 stages: [
     lint, # Lints all code

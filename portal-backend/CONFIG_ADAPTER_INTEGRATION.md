@@ -267,33 +267,10 @@ kafka:
       "de.civitascore.config.results"
     })
 @TestPropertySource(properties = {"kafka.enabled=true"})  // ← Enable Kafka for this test
+@Import(ConfigAdapterTestConfiguration.class)             // ← In-process adapter as a context bean
 class EventPublishingIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @Autowired private KafkaTemplate<String, String> kafkaTemplate;
-  @Value("${spring.embedded.kafka.brokers}")
-  private String embeddedKafkaBrokers;
-
-  private ConfigAdapterTestHelper configAdapterHelper;
-
-  @BeforeEach
-  void setUp() {
-    // Ensure civitas-core realm exists
-    ensureCivitasCoreRealmExists();
-
-    // Start Config Adapter in-process
-    configAdapterHelper = new ConfigAdapterTestHelper(
-        KEYCLOAK,
-        embeddedKafkaBrokers,
-        kafkaTemplate
-    );
-  }
-
-  @AfterEach
-  void tearDown() {
-    if (configAdapterHelper != null) {
-      configAdapterHelper.close();
-    }
-  }
 
   @Test
   void shouldCreateUserInKeycloakWhenCreatingUser() {
@@ -325,6 +302,11 @@ class EventPublishingIntegrationTest extends BaseKeycloakIntegrationTest {
 - ✅ Tests both portal-backend and config-adapter interaction
 - ✅ No mocking required
 - ✅ Tests run in isolation with @EmbeddedKafka
+
+The adapter is a context bean rather than something built in `@BeforeEach`, so its Kafka consumer is
+subscribed during context refresh. The `init` profile initializers publish IDM events from
+`ApplicationReadyEvent`; a consumer created per test method would miss those and every publish would
+run into its full result timeout.
 
 #### Running Integration Tests
 

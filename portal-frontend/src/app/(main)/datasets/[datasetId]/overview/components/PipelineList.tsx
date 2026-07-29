@@ -1,7 +1,8 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
-import { useMemo } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
+import { useEffect, useMemo, useRef } from 'react'
+import { toast } from 'sonner'
 
 import { DataSourceNodeData } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/nodes'
 import {
@@ -11,10 +12,14 @@ import {
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
 import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
+import { BasicTooltip } from '@/components/tooltip/Tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { usePermissions } from '@/hooks/use-permissions'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { PipelineBasicInfo } from '@/types/datasets'
 import { DATASINK_TYPES } from '@/types/datasinks'
+import { formatDate } from '@/utils/formatDate'
 
 const getPipelineBadges = (dto: PipelineOutputDTO, datasourceConnectors: Map<string, string>): string[] => {
   const nodes = dto.styles?.nodes ?? []
@@ -43,13 +48,33 @@ const getPipelineBadges = (dto: PipelineOutputDTO, datasourceConnectors: Map<str
 interface PipelineListProps {
   datasetId: string
   pipelines: PipelineBasicInfo[]
-  canAdd: boolean
+  canCreatePipeline: boolean
 }
 
-export const PipelineList = ({ datasetId, pipelines, canAdd }: PipelineListProps) => {
+export const PipelineList = ({ datasetId, pipelines, canCreatePipeline }: PipelineListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.pipelines')
+  const locale = useLocale()
+  const { hasPermission } = usePermissions()
+  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
   const { data: pipelinesData } = useGetPipelines(datasetId)
-  const { data: datasourcesData } = useGetDatasources()
+  const { data: datasourcesData } = useGetDatasources({ isEnabled: canReadDatasources })
+  const seenErrors = useRef(new Set<string>())
+
+  useEffect(() => {
+    for (const pipeline of pipelines) {
+      const status = pipeline.runtimeStatus
+      if (status?.state !== 'ERROR') continue
+      const key = `${pipeline.id}:${status.lastEventId ?? status.occurredAt ?? status.message ?? 'error'}`
+      if (seenErrors.current.has(key)) continue
+      seenErrors.current.add(key)
+      toast.error(
+        t('errorToast', {
+          name: pipeline.name,
+          message: status.message ?? t('unknownError'),
+        }),
+      )
+    }
+  }, [pipelines, t])
 
   const datasourceConnectors = useMemo(() => {
     const map = new Map<string, string>()
@@ -71,7 +96,7 @@ export const PipelineList = ({ datasetId, pipelines, canAdd }: PipelineListProps
     <div className="py-3 mb-6">
       <div className="flex items-center justify-between gap-4">
         <h4 className="font-semibold">{t('title')}</h4>
-        {canAdd && (
+        {canCreatePipeline && (
           <Button asChild variant="outline">
             <GuardedLink href={`/datasets/${datasetId}/data-flow/pipeline-editor`}>{t('addButton')}</GuardedLink>
           </Button>
@@ -89,6 +114,31 @@ export const PipelineList = ({ datasetId, pipelines, canAdd }: PipelineListProps
                 {pipeline.name}
               </GuardedLink>
               <div className="flex items-center gap-2 self-center" data-testid={`pipelineRowBadges-${pipeline.id}`}>
+                {pipeline.runtimeStatus?.state === 'ERROR' && (
+                  <BasicTooltip
+                    tooltipContent={
+                      <div className="space-y-2 text-left text-sm">
+                        <p>{pipeline.runtimeStatus.message ?? t('pipelineError')}</p>
+                        {pipeline.runtimeStatus.occurredAt && (
+                          <p>{formatDate(pipeline.runtimeStatus.occurredAt, locale)}</p>
+                        )}
+                        {pipeline.runtimeStatus.sanitizedStacktrace && (
+                          <pre className="max-h-48 max-w-[480px] overflow-auto whitespace-pre-wrap text-xs">
+                            {pipeline.runtimeStatus.sanitizedStacktrace}
+                          </pre>
+                        )}
+                      </div>
+                    }
+                  >
+                    <button
+                      type="button"
+                      aria-label={t('errorDetails', { name: pipeline.name })}
+                      className="text-destructive"
+                    >
+                      <Badge variant="destructive">{t('errorLabel')}</Badge>
+                    </button>
+                  </BasicTooltip>
+                )}
                 {(badgesByPipelineId.get(pipeline.id) ?? []).map(label => (
                   <Badge key={label} variant="secondary">
                     {label}

@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { AxiosError } from 'axios'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -23,6 +24,7 @@ vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   useReleaseDataset: () => ({ mutateAsync: mockReleaseDataset, isPending: false }),
   useUnreleaseDataset: () => ({ mutateAsync: mockUnreleaseDataset, isPending: false }),
   useUpdateReleasedDatasetMeta: () => ({ mutateAsync: mockUpdateReleasedDatasetMeta, isPending: false }),
+  useGetDataset: () => ({ data: undefined }),
 }))
 
 vi.mock('@/app/services/api/users/clientRequests', () => ({
@@ -201,24 +203,12 @@ describe('DatasetOverview', () => {
   })
 
   describe('Status availability and auto-revert', () => {
-    describe('READY and AVAILABLE are disabled when canSetAvailable is false', () => {
+    describe('READY and AVAILABLE are disabled when canStage is false', () => {
       it('when no pipelines are present', async () => {
         renderComponent({
           dataset: makeDraftDataset({ pipelines: [] }),
           groupCount: 1,
           roleCount: 1,
-        })
-        clickEditButton()
-        await openStatusDropdown()
-        expect(getStatusOption('READY')).toHaveAttribute('aria-disabled', 'true')
-        expect(getStatusOption('AVAILABLE')).toHaveAttribute('aria-disabled', 'true')
-      })
-
-      it('when there are namedApis but no assignments', async () => {
-        renderComponent({
-          dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
-          groupCount: 0,
-          roleCount: 0,
         })
         clickEditButton()
         await openStatusDropdown()
@@ -257,7 +247,7 @@ describe('DatasetOverview', () => {
       })
     })
 
-    describe('READY and AVAILABLE are enabled when canSetAvailable is true', () => {
+    describe('READY and AVAILABLE are enabled when canStage is true', () => {
       it('when pipelines present, assignments set, and form passes strict schema', async () => {
         renderComponent({
           dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
@@ -275,6 +265,18 @@ describe('DatasetOverview', () => {
           dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
           groupCount: 1,
           roleCount: 1,
+        })
+        clickEditButton()
+        await openStatusDropdown()
+        expect(getStatusOption('READY')).not.toHaveAttribute('aria-disabled', 'true')
+        expect(getStatusOption('AVAILABLE')).not.toHaveAttribute('aria-disabled', 'true')
+      })
+
+      it('when distribution present and form valid but no assignments (assignments not required)', async () => {
+        renderComponent({
+          dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
+          groupCount: 0,
+          roleCount: 0,
         })
         clickEditButton()
         await openStatusDropdown()
@@ -306,9 +308,9 @@ describe('DatasetOverview', () => {
       })
     })
 
-    describe('auto-reverts status to DRAFT and shows toast when canSetAvailable becomes false', () => {
+    describe('auto-reverts status to DRAFT and shows toast when canStage becomes false', () => {
       it.each([{ dataSetStatus: 'READY' as const }, { dataSetStatus: 'AVAILABLE' as const }])(
-        'reverts from $dataSetStatus to DRAFT when assignments drop to 0',
+        'keeps $dataSetStatus when assignments drop to 0 (assignments not required)',
         async ({ dataSetStatus }) => {
           const { rerender } = renderComponent({
             dataset: makeDraftDataset({
@@ -335,8 +337,8 @@ describe('DatasetOverview', () => {
             )
           })
 
-          expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
-          expect(toast.info).toHaveBeenCalledWith('info.switchMode')
+          expect(screen.getByTestId('statusDropdown')).toHaveTextContent(dataSetStatus)
+          expect(toast.info).not.toHaveBeenCalled()
         },
       )
 
@@ -500,6 +502,49 @@ describe('DatasetOverview', () => {
           expect.objectContaining({ name: 'Updated Name', id: 'test-id' }),
         )
       })
+    })
+  })
+
+  describe('Save error handling: scope-violation vs. generic', () => {
+    const axios422 = (type?: string) =>
+      new AxiosError('request failed', undefined, undefined, undefined, {
+        status: 422,
+        statusText: '',
+        headers: {},
+        config: {} as never,
+        data: { detail: 'scope violation', type },
+      })
+
+    it('shows the scope-violation toast when the save fails with a DATASOURCE_SCOPE_VIOLATION 422', async () => {
+      mockPatchDataset.mockRejectedValueOnce(axios422('urn:civitas:error:DATASOURCE_SCOPE_VIOLATION'))
+      renderComponent()
+      clickEditButton()
+
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
+      })
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('messages.datasourceScopeViolation')
+      })
+      expect(toast.error).not.toHaveBeenCalledWith('messages.transitionError')
+    })
+
+    it('shows the generic transition-error toast for any other save failure', async () => {
+      mockPatchDataset.mockRejectedValueOnce(new Error('boom'))
+      renderComponent()
+      clickEditButton()
+
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
+      })
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('messages.transitionError')
+      })
+      expect(toast.error).not.toHaveBeenCalledWith('messages.datasourceScopeViolation')
     })
   })
 

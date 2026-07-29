@@ -22,34 +22,26 @@ import org.slf4j.LoggerFactory;
 /**
  * Typed, validated view of a route command's payload — decoded once from the loosely-typed saga
  * {@code Map} (which arrives via the Kafka → Flowable variable round-trip). It carries the
- * named-API {@code slugs} and per-slug {@code standardBySlug} (CREATE, drift checks), the
- * slug-keyed {@code routeIds} (UPDATE/DELETE/RESTORE) and the per-slug previous open-data flags
- * (RESTORE). An empty {@link #slugs}/{@link #routeIds} means the dataset has no named APIs: CREATE
- * provisions nothing and UPDATE/DELETE/RESTORE no-op (the legacy single dataset-level route was
- * removed), expressed in one place instead of re-derived in each handler.
+ * named-API {@code slugs} and per-slug {@code standardBySlug} (CREATE, drift checks) and the
+ * slug-keyed {@code routeIds} (UPDATE/DELETE/RESTORE). An empty {@link #slugs}/{@link #routeIds}
+ * means the dataset has no named APIs: CREATE provisions nothing and UPDATE/DELETE/RESTORE no-op
+ * (the legacy single dataset-level route was removed), expressed in one place instead of re-derived
+ * in each handler.
  *
  * @param slugs named-API slugs from the {@code namedApis} payload entry (entries without a usable
  *     slug are dropped and logged)
  * @param routeIds slug-keyed APISIX route ids persisted by the portal-backend from the prior
  *     CREATE_ROUTE result (null-keyed/-valued entries are dropped and logged)
- * @param previousOpenBySlug per-slug open-data state captured by UPDATE_ROUTE for RESTORE_ROUTE
  * @param standardBySlug per-slug API standard ({@code STA}/{@code OWS}/{@code CUSTOM}) gating
  *     routability in CREATE_ROUTE and selecting the upstream (see {@link RouteUpstreamKind})
  */
 record RoutePayload(
-    List<String> slugs,
-    Map<String, String> routeIds,
-    Map<String, Boolean> previousOpenBySlug,
-    Map<String, String> standardBySlug) {
+    List<String> slugs, Map<String, String> routeIds, Map<String, String> standardBySlug) {
 
   private static final Logger LOG = LoggerFactory.getLogger(RoutePayload.class);
 
   static RoutePayload decode(SagaCommandMessage command) {
-    return new RoutePayload(
-        readSlugs(command),
-        readRouteIds(command),
-        readPreviousOpenBySlug(command),
-        readStandardBySlug(command));
+    return new RoutePayload(readSlugs(command), readRouteIds(command), readStandardBySlug(command));
   }
 
   /**
@@ -164,33 +156,6 @@ record RoutePayload(
           Encode.forJava(command.sagaId()));
     }
     return routeIds;
-  }
-
-  /** Reads the per-slug previous open-data state captured by UPDATE_ROUTE for RESTORE_ROUTE. */
-  private static Map<String, Boolean> readPreviousOpenBySlug(SagaCommandMessage command) {
-    Object raw = command.payload().get("previousOpenDataAccess");
-    if (!(raw instanceof Map<?, ?> map)) {
-      return Map.of();
-    }
-    Map<String, Boolean> previous = new LinkedHashMap<>();
-    int dropped = 0;
-    for (Map.Entry<?, ?> entry : map.entrySet()) {
-      if (entry.getKey() == null) {
-        dropped++;
-        continue;
-      }
-      previous.put(
-          entry.getKey().toString(),
-          Boolean.TRUE.equals(entry.getValue())
-              || "true".equalsIgnoreCase(String.valueOf(entry.getValue())));
-    }
-    if (dropped > 0) {
-      LOG.warn(
-          "RESTORE_ROUTE: ignored {} previousOpenDataAccess entry/entries with a null key (saga={})",
-          dropped,
-          Encode.forJava(command.sagaId()));
-    }
-    return previous;
   }
 
   /** Per-slug API standard from the {@code namedApis} payload, used to gate CREATE_ROUTE. */

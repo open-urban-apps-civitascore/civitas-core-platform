@@ -42,7 +42,7 @@ services:
       start_period: 5s
 
   apisix:
-    image: apache/apisix:3.14.0-debian
+    image: apache/apisix:3.17.0-debian
     container_name: civitas-apisix
     volumes:
       - ../apisix/apisix_conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro

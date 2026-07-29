@@ -7,9 +7,8 @@ auth:bearer {
 }
 
 script:pre-request {
-  // NiFi's POST /access/token sets a __Secure-Authorization-Bearer cookie.
-  // If Bruno also sends it back, NiFi's CSRF filter rejects state-changing
-  // requests (403, logged as anonymous) even though the Authorization header
-  // is present. Drop cookies before every request — only the header is used.
+  // The token is a Keycloak OIDC access token (client-credentials); it is sent only via the
+  // Authorization header. Clear the cookie jar before every request so a stray NiFi bearer cookie
+  // can never trigger NiFi's CSRF filter on state-changing requests (403, logged as anonymous).
   bru.cookies.jar().clear();
 }

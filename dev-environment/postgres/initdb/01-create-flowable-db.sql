@@ -1,0 +1,11 @@
+-- Create the dedicated Flowable saga database used by the config-adapter's embedded
+-- Flowable engine (separate from portal_backend on the same server).
+--
+-- This runs from docker-entrypoint-initdb.d AFTER the Postgres entrypoint finishes its
+-- bootstrap (the temporary socket-only server has shut down and the final server is up),
+-- so it is race-free on a fresh volume — unlike a `CREATE DATABASE` fired from the host
+-- against a server that pg_isready reports as "ready" while it is still initialising.
+--
+-- Init scripts only run on a FRESH volume. For pre-existing volumes the idempotent
+-- guard in start-portal-dev.sh provisions the database instead.
+CREATE DATABASE flowable OWNER admin;

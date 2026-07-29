@@ -1,0 +1,34 @@
+meta {
+  name: 2b. Release Source DataStructure Version
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{sqlSourceDataStructureId}}
+  versionId: {{sqlSourceVersionId}}
+}
+
+tests {
+  test("Released", function() {
+    const status = res.getStatus();
+    // 200=released
+    expect(status).to.equal(200);
+  });
+}
+
+docs {
+  **SQL saga step 2b** — Prerequisites: source structure (step 2), source version (step 2a).
+
+  Releases the source structure version so the datasource can reference it (a datasource can only be released once its data-structure version is released).
+
+  **Expected Response:** 200 OK. 400 if not in DRAFT state (already released — idempotent).
+
+  **Post-condition:** Source version status transitions from `DRAFT` to `PUBLISHED`.
+}

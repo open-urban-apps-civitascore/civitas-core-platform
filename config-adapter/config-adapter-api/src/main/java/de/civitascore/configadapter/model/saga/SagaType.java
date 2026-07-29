@@ -12,19 +12,25 @@ package de.civitascore.configadapter.model.saga;
 /** Saga workflow types. Each type defines a distinct step ordering and compensation strategy. */
 public enum SagaType {
 
-  /** Dataset provisioning: FROST → APISIX → Redpanda (conditional). */
+  /** Dataset provisioning: FROST → APISIX → NiFi (conditional). */
   DATASET_CREATE("dataset-create"),
 
-  /**
-   * Dataset update: FROST → APISIX → Redpanda (conditional). Compensation restores previous state.
-   */
+  /** Dataset update: FROST → APISIX → NiFi (conditional). Compensation restores previous state. */
   DATASET_UPDATE("dataset-update"),
 
   /**
-   * Dataset deletion: Redpanda (conditional) → APISIX → FROST (reverse order). Best-effort
-   * execution, no compensation.
+   * Dataset deletion: NiFi (conditional) → APISIX → FROST (reverse order). Best-effort execution,
+   * no compensation.
    */
-  DATASET_DELETE("dataset-delete");
+  DATASET_DELETE("dataset-delete"),
+
+  /**
+   * Dataset unrelease: NiFi (conditional) → APISIX (reverse order). Tears down only the ingest and
+   * consumer access (pipeline + route/upstream); the data-holding sink (PostGIS table, FROST
+   * project) is deliberately kept so a later re-release reuses it. Best-effort execution, no
+   * compensation.
+   */
+  DATASET_UNRELEASE("dataset-unrelease");
 
   private final String key;
 

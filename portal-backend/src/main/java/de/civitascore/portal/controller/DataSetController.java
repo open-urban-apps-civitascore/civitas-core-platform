@@ -9,6 +9,7 @@ import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
 import de.civitascore.portal.repository.specification.DataSetSpec;
 import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.service.DataSetService;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -100,6 +101,19 @@ public class DataSetController
   @Override
   protected DataSetService getService() {
     return dataSetService;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Widens dataset scope filtering with Epic 1 union inheritance: in addition to directly scoped
+   * dataset IDs, datasets belonging to a datapool the user has a DATAPOOL-scoped grant on are
+   * visible ({@code id IN (scopeIds) OR datapool_id IN (poolIds)}).
+   */
+  @Override
+  protected Specification<DataSet> scopeSpecification(AllowedScopes scopes) {
+    return ScopeFilteringSpecification.dataSetByScopeOrPool(
+        scopes.getScopeIds(), scopes.getPoolIds());
   }
 
   /** {@inheritDoc} */
@@ -236,7 +250,9 @@ public class DataSetController
   }
 
   /**
-   * Deletes a DRAFT dataset. READY or released datasets must be unstaged/unreleased first.
+   * Deletes a dataset. An AVAILABLE dataset must be unreleased first. A never-provisioned dataset
+   * is removed immediately; a dataset that still holds a provisioned sink is torn down
+   * asynchronously via a DELETE saga and removed once the saga completes.
    *
    * @param id the UUID of the dataset to delete
    */
@@ -245,9 +261,10 @@ public class DataSetController
   @Operation(
       summary = "Delete a dataset",
       description =
-          "Deletes a DRAFT dataset immediately (204 No Content). "
-              + "READY datasets cannot be deleted — unstage first (POST /{id}/unstage). "
-              + "AVAILABLE datasets cannot be deleted directly — unrelease first (POST /{id}/unrelease) to tear down infrastructure, then delete.")
+          "Deletes a dataset (204 No Content). A never-provisioned dataset is removed immediately. "
+              + "A dataset that still holds a provisioned sink is torn down asynchronously via a "
+              + "DELETE saga and removed once the saga completes. An AVAILABLE dataset cannot be "
+              + "deleted directly — unrelease it first (POST /{id}/unrelease).")
   public void delete(@PathVariable UUID id) {
     dataSetService.deleteById(id);
   }

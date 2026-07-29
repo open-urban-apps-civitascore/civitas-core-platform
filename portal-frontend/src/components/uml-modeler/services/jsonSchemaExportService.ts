@@ -3,8 +3,13 @@
  *
  * Converts UML diagram data to a JSON Schema (draft 2020-12) document.
  *
- * Conventional UML -> JSON Schema mapping:
- * - Each UML class/interface/abstractClass becomes an object schema.
+ * Only relationship types in the supported release scope contribute to the
+ * schema; any other type (including legacy edges in older models) carries no
+ * semantics and is silently ignored — no mapping is invented for it. The scope
+ * is deliberately small and grows over time — see umlContainment.
+ *
+ * UML -> JSON Schema mapping:
+ * - Each UML class becomes an object schema.
  * - Each attribute becomes a `properties` entry.
  * - Primitive UML types map to JSON Schema `type`/`format`.
  * - Geometry types map to a GeoJSON-style `$ref`.
@@ -13,24 +18,26 @@
  *   are added to the class's `required` array.
  * - Enumerations map to the `enum` keyword.
  * - Inheritance maps to `allOf: [{ $ref }, { ...own }]`.
- * - Associations/aggregation/composition map to a `$ref` property (an array
- *   `$ref` for many multiplicities).
+ * - Composition maps to a `$ref` property on the container (an array `$ref`
+ *   for many multiplicities).
  *
- * Root selection (composition/aggregation hierarchy): the class that is not
- * contained by any other class via composition (filled diamond) or aggregation
- * is the root of the document; every other class is emitted under `$defs` and
- * linked via `$ref`. When ambiguous, the class matching the diagram name is
- * preferred, falling back to the first class node.
- *
- * Multiple disconnected roots: when the diagram contains more than one
- * unconnected component (i.e. multiple root classes), the export uses a
- * type-library layout — all classes are placed in `$defs` and the document
- * root carries only `$id`, `$schema`, and `title`. This avoids arbitrarily
- * promoting one class to the document root while silently orphaning the others.
+ * Root: the document root is the data structure itself, titled after the
+ * diagram. Every class is emitted under `$defs`; the single root class — the
+ * `isRoot`-designated element or, absent a designation, the one class not
+ * embedded by any structural or inheritance edge — is referenced from the
+ * document root via a `$ref` property, so the structure's name — not an
+ * arbitrary class — is always the top level. Every other element must be
+ * reachable from the root; otherwise (or when no unique root exists) the
+ * export throws {@link SchemaExportError} instead of guessing. An empty
+ * diagram exports an empty object schema; a diagram consisting of a single
+ * enumeration keeps its `enum` at the document root instead.
  */
 
 import type { UMLDiagram } from '../types/diagram'
-import type { UMLAttribute, UMLClass, UMLElement, UMLEnumeration, UMLRelationship, UMLType } from '../types/uml'
+import type { UMLAttribute, UMLElement, UMLEnumeration, UMLRelationship, UMLType } from '../types/uml'
+import { hasAttributes } from '../types/uml'
+import type { RootResolutionFailure } from './umlContainment'
+import { classifyStructuralEdge, collectParentIds, parseMultiplicity, resolveRootElement } from './umlContainment'
 
 const JSON_SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema'
 const BASE_MODEL_URI = 'http://civitas.org/model'
@@ -68,7 +75,10 @@ const GEOMETRY_TYPES = new Set([
 /**
  * GeoJSON reference base for geometry types.
  */
-const GEOJSON_REF_BASE = 'https://geojson.org/schema'
+export const GEOJSON_REF_BASE = 'https://geojson.org/schema'
+
+/** Lower-cases the first character, leaving the rest untouched. */
+const lowerFirst = (value: string): string => value.charAt(0).toLowerCase() + value.slice(1)
 
 /**
  * Sanitizes a name for use in URIs and `$defs` keys.
@@ -80,31 +90,6 @@ export const sanitizeName = (name: string): string => {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
 }
-
-/**
- * Parses a multiplicity string into lower/upper numeric bounds.
- * `upper === Infinity` represents an unbounded (`*`) upper bound.
- */
-const parseMultiplicity = (multiplicity?: string): { lower: number; upper: number } => {
-  if (!multiplicity) return { lower: 1, upper: 1 }
-
-  const trimmed = multiplicity.trim()
-  if (trimmed === '*') return { lower: 0, upper: Infinity }
-
-  const rangeMatch = trimmed.match(/^(\d+|\*)\.\.(\d+|\*)$/)
-  if (rangeMatch) {
-    const lower = rangeMatch[1] === '*' ? 0 : Number(rangeMatch[1])
-    const upper = rangeMatch[2] === '*' ? Infinity : Number(rangeMatch[2])
-    return { lower, upper }
-  }
-
-  const single = Number(trimmed)
-  if (!Number.isNaN(single)) return { lower: single, upper: single }
-
-  return { lower: 1, upper: 1 }
-}
-
-const isMany = (upper: number): boolean => upper === Infinity || upper > 1
 
 /**
  * Converts a single UML type into a JSON Schema fragment.
@@ -138,6 +123,8 @@ const typeToSchema = (type: UMLType, classDefKeyById: Map<string, string>, crs?:
  * multiplicity (arrays) and default values.
  * For geometry attributes, the CRS string from `attr.meta.gisInfo.crs` is
  * forwarded to `typeToSchema` and emitted as a sibling `crs` property.
+ * `x-core-primaryKey` marks the primary key, only on a mandatory single-valued
+ * attribute (an array or optional value cannot back one).
  */
 const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, string>): JsonSchemaObject => {
   const crs = attr.meta?.gisInfo?.crs
@@ -145,7 +132,8 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
   const { lower, upper } = parseMultiplicity(attr.multiplicity)
 
   let schema: JsonSchemaObject
-  if (isMany(upper)) {
+  const isMultivalued = upper > 1
+  if (isMultivalued) {
     schema = { type: 'array', items: baseSchema }
     if (lower >= 1) schema.minItems = lower
     if (upper !== Infinity) schema.maxItems = upper
@@ -157,20 +145,37 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
     schema.default = attr.defaultValue
   }
 
+  // Conceptual identity marker (engine-neutral): the UML "{id}" attribute is the entity's primary
+  // key. Adapters interpret it technically (PostGIS PRIMARY KEY + UPSERT, FROST reference key, …);
+  // the editor stays unaware of any concrete implementation. JSON Schema has no native PK keyword,
+  // so the platform extension keyword 'x-core-primaryKey' carries it. Only a mandatory single value
+  // can back a key, so an array- or optional-valued isId (e.g. an imported/edge-authored 0..1) is
+  // not marked.
+  if (attr.isId && canMultiplicityBePrimaryKey(attr.multiplicity)) {
+    schema['x-core-primaryKey'] = true
+  }
+
   return schema
 }
 
 /**
- * Determines whether an attribute is required.
+ * Determines whether an attribute is required. A valid primary-key {@code isId} is always required;
+ * otherwise requiredness follows the multiplicity lower bound (so an optional single-valued isId,
+ * which cannot be a key, stays optional).
  */
-const isAttributeRequired = (attr: UMLAttribute): boolean => {
-  if (attr.isId) return true
-  const { lower } = parseMultiplicity(attr.multiplicity)
-  return lower >= 1
+export const isAttributeRequired = (attr: UMLAttribute): boolean => {
+  if (attr.isId && canMultiplicityBePrimaryKey(attr.multiplicity)) return true
+  return parseMultiplicity(attr.multiplicity).lower >= 1
 }
 
-const hasAttributes = (element: UMLElement): element is UMLClass =>
-  'attributes' in element && Array.isArray((element as UMLClass).attributes)
+/**
+ * A primary key must be exactly one mandatory value: a many multiplicity is an array, and an
+ * optional one (`0..1`) is nullable — neither can be (part of) a primary key.
+ */
+export const canMultiplicityBePrimaryKey = (multiplicity?: string): boolean => {
+  const { lower, upper } = parseMultiplicity(multiplicity)
+  return lower >= 1 && upper === 1
+}
 
 /**
  * Builds the object schema (properties/required) for a class-like element,
@@ -200,20 +205,26 @@ const buildClassSchema = (
     }
   }
 
-  // Associations / aggregation / composition originating from this element
-  for (const edge of diagram.edges) {
-    const rel = edge.data.relationship
-    if (rel.source !== element.id) continue
-    if (!['association', 'aggregation', 'composition'].includes(rel.type)) continue
+  for (const edge of diagram.edges ?? []) {
+    const rel = edge.data?.relationship
+    if (!rel) continue
+    const containment = classifyStructuralEdge(rel)
+    if (!containment || containment.containerId !== element.id) continue
 
-    const targetDefKey = classDefKeyById.get(rel.target)
-    if (!targetDefKey) continue
+    const partDefKey = classDefKeyById.get(containment.partId)
+    if (!partDefKey) continue
 
-    const propName = rel.targetRole || sanitizeName(targetDefKey) || targetDefKey
-    const { lower, upper } = parseMultiplicity(rel.targetMultiplicity)
-    const ref: JsonSchemaObject = { $ref: `#/$defs/${targetDefKey}` }
+    const partElement = (diagram.nodes ?? []).find(node => node.data?.element?.id === containment.partId)?.data?.element
+    const propName =
+      containment.role ||
+      rel.name ||
+      (partElement ? lowerFirst(partElement.name) : '') ||
+      sanitizeName(partDefKey) ||
+      partDefKey
+    const { lower, upper } = parseMultiplicity(containment.multiplicity)
+    const ref: JsonSchemaObject = { $ref: `#/$defs/${partDefKey}` }
 
-    if (isMany(upper)) {
+    if (upper > 1) {
       const arraySchema: JsonSchemaObject = { type: 'array', items: ref }
       if (lower >= 1) arraySchema.minItems = lower
       properties[propName] = arraySchema
@@ -232,13 +243,9 @@ const buildClassSchema = (
   if (element.documentation) ownSchema.description = element.documentation
   if (required.length > 0) ownSchema.required = required
 
-  // Inheritance: subclass uses allOf [parent $ref, own schema]
   const parentRefs: JsonSchemaObject[] = []
-  for (const edge of diagram.edges) {
-    const rel = edge.data.relationship
-    if (rel.source !== element.id) continue
-    if (rel.type !== 'inheritance' && rel.type !== 'realization') continue
-    const parentDefKey = classDefKeyById.get(rel.target)
+  for (const parentId of collectParentIds(diagram, element.id)) {
+    const parentDefKey = classDefKeyById.get(parentId)
     if (parentDefKey) parentRefs.push({ $ref: `#/$defs/${parentDefKey}` })
   }
 
@@ -250,64 +257,56 @@ const buildClassSchema = (
 }
 
 /**
- * Returns all root elements of the diagram's class hierarchy.
- * A root is a non-enumeration class that is not the target of any composition,
- * aggregation, inheritance, or realization edge. When every non-enumeration
- * class is contained (a fully circular hierarchy), all non-enumeration classes
- * are treated as roots.
- *
- * Returning more than one root means the diagram has multiple disconnected
- * components and should be exported as a type-library schema.
+ * Maps every element id to a stable, unique `$defs` key (name-based, `_n`-suffixed on collision).
+ * The keys are embedded verbatim in `#/$defs/<key>` refs, which the platform resolvers match by
+ * prefix-stripping rather than JSON-Pointer evaluation — so instead of `~0`/`~1`-escaping the refs
+ * (which those resolvers would not unescape), pointer-special characters are kept out of the keys
+ * themselves, making every emitted ref a valid JSON Pointer for standard tooling too.
  */
-const findRootElements = (diagram: UMLDiagram, elements: UMLElement[]): UMLElement[] => {
-  if (elements.length === 0) return []
-
-  // An element is "contained" if it is the target of a composition/aggregation.
-  const containedIds = new Set<string>()
-  for (const edge of diagram.edges) {
-    const rel = edge.data.relationship
-    if (
-      rel.type === 'composition' ||
-      rel.type === 'aggregation' ||
-      rel.type === 'inheritance' ||
-      rel.type === 'realization'
-    ) {
-      containedIds.add(rel.target)
-    }
-  }
-
-  const candidates = elements.filter(element => element.type !== 'enumeration' && !containedIds.has(element.id))
-  const pool = candidates.length > 0 ? candidates : elements.filter(e => e.type !== 'enumeration')
-  if (pool.length === 0) return elements.slice(0, 1)
-
-  return pool
-}
-
-/**
- * Main export function - converts a UMLDiagram into a JSON Schema document.
- */
-export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): JsonSchemaObject => {
-  const elements = diagram.nodes.map(node => node.data.element)
-
-  // Map every class element id to a stable `$defs` key.
-  const classDefKeyById = new Map<string, string>()
+export const assignDefKeys = (elements: UMLElement[]): Map<string, string> => {
+  const defKeyById = new Map<string, string>()
   const usedKeys = new Set<string>()
   for (const element of elements) {
-    let key = element.name || 'Type'
+    const key = (element.name || 'Type').replace(/[~/]/g, '-')
     let candidate = key
     let suffix = 1
     while (usedKeys.has(candidate)) {
       candidate = `${key}_${suffix++}`
     }
-    key = candidate
-    usedKeys.add(key)
-    classDefKeyById.set(element.id, key)
+    usedKeys.add(candidate)
+    defKeyById.set(element.id, candidate)
   }
+  return defKeyById
+}
+
+/**
+ * The diagram cannot be exported as a schema: it has no unique root class or leaves elements
+ * unreachable from it. Carries the typed {@link RootResolutionFailure} so callers can render a
+ * precise, actionable message.
+ */
+export class SchemaExportError extends Error {
+  constructor(readonly failure: RootResolutionFailure) {
+    super(`diagram has no exportable root: ${failure.code}`)
+    this.name = 'SchemaExportError'
+  }
+}
+
+/**
+ * Main export function - converts a UMLDiagram into a JSON Schema document.
+ *
+ * @throws SchemaExportError when the diagram has no unique root class or elements are unreachable
+ *   from it — callers surface this as a validation message instead of persisting a guessed schema
+ */
+export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): JsonSchemaObject => {
+  const elements = (diagram.nodes ?? []).map(node => node.data?.element).filter((e): e is UMLElement => !!e)
+
+  const classDefKeyById = assignDefKeys(elements)
 
   const sanitizedName = sanitizeName(diagram.name) || 'untitled'
   const id = modelUri || `${BASE_MODEL_URI}/${sanitizedName}`
 
-  const rootElements = findRootElements(diagram, elements)
+  const resolution = resolveRootElement(diagram)
+  if (resolution.kind === 'invalid') throw new SchemaExportError(resolution.failure)
 
   const schema: JsonSchemaObject = {
     $id: id,
@@ -316,55 +315,52 @@ export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): Json
     type: 'object',
   }
 
-  if (rootElements.length === 0) {
+  if (resolution.kind === 'empty') {
     schema.properties = {}
     return schema
   }
 
-  // Multiple disconnected roots: use a type-library layout. All classes go into
-  // $defs and the document root carries only the envelope fields ($id, $schema,
-  // title). This prevents arbitrarily promoting one class to the document root
-  // while silently orphaning the others as unreferenced $defs entries.
-  if (rootElements.length > 1) {
+  const rootElement = resolution.root
+  if (resolution.kind === 'enum') {
+    const rootSchema = buildClassSchema(rootElement, diagram, classDefKeyById)
+    Object.assign(schema, rootSchema)
+    // buildClassSchema omits `type` for enumerations, so drop the pre-initialized `type: 'object'`.
     delete schema.type
-    const defs: JsonSchemaObject = {}
-    for (const element of elements) {
-      const defKey = classDefKeyById.get(element.id)
-      if (!defKey) continue
-      defs[defKey] = buildClassSchema(element, diagram, classDefKeyById)
+    schema.$id = id
+    schema.$schema = JSON_SCHEMA_DIALECT
+    schema.title = rootElement.name || diagram.name
+
+    const defs = buildDefs(
+      elements.filter(e => e.id !== rootElement.id),
+      diagram,
+      classDefKeyById,
+    )
+    if (Object.keys(defs).length > 0) {
+      schema.$defs = defs
     }
-    schema.$defs = defs
     return schema
   }
 
-  // Single root: merge the root class schema into the document root.
-  // The root class keeps its own title rather than being overwritten by the
-  // diagram name.
-  const rootElement = rootElements[0]
-  const rootSchema = buildClassSchema(rootElement, diagram, classDefKeyById)
-  Object.assign(schema, rootSchema)
-  // buildClassSchema does not emit `type` for enumerations, so the
-  // pre-initialized `type: 'object'` must be removed explicitly.
-  if (rootElement.type === 'enumeration') {
-    delete schema.type
+  const rootDefKey = classDefKeyById.get(rootElement.id) as string
+  schema.properties = {
+    [sanitizeName(rootElement.name) || rootDefKey]: { $ref: `#/$defs/${rootDefKey}` },
   }
-  schema.$id = id
-  schema.$schema = JSON_SCHEMA_DIALECT
-  schema.title = rootElement.name || diagram.name
+  schema.$defs = buildDefs(elements, diagram, classDefKeyById)
+  return schema
+}
 
-  // Emit every non-root element into $defs.
+const buildDefs = (
+  elements: UMLElement[],
+  diagram: UMLDiagram,
+  classDefKeyById: Map<string, string>,
+): JsonSchemaObject => {
   const defs: JsonSchemaObject = {}
   for (const element of elements) {
-    if (element.id === rootElement.id) continue
     const defKey = classDefKeyById.get(element.id)
     if (!defKey) continue
     defs[defKey] = buildClassSchema(element, diagram, classDefKeyById)
   }
-  if (Object.keys(defs).length > 0) {
-    schema.$defs = defs
-  }
-
-  return schema
+  return defs
 }
 
 /**

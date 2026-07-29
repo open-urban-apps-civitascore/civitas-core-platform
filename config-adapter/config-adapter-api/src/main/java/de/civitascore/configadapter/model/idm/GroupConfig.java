@@ -60,6 +60,13 @@ public final class GroupConfig implements IdmConfigValue {
    */
   private Set<String> subGroups;
 
+  /**
+   * Keycloak user UUIDs (user externalIds) that should be members of this group. {@code null} means
+   * "not provided" and membership is left untouched; an empty set removes all members. The adapter
+   * reconciles membership diff-based against the current Keycloak state.
+   */
+  private Set<String> members;
+
   public GroupConfig() {}
 
   public String getId() {
@@ -126,6 +133,14 @@ public final class GroupConfig implements IdmConfigValue {
     this.subGroups = subGroups;
   }
 
+  public Set<String> getMembers() {
+    return members;
+  }
+
+  public void setMembers(Set<String> members) {
+    this.members = members;
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (obj == this) return true;
@@ -138,12 +153,14 @@ public final class GroupConfig implements IdmConfigValue {
         && Objects.equals(this.attributes, that.attributes)
         && Objects.equals(this.realmRoles, that.realmRoles)
         && Objects.equals(this.clientRoles, that.clientRoles)
-        && Objects.equals(this.subGroups, that.subGroups);
+        && Objects.equals(this.subGroups, that.subGroups)
+        && Objects.equals(this.members, that.members);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, path, parentId, attributes, realmRoles, clientRoles, subGroups);
+    return Objects.hash(
+        id, name, path, parentId, attributes, realmRoles, clientRoles, subGroups, members);
   }
 
   @Override

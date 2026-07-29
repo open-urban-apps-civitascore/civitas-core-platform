@@ -2,6 +2,8 @@
 # All frontend jobs should extend this
 .only-frontend-changes:
   rules:
+    # Always run on the nightly scheduled pipeline so the full build/scan runs
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
     # Always run on main and develop branch
@@ -13,6 +15,7 @@
         - portal-frontend/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/frontend.yml
+
 
 lint-frontend:
   extends: .only-frontend-changes
@@ -227,6 +230,12 @@ deploy-frontend:
       if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
         docker buildx imagetools create $CI_REGISTRY_IMAGE/frontend-portal:$REVISION --tag $CI_REGISTRY_IMAGE/frontend-portal:$CI_COMMIT_BRANCH
       fi
+    # Nightly build: additionally tag with <branch>-nightly-<YYYYMMDD>
+    - |
+      if [ "$IS_NIGHTLY" = "true" ] && [ -n "$NIGHTLY_IMAGE_TAG" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/frontend-portal:$REVISION --tag $CI_REGISTRY_IMAGE/frontend-portal:$NIGHTLY_IMAGE_TAG
+      fi
+
 
 sbom-frontend-image:
   extends: .only-frontend-changes

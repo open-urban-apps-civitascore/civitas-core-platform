@@ -1,0 +1,52 @@
+meta {
+  name: 04. Create DataStructure Version
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{scopeDataStructureId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "1.0.0",
+    "description": "Initial version for scope-test data structure",
+    "modelName": "ScopeTestModel",
+    "model": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ScopeTestModel",
+      "type": "object",
+      "properties": {
+        "attribut": { "type": "string" }
+      }
+    },
+    "styles": {}
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('scopeVersionId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("scopeVersionId is set", function() {
+    expect(bru.getVar('scopeVersionId')).to.be.a('string');
+  });
+}
+
+docs {
+  **Precondition:** `scopeDataStructureId` set. **Post-condition:** saves `scopeVersionId`.
+}

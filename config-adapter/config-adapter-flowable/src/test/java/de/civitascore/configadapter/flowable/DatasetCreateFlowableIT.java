@@ -9,8 +9,6 @@
  */
 package de.civitascore.configadapter.flowable;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -22,11 +20,11 @@ import com.sun.net.httpserver.HttpServer;
 import de.civitascore.configadapter.apisix.ApisixSagaHandler;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
-import de.civitascore.configadapter.flowable.coded.CodedProcessDeployer;
 import de.civitascore.configadapter.flowable.common.FlowableEngineFactory;
 import de.civitascore.configadapter.flowable.common.SagaHandlerRegistry;
 import de.civitascore.configadapter.flowable.common.kafka.FlowableResultPublisher;
 import de.civitascore.configadapter.frost.FrostSagaHandler;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.core.MediaType;
@@ -41,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.awaitility.Awaitility;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.ProcessEngine;
 import org.flowable.engine.RuntimeService;
@@ -50,8 +49,7 @@ import org.flowable.job.api.Job;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -62,12 +60,18 @@ import org.testcontainers.utility.DockerImageName;
 @Testcontainers
 class DatasetCreateFlowableIT {
 
+  static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+  }
+
   static Network network = Network.newNetwork();
 
   @SuppressWarnings("resource")
   @Container
   static GenericContainer<?> postgis =
-      new GenericContainer<>(DockerImageName.parse("postgis/postgis:16-3.4-alpine"))
+      new GenericContainer<>(DockerImageName.parse(TestContainerImages.POSTGIS))
           .withNetwork(network)
           .withNetworkAliases("database")
           .withEnv("POSTGRES_DB", "sensorthings")
@@ -78,11 +82,13 @@ class DatasetCreateFlowableIT {
   @SuppressWarnings("resource")
   @Container
   static GenericContainer<?> frost =
-      new GenericContainer<>(DockerImageName.parse("hylkevds/frost-http-projects:latest"))
+      new GenericContainer<>(DockerImageName.parse(TestContainerImages.FROST))
           .withNetwork(network)
           .withExposedPorts(8080)
           .dependsOn(postgis)
           .withEnv("serviceRootUrl", "http://localhost:8080/FROST-Server/")
+          .withEnv("plugins_projects_enable", "true")
+          .withEnv("plugins_projects_enableDefaultRules", "false")
           .withEnv("plugins_modelLoader_enable", "true")
           .withEnv("plugins_multiDatastream_enable", "false")
           .withEnv("plugins_actuation_enable", "false")
@@ -91,8 +97,6 @@ class DatasetCreateFlowableIT {
           .withEnv("persistence_db_username", "sensorthings")
           .withEnv("persistence_db_password", "ChangeMe")
           .withEnv("persistence_autoUpdateDatabase", "true")
-          .withEnv("plugins_modelLoader_securityPath", "")
-          .withEnv("plugins_modelLoader_securityFiles", "")
           .waitingFor(
               Wait.forHttp("/FROST-Server/v1.1/Projects")
                   .forStatusCode(200)
@@ -110,7 +114,6 @@ class DatasetCreateFlowableIT {
     frostBaseUrl =
         "http://" + frost.getHost() + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
     httpClient = ClientBuilder.newClient();
-    waitForFrostReady();
 
     apisixRequestPaths = Collections.synchronizedList(new ArrayList<>());
     apisixMock = HttpServer.create(new InetSocketAddress(0), 0);
@@ -136,6 +139,7 @@ class DatasetCreateFlowableIT {
                 "apisix.api.host", "api.test.local",
                 "apisix.api.public.url", "http://api.test.local",
                 "apisix.plugin.config.id", "test-plugin-config",
+                "apisix.service.id", "svc-frost-server",
                 "apisix.frost.api.key", "test-frost-upstream-key")));
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
@@ -162,10 +166,9 @@ class DatasetCreateFlowableIT {
     network.close();
   }
 
-  @ParameterizedTest(name = "approach={0}")
-  @ValueSource(strings = {"bpmn", "coded"})
-  void datasetCreateSaga_completesWithRealFrostAndMockApisix(String approach) {
-    deployProcesses(approach);
+  @Test
+  void datasetCreateSaga_completesWithRealFrostAndMockApisix() {
+    deployProcesses();
     String datasetId = "ds-flowable-e2e-" + UUID.randomUUID().toString().substring(0, 8);
 
     Map<String, Object> variables = new HashMap<>();
@@ -173,7 +176,6 @@ class DatasetCreateFlowableIT {
     variables.put("datasetId", datasetId);
     variables.put("datasetName", "Flowable E2E Test Dataset");
     variables.put("description", "Integration test via Flowable");
-    variables.put("openDataAccess", true);
     variables.put("hasPipelines", false);
     variables.put("datasources", List.of());
     variables.put("dataPipelines", List.of());
@@ -211,7 +213,7 @@ class DatasetCreateFlowableIT {
     assertEquals(
         List.of("create-project", "create-route"),
         tasks,
-        "Should execute FROST then APISIX (no pipelines = skip Redpanda)");
+        "Should execute FROST then APISIX (no pipelines = skip Pipeline)");
 
     Object projectId =
         historyService
@@ -242,10 +244,9 @@ class DatasetCreateFlowableIT {
         "Should have created route");
   }
 
-  @ParameterizedTest(name = "approach={0}")
-  @ValueSource(strings = {"bpmn", "coded"})
-  void datasetCreateSaga_compensatesOnApisixFailure(String approach) throws IOException {
-    deployProcesses(approach);
+  @Test
+  void datasetCreateSaga_compensatesOnApisixFailure() throws IOException {
+    deployProcesses();
     apisixMock.stop(0);
     apisixMock = HttpServer.create(new InetSocketAddress(0), 0);
     apisixMock.createContext(
@@ -263,7 +264,6 @@ class DatasetCreateFlowableIT {
     variables.put("datasetId", datasetId);
     variables.put("datasetName", "Flowable Fail Test");
     variables.put("description", "Should compensate");
-    variables.put("openDataAccess", true);
     variables.put("hasPipelines", false);
     variables.put("datasources", List.of());
     variables.put("dataPipelines", List.of());
@@ -302,12 +302,8 @@ class DatasetCreateFlowableIT {
         "Should have executed a compensation task");
   }
 
-  private void deployProcesses(String approach) {
-    if ("coded".equals(approach)) {
-      CodedProcessDeployer.deploy(processEngine.getRepositoryService());
-    } else {
-      BpmnProcessDeployer.deploy(processEngine.getRepositoryService());
-    }
+  private void deployProcesses() {
+    BpmnProcessDeployer.deploy(processEngine.getRepositoryService());
   }
 
   private void executeAllJobs() {
@@ -334,20 +330,6 @@ class DatasetCreateFlowableIT {
     try (OutputStream os = exchange.getResponseBody()) {
       os.write(response);
     }
-  }
-
-  private void waitForFrostReady() {
-    await()
-        .atMost(60, SECONDS)
-        .pollInterval(2, SECONDS)
-        .ignoreExceptions()
-        .untilAsserted(
-            () -> {
-              try (Response response =
-                  httpClient.target(frostBaseUrl).path("Projects").request().get()) {
-                assertEquals(200, response.getStatus());
-              }
-            });
   }
 
   private AdapterConfig mapConfig(Map<String, String> props) {

@@ -125,14 +125,18 @@ export const AccessManagementTable = ({
               onDeleteRole={roleId => onDeleteRole?.(info.row.original.groupId, roleId)}
             />
             {!isReadOnly && !info.getValue().length && onAddRoleClick && (
-              <Button
-                className="w-40 bg-secondary text-xs text-secondary-foreground hover:bg-secondary/90"
-                size="sm"
-                onClick={() => onAddRoleClick(info.row.original.groupId)}
-              >
-                <UserPlus />
-                {t('addRole')}
-              </Button>
+              <div className="flex flex-col py-3">
+                <Button
+                  className="w-40 bg-secondary text-xs text-secondary-foreground hover:bg-secondary/90"
+                  size="sm"
+                  onClick={() => onAddRoleClick(info.row.original.groupId)}
+                >
+                  <UserPlus />
+                  {t('addRole')}
+                  <span className="text-red-500">*</span>
+                </Button>
+                <span className="text-red-500 mt-1">{t('infoBoxes.atLeastOne')}</span>
+              </div>
             )}
           </div>
         ),

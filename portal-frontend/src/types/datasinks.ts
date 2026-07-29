@@ -7,15 +7,15 @@ export const DATASINK_TYPES = {
   POSTGIS: 'POSTGIS',
 } as const
 
-export const DatasinkTypeEnum = enumFromConst(DATASINK_TYPES)
+export const DataSinkTypeEnum = enumFromConst(DATASINK_TYPES)
 
-export type DatasinkType = (typeof DATASINK_TYPES)[keyof typeof DATASINK_TYPES]
+export type DataSinkType = (typeof DATASINK_TYPES)[keyof typeof DATASINK_TYPES]
 
-export type Datasink = {
+export type DataSink = {
   id: string
   datasetId: string
   pipelineId: string
-  dataSinkType: DatasinkType
+  dataSinkType: DataSinkType
   configuration: {
     tableName: string
     dataStructureVersion: DatastructureVersionSummary
@@ -24,19 +24,30 @@ export type Datasink = {
   modifiedAt: string
 }
 
-export type PostgisPipelineDatasink = {
+export type PostgisDataSinkPayload = {
   id: string | null
   dataSinkType: typeof DATASINK_TYPES.POSTGIS
   configuration: {
     tableName: string
     dataStructureVersionId: string
   }
+  /** Acknowledges that this update discards the sink's stored data, rebuilt on the next release (see backend guard). */
+  confirmDataLoss?: boolean
 }
 
-export type FrostPipelineDatasink = {
+export type FrostDataSinkPayload = {
   id: string | null
   dataSinkType: typeof DATASINK_TYPES.FROST
-  configuration: Record<string, never>
+  /** Empty for passthrough; a mapped pipeline references its final mapping's target structure. */
+  configuration: { dataStructureVersionId?: string }
+  /** Acknowledges that this update re-provisions the sink and discards its stored data (see backend guard). */
+  confirmDataLoss?: boolean
 }
 
-export type PipelineDatasink = PostgisPipelineDatasink | FrostPipelineDatasink
+export type DataSinkPayload = PostgisDataSinkPayload | FrostDataSinkPayload
+
+export type CreateDataSinkInput = { datasetId: string; data: DataSinkPayload }
+
+export type UpdateDataSinkInput = { datasetId: string; dataSinkId: string; data: DataSinkPayload }
+
+export type DeleteDataSinkInput = { datasetId: string; dataSinkId: string }

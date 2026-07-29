@@ -70,7 +70,8 @@ export const DatapoolOverview = (props: DatapoolOverviewProps) => {
 
   const { mutateAsync: createDatapool, isPending: isCreating } = useCreateDatapool()
   const { mutate: updateDatapool, isPending: isUpdating } = usePatchDatapool()
-  const isLoading = isCreating || isUpdating
+  const [isNavigatingAfterCreate, setIsNavigatingAfterCreate] = useState(false)
+  const isLoading = isCreating || isUpdating || isNavigatingAfterCreate
 
   const updateMode = useCallback(
     (isEditing: boolean) => {
@@ -126,6 +127,7 @@ export const DatapoolOverview = (props: DatapoolOverviewProps) => {
       if (areAssignmentsInvalid) {
         toast.error(t('errors.groupsWithoutRoles'))
       }
+      setIsNavigatingAfterCreate(true)
       router.push(`/datapools/${data.id}?mode=edit`)
       return true
     } catch {
@@ -151,7 +153,6 @@ export const DatapoolOverview = (props: DatapoolOverviewProps) => {
             if (areAssignmentsInvalid) {
               toast.error(t('errors.groupsWithoutRoles'))
             }
-            updateMode(false)
             router.refresh()
             form.reset(mapDatapoolToFormData(data.data), { keepDirty: false })
             const updatedAssignments = assignedGroups.filter(g => g.assignedRoles.length > 0)
@@ -213,6 +214,7 @@ export const DatapoolOverview = (props: DatapoolOverviewProps) => {
       router.push('/datapools')
     } else {
       setIsExitModalOpen(false)
+      updateMode(false)
     }
   }
 

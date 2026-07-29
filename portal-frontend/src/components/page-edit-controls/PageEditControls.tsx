@@ -13,7 +13,7 @@ import { Button } from '../ui/button'
 type PageEditControlsProps<T extends StatusTypes> = ActionButtonsProps & {
   status: T
   onStatusChange: (status: T) => void
-  canSetAvailable: boolean
+  canStage: boolean
   canSetDraft?: boolean
   canRelease?: boolean
   onEditClick: () => void
@@ -22,13 +22,14 @@ type PageEditControlsProps<T extends StatusTypes> = ActionButtonsProps & {
   statusOptions: T[]
   canEdit?: boolean
   statusHint?: string
+  availableHint?: string
 }
 
 const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>): JSX.Element => {
   const {
     status,
     onStatusChange,
-    canSetAvailable,
+    canStage,
     canSetDraft,
     canRelease,
     hasCard = true,
@@ -40,6 +41,7 @@ const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>
     statusOptions,
     canEdit = true,
     statusHint,
+    availableHint,
     ...actionButtonsProps
   } = props
 
@@ -56,11 +58,12 @@ const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>
         status={status}
         statusOptions={statusOptions}
         onStatusChange={onStatusChange}
-        canSetAvailable={canSetAvailable}
+        canStage={canStage}
         canSetDraft={canSetDraft}
         canRelease={canRelease}
         isReadOnly={isReadOnly}
         statusHint={statusHint}
+        availableHint={availableHint}
       />
 
       <div>

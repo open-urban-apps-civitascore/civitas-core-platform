@@ -2,7 +2,24 @@
   "welcome": {
     "title": "Willkommen in CIVITAS/CORE V2 Beta",
     "subtitle": "Neu hier?",
-    "docsButton": "Dokumentation"
+    "docsButton": "Dokumentation",
+    "recommendedWorkflow": {
+      "title": "Empfohlener Ablauf",
+      "steps": {
+        "datastructure": {
+          "title": "Datenstruktur erstellen",
+          "subtitle": "Beschreibt die Daten"
+        },
+        "datasource": {
+          "title": "Datenquelle erstellen",
+          "subtitle": "Nutzt die Datenstruktur"
+        },
+        "pipeline": {
+          "title": "<b>Dataset erstellen</b> und <b>Pipeline konfigurieren</b>",
+          "subtitle": "Nutzt die Datenquelle, um den Datenfluss zu starten"
+        }
+      }
+    }
   },
   "common": {
     "type-to-search": "Zum Suchen tippen",
@@ -49,6 +66,10 @@
       "backToHome": "Zurück zur Startseite",
       "loadingError": "Fehler beim Laden der Daten",
       "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+      "genericErrorTitle": "Beim Aufruf dieser Seite ist ein unerwarteter Fehler aufgetreten.",
+      "genericErrorSubtitle": "Bitte erneut versuchen oder zur Startseite zurückkehren.",
+      "tryAgain": "Neu laden",
+      "goToHomePage": "Zur Startseite",
       "nameRequired": "Name ist erforderlich",
       "descriptionRequired": "Beschreibung ist erforderlich",
       "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein",
@@ -60,7 +81,9 @@
       "nameExistsToast": "Der Name {name} ist bereits vergeben. Bitte wählen sie einen anderen Namen.",
       "emailExists": "Diese E-Mail ist bereits vergeben.",
       "emailExistsToast": "Die E-mail {email} ist bereits vergeben. Bitte wählen Sie eine andere E-Mail-Adresse.",
-      "insufficientPermissions": "Sie verfügen nicht über die notwendigen Berechtigungen für diese Aktion."
+      "insufficientPermissions": "Sie verfügen nicht über die notwendigen Berechtigungen für diese Aktion.",
+      "invalidCharacters": "Es sind nur Buchstaben, Zahlen, Binde- und Unterstriche erlaubt.",
+      "mustNotStartWithNumber": "Darf nicht mit einer Nummer beginnen."
     },
     "items": {
       "data": "Daten",
@@ -85,13 +108,15 @@
       "updateSuccess": "{item} wurde erfolgreich aktualisiert",
       "updateError": "Beim Aktualisieren des {item}s ist ein Fehler aufgetreten.",
       "createSuccess": "{item} wurde erfolgreich angelegt",
-      "deleteSuccess": "{item} wurde erfolgreich gelöscht"
+      "deleteSuccess": "{item} wurde erfolgreich gelöscht",
+      "releasePermissionRequiredHint": "Die Berechtigung „Freigeben“ ist erforderlich. Ein Data Owner kann die Freigabe durchführen."
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
-      "descriptionHint": "max. 150 Zeichen"
+      "descriptionHint": "max. 150 Zeichen",
+      "creationSubtitle": "Im ersten Schritt ist nur ein Name erforderlich. Weitere Basisinformationen können später ergänzt werden."
     },
     "success": {
       "statusChangeSuccess": "Der Verfügbarkeitsstatus wurde erfolgreich aktualisiert.",
@@ -163,7 +188,8 @@
     },
     "infoBoxes": {
       "firstBox": "Gruppen, die plattformweite Berechtigungen an allen datenbezogenen Elementen besitzen, haben Zugriff.",
-      "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen."
+      "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen.",
+      "atLeastOne": "Mindestens eine Rolle erforderlich"
     },
     "messages": {
       "updateSuccess": "Berechtigungen wurden erfolgreich aktualisiert.",
@@ -249,7 +275,10 @@
     },
     "create": {
       "title": "Neuer Datensatz",
-      "subtitle": "Neue Datensätze sind nur intern sichtbar."
+      "subtitle": "Neue Datensätze sind nur intern sichtbar.",
+      "basicInfo": {
+        "title": "Basisinformation"
+      }
     },
     "overview": {
       "info": {
@@ -258,7 +287,7 @@
       "completion": {
         "title": "Erstellungsfortschritt",
         "accessManagement": {
-          "title": "Zugriffsberechtigungen",
+          "title": "Zugriff",
           "button": {
             "readOnly": "Gruppen und Rollen ansehen",
             "editable": "Gruppen und Rollen bearbeiten"
@@ -276,12 +305,16 @@
           "pipelines": {
             "title": "Pipeline(s)",
             "empty": "Noch keine Pipeline vorhanden",
-            "addButton": "Pipeline hinzufügen"
+            "addButton": "Pipeline hinzufügen",
+            "unknownError": "Unbekannter Fehler.",
+            "pipelineError": "Pipelinefehler",
+            "errorLabel": "Fehler",
+            "errorDetails": "Fehlerdetails für {name}",
+            "errorToast": "Pipeline „{name}“: {message}"
           },
           "apis": {
             "title": "APIs",
             "empty": "Noch keine API vorhanden",
-            "noDescription": "Keine Beschreibung vorhanden",
             "addButton": "API hinzufügen",
             "sensorThings": "SensorThings API",
             "sensorThingsSubtitle": "Zeitreihendaten",
@@ -329,10 +362,10 @@
             },
             "styles": {
               "title": "Stile",
+              "subtitle": "Stile werden hier erstellt und anschließend Layern zugeordnet",
               "addStyle": "Stil hinzufügen",
               "newStyle": "Neuer Stil {index}",
               "untitledStyle": "Unbenannter Stil {index}",
-
               "name": "Name",
               "sldFile": "SLD-Datei",
               "sldFilePlaceholder": "SLD auswählen...",
@@ -392,7 +425,7 @@
                 "tablePlaceHolder": "Tabelle auswählen ...",
                 "attributes": "Attribute",
                 "attributesPlaceHolder": "Attribute auswählen ...",
-                "filter": "Filter definieren",
+                "filter": "CQL-Filter definieren",
                 "filterHint": "mit CQL, z. B. attribut='wert'"
               },
               "geometry": {
@@ -400,6 +433,7 @@
                 "geometryField": "Geometriefeld",
                 "geometryFieldPlaceHolder": "Geometriefeld auswählen ...",
                 "nativeCrs": "Natives Koordinatenreferenzsystem (CRS)",
+                "nativeCrsMissingWarning": "Für die Geometrie der Datenstruktur der ausgewählten Tabelle ist kein Koordinatenreferenzsystem (CRS) definiert. Fügen Sie dem Geometrieattribut in der Datenstruktur ein CRS hinzu, bevor dieser Layer gespeichert werden kann.",
                 "definedCrs": "Angegebenes Koordinatenreferenzsystem (CRS)",
                 "crsPlaceHolder": "CRS auswählen ...",
                 "boundingBox": "Bounding Box",
@@ -408,6 +442,7 @@
               },
               "style": {
                 "sectionTitle": "Layer-Stil",
+                "sectionSubtitle": "Stile werden im Tab „Stile“ erstellt und hier Layern zugewiesen",
                 "standardStyle": "Standardanzeige",
                 "default": "Standard (Geoserver default)",
                 "alternativeStyles": "Alternative Stile",
@@ -443,7 +478,6 @@
               "deleteStyleSuccess": "Stil wurde erfolgreich gelöscht.",
               "deleteStyleError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut."
             },
-
             "errors": {
               "name": {
                 "required": "Bezeichnung ist erforderlich"
@@ -532,7 +566,8 @@
       "unstageSuccess": "Der Datensatz wurde erfolgreich auf Entwurf zurückgesetzt.",
       "releaseSuccess": "Der Datensatz wurde erfolgreich freigegeben.",
       "unreleaseSuccess": "Die Freigabe des Datensatzes wurde erfolgreich aufgehoben.",
-      "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut."
+      "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+      "datasourceScopeViolation": "Der ausgewählte Datenpool ist nicht mit den verwendeten Datenquellen kompatibel. Eine oder mehrere Datenquellen sind für diesen Datenpool nicht freigegeben."
     },
     "warningModal": {
       "title": "Datensatz löschen?",
@@ -783,6 +818,7 @@
     "values": {
       "ASSIGNMENT": "Zuweisung",
       "DATASET": "Datensatz",
+      "DATASET_DASHBOARD": "Datensatz-Dashboard",
       "DATASET_PAYLOAD": "Datensatz-Payload",
       "DATASOURCE": "Datenquelle",
       "DATASTRUCTURE": "Datenstruktur",
@@ -851,10 +887,9 @@
         "description": "Diese Aktion kann nicht rückgängig gemacht werden.",
         "confirm": "Löschen"
       },
-      "deleteErrorModal": {
+      "infoModal": {
         "title": "Rolle kann nicht gelöscht werden",
-        "description": "Zuerst müssen alle Zuordnungen zu Gruppen und Geltungsbereichen entfernt werden.",
-        "close": "Schliessen"
+        "description": "Zuerst müssen alle Zuordnungen zu Gruppen und Geltungsbereichen entfernt werden."
       }
     },
     "permissionsTab": {
@@ -929,7 +964,8 @@
     },
     "errors": {
       "createError": "Beim Anlegen der Rolle ist ein Fehler aufgetreten",
-      "updateError": "Beim Aktualisieren der Rolle ist ein Fehler aufgetreten"
+      "updateError": "Beim Aktualisieren der Rolle ist ein Fehler aufgetreten",
+      "deleteError": "Beim Löschen der Rolle ist ein Fehler aufgetreten"
     },
     "success": {
       "assignmentSuccess": "Die Zuweisungen wurden erfolgreich aktualisiert"
@@ -963,6 +999,8 @@
     "errors": {
       "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
       "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)",
+      "topicInvalidChars": "Das Topic darf keine Kommas, Semikolons oder Leerzeichen enthalten.",
+      "topicSingle": "Es ist nur ein Topic erlaubt.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
@@ -976,8 +1014,7 @@
       "title": "Neue Datenquelle",
       "subtitle": "Neue Datenquellen sind nur intern sichtbar.",
       "basicInfo": {
-        "title": "Basisinformation",
-        "subtitle": "Der Name kann später angepasst werden."
+        "title": "Basisinformation"
       }
     },
     "edit": {
@@ -995,7 +1032,7 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
-      "accessManagement": "Zugriffsberechtigungen",
+      "accessManagement": "Zugriff",
       "datapools": "Datenpools"
     },
     "connectorTab": {
@@ -1077,8 +1114,7 @@
       "title": "Neue Datenstruktur",
       "subtitle": "Neue Datenstrukturen sind nur intern sichtbar.",
       "basicInfo": {
-        "title": "Basisinformation",
-        "subtitle": "Der Name kann später angepasst werden."
+        "title": "Basisinformation"
       }
     },
     "form": {
@@ -1088,7 +1124,7 @@
     },
     "tabs": {
       "basicInfo": "Basisinformationen",
-      "accessManagement": "Zugriffsberechtigungen",
+      "accessManagement": "Zugriff",
       "versions": "Versionen"
     },
     "edit": {
@@ -1130,7 +1166,7 @@
     "versionInfo": {
       "title": "Versionsinformationen",
       "versionNumber": "Versionsnummer",
-      "versionNumberPlaceholder": "z. B. 1.0",
+      "versionNumberPlaceholder": "z. B. 1.0.0",
       "description": "Versionsbeschreibung",
       "source": "Quelle"
     },
@@ -1146,12 +1182,14 @@
     },
     "errors": {
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
-      "versionAlreadyExists": "Es existiert bereits eine Version mit der gleichen Versionsnummer in dieser Datenstruktur."
+      "versionAlreadyExists": "Es existiert bereits eine Version mit der gleichen Versionsnummer in dieser Datenstruktur.",
+      "versionFormat": "Die Versionsnummer muss dem Format X.Y.Z folgen (z. B. 1.0.0).",
+      "releaseInvalidModel": "Die Version kann nicht veröffentlicht werden: {reason}"
     }
   },
   "pipelineEditor": {
     "title": "Pipeline Editor",
-    "subtitle": "Definiert, wie Daten ingestiert, transformiert und persistiert werden",
+    "subtitle": "Definiert, wie Daten aufgenommen, transformiert und gespeichert werden",
     "canvas": {
       "noPipeline": "Keine Pipeline verfügbar"
     },
@@ -1169,9 +1207,9 @@
       "start": "Start",
       "end": "Ende",
       "dataSource": "Datenquelle",
-      "cronTrigger": "CRON-Trigger",
-      "frostStorage": "FROST-Server",
-      "geoPersistence": "Geo-Persistenz",
+      "cronTrigger": "Geplanter Trigger",
+      "frostStorage": "Sensordaten-Speicher",
+      "geoPersistence": "Geodaten-Speicher",
       "mapping": "Mapping"
     },
     "palette": {
@@ -1191,14 +1229,14 @@
       "flowEndDesc": "Pipeline-Endpunkt. Ausführung endet hier.",
       "dataSource": "Datenquelle",
       "dataSourceDesc": "Datenquelle auswählen",
-      "cron": "CRON",
-      "cronDesc": "Geplanter Trigger. Führt Pipeline nach Zeitplan aus.",
-      "frostServer": "FROST Server",
-      "frostServerDesc": "SensorThings API persistence",
-      "geoPersistence": "Geo-Persistenz",
-      "geoPersistenceDesc": "WFS/WMS Geo-Daten-Persistenz.",
+      "cron": "Geplanter Trigger",
+      "cronDesc": "Pipeline nach Zeitplan ausführen",
+      "frostServer": "Sensordaten-Speicher",
+      "frostServerDesc": "Für SensorThings API",
+      "geoPersistence": "Geodaten-Speicher",
+      "geoPersistenceDesc": "Für WFS/WMS API",
       "mapping": "Mapping",
-      "mappingDesc": "Bloblang-Datentransformation. Daten zuordnen und transformieren."
+      "mappingDesc": "Datenstrukturen mappen"
     },
     "controlPanel": {
       "entryPoint": "Pipeline-Einstiegspunkt",
@@ -1212,8 +1250,8 @@
     },
     "cronPanel": {
       "cronExpression": "CRON-Ausdruck",
-      "invalidCron": "Ungültiger CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein (Sekunden Minuten Stunden Tag-des-Monats Monat Wochentag).",
-      "cronHint": "Ein CRON-Ausdruck legt fest, wann die Pipeline automatisch ausgeführt werden soll.",
+      "invalidCron": "Ungültiger CRON-Ausdruck. Muss 6-Feld NiFi-Syntax sein (Sekunden Minuten Stunden Tag-des-Monats Monat Wochentag).",
+      "cronHint": "Ein CRON-Ausdruck legt fest, wann die Pipeline automatisch ausgeführt werden soll. Sechs Felder, kein Jahr. Für den Wochentag bevorzugt Namen (MON–SUN) verwenden; Zahlen sind 0–7, wobei 0 und 7 für Sonntag stehen.",
       "learnCron": "Über CRON-Ausdrücke erfahren",
       "currentExpression": "Aktueller Ausdruck"
     },
@@ -1227,17 +1265,18 @@
       "description": "Beschreibung",
       "tags": "Tags",
       "showDataStructure": "Datenstruktur anzeigen",
-      "noPermission": "Keine Berechtigung zum Lesen von Datenquellen"
+      "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
+      "anonymousName": "Anonyme Datenquelle"
     },
     "frostPanel": {
-      "details": "FROST Server Details",
+      "details": "Sensordaten-Speicher Details",
       "serverName": "Servername",
       "serverUrl": "Server-URL",
-      "internalServer": "Interner Frost Server",
+      "internalServer": "Interner Server",
       "version": "Version"
     },
     "geoPersistencePanel": {
-      "title": "Geo-Persistenz",
+      "title": "Geodaten-Speicher",
       "tableName": "Tabellenname",
       "tableNamePlaceholder": "Tabellennamen eingeben...",
       "dataStructureVersion": "Datenstruktur-Version",
@@ -1245,7 +1284,8 @@
       "changeDataStructure": "Datenstruktur ändern",
       "details": "Datenstruktur-Details",
       "dataStructureName": "Datenstruktur",
-      "versionNumber": "Version"
+      "versionNumber": "Version",
+      "anonymousDataStructure": "Anonyme Datenstruktur"
     },
     "mappingPanel": {
       "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
@@ -1279,10 +1319,42 @@
         "startNodeRequired": "Pipeline muss mindestens einen Start-Knoten haben",
         "endNodeRequired": "Pipeline muss mindestens einen End-Knoten haben",
         "nodeNotConfigured": "{label} ist nicht konfiguriert",
-        "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
+        "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld NiFi-Syntax sein.",
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
         "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben",
-        "duplicateTableName": "Zwei Geo-Persistenz-Speicher dürfen nicht den gleichen Namen haben"
+        "duplicateTableName": "Zwei Geo-Persistenz-Speicher dürfen nicht den gleichen Namen haben",
+        "cronMqttIncompatible": "Ein CRON-Trigger kann nicht mit einer MQTT-Datenquelle verwendet werden. Bitte eine SQL-Quelle (Pull) verwenden.",
+        "cronSourceConnectorUnknown": "Der Quell-Konnektor konnte nicht ermittelt werden; ein CRON-Trigger funktioniert nur mit einer SQL-Quelle (Pull), nicht mit MQTT.",
+        "sqlSourceNoScheduleDefaultPoll": "Diese SQL-Quelle hat keinen CRON-Knoten und pollt im Standardintervall (alle 5 Minuten). Für einen expliziten Zeitplan bitte einen CRON-Knoten hinzufügen.",
+        "sqlSourceToFrost": "Eine SQL-Quelle kann nur über ein Feld-Mapping in einen FROST-Speicher schreiben — bitte einen Mapping-Knoten hinzufügen oder eine SensorThings-Quelle (MQTT) verwenden.",
+        "frostMappingUnknownStaTarget": "{label} bildet {path} ab — kein gültiger SensorThings-Zielpfad; erlaubt sind die Katalogpfade des Thing-förmigen Zielmodells (z. B. $.name, $.Datastreams[].name, $.Datastreams[].Observations[].result) sowie dessen Match-Schlüssel",
+        "frostMappingMissingMatchKeys": "{label} muss die Match-Schlüssel ({entity}) abbilden: {fields} — sie identifizieren die Entität beim Find-or-Create",
+        "frostMappingNoMatchKeyInStructure": "{label}: die Zielstruktur deklariert keinen Match-Schlüssel für {entity} — markiere ein Attribut mit dem UML-'{id}'-Flag oder lege ein Attribut \"reference\" an",
+        "frostMappingCreateSetIncomplete": "{label} bildet {entity} unvollständig ab; für das Anlegen fehlen: {fields} (oder alle Anlege-Felder weglassen für reinen Lookup)",
+        "frostMappingLocationNeedsCreatableThing": "{label} bildet eine Location ab — das geht nur mit vollständig abgebildetem Thing (name, description), da Locations über dessen Deep-Insert entstehen",
+        "frostMappingObservationNeedsResult": "{label} bildet eine Observation ohne $.Datastreams[].Observations[].result ab",
+        "frostMappingFeatureOfInterestNeedsObservation": "{label} bildet eine FeatureOfInterest ohne Observation ab — das Feature wird per Deep-Insert in die Observation eingebettet",
+        "frostMappingUnsafeMatchKeyName": "{label}: der Match-Schlüssel-Name \"{keyName}\" ist kein gültiger Bezeichner (erlaubt: Buchstaben, Ziffern, Unterstrich, nicht mit Ziffer beginnend) — benenne das Attribut um",
+        "frostMappingReservedMatchKeyName": "{label}: der Match-Schlüssel-Name \"{keyName}\" ist reserviert — er darf nicht wie der properties-Bag heißen, in dem er liegt; benenne das identifizierende Attribut um",
+        "frostMappingFallbackMatchKey": "{label}: kein '{id}'-Attribut markiert — Match-Schlüssel fällt auf \"reference\" zurück",
+        "nodeNotWired": "{label} muss mit einer eingehenden und einer ausgehenden Kante verbunden sein",
+        "mappingRequiredFieldsMissing": "{label} weist nicht alle Pflicht-Zielfelder zu: {fields}",
+        "mappingNotSaved": "{label} hat kein gespeichertes Feld-Mapping — bitte den Mapping-Editor öffnen und speichern",
+        "mappingDataCorrupt": "{label} trägt keine gültigen Mapping-Daten — bitte den Knoten löschen und neu anlegen",
+        "edgeEndpointMissing": "Eine Kante verweist auf einen nicht vorhandenen Knoten — bitte die Kante entfernen",
+        "sourceNodeRequired": "Pipeline hat keinen Datenquellen-Knoten; genau eine verdrahtete Datenquelle ist erforderlich",
+        "sinkNodeRequired": "Pipeline hat keinen Datensenken-Knoten (Sensor- oder Geodaten-Speicher); genau eine verdrahtete Datensenke ist erforderlich",
+        "multipleSourceNodes": "{label} ist ein zusätzlicher Datenquellen-Knoten; eine Pipeline unterstützt genau einen",
+        "multipleSinkNodes": "{label} ist ein zusätzlicher Datensenken-Knoten; eine Pipeline unterstützt genau einen",
+        "nodeUnsupportedPosition": "{label} ist an einer nicht unterstützten Position verdrahtet",
+        "unknownNodeInFlow": "{label} hat einen nicht unterstützten Knotentyp und kann nicht in den Datenfluss verdrahtet werden",
+        "flowBranches": "Der Datenfluss verzweigt bei {label}; ein linearer Fluss von Quelle zu Senke ist erforderlich",
+        "flowCycle": "Der Datenfluss enthält einen Zyklus bei {label}",
+        "noDataPath": "Es gibt keinen Datenfluss-Pfad von der Datenquelle zur Datensenke",
+        "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datensenke",
+        "cronTriggerCapacity": "{label} ist ein zusätzlicher Zeitplan-Trigger an der Datenquelle; der Trigger-Port fasst höchstens einen",
+        "edgeFormIncompatible": "{label} kann {form} von {upstreamLabel} nicht verarbeiten; akzeptiert wird: {accepted}",
+        "mappingChainStructureMismatch": "Die Output-Datenstruktur in Mapping-Node {upstreamLabel} und die Input-Datenstruktur in Mapping-Node {label} sind inkompatibel"
       }
     },
     "toolbar": {
@@ -1297,6 +1369,11 @@
       "deleteConfirmTitle": "Pipeline löschen?",
       "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
     },
+    "dataLoss": {
+      "title": "Gespeicherte Daten verwerfen und neu erzeugen?",
+      "description": "Diese Änderung verwirft alle gespeicherten Daten dieses Datensatzes. Die Daten werden beim nächsten Ausführen der Pipeline neu erzeugt. Alle bisher gespeicherten Daten gehen dauerhaft verloren.",
+      "confirm": "Gespeicherte Daten verwerfen"
+    },
     "header": {
       "saveAll": "Alle speichern",
       "savingAll": "Speichert...",
@@ -1304,7 +1381,7 @@
       "validationFailed": "Validierung fehlgeschlagen für: {names}",
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
-      "saveSucces": "Pipelines erfolgreich gespeichert",
+      "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
       "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt."
     },
     "tabs": {
@@ -1317,6 +1394,8 @@
     },
     "lines": "{count, plural, one {# Zeile} other {# Zeilen}}",
     "mappingEditor": {
+      "modelUnresolvable": "Das gespeicherte Schema von „{name}“ konnte nicht gelesen werden. Angezeigt wird die Diagrammstruktur — sie kann von der Struktur abweichen, die beim Deployment verwendet wird.",
+      "diagramUnresolvable": "„{name}“ liefert keine abbildbaren Felder: {reason}",
       "toolbar": {
         "title": "Mapping",
         "status": "{mapped} zugeordnet · {unmapped} nicht zugeordnet"
@@ -1335,7 +1414,14 @@
       },
       "errors": {
         "typeMismatchWithType": "Typen stimmen nicht überein ({type}). Konvertierungsfunktion hinzufügen.",
-        "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen."
+        "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen.",
+        "outputToOutput": "Zwei Ausgänge können nicht verbunden werden.",
+        "inputToInput": "Zwei Eingänge können nicht verbunden werden."
+      },
+      "unconnectedWarning": {
+        "title": "Nicht verbundene Transformationen entfernen?",
+        "description": "{count, plural, one {# Transformation ist} other {# Transformationen sind}} nicht mit dem Ausgang verbunden und {count, plural, one {wird} other {werden}} beim Verlassen des Editors entfernt.",
+        "confirm": "Verlassen und entfernen"
       },
       "categories": {
         "literal": "Literal",
@@ -1387,6 +1473,9 @@
               "label": "Muster"
             }
           }
+        },
+        "geoPoint": {
+          "description": "Längengrad + Breitengrad → Point"
         }
       }
     }
@@ -1408,6 +1497,11 @@
     "export": {
       "success": "Diagramm erfolgreich exportiert",
       "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut."
+    },
+    "rootValidation": {
+      "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",
+      "ambiguousRoot": "Das Diagramm hat mehrere mögliche Wurzelklassen ({names}). Markieren Sie die Wurzelklasse in den Klasseneigenschaften oder verbinden Sie die Klassen zu einer Hierarchie.",
+      "unreachable": "Diese Elemente sind von der Wurzelklasse „{root}“ aus nicht erreichbar: {names}. Verbinden Sie sie mit der Hierarchie oder entfernen Sie sie."
     }
   },
   "datapools": {

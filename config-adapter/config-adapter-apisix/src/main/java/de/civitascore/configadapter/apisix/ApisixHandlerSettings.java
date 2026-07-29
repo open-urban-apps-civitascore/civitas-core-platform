@@ -19,9 +19,11 @@ import java.util.List;
  * Initialization fails fast (throws {@link IllegalArgumentException}) when any required setting is
  * missing: {@code apisix.admin.key}, {@code apisix.api.host}, {@code apisix.api.public.url}, {@code
  * apisix.plugin.config.id} (private routes rely on this plugin_config to enforce OIDC/OPA — without
- * it private datasets would be publicly reachable), and the FROST upstream credentials APISIX uses
- * to proxy private datasets ({@code apisix.frost.api.key} or {@code
- * apisix.frost.basic.auth.username}/{@code .password}).
+ * it private datasets would be publicly reachable), {@code apisix.service.id} (every route carries
+ * it so OPA can resolve the backend via {@code with_service=true} — without it every dataset route
+ * is rejected as {@code unknown_backend}), and the FROST upstream credentials APISIX uses to proxy
+ * private datasets ({@code apisix.frost.api.key} or {@code apisix.frost.basic.auth.username}/{@code
+ * .password}).
  *
  * <p>{@code apisix.geoserver.url} (the gateway-reachable GeoServer base, e.g. {@code
  * http://civitas-geoserver:8080/geoserver}) is the upstream target for {@code OWS} (map services)
@@ -32,7 +34,9 @@ import java.util.List;
  * @param adminApiUrl APISIX Admin API base URL ({@code apisix.admin.url})
  * @param adminApiKey APISIX Admin API key ({@code apisix.admin.key}, required)
  * @param pluginConfigId shared plugin_config enforcing OIDC/OPA on protected routes (required)
- * @param serviceId optional APISIX service to attach saga routes to ({@code apisix.service.id})
+ * @param serviceId APISIX service every saga route references ({@code apisix.service.id}, required)
+ *     — OPA resolves the backend provider from it via {@code with_service=true}; without it OPA
+ *     rejects every dataset route as {@code unknown_backend}
  * @param apiHost virtual host saga routes are pinned to (required, issue #1368)
  * @param apiPublicUrl public base URL reported back to the portal (required, trailing slash
  *     stripped)
@@ -64,12 +68,17 @@ record ApisixHandlerSettings(
 
   /**
    * Internal trust headers stripped from every saga route regardless of configuration. {@code
-   * X-Allowed-Scope-Ids} is set by OPA ({@code send_headers_upstream}) and trusted downstream — a
+   * X-Allowed-Scope-Ids} and {@code X-Allowed-Pool-Ids} are set by OPA ({@code
+   * send_headers_upstream}) and trusted downstream for scope/datapool collection filtering — a
    * client-supplied value must never pass the gateway. The configured {@code
    * apisix.proxy.rewrite.headers.remove} list is merged ON TOP of this baseline; it cannot disable
-   * it (secure-by-default, MR !547 review finding 3).
+   * it (secure-by-default, MR !547 review finding 3). Because saga routes carry a route-level
+   * {@code proxy-rewrite} that overrides the plugin-config strip list (APISIX Route &gt;
+   * PluginConfig precedence), this baseline MUST mirror the headers OPA emits — keep it in sync
+   * with the gateway plugin-config strip list (dev-environment/apisix/apisix_conf/apisix.yaml).
    */
-  static final List<String> ALWAYS_STRIPPED_HEADERS = List.of("X-Allowed-Scope-Ids");
+  static final List<String> ALWAYS_STRIPPED_HEADERS =
+      List.of("X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids");
 
   private static final String PREFIX = "apisix.";
 
@@ -95,6 +104,12 @@ record ApisixHandlerSettings(
             "apisix.plugin.config.id must be configured — private dataset routes rely on this"
                 + " APISIX plugin_config to enforce client-side OIDC/OPA. Without it, private"
                 + " datasets would be publicly reachable through the gateway.");
+    String serviceId =
+        requireNonBlank(
+            config.getProperty(PREFIX + "service.id"),
+            "apisix.service.id must be configured — every dataset route carries this service_id, and"
+                + " OPA resolves the backend provider from it via with_service=true. Without it OPA"
+                + " cannot identify the backend and rejects every dataset route as unknown_backend.");
     FrostUpstreamAuth frostAuth =
         FrostUpstreamAuth.resolve(
             config.getProperty(PREFIX + "frost.basic.auth.username"),
@@ -107,7 +122,7 @@ record ApisixHandlerSettings(
         config.getProperty(PREFIX + "admin.url", ADMIN_URL_DEFAULT),
         adminApiKey,
         pluginConfigId,
-        config.getProperty(PREFIX + "service.id"),
+        serviceId,
         apiHost,
         stripTrailingSlash(apiPublicUrl),
         stripTrailingSlash(config.getProperty(PREFIX + "geoserver.url", GEOSERVER_URL_DEFAULT)),

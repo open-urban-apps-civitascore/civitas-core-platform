@@ -26,7 +26,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.InvalidDataAccessApiUsageException;
 
 @DisplayName("Assignment Service Integration Tests")
 class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -390,7 +389,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should fail when DATA role has null scopeType")
+    @DisplayName("Should reject DATA role with null scopeType at the API layer (400, not a DB 500)")
     void shouldFailWhenDataRoleHasNullScope() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
@@ -398,8 +397,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeType(null);
 
       assertThatThrownBy(() -> assignmentService.create(input))
-          .isInstanceOf(InvalidDataAccessApiUsageException.class)
-          .hasMessageContaining("Only SYSTEM roles can have null scope");
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DATA roles must be scoped");
     }
   }
 

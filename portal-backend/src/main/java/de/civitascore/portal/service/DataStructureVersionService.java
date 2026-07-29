@@ -1,11 +1,13 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -17,13 +19,15 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for managing {@link DataStructureVersion} entities through their lifecycle (DRAFT to
  * AVAILABLE). Persists the version's JSON Schema, enforces unique version strings within a data
- * structure, and constrains versions that are in use by data sources.
+ * structure, and constrains versions that are in use — a version is in use when a data source or a
+ * data sink references it.
  */
 @Slf4j
 @Service
@@ -32,6 +36,7 @@ public class DataStructureVersionService
     extends BaseService<DataStructureVersion, DataStructureVersionInputDTO> {
 
   private final DataSourceRepository dataSourceRepository;
+  private final DataSinkRepository dataSinkRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
 
   private final DataStructureService dataStructureService;
@@ -94,9 +99,9 @@ public class DataStructureVersionService
 
   /**
    * Validates and constrains update input based on the version's current state. If the version is
-   * in use by a data source, structural fields (model, version, styles) are locked and only
-   * description and modelName may change. A released version that is not in use may have its model
-   * replaced but never cleared — it must always retain a non-empty model.
+   * in use by a data source or a data sink, structural fields (model, version, styles) are locked
+   * and only description and modelName may change. A released version that is not in use may have
+   * its model replaced but never cleared — it must always retain a non-empty model.
    *
    * @param input the update input
    * @param existingEntity the current version entity
@@ -115,7 +120,7 @@ public class DataStructureVersionService
     boolean isReleased =
         existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT;
 
-    if (isReleased && dataSourceRepository.existsByDataStructureVersionId(existingEntity.getId())) {
+    if (isReleased && isInUse(existingEntity.getId())) {
       // Version is in use: block all structural changes, allow only description and modelName.
       // Copy the maps so the update mapper does not clear the managed entity's own collections
       // (MapStruct clears + putAll on the target map; sharing the reference would empty it).
@@ -235,8 +240,42 @@ public class DataStructureVersionService
           "model", id, "DataStructureVersion must contain a model before releasing");
     }
 
+    validateModelId(version);
+
     version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     return dataStructureVersionRepository.save(version);
+  }
+
+  /**
+   * Validates the model's {@code $id} — the DataStructure's stable identity and JSON-Schema {@code
+   * $ref} target — is a well-formed CORE URN whose disambiguator was in fact derived from this
+   * version's DataStructure id. A malformed or foreign {@code $id} would be shipped verbatim to the
+   * config-adapter and break {@code $ref} resolution downstream, so it is rejected before release.
+   * The {@code $id} is optional: a model authored without a UML diagram carries none.
+   */
+  private void validateModelId(DataStructureVersion version) {
+    Object modelId = version.getModel().get("$id");
+    if (modelId == null) {
+      return;
+    }
+    UUID dataStructureId = version.getDataStructure().getId();
+    String echoedModelId = StringUtils.abbreviate(modelId.toString(), 256);
+    if (!CoreUrn.matchesId(modelId.toString(), dataStructureId)) {
+      // The generic exception message reaches the client verbatim; internal identifiers and
+      // derivation details stay out of it. The full context for diagnosis goes to the log.
+      log.warn(
+          "Rejected model $id on release of DataStructureVersion {}: '{}' does not match"
+              + " DataStructure {} (expected disambiguator {})",
+          version.getId(),
+          Encode.forJava(echoedModelId),
+          dataStructureId,
+          CoreUrn.disambiguatorFor(dataStructureId));
+      throw new InvalidInputException(
+          "model.$id",
+          version.getId(),
+          "DataStructure model $id is not a valid CORE URN for this DataStructure: "
+              + echoedModelId);
+    }
   }
 
   /**
@@ -268,12 +307,12 @@ public class DataStructureVersionService
   }
 
   /**
-   * Validates that the version is not in use by any data source and that deleting it would not
-   * leave a released data structure without any released versions.
+   * Validates that the version is not in use by any data source or data sink and that deleting it
+   * would not leave a released data structure without any released versions.
    *
    * @param id the version ID to delete
    * @return the version entity to be deleted
-   * @throws ResourceInUseException if the version is referenced by a data source
+   * @throws ResourceInUseException if the version is referenced by a data source or a data sink
    * @throws InvalidInputException if the version is the only released version of a released data
    *     structure
    */
@@ -289,12 +328,18 @@ public class DataStructureVersionService
   }
 
   private void validateNotInUse(UUID versionId) {
-    if (dataSourceRepository.existsByDataStructureVersionId(versionId)) {
+    if (isInUse(versionId)) {
       throw new ResourceInUseException(
           "DataStructureVersion",
           versionId,
-          "Cannot modify DataStructureVersion because it is referenced by one or more DataSources.");
+          "Cannot modify DataStructureVersion because it is referenced by one or more DataSources or DataSinks.");
     }
+  }
+
+  /** A version is in use when a data source or a data sink references it. */
+  private boolean isInUse(UUID versionId) {
+    return dataSourceRepository.existsByDataStructureVersionId(versionId)
+        || dataSinkRepository.existsByDataStructureVersionId(versionId);
   }
 
   private void validateExistenceOfOtherReleasedVersion(

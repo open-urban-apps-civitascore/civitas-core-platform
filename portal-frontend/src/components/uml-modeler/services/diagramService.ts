@@ -113,6 +113,29 @@ export const diagramReducer = (state: UMLDiagram, action: DiagramAction): UMLDia
       }
     }
 
+    case 'SET_ROOT_NODE': {
+      const { id } = action.payload
+      return {
+        ...state,
+        nodes: state.nodes.map(node => {
+          const shouldFlag = node.id === id
+          const isFlagged = node.data.element.isRoot === true
+          if (isFlagged === shouldFlag) return node
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              // `undefined` instead of `false` keeps the flag out of the persisted styles JSON.
+              element: { ...node.data.element, isRoot: shouldFlag || undefined },
+              isDirty: true,
+            },
+          }
+        }) as UMLNode[],
+        lastModified: new Date(),
+        isDirty: true,
+      }
+    }
+
     case 'UPDATE_EDGE': {
       const { id, updates } = action.payload
       return {

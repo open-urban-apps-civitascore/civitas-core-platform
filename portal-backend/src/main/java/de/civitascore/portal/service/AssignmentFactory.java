@@ -118,6 +118,16 @@ public class AssignmentFactory {
     assignment.setCatalog(null);
 
     if (scopeType == null) {
+      Role role = assignment.getRole();
+      if (role == null) {
+        throw new IllegalStateException("Assignment role must be resolved before scope validation");
+      }
+      if (role.getRoleType() == RoleType.DATA) {
+        throw new InvalidInputException(
+            "Assignment",
+            "scopeType",
+            "DATA roles must be scoped (TENANT or a concrete scope), scopeType must not be null");
+      }
       return assignment;
     }
 

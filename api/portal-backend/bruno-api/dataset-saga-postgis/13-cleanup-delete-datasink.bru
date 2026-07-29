@@ -1,0 +1,88 @@
+meta {
+  name: 13. Verify DELETE saga complete (dataset + sink gone)
+  type: http
+  seq: 21
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{pgDataSetId}}
+}
+
+script:pre-request {
+  // Wait for the DATASET_DELETE saga (triggered in step 12) to finish. The teardown of the
+  // NiFi flow, APISIX route/upstream and PostGIS sink runs asynchronously; the DataSet entity
+  // is removed only once the saga completes. Poll GET /datasets/{id} until it returns 404.
+  const axios = require('axios');
+  const baseUrl = bru.getEnvVar('baseUrl');
+  const keycloakUrl = bru.getEnvVar('keycloakUrl');
+  const datasetId = bru.getVar('pgDataSetId');
+
+  // Bruno's QuickJS sandbox has no URLSearchParams — build the form body by hand.
+  const form = [
+    ['grant_type', 'password'],
+    ['client_id', bru.getEnvVar('clientId')],
+    ['client_secret', bru.getEnvVar('clientSecret')],
+    ['username', bru.getEnvVar('username')],
+    ['password', bru.getEnvVar('password')],
+  ].map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+
+  // This is a wait-for-saga poll, not an assertion: a transient token or GET error must retry,
+  // never abort the run. validateStatus keeps every response in-band; the tests block below is
+  // what actually asserts the 404 end state.
+  for (let i = 0; i < 30; i++) {
+    try {
+      const tokenResp = await axios.post(
+        `${keycloakUrl}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`,
+        form,
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          validateStatus: () => true,
+        }
+      );
+      const token = tokenResp.data && tokenResp.data.access_token;
+      if (token) {
+        const resp = await axios.get(
+          `${baseUrl}/datasets/${datasetId}`,
+          {
+            headers: { 'Authorization': `Bearer ${token}` },
+            validateStatus: () => true,
+          }
+        );
+        if (resp.status === 404) {
+          break;
+        }
+      }
+    } catch (e) {
+      // Ignore and retry — the assertion lives in the tests block.
+    }
+    await new Promise(r => setTimeout(r, 2000));
+  }
+}
+
+tests {
+  test("DataSet entity removed after DELETE saga", function() {
+    // The entity is removed only once the DATASET_DELETE saga reports success, so a 404 here
+    // proves the portal DataSet (and its cascaded sink + pipeline rows) is gone. It does NOT
+    // observe the PostGIS DDL itself — the DROP runs in the config-adapter, out of reach of an
+    // HTTP collection. A direct sink-table teardown assertion belongs in the E2E suite.
+    expect(res.getStatus()).to.equal(404);
+  });
+}
+
+docs {
+  **PostGIS saga step 13** — Verify the DATASET_DELETE saga completed.
+
+  Polls `GET /datasets/{id}` (up to 60s) until it returns `404`. The DELETE saga triggered in step 12 de-provisions the NiFi flow, APISIX route/upstream and the PostGIS sink table, then removes the DataSet entity together with its sink and pipeline via cascade.
+
+  **What the 404 proves — and what it does not.** The entity is removed only once the saga reports success, so the 404 establishes that the portal DataSet and its cascaded sink/pipeline rows are gone. It does **not** independently verify the data-bearing PostGIS table was dropped: that DDL runs inside the config-adapter, and this HTTP collection cannot query PostGIS to confirm it (Bruno's sandbox has only `axios`, no DB client). A premature or erroneous saga-completion result would let this step pass while leaving an orphan sink table behind. A true sink-teardown assertion (querying `information_schema` after the delete) belongs in the shell-based E2E suite, not here.
+
+  There is no separate manual sink delete anymore: the saga owns the sink teardown.
+
+  **Expected Response:** 404 Not Found (dataset entity removed after the DELETE saga).
+}

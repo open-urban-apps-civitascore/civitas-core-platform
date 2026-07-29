@@ -13,9 +13,9 @@ import {
   getSelectedNodes,
   validateRelationshipConnection,
 } from '../../services/diagramService'
-import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge } from '../../types/diagram'
+import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge, UMLElementUpdate } from '../../types/diagram'
 import type { UseMultiSessionReturn } from '../../types/session'
-import type { UMLElement, UMLRelationship, UMLRelationshipType } from '../../types/uml'
+import type { UMLRelationship, UMLRelationshipType } from '../../types/uml'
 
 interface ActiveDiagramProviderComponentProps {
   children: ReactNode
@@ -38,7 +38,7 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   sessionManager,
 }) => {
   const activeSession = sessionManager.getActiveSession()
-  const [activeRelationshipType, setActiveRelationshipType] = useState('association')
+  const [activeRelationshipType, setActiveRelationshipType] = useState<UMLRelationshipType | null>(null)
 
   const diagram = activeSession?.diagram || createEmptyDiagram()
 
@@ -89,8 +89,15 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   )
 
   const updateNode = useCallback(
-    (nodeId: string, updates: Partial<UMLElement>) => {
+    (nodeId: string, updates: UMLElementUpdate) => {
       dispatch({ type: 'UPDATE_NODE', payload: { id: nodeId, updates } })
+    },
+    [dispatch],
+  )
+
+  const setRootNode = useCallback(
+    (nodeId: string | null) => {
+      dispatch({ type: 'SET_ROOT_NODE', payload: { id: nodeId } })
     },
     [dispatch],
   )
@@ -119,17 +126,18 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   // Edge operations
   const addEdge = useCallback(
     (connection: Connection) => {
-      const edgeType = activeRelationshipType || 'association'
+      if (!activeRelationshipType) return
+      const edgeType = activeRelationshipType
       if (!validateRelationshipConnection(diagram, connection, edgeType)) return
       const newEdge: UMLEdge = {
         id: crypto.randomUUID(),
-        type: edgeType as UMLRelationshipType,
+        type: edgeType,
         source: connection.source!,
         target: connection.target!,
         data: {
           relationship: {
             id: crypto.randomUUID(),
-            type: edgeType as UMLRelationshipType,
+            type: edgeType,
             source: connection.source!,
             target: connection.target!,
           },
@@ -205,7 +213,8 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   }, [diagram, deleteNodes, deleteEdges])
 
   const validateConnectionCallback = useCallback(
-    (connection: Connection) => validateRelationshipConnection(diagram, connection, activeRelationshipType),
+    (connection: Connection) =>
+      activeRelationshipType ? validateRelationshipConnection(diagram, connection, activeRelationshipType) : false,
     [diagram, activeRelationshipType],
   )
 
@@ -227,6 +236,7 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
       // Node operations
       addNode,
       updateNode,
+      setRootNode,
       deleteNodes,
       selectNode,
 
@@ -261,6 +271,7 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
       dispatch,
       addNode,
       updateNode,
+      setRootNode,
       deleteNodes,
       selectNode,
       addEdge,

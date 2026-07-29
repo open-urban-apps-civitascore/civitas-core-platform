@@ -2,7 +2,24 @@
   "welcome": {
     "title": "Welcome to CIVITAS/CORE V2 Beta",
     "subtitle": "New here?",
-    "docsButton": "Documentation"
+    "docsButton": "Documentation",
+    "recommendedWorkflow": {
+      "title": "Recommended workflow",
+      "steps": {
+        "datastructure": {
+          "title": "Create a Data structure",
+          "subtitle": "Describes the Data"
+        },
+        "datasource": {
+          "title": "Create a Data source",
+          "subtitle": "Use the Data structure"
+        },
+        "pipeline": {
+          "title": "<b>Create a Dataset</b> and <b>configure a Pipeline</b>",
+          "subtitle": "Use the Data source to start the Dataflow"
+        }
+      }
+    }
   },
   "common": {
     "type-to-search": "Type to search",
@@ -50,6 +67,10 @@
       "notFound": "No {items} found",
       "loadingError": "Error while loading data",
       "unexpectedError": "An unexpected error occurred. Please try again.",
+      "genericErrorTitle": "This page could not be loaded.",
+      "genericErrorSubtitle": "Please try again or return to the home page.",
+      "tryAgain": "Try Again",
+      "goToHomePage": "Go to Home Page",
       "nameRequired": "Name is required",
       "descriptionRequired": "Description is required",
       "descriptionMaxLength": "Description must be 150 characters or less",
@@ -61,7 +82,9 @@
       "nameExistsToast": "The name {name} is already in use. Please, choose another name.",
       "emailExists": "This email is already in use.",
       "emailExistsToast": "The email {email} is already in use. Please, choose another email address.",
-      "insufficientPermissions": "You do not have the necessary permissions to perform this action."
+      "insufficientPermissions": "You do not have the necessary permissions to perform this action.",
+      "invalidCharacters": "Only letters, numbers, hyphens and underscores are allowed.",
+      "mustNotStartWithNumber": "Must not start with a number."
     },
     "items": {
       "data": "data",
@@ -86,13 +109,15 @@
       "updateSuccess": "{item} has been successfully updated",
       "updateError": "An error occurred while updating {item}.",
       "createSuccess": "{item} has been successfully created",
-      "deleteSuccess": "{item} has been successfully deleted"
+      "deleteSuccess": "{item} has been successfully deleted",
+      "releasePermissionRequiredHint": "The Release permission is required. Contact a Data Owner."
     },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
       "commaSeparated": "comma-separated",
       "requiredInAvailable": "This field is required in the available mode.",
-      "descriptionHint": "max. 150 characters"
+      "descriptionHint": "max. 150 characters",
+      "creationSubtitle": "Only a name is required in the first step. Additional basic information can be added later."
     },
     "success": {
       "statusChangeSuccess": "The availability status has been successfully updated.",
@@ -164,7 +189,8 @@
     },
     "infoBoxes": {
       "firstBox": "Groups with platform-wide permissions on all Data-related elements have access.",
-      "secondBox": "By removing your own group-role assignment, you may lose your permissions."
+      "secondBox": "By removing your own group-role assignment, you may lose your permissions.",
+      "atLeastOne": "At least one role is required"
     },
     "messages": {
       "updateSuccess": "Permissions have been successfully updated.",
@@ -250,7 +276,10 @@
     },
     "create": {
       "title": "New Dataset",
-      "subtitle": "New Datasets are only visible internally."
+      "subtitle": "New Datasets are only visible internally.",
+      "basicInfo": {
+        "title": "Base Information"
+      }
     },
     "overview": {
       "info": {
@@ -259,7 +288,7 @@
       "completion": {
         "title": "Creation Progress",
         "accessManagement": {
-          "title": "Access Management",
+          "title": "Access",
           "button": {
             "readOnly": "View Groups and Roles",
             "editable": "Edit Groups and Roles"
@@ -277,12 +306,16 @@
           "pipelines": {
             "title": "Pipeline(s)",
             "empty": "No pipeline available yet",
-            "addButton": "Add pipeline"
+            "addButton": "Add pipeline",
+            "unknownError": "Unknown error.",
+            "pipelineError": "Pipeline error",
+            "errorLabel": "Error",
+            "errorDetails": "Error details for {name}",
+            "errorToast": "Pipeline \"{name}\": {message}"
           },
           "apis": {
             "title": "APIs",
             "empty": "No API available yet",
-            "noDescription": "No description provided",
             "addButton": "Add API",
             "sensorThings": "SensorThings API",
             "sensorThingsSubtitle": "Time Series Data",
@@ -330,11 +363,11 @@
             },
             "styles": {
               "title": "Styles",
+              "subtitle": "Styles are created here and then assigned to layers",
               "addStyle": "Add Style",
               "newStyle": "New Style {index}",
               "untitledStyle": "Untitled Style {index}",
               "name": "Name",
-
               "sldFile": "SLD file",
               "sldFilePlaceholder": "Select SLD...",
               "styleEditor": "Style editor",
@@ -393,7 +426,7 @@
                 "tablePlaceHolder": "Select Table ...",
                 "attributes": "Attributes",
                 "attributesPlaceHolder": "Select Attributes ...",
-                "filter": "Define Filters",
+                "filter": "Define CQL-Filter",
                 "filterHint": "with CQL, e. g. attribute='value'"
               },
               "geometry": {
@@ -401,6 +434,7 @@
                 "geometryField": "Geometry Field",
                 "geometryFieldPlaceHolder": "Select Geometry Field ...",
                 "nativeCrs": "Native Coordinate Reference System (CRS)",
+                "nativeCrsMissingWarning": "The selected table's data structure has no coordinate reference system (CRS) defined for its geometry attribute. Add a CRS to the geometry attribute in the data structure before this layer can be saved.",
                 "definedCrs": "Defined Coordinate Reference System (CRS)",
                 "crsPlaceHolder": "Select CRS ...",
                 "boundingBox": "Bounding Box",
@@ -409,6 +443,7 @@
               },
               "style": {
                 "sectionTitle": "Layer-Style",
+                "sectionSubtitle": "Styles are created in the \"Styles\" tab and assigned to layers here",
                 "standardStyle": "Standard Style",
                 "default": "Standard (Geoserver default)",
                 "alternativeStyles": "Alternative Styles",
@@ -533,7 +568,8 @@
       "unstageSuccess": "Dataset has been successfully reverted to draft.",
       "releaseSuccess": "Dataset has been successfully released.",
       "unreleaseSuccess": "Dataset has been successfully unreleased.",
-      "transitionError": "An error occurred while changing the Dataset status. Please try again."
+      "transitionError": "An error occurred while changing the Dataset status. Please try again.",
+      "datasourceScopeViolation": "The selected Data pool is not compatible with the Data sources used by this Dataset. One or more Data sources are not approved for the selected Data pool."
     },
     "warningModal": {
       "title": "Delete Dataset?",
@@ -789,6 +825,7 @@
     "values": {
       "ASSIGNMENT": "Assignment",
       "DATASET": "Dataset",
+      "DATASET_DASHBOARD": "Dataset Dashboard",
       "DATASET_PAYLOAD": "Dataset Payload",
       "DATASOURCE": "Data source",
       "DATASTRUCTURE": "Data structure",
@@ -858,10 +895,9 @@
         "description": "This action cannot be undone.",
         "confirm": "Delete"
       },
-      "deleteErrorModal": {
+      "infoModal": {
         "title": "Role cannot be deleted",
-        "description": "All assignments to groups and scopes must be removed first.",
-        "close": "Close"
+        "description": "All assignments to groups and scopes must be removed first."
       }
     },
     "permissionsTab": {
@@ -936,7 +972,8 @@
     },
     "errors": {
       "createError": "An error occurred while creating the role",
-      "updateError": "An error occurred while updating the role"
+      "updateError": "An error occurred while updating the role",
+      "deleteError": "An error occurred while deleting the role"
     },
     "success": {
       "assignmentSuccess": "The assignments have been successfully updated"
@@ -970,6 +1007,8 @@
     "errors": {
       "invalidDsn": "Enter a valid URI (e.g. postgres://host:5432/db)",
       "invalidBrokerUrl": "Enter a valid broker URL (e.g. tcp://broker:1883)",
+      "topicInvalidChars": "The topic must not contain commas, semicolons or spaces.",
+      "topicSingle": "Only one topic is allowed.",
       "creationError": "An error occurred while creating the Data source.",
       "updateError": "An error occurred while updating the Data source.",
       "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
@@ -983,8 +1022,7 @@
       "title": "New Data source",
       "subtitle": "New Data sources are only visible internally.",
       "basicInfo": {
-        "title": "Base Information",
-        "subtitle": "The name can be changed later."
+        "title": "Base Information"
       }
     },
     "edit": {
@@ -997,7 +1035,7 @@
       "basicInfo": "Base Information",
       "connector": "Connector",
       "dataStructure": "Data structure",
-      "accessManagement": "Access Management",
+      "accessManagement": "Access",
       "datapools": "Data pools"
     },
     "form": {
@@ -1089,8 +1127,7 @@
       "title": "New Data structure",
       "subtitle": "New Data structures are only visible internally.",
       "basicInfo": {
-        "title": "Base Information",
-        "subtitle": "The name can be changed later."
+        "title": "Base Information"
       }
     },
     "form": {
@@ -1100,7 +1137,7 @@
     },
     "tabs": {
       "basicInfo": "Base Information",
-      "accessManagement": "Access Management",
+      "accessManagement": "Access",
       "versions": "Versions"
     },
     "edit": {
@@ -1142,7 +1179,7 @@
     "versionInfo": {
       "title": "Version Information",
       "versionNumber": "Version Number",
-      "versionNumberPlaceholder": "e. g. 1.0",
+      "versionNumberPlaceholder": "e. g. 1.0.0",
       "description": "Version Description",
       "source": "Source"
     },
@@ -1158,12 +1195,14 @@
     },
     "errors": {
       "creationError": "An error occurred while creating the Data structure version.",
-      "versionAlreadyExists": "A version with the same version number already exists in this Data structure."
+      "versionAlreadyExists": "A version with the same version number already exists in this Data structure.",
+      "versionFormat": "The version number must follow the format X.Y.Z (e. g. 1.0.0).",
+      "releaseInvalidModel": "The version cannot be released: {reason}"
     }
   },
   "pipelineEditor": {
     "title": "Pipeline Editor",
-    "subtitle": "Defines how data is ingested, transformed, and persisted",
+    "subtitle": "Defines how data is ingested, transformed, and stored",
     "canvas": {
       "noPipeline": "No pipeline available"
     },
@@ -1181,9 +1220,9 @@
       "start": "Start",
       "end": "End",
       "dataSource": "Data source",
-      "cronTrigger": "CRON Trigger",
-      "frostStorage": "FROST Server",
-      "geoPersistence": "Geo Persistence",
+      "cronTrigger": "Scheduled Trigger",
+      "frostStorage": "Sensor Data Storage",
+      "geoPersistence": "Geospatial Data Storage",
       "mapping": "Mapping"
     },
     "palette": {
@@ -1203,14 +1242,14 @@
       "flowEndDesc": "Pipeline exit point. Execution ends here.",
       "dataSource": "Data source",
       "dataSourceDesc": "Select data source.",
-      "cron": "CRON",
-      "cronDesc": "Scheduled trigger. Executes pipeline on schedule.",
-      "frostServer": "FROST Server",
-      "frostServerDesc": "SensorThings API persistence. Store or retrieve data.",
-      "geoPersistence": "Geo Persistence",
-      "geoPersistenceDesc": "OWS geo data persistence.",
+      "cron": "Scheduled Trigger",
+      "cronDesc": "Run pipeline on schedule",
+      "frostServer": "Sensor Data Storage",
+      "frostServerDesc": "For SensorThings API",
+      "geoPersistence": "Geospatial Data Storage",
+      "geoPersistenceDesc": "For WFS/WMS API",
       "mapping": "Mapping",
-      "mappingDesc": "Bloblang data transformation. Map and transform data."
+      "mappingDesc": "Map Data structures"
     },
     "controlPanel": {
       "entryPoint": "Pipeline Entry Point",
@@ -1224,8 +1263,8 @@
     },
     "cronPanel": {
       "cronExpression": "CRON Expression",
-      "invalidCron": "Invalid cron expression. Must be 6-field Quartz syntax (seconds minutes hours day-of-month month day-of-week).",
-      "cronHint": "A CRON expression defines when the pipeline should run automatically.",
+      "invalidCron": "Invalid cron expression. Must be 6-field NiFi syntax (seconds minutes hours day-of-month month day-of-week).",
+      "cronHint": "A CRON expression defines when the pipeline should run automatically. Six fields, no year. For the weekday, prefer names (MON–SUN); numbers are 0–7 with 0 and 7 meaning Sunday.",
       "learnCron": "Learn about CRON expressions",
       "currentExpression": "Current Expression"
     },
@@ -1239,17 +1278,18 @@
       "description": "Description",
       "tags": "Tags",
       "showDataStructure": "Show Data Structure",
-      "noPermission": "No permission to read datasources"
+      "noPermission": "No permission to read datasources",
+      "anonymousName": "Anonymous Data Source"
     },
     "frostPanel": {
-      "details": "FROST Server Details",
+      "details": "Sensor Data Storage Details",
       "serverName": "Server Name",
       "serverUrl": "Server URL",
-      "internalServer": "Internal Frost Server",
+      "internalServer": "Internal Server",
       "version": "Version"
     },
     "geoPersistencePanel": {
-      "title": "Geo Persistence",
+      "title": "Geospatial Data Storage",
       "tableName": "Table Name",
       "tableNamePlaceholder": "Enter table name...",
       "dataStructureVersion": "Data Structure Version",
@@ -1257,7 +1297,8 @@
       "changeDataStructure": "Change Data Structure",
       "details": "Data Structure Details",
       "dataStructureName": "Data Structure",
-      "versionNumber": "Version"
+      "versionNumber": "Version",
+      "anonymousDataStructure": "Anonymous Data Structure"
     },
     "mappingPanel": {
       "hint": "Define your data transformation mapping using YAML or JSON format.",
@@ -1291,10 +1332,42 @@
         "startNodeRequired": "Pipeline must have at least one Start node",
         "endNodeRequired": "Pipeline must have at least one End node",
         "nodeNotConfigured": "{label} is not configured",
-        "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
+        "invalidCronExpression": "{label} has an invalid cron expression. Must be 6-field NiFi syntax.",
         "orphanNode": "{label} is not connected to any other node",
         "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End",
-        "duplicateTableName": "Two Geo Persistence tables must not have the same name"
+        "duplicateTableName": "Two Geo Persistence tables must not have the same name",
+        "cronMqttIncompatible": "A CRON trigger cannot be used with an MQTT data source. Use a SQL (pull) source instead.",
+        "cronSourceConnectorUnknown": "Could not verify the source connector; a CRON trigger only works with a SQL (pull) source, not MQTT.",
+        "sqlSourceNoScheduleDefaultPoll": "This SQL source has no CRON node and will poll on the default schedule (every 5 minutes). Add a CRON node to set an explicit schedule.",
+        "sqlSourceToFrost": "A SQL source can only write to a FROST sink through a field mapping — add a mapping node or use a SensorThings (MQTT) source.",
+        "frostMappingUnknownStaTarget": "{label} maps {path} — not a valid SensorThings target path; allowed are the catalog paths of the Thing-shaped target model (e.g. $.name, $.Datastreams[].name, $.Datastreams[].Observations[].result) plus its match keys",
+        "frostMappingMissingMatchKeys": "{label} must map the {entity} match keys: {fields} — they identify the entity during find-or-create",
+        "frostMappingNoMatchKeyInStructure": "{label}: the target structure declares no match key for {entity} — mark an attribute with the UML '{id}' flag or add a \"reference\" attribute",
+        "frostMappingCreateSetIncomplete": "{label} maps {entity} partially; creating it also requires: {fields} (or map none of the create fields for lookup-only)",
+        "frostMappingLocationNeedsCreatableThing": "{label} maps a Location — that requires a fully mapped Thing (name, description), since Locations are created via its deep insert",
+        "frostMappingObservationNeedsResult": "{label} maps an Observation without $.Datastreams[].Observations[].result",
+        "frostMappingFeatureOfInterestNeedsObservation": "{label} maps a FeatureOfInterest without an Observation — the feature is deep-inserted into the observation body",
+        "frostMappingUnsafeMatchKeyName": "{label}: the match-key name \"{keyName}\" is not a valid identifier (letters, digits, underscore; must not start with a digit) — rename the attribute",
+        "frostMappingReservedMatchKeyName": "{label}: the match-key name \"{keyName}\" is reserved — it must not be named after the properties bag it lives in; rename the identifying attribute",
+        "frostMappingFallbackMatchKey": "{label}: no '{id}' attribute marked — the match key falls back to \"reference\"",
+        "nodeNotWired": "{label} must be connected with both an incoming and an outgoing edge",
+        "mappingRequiredFieldsMissing": "{label} does not map all required target fields: {fields}",
+        "mappingNotSaved": "{label} has no saved field mapping — open the mapping editor and save it",
+        "mappingDataCorrupt": "{label} carries no valid mapping data — delete the node and recreate it",
+        "edgeEndpointMissing": "An edge references a node that does not exist — remove the edge",
+        "sourceNodeRequired": "Pipeline has no data source node; exactly one wired data source is required",
+        "sinkNodeRequired": "Pipeline has no data sink node (sensor or geospatial data storage); exactly one wired data sink is required",
+        "multipleSourceNodes": "{label} is an additional data source node; a pipeline supports exactly one",
+        "multipleSinkNodes": "{label} is an additional data sink node; a pipeline supports exactly one",
+        "nodeUnsupportedPosition": "{label} is wired in an unsupported position",
+        "unknownNodeInFlow": "{label} has an unsupported node type and cannot be wired into the data flow",
+        "flowBranches": "The data flow branches at {label}; a linear source-to-sink flow is required",
+        "flowCycle": "The data flow contains a cycle at {label}",
+        "noDataPath": "There is no data path from the data source to the data sink",
+        "mappingNotOnPath": "{label} is not on the data path between the data source and the data sink",
+        "cronTriggerCapacity": "{label} is an additional schedule trigger on the data source; its trigger port holds at most one",
+        "edgeFormIncompatible": "{label} cannot consume {form} from {upstreamLabel}; it accepts: {accepted}",
+        "mappingChainStructureMismatch": "The output data structure in mapping node {upstreamLabel} and the input data structure in mapping node {label} are incompatible"
       }
     },
     "toolbar": {
@@ -1309,6 +1382,11 @@
       "deleteConfirmTitle": "Delete Pipeline?",
       "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone."
     },
+    "dataLoss": {
+      "title": "Discard stored data and rebuild it?",
+      "description": "This change discards all stored data for this Dataset. The data will be recreated the next time the pipeline runs. All previously stored data will be permanently lost.",
+      "confirm": "Discard stored data"
+    },
     "header": {
       "saveAll": "Save All",
       "savingAll": "Saving...",
@@ -1316,7 +1394,7 @@
       "validationFailed": "Validation failed for: {names}",
       "duplicateNames": "Duplicate pipeline names: {names}",
       "saveFailed": "Failed to save: {names}",
-      "saveSucces": "Pipelines saved successfully",
+      "saveSuccess": "Pipeline \"{name}\" saved successfully",
       "datasourceScopeViolation": "Cannot save \"{name}\": one or more datasources are not permitted for this datapool."
     },
     "tabs": {
@@ -1329,6 +1407,8 @@
     },
     "lines": "{count, plural, one {# line} other {# lines}}",
     "mappingEditor": {
+      "modelUnresolvable": "The stored schema of \"{name}\" could not be read. Showing the diagram structure instead — it may differ from the structure used at deploy time.",
+      "diagramUnresolvable": "\"{name}\" provides no mappable fields: {reason}",
       "toolbar": {
         "title": "Mapping",
         "status": "{mapped} mapped · {unmapped} unmapped"
@@ -1347,7 +1427,14 @@
       },
       "errors": {
         "typeMismatchWithType": "Types don't match ({type}). Add a conversion function.",
-        "typeMismatch": "Types don't match. Add a conversion function."
+        "typeMismatch": "Types don't match. Add a conversion function.",
+        "outputToOutput": "Two outputs can't be connected.",
+        "inputToInput": "Two inputs can't be connected."
+      },
+      "unconnectedWarning": {
+        "title": "Remove unconnected transforms?",
+        "description": "{count, plural, one {# transform is} other {# transforms are}} not connected to the output and will be removed when you leave the editor.",
+        "confirm": "Leave and remove"
       },
       "categories": {
         "literal": "Literal",
@@ -1399,6 +1486,9 @@
               "label": "Pattern"
             }
           }
+        },
+        "geoPoint": {
+          "description": "longitude + latitude → Point"
         }
       }
     }
@@ -1420,6 +1510,11 @@
     "export": {
       "success": "Diagram exported successfully",
       "error": "Failed to export diagram. Please try again."
+    },
+    "rootValidation": {
+      "noRoot": "No root class can be determined in the diagram — every class is embedded in another one (cyclic structure).",
+      "ambiguousRoot": "The diagram has several possible root classes ({names}). Mark the root class in the class properties or connect the classes into a hierarchy.",
+      "unreachable": "These elements are not reachable from the root class \"{root}\": {names}. Connect them to the hierarchy or remove them."
     }
   },
   "datapools": {
@@ -1485,11 +1580,11 @@
         "addDataset": "Create Dataset",
         "noDatasets": "No datasets available",
         "noDatasetsSubTitle": "No datasets have been added to this data pool yet.",
-        "tableHeader": {
+        "tableHeaders": {
           "name": "Name",
-          "createdBy": "Contact Person",
+          "contact": "Contact Person",
           "modifiedAt": "Updated",
-          "datasetStatus": "Status"
+          "status": "Status"
         }
       }
     },

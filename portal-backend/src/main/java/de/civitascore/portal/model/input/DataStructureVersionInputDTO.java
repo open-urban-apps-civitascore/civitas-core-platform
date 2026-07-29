@@ -6,6 +6,7 @@ import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import java.util.Map;
 import java.util.UUID;
 import lombok.Data;
@@ -21,7 +22,12 @@ public class DataStructureVersionInputDTO extends BaseInputDTO {
   @Schema(description = "How this version was created (required)")
   @NotNull(message = "DataStructureVersionSource is required") private DataStructureVersionSource dataStructureVersionSource;
 
-  @NotBlank(message = "Version is required") private String version;
+  // Mirrors the version segment of the CORE URN grammar (CoreUrn.VERSION) and the frontend's
+  // VERSION_PATTERN: any other shape would only fail later, opaquely, at release.
+  @NotBlank(message = "Version is required") @Pattern(
+      regexp = "\\d+\\.\\d+\\.\\d+",
+      message = "Version must follow the format X.Y.Z (e.g. 1.0.0)")
+  private String version;
 
   private String description;
 

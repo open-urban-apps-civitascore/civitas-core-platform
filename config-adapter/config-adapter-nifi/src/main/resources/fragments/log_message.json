@@ -1,0 +1,60 @@
+{
+  "name": "LogMessage",
+  "comments": "Error sink: records that fail JSON conversion or RecordPath mapping are logged here (WARN + bulletin) instead of being dropped silently. A durable/recoverable dead-letter sink can later replace this terminal node without changing the surrounding wiring.",
+  "position": {
+    "x": 0.0,
+    "y": 400.0
+  },
+  "type": "org.apache.nifi.processors.standard.LogMessage",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-standard-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "log-level": "warn",
+    "log-prefix": "civitas-pipeline-dlq",
+    "log-message": "Pipeline record dropped (cause in the failing processor's bulletin): httpStatus=${invokehttp.status.code} exception=${invokehttp.java.exception.class} file=${uuid}"
+  },
+  "propertyDescriptors": {
+    "log-level": {
+      "name": "log-level",
+      "displayName": "Log Level",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "log-prefix": {
+      "name": "log-prefix",
+      "displayName": "Log prefix",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "log-message": {
+      "name": "log-message",
+      "displayName": "Log message",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "style": {},
+  "schedulingPeriod": "0 sec",
+  "schedulingStrategy": "TIMER_DRIVEN",
+  "executionNode": "ALL",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "autoTerminatedRelationships": [
+    "success"
+  ],
+  "scheduledState": "ENABLED",
+  "retryCount": 10,
+  "retriedRelationships": [],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins",
+  "componentType": "PROCESSOR"
+}

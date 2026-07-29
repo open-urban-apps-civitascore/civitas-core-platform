@@ -140,14 +140,14 @@ describe('RolesPage server-side pagination', () => {
     expect(dataParams?.get('roleType')).toBe('DATA')
   })
 
-  it('tab switch resets pagination to page 0', () => {
-    const setPaginationParams = vi.fn()
+  it('tab switch updates the tab param', () => {
+    const setTabValueParam = vi.fn()
     vi.mocked(useQueryParams).mockReturnValue({
       setSortingParams: vi.fn(),
-      setPaginationParams,
+      setPaginationParams: vi.fn(),
       setSearchParam: vi.fn(),
       getApiRequestParamsByUrl: vi.fn(() => new URLSearchParams()),
-      setTabValueParam: vi.fn(),
+      setTabValueParam,
       pageIndex: 0,
       pageSize: 10,
       sorting: [],
@@ -158,6 +158,6 @@ describe('RolesPage server-side pagination', () => {
     mockCurrentUser([PERMISSION_NAMES.ROLE_READ])
     renderPage()
     fireEvent.click(screen.getByText('dataRoles'))
-    expect(setPaginationParams).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 10 })
+    expect(setTabValueParam).toHaveBeenCalledWith('DATA')
   })
 })

@@ -7,10 +7,12 @@ import {
 
 import { apiRequest } from '../request/apiRequest'
 
+export const BREADCRUMB_QUERY_KEY = 'breadcrumb'
+
 export const useGetBredcrumbs = (breadcrumbs: Breadcrumb[]) =>
   useQueries({
     queries: breadcrumbs.map(crumb => ({
-      queryKey: ['breadcrumb', crumb.href],
+      queryKey: [BREADCRUMB_QUERY_KEY, crumb.href],
       enabled: crumb.isDynamic && crumb.apiHref !== undefined,
       queryFn: () =>
         apiRequest<BreadcrumbApiResponse>({

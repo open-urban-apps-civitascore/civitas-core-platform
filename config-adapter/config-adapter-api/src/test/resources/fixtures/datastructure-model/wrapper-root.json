@@ -1,0 +1,30 @@
+{
+  "$id": "urn:core:tenant:civitas:datastructure:contract:WrapperRoot:0000000000:1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WrapperRoot",
+  "type": "object",
+  "properties": {
+    "dog": { "$ref": "#/$defs/Dog" }
+  },
+  "$defs": {
+    "Animal": {
+      "type": "object",
+      "title": "Animal",
+      "properties": {
+        "id": { "type": "string", "x-core-primaryKey": true },
+        "name": { "type": "string" }
+      },
+      "required": ["id"]
+    },
+    "Dog": {
+      "allOf": [{ "$ref": "#/$defs/Animal" }],
+      "type": "object",
+      "title": "Dog",
+      "properties": {
+        "breed": { "type": "string" },
+        "home": { "$ref": "https://geojson.org/schema/Point.json", "crs": "EPSG:25832" }
+      },
+      "required": ["breed"]
+    }
+  }
+}

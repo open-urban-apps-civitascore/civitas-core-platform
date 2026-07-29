@@ -66,7 +66,7 @@ This brings up:
 
 | Service     | Where                           | Login                                    |
 |-------------|---------------------------------|------------------------------------------|
-| NiFi UI     | `https://localhost:8443/nifi`   | `admin` / `nifi-dev-password-1234567890` |
+| NiFi UI     | `https://localhost:8443/nifi`   | login via Keycloak (OIDC)                |
 | Mosquitto   | `localhost:1883`                | anonymous                                |
 | PostGIS     | `localhost:5435`, DB `nifi_demo`| `nifi` / `nifi-demo-password`            |
 

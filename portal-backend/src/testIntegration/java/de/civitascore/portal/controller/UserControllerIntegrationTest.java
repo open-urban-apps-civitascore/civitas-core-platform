@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.UserTitleType;
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.UserInputDTO;
 import de.civitascore.portal.model.output.UserOutputDTO;
+import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
 import java.util.List;
@@ -25,9 +27,21 @@ import org.springframework.http.ResponseEntity;
 class UserControllerIntegrationTest
     extends BaseControllerIntegrationTest<UserInputDTO, UserOutputDTO> {
 
+  @Autowired protected PortalTestDataFactory portalData;
+  @Autowired protected UserRepository userRepository;
+
   private final String USERS_ENDPOINT = "/users";
 
-  @Autowired protected PortalTestDataFactory portalData;
+  /**
+   * Marks the user as already-synced to Keycloak so that {@code replaceGroups} (which now requires
+   * a non-blank externalId — see UserService.replaceGroups guard) accepts the call. Tests in this
+   * class run without an active config adapter, so the create flow leaves externalId null.
+   */
+  private void markUserAsSynced(UUID userId) {
+    User user = userRepository.findById(userId).orElseThrow();
+    user.setExternalId("test-kc-" + userId);
+    userRepository.saveAndFlush(user);
+  }
 
   @Override
   protected String getEndpointPath() {
@@ -604,6 +618,7 @@ class UserControllerIntegrationTest
     @DisplayName("Should replace user groups with new set")
     void shouldReplaceUserGroups() {
       UUID userId = createTestEntity();
+      markUserAsSynced(userId);
       UUID groupA = createTestGroup("Group A " + UUID.randomUUID().toString().substring(0, 8));
       UUID groupB = createTestGroup("Group B " + UUID.randomUUID().toString().substring(0, 8));
 
@@ -619,6 +634,7 @@ class UserControllerIntegrationTest
     @DisplayName("Should clear all groups with empty list")
     void shouldClearAllGroups() {
       UUID userId = createTestEntity();
+      markUserAsSynced(userId);
       UUID groupA = createTestGroup("Group A " + UUID.randomUUID().toString().substring(0, 8));
       performReplaceGroups(userId, List.of(groupA));
 
@@ -633,9 +649,21 @@ class UserControllerIntegrationTest
     @DisplayName("Should return 400 for non-existent group ID")
     void shouldReturn400ForNonExistentGroup() {
       UUID userId = createTestEntity();
+      markUserAsSynced(userId);
 
       ResponseEntity<UserOutputDTO> response =
           performReplaceGroups(userId, List.of(UUID.randomUUID()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should return 400 when user has not been synced to Keycloak yet")
+    void shouldReturn400WhenUserNotSynced() {
+      UUID userId = createTestEntity();
+      UUID groupA = createTestGroup("Group A " + UUID.randomUUID().toString().substring(0, 8));
+
+      ResponseEntity<UserOutputDTO> response = performReplaceGroups(userId, List.of(groupA));
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -655,6 +683,7 @@ class UserControllerIntegrationTest
     @DisplayName("Should replace existing groups with different set")
     void shouldReplaceExistingGroupsWithDifferentSet() {
       UUID userId = createTestEntity();
+      markUserAsSynced(userId);
       UUID groupA = createTestGroup("Group A " + UUID.randomUUID().toString().substring(0, 8));
       UUID groupB = createTestGroup("Group B " + UUID.randomUUID().toString().substring(0, 8));
       UUID groupC = createTestGroup("Group C " + UUID.randomUUID().toString().substring(0, 8));

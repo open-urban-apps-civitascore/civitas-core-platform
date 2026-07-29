@@ -141,7 +141,7 @@ geoserver.postgis.password=secret
 
 Passwords (`geoserver.admin.password`, `geoserver.postgis.password`, and the `passwd` of an
 incoming `DataStoreConfig`) may be supplied encrypted as `ENC(<base64>)` values, following the same
-AES-256-GCM scheme as the RedPanda adapter. They are decrypted in-memory only when needed; plaintext
+project-wide AES-256-GCM credential scheme. They are decrypted in-memory only when needed; plaintext
 values are accepted unchanged for backward compatibility. The master key is read from the
 `CIVITAS_MASTER_KEY` environment variable, and encrypted values must be produced with the
 `portal-backend:datasource-connector` credential context. If `CIVITAS_MASTER_KEY` is not set,
@@ -458,7 +458,9 @@ de.civitascore.dataset.geoserver.result
 ```
 
 `PROVISION_WORKSPACE` derives the workspace name from `datasetId` via `toWorkspaceName()`:
-lowercases and replaces all non-alphanumeric/non-underscore characters with `_`.
+lowercases, replaces all non-alphanumeric/non-underscore characters with `_`, and prefixes the
+result with `ds_` when it would start with a digit (the workspace is emitted as an XML namespace
+prefix in OGC capabilities documents, and an NCName must not start with a digit).
 
 Only datasinks with `"type": "POSTGIS"` are provisioned as feature types; other sink types
 are skipped. From each sink's `configuration`, only `tableName`, `crs`, and `projectionPolicy`
@@ -520,7 +522,7 @@ Tests cover:
 
 ### Integration Tests
 
-`GeoServerAdapterIntegrationTest` runs the adapter against a real **GeoServer Cloud
+`GeoServerAdapterIT` runs the adapter against a real **GeoServer Cloud
 2.28.3.0** stack started with Testcontainers. The setup mirrors
 [`dev-environment/geoserver/docker-compose.yaml`](../../dev-environment/geoserver/docker-compose.yaml)
 and exercises the same provisioning flow as the Bruno collection
@@ -552,8 +554,8 @@ Total stack startup: ~60–120s.
 > the adapter's current implementation. Unit tests still verify the JSON body shape.
 
 ```bash
-# Run only the integration test (requires Docker)
-mvn test -pl config-adapter-geoserver -Dtest=GeoServerAdapterIntegrationTest
+# Run only the integration test (requires Docker); -Dtest=none skips the unit tests
+mvn verify -pl config-adapter-geoserver -Dit.test=GeoServerAdapterIT -Dtest=none -DfailIfNoTests=false
 ```
 
 ## Troubleshooting

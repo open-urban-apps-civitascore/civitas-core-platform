@@ -79,7 +79,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
-  const [canSetAvailable, setCanSetAvailable] = useState(true)
+  const [canStage, setCanSetAvailable] = useState(true)
 
   const isInUse = version?.inUse || false
 
@@ -113,8 +113,9 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     version,
     isCreateMode,
     datastructureId: datastructure.id,
+    dataStructureName: datastructure.name,
     onCreateVersion: redirectAfterVersionCreation,
-    canSetAvailable,
+    canStage,
   })
 
   const formValues = useWatch({ control: form.control })
@@ -166,16 +167,17 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }
 
   const exitEditMode = () => {
-    if (isCreateMode) router.push(`/datastructures/${datastructureId}`)
-    else {
-      setIsReadOnly(true)
-      setIsExitModalOpen(false)
-    }
+    setIsExitModalOpen(false)
+    router.push(`/datastructures/${datastructureId}`)
   }
 
   const handleExitWarningSave = async () => {
     const isSaved = await handleSubmit()
-    if (isSaved) exitEditMode()
+    if (isSaved) {
+      exitEditMode()
+    } else {
+      setIsExitModalOpen(false)
+    }
   }
 
   const handleExit = () => {
@@ -211,10 +213,11 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
         status={statusWatch}
         onStatusChange={handleStatusChange}
-        canSetAvailable={canSetAvailable}
+        canStage={canStage}
         canSetDraft={canSetDraft}
         canRelease={canRelease}
         statusHint={statusHint}
+        availableHint={!canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined}
       />
       <ActionButtons
         confirmButtonType="button"

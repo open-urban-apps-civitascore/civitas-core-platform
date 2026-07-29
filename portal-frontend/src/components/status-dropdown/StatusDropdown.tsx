@@ -14,22 +14,24 @@ interface StatusDropdownProps<T extends StatusTypes> {
   status: T
   onStatusChange: (status: T) => void
   statusOptions: readonly T[]
-  canSetAvailable?: boolean
+  canStage?: boolean
   canSetDraft?: boolean
   canRelease?: boolean
   isReadOnly?: boolean
   statusHint?: string
+  availableHint?: string
 }
 export const StatusDropdown = <T extends StatusTypes>(props: StatusDropdownProps<T>) => {
   const {
     status,
     onStatusChange,
-    canSetAvailable = false,
+    canStage = false,
     canSetDraft = true,
     canRelease = true,
     isReadOnly = false,
     statusOptions,
     statusHint,
+    availableHint,
   } = props
   const t = useTranslations('common.status')
 
@@ -76,31 +78,44 @@ export const StatusDropdown = <T extends StatusTypes>(props: StatusDropdownProps
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {statusOptions.map(option => (
-            <DropdownMenuItem
-              key={option}
-              data-testid={`statusOption-${option.toLowerCase()}`}
-              onClick={() => onStatusChange(option)}
-              disabled={
-                // AVAILABLE requires both form validation (canSetAvailable) and *_RELEASE permission (canRelease).
-                // READY is a stage step requiring only *_UPDATE (implied by edit mode) — no RELEASE permission needed.
-                (option === STATUS_TYPES.AVAILABLE && (!canSetAvailable || !canRelease)) ||
-                (option === STATUS_TYPES.READY && !canSetAvailable) ||
-                (option === STATUS_TYPES.DRAFT && !canSetDraft)
-              }
-              className={cn(
-                status === option && 'bg-accent',
-                ((option === STATUS_TYPES.AVAILABLE && (!canSetAvailable || !canRelease)) ||
-                  (option === STATUS_TYPES.READY && !canSetAvailable)) &&
-                  'opacity-50 cursor-not-allowed',
-              )}
-            >
-              <div className="flex items-center gap-2">
-                {getStatusIcon(option)}
-                <span>{getStatusLabel(option)}</span>
-              </div>
-            </DropdownMenuItem>
-          ))}
+          {statusOptions.map(option => {
+            // canStage means the content passes validation to leave DRAFT (stage to READY).
+            // AVAILABLE additionally needs *_RELEASE permission (canRelease); READY only needs *_UPDATE (implied by edit mode).
+            const isAvailableDisabled = option === STATUS_TYPES.AVAILABLE && (!canStage || !canRelease)
+            const isReadyDisabled = option === STATUS_TYPES.READY && !canStage
+            const isDisabled = isAvailableDisabled || isReadyDisabled || (option === STATUS_TYPES.DRAFT && !canSetDraft)
+
+            const item = (
+              <DropdownMenuItem
+                key={option}
+                data-testid={`statusOption-${option.toLowerCase()}`}
+                onClick={() => onStatusChange(option)}
+                disabled={isDisabled}
+                className={cn(
+                  status === option && 'bg-accent',
+                  (isAvailableDisabled || isReadyDisabled) && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(option)}
+                  <span>{getStatusLabel(option)}</span>
+                </div>
+              </DropdownMenuItem>
+            )
+
+            if (isAvailableDisabled && availableHint) {
+              return (
+                <Tooltip key={option}>
+                  <TooltipTrigger asChild>
+                    <div>{item}</div>
+                  </TooltipTrigger>
+                  <TooltipContent>{availableHint}</TooltipContent>
+                </Tooltip>
+              )
+            }
+
+            return item
+          })}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

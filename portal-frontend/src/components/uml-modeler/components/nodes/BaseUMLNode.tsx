@@ -11,6 +11,8 @@ interface BaseUMLNodeProps {
   isSelected: boolean
   stereotype?: string
   name: string
+  /** Renders the «root» marker for the diagram's designated root class. */
+  isRoot?: boolean
   children: ReactNode
   className?: string
 }
@@ -38,6 +40,7 @@ export const BaseUMLNode: React.FC<BaseUMLNodeProps> = ({
   isSelected,
   stereotype,
   name,
+  isRoot = false,
   children,
   className = '',
 }) => {
@@ -52,7 +55,7 @@ export const BaseUMLNode: React.FC<BaseUMLNodeProps> = ({
       <div
         className="node-header"
         style={{
-          height: NODE_DIMENSIONS.headerHeight,
+          minHeight: NODE_DIMENSIONS.headerHeight,
           padding: `${NODE_DIMENSIONS.sectionPadding}px`,
           borderBottom: `${NODE_DIMENSIONS.separatorHeight}px solid ${UML_COLORS[elementType].border}`,
           textAlign: 'center',
@@ -63,6 +66,7 @@ export const BaseUMLNode: React.FC<BaseUMLNodeProps> = ({
           cursor: 'grab',
         }}
       >
+        {isRoot && <div style={{ fontSize: '10px', marginBottom: '2px', fontStyle: 'italic' }}>«root»</div>}
         {stereotype && <div style={{ fontSize: '10px', marginBottom: '2px', fontStyle: 'italic' }}>{stereotype}</div>}
         <div style={{ fontStyle: elementType === 'interface' ? 'italic' : 'normal' }}>{name}</div>
       </div>

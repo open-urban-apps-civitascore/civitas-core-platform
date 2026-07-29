@@ -10,8 +10,9 @@ import { BasicDropdownMenu } from '@/components/dropdown-menu/BasicDropdownMenu'
 import { Button } from '@/components/ui/button'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
-import { downloadJsonSchema } from '../../services/jsonSchemaExportService'
+import { downloadJsonSchema, SchemaExportError } from '../../services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '../../services/modelUploadService'
+import { rootFailureMessage } from '../../services/rootFailureMessage'
 
 interface ToolbarProps {
   onSave?: () => void
@@ -36,9 +37,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const handleSave = useCallback(() => {
     if (isSaving) return
 
-    const payload = {
-      ...buildUMLModelPayload(diagram),
-      name: sessionName || diagram.name,
+    let payload
+    try {
+      payload = {
+        ...buildUMLModelPayload(diagram),
+        name: sessionName || diagram.name,
+      }
+    } catch (error) {
+      // A rethrow from an onClick handler bypasses error boundaries and leaves the user with a
+      // silent dead button — walker bugs stay loud via the console, but still get a toast.
+      if (!(error instanceof SchemaExportError)) {
+        console.error('UML model save failed', error)
+        toast.error(t('save.error'))
+        return
+      }
+      toast.error(rootFailureMessage(t, error.failure))
+      return
     }
 
     createModel.mutate(payload, {
@@ -56,7 +70,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     try {
       downloadJsonSchema(diagram)
       toast.success(t('export.success'))
-    } catch {
+    } catch (error) {
+      if (error instanceof SchemaExportError) {
+        toast.error(rootFailureMessage(t, error.failure))
+        return
+      }
+      // The generic toast alone would make an export bug undebuggable.
+      console.error('JSON schema export failed', error)
       toast.error(t('export.error'))
     }
   }, [diagram, t])

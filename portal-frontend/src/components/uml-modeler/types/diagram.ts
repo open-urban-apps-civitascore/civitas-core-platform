@@ -2,6 +2,16 @@ import type { Connection, Edge, EdgeChange, Node, NodeChange } from '@xyflow/rea
 
 import type { UMLElement, UMLElementType, UMLRelationship, UMLRelationshipType } from './uml'
 
+// Omit that distributes over the UMLElement union — a plain Omit would collapse it to the common
+// keys and lose variant-specific fields (literals, attributes, …).
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+
+/**
+ * Per-node element update. `isRoot` is excluded so the radio invariant (at most one flag
+ * diagram-wide) has exactly one writer by construction: the SET_ROOT_NODE action.
+ */
+export type UMLElementUpdate = Partial<DistributiveOmit<UMLElement, 'isRoot'>>
+
 // UML Node data structure
 export interface UMLNodeData extends Record<string, unknown> {
   element: UMLElement
@@ -54,7 +64,10 @@ export type DiagramAction =
   | { type: 'EDGE_CHANGES'; payload: EdgeChange[] }
   | { type: 'ADD_EDGE'; payload: Connection }
   | { type: 'ADD_NODE'; payload: UMLNode }
-  | { type: 'UPDATE_NODE'; payload: { id: string; updates: Partial<UMLElement> } }
+  | { type: 'UPDATE_NODE'; payload: { id: string; updates: UMLElementUpdate } }
+  // Root designation is radio-semantic (at most one flag diagram-wide), so it is one atomic
+  // action instead of per-node updates; `id: null` clears the designation entirely.
+  | { type: 'SET_ROOT_NODE'; payload: { id: string | null } }
   | { type: 'UPDATE_EDGE'; payload: { id: string; updates: Partial<UMLRelationship> } }
   | { type: 'DELETE_NODES'; payload: string[] }
   | { type: 'DELETE_EDGES'; payload: string[] }

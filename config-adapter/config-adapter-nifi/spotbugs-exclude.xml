@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <!-- The flow/graph/mapping/schema packages are immutable-by-convention value records and DTOs
+       that carry Jackson Map/List/JsonNode structures by reference. Defensive-copying every record
+       accessor would add noise without real safety benefit: these objects live within a single,
+       controlled deployment-planning call and are never shared across threads or mutated by callers.
+       (Mirrors the EI_EXPOSE exclusions in config-adapter-flowable.) -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    <Package name="~de\.civitascore\.configadapter\.nifi\.(flow|graph|mapping|schema)(\..*)?"/>
+  </Match>
+
+  <!-- NiFi REST references (ProcessGroupRef/ControllerServiceRef) are immutable records. -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    <Package name="~de\.civitascore\.configadapter\.nifi\.rest(\..*)?"/>
+  </Match>
+</FindBugsFilter>

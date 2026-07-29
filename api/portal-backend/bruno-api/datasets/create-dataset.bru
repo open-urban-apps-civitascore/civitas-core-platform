@@ -10,6 +10,10 @@ post {
   auth: inherit
 }
 
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
 body:json {
   {
     "name": "Sensor Readings Dataset",

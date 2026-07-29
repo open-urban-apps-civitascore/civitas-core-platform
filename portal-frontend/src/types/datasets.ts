@@ -23,6 +23,17 @@ export const DatasetStatusSchema = enumFromConst(DATASET_STATUS_TYPES)
 export type PipelineBasicInfo = {
   id: string
   name: string
+  description?: string
+  runtimeStatus?: PipelineRuntimeStatus
+}
+
+export type PipelineRuntimeStatus = {
+  state: 'OK' | 'ERROR' | 'UNKNOWN'
+  message?: string | null
+  sanitizedStacktrace?: string | null
+  occurredAt?: string | null
+  source?: 'DEPLOYMENT' | 'RUNTIME' | null
+  lastEventId?: string | null
 }
 
 // BACKEND COMMUNICATION
@@ -38,7 +49,23 @@ export const DatasetApiResponseSchema = z.object({
   description: z.string(),
   dataSetStatus: DatasetStatusSchema,
   openDataAccess: z.boolean(),
-  pipelines: z.array(z.object({ id: z.string(), name: z.string() })),
+  pipelines: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      description: z.string().optional(),
+      runtimeStatus: z
+        .object({
+          state: z.enum(['OK', 'ERROR', 'UNKNOWN']),
+          message: z.string().nullable().optional(),
+          sanitizedStacktrace: z.string().nullable().optional(),
+          occurredAt: z.string().nullable().optional(),
+          source: z.enum(['DEPLOYMENT', 'RUNTIME']).nullable().optional(),
+          lastEventId: z.string().nullable().optional(),
+        })
+        .optional(),
+    }),
+  ),
   namedApis: z.array(NamedApiSchema).optional(),
   datapool: DatapoolItemSchema.nullable(),
   visualizations: z
@@ -46,6 +73,9 @@ export const DatasetApiResponseSchema = z.object({
       z.object({ id: z.string(), name: z.string(), description: z.string().optional(), type: z.enum(['dashboard']) }),
     )
     .optional(),
+  // True once the data-holding sink (PostGIS table / FROST project) physically exists. Stays true
+  // across an unrelease. Drives the data-loss warning before a destructive sink change.
+  provisioned: z.boolean().optional(),
 })
 
 export type Dataset = z.infer<typeof DatasetApiResponseSchema>
@@ -107,6 +137,12 @@ export type DatasetBaseFormData = z.input<typeof DatasetBaseFormSchema>
 export const DatasetCreateFormSchema = z.object({
   name: z.string().trim().min(3, 'common.errors.atLeast3').max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
   datapoolId: z.string().nullable(),
+  description: z
+    .string()
+    .trim()
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength')
+    .optional()
+    .or(z.literal('')),
 })
 
 export type DatasetCreateFormData = z.input<typeof DatasetCreateFormSchema>

@@ -1,0 +1,52 @@
+meta {
+  name: Update DataSink (confirm data loss)
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{dataSinkId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "POSTGIS",
+    "configuration": {
+      "tableName": "sensor_observations_rebuilt",
+      "dataStructureVersionId": "{{dataStructureVersionId}}"
+    },
+    "confirmDataLoss": true
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSinkId', res.body.id);
+  }
+}
+
+docs {
+  Changing `tableName` (or `dataStructureVersionId`) on a **provisioned** dataset drops and
+  recreates the backing table, discarding all stored data. The backend rejects such a change with
+  409 unless `confirmDataLoss: true` is set.
+
+  **Precondition:** `dataSetId`, `dataSinkId`, `dataStructureVersionId` set; the dataset has been
+  released at least once (provisioned = true).
+
+  **Expected Response:** 200 OK. Without `confirmDataLoss`, the same request returns 409 Conflict.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSink record updated; table rebuild happens on the next re-release |
+  | Config Adapter | PostGIS table dropped + recreated on re-release |
+  | External System | Stored rows are lost |
+}

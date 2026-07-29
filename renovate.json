@@ -29,7 +29,7 @@
       "matchFileNames": ["portal-backend/**"],
       "dependencyDashboardApproval": false,
       "commitMessagePrefix": "chore(backend):",
-      "reviewers": ["franklex", "fm41", "jonasfrz", "lukas.wydra"],
+      "reviewers": ["franklex", "jonasfrz"],
       "reviewersSampleSize": 1,
       "addLabels": ["cop backend", "team data mgmt"]
     },
@@ -56,33 +56,51 @@
     },
     {
       "description": "Group Spring Boot dependencies",
-      "matchPackagePatterns": ["^org\\.springframework"],
       "groupName": "Spring Boot dependencies",
       "matchFileNames": ["portal-backend/**", "config-adapter/**"],
+      "matchPackageNames": [
+        "/^org\\.springframework/"
+      ],
       "dependencyDashboardApproval": false
     },
     {
       "description": "Group React ecosystem",
-      "matchPackagePatterns": ["^react", "^@types/react"],
       "groupName": "React ecosystem",
-      "matchFileNames": ["portal-frontend/**"]
+      "matchFileNames": ["portal-frontend/**"],
+      "matchPackageNames": [
+        "/^react/",
+        "/^@types/react/"
+      ]
     },
     {
       "description": "Group Next.js related packages",
-      "matchPackageNames": ["next"],
-      "matchPackagePatterns": ["^@next/", "^next-"],
+      "matchPackageNames": ["next", "/^@next//", "/^next-/"],
       "groupName": "Next.js",
       "matchFileNames": ["portal-frontend/**"]
     },
     {
       "description": "Group testing libraries",
-      "matchPackagePatterns": ["^@testing-library/", "^vitest", "^@vitest/", "^@playwright/", "junit", "mockito"],
-      "groupName": "testing libraries"
+      "groupName": "testing libraries",
+      "matchPackageNames": [
+        "/^@testing-library//",
+        "/^vitest/",
+        "/^@vitest//",
+        "/^@playwright//",
+        "/junit/",
+        "/mockito/"
+      ]
     },
     {
       "description": "Group linting and formatting tools",
-      "matchPackagePatterns": ["^eslint", "^@eslint/", "^prettier", "^@prettier/", "checkstyle", "spotbugs"],
-      "groupName": "linting and formatting"
+      "groupName": "linting and formatting",
+      "matchPackageNames": [
+        "/^eslint/",
+        "/^@eslint//",
+        "/^prettier/",
+        "/^@prettier//",
+        "/checkstyle/",
+        "/spotbugs/"
+      ]
     },
     {
       "description": "Pin Docker digests",
@@ -128,6 +146,19 @@
   "gitlabci": {
     "enabled": true
   },
+  "customManagers": [
+    {
+      "description": "Track Docker image versions declared as Testcontainers Java constants. Lines annotated with '// renovate: datasource=docker' immediately above a 'public static final String NAME = \"image:tag\"' constant are matched. The existing pinDigests rule additionally appends @sha256: digests for full reproducibility.",
+      "customType": "regex",
+      "fileMatch": [
+        "portal-backend/src/testIntegration/.*TestContainerImages\\.java$",
+        "config-adapter/.*/src/test/.*TestContainerImages\\.java$"
+      ],
+      "matchStrings": [
+        "// renovate: datasource=(?<datasource>[^\\n]+)\\n\\s+public static final String \\w+ = \"(?<depName>[^:\"]+):(?<currentValue>[^\"]+)\";"
+      ]
+    }
+  ],
   "postUpdateOptions": [
     "npmDedupe"
   ]

@@ -12,6 +12,7 @@ package de.civitascore.configadapter.flowable.common.kafka;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import de.civitascore.configadapter.adapter.PipelineStatusPublisher;
 import de.civitascore.configadapter.flowable.common.SagaFailure;
 import de.civitascore.configadapter.flowable.common.SagaResultPublisher;
 import java.util.HashMap;
@@ -32,7 +33,7 @@ import org.slf4j.LoggerFactory;
  * {@code KafkaSagaActionDispatcher}. Ensures downstream consumers (portal-backend) see identical
  * messages regardless of which orchestrator is running.
  */
-public class FlowableResultPublisher implements SagaResultPublisher {
+public class FlowableResultPublisher implements SagaResultPublisher, PipelineStatusPublisher {
 
   private static final Logger LOG = LoggerFactory.getLogger(FlowableResultPublisher.class);
 
@@ -41,10 +42,16 @@ public class FlowableResultPublisher implements SagaResultPublisher {
 
   private final Producer<String, byte[]> producer;
   private final ObjectMapper objectMapper;
+  private final String pipelineStatusTopic;
 
   public FlowableResultPublisher(Producer<String, byte[]> producer) {
+    this(producer, "de.civitascore.pipeline.status");
+  }
+
+  public FlowableResultPublisher(Producer<String, byte[]> producer, String pipelineStatusTopic) {
     this.producer = producer;
     this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    this.pipelineStatusTopic = pipelineStatusTopic;
   }
 
   @Override
@@ -71,6 +78,9 @@ public class FlowableResultPublisher implements SagaResultPublisher {
     message.put("failedStep", failure.failedStep());
     message.put("error", failure.error());
     message.put("compensated", failure.compensated());
+    if (failure.pipelineStatus() != null) {
+      message.put("pipelineStatus", failure.pipelineStatus());
+    }
     message.put("staleResources", List.of());
     message.put("cleanedResources", List.of());
 
@@ -81,10 +91,20 @@ public class FlowableResultPublisher implements SagaResultPublisher {
         failure.compensated());
   }
 
+  @Override
+  public void publish(Map<String, Object> event) {
+    String key = event.get("datasetId") + "/" + event.get("pipelineId");
+    publish(pipelineStatusTopic, key, event);
+  }
+
   private void publish(String key, Map<String, Object> message) {
+    publish(SAGA_RESULT_TOPIC, key, message);
+  }
+
+  private void publish(String topic, String key, Map<String, Object> message) {
     try {
       byte[] json = objectMapper.writeValueAsBytes(message);
-      var record = new ProducerRecord<>(SAGA_RESULT_TOPIC, key, json);
+      var record = new ProducerRecord<>(topic, key, json);
       producer.send(record).get(PUBLISH_TIMEOUT_MS, TimeUnit.MILLISECONDS);
     } catch (JsonProcessingException e) {
       LOG.error("Failed to serialize saga result: {}", Encode.forJava(e.getMessage()), e);

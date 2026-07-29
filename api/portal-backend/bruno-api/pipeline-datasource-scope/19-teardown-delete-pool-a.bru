@@ -1,0 +1,21 @@
+meta {
+  name: 19. Teardown - delete Pool A
+  type: http
+  seq: 20
+}
+
+delete {
+  url: {{baseUrl}}/datapools/{{scopePoolAId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: in [200, 204, 400, 404, 409]
+}
+
+tests {
+  test("Pool A cleanup tolerated", function() {
+    expect([200, 204, 400, 404, 409]).to.include(res.getStatus());
+  });
+}

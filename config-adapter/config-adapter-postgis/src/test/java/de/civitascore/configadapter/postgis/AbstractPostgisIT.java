@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.postgis;
 
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -25,7 +26,7 @@ import org.testcontainers.utility.DockerImageName;
 abstract class AbstractPostgisIT {
 
   private static final DockerImageName POSTGIS_IMAGE =
-      DockerImageName.parse("postgis/postgis:16-3.4-alpine").asCompatibleSubstituteFor("postgres");
+      DockerImageName.parse(TestContainerImages.POSTGIS).asCompatibleSubstituteFor("postgres");
 
   protected static final PostgreSQLContainer POSTGIS;
 

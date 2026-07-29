@@ -1,0 +1,62 @@
+meta {
+  name: 4c. Create FROST DataSink
+  type: http
+  seq: 17
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sagaDataSetId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "FROST",
+    "configuration": {}
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaDataSinkId', res.body.id);
+  }
+}
+
+tests {
+  test("DataSink created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Has FROST type", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.dataSinkType).to.equal('FROST');
+    }
+  });
+}
+
+docs {
+  **Saga step 4c of 20** — Prerequisites: DataSet created (step 4).
+
+  Creates the FROST DataSink the pipeline's `frost` graph node references. The deploy derives the pipeline's sink from the wired sink node in the graph — there is **no implicit FROST default**, so a pipeline without a referenced FROST sink entity is rejected by the adapter.
+
+  FROST sinks carry no configuration of their own — provisioning happens via the FROST adapter on dataset release.
+
+  **Skip this step if 0h already found a FROST sink** (`sagaDataSinkId` set) — a repeated POST creates a duplicate.
+
+  **Expected Response:** 201 Created, body contains `id` and `dataSinkType: "FROST"`.
+
+  **Post-condition:** Save `sagaDataSinkId` from `body.id` (referenced by the pipeline in step 5, deleted in cleanup step 12b).
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSink record created in `portal_backend` DB, FK `dataset_id` → this dataset |
+  | Config Adapter | — (FROST project is provisioned when the parent DataSet is released) |
+  | External System | — |
+}

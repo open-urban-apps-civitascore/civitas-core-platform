@@ -1,0 +1,487 @@
+/**
+ * <p>This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+ *
+ * <p>SPDX-License-Identifier: EUPL-1.2
+ *
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ *
+ */
+package de.civitascore.configadapter.apisix;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.configadapter.Constants;
+import de.civitascore.configadapter.Topics;
+import de.civitascore.configadapter.adapter.ConfigAdapter;
+import de.civitascore.configadapter.configuration.AppConfig;
+import de.civitascore.configadapter.configuration.ApplicationConfig;
+import de.civitascore.configadapter.messaging.EventPublisher;
+import de.civitascore.configadapter.model.ConfigResultEvent;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.configuration2.MapConfiguration;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.utility.MountableFile;
+
+/**
+ * Base class for ApisixAdapter integration tests. Uses the singleton container pattern so etcd and
+ * APISIX start only once per JVM.
+ */
+@SuppressWarnings("resource")
+abstract class AbstractApisixIT {
+
+  protected static final String ADMIN_API_KEY = "edd1c9f034335f136f87ad84b625c8f1";
+  protected static final Network NETWORK = Network.newNetwork();
+
+  @SuppressWarnings("resource")
+  protected static final GenericContainer<?> ETCD;
+
+  @SuppressWarnings("resource")
+  protected static final GenericContainer<?> APISIX;
+
+  static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+
+    ETCD =
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.ETCD))
+            .withNetwork(NETWORK)
+            .withNetworkAliases("etcd")
+            .withExposedPorts(2379, 2380)
+            .withEnv("ETCD_ENABLE_V2", "true")
+            .withEnv("ALLOW_NONE_AUTHENTICATION", "yes")
+            .withEnv("ETCD_ADVERTISE_CLIENT_URLS", "http://etcd:2379")
+            .withEnv("ETCD_LISTEN_CLIENT_URLS", "http://0.0.0.0:2379")
+            .waitingFor(Wait.forLogMessage(".*ready to serve client requests.*", 1))
+            .withReuse(false);
+    ETCD.start();
+
+    APISIX =
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.APISIX))
+            .withNetwork(NETWORK)
+            .withNetworkAliases("apisix")
+            .dependsOn(ETCD)
+            .withExposedPorts(9080, 9180, 9443)
+            .withCopyFileToContainer(
+                MountableFile.forClasspathResource("apisix-test-config.yaml", 0644),
+                "/usr/local/apisix/conf/config.yaml")
+            // Admin-API readiness gates container start, so it is checked once per JVM instead of
+            // per test method. The timeout allows for a cold CI runner.
+            .waitingFor(
+                Wait.forHttp("/apisix/admin/upstreams")
+                    .forPort(9180)
+                    .withHeader("X-API-KEY", ADMIN_API_KEY)
+                    .forStatusCode(200)
+                    .withStartupTimeout(Duration.ofMinutes(2)))
+            .withReuse(false);
+    APISIX.start();
+
+    // Singleton container pattern: containers are shared across all subclasses of
+    // AbstractApisixIT for performance (one startup instead of six).
+    // @AfterAll cannot be used here because it runs after EACH subclass — the first
+    // @AfterAll would stop the containers and break all subsequent subclasses.
+    // A JVM shutdown hook ensures cleanup regardless of test execution order.
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread(
+                () -> {
+                  APISIX.stop();
+                  ETCD.stop();
+                  NETWORK.close();
+                }));
+  }
+
+  protected ApisixAdapter adapter;
+  protected TestEventPublisher eventPublisher;
+  protected HttpClient httpClient;
+  protected ObjectMapper objectMapper;
+  protected String adminApiUrl;
+
+  @BeforeEach
+  void setUp() {
+    adminApiUrl = "http://" + APISIX.getHost() + ":" + APISIX.getMappedPort(9180);
+
+    Map<String, Object> props = new HashMap<>();
+    props.put("apisix.admin.url", adminApiUrl);
+    props.put("apisix.admin.key", ADMIN_API_KEY);
+    props.put(
+        "apisix.topics",
+        String.join(
+            ",",
+            Topics.BACKEND_CREATED.toString(),
+            Topics.BACKEND_UPDATED.toString(),
+            Topics.BACKEND_DELETED.toString(),
+            Topics.ROUTE_CREATED.toString(),
+            Topics.ROUTE_UPDATED.toString(),
+            Topics.ROUTE_DELETED.toString()));
+    AppConfig config = new AppConfig(new MapConfiguration(props));
+
+    adapter = new ApisixAdapter();
+    adapter.initialize(config);
+
+    eventPublisher = new TestEventPublisher();
+    adapter.setEventPublisher(eventPublisher);
+
+    httpClient =
+        HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .version(HttpClient.Version.HTTP_1_1)
+            .build();
+
+    objectMapper = new ObjectMapper();
+  }
+
+  @AfterEach
+  void tearDown() {
+    if (adapter != null) {
+      adapter.close();
+    }
+  }
+
+  // ---- Convenience helpers ----
+
+  protected String createDefaultUpstream(String suffix) throws Exception {
+    String id = "test-upstream-" + suffix;
+    createUpstreamDirectly(id, ApisixTestFixtures.defaultUpstreamConfig());
+    return id;
+  }
+
+  protected void awaitSuccessResult() {
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              assertEquals(
+                  ConfigResultEvent.Status.SUCCESS,
+                  eventPublisher.getPublishedEvents().getFirst().status());
+            });
+  }
+
+  protected void awaitRouteInApisix(String expectedUri, String... expectedPlugins) {
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              JsonNode route = findRouteByUri(expectedUri);
+              assertNotNull(route, "Route with URI '" + expectedUri + "' should exist in APISIX");
+              if (expectedPlugins.length > 0) {
+                JsonNode plugins = route.get("value").get("plugins");
+                assertNotNull(plugins, "Route should have plugins");
+                for (String plugin : expectedPlugins) {
+                  assertTrue(plugins.has(plugin), "Route should have plugin: " + plugin);
+                }
+              }
+            });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  protected void awaitUpstreamInApisix(int expectedNodeCount) {
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              JsonNode upstream = findUpstreamByNodeCount(expectedNodeCount);
+              assertNotNull(
+                  upstream, "Upstream with " + expectedNodeCount + " nodes should exist in APISIX");
+            });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  private JsonNode findRouteByUri(String uri) throws Exception {
+    String url = adminApiUrl + "/apisix/admin/routes";
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .GET()
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() != 200) {
+      throw new RuntimeException(
+          "Failed to list routes. Status: " + response.statusCode() + ", Body: " + response.body());
+    }
+
+    JsonNode root = objectMapper.readTree(response.body());
+    JsonNode list = root.get("list");
+    if (list != null && list.isArray()) {
+      for (JsonNode item : list) {
+        JsonNode value = item.get("value");
+        if (value != null && value.has("uri") && uri.equals(value.get("uri").asText())) {
+          return item;
+        }
+      }
+    }
+    return null;
+  }
+
+  private JsonNode findUpstreamByNodeCount(int expectedNodeCount) throws Exception {
+    String url = adminApiUrl + "/apisix/admin/upstreams";
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .GET()
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() != 200) {
+      throw new RuntimeException(
+          "Failed to list upstreams. Status: "
+              + response.statusCode()
+              + ", Body: "
+              + response.body());
+    }
+
+    JsonNode root = objectMapper.readTree(response.body());
+    JsonNode list = root.get("list");
+    if (list != null && list.isArray()) {
+      for (JsonNode item : list) {
+        JsonNode value = item.get("value");
+        if (value != null && value.has("nodes") && value.get("nodes").size() == expectedNodeCount) {
+          return item;
+        }
+      }
+    }
+    return null;
+  }
+
+  // ---- Direct APISIX Admin API helpers ----
+
+  protected void createUpstreamDirectly(String upstreamId, Map<String, Object> config)
+      throws Exception {
+    String url = adminApiUrl + "/apisix/admin/upstreams/" + upstreamId;
+    String json = objectMapper.writeValueAsString(config);
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-Type", Constants.CONTENT_TYPE_JSON)
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .PUT(HttpRequest.BodyPublishers.ofString(json))
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+      throw new RuntimeException(
+          "Failed to create upstream directly. Status: "
+              + response.statusCode()
+              + ", Body: "
+              + response.body());
+    }
+
+    await()
+        .atMost(5, SECONDS)
+        .pollInterval(500, java.util.concurrent.TimeUnit.MILLISECONDS)
+        .untilAsserted(
+            () -> {
+              JsonNode upstream = getUpstreamFromApisix(upstreamId);
+              assertNotNull(upstream, "Upstream should be created");
+            });
+  }
+
+  protected JsonNode getUpstreamFromApisix(String upstreamId) throws Exception {
+    String url = adminApiUrl + "/apisix/admin/upstreams/" + upstreamId;
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .GET()
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() == 404) {
+      throw new RuntimeException("Upstream not found: " + upstreamId);
+    }
+
+    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+      throw new RuntimeException(
+          "Failed to get upstream. Status: "
+              + response.statusCode()
+              + ", Body: "
+              + response.body());
+    }
+
+    return objectMapper.readTree(response.body());
+  }
+
+  /**
+   * Provisions an APISIX plugin_config resource so tests referencing it via {@code
+   * apisix.plugin.config.id} resolve cleanly. APISIX rejects routes that reference unknown
+   * plugin_configs, so even a no-op gateway-side OIDC stand-in is needed for happy-path tests.
+   */
+  protected void createPluginConfigDirectly(String pluginConfigId, Map<String, Object> plugins)
+      throws Exception {
+    String url = adminApiUrl + "/apisix/admin/plugin_configs/" + pluginConfigId;
+    Map<String, Object> body = Map.of("plugins", plugins);
+    String json = objectMapper.writeValueAsString(body);
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-Type", "application/json")
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .PUT(HttpRequest.BodyPublishers.ofString(json))
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+      throw new RuntimeException(
+          "Failed to create plugin_config. Status: "
+              + response.statusCode()
+              + ", Body: "
+              + response.body());
+    }
+  }
+
+  protected void createServiceDirectly(String serviceId, Map<String, Object> config)
+      throws Exception {
+    String url = adminApiUrl + "/apisix/admin/services/" + serviceId;
+    String json = objectMapper.writeValueAsString(config);
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-Type", "application/json")
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .PUT(HttpRequest.BodyPublishers.ofString(json))
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+      throw new RuntimeException(
+          "Failed to create service. Status: "
+              + response.statusCode()
+              + ", Body: "
+              + response.body());
+    }
+  }
+
+  protected void createRouteDirectly(String routeId, Map<String, Object> config) throws Exception {
+    String url = adminApiUrl + "/apisix/admin/routes/" + routeId;
+    String json = objectMapper.writeValueAsString(config);
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-Type", "application/json")
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .PUT(HttpRequest.BodyPublishers.ofString(json))
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+      throw new RuntimeException(
+          "Failed to create route directly. Status: "
+              + response.statusCode()
+              + ", Body: "
+              + response.body());
+    }
+
+    await()
+        .atMost(5, SECONDS)
+        .pollInterval(500, java.util.concurrent.TimeUnit.MILLISECONDS)
+        .untilAsserted(
+            () -> {
+              JsonNode route = getRouteFromApisix(routeId);
+              assertNotNull(route, "Route should be created");
+            });
+  }
+
+  protected JsonNode getRouteFromApisix(String routeId) throws Exception {
+    String url = adminApiUrl + "/apisix/admin/routes/" + routeId;
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .GET()
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() == 404) {
+      throw new RuntimeException("Route not found: " + routeId);
+    }
+
+    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+      throw new RuntimeException(
+          "Failed to get route. Status: " + response.statusCode() + ", Body: " + response.body());
+    }
+
+    return objectMapper.readTree(response.body());
+  }
+
+  static class TestEventPublisher implements EventPublisher {
+    private final List<ConfigResultEvent> publishedEvents =
+        Collections.synchronizedList(new ArrayList<>());
+
+    @Override
+    public void publish(String topic, ConfigResultEvent event) {
+      publishedEvents.add(event);
+    }
+
+    public List<ConfigResultEvent> getPublishedEvents() {
+      return new ArrayList<>(publishedEvents);
+    }
+
+    @Override
+    public String getName() {
+      return "test";
+    }
+
+    @Override
+    public void initialize(ApplicationConfig config, ConfigAdapter adapter) {}
+  }
+}

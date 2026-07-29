@@ -5,7 +5,7 @@ import { createContext, useContext } from 'react'
 export interface UnsavedChangesContextValue {
   hasUnsavedChanges: boolean
   setHasUnsavedChanges: (dirty: boolean) => void
-  setSaveHandler: (handler: (() => Promise<boolean>) | null) => void
+  setSaveHandler: (handler: (() => Promise<boolean>) | null, shouldRefreshAfterNavigate?: boolean) => void
   requestNavigation: (href: string) => void
   requestBack: () => void
 }

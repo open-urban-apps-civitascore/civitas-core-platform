@@ -84,6 +84,11 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   public User replaceGroups(UUID userId, List<UUID> groupIds) {
     User user = findByIdOrThrow(userId);
 
+    if (user.getExternalId() == null || user.getExternalId().isBlank()) {
+      throw new InvalidInputException(
+          "user", "not synced", "User has not been synced to Keycloak yet; retry shortly.");
+    }
+
     if (groupIds.isEmpty()) {
       user.setGroups(new HashSet<>());
     } else {
@@ -97,7 +102,9 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
       user.setGroups(new HashSet<>(groups));
     }
 
-    return save(user);
+    user = getRepository().saveAndFlush(user);
+    preValidateWithExternalSystem(user, null, "update", null);
+    return user;
   }
 
   @Override
@@ -143,6 +150,17 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     userConfig.setFirstName(entity.getFirstName());
     userConfig.setLastName(entity.getLastName());
     userConfig.setEnabled(true);
+    // Use externalId (Keycloak group UUID) — stable across portal-side group renames.
+    // Groups not yet synced to Keycloak (externalId == null) are excluded; the adapter cannot
+    // assign a membership to a group that does not yet exist on the Keycloak side. The missing
+    // memberships are re-attempted on the next user update after the catch-up sync runs.
+    userConfig.setGroups(
+        entity.getGroups().stream()
+            .map(Group::getExternalId)
+            .filter(Objects::nonNull)
+            .filter(id -> !id.isBlank())
+            .sorted()
+            .toList());
 
     return userConfig;
   }

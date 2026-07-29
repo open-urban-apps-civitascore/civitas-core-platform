@@ -1,0 +1,22 @@
+meta {
+  name: Get Layer by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/layers/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{layerId}}
+}
+
+docs {
+  **Precondition:** `dataSetId` and `layerId` are set.
+
+  **Expected Response:** 200 OK, body contains the Layer with matching `id`, including `dataSinkId`, `defaultStyleId`, `alternativeStyleIds`, and (once provisioned) `geometryType` and `nativeCRS`.
+}

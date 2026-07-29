@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -17,6 +18,7 @@ import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.Dashboard;
 import de.civitascore.portal.model.entity.DashboardSource;
@@ -31,6 +33,10 @@ import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DashboardSourceRepository;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -48,28 +54,53 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataSetService Tests")
 class DataSetServiceTest {
 
   @Mock private DataSetRepository dataSetRepository;
+  @Mock private DataSinkRepository dataSinkRepository;
   @Mock private DataSetMapper dataSetMapper;
   @Mock private DataPoolRepository dataPoolRepository;
   @Mock private AssignmentFactory assignmentFactory;
   @Mock private DataSetSagaPublisher sagaPublisher;
   @Mock private DashboardRepository dashboardRepository;
   @Mock private DashboardSourceRepository dashboardSourceRepository;
+  @Mock private PipelineRuntimeStatusService pipelineRuntimeStatusService;
+  @Mock private ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   private DataSetService createService() {
+    // Default to TENANT wildcard so the F4 target-pool check passes for existing pool-setting
+    // tests;
+    // F4-specific tests override allowedScopesProvider.getObject() after calling createService().
+    lenient().when(allowedScopesProvider.getObject()).thenReturn(wildcardScopes());
     return new DataSetService(
         dataSetRepository,
+        dataSinkRepository,
         dataSetMapper,
         dataPoolRepository,
         assignmentFactory,
         sagaPublisher,
         dashboardRepository,
-        dashboardSourceRepository);
+        dashboardSourceRepository,
+        pipelineRuntimeStatusService,
+        allowedScopesProvider,
+        new DataSourceDatapoolScopeValidator());
+  }
+
+  private static AllowedScopes wildcardScopes() {
+    AllowedScopes scopes = new AllowedScopes();
+    scopes.setWildcard();
+    return scopes;
+  }
+
+  private static AllowedScopes poolScopes(UUID... poolIds) {
+    AllowedScopes scopes = new AllowedScopes();
+    scopes.setPoolIds(Set.of(poolIds));
+    return scopes;
   }
 
   private DataSet readyDataSet(UUID id) {
@@ -89,6 +120,7 @@ class DataSetServiceTest {
     DataSet ds = readyDataSet(id);
     ds.setDataSetStatus(DataSetStatus.AVAILABLE);
     ds.setProjectId("proj-1");
+    ds.setFrostBaseUrl("https://frost.example.com/Projects(1)");
     ds.getNamedApis().forEach(api -> api.setRouteId("route-1"));
     ds.setServiceId("svc-1");
     ds.setPublicUrl("https://example.com");
@@ -119,7 +151,7 @@ class DataSetServiceTest {
       p.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(p);
 
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSet result = createService().stage(id);
@@ -133,7 +165,7 @@ class DataSetServiceTest {
       DataSet ds = draftDataSet(id);
       ds.getPipelines().add(new Pipeline());
 
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
@@ -146,7 +178,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
 
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
@@ -164,7 +196,7 @@ class DataSetServiceTest {
       api.setStandard(ApiStandard.STA);
       ds.setNamedApis(new HashSet<>(Set.of(api)));
 
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSet result = createService().stage(id);
@@ -178,6 +210,64 @@ class DataSetServiceTest {
       p.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(p);
       return ds;
+    }
+  }
+
+  @Nested
+  @DisplayName("unstage()")
+  class UnstageTests {
+
+    @Test
+    @DisplayName("throws when dataset not in READY status")
+    void throwsWhenNotReady() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().unstage(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("READY");
+    }
+
+    @Test
+    @DisplayName("throws ResourceInUseException when a CREATE saga is in-flight")
+    void throwsWhenCreateSagaInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().unstage(id))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight");
+    }
+
+    @Test
+    @DisplayName("allows unstage while an UNRELEASE saga is in-flight (AVAILABLE -> DRAFT chain)")
+    void allowsUnstageWhileUnreleaseInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UNRELEASE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet result = createService().unstage(id);
+
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+      assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.UNRELEASE);
+    }
+
+    @Test
+    @DisplayName("reverts status to DRAFT")
+    void revertsToDraft() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet result = createService().unstage(id);
+
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
     }
   }
 
@@ -208,6 +298,19 @@ class DataSetServiceTest {
     }
 
     @Test
+    @DisplayName("throws ResourceInUseException when a saga is in-flight")
+    void throwsWhenSagaInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight");
+    }
+
+    @Test
     @DisplayName("sets status to AVAILABLE, pendingSagaType to CREATE, publishes trigger")
     void setsStatusAndPublishesTrigger() {
       UUID id = UUID.randomUUID();
@@ -221,6 +324,113 @@ class DataSetServiceTest {
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
       assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.CREATE);
       verify(sagaPublisher).publishCreateRequested(result);
+    }
+  }
+
+  @Nested
+  @DisplayName("datapool scope re-validation (backstop)")
+  class DatapoolScopeRevalidationTests {
+
+    private DataPool pool(UUID id) {
+      DataPool p = new DataPool();
+      p.setId(id);
+      return p;
+    }
+
+    private DataSource dataSource(UUID id, DatapoolScopeType scopeType, DataPool... scopedPools) {
+      DataSource ds = new DataSource();
+      ds.setId(id);
+      ds.setDatapoolScopeType(scopeType);
+      ds.setScopedDataPools(new HashSet<>(Set.of(scopedPools)));
+      return ds;
+    }
+
+    private void addPipelineWithSource(DataSet dataSet, DataSource source) {
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(Set.of(source)));
+      dataSet.getPipelines().add(p);
+    }
+
+    @Test
+    @DisplayName(
+        "release rejects when a pipeline datasource is out of scope for the dataset's pool")
+    void releaseRejectsOutOfScopeDataSource() {
+      UUID id = UUID.randomUUID();
+      DataPool poolB = pool(UUID.randomUUID());
+      DataSet ds = readyDataSet(id);
+      ds.setDataPool(poolB);
+      // SPECIFIC-scoped to a DIFFERENT pool than the dataset now sits in.
+      UUID offendingId = UUID.randomUUID();
+      addPipelineWithSource(
+          ds, dataSource(offendingId, DatapoolScopeType.SPECIFIC, pool(UUID.randomUUID())));
+
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(offendingId));
+      verify(sagaPublisher, never()).publishCreateRequested(any());
+    }
+
+    @Test
+    @DisplayName("release passes when the pipeline datasource is in scope for the dataset's pool")
+    void releasePassesInScopeDataSource() {
+      UUID id = UUID.randomUUID();
+      DataPool poolB = pool(UUID.randomUUID());
+      DataSet ds = readyDataSet(id);
+      ds.setDataPool(poolB);
+      addPipelineWithSource(ds, dataSource(UUID.randomUUID(), DatapoolScopeType.SPECIFIC, poolB));
+
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet result = createService().release(id);
+
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
+      verify(sagaPublisher).publishCreateRequested(result);
+    }
+
+    @Test
+    @DisplayName("stage rejects when a pipeline datasource is out of scope for the dataset's pool")
+    void stageRejectsOutOfScopeDataSource() {
+      UUID id = UUID.randomUUID();
+      DataPool poolB = pool(UUID.randomUUID());
+      DataSet ds = draftDataSet(id);
+      ds.setName("name");
+      ds.setDescription("desc");
+      ds.setDataPool(poolB);
+      UUID offendingId = UUID.randomUUID();
+      addPipelineWithSource(
+          ds, dataSource(offendingId, DatapoolScopeType.SPECIFIC, pool(UUID.randomUUID())));
+
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().stage(id))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(offendingId));
+    }
+
+    @Test
+    @DisplayName("release rejects a pool-less dataset carrying a SPECIFIC-scoped datasource")
+    void releaseRejectsSpecificSourceInPoolLessDataset() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataPool(null);
+      UUID offendingId = UUID.randomUUID();
+      addPipelineWithSource(
+          ds, dataSource(offendingId, DatapoolScopeType.SPECIFIC, pool(UUID.randomUUID())));
+
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(DataSourceScopeViolationException.class);
+      verify(sagaPublisher, never()).publishCreateRequested(any());
     }
   }
 
@@ -254,8 +464,9 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("sets pendingSagaType to DELETE and publishes trigger")
-    void setsPendingDeleteAndPublishes() {
+    @DisplayName(
+        "optimistically sets status to READY, pendingSagaType to UNRELEASE, publishes trigger")
+    void setsReadyAndPendingUnreleaseAndPublishes() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
@@ -264,8 +475,13 @@ class DataSetServiceTest {
       DataSetService service = createService();
       DataSet result = service.unrelease(id);
 
-      assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
-      verify(sagaPublisher).publishDeleteRequested(result);
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+      assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.UNRELEASE);
+      // Infrastructure fields must survive unrelease so the teardown payload carries the resource
+      // IDs; the completion callback clears route/pipeline, not unrelease.
+      assertThat(result.getProjectId()).isEqualTo("proj-1");
+      assertThat(result.getServiceId()).isEqualTo("svc-1");
+      verify(sagaPublisher).publishUnreleaseRequested(result);
     }
   }
 
@@ -342,6 +558,43 @@ class DataSetServiceTest {
 
       DataSet result = createService().updateReleasedMeta(id, input);
       assertThat(result).isNotNull();
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+
+    @Test
+    @DisplayName("rejects a released-dataset pool switch to a pool a pipeline datasource is not in")
+    void rejectsReleasedPoolSwitchWithOutOfScopeDataSource() {
+      UUID id = UUID.randomUUID();
+      UUID poolAId = UUID.randomUUID();
+      UUID poolBId = UUID.randomUUID();
+      DataPool poolA = new DataPool();
+      poolA.setId(poolAId);
+      DataPool poolB = new DataPool();
+      poolB.setId(poolBId);
+
+      DataSet ds = readyDataSet(id);
+      ds.setDataPool(poolA);
+      UUID offendingId = UUID.randomUUID();
+      DataSource specificToA = new DataSource();
+      specificToA.setId(offendingId);
+      specificToA.setDatapoolScopeType(DatapoolScopeType.SPECIFIC);
+      specificToA.setScopedDataPools(new HashSet<>(Set.of(poolA)));
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(Set.of(specificToA)));
+      ds.getPipelines().add(p);
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataPoolRepository.findById(poolBId)).thenReturn(Optional.of(poolB));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setDatapoolId(poolBId);
+
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(offendingId));
       verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
     }
 
@@ -476,6 +729,162 @@ class DataSetServiceTest {
       assertThat(persisted.getPublicUrl()).isEqualTo("https://public.example.com");
       assertThat(persisted.getPipelineIds()).containsExactly("pipe-1");
       assertThat(persisted.getPendingSagaType()).isNull();
+      assertThat(persisted.isProvisioned()).isTrue();
+    }
+
+    @Test
+    @DisplayName("UPDATE: a completion that yields a project id marks the dataset provisioned")
+    void updateMarksProvisionedWhenSinkExists() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().isProvisioned()).isTrue();
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+
+    private Pipeline attachedPipeline(DataSet ds, UUID pipelineId) {
+      Pipeline pipeline = new Pipeline();
+      pipeline.setId(pipelineId);
+      ds.getPipelines().add(pipeline);
+      return pipeline;
+    }
+
+    @Test
+    @DisplayName("CREATE: marks the deployed pipelines as successfully deployed")
+    void createMarksPipelinesDeployed() {
+      UUID id = UUID.randomUUID();
+      UUID firstPipeline = UUID.randomUUID();
+      UUID secondPipeline = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      attachedPipeline(ds, firstPipeline);
+      attachedPipeline(ds, secondPipeline);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1"),
+              "svc-1",
+              "https://public.example.com",
+              List.of(firstPipeline.toString(), secondPipeline.toString()),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      ArgumentCaptor<List<String>> marked = ArgumentCaptor.captor();
+      verify(pipelineRuntimeStatusService).markDeploymentSucceeded(marked.capture());
+      assertThat(marked.getValue())
+          .containsExactlyInAnyOrder(firstPipeline.toString(), secondPipeline.toString());
+    }
+
+    @Test
+    @DisplayName("UPDATE: marks the deployed pipelines as successfully deployed")
+    void updateMarksPipelinesDeployed() {
+      UUID id = UUID.randomUUID();
+      UUID pipelineId = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      attachedPipeline(ds, pipelineId);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1"),
+              "svc-1",
+              "https://public.example.com",
+              List.of(pipelineId.toString()),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      verify(pipelineRuntimeStatusService).markDeploymentSucceeded(List.of(pipelineId.toString()));
+    }
+
+    @Test
+    @DisplayName("UPDATE: a pipeline the same saga tore down is not marked as deployed")
+    void updateDoesNotMarkTornDownPipelines() {
+      UUID id = UUID.randomUUID();
+      UUID keptPipeline = UUID.randomUUID();
+      UUID removedPipeline = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      // Only the kept pipeline is still attached; the removed one was detached before the saga ran.
+      attachedPipeline(ds, keptPipeline);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      // The adapter reports every id it processed, including the one it deleted.
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1"),
+              "svc-1",
+              "https://public.example.com",
+              List.of(keptPipeline.toString(), removedPipeline.toString()),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      verify(pipelineRuntimeStatusService)
+          .markDeploymentSucceeded(List.of(keptPipeline.toString()));
+    }
+
+    @Test
+    @DisplayName("UNRELEASE: torn-down pipelines are not marked as deployed")
+    void unreleaseDoesNotMarkPipelinesDeployed() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UNRELEASE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(), null, null, null, null, null, List.of("pipe-1"), null, null, null);
+
+      createService().handleSagaCompleted(id, result);
+
+      verify(pipelineRuntimeStatusService, never()).markDeploymentSucceeded(any());
     }
 
     @Test
@@ -515,6 +924,7 @@ class DataSetServiceTest {
               List.of(
                   new SagaResultPayload.DashboardSourceResult(
                       "src-keep", "trino.civitas.traffic", id.toString())),
+              null,
               null,
               null,
               null,
@@ -571,6 +981,7 @@ class DataSetServiceTest {
               null,
               null,
               null,
+              null,
               null);
 
       createService().handleSagaCompleted(id, result);
@@ -612,6 +1023,7 @@ class DataSetServiceTest {
               null,
               null,
               null,
+              null,
               null);
 
       // The bad id is logged as drift and skipped; the handler must not throw and must clear
@@ -645,6 +1057,7 @@ class DataSetServiceTest {
               null,
               null,
               List.of(new SagaResultPayload.DashboardResult(unknownId.toString(), "engine-9")),
+              null,
               null,
               null,
               null,
@@ -897,11 +1310,13 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("DELETE: clears infrastructure fields and reverts to READY")
-    void deleteClearsAndReverts() {
+    @DisplayName("UNRELEASE: clears only route/pipeline fields, keeps the sink, stays READY")
+    void unreleaseClearsRouteAndPipelineKeepsSink() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
-      ds.setPendingSagaType(PendingSagaType.DELETE);
+      // unrelease set READY optimistically before the saga ran.
+      ds.setDataSetStatus(DataSetStatus.READY);
+      ds.setPendingSagaType(PendingSagaType.UNRELEASE);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -916,11 +1331,77 @@ class DataSetServiceTest {
       DataSet persisted = saved.getValue();
       assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
       assertThat(persisted.getPendingSagaType()).isNull();
-      assertThat(persisted.getProjectId()).isNull();
-      assertThat(persisted.getServiceId()).isNull();
-      assertThat(persisted.getPublicUrl()).isNull();
+      // Route/consumer-access layer torn down (routes/upstream deleted by DELETE_ROUTE).
       assertThat(persisted.getPipelineIds()).isNull();
       assertThat(persisted.getNamedApis()).allMatch(api -> api.getRouteId() == null);
+      assertThat(persisted.getServiceId()).isNull();
+      assertThat(persisted.getPublicUrl()).isNull();
+      // Data-holding sink references survive so a re-release reuses the existing data.
+      assertThat(persisted.getProjectId()).isEqualTo("proj-1");
+      assertThat(persisted.getFrostBaseUrl()).isEqualTo("https://frost.example.com/Projects(1)");
+      verify(dataSetRepository, never()).delete(any(DataSet.class));
+    }
+
+    @Test
+    @DisplayName("UNRELEASE: leaves a user-moved DRAFT status untouched")
+    void unreleaseLeavesDraftUntouched() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      // AVAILABLE -> DRAFT chain moved the dataset on to DRAFT while the teardown was running.
+      ds.setDataSetStatus(DataSetStatus.DRAFT);
+      ds.setPendingSagaType(PendingSagaType.UNRELEASE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService()
+          .handleSagaCompleted(
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("DELETE: removes the entity after teardown, without a status save")
+    void deleteRemovesEntity() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      createService()
+          .handleSagaCompleted(
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
+
+      verify(dataSetRepository).delete(ds);
+      verify(dataSetRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CREATE: marks the dataset provisioned")
+    void createMarksProvisioned() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      ds.setProvisioned(false);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService()
+          .handleSagaCompleted(
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().isProvisioned()).isTrue();
     }
 
     @Test
@@ -960,6 +1441,91 @@ class DataSetServiceTest {
       verify(dataSetRepository).save(saved.capture());
       assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.READY);
       assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("UNRELEASE failure: reverts optimistic READY to AVAILABLE, pending cleared")
+    void unreleaseFailureRevertsToAvailable() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.READY);
+      ds.setPendingSagaType(PendingSagaType.UNRELEASE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaFailed(id, "delete-route", "APISIX down", false);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      // A failed teardown must NOT stay READY — live routes may remain, so undo the optimistic set.
+      assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("UNRELEASE failure: leaves a user-moved DRAFT status untouched")
+    void unreleaseFailureLeavesDraftUntouched() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.DRAFT);
+      ds.setPendingSagaType(PendingSagaType.UNRELEASE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaFailed(id, "delete-route", "APISIX down", false);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("DELETE failure: stays AVAILABLE, pending cleared, entity kept")
+    void deleteFailureStaysAvailable() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaFailed(id, "deprovision-sink", "PostGIS down", false);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
+      verify(dataSetRepository, never()).delete(any(DataSet.class));
+    }
+
+    @Test
+    @DisplayName("UPDATE failure: stays AVAILABLE, pending cleared")
+    void updateFailureStaysAvailable() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaFailed(id, "update-route", "APISIX timeout", false);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
+      assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("no pending saga: skips save (duplicate delivery)")
+    void noPendingSagaSkipsSave() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(null);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      createService().handleSagaFailed(id, "any", "any", false);
+
+      verify(dataSetRepository, never()).save(any());
     }
   }
 
@@ -1005,6 +1571,28 @@ class DataSetServiceTest {
     }
 
     @Test
+    @DisplayName("create rejects a target datapool the caller is not authorized for (F4)")
+    void createRejectsUnauthorizedTargetPool() {
+      UUID poolId = UUID.randomUUID();
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("ds");
+      input.setDatapoolId(poolId);
+
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+
+      DataSetService service = createService();
+      when(dataSetMapper.toEntity(any())).thenReturn(entity);
+      when(dataPoolRepository.findById(poolId)).thenReturn(Optional.of(pool));
+      // Caller is authorized only for a DIFFERENT pool → the target pool is off-limits.
+      when(allowedScopesProvider.getObject()).thenReturn(poolScopes(UUID.randomUUID()));
+
+      assertThatThrownBy(() -> service.create(input)).isInstanceOf(AccessDeniedException.class);
+      verify(dataSetRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName(
         "create with null datapoolId creates dataset without pool (datapoolId is optional)")
     void createWithNullDatapoolIdLeavesDataPoolNull() {
@@ -1021,8 +1609,8 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("update with null datapoolId unassigns the DataPool from the entity")
-    void updateWithNullDatapoolIdUnassignsDataPool() {
+    @DisplayName("update with an omitted datapoolId leaves the DataPool untouched")
+    void updateWithOmittedDatapoolIdKeepsDataPool() {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       DataPool existingPool = new DataPool();
@@ -1036,8 +1624,153 @@ class DataSetServiceTest {
       input.setName("updated name");
 
       DataSet result = createService().update(id, input);
+      assertThat(result.getDataPool()).isSameAs(existingPool);
+      verify(dataPoolRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("update with an explicit null datapoolId unassigns the DataPool")
+    void updateWithExplicitNullDatapoolIdUnassignsDataPool() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSet(id);
+      DataPool existingPool = new DataPool();
+      existingPool.setId(UUID.randomUUID());
+      ds.setDataPool(existingPool);
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+      input.setDatapoolId(null);
+
+      DataSet result = createService().update(id, input);
       assertThat(result.getDataPool()).isNull();
       verify(dataPoolRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("a rename-only update does not trip the scope guard on a pooled dataset")
+    void renameOnlyUpdateKeepsPoolAndPassesScopeGuard() {
+      UUID id = UUID.randomUUID();
+      UUID poolId = UUID.randomUUID();
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+
+      DataSet entity = draftDataSet(id);
+      entity.setDataPool(pool);
+
+      DataSource specificToPool = new DataSource();
+      specificToPool.setId(UUID.randomUUID());
+      specificToPool.setDatapoolScopeType(DatapoolScopeType.SPECIFIC);
+      specificToPool.setScopedDataPools(new HashSet<>(Set.of(pool)));
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSources(new HashSet<>(Set.of(specificToPool)));
+      entity.setPipelines(new HashSet<>(Set.of(pipeline)));
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      // No datapoolId in the body: the pool must survive, so the SPECIFIC source stays in scope
+      // instead of being validated against a pool-less dataset.
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("renamed");
+
+      DataSet result = createService().update(id, input);
+      assertThat(result.getDataPool()).isSameAs(pool);
+    }
+
+    @Test
+    @DisplayName(
+        "switching a dataset to a pool its pipeline's SPECIFIC datasource is not scoped for is"
+            + " rejected")
+    void poolSwitchRejectsOutOfScopePipelineDataSource() {
+      UUID poolAId = UUID.randomUUID();
+      UUID poolBId = UUID.randomUUID();
+      DataPool poolA = new DataPool();
+      poolA.setId(poolAId);
+      DataPool poolB = new DataPool();
+      poolB.setId(poolBId);
+
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      entity.setDataPool(poolA);
+      UUID offendingId = UUID.randomUUID();
+      DataSource specificToA = new DataSource();
+      specificToA.setId(offendingId);
+      specificToA.setDatapoolScopeType(DatapoolScopeType.SPECIFIC);
+      specificToA.setScopedDataPools(new HashSet<>(Set.of(poolA)));
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(Set.of(specificToA)));
+      entity.getPipelines().add(p);
+
+      when(dataPoolRepository.findById(poolBId)).thenReturn(Optional.of(poolB));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setDatapoolId(poolBId);
+
+      assertThatThrownBy(() -> createService().postConvertToEntity(entity, input))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(offendingId));
+    }
+
+    @Test
+    @DisplayName("switching pool leaves an ALL-scoped pipeline datasource accepted")
+    void poolSwitchAcceptsAllScopedPipelineDataSource() {
+      UUID poolAId = UUID.randomUUID();
+      UUID poolBId = UUID.randomUUID();
+      DataPool poolA = new DataPool();
+      poolA.setId(poolAId);
+      DataPool poolB = new DataPool();
+      poolB.setId(poolBId);
+
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      entity.setDataPool(poolA);
+      DataSource allScoped = new DataSource();
+      allScoped.setId(UUID.randomUUID());
+      allScoped.setDatapoolScopeType(DatapoolScopeType.ALL);
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(Set.of(allScoped)));
+      entity.getPipelines().add(p);
+
+      when(dataPoolRepository.findById(poolBId)).thenReturn(Optional.of(poolB));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setDatapoolId(poolBId);
+
+      DataSet result = createService().postConvertToEntity(entity, input);
+      assertThat(result.getDataPool()).isSameAs(poolB);
+    }
+
+    @Test
+    @DisplayName("an update that leaves the pool unchanged accepts an in-scope bound datasource")
+    void poolUnchangedAcceptsInScopeBoundDataSource() {
+      UUID poolId = UUID.randomUUID();
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      entity.setDataPool(pool);
+      DataSource specificToPool = new DataSource();
+      specificToPool.setId(UUID.randomUUID());
+      specificToPool.setDatapoolScopeType(DatapoolScopeType.SPECIFIC);
+      specificToPool.setScopedDataPools(new HashSet<>(Set.of(pool)));
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(Set.of(specificToPool)));
+      entity.getPipelines().add(p);
+
+      when(dataPoolRepository.findById(poolId)).thenReturn(Optional.of(pool));
+
+      // A PATCH re-sends the existing datapoolId (no pool change); the re-validation must accept
+      // the
+      // still-in-scope bound datasource rather than reject a legitimate metadata edit.
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setDatapoolId(poolId);
+
+      DataSet result = createService().postConvertToEntity(entity, input);
+      assertThat(result.getDataPool()).isSameAs(pool);
     }
   }
 }

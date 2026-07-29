@@ -1,4 +1,4 @@
-import { Circle, CircleCheckBig } from 'lucide-react'
+import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { UseFormReturn } from 'react-hook-form'
@@ -47,10 +47,14 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
   return (
     <>
       <div className={cn('max-w-300 flex gap-2 pt-2')}>
-        {nameValue ? <CircleCheckBig /> : <Circle />}
+        {nameValue ? (
+          <CircleCheckBig className="w-6 h-6 text-green-600" />
+        ) : (
+          <CircleDashed className="w-6 h-6 text-muted-foreground" />
+        )}
         <div className={cn('w-full flex flex-col')}>
           <DetailsFieldContainer className="pt-0">
-            <SubHeader title={t('overview.info.title')} titleClassName="text-2xl leading-none font-bold" />
+            <SubHeader title={t('overview.info.title')} titleClassName="text-xl leading-none font-semibold" />
           </DetailsFieldContainer>
           {isLoading ? (
             <LoadingSpinner className="h-[364px]" />

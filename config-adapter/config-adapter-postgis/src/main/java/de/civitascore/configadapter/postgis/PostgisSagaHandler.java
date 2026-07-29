@@ -15,6 +15,8 @@ import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
+import de.civitascore.configadapter.model.dataset.DataStructureSchema;
+import de.civitascore.configadapter.model.dataset.WorkspaceNames;
 import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.DbRoleConfig;
 import de.civitascore.configadapter.model.postgis.GeometryColumnConfig;
@@ -31,6 +33,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,9 +42,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Saga command handler for PostGIS, mirroring the FROST / APISIX / RedPanda handlers but executing
- * DDL over JDBC instead of HTTP. Discovered via {@link java.util.ServiceLoader} and registered in
- * the saga orchestrator's handler registry.
+ * Saga command handler for PostGIS, mirroring the FROST / APISIX / NiFi handlers but executing DDL
+ * over JDBC instead of HTTP. Discovered via {@link java.util.ServiceLoader} and registered in the
+ * saga orchestrator's handler registry.
  *
  * <p>Two families of operations:
  *
@@ -62,26 +65,35 @@ import org.slf4j.LoggerFactory;
  * <pre>{@code
  * { "type": "POSTGIS",
  *   "configuration": {
- *     "schema": "ds_42",                 // optional; created (idempotent) if present
- *     "owner": "ds_42_admin",            // optional schema owner
  *     "tableName": "sensor_readings",    // required; the table GeoServer reads
  *     "columns": [ {name,type,...} ],    // optional explicit override (see below)
  *     "geometryColumns": [ {name,geometryType,srid,...} ],
- *     "primaryKey": ["id"],
+ *     "primaryKey": ["id"],              // optional override (non-empty); else derived from schema
  *     "indexes": [ {...} ],
  *     "readRole": { "name":"ds_42_geo", "canLogin":true,
  *                   "password":"ENC(...)", "privileges":["USAGE"] } },  // optional GeoServer role
  *   "dataStructure": { ... } }           // resolved JSON Schema from Model Atlas
  * }</pre>
  *
+ * <p>The schema is not part of {@code configuration}: it is derived from the trigger's {@code
+ * datasetId} (see below).
+ *
  * <p>Columns come from explicit {@code configuration.columns} when present, otherwise derived from
  * {@code dataStructure} via {@link DataStructureTableMapper}; at least one column or geometry
- * column must result for provisioning (deprovisioning needs only the identifiers).
+ * column must result for provisioning (deprovisioning needs only the identifiers). The primary key
+ * comes from explicit {@code configuration.primaryKey} when present, otherwise from the {@code
+ * x-core-primaryKey} markers in {@code dataStructure}.
  *
- * <p>{@code PROVISION_SINK} creates schema (if given), table, and read role + grants for each sink
- * in one transaction; {@code DEPROVISION_SINK} drops the table and role (schemas are left, as they
- * may be shared). Both re-derive their targets from {@code datasinks}, so the
- * compensation/forward-delete paths are symmetric.
+ * <p>The per-DataSet schema name is derived from the trigger's {@code datasetId} via {@link
+ * de.civitascore.configadapter.model.dataset.WorkspaceNames#fromDatasetId} — the same rule the
+ * GeoServer workspace uses, so the table lands in the schema GeoServer reads from. A provision
+ * without a {@code datasetId} is rejected rather than silently falling back to {@code public}.
+ *
+ * <p>{@code PROVISION_SINK} creates the schema, table, and read role + grants for each sink in one
+ * transaction; {@code DEPROVISION_SINK} drops the table and role, then drops the per-DataSet schema
+ * ({@code RESTRICT} — left in place if still non-empty; never {@code public}). Both re-derive their
+ * targets from {@code datasinks} + {@code datasetId}, so the compensation/forward-delete paths are
+ * symmetric.
  *
  * <p>CREATE/PROVISION are idempotent (duplicate-object SQLStates absorbed); DROP/DEPROVISION are
  * idempotent (missing-object SQLStates absorbed), so steps and compensations are safe to retry.
@@ -96,6 +108,9 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   private static final String ADAPTER_NAME = "postgis";
   private static final String COMPENSATE_TYPE = "COMPENSATE_STEP";
   private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
+
+  /** The shared schema that predates per-DataSet schemas; never dropped on deprovision. */
+  private static final String SHARED_PUBLIC_SCHEMA = "public";
 
   private final ObjectMapper objectMapper =
       new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -221,10 +236,6 @@ public class PostgisSagaHandler implements SagaCommandHandler {
                 .grantSelectOnTable(
                     sink.role().getName(), sink.table().getSchema(), sink.table().getName()));
       }
-      // After role creation: ALTER SCHEMA … OWNER TO requires the owner role to already exist.
-      if (sink.schema() != null) {
-        statements.addAll(dialect().alterSchemaOwner(sink.schema()));
-      }
       provisioned.add(sink.identifiers());
     }
     ddl.runDdl(statements, true, false);
@@ -241,13 +252,30 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       throws SQLException {
     List<SinkSpec> sinks = parseSinks(command, false);
     List<String> statements = new ArrayList<>();
+    Set<String> schemasToDrop = new LinkedHashSet<>();
     for (SinkSpec sink : sinks) {
       if (sink.role() != null) {
         statements.addAll(dialect().dropRole(sink.role()));
       }
       statements.addAll(dialect().dropTable(sink.table().getSchema(), sink.table().getName()));
-      // The schema is intentionally left in place: it may be shared across datasets. The table and
-      // read role are the per-dataset artifacts this step removes.
+      // Collect the per-DataSet schema to drop after its tables (never public or a blank one).
+      SchemaConfig schema = sink.schema();
+      if (schema != null
+          && schema.getName() != null
+          && !schema.getName().isBlank()
+          && !SHARED_PUBLIC_SCHEMA.equalsIgnoreCase(schema.getName())) {
+        schemasToDrop.add(schema.getName());
+      }
+    }
+    // Drop each per-DataSet schema once, after its tables: a DataSet's sinks share one schema, so a
+    // per-sink drop would hit sibling tables. RESTRICT (never CASCADE) means the schema is dropped
+    // only once empty — which it is here, its tables having just been dropped. A schema left
+    // unexpectedly non-empty makes this step fail (the best-effort delete then continues); nothing
+    // is force-dropped.
+    for (String schemaName : schemasToDrop) {
+      SchemaConfig schema = new SchemaConfig();
+      schema.setName(schemaName);
+      statements.addAll(dialect().dropSchema(schema));
     }
     ddl.runDdl(statements, false, true);
 
@@ -379,27 +407,39 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       if (tableName == null || tableName.isBlank()) {
         throw new IllegalArgumentException("POSTGIS data sink is missing configuration.tableName");
       }
-      String schemaName = stringValue(config, "schema");
+      // The per-DataSet schema is always derived from the trigger's datasetId (same WorkspaceNames
+      // rule the GeoServer workspace uses), so PostGIS, GeoServer and NiFi all agree on one name.
+      // A dataset provision must never silently fall back to the shared public schema, so fail fast
+      // when no datasetId is present (an anomaly — PROVISION_SINK is a dataset-saga-only
+      // operation).
+      String schemaName = datasetSchemaName(command);
+      if (requireColumns && (schemaName == null || schemaName.isBlank())) {
+        throw new IllegalArgumentException(
+            "POSTGIS data sink '"
+                + tableName
+                + "' cannot derive a per-DataSet schema: the trigger carries no datasetId");
+      }
 
       SchemaConfig schema = null;
       if (schemaName != null && !schemaName.isBlank()) {
         schema = new SchemaConfig();
         schema.setName(schemaName);
-        schema.setOwner(stringValue(config, "owner"));
       }
 
       List<GeometryColumnConfig> geometryColumns =
           convertList(config.get("geometryColumns"), GeometryColumnConfig.class);
       List<ColumnConfig> columns = convertList(config.get("columns"), ColumnConfig.class);
-      if (requireColumns
-          && columns.isEmpty()
-          && sink.get("dataStructure") instanceof Map<?, ?> model) {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> dataStructure =
+          sink.get("dataStructure") instanceof Map<?, ?> model ? (Map<String, Object>) model : null;
+      // The primary key only matters when the table is created (PROVISION). For DEPROVISION
+      // (requireColumns=false) columns are intentionally not derived, so deriving/validating a PK
+      // there would wrongly fail — the table is being dropped, not built.
+      if (requireColumns && columns.isEmpty() && dataStructure != null) {
         Set<String> geometryNames = new HashSet<>();
         for (GeometryColumnConfig geometry : geometryColumns) {
           geometryNames.add(geometry.name());
         }
-        @SuppressWarnings("unchecked")
-        Map<String, Object> dataStructure = (Map<String, Object>) model;
         DataStructureTableMapper.TableColumns derived =
             DataStructureTableMapper.deriveColumns(dataStructure, geometryNames);
         columns = derived.columns();
@@ -409,12 +449,40 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         }
       }
 
+      // Explicit configuration wins; otherwise the schema's x-core-primaryKey marker via the shared
+      // resolver — the same "explicit wins, else marker" rule the NiFi adapter uses, so the table
+      // PRIMARY KEY and the NiFi UPSERT keys cannot diverge.
+      List<String> primaryKey =
+          requireColumns
+              ? DataStructureSchema.resolvePrimaryKey(config.get("primaryKey"), dataStructure)
+              : List.of();
+      // The primary key must reference actual table columns; otherwise the emitted PRIMARY KEY(...)
+      // would name a missing column and provisioning fails with broken DDL. This can happen when
+      // columns are configured explicitly but a primary-key column (marked or explicit) is omitted
+      // —
+      // including a partial composite key, which would also silently tighten the table's
+      // uniqueness.
+      if (!primaryKey.isEmpty()) {
+        Set<String> columnNames = new HashSet<>();
+        columns.forEach(column -> columnNames.add(column.name()));
+        geometryColumns.forEach(geometry -> columnNames.add(geometry.name()));
+        List<String> missingKeyColumns =
+            primaryKey.stream().filter(key -> !columnNames.contains(key)).toList();
+        if (!missingKeyColumns.isEmpty()) {
+          throw new IllegalArgumentException(
+              "POSTGIS data sink '"
+                  + tableName
+                  + "' primary key references column(s) not present in the table: "
+                  + missingKeyColumns);
+        }
+      }
+
       TableConfig table = new TableConfig();
       table.setSchema(schemaName);
       table.setName(tableName);
       table.setColumns(columns);
       table.setGeometryColumns(geometryColumns);
-      table.setPrimaryKey(stringList(config.get("primaryKey")));
+      table.setPrimaryKey(primaryKey);
       table.setIndexes(convertList(config.get("indexes"), IndexConfig.class));
       if (requireColumns && table.getColumns().isEmpty() && table.getGeometryColumns().isEmpty()) {
         throw new IllegalArgumentException(
@@ -472,20 +540,22 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   }
 
   @SuppressWarnings("unchecked")
-  private static List<String> stringList(Object raw) {
-    return raw instanceof List<?> list ? (List<String>) list : null;
-  }
-
-  @SuppressWarnings("unchecked")
   private static List<Map<String, Object>> mapList(Map<String, Object> payload, String key) {
-    if (!(payload.get(key) instanceof List<?> list)) {
+    Object raw = payload.get(key);
+    if (raw == null) {
       return List.of();
     }
-    List<Map<String, Object>> result = new ArrayList<>();
+    if (!(raw instanceof List<?> list)) {
+      throw new IllegalArgumentException(key + " must be a list");
+    }
+    List<Map<String, Object>> result = new ArrayList<>(list.size());
     for (Object item : list) {
-      if (item instanceof Map<?, ?> map) {
-        result.add((Map<String, Object>) map);
+      // Reject a non-map entry rather than silently dropping it: a malformed entry must fail the
+      // whole command, not yield a partial provision the saga still reports as success.
+      if (!(item instanceof Map<?, ?> map)) {
+        throw new IllegalArgumentException(key + " entries must be objects");
       }
+      result.add((Map<String, Object>) map);
     }
     return result;
   }
@@ -497,6 +567,19 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   private static String stringValue(Map<String, Object> map, String key) {
     return map.get(key) instanceof String s ? s : null;
+  }
+
+  /**
+   * The dedicated per-DataSet schema, derived from the trigger's {@code datasetId} via the shared
+   * {@link WorkspaceNames#fromDatasetId} rule — the same derivation the GeoServer workspace uses,
+   * so the sink table lands in the schema GeoServer reads from. Returns {@code null} when the
+   * payload carries no {@code datasetId} (e.g. a non-dataset caller), leaving the table
+   * unqualified.
+   */
+  private static String datasetSchemaName(SagaCommandMessage command) {
+    return command.payload().get("datasetId") instanceof String datasetId && !datasetId.isBlank()
+        ? WorkspaceNames.fromDatasetId(datasetId)
+        : null;
   }
 
   /** A payload boolean; absent or non-{@code Boolean} → false. */

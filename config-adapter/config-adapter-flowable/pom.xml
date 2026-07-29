@@ -13,7 +13,7 @@
 	<packaging>jar</packaging>
 
 	<name>Config Adapter Flowable Orchestrator</name>
-	<description>Flowable-based saga orchestrator for multi-adapter provisioning workflows. Provides both BPMN XML and Java-coded workflow definitions for comparison.</description>
+	<description>Flowable-based saga orchestrator for multi-adapter provisioning workflows. Saga workflows are defined as BPMN 2.0 process definitions.</description>
 
 	<dependencies>
 		<!-- Internal -->
@@ -21,6 +21,13 @@
 			<groupId>de.civitas-core</groupId>
 			<artifactId>config-adapter-api</artifactId>
 			<version>${revision}</version>
+		</dependency>
+		<dependency>
+			<groupId>de.civitas-core</groupId>
+			<artifactId>config-adapter-api</artifactId>
+			<version>${project.version}</version>
+			<type>test-jar</type>
+			<scope>test</scope>
 		</dependency>
 
 		<!-- Flowable BPMN Engine -->
@@ -148,18 +155,6 @@
 
 	<build>
 		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-failsafe-plugin</artifactId>
-				<executions>
-					<execution>
-						<goals>
-							<goal>integration-test</goal>
-							<goal>verify</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
 			<plugin>
 				<groupId>com.github.spotbugs</groupId>
 				<artifactId>spotbugs-maven-plugin</artifactId>

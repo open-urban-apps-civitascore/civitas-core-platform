@@ -165,16 +165,16 @@ export const sessionReducer = (state: PipelineSessionState, action: PipelineSess
 
       return {
         ...state,
-        sessions: state.sessions.map(session =>
-          session.id === sessionId
-            ? {
-                ...session,
-                pipeline,
-                isDirty: true,
-                lastModified: new Date(),
-              }
-            : session,
-        ),
+        sessions: state.sessions.map(session => {
+          if (session.id !== sessionId) return session
+          const nextPipeline = typeof pipeline === 'function' ? pipeline(session.pipeline) : pipeline
+          return {
+            ...session,
+            pipeline: nextPipeline,
+            isDirty: true,
+            lastModified: new Date(),
+          }
+        }),
       }
     }
 

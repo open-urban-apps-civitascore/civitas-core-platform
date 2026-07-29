@@ -38,7 +38,8 @@ class BpmnSchemaValidationTest {
       strings = {
         "/processes/dataset-create.bpmn",
         "/processes/dataset-update.bpmn",
-        "/processes/dataset-delete.bpmn"
+        "/processes/dataset-delete.bpmn",
+        "/processes/dataset-unrelease.bpmn"
       })
   void validatesAgainstOmgBpmn20Schema(String resource) throws Exception {
     URL xsdUrl = getClass().getResource(BPMN20_XSD);

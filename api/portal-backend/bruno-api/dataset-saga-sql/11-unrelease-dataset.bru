@@ -1,0 +1,44 @@
+meta {
+  name: 11. Unrelease DataSet (triggers unrelease saga, sink preserved)
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sqlDataSetId}}
+}
+
+tests {
+  test("Unreleased", function() {
+    const status = res.getStatus();
+    // 202=unrelease saga triggered
+    expect(status).to.equal(202);
+  });
+}
+
+docs {
+  **SQL saga step 11** — Trigger the DATASET_UNRELEASE saga (sink-preserving teardown).
+
+  Transitions the dataset from `AVAILABLE` back to `READY` and triggers the **DATASET_UNRELEASE** saga asynchronously. The saga tears down only the consumer/ingest layer — it undeploys the NiFi flow and removes the APISIX route + upstream. The data-holding sink is **preserved**: the PostGIS table stays intact, so a later re-release reuses it without data loss. The full sink teardown runs only via the delete endpoint.
+
+  **Precondition:** `sqlDataSetId` is set; dataset is in `AVAILABLE` state.
+
+  **Expected Response:** 202 Accepted (saga triggered). 400 if not in `AVAILABLE` state.
+
+  **Kafka Events**
+  - Produces: `de.civitascore.dataset.saga.trigger` (sagaType: `DATASET_UNRELEASE`)
+  - Consumes: `de.civitascore.saga.result` (type: `SAGA_COMPLETED` or `SAGA_FAILED`)
+
+  **System Impact:**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataSet status → `READY`; `pendingSagaType` = `UNRELEASE` until saga completes; `provisioned` stays `true` |
+  | Config Adapter (Orchestrator) | Undeploys NiFi flow + removes APISIX route/upstream; PostGIS table preserved |
+}

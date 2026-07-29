@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import de.civitascore.portal.service.DataSetService;
+import de.civitascore.portal.service.PipelineRuntimeStatusService;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -25,13 +26,15 @@ import tools.jackson.databind.json.JsonMapper;
 class DataSetSagaResultListenerTest {
 
   @Mock private DataSetService dataSetService;
+  @Mock private PipelineRuntimeStatusService pipelineRuntimeStatusService;
 
   private final ObjectMapper objectMapper = new JsonMapper();
   private DataSetSagaResultListener listener;
 
   @BeforeEach
   void setUp() {
-    listener = new DataSetSagaResultListener(dataSetService, objectMapper);
+    listener =
+        new DataSetSagaResultListener(dataSetService, objectMapper, pipelineRuntimeStatusService);
   }
 
   private String completedPayload(UUID datasetId) throws Exception {

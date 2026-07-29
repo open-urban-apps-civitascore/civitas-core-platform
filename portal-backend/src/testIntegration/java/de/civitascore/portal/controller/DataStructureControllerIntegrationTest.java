@@ -8,6 +8,7 @@ import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Group;
@@ -205,7 +206,9 @@ class DataStructureControllerIntegrationTest
               b.version("1.0.0")
                   .description("Version 1 Description")
                   .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
-                  .model(Map.<String, Object>of("$id", "http://modelatlas.example.com/models/1"))
+                  .model(
+                      Map.<String, Object>of(
+                          "$id", "urn:core:platform:civitas:element:common:GeoPoint:1.0.0"))
                   .modelName("Test Model v1")
                   .styles(Map.of("color", "blue", "size", "large")));
 
@@ -215,7 +218,10 @@ class DataStructureControllerIntegrationTest
               b.version("2.0.0")
                   .description("Version 2 Description")
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
-                  .model(Map.<String, Object>of("$id", "http://modelatlas.example.com/models/2"))
+                  .model(
+                      Map.<String, Object>of(
+                          "$id",
+                          "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                   .modelName("Test Model v2")
                   .styles(Map.of("color", "red", "size", "medium")));
 
@@ -369,7 +375,8 @@ class DataStructureControllerIntegrationTest
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
                   .model(
                       Map.<String, Object>of(
-                          "$id", "http://modelatlas.example.com/models/released"))
+                          "$id",
+                          "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                   .modelName("Released Model"));
 
       // Release via API
@@ -449,7 +456,8 @@ class DataStructureControllerIntegrationTest
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
                   .model(
                       Map.<String, Object>of(
-                          "$id", "http://modelatlas.example.com/models/released"))
+                          "$id",
+                          "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                   .modelName("Released Model"));
     }
 
@@ -494,7 +502,9 @@ class DataStructureControllerIntegrationTest
               b.version("1.0.0")
                   .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
                   .model(
-                      Map.<String, Object>of("$id", "http://modelatlas.example.com/models/draft"))
+                      Map.<String, Object>of(
+                          "$id",
+                          "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                   .modelName("Draft Model"));
 
       ResponseEntity<DataStructureOutputDTO> response =
@@ -589,7 +599,8 @@ class DataStructureControllerIntegrationTest
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
                   .model(
                       Map.<String, Object>of(
-                          "$id", "http://modelatlas.example.com/models/released"))
+                          "$id",
+                          "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                   .modelName("Released Model"));
     }
 
@@ -690,7 +701,8 @@ class DataStructureControllerIntegrationTest
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
                   .model(
                       Map.<String, Object>of(
-                          "$id", "http://modelatlas.example.com/models/released"))
+                          "$id",
+                          "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                   .modelName("Released Model"));
     }
 
@@ -969,7 +981,8 @@ class DataStructureControllerIntegrationTest
                       .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
                       .model(
                           Map.<String, Object>of(
-                              "$id", "http://modelatlas.example.com/models/inuse"))
+                              "$id",
+                              "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                       .modelName("InUse Model"));
 
       portalData.dataSource(
@@ -1031,6 +1044,80 @@ class DataStructureControllerIntegrationTest
       assertThat(response.getBody().isInUse())
           .as("inUse should be false when no DataSource references any version")
           .isFalse();
+    }
+
+    /**
+     * Builds a released DataStructure whose version is referenced by a DataSink, not a DataSource.
+     */
+    private UUID createStructureReferencedByDataSink() {
+      DataStructure ds =
+          portalData.dataStructure(
+              b ->
+                  b.name("Sink-Referenced Data Structure")
+                      .description("Data structure with a version referenced by a DataSink")
+                      .dataStructureStatus(DataStructureStatus.AVAILABLE));
+
+      DataStructureVersion version =
+          portalData.dataStructureVersion(
+              ds,
+              b ->
+                  b.version("1.0.0")
+                      .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
+                      .model(Map.of("title", "SinkReferenced"))
+                      .modelName("Sink Referenced Model"));
+
+      DataSet dataSet = portalData.dataSet();
+      portalData.dataSink(
+          dataSet,
+          null,
+          sink ->
+              sink.setConfiguration(Map.of("dataStructureVersionId", version.getId().toString())));
+
+      return ds.getId();
+    }
+
+    @Test
+    @DisplayName("Should return inUse=true in output DTO when a DataSink references a version")
+    void shouldReturnInUseTrueWhenDataSinkReferences() {
+      UUID structureId = createStructureReferencedByDataSink();
+
+      ResponseEntity<DataStructureOutputDTO> response = performGetById(structureId);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().isInUse())
+          .as("inUse should be true when a DataSink references a version")
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("Should return 409 when deleting a data structure referenced by a DataSink")
+    void shouldReturn409WhenDeletingDataSinkReferencedStructure() {
+      UUID structureId = createStructureReferencedByDataSink();
+
+      ResponseEntity<Void> response = performDelete(structureId);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status")
+          .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when unreleasing a data structure referenced by a DataSink")
+    void shouldReturn409WhenUnreleasingDataSinkReferencedStructure() {
+      UUID structureId = createStructureReferencedByDataSink();
+
+      ResponseEntity<DataStructureOutputDTO> response =
+          exchange(
+              ENDPOINT + "/" + structureId + "/unrelease",
+              HttpMethod.POST,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status")
+          .isEqualTo(HttpStatus.CONFLICT);
     }
   }
 }

@@ -2,20 +2,28 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.LayerRepository;
+import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -32,18 +40,21 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   private final DataSetRepository dataSetRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
   private final LayerRepository layerRepository;
+  private final ScopeAccessAuthorizer scopeAccessAuthorizer;
 
   public DataSinkService(
       DataSinkRepository dataSinkRepository,
       DataSinkMapper dataSinkMapper,
       DataSetRepository dataSetRepository,
       DataStructureVersionRepository dataStructureVersionRepository,
-      LayerRepository layerRepository) {
+      LayerRepository layerRepository,
+      ScopeAccessAuthorizer scopeAccessAuthorizer) {
     this.dataSinkRepository = dataSinkRepository;
     this.dataSinkMapper = dataSinkMapper;
     this.dataSetRepository = dataSetRepository;
     this.dataStructureVersionRepository = dataStructureVersionRepository;
     this.layerRepository = layerRepository;
+    this.scopeAccessAuthorizer = scopeAccessAuthorizer;
   }
 
   @Override
@@ -98,7 +109,47 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
       throw new InvalidInputException(
           getEntityName(), existingEntity.getId(), "dataSinkType cannot be changed after creation");
     }
+    requireDataLossConfirmation(input, existingEntity);
     return input;
+  }
+
+  /**
+   * A change to {@code tableName} or {@code dataStructureVersionId} rebuilds the sink's backing
+   * storage on the next release, discarding all stored data — for POSTGIS a table drop+recreate (no
+   * ALTER TABLE), for FROST a re-provisioning of the target entities. If the parent dataset has
+   * been provisioned (storage actually exists), such a change requires explicit {@code
+   * confirmDataLoss=true}; otherwise the update is rejected with 409. Comparing ids alone is
+   * sufficient because the AVAILABLE-only invariant makes a version's model immutable for the
+   * sink's lifetime (see {@link #requireExistingDataStructureVersion}).
+   */
+  private void requireDataLossConfirmation(DataSinkInputDTO input, DataSink existingEntity) {
+    if (input.isConfirmDataLoss() || !existingEntity.getDataSet().isProvisioned()) {
+      return;
+    }
+
+    Map<String, Object> incoming = input.getConfiguration();
+    if (incoming == null) {
+      return;
+    }
+    Map<String, Object> current = existingEntity.getConfiguration();
+
+    boolean destructiveChange =
+        fieldChanged(incoming, current, "tableName")
+            || fieldChanged(incoming, current, "dataStructureVersionId");
+    if (destructiveChange) {
+      throw new ResourceInUseException(
+          getEntityName(),
+          existingEntity.getId(),
+          "This change rebuilds the sink's table and discards all stored data;"
+              + " set confirmDataLoss=true to proceed");
+    }
+  }
+
+  private static boolean fieldChanged(
+      Map<String, Object> incoming, Map<String, Object> current, String key) {
+    Object newValue = incoming.get(key);
+    Object oldValue = current == null ? null : current.get(key);
+    return !Objects.equals(String.valueOf(newValue), String.valueOf(oldValue));
   }
 
   /**
@@ -161,14 +212,26 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
 
   private void validateConfiguration(DataSinkType type, Map<String, Object> config) {
     switch (type) {
-      case FROST -> {
-        if (config != null && !config.isEmpty()) {
-          throw new InvalidInputException(
-              "DataSink", "configuration", "FROST sinks require an absent or empty configuration");
-        }
-      }
+      case FROST -> validateFrostConfiguration(config);
       case POSTGIS -> validatePostgisConfiguration(config);
     }
+  }
+
+  /**
+   * A FROST configuration is empty (passthrough) or references exactly the mapping's Thing-shaped
+   * target structure — any other key would silently be dropped by the deploy engine.
+   */
+  private void validateFrostConfiguration(Map<String, Object> config) {
+    if (config == null || config.isEmpty()) {
+      return;
+    }
+    if (!config.keySet().equals(Set.of("dataStructureVersionId"))) {
+      throw new InvalidInputException(
+          "DataSink",
+          "configuration",
+          "FROST sinks accept only an optional dataStructureVersionId");
+    }
+    requireExistingDataStructureVersion(config.get("dataStructureVersionId"));
   }
 
   private void validatePostgisConfiguration(Map<String, Object> config) {
@@ -190,10 +253,13 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
           "configuration.dataStructureVersionId",
           "dataStructureVersionId is required for POSTGIS sinks");
     }
+    requireExistingDataStructureVersion(dsvIdRaw);
+  }
 
+  private void requireExistingDataStructureVersion(Object dsvIdRaw) {
     UUID dsvId;
     try {
-      dsvId = UUID.fromString(dsvIdRaw.toString());
+      dsvId = UUID.fromString(String.valueOf(dsvIdRaw));
     } catch (IllegalArgumentException e) {
       throw new InvalidInputException(
           "DataSink",
@@ -201,11 +267,40 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
           "dataStructureVersionId must be a valid UUID");
     }
 
-    if (!dataStructureVersionRepository.existsById(dsvId)) {
+    // Authorization scopes on the parent DataStructure, which is only known after loading the
+    // version, so existence is necessarily checked first. A missing version and an unauthorized
+    // one must yield the SAME outward failure, otherwise the 400-vs-403 difference is an existence
+    // oracle over version ids. Both therefore raise the identical "not available" 400; the real
+    // authorization denial is still logged server-side by ScopeAccessAuthorizer for audit.
+    DataStructureVersion dsv =
+        dataStructureVersionRepository.findById(dsvId).orElseThrow(this::versionNotAvailable);
+
+    // The version references a DATASTRUCTURE-scoped entity, which the DATASET-typed route header
+    // cannot cover — authorize the caller against the parent structure. This is the whole guard:
+    // DataSinkController is a plain BaseController with no scope filtering of its own.
+    try {
+      scopeAccessAuthorizer.authorizeReferences(
+          ScopeType.DATASTRUCTURE, Set.of(dsv.getDataStructure().getId()));
+    } catch (AccessDeniedException e) {
+      throw versionNotAvailable();
+    }
+
+    // A sink may only reference an AVAILABLE version. This makes the referenced model immutable for
+    // the sink's lifetime (an AVAILABLE version cannot go back to DRAFT while a sink uses it), so a
+    // same-id reference always means the same model — the data-loss diff can compare ids alone.
+    if (dsv.getDataStructureVersionStatus() != DataStructureVersionStatus.AVAILABLE
+        || dsv.getDataStructure().getDataStructureStatus() != DataStructureStatus.AVAILABLE) {
       throw new InvalidInputException(
           "DataSink",
           "configuration.dataStructureVersionId",
-          "DataStructureVersion not found: " + dsvId);
+          "Referenced DataStructureVersion must be in AVAILABLE status");
     }
+  }
+
+  private InvalidInputException versionNotAvailable() {
+    return new InvalidInputException(
+        "DataSink",
+        "configuration.dataStructureVersionId",
+        "Referenced DataStructureVersion is not available");
   }
 }

@@ -33,7 +33,9 @@ public enum SagaStepStatus {
   /** Adapter returned failure or step timed out. */
   FAILED,
 
-  /** Step was skipped because its condition was not met (e.g. no pipelines for Redpanda). */
+  /**
+   * Step was skipped because its condition was not met (e.g. no pipelines for the NiFi adapter).
+   */
   SKIPPED,
 
   /** Compensation command sent for this step. */

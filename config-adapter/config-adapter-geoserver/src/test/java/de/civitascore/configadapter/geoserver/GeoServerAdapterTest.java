@@ -16,6 +16,7 @@ import static de.civitascore.configadapter.geoserver.GeoServerAdapter.ResourceTy
 import static de.civitascore.configadapter.geoserver.GeoServerAdapter.ResourceType.LAYER;
 import static de.civitascore.configadapter.geoserver.GeoServerAdapter.ResourceType.STYLE;
 import static de.civitascore.configadapter.geoserver.GeoServerAdapter.ResourceType.WORKSPACE;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -53,6 +54,8 @@ import java.time.OffsetDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 class GeoServerAdapterTest {
@@ -718,6 +721,198 @@ class GeoServerAdapterTest {
       adapter.processConfigEvent("de.civitascore.geo.workspace.created", event);
 
       verify(mockPublisher, never()).publish(any(String.class), any(ConfigResultEvent.class));
+    }
+  }
+
+  @Nested
+  class RequireSafePath {
+
+    // requireSafePath must enforce its contract on its own, independent of the caller's
+    // slash-normalization: every "/"-delimited segment (including leading/trailing empties) must be
+    // a safe single path segment, otherwise the input is rejected as INVALID_PAYLOAD.
+    @ParameterizedTest
+    @ValueSource(
+        strings = {
+          "workspaces/../../admin", // parent traversal in the middle
+          "workspaces/..", // parent traversal at the end
+          "..", // traversal-only
+          ".", // single-dot segment
+          "workspaces/./styles", // single-dot in the middle
+          "../workspaces/myws", // leading parent traversal
+          "workspaces//styles", // empty segment from double slash
+          "workspaces/", // trailing empty segment (split must keep it)
+          "/workspaces", // leading empty segment
+          "workspaces/%2e%2e/admin", // url-encoded dot-dot
+          "workspaces/%2f..%2fadmin", // url-encoded slash
+          "workspaces/..\\..\\admin", // backslash traversal
+          "workspaces/my ws", // space
+          "workspaces/ws\nadmin", // newline / log injection
+          "workspaces/ws\tadmin", // tab
+          "workspaces/wörld", // non-ascii
+          "" // empty path
+        })
+    void rejectsUnsafePath(String targetResource) {
+      FatalAdapterException exception =
+          assertThrows(
+              FatalAdapterException.class, () -> GeoServerAdapter.requireSafePath(targetResource));
+      assertEquals(AdapterErrorCode.INVALID_PAYLOAD, exception.getErrorCode());
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = {
+          "workspaces",
+          "workspaces/myws",
+          "workspaces/my_ws-1",
+          "workspaces/my_ws/styles/base-style",
+          "workspaces/myws/datastores/myds/featuretypes/Traffic_2024"
+        })
+    void acceptsSafePath(String targetResource) {
+      assertDoesNotThrow(() -> GeoServerAdapter.requireSafePath(targetResource));
+    }
+  }
+
+  @Nested
+  class PathTraversalProtection {
+
+    private Invocation.Builder mockBuilder;
+    private Response mockResponse;
+
+    @BeforeEach
+    void setUpMocks() {
+      stubBaseConfig(
+          "de.civitascore.geo.workspace.created,de.civitascore.geo.workspace.updated,"
+              + "de.civitascore.geo.workspace.deleted");
+
+      Client mockClient = mock(Client.class);
+      WebTarget mockTarget = mock(WebTarget.class);
+      WebTarget mockPathTarget = mock(WebTarget.class);
+      mockBuilder = mock(Invocation.Builder.class);
+      mockResponse = mock(Response.class);
+
+      when(mockClient.target(any(String.class))).thenReturn(mockTarget);
+      when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
+      when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
+      when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
+      when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
+
+      adapter.setClient(mockClient);
+      adapter.initialize(mockConfig);
+      adapter.setEventPublisher(mock(EventPublisher.class));
+    }
+
+    @Test
+    void createRejectsParentTraversalInTheMiddle() {
+      assertRejectedWithoutHttpCall(
+          Operation.CREATE, "de.civitascore.geo.workspace.created", "workspaces/../../admin");
+    }
+
+    @Test
+    void createRejectsTraversalAtTheEnd() {
+      assertRejectedWithoutHttpCall(
+          Operation.CREATE, "de.civitascore.geo.workspace.created", "workspaces/..");
+    }
+
+    @Test
+    void createRejectsTraversalOnlyPath() {
+      assertRejectedWithoutHttpCall(Operation.CREATE, "de.civitascore.geo.workspace.created", "..");
+    }
+
+    @Test
+    void createRejectsSingleDotSegment() {
+      assertRejectedWithoutHttpCall(
+          Operation.CREATE, "de.civitascore.geo.workspace.created", "workspaces/./styles");
+    }
+
+    @Test
+    void createRejectsEmptySegmentFromDoubleSlash() {
+      assertRejectedWithoutHttpCall(
+          Operation.CREATE, "de.civitascore.geo.workspace.created", "workspaces//styles");
+    }
+
+    @Test
+    void createRejectsUrlEncodedTraversal() {
+      assertRejectedWithoutHttpCall(
+          Operation.CREATE, "de.civitascore.geo.workspace.created", "workspaces/%2e%2e/admin");
+    }
+
+    @Test
+    void createRejectsBackslashTraversal() {
+      assertRejectedWithoutHttpCall(
+          Operation.CREATE, "de.civitascore.geo.workspace.created", "workspaces/..\\..\\admin");
+    }
+
+    @Test
+    void updateRejectsParentTraversal() {
+      assertRejectedWithoutHttpCall(
+          Operation.UPDATE, "de.civitascore.geo.workspace.updated", "workspaces/myws/../../admin");
+    }
+
+    @Test
+    void deleteRejectsParentTraversal() {
+      assertRejectedWithoutHttpCall(
+          Operation.DELETE, "de.civitascore.geo.workspace.deleted", "workspaces/myws/../../admin");
+    }
+
+    @Test
+    void createAcceptsResourceNameWithUnderscoreAndHyphen()
+        throws FatalAdapterException, RetryableAdapterException {
+      when(mockResponse.getStatus()).thenReturn(201);
+      when(mockResponse.getHeaderString("Location"))
+          .thenReturn("http://localhost:8080/geoserver/rest/workspaces/my_ws-1");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      ConfigEvent event =
+          createConfigEvent(Operation.CREATE, "workspaces/my_ws-1", workspace("my_ws-1"));
+
+      adapter.processConfigEvent("de.civitascore.geo.workspace.created", event);
+
+      verify(mockBuilder).post(any(Entity.class));
+    }
+
+    @Test
+    void createAcceptsMultiSegmentSafePath()
+        throws FatalAdapterException, RetryableAdapterException {
+      when(mockResponse.getStatus()).thenReturn(201);
+      when(mockResponse.getHeaderString("Location"))
+          .thenReturn("http://localhost:8080/geoserver/rest/workspaces/my_ws/styles/base-style");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      ConfigEvent event =
+          createConfigEvent(
+              Operation.CREATE, "workspaces/my_ws/styles/base-style", workspace("base-style"));
+
+      adapter.processConfigEvent("de.civitascore.geo.workspace.created", event);
+
+      verify(mockBuilder).post(any(Entity.class));
+    }
+
+    @Test
+    void createStillAcceptsLeadingAndTrailingSlashes()
+        throws FatalAdapterException, RetryableAdapterException {
+      when(mockResponse.getStatus()).thenReturn(201);
+      when(mockResponse.getHeaderString("Location"))
+          .thenReturn("http://localhost:8080/geoserver/rest/workspaces/ws");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      ConfigEvent event = createConfigEvent(Operation.CREATE, "/workspaces/ws/", workspace("ws"));
+
+      adapter.processConfigEvent("de.civitascore.geo.workspace.created", event);
+
+      verify(mockBuilder).post(any(Entity.class));
+    }
+
+    private void assertRejectedWithoutHttpCall(
+        Operation operation, String topic, String targetResource) {
+      ConfigEvent event = createConfigEvent(operation, targetResource, workspace("myws"));
+
+      FatalAdapterException exception =
+          assertThrows(FatalAdapterException.class, () -> adapter.processConfigEvent(topic, event));
+
+      assertEquals(AdapterErrorCode.INVALID_PAYLOAD, exception.getErrorCode());
+      verify(mockBuilder, never()).post(any(Entity.class));
+      verify(mockBuilder, never()).put(any(Entity.class));
+      verify(mockBuilder, never()).delete();
     }
   }
 

@@ -39,10 +39,17 @@ public class KafkaEventConfig {
   /** Validates the configured Kafka compression type on startup, failing fast if unsupported. */
   @PostConstruct
   void validateCompressionType() {
-    String compressionType = kafkaProperties.getProducer().getCompressionType();
+    // Mirror buildProducerProperties() precedence: the raw properties map is merged last and wins,
+    // so validate the map value first and fall back to the typed field. Any other order can pass a
+    // valid typed value while the producer runs the invalid map value, deferring the failure to the
+    // first send() instead of failing fast at boot.
+    Object nativeType = kafkaProperties.getProducer().getProperties().get("compression.type");
+    String compressionType =
+        nativeType != null
+            ? nativeType.toString()
+            : kafkaProperties.getProducer().getCompressionType();
     if (compressionType == null) {
-      Object nativeType = kafkaProperties.getProducer().getProperties().get("compression.type");
-      compressionType = nativeType != null ? nativeType.toString() : "none";
+      compressionType = "none";
     }
     if (!VALID_COMPRESSION_TYPES.contains(compressionType)) {
       throw new IllegalArgumentException(

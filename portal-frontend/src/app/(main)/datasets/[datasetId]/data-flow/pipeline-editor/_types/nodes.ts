@@ -1,5 +1,5 @@
-import { emptyMappingConfig, type MappingConfig } from '../_components/mapping-editor/_types'
-import type { PipelineNodeType } from './pipeline'
+import { type MappingConfig } from '../_components/mapping-editor/_types'
+import type { StaTargetVocabulary } from '../_constants/staTargetCatalog'
 import { PIPELINE_NODE_TYPES } from './pipeline'
 
 // ============================================================================
@@ -74,12 +74,10 @@ export interface EntityNodeData extends BasePipelineNodeData {
 
 /**
  * Data specific to DataSource nodes.
- *
  */
 export interface DataSourceNodeData extends BasePipelineNodeData {
   entityType: typeof ENTITY_TYPES.Datasource
   entityId?: string
-  entityName?: string
   entityMetadata?: {
     connector?: string
     connection?: string
@@ -115,12 +113,10 @@ export interface GeoPersistenceNodeData extends BasePipelineNodeData {
   entityId?: string
   /** Table name for geo data storage */
   tableName: string
-  /** ID of the selected data structure version */
+  /**
+   * "datastructureId/versionId" composite key of the selected data structure version
+   */
   dataStructureVersionId?: string
-  /** Display name of the selected data structure */
-  dataStructureName?: string
-  /** Version number of the selected data structure version */
-  versionNumber?: string
 }
 
 // ============================================================================
@@ -150,12 +146,22 @@ export interface CronNodeData extends BasePipelineNodeData {
 export interface MappingNodeData extends BasePipelineNodeData {
   sourceDatastructureId?: string
   sourceVersionId?: string
-  sourceName?: string
   targetDatastructureId?: string
   targetVersionId?: string
-  targetName?: string
   /** The single saved artifact produced by the mapping editor. */
   mappingConfig: MappingConfig
+  /**
+   * Snapshot of the required target-field paths (e.g. {@code $.name}) at mapping-save time. Lets the
+   * synchronous, pure pipeline validation check that every required target field is assigned without
+   * re-fetching the target schema. {@code undefined} on legacy nodes saved before this existed.
+   */
+  targetRequiredFields?: string[]
+  /**
+   * Snapshot of the target structure's effective FROST match keys at mapping-save time (from the
+   * {@code x-core-primaryKey} marker, fallback {@code reference}). Only consumed when this mapping
+   * feeds a FROST sink; {@code undefined} on legacy nodes saved before this existed.
+   */
+  staMatchKeys?: StaTargetVocabulary
 }
 
 // ============================================================================
@@ -226,68 +232,4 @@ export const isCronNodeData = (data: PipelineNodeData): data is CronNodeData => 
  */
 export const isMappingNodeData = (data: PipelineNodeData): data is MappingNodeData => {
   return 'mappingConfig' in data
-}
-
-// ============================================================================
-// Node Data Factory Helpers
-// ============================================================================
-
-/**
- * Creates default node data based on node type.
- * Used when creating new nodes from the palette.
- *
- */
-export const createDefaultNodeData = (nodeType: PipelineNodeType): PipelineNodeData => {
-  switch (nodeType) {
-    case PIPELINE_NODE_TYPES.Start:
-      return {
-        nodeType: PIPELINE_NODE_TYPES.Start,
-        label: 'Start',
-        configured: true, // Always configured
-        description: 'Entry point of the pipeline. Execution begins here.',
-      }
-    case PIPELINE_NODE_TYPES.End:
-      return {
-        nodeType: PIPELINE_NODE_TYPES.End,
-        label: 'End',
-        configured: true, // Always configured
-        description: 'Exit point of the pipeline. Execution completes here.',
-      }
-    case PIPELINE_NODE_TYPES.DataSource:
-      return {
-        label: 'DataSource',
-        configured: false, // Needs entity selection
-        entityType: ENTITY_TYPES.Datasource,
-      }
-    case PIPELINE_NODE_TYPES.Frost:
-      return {
-        label: 'Frost Server',
-        configured: true, // Auto-configured with fixed server
-        entityType: ENTITY_TYPES.Frost,
-        serverName: 'Frost Server',
-        serverUrl: '',
-        version: '1.1',
-      }
-    case PIPELINE_NODE_TYPES.GeoPersistence:
-      return {
-        label: 'Geo Persistence',
-        configured: false, // Needs table name and data structure version
-        entityType: ENTITY_TYPES.Persistence,
-        tableName: '',
-      }
-    case PIPELINE_NODE_TYPES.Cron:
-      return {
-        label: 'CRON',
-        configured: false, // Needs cron expression
-        cronExpression: '',
-      }
-    case PIPELINE_NODE_TYPES.Mapping:
-      return {
-        label: 'Mapping',
-        configured: false, // Needs name + source + target
-        mappingConfig: emptyMappingConfig(),
-      }
-    default:
-      throw new Error(`Unknown node type: ${nodeType}`)
-  }
 }

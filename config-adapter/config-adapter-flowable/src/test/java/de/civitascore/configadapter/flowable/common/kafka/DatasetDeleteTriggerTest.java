@@ -51,7 +51,7 @@ class DatasetDeleteTriggerTest {
   private FlowableTriggerConsumer consumer;
   private SagaCommandHandler frost;
   private SagaCommandHandler apisix;
-  private SagaCommandHandler redpanda;
+  private SagaCommandHandler pipeline;
   private SagaCommandHandler geoserver;
   private SagaCommandHandler postgis;
 
@@ -59,17 +59,17 @@ class DatasetDeleteTriggerTest {
   void setUp() {
     frost = FlowableTestSupport.mockHandler("frost");
     apisix = FlowableTestSupport.mockHandler("apisix");
-    redpanda = FlowableTestSupport.mockHandler("redpanda");
+    pipeline = FlowableTestSupport.mockHandler("nifi");
     geoserver = FlowableTestSupport.mockHandler("geoserver");
     postgis = FlowableTestSupport.mockHandler("postgis");
     stubStepSuccess(frost, "delete-project");
     stubStepSuccess(apisix, "delete-route");
-    stubStepSuccess(redpanda, "delete-pipelines");
+    stubStepSuccess(pipeline, "delete-pipelines");
     stubStepSuccess(geoserver, "delete-workspace");
     stubStepSuccess(postgis, "deprovision-sink");
 
     SagaHandlerRegistry registry =
-        FlowableTestSupport.registry(frost, apisix, redpanda, geoserver, postgis);
+        FlowableTestSupport.registry(frost, apisix, pipeline, geoserver, postgis);
     engine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     BpmnProcessDeployer.deploy(engine.getRepositoryService());
     consumer = new FlowableTriggerConsumer(engine.getRuntimeService(), engine.getHistoryService());

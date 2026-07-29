@@ -24,7 +24,6 @@ export {
 export {
   type BasePipelineNodeData,
   type ControlNodeData,
-  createDefaultNodeData,
   type CronNodeData,
   type DataSourceNodeData,
   ENTITY_TYPES,

@@ -9,4 +9,5 @@ public class PipelineSummaryDTO {
   private UUID id;
   private String name;
   private String description;
+  private PipelineRuntimeStatusDTO runtimeStatus;
 }

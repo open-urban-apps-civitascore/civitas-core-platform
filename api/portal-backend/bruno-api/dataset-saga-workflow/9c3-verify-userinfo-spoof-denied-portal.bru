@@ -1,0 +1,45 @@
+meta {
+  name: 9c3. Verify X-Userinfo spoofing is rejected on the portal-backend route (→ 401)
+  type: http
+  seq: 25
+  tags: [
+    requires-nifi
+  ]
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}
+  body: none
+  auth: none
+}
+
+headers {
+  X-Userinfo: eyJzdWIiOiJmb3JnZWQtYWRtaW4tMTIzNDUifQ
+}
+
+tests {
+  test("A forged X-Userinfo cannot impersonate a user on the portal-backend route (401, not 200/403)", function() {
+    // Counterpart to 9c2 (saga-created dataset payload route) on the portal-backend MANAGEMENT route
+    // (the gateway's /v1/* catch-all → portal-backend). Both routes reference the same plugin_config
+    // (serverless-pre-function strips client X-Userinfo before OPA). The forged header claims
+    // sub="forged-admin-12345" against the metadata endpoint /v1/datasets/{id}.
+    //
+    // Metadata is not open data, so an anonymous caller is denied. The discriminator: if the strip
+    // works, OPA sees no userinfo → 401. If the forged header reached OPA, it would be treated as an
+    // (authenticated-but-unknown) identity → 403 (or, worse, a real grant if the sub matched). Exactly
+    // 401 proves the strip is active on the portal-backend route too, not only the dataset route.
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  **Saga step 9c3** — X-Userinfo spoofing guard on the **portal-backend** route.
+
+  The Issue requires the identity-header strip to hold on portal-backend **and** saga-created dataset
+  routes. 9c2 covers the dataset payload route; this step covers the portal-backend management route
+  (`/v1/datasets/{id}`, reached via the gateway's `/v1/*` catch-all). It sends an unauthenticated
+  request with a **forged** `X-Userinfo` and asserts **401** — the `serverless-pre-function` cleared
+  the header before OPA, so the forged identity never took effect.
+
+  **Precondition:** runs while the dataset is protected (before 9f).
+}

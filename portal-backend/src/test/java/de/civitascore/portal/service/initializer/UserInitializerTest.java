@@ -15,9 +15,7 @@ import de.civitascore.portal.configuration.EventProperties;
 import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.model.embedded.UserTitleType;
 import de.civitascore.portal.model.entity.User;
-import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.GroupRepository;
-import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.ConfigEventPublisherService;
 import java.util.List;
@@ -43,8 +41,6 @@ class UserInitializerTest {
   @Mock private InitProperties properties;
   @Mock private UserRepository userRepository;
   @Mock private GroupRepository groupRepository;
-  @Mock private RoleRepository roleRepository;
-  @Mock private AssignmentRepository assignmentRepository;
   @Mock private ConfigEventPublisherService configEventPublisher;
   @Mock private Environment environment;
 
@@ -57,8 +53,6 @@ class UserInitializerTest {
             properties,
             userRepository,
             groupRepository,
-            roleRepository,
-            assignmentRepository,
             configEventPublisher,
             environment,
             new KeycloakProperties(TARGET_REALM, "http://keycloak:8080", "civitas-core"),

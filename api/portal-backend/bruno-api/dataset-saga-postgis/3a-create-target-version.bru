@@ -1,0 +1,72 @@
+meta {
+  name: 3a. Create Target DataStructure Version (geometry)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{pgTargetDataStructureId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "1.0.0",
+    "description": "Target version with GeoJSON Point geometry (GEOMETRY(POINT,4326) column)",
+    "modelName": "GeoSensorTarget",
+    "model": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "GeoSensorTarget",
+      "type": "object",
+      "properties": {
+        "stationid": { "type": "string" },
+        "geo": { "$ref": "https://geojson.org/schema/Point.json" }
+      },
+      "required": ["stationid"]
+    },
+    "styles": {}
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('pgTargetVersionId', res.body.id);
+  }
+}
+
+tests {
+  test("Version created", function() {
+    const status = res.getStatus();
+    // 201=created. This collection assumes a clean DB per run (CI uses an ephemeral stack); a 409
+    // would mean a previous run leaked — fail loudly rather than carry a stale id downstream.
+    expect(status).to.equal(201);
+  });
+
+  test("Has id", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.id).to.be.a('string');
+    }
+  });
+}
+
+docs {
+  **PostGIS saga step 3a** — Precondition: `pgTargetDataStructureId` is set (step 3).
+
+  Creates version 1.0.0 of the target structure. The `geo` property `$ref`s `https://geojson.org/schema/Point.json`; without a `crs` hint the PostGIS adapter defaults the geometry column SRID to 4326, producing `GEOMETRY(POINT,4326)`. `stationid` becomes a text column. This is the schema the POSTGIS DataSink's table is derived from.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if it already exists.
+
+  **Post-condition:** Saves `pgTargetVersionId` from `body.id` (referenced by the DataSink in step 6 and as the mapping `target` URN version in step 7).
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Version record created in `portal_backend` DB, linked to the target DataStructure |
+}

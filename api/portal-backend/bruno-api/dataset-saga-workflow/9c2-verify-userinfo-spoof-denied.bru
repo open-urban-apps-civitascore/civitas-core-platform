@@ -1,0 +1,46 @@
+meta {
+  name: 9c2. Verify X-Userinfo spoofing is rejected (forged identity → 401, not 403)
+  type: http
+  seq: 25
+  tags: [
+    requires-nifi
+  ]
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/{{sagaSlug}}
+  body: none
+  auth: none
+}
+
+headers {
+  X-Userinfo: eyJzdWIiOiJmb3JnZWQtYWRtaW4tMTIzNDUifQ
+}
+
+tests {
+  test("A forged X-Userinfo cannot impersonate a user — gateway strips it before OPA (401, not 403)", function() {
+    // Since unauth_action=pass lets anonymous requests reach OPA, and OPA's trust model keys identity
+    // off X-Userinfo, the gateway's serverless-pre-function MUST clear any client-supplied X-Userinfo
+    // before openid-connect/OPA. The forged header carries sub="forged-admin-12345".
+    //
+    // The status code is the discriminator: when the strip works, OPA sees NO userinfo → anonymous →
+    // 401. If the strip were dropped/broken, the forged header would reach OPA → it would be treated
+    // as an (authenticated-but-unknown) caller → 403. Asserting exactly 401 turns a future regression
+    // (plugin removed, Lua typo, phase reorder) into a red test instead of a silent identity bypass.
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  **Saga step 9c2** — Security regression guard for X-Userinfo spoofing.
+
+  With `unauth_action: "pass"`, anonymous requests now reach OPA, and OPA decides authorization from the
+  `X-Userinfo` header (the decoded `sub`). A `serverless-pre-function` (rewrite phase, priority 10000,
+  before openid-connect at 2599) clears any client-supplied `X-Userinfo`/`X-Access-Token`/`X-Id-Token`,
+  so a client cannot forge an identity. This test sends an unauthenticated request with a **forged**
+  `X-Userinfo` to the protected dataset (openDataAccess=false at this step) and asserts the gateway
+  denies with **401** — proving the forged header was stripped and never reached OPA (a non-stripped
+  forged header would yield 403).
+
+  **Precondition:** runs after 9c while the dataset is still protected (before 9f toggles open).
+}

@@ -57,9 +57,6 @@ sleep 1
 echo
 echo "Stopping Docker services..."
 
-cd "$SCRIPT_DIR/modelatlas"
-$COMPOSE_DOWN 2>/dev/null && echo "  Model Atlas stopped" || true
-
 cd "$SCRIPT_DIR/nifi"
 $COMPOSE_DOWN 2>/dev/null && echo "  Apache NiFi stopped" || true
 

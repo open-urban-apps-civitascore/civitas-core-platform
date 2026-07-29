@@ -1,0 +1,32 @@
+meta {
+  name: 15. Cleanup - Delete DataSet (safety net)
+  type: http
+  seq: 23
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{pgDataSetId}}
+}
+
+tests {
+  test("DataSet already gone or deleted", function() {
+    const status = res.getStatus();
+    // After the DELETE saga (steps 12/13) the dataset entity is already removed → 404.
+    // 204 only occurs as a safety net for a never-provisioned run deleted synchronously.
+    expect(status === 204 || status === 404).to.be.true;
+  });
+}
+
+docs {
+  **PostGIS saga step 15** — Delete the dataset (safety net).
+
+  With the new delete contract this step is normally a no-op: the DATASET_DELETE saga (steps 12/13) already removed the DataSet entity after its teardown completed, so this usually returns `404`. It remains only as a safety net for a never-provisioned dataset, which is deleted synchronously (`204`) without a saga.
+
+  **Expected Response:** 404 Not Found (already removed by the DELETE saga). 204 only for a never-provisioned run.
+}

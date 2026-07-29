@@ -139,6 +139,21 @@ class AssignmentFactoryTest {
     }
 
     @Test
+    @DisplayName("Should reject DATA role with null scopeType via AssignmentGroupInputDTO")
+    void shouldRejectDataRoleWithNullScopeType() {
+      UUID roleId = UUID.randomUUID();
+      Role role = createRole(roleId, RoleType.DATA);
+      when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+
+      AssignmentGroupInputDTO dto = new AssignmentGroupInputDTO();
+      dto.setRoleId(roleId);
+
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DATA roles must be scoped");
+    }
+
+    @Test
     @DisplayName("Should throw when roleId is null")
     void shouldThrowWhenRoleIdIsNull() {
       AssignmentGroupInputDTO dto = new AssignmentGroupInputDTO();
@@ -243,6 +258,26 @@ class AssignmentFactoryTest {
       assertThat(result.getGroup()).isEqualTo(group);
       assertThat(result.getRole()).isEqualTo(role);
       assertThat(result.getScopeType()).isNull();
+    }
+
+    @Test
+    @DisplayName("Should reject DATA role with null scopeType via AssignmentInputDTO")
+    void shouldRejectDataRoleWithNullScopeType() {
+      UUID groupId = UUID.randomUUID();
+      UUID roleId = UUID.randomUUID();
+      Group group = createGroup(groupId);
+      Role role = createRole(roleId, RoleType.DATA);
+
+      when(groupRepository.findById(groupId)).thenReturn(Optional.of(group));
+      when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+
+      AssignmentInputDTO dto = new AssignmentInputDTO();
+      dto.setGroupId(groupId);
+      dto.setRoleId(roleId);
+
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DATA roles must be scoped");
     }
   }
 

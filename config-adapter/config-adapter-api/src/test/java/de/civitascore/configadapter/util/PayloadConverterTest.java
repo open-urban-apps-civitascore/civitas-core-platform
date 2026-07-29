@@ -10,9 +10,7 @@
 package de.civitascore.configadapter.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.model.dataset.Dataset;
 import java.io.IOException;
@@ -33,14 +31,12 @@ class PayloadConverterTest {
       Map<String, Object> trigger =
           Map.of(
               "id", "ds-001",
-              "name", "Test Dataset",
-              "openDataAccess", true);
+              "name", "Test Dataset");
 
       Dataset dataset = PayloadConverter.toDataset(trigger);
 
       assertEquals("ds-001", dataset.id());
       assertEquals("Test Dataset", dataset.name());
-      assertTrue(dataset.openDataAccess());
     }
 
     @Test
@@ -57,17 +53,6 @@ class PayloadConverterTest {
       Dataset dataset = PayloadConverter.toDataset(trigger);
 
       assertEquals("ds-001", dataset.id());
-      assertFalse(dataset.openDataAccess());
-    }
-
-    @Test
-    @DisplayName("defaults openDataAccess to false when missing")
-    void shouldDefaultOpenDataAccessToFalse() {
-      Map<String, Object> trigger = Map.of("id", "ds-001", "name", "Test");
-
-      Dataset dataset = PayloadConverter.toDataset(trigger);
-
-      assertFalse(dataset.openDataAccess());
     }
   }
 
@@ -80,13 +65,12 @@ class PayloadConverterTest {
     void shouldDeserializeJsonToDataset() throws IOException {
       String json =
           """
-          {"id":"ds-002","name":"From JSON","openDataAccess":true}""";
+          {"id":"ds-002","name":"From JSON"}""";
 
       Dataset dataset = PayloadConverter.toDataset(json.getBytes());
 
       assertEquals("ds-002", dataset.id());
       assertEquals("From JSON", dataset.name());
-      assertTrue(dataset.openDataAccess());
     }
 
     @Test
@@ -111,7 +95,7 @@ class PayloadConverterTest {
     void shouldReadValue() throws IOException {
       String json =
           """
-          {"id":"ds-004","name":"Generic","openDataAccess":false}""";
+          {"id":"ds-004","name":"Generic"}""";
 
       Dataset dataset = PayloadConverter.readValue(json.getBytes(), Dataset.class);
 
@@ -148,13 +132,12 @@ class PayloadConverterTest {
     @Test
     @DisplayName("fromValue converts Map to typed object")
     void shouldConvertFromValue() {
-      Map<String, Object> map = Map.of("id", "ds-005", "name", "Converted", "openDataAccess", true);
+      Map<String, Object> map = Map.of("id", "ds-005", "name", "Converted");
 
       Dataset dataset = PayloadConverter.fromValue(map, Dataset.class);
 
       assertEquals("ds-005", dataset.id());
       assertEquals("Converted", dataset.name());
-      assertTrue(dataset.openDataAccess());
     }
   }
 }

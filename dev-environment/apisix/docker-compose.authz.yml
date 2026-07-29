@@ -38,6 +38,8 @@ services:
     image: openpolicyagent/opa:1.14.0-static
     container_name: civitas-opa
     restart: always
+    environment:
+      API_HOST: ${API_HOST:-api.localhost}
     command:
       - "run"
       - "--server"

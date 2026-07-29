@@ -1,7 +1,6 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AxiosError } from 'axios'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -15,7 +14,9 @@ import {
   useUpdateDatastructureVersionReleased,
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
+import { SchemaExportError } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
+import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
 import { useError } from '@/hooks/use-error'
 import { STATUS_TYPES } from '@/types/common'
 import {
@@ -36,6 +37,7 @@ import {
   parseDatastructureVersionFormData,
 } from '@/utils/datastructures'
 import { pickDirtyValues } from '@/utils/form'
+import { buildDataStructureUrn } from '@/utils/urn'
 
 export const defaultDatastructureVersionFormData: DatastructureVersionFormData = {
   id: '',
@@ -50,21 +52,23 @@ export const defaultDatastructureVersionFormData: DatastructureVersionFormData =
 
 interface UseDatastructureVersionProps {
   datastructureId: string
+  dataStructureName: string
   version: DatastructureVersion | null
   isCreateMode: boolean
   onCreateVersion?: (data: DatastructureVersion) => void
-  canSetAvailable?: boolean
+  canStage?: boolean
 }
 
 export const useDatastructureVersion = ({
-  datastructureId,
+  dataStructureName,
   version,
   isCreateMode,
   onCreateVersion,
-  canSetAvailable = true,
+  canStage = true,
 }: UseDatastructureVersionProps) => {
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
+  const tUmlModeler = useTranslations('umlModeler')
   const router = useRouter()
   const { handleFormValidationError } = useError()
   const [initialSession, setInitialSession] = useState(() => buildSessionFromVersion(version))
@@ -98,10 +102,8 @@ export const useDatastructureVersion = ({
 
   const statusWatch = form.watch('dataStructureVersionStatus')
   const nodesWatch = form.watch('nodes')
-  const versionWatch = form.watch('version')
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
-  const modelUri = `http://civitas.org/model/${datastructureId}/${versionWatch}`
 
   useEffect(() => {
     form.setValue('modelName', modelName || null, { shouldDirty: shouldMarkModelFieldsDirty })
@@ -139,7 +141,7 @@ export const useDatastructureVersion = ({
   }
 
   const revalidateDraftMode = () => {
-    if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+    if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canStage) {
       form.setValue('dataStructureVersionStatus', DATASTRUCTURE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
@@ -157,7 +159,7 @@ export const useDatastructureVersion = ({
   useEffect(() => {
     revalidateDraftMode()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSetAvailable, statusWatch])
+  }, [canStage, statusWatch])
 
   const handleStatusChange = (newStatus: DatastructureStatusType) => {
     form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })
@@ -285,7 +287,26 @@ export const useDatastructureVersion = ({
 
     try {
       const sessionDiagram = nodesWatch.length > 0 ? activeSession?.diagram || null : null
-      const { model } = sessionDiagram ? buildUMLModelPayload(sessionDiagram, modelUri) : { model: null }
+      const modelUri = sessionDiagram
+        ? buildDataStructureUrn(dataStructureName, datastructureId, parsed.data.version)
+        : undefined
+      let model: Record<string, unknown> | null = null
+      if (sessionDiagram) {
+        try {
+          model = buildUMLModelPayload(sessionDiagram, modelUri).model
+        } catch (error) {
+          if (!(error instanceof SchemaExportError)) throw error
+          // A version that is (or becomes) released must not exist without a model — the deploy
+          // engine reads it. Keyed on the target status, not the dirty transition, so a version
+          // already released is refused too. A draft saves silently diagram-only: the model/diagram
+          // distinction is not one the user should have to reason about while still modelling.
+          if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE) {
+            const reason = rootFailureMessage(tUmlModeler, error.failure)
+            toast.error(t('errors.releaseInvalidModel', { reason }))
+            return false
+          }
+        }
+      }
       const payload = mapDatastructureVersionFormToApiData(parsed.data, sessionDiagram, model)
 
       if (isCreateMode) {
@@ -297,7 +318,8 @@ export const useDatastructureVersion = ({
       }
       return true
     } catch (error: unknown) {
-      console.error('An error occurred while submitting datastructure version data.', (error as AxiosError).message)
+      console.error('An error occurred while submitting datastructure version data.', error)
+      toast.error(tCommon('errors.unexpectedError'))
       return false
     }
   }

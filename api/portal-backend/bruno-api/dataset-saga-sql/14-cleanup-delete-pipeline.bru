@@ -1,0 +1,33 @@
+meta {
+  name: 14. Cleanup - Delete Pipeline (safety net)
+  type: http
+  seq: 22
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sqlDataSetId}}
+  id: {{sqlPipelineId}}
+}
+
+tests {
+  test("Pipeline already gone or deleted", function() {
+    const status = res.getStatus();
+    // After the DELETE saga (steps 12/13) the pipeline is already cascade-removed → 404.
+    // 204 only occurs as a safety net for a never-provisioned / partially built run.
+    expect(status === 204 || status === 404).to.be.true;
+  });
+}
+
+docs {
+  **SQL saga step 14** — Delete the pipeline (safety net).
+
+  With the new delete contract this step is normally a no-op: the DATASET_DELETE saga (steps 12/13) already undeployed the NiFi flow and removed the pipeline via cascade, so this usually returns `404`. It remains only as a safety net for a run that never reached provisioning (e.g. a partially built dataset), where the pipeline record may still exist and returns `204`.
+
+  **Expected Response:** 404 Not Found (already removed by the DELETE saga). 204 only for a never-provisioned run.
+}

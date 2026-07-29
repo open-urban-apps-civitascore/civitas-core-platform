@@ -1,0 +1,22 @@
+meta {
+  name: Get DataSink by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{dataSinkId}}
+}
+
+docs {
+  **Precondition:** `dataSetId` and `dataSinkId` are set.
+
+  **Expected Response:** 200 OK, body contains the DataSink with matching `id`, including the `inUse` flag and (for POSTGIS) the inline DataStructureVersion summary.
+}

@@ -95,7 +95,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
   const {
     areAssignmentsDirty,
-    canSetAvailable,
+    canStage,
     completedTabs,
     form: datastructureForm,
     handleStatusChange,
@@ -107,8 +107,9 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     canSetDraft,
     setSelectedTab,
     statusHint,
+    statusAvailableHint,
     datastructureStatus,
-  } = useDatastructure({ datastructure, assignedGroups, initialAssignments })
+  } = useDatastructure({ datastructure, assignedGroups, initialAssignments, canRelease })
 
   const hasUnsavedChanges = datastructureForm.formState.isDirty || areAssignmentsDirty
 
@@ -123,11 +124,18 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     setIsExitModalOpen(false)
   }
 
-  const handleSave = async (): Promise<boolean> => {
-    const isSaved = await saveDatastructure()
+  const handleSave = async (shouldRefresh = true): Promise<boolean> => {
+    const isSaved = await saveDatastructure(shouldRefresh)
+    if (isSaved) {
+      setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+    }
+    return isSaved
+  }
+
+  const handleSaveAndExit = async (): Promise<boolean> => {
+    const isSaved = await handleSave()
     if (isSaved) {
       setIsExitModalOpen(false)
-      setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
       updateMode(false)
     }
     return isSaved
@@ -138,7 +146,9 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     else exitEditMode()
   }
 
-  useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
+  // shouldRefresh === false when navigating away. The router refresh is done by the
+  // UnsavedChangesProvider after the push (a refresh before the push would cancel the navigation).
+  useRegisterUnsavedChanges(hasUnsavedChanges, () => handleSave(false), true)
 
   const renderTabContent = () => {
     switch (selectedTab) {
@@ -151,9 +161,6 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             versions={mapDatastructureVersionsApiToListData(datastructure.dataStructureVersions)}
             rowCount={datastructure.dataStructureVersions.length}
             isReadOnly={isReadOnly}
-            isDirty={datastructureForm.formState.isDirty}
-            isLoading={isLoading}
-            onSave={saveDatastructure}
           />
         )
       case 'accessManagement':
@@ -186,11 +193,12 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             status={datastructureStatus}
             onStatusChange={handleStatusChange}
             statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
-            canSetAvailable={canSetAvailable}
+            canStage={canStage}
             canRelease={canRelease}
             statusHint={statusHint}
+            availableHint={statusAvailableHint}
             confirmButtonType="button"
-            onConfirmClick={handleSave}
+            onConfirmClick={() => handleSave()}
             isConfirmButtonDisabled={isConfirmButtonDisabled}
             isCancelButtonDisabled={isLoading}
             onCancelClick={handleExit}
@@ -225,7 +233,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
         isLoading={isLoading}
         onOpenChange={setIsExitModalOpen}
         onDiscard={handleDiscardAndExit}
-        onConfirm={handleSave}
+        onConfirm={handleSaveAndExit}
       />
     </PageContainer>
   )

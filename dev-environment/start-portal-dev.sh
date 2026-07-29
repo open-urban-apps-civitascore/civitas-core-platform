@@ -466,7 +466,6 @@ echo "  - APISIX + etcd"
 echo "  - OPA + AuthZ Repository"
 echo "  - FROST Server"
 echo "  - Apache NiFi"
-echo "  - Model Atlas + Apicurio Registry"
 echo
 
 cd "$SCRIPT_DIR/postgres"
@@ -493,18 +492,41 @@ fi
 
 # Ensure the Flowable saga database exists (config-adapter's embedded engine).
 # PostgreSQL has no "CREATE DATABASE IF NOT EXISTS", so guard with a catalog check.
-# Unlike init scripts (docker-entrypoint-initdb.d, which only run on a fresh volume),
-# this runs on every start — so it also provisions the database on existing volumes
-# created before Flowable was introduced. Idempotent, same spirit as Flyway below.
+# On a fresh volume the database is created race-free by postgres/initdb/; this block
+# covers PRE-EXISTING volumes (created before Flowable was introduced) where the init
+# scripts no longer run. It also retries: pg_isready can report "ready" while the
+# entrypoint is still finishing its bootstrap, so a single CREATE DATABASE may transiently
+# fail — we retry instead of silently warning. Idempotent, same spirit as Flyway below.
 echo "  Ensuring Flowable database exists..."
-if docker exec civitas-postgres-portal psql -U admin -d portal_backend -tAc \
-    "SELECT 1 FROM pg_database WHERE datname='flowable'" 2>/dev/null | grep -q 1; then
-    echo "  Flowable database already present"
-elif docker exec civitas-postgres-portal psql -U admin -d portal_backend -c \
-    "CREATE DATABASE flowable OWNER admin" >/dev/null 2>&1; then
-    echo "  Flowable database created"
-else
-    echo "  WARNING: Could not create Flowable database (config-adapter may fail to start)"
+FLOWABLE_DB_READY=false
+for i in $(seq 1 10); do
+    if docker exec civitas-postgres-portal psql -U admin -d portal_backend -tAc \
+        "SELECT 1 FROM pg_database WHERE datname='flowable'" 2>/dev/null | grep -q 1; then
+        echo "  Flowable database already present"
+        FLOWABLE_DB_READY=true
+        break
+    fi
+    CREATE_OUTPUT=$(docker exec civitas-postgres-portal psql -U admin -d portal_backend -c \
+        "CREATE DATABASE flowable OWNER admin" 2>&1)
+    if echo "$CREATE_OUTPUT" | grep -q "CREATE DATABASE"; then
+        echo "  Flowable database created"
+        FLOWABLE_DB_READY=true
+        break
+    fi
+    # A concurrent creator (init script / another start) may have won the race meanwhile.
+    if echo "$CREATE_OUTPUT" | grep -q "already exists"; then
+        echo "  Flowable database already present"
+        FLOWABLE_DB_READY=true
+        break
+    fi
+    sleep 1
+done
+if [ "$FLOWABLE_DB_READY" = false ]; then
+    echo "  ERROR: Could not create Flowable database after 10 attempts; last psql output:"
+    echo "    $CREATE_OUTPUT"
+    echo "  config-adapter will fail to start — create it manually with:"
+    echo "    docker exec civitas-postgres-portal psql -U admin -d portal_backend -c 'CREATE DATABASE flowable OWNER admin'"
+    exit 1
 fi
 
 echo "  Running database migrations..."
@@ -622,10 +644,6 @@ else
     echo "           Dataset pipeline deployment will not work."
 fi
 
-cd "$SCRIPT_DIR/modelatlas"
-$DOCKER_COMPOSE up -d
-echo "  Model Atlas + Apicurio Registry started"
-
 cd "$SCRIPT_DIR"
 
 echo
@@ -674,19 +692,6 @@ wait_for_service "Keycloak" "http://localhost:8080/realms/master" 60
 wait_for_service "Kafka UI" "http://localhost:8090" 30
 wait_for_service "OPA" "http://localhost:8181/health" 30
 wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 60
-# Model Atlas has no health endpoint — check that it responds (any HTTP status)
-MA_READY=false
-for i in $(seq 1 30); do
-    if curl -s -o /dev/null "http://localhost:8086/" 2>/dev/null; then
-        echo "  Model Atlas is ready"
-        MA_READY=true
-        break
-    fi
-    sleep 2
-done
-if [ "$MA_READY" = false ]; then
-    echo "  WARNING: Model Atlas may not be ready yet (timeout)"
-fi
 
 # macOS: disable Keycloak https requirement on master realm on macos
 if [ "$OS_TYPE" = "Darwin" ]; then
@@ -822,6 +827,11 @@ if [ "$config_adapter_option" = "2" ]; then
 #!/bin/bash
 # Config Adapter environment variables (from application.properties)
 export HEALTHCHECK_PORT=8088
+# Master key for decrypting ENC(...) credentials (e.g. a datasource DB password) at deploy time.
+# MUST match portal-backend's civitas.master-key — the local profile (application-local.yaml) and
+# apps/docker-compose.yml both use this dev value. Without it the NiFi/GeoServer saga fails with
+# "encrypted credentials present but CIVITAS_MASTER_KEY is not configured".
+export CIVITAS_MASTER_KEY=${CIVITAS_MASTER_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
 export ADAPTERS=keycloak,apisix,frost
 export EVENTHANDLER_NAME=kafka
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
@@ -851,7 +861,7 @@ export APISIX_PLUGIN_CONFIG_ID=1
 export APISIX_SERVICE_ID=svc-frost-server
 # Headers the saga's route-level proxy-rewrite must strip in lieu of plugin_config 1
 # (Route-over-PluginConfig precedence overrides plugin_config's proxy-rewrite).
-export APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids
+export APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
 # FROST upstream auth APISIX injects into proxy-rewrite for private dataset routes.
 export APISIX_FROST_API_KEY=dev-frost-api-key
 export APISIX_FROST_API_KEY_HEADER=X-API-Key
@@ -862,16 +872,35 @@ export FROST_API_KEY=dev-frost-api-key
 export FROST_API_KEY_HEADER=X-API-Key
 export FROST_TOPICS=de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
 export NIFI_URL=https://localhost:8443
+# config-adapter authenticates to NiFi via the OIDC client-credentials grant (Keycloak).
+export NIFI_OIDC_TOKEN_URI=http://localhost:8080/realms/civitas-core/protocol/openid-connect/token
+export NIFI_OIDC_CLIENT_ID=nifi
+export NIFI_OIDC_CLIENT_SECRET=${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}
+# FROST as seen from inside the NiFi container (the flow's HTTP legs run there),
+# not the host-mapped localhost:8085.
+export NIFI_FROST_URL=http://civitas-frost:8080/FROST-Server/v1.1
 export NIFI_TOPICS=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+# PostGIS sink connection for the DEPLOYED NiFi flow (PutDatabaseRecord). The flow runs INSIDE the
+# NiFi container, so this must be the docker name + internal port (like apps/docker-compose.yml) —
+# not localhost/5434. Without it the POSTGIS sink stage fails: "no platform database connection URL".
+export NIFI_POSTGIS_URL=${NIFI_POSTGIS_URL:-jdbc:postgresql://civitas-geoserver-db:5432/geoserver}
+export NIFI_POSTGIS_USER=${NIFI_POSTGIS_USER:-geoserver}
+export NIFI_POSTGIS_PASSWORD=${NIFI_POSTGIS_PASSWORD:-geoserver}
 export GEOSERVER_URL=http://localhost:8082/geoserver
 export GEOSERVER_ADMIN_USER=admin
 export GEOSERVER_ADMIN_PASSWORD=geoserver
-export GEOSERVER_POSTGIS_HOST=localhost
-export GEOSERVER_POSTGIS_PORT=5434
-export GEOSERVER_POSTGIS_DB=geoserver
+# GeoServer datastore connection: the adapter only relays these to GeoServer via REST; the
+# GeoServer CONTAINER opens the actual DB connection over the docker network, so this must be
+# the container name + internal port (NOT localhost / the host-published 5434, which from inside
+# the GeoServer container would point at GeoServer itself). Var name is GEOSERVER_POSTGIS_DATABASE
+# (dots->underscores of geoserver.postgis.database), matching apps/docker-compose.yml.
+export GEOSERVER_POSTGIS_HOST=civitas-geoserver-db
+export GEOSERVER_POSTGIS_PORT=5432
+export GEOSERVER_POSTGIS_DATABASE=geoserver
 export GEOSERVER_POSTGIS_USER=geoserver
 export GEOSERVER_POSTGIS_PASSWORD=geoserver
-# PostGIS adapter DDL connection — must point at the same database the GeoServer datastore reads
+# PostGIS adapter DDL connection — opened by the config-adapter ITSELF (runs on the host in cmd
+# mode), so it uses the host-published port 5434. Same physical DB as the datastore above.
 export POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5434/geoserver
 export POSTGIS_JDBC_USER=geoserver
 export POSTGIS_JDBC_PASSWORD=geoserver
@@ -899,7 +928,6 @@ cd "$BACKEND_DIR"
 export SPRING_DATASOURCE_USERNAME=admin
 export SPRING_DATASOURCE_PASSWORD=admin
 export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable&gssEncMode=disable"
-export MODEL_ATLAS_BASE_URL=http://localhost:8086
 mvn clean spring-boot:run -Dspring-boot.run.profiles=local,init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION
 exec bash
 SCRIPT_EOF
@@ -926,6 +954,8 @@ if [ "$config_adapter_option" = "3" ]; then
     echo
     echo "Environment variables to set in IDE:"
     echo "  HEALTHCHECK_PORT=8088"
+    echo "  # must match portal-backend's civitas.master-key (local profile / apps compose)"
+    echo "  CIVITAS_MASTER_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     echo "  KAFKA_BOOTSTRAP_SERVERS=localhost:9092"
     echo "  FLOWABLE_JDBC_URL=jdbc:postgresql://localhost:5432/flowable"
     echo "  FLOWABLE_JDBC_USERNAME=admin"
@@ -943,21 +973,30 @@ if [ "$config_adapter_option" = "3" ]; then
     echo "  APISIX_API_PUBLIC_URL=http://api.localhost:9080"
     echo "  APISIX_PLUGIN_CONFIG_ID=1"
     echo "  APISIX_SERVICE_ID=svc-frost-server"
-    echo "  APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids"
+    echo "  APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids,X-Allowed-Pool-Ids"
     echo "  APISIX_FROST_API_KEY=dev-frost-api-key"
     echo "  APISIX_FROST_API_KEY_HEADER=X-API-Key"
     echo "  FROST_URL=http://localhost:8085/FROST-Server/v1.1"
     echo "  FROST_PUBLIC_URL=http://civitas-frost:8080/FROST-Server/v1.1"
     echo "  FROST_API_KEY=dev-frost-api-key"
     echo "  NIFI_URL=https://localhost:8443"
+    echo "  NIFI_OIDC_TOKEN_URI=http://localhost:8080/realms/civitas-core/protocol/openid-connect/token"
+    echo "  NIFI_OIDC_CLIENT_ID=nifi"
+    echo "  NIFI_OIDC_CLIENT_SECRET=<set; see dev-environment/nifi/.env.example>"
+    echo "  # PostGIS sink conn for the deployed NiFi flow (runs in the NiFi container) -> docker name + 5432"
+    echo "  NIFI_POSTGIS_URL=jdbc:postgresql://civitas-geoserver-db:5432/geoserver"
+    echo "  NIFI_POSTGIS_USER=geoserver"
+    echo "  NIFI_POSTGIS_PASSWORD=geoserver"
     echo "  GEOSERVER_URL=http://localhost:8082/geoserver"
     echo "  GEOSERVER_ADMIN_USER=admin"
     echo "  GEOSERVER_ADMIN_PASSWORD=geoserver"
-    echo "  GEOSERVER_POSTGIS_HOST=localhost"
-    echo "  GEOSERVER_POSTGIS_PORT=5434"
-    echo "  GEOSERVER_POSTGIS_DB=geoserver"
+    echo "  # datastore conn is relayed to the GeoServer container -> use the docker name + internal port"
+    echo "  GEOSERVER_POSTGIS_HOST=civitas-geoserver-db"
+    echo "  GEOSERVER_POSTGIS_PORT=5432"
+    echo "  GEOSERVER_POSTGIS_DATABASE=geoserver"
     echo "  GEOSERVER_POSTGIS_USER=geoserver"
     echo "  GEOSERVER_POSTGIS_PASSWORD=geoserver"
+    echo "  # DDL conn is opened by the adapter itself (host) -> host-published port 5434"
     echo "  POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5434/geoserver"
     echo "  POSTGIS_JDBC_USER=geoserver"
     echo "  POSTGIS_JDBC_PASSWORD=geoserver"
@@ -983,7 +1022,6 @@ if [ "$backend_option" = "3" ]; then
     echo "  SPRING_DATASOURCE_USERNAME=admin"
     echo "  SPRING_DATASOURCE_PASSWORD=admin"
     echo "  SPRING_DATASOURCE_URL=\"jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable&gssEncMode=disable\""
-    echo "  MODEL_ATLAS_BASE_URL=http://localhost:8086"
     echo
 fi
 
@@ -1195,10 +1233,9 @@ echo "  GeoServer PostGIS: localhost:5434  db=geoserver  user=geoserver  (see ge
 echo "  GeoServer Consul: http://localhost:8500"
 echo "  APISIX Gateway:   http://localhost:9080"
 echo "  APISIX Admin API: http://localhost:9180"
-echo "  Apache NiFi:      https://localhost:8443/nifi (${SINGLE_USER_CREDENTIALS_USERNAME:-admin} / ${SINGLE_USER_CREDENTIALS_PASSWORD:-see nifi/.env})"
+echo "  Apache NiFi:      https://localhost:8443/nifi (login via Keycloak / OIDC)"
 echo "  OPA:              http://localhost:8181"
 echo "  AuthZ Repository: http://localhost:8091"
-echo "  Model Atlas:      http://localhost:8086"
 echo "  Apicurio Registry UI: http://localhost:8888"
 echo
 echo "======================================================"
@@ -1235,5 +1272,4 @@ echo "  cd dev-environment/apisix && docker compose down"
 echo "  cd dev-environment/frost && docker compose down"
 echo "  cd dev-environment/geoserver && docker compose down"
 echo "  cd dev-environment/nifi && docker compose down"
-echo "  cd dev-environment/modelatlas && docker compose down"
 echo

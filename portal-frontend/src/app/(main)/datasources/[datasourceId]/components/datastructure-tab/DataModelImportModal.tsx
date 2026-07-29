@@ -33,10 +33,20 @@ interface DataModelImportModalProps extends DialogProps {
   datasourceTitle: string
   onSelectVersion: (selection: RowSelectionState) => void
   isUpdating?: boolean
+  // If true, the import button is enabled when a saved datastructure gets unselected
+  canRemoveSelection?: boolean
 }
 
 export const DataModelImportModal = (props: DataModelImportModalProps) => {
-  const { selectedVersion, datasourceTitle, open, onOpenChange = () => {}, onSelectVersion, isUpdating = false } = props
+  const {
+    selectedVersion,
+    datasourceTitle,
+    open,
+    onOpenChange = () => {},
+    onSelectVersion,
+    isUpdating = false,
+    canRemoveSelection = true,
+  } = props
   const t = useTranslations('datasources.dataModel.importModal')
   const tCommon = useTranslations('common')
   const tDatastructures = useTranslations('datastructures')
@@ -217,6 +227,15 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
     onSortingChange: updater => setSorting(resolveUpdater(updater, sorting)),
   })
 
+  // Import button disabled when loading, no datastructure selected or current selection is equal to saved selection
+  // When canRemoveSelection is true and a saved datastructure gets unselected, the import button is enabled (datastructure is removed)
+  const isImportButtonDisabled =
+    isUpdating ||
+    isFetchingDatasources ||
+    Object.keys(selection)[0] === selectedVersion ||
+    (JSON.stringify(selection) === '{}' && !selectedVersion) ||
+    (JSON.stringify(selection) === '{}' && !canRemoveSelection)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -249,7 +268,7 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
           confirmButtonType="button"
           onConfirmClick={() => onSelectVersion(selection)}
           onCancelClick={() => onOpenChange(false)}
-          isConfirmButtonDisabled={isUpdating || isFetchingDatasources}
+          isConfirmButtonDisabled={isImportButtonDisabled}
           hasCard={false}
           confirmButtonTitle={tCommon('actions.import')}
         />

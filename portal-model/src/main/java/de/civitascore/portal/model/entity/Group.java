@@ -2,6 +2,7 @@ package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.entity.base.AssignableEntity;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
@@ -29,16 +30,23 @@ import lombok.experimental.SuperBuilder;
 @Entity
 @Table(
     name = "groups",
-    uniqueConstraints =
-        @UniqueConstraint(
-            name = "uk_group_name",
-            columnNames = {"name"}),
+    uniqueConstraints = {
+      @UniqueConstraint(
+          name = "uk_group_name",
+          columnNames = {"name"}),
+      @UniqueConstraint(
+          name = "uk_group_external_id",
+          columnNames = {"external_id"})
+    },
     indexes = {@Index(name = "idx_group_contact", columnList = "contact_user_id")})
 @Getter
 @Setter
 @SuperBuilder
 @NoArgsConstructor
 public class Group extends AssignableEntity {
+
+  @Column(name = "external_id", length = 255)
+  private String externalId;
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(

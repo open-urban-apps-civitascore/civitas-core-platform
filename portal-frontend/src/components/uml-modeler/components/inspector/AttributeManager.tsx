@@ -8,16 +8,17 @@ import { GroupedOption, GroupedSelect } from '@/components/select/grouped-select
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 
-import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
+import {
+  cardinalityForDisplay,
+  cardinalityForStorage,
+  PROPERTY_CARDINALITY_VALUES,
+  UML_GEOMETRY_TYPES,
+  UML_PRIMITIVE_TYPES,
+} from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
-import {
-  type UMLAttribute,
-  type UMLElement,
-  type UMLGeometryType,
-  type UMLPrimitiveType,
-  type Visibility,
-} from '../../types/uml'
+import { canMultiplicityBePrimaryKey } from '../../services/jsonSchemaExportService'
+import { type UMLAttribute, type UMLElement, type UMLGeometryType, type UMLPrimitiveType } from '../../types/uml'
 
 interface AttributeManagerProps {
   nodeId: string
@@ -36,7 +37,6 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
         id: crypto.randomUUID(),
         name: 'neuesAttribut',
         type: 'String',
-        visibility: 'private',
         isId: false,
       }
       updateNode(nodeId, {
@@ -71,12 +71,19 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     return null
   }
 
-  const visibilityOptions: SelectOption<Visibility>[] = [
-    { value: 'public', label: '+' },
-    { value: 'private', label: '-' },
-    { value: 'protected', label: '#' },
-    { value: 'package', label: '~' },
-  ]
+  // Options for the cardinality dropdown of a single attribute. Imported or
+  // edge-authored models may carry a multiplicity outside the dropdown's four
+  // values (e.g. `*` or a range like `1..5`); we surface that value as an extra
+  // option so it stays visible and isn't silently discarded on the next edit.
+  const getMultiplicityOptions = (multiplicity?: string): SelectOption<string>[] => {
+    const displayed = cardinalityForDisplay(multiplicity)
+    const options: SelectOption<string>[] = PROPERTY_CARDINALITY_VALUES.map(value => ({ value, label: value }))
+    if (!options.some(option => option.value === displayed)) {
+      options.push({ value: displayed, label: displayed })
+    }
+    return options
+  }
+
   const primitiveTypeOptions = Object.keys(UML_PRIMITIVE_TYPES) as UMLPrimitiveType[]
   const geometryTypeOptions = Object.keys(UML_GEOMETRY_TYPES) as UMLGeometryType[]
 
@@ -199,6 +206,25 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               />
             </div>
 
+            {/* Cardinality / multiplicity */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Cardinality</label>
+              <BasicSelect
+                options={getMultiplicityOptions(attribute.multiplicity)}
+                onValueChange={e => {
+                  const multiplicity = cardinalityForStorage(e)
+                  updateAttribute(attribute.id, {
+                    multiplicity,
+                    ...(canMultiplicityBePrimaryKey(multiplicity) ? {} : { isId: false }),
+                  })
+                }}
+                value={cardinalityForDisplay(attribute.multiplicity)}
+                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                size="sm"
+                disabled={isReadOnly}
+              />
+            </div>
+
             {/* meta info - CRS */}
             <div className={cn(!isGeometryType(attribute.type as string) && 'hidden')}>
               <label className="block text-xs font-medium text-gray-600 mb-1">CRS</label>
@@ -209,19 +235,6 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
                 disabled={!isFirstGeomAttr(attribute.id)}
                 size="sm"
                 triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Visibility */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Visibility</label>
-              <BasicSelect
-                options={visibilityOptions}
-                onValueChange={e => updateAttribute(attribute.id, { visibility: e as Visibility })}
-                value={attribute.visibility}
-                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                size="sm"
-                disabled={isReadOnly}
               />
             </div>
 
@@ -253,20 +266,21 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               </label>
             </div>
 
-            {/* Primary key checkbox */}
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id={`static-${attribute.id}`}
-                checked={attribute.isId}
-                onChange={e => updateAttribute(attribute.id, { isId: e.target.checked })}
-                className="mr-2"
-                disabled={isReadOnly}
-              />
-              <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
-                {`Primary Key {id}`}
-              </label>
-            </div>
+            {canMultiplicityBePrimaryKey(attribute.multiplicity) && (
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={`primary-key-${attribute.id}`}
+                  checked={attribute.isId || false}
+                  onChange={e => updateAttribute(attribute.id, { isId: e.target.checked })}
+                  className="mr-2"
+                  disabled={isReadOnly}
+                />
+                <label htmlFor={`primary-key-${attribute.id}`} className="text-xs text-gray-600">
+                  Primary Key {'{id}'}
+                </label>
+              </div>
+            )}
           </div>
         ))}
 

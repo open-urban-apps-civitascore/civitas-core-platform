@@ -45,6 +45,15 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
+vi.mock('@/hooks/use-permissions', () => ({
+  usePermissions: () => ({
+    hasPermission: () => true,
+    hasScopedPermission: () => true,
+    hasPermissionInScope: () => true,
+    hasAnyPermission: () => true,
+  }),
+}))
+
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
@@ -231,7 +240,7 @@ describe('ApiConfigPage', () => {
       fireEvent.submit(screen.getByTestId('apiConfigForm'))
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/datasets/test-id/apis/sta?mode=edit')
+        expect(mockReplace).toHaveBeenCalledWith('/datasets/test-id/apis/sta?mode=edit')
       })
     })
 

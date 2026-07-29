@@ -33,7 +33,13 @@ public final class WorkspaceNames {
 
   /**
    * Normalizes a dataset id into a GeoServer workspace name: lowercased, with every character that
-   * is not {@code a-z}, {@code 0-9} or {@code _} replaced by {@code _}.
+   * is not {@code a-z}, {@code 0-9} or {@code _} replaced by {@code _}, and prefixed with {@code
+   * ds_} when the result would start with a digit.
+   *
+   * <p>The prefix keeps the name a valid XML NCName: GeoServer emits the workspace as an XML
+   * namespace prefix in OGC capabilities documents, and an NCName must not start with a digit — a
+   * digit-initial dataset UUID would otherwise break the (global) WFS {@code GetCapabilities}
+   * response. Letter- and underscore-initial names are already valid NCNames and stay unchanged.
    *
    * @param datasetId the dataset id (must not be blank)
    * @return the workspace name
@@ -43,6 +49,8 @@ public final class WorkspaceNames {
     if (datasetId == null || datasetId.isBlank()) {
       throw new IllegalArgumentException("datasetId must not be blank");
     }
-    return NON_WORKSPACE_CHAR.matcher(datasetId.toLowerCase(Locale.ROOT)).replaceAll("_");
+    String normalized =
+        NON_WORKSPACE_CHAR.matcher(datasetId.toLowerCase(Locale.ROOT)).replaceAll("_");
+    return Character.isDigit(normalized.charAt(0)) ? "ds_" + normalized : normalized;
   }
 }

@@ -1,0 +1,31 @@
+meta {
+  name: 08. Patch DataSource with version
+  type: http
+  seq: 9
+}
+
+patch {
+  url: {{baseUrl}}/datasources/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{scopeDataSourceId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionId": "{{scopeVersionId}}"
+  }
+}
+
+tests {
+  test("Patched", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Sets `dataStructureVersionId`, required before the DataSource can be released (step 09).
+}

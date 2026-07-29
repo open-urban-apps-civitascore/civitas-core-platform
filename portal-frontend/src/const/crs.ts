@@ -15,19 +15,23 @@ export const crsOptions = [
   {
     label: 'EPSG:25832 – UTM Zone 32N',
     value: 'EPSG:25832',
-    nativeBounds: [-1866822.47, 3680224.65, 3246120.36, 9483069.2], // metres – https://epsg.io/25832
+    // metres – realistic extent: EPSG area-of-use (6–12°E) reprojected via PROJ 9.2.1.
+    // NOT epsg.io "Projected bounds" (whole domain), which is far too wide (negative easting)
+    // and made external clients see no data / broke the GeoServer preview.
+    nativeBounds: [239323.44, 4290145.58, 761545.65, 9365801.91],
     proj4def: '+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs',
   },
   {
     label: 'EPSG:25833 – UTM Zone 33N',
     value: 'EPSG:25833',
-    nativeBounds: [-2450512.62, 3680451.78, 2665647.82, 9493779.8], // metres – https://epsg.io/25833
+    // metres – realistic extent: EPSG area-of-use (12–18°E) reprojected via PROJ 9.2.1.
+    nativeBounds: [269387.69, 5138493.34, 731380.98, 9375835.77],
     proj4def: '+proj=utm +zone=33 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs',
   },
   {
     label: 'EPSG:4258  – ETRS89',
     value: 'EPSG:4258',
-    nativeBounds: [-16.1, 33.26, 38.01, 84.73], // degrees – https://epsg.io/4258
+    nativeBounds: [-16.1, 32.88, 40.18, 84.73], // degrees – EPSG area-of-use (PROJ 9.2.1)
     proj4def: '+proj=longlat +ellps=GRS80 +no_defs',
   },
 ]

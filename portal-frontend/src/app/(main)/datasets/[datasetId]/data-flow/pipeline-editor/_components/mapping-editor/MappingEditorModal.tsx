@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import {
   CanvasScaffold,
   createTransformNodeType,
@@ -19,14 +20,24 @@ import type { PortType, TransformNodeData } from '@/components/node-editor/types
 import { buildRegistry } from '@/components/node-editor/types'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
+import { buildDataStructureUrn } from '@/utils/urn'
 
+import type { StaTargetVocabulary } from '../../_constants/staTargetCatalog'
+import { deriveStaMatchKeys } from '../../_constants/staTargetCatalog'
 import type { MappingConfig } from './_types'
 import { ARRAY_EDGE_STYLE } from './_types'
-import { compileCanvas, decompileConfig, SOURCE_NODE_ID, TARGET_NODE_ID } from './compile'
+import {
+  compileCanvas,
+  decompileConfig,
+  findUnconnectedTransformNodes,
+  SOURCE_NODE_ID,
+  TARGET_NODE_ID,
+} from './compile'
 import { TransformInspector } from './inspector/TransformInspector'
 import { MegaNode } from './nodes/MegaNode'
-import { umlDiagramToSchemaTree } from './schema/adapter'
-import { flattenTree, objectFieldsCompatible } from './schema/fieldTree'
+import { flattenTree, objectFieldsCompatible, requiredFieldPaths } from './schema/fieldTree'
+import { versionToSchemaTree } from './schema/versionTree'
 import { computeStatus } from './status'
 import type { MappingTransformDef } from './transforms'
 import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
@@ -45,7 +56,7 @@ interface MappingEditorModalProps {
   source: SchemaRef
   target: SchemaRef
   config: MappingConfig
-  onSave: (config: MappingConfig) => void
+  onSave: (config: MappingConfig, targetRequiredFields: string[], staMatchKeys: StaTargetVocabulary) => void
 }
 
 const FULLSCREEN =
@@ -62,6 +73,7 @@ export const MappingEditorModal = ({
 }: MappingEditorModalProps) => {
   const t = useTranslations('pipelineEditor.mappingEditor')
   const tCommon = useTranslations('common')
+  const tUmlModeler = useTranslations('umlModeler')
 
   /**
    * Build a translated copy of the registry so PaletteShell renders
@@ -97,20 +109,51 @@ export const MappingEditorModal = ({
     isEnabled: open,
   })
 
-  const sourceTree = useMemo(
-    () => umlDiagramToSchemaTree(sourceQuery.data?.data?.styles, source.name ?? 'source'),
+  const sourceResolution = useMemo(
+    () => versionToSchemaTree(sourceQuery.data?.data, source.name ?? 'source'),
     [sourceQuery.data, source.name],
   )
-  const targetTree = useMemo(
-    () => umlDiagramToSchemaTree(targetQuery.data?.data?.styles, target.name ?? 'target'),
+  const targetResolution = useMemo(
+    () => versionToSchemaTree(targetQuery.data?.data, target.name ?? 'target'),
     [targetQuery.data, target.name],
   )
+  const sourceTree = sourceResolution.tree
+  const targetTree = targetResolution.tree
   const sourceFields = useMemo(() => flattenTree(sourceTree), [sourceTree])
   const targetFields = useMemo(() => flattenTree(targetTree), [targetTree])
+
+  // The diagram-derived fallback tree is not the artifact the engine reads — the user must know
+  // before drawing mappings against it — and a rootless diagram yields an empty tree whose reason
+  // would otherwise be invisible. The stable role-keyed toast ids absorb re-renders (StrictMode,
+  // refetches) into one visible warning per side, even when both structures share a name.
+  useEffect(() => {
+    if (!open) return
+    for (const [role, resolution] of [
+      ['source', sourceResolution],
+      ['target', targetResolution],
+    ] as const) {
+      if (resolution.isModelBroken) {
+        toast.warning(t('modelUnresolvable', { name: resolution.tree.name }), {
+          id: `model-broken-${role}`,
+        })
+      }
+      if (resolution.diagramFailure) {
+        toast.warning(
+          t('diagramUnresolvable', {
+            name: resolution.tree.name,
+            reason: rootFailureMessage(tUmlModeler, resolution.diagramFailure),
+          }),
+          { id: `diagram-unresolvable-${role}` },
+        )
+      }
+    }
+  }, [open, sourceResolution, targetResolution, t, tUmlModeler])
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Which exit action is awaiting confirmation because unconnected transforms would be dropped.
+  const [pendingExit, setPendingExit] = useState<'apply' | 'close' | null>(null)
   const nextId = useRef(0)
   const initialized = useRef(false)
 
@@ -134,7 +177,7 @@ export const MappingEditorModal = ({
       const field = sourceFields.get(handleId)
       if (!field) return null
       // `sub` is the concrete field type (incl. geometry names like 'Point') so the
-      // scalar subtype check matches Point↔Point and blocks Point↔Polygon.
+      // exact subtype check matches Point↔Point and blocks Point↔Polygon.
       return { type: field.portType, sub: field.type }
     }
     if (nodeId === TARGET_NODE_ID) {
@@ -154,17 +197,16 @@ export const MappingEditorModal = ({
 
   /**
    * Two ports are compatible when:
-   *  - both have the same portType category (scalar / array / object)
-   *  - AND for scalars: the subtype matches exactly (int↔int, str↔str, Point↔Point, …)
-   *    — type conversions must go through an explicit conversion node, and geometries
-   *    (first-class scalar-like types) only connect to the same geometry kind, so
-   *    Point↔Polygon is blocked automatically.
+   *  - both have the same portType category (scalar / geometry / array / object)
+   *  - AND for scalar/geometry ports: the subtype matches exactly (int↔int, str↔str, Point↔Point, …)
+   *    — type conversions must go through an explicit conversion node.
    */
   const portsCompatible = useCallback(
     (from: { type: PortType; sub?: string } | null, to: { type: PortType; sub?: string } | null): boolean => {
       if (!from || !to) return false
       if (from.type !== to.type) return false
-      if (from.type === 'scalar' && from.sub && to.sub && from.sub !== to.sub) return false
+      if ((from.type === 'scalar' || from.type === 'geometry') && from.sub && to.sub && from.sub !== to.sub)
+        return false
       return true
     },
     [],
@@ -204,12 +246,19 @@ export const MappingEditorModal = ({
     (_event, connectionState) => {
       // connectionState.isValid is false when the drag ended on an incompatible handle
       if (connectionState && !connectionState.isValid && pendingConnection.current) {
-        const from = endpointInfo(pendingConnection.current.nodeId, pendingConnection.current.handleId)
-        // Only show the message when we can identify the source type (not a missed drop into empty space)
-        if (from?.sub) {
-          toast.error(t('errors.typeMismatchWithType', { type: from.sub }))
-        } else if (from) {
-          toast.error(t('errors.typeMismatch'))
+        const fromDir = connectionState.fromHandle?.type
+        const toDir = connectionState.toHandle?.type
+        // Same-direction drop (output-output or input-input)
+        if (toDir && fromDir === toDir) {
+          toast.error(fromDir === 'source' ? t('errors.outputToOutput') : t('errors.inputToInput'))
+        } else {
+          const from = endpointInfo(pendingConnection.current.nodeId, pendingConnection.current.handleId)
+          // Only show the message when we can identify the source type (not a missed drop into empty space)
+          if (from?.sub) {
+            toast.error(t('errors.typeMismatchWithType', { type: from.sub }))
+          } else if (from) {
+            toast.error(t('errors.typeMismatch'))
+          }
         }
       }
       pendingConnection.current = null
@@ -300,16 +349,41 @@ export const MappingEditorModal = ({
   // Look up the def from the translated registry so the inspector receives translated labels
   const selectedDef = selectedData ? translatedRegistry.byType[selectedData.defType] : undefined
 
-  const handleSave = () => {
+  // Transform nodes that aren't wired to the output — compileCanvas drops these on save.
+  const unconnectedTransforms = useMemo(() => findUnconnectedTransformNodes(nodes, edges), [nodes, edges])
+
+  const doSave = () => {
     const { fields, positions } = compileCanvas(nodes, edges)
-    onSave({
-      $schema: 'https://civitasconnect.digital/core/mapping/v1',
-      source: `urn:core:datastructure:${source.datastructureId}:${source.versionId}`,
-      target: `urn:core:datastructure:${target.datastructureId}:${target.versionId}`,
-      fields,
-      positions,
-    })
+    // A selectable source/target is always a released version, so name and
+    // version are present. If buildDataStructureUrn throws here, the platform is
+    // in an unexpected state (a released DataStructure without name/version) —
+    // let it surface rather than silently emitting a malformed URN.
+    onSave(
+      {
+        $schema: 'https://civitasconnect.digital/core/mapping/v1',
+        source: buildDataStructureUrn(source.name ?? '', source.datastructureId, sourceQuery.data?.data?.version ?? ''),
+        target: buildDataStructureUrn(target.name ?? '', target.datastructureId, targetQuery.data?.data?.version ?? ''),
+        fields,
+        positions,
+      },
+      requiredFieldPaths(targetTree),
+      deriveStaMatchKeys(targetTree),
+    )
+  }
+
+  const performExit = (action: 'apply' | 'close') => {
+    setPendingExit(null)
+    if (action === 'apply') doSave()
     onOpenChange(false)
+  }
+
+  // Warn before leaving if unconnected transforms would be discarded; otherwise exit directly.
+  const requestExit = (action: 'apply' | 'close') => {
+    if (unconnectedTransforms.length > 0) {
+      setPendingExit(action)
+      return
+    }
+    performExit(action)
   }
 
   const { mapped, unmapped } = status.counts
@@ -319,10 +393,10 @@ export const MappingEditorModal = ({
       <DialogTitle className="text-base">{name || t('toolbar.title')}</DialogTitle>
       <span className="text-center text-xs text-muted-foreground">{t('toolbar.status', { mapped, unmapped })}</span>
       <div className="flex items-center justify-end gap-2">
-        <Button size="sm" onClick={handleSave}>
+        <Button size="sm" onClick={() => requestExit('apply')} disabled={!isReady}>
           {tCommon('actions.apply')}
         </Button>
-        <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>
+        <Button size="sm" variant="outline" onClick={() => requestExit('close')}>
           {tCommon('actions.close')}
         </Button>
       </div>
@@ -340,44 +414,58 @@ export const MappingEditorModal = ({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        showCloseButton={false}
-        className={FULLSCREEN}
-        aria-describedby={undefined}
-        onKeyDown={stopDeletePropagation}
-      >
-        <EditorLayout
-          toolbar={toolbar}
-          palette={<PaletteShell registry={translatedRegistry} title={t('palette.title')} />}
-          inspector={
-            <InspectorShell
-              title={t('inspector.title')}
-              isEmpty={!selectedDef}
-              emptyMessage={t('inspector.emptyMessage')}
-            >
-              {selectedDef && selectedData && (
-                <TransformInspector def={selectedDef} config={selectedData.config} onChange={updateConfig} />
-              )}
-            </InspectorShell>
-          }
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          showCloseButton={false}
+          className={FULLSCREEN}
+          aria-describedby={undefined}
+          onKeyDown={stopDeletePropagation}
         >
-          <CanvasScaffold
-            nodes={displayNodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onConnectStart={onConnectStart}
-            onConnectEnd={onConnectEnd}
-            isValidConnection={isValidConnection}
-            onDropNode={onDropNode}
-            onSelectionChange={setSelectedId}
-            deleteKeyCode={['Delete', 'Backspace']}
-          />
-        </EditorLayout>
-      </DialogContent>
-    </Dialog>
+          <EditorLayout
+            toolbar={toolbar}
+            palette={<PaletteShell registry={translatedRegistry} title={t('palette.title')} />}
+            inspector={
+              <InspectorShell
+                title={t('inspector.title')}
+                isEmpty={!selectedDef}
+                emptyMessage={t('inspector.emptyMessage')}
+              >
+                {selectedDef && selectedData && (
+                  <TransformInspector def={selectedDef} config={selectedData.config} onChange={updateConfig} />
+                )}
+              </InspectorShell>
+            }
+          >
+            <CanvasScaffold
+              nodes={displayNodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onConnectStart={onConnectStart}
+              onConnectEnd={onConnectEnd}
+              isValidConnection={isValidConnection}
+              onDropNode={onDropNode}
+              onSelectionChange={setSelectedId}
+              deleteKeyCode={['Delete', 'Backspace']}
+            />
+          </EditorLayout>
+        </DialogContent>
+      </Dialog>
+
+      <WarningModal
+        open={pendingExit !== null}
+        title={t('unconnectedWarning.title')}
+        description={t('unconnectedWarning.description', { count: unconnectedTransforms.length })}
+        confirmButtonTitle={t('unconnectedWarning.confirm')}
+        onOpenChange={isOpen => {
+          if (!isOpen) setPendingExit(null)
+        }}
+        onDiscard={() => setPendingExit(null)}
+        onConfirm={() => pendingExit && performExit(pendingExit)}
+      />
+    </>
   )
 }

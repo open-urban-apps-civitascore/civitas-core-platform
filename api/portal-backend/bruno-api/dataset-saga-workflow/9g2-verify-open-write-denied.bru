@@ -1,0 +1,40 @@
+meta {
+  name: 9g2. Verify Open-Data is read-only (anonymous write → denied)
+  type: http
+  seq: 28
+  tags: [
+    requires-nifi
+  ]
+}
+
+post {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/{{sagaSlug}}/Things
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "anon-write-attempt"
+  }
+}
+
+tests {
+  test("Anonymous WRITE to an open dataset is denied with exactly 401 (no credentials)", function() {
+    // Open data grants anonymous READ only (OPA allows GET on the open-data flag). A write has no
+    // matching permission/grant, so OPA denies it — proving the bypass-free model never opens writes.
+    // Per the status contract an anonymous (no-credentials) deny is exactly 401; accepting 404/405
+    // would let a missing/mis-provisioned route or an unreached OPA path pass undetected.
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  **Saga step 9g2** — Open Data Access is **read-only**. After 9f flipped `openDataAccess` to true, an
+  unauthenticated **GET** is allowed (9g → 200), but an unauthenticated **write** (POST) to the same
+  open dataset must be rejected. In the OPA-based model the route always carries OIDC + OPA; OPA's
+  open-data ABAC grant matches GET only, so any anonymous write falls through to a deny.
+
+  This is the universal counterpart to the old route-level method gate (GET/HEAD/OPTIONS), now enforced
+  centrally by OPA rather than by stripping the auth plugin at the gateway.
+}

@@ -27,6 +27,7 @@ interface EntitySelectorProps {
   isError: boolean
   onChange: (entity: SelectableEntity | undefined) => void
   isDisabled?: boolean
+  fallbackName?: string
 }
 
 // ============================================================================
@@ -42,6 +43,7 @@ export const EntitySelector: React.FC<EntitySelectorProps> = ({
   isError,
   onChange,
   isDisabled = false,
+  fallbackName,
 }) => {
   const t = useTranslations('pipelineEditor')
   const tCommon = useTranslations('common')
@@ -59,6 +61,12 @@ export const EntitySelector: React.FC<EntitySelectorProps> = ({
   }
 
   const selectedValue = selectedId !== undefined ? String(selectedId) : undefined
+
+  const hasSelectedEntity = entities.some(e => String(e.id) === selectedValue)
+  const displayEntities =
+    selectedValue && !hasSelectedEntity && fallbackName
+      ? [...entities, { id: selectedValue, name: fallbackName }]
+      : entities
 
   return (
     <div className="space-y-2">
@@ -87,7 +95,7 @@ export const EntitySelector: React.FC<EntitySelectorProps> = ({
                   </div>
                 </SelectItem>
               )}
-              {entities.map(entity => (
+              {displayEntities.map(entity => (
                 <SelectItem key={String(entity.id)} value={String(entity.id)}>
                   {entity.name}
                 </SelectItem>

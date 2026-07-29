@@ -44,41 +44,6 @@ class ArchitectureTest {
   }
 
   @Test
-  void codedBuilders_shouldNotDependOnKafkaPackage() {
-    noClasses()
-        .that()
-        .resideInAPackage("..coded..")
-        .should()
-        .dependOnClassesThat()
-        .resideInAPackage("..kafka..")
-        .check(classes);
-  }
-
-  @Test
-  void bpmnPackage_shouldNotDependOnCodedPackage() {
-    noClasses()
-        .that()
-        .resideInAPackage("de.civitascore.configadapter.flowable.bpmn..")
-        .should()
-        .dependOnClassesThat()
-        .resideInAPackage("de.civitascore.configadapter.flowable.coded..")
-        .as("BPMN and coded approaches must be independent")
-        .check(classes);
-  }
-
-  @Test
-  void codedPackage_shouldNotDependOnBpmnPackage() {
-    noClasses()
-        .that()
-        .resideInAPackage("de.civitascore.configadapter.flowable.coded..")
-        .should()
-        .dependOnClassesThat()
-        .resideInAPackage("de.civitascore.configadapter.flowable.bpmn..")
-        .as("BPMN and coded approaches must be independent")
-        .check(classes);
-  }
-
-  @Test
   void noClassesShouldDependOnCustomOrchestrator() {
     noClasses()
         .that()

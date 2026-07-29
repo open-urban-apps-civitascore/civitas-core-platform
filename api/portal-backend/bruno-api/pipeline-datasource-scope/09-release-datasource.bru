@@ -1,0 +1,26 @@
+meta {
+  name: 09. Release DataSource (-> AVAILABLE)
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{scopeDataSourceId}}
+}
+
+tests {
+  test("Released", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Transitions the DataSource to `AVAILABLE`. This is required so that the pipeline write in step 11
+  passes the AVAILABLE-status check and actually reaches the DataPool-scope validation (the 422).
+}

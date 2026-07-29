@@ -52,6 +52,11 @@ public record SagaCommandResult(
     return new SagaCommandResult("STEP_FAILED", sagaId, stepId, Map.of(), Map.of(), error);
   }
 
+  public static SagaCommandResult failure(
+      String sagaId, String stepId, Map<String, Object> resultData, String error) {
+    return new SagaCommandResult("STEP_FAILED", sagaId, stepId, resultData, Map.of(), error);
+  }
+
   public static SagaCommandResult compensationSuccess(String sagaId, String stepId) {
     return new SagaCommandResult(
         "COMPENSATION_COMPLETED", sagaId, stepId, Map.of(), Map.of(), null);
@@ -59,5 +64,11 @@ public record SagaCommandResult(
 
   public static SagaCommandResult compensationFailure(String sagaId, String stepId, String error) {
     return new SagaCommandResult("COMPENSATION_FAILED", sagaId, stepId, Map.of(), Map.of(), error);
+  }
+
+  public static SagaCommandResult compensationFailure(
+      String sagaId, String stepId, Map<String, Object> resultData, String error) {
+    return new SagaCommandResult(
+        "COMPENSATION_FAILED", sagaId, stepId, resultData, Map.of(), error);
   }
 }

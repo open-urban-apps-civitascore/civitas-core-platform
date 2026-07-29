@@ -3,8 +3,7 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.PipelineMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DatapoolScopeType;
-import de.civitascore.portal.model.entity.DataPool;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
@@ -14,17 +13,16 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
-import de.civitascore.portal.util.DataSourceScopeViolationException;
+import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -43,6 +41,8 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
   private final DataSourceRepository dataSourceRepository;
   private final DataSinkService dataSinkService;
   private final DataSinkRepository dataSinkRepository;
+  private final ScopeAccessAuthorizer scopeAccessAuthorizer;
+  private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
   public PipelineService(
       PipelineRepository pipelineRepository,
@@ -50,13 +50,17 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
       DataSetRepository dataSetRepository,
       DataSourceRepository dataSourceRepository,
       DataSinkService dataSinkService,
-      DataSinkRepository dataSinkRepository) {
+      DataSinkRepository dataSinkRepository,
+      ScopeAccessAuthorizer scopeAccessAuthorizer,
+      DataSourceDatapoolScopeValidator datapoolScopeValidator) {
     this.pipelineRepository = pipelineRepository;
     this.pipelineMapper = pipelineMapper;
     this.dataSetRepository = dataSetRepository;
     this.dataSourceRepository = dataSourceRepository;
     this.dataSinkService = dataSinkService;
     this.dataSinkRepository = dataSinkRepository;
+    this.scopeAccessAuthorizer = scopeAccessAuthorizer;
+    this.datapoolScopeValidator = datapoolScopeValidator;
   }
 
   @Override
@@ -132,13 +136,16 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
             });
 
     if (input.getDataSourceIds() != null && !input.getDataSourceIds().isEmpty()) {
+      // Authorize before revealing existence: a "not found" answer for an unauthorized caller
+      // would otherwise turn this endpoint into an existence oracle over the DataSource table.
+      scopeAccessAuthorizer.authorizeReferences(ScopeType.DATASOURCE, input.getDataSourceIds());
       List<DataSource> dataSources = dataSourceRepository.findAllById(input.getDataSourceIds());
       if (dataSources.size() != input.getDataSourceIds().size()) {
         throw new InvalidInputException(
             "Pipeline", "dataSourceIds", "One or more DataSource IDs not found");
       }
       dataSources.forEach(this::validateDataSourceLinkable);
-      validateDataSourcesInScope(dataSources, entity.getDataSet());
+      datapoolScopeValidator.validate(dataSources, entity.getDataSet().getDataPool());
       entity.setDataSources(new HashSet<>(dataSources));
     } else {
       entity.setDataSources(null);
@@ -215,33 +222,6 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
             });
 
     return saved;
-  }
-
-  private void validateDataSourcesInScope(List<DataSource> dataSources, DataSet dataSet) {
-    List<DataSource> offendingDataSources =
-        new ArrayList<>(
-            dataSources.stream()
-                .filter(ds -> ds.getDatapoolScopeType() == DatapoolScopeType.NONE)
-                .toList());
-
-    DataPool dataPool = dataSet.getDataPool();
-    if (dataPool != null) {
-      offendingDataSources.addAll(
-          dataSources.stream().filter(ds -> !isPermittedForDataPool(ds, dataPool)).toList());
-    }
-
-    if (!offendingDataSources.isEmpty()) {
-      throw new DataSourceScopeViolationException(
-          offendingDataSources.stream().map(DataSource::getId).collect(Collectors.toList()));
-    }
-  }
-
-  private boolean isPermittedForDataPool(DataSource dataSource, DataPool dataPool) {
-    if (dataSource.getDatapoolScopeType() != DatapoolScopeType.SPECIFIC) {
-      return true;
-    }
-    return dataSource.getScopedDataPools().stream()
-        .anyMatch(scopedPool -> scopedPool.getId().equals(dataPool.getId()));
   }
 
   private void validateDataSourceLinkable(DataSource dataSource) {

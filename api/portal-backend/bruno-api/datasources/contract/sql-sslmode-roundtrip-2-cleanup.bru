@@ -1,0 +1,21 @@
+meta {
+  name: Contract SQL — sslmode round-trip (2/2 cleanup)
+  type: http
+  seq: 91
+}
+
+delete {
+  url: {{baseUrl}}/datasources/{{contractSqlSslId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("Status is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

@@ -28,7 +28,8 @@ public final class BpmnProcessDeployer {
       List.of(
           "processes/dataset-create.bpmn",
           "processes/dataset-update.bpmn",
-          "processes/dataset-delete.bpmn");
+          "processes/dataset-delete.bpmn",
+          "processes/dataset-unrelease.bpmn");
 
   private BpmnProcessDeployer() {}
 

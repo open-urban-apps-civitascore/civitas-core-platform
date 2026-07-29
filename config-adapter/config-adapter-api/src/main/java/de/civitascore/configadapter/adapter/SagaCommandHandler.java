@@ -27,8 +27,7 @@ public interface SagaCommandHandler extends AutoCloseable {
 
   /**
    * Returns the adapter name this handler is responsible for (e.g. {@code "frost"}, {@code
-   * "apisix"}, {@code "redpanda"}). Must match the {@code adapter} field in {@link
-   * SagaCommandMessage}.
+   * "apisix"}, {@code "nifi"}). Must match the {@code adapter} field in {@link SagaCommandMessage}.
    */
   String adapter();
 
@@ -63,6 +62,9 @@ public interface SagaCommandHandler extends AutoCloseable {
   default Map<String, String> fieldAliases() {
     return Map.of();
   }
+
+  /** Injects the application-owned publisher for asynchronous pipeline runtime events. */
+  default void setPipelineStatusPublisher(PipelineStatusPublisher publisher) {}
 
   @Override
   default void close() {}

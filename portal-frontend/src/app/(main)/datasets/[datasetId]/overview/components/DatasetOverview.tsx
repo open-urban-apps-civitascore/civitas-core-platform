@@ -44,11 +44,13 @@ import {
   DatasetUpdateApiData,
   DatasetUpdateApiSchema,
 } from '@/types/datasets'
+import { isDatapoolScopeViolationError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { mapDatasetToFormData } from '../../../utils/mappers'
 import { BaseInfoForm } from '../../components/BaseInfoForm'
 import { CompletionStep } from '../../components/CompletionStep'
+import { usePipelinePermissions } from '../../data-flow/pipeline-editor/_hooks/use-pipeline-permissions'
 import { ApiList } from './ApiList'
 import { PipelineList } from './PipelineList'
 import { VisualizationList } from './VisualizationList'
@@ -66,19 +68,31 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const tCommon = useTranslations('common')
 
   const { hasPermission, hasScopedPermission } = usePermissions()
+
+  const canRead = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_READ,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
+
   const canUpdate = hasScopedPermission(
     PERMISSION_NAMES.DATASET_UPDATE,
     ASSIGNMENT_SCOPE_TYPES.DATASET,
     dataset.id,
     dataset.datapool?.id,
   )
+
   const canRelease = hasScopedPermission(
     PERMISSION_NAMES.DATASET_RELEASE,
     ASSIGNMENT_SCOPE_TYPES.DATASET,
     dataset.id,
     dataset.datapool?.id,
   )
-  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
+
+  const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
+
+  const { canCreatePipeline } = usePipelinePermissions(dataset.id, dataset.datapool?.id)
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
@@ -133,17 +147,16 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const formValues = useWatch({ control: form.control })
 
-  const canSetAvailable = useMemo(() => {
+  const canStage = useMemo(() => {
     const hasDistribution = !!dataset.pipelines?.length || !!dataset.namedApis?.length
-    const hasAssignments = groupCount > 0 && roleCount > 0
-    return DatasetFormAvailableSchema.safeParse(formValues).success && hasDistribution && hasAssignments
-  }, [formValues, dataset.pipelines, dataset.namedApis, groupCount, roleCount])
+    return DatasetFormAvailableSchema.safeParse(formValues).success && hasDistribution
+  }, [formValues, dataset.pipelines, dataset.namedApis])
 
   // Auto-revert status to draft when required fields become invalid
   const revalidateDraftMode = () => {
     const isReadyOrAvailable =
       dataSetStatus === DATASET_STATUS_TYPES.READY || dataSetStatus === DATASET_STATUS_TYPES.AVAILABLE
-    if (isReadyOrAvailable && !canSetAvailable) {
+    if (isReadyOrAvailable && !canStage) {
       setDataSetStatus(DATASET_STATUS_TYPES.DRAFT)
       toast.info(tCommon('info.switchMode'))
     }
@@ -161,7 +174,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   useEffect(() => {
     revalidateDraftMode()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSetAvailable, dataSetStatus])
+  }, [canStage, dataSetStatus])
 
   const getTransitionSteps = (
     oldStatus: DatasetStatusTypes,
@@ -234,11 +247,15 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         toast.success(t('messages.updateSuccess'))
       }
 
+      form.reset(formData)
       router.refresh()
-      setIsReadOnly(true)
       return true
-    } catch {
-      toast.error(t('messages.transitionError'))
+    } catch (error) {
+      if (isDatapoolScopeViolationError(error)) {
+        toast.error(t('messages.datasourceScopeViolation'))
+      } else {
+        toast.error(t('messages.transitionError'))
+      }
       return false
     }
   }
@@ -285,15 +302,17 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const handleSaveAndExit = () => {
     // Handle status-only change (form not dirty)
     if (hasOnlyStatusChanges) {
-      void handleSaveAndTransition(form.getValues() as DatasetFormDraft).then(() => {
+      void handleSaveAndTransition(form.getValues() as DatasetFormDraft).then(isSaved => {
         setIsExitModalOpen(false)
+        if (isSaved) setIsReadOnly(true)
       })
       return
     }
 
     void form.handleSubmit(data => {
-      void handleSaveAndTransition(data as DatasetFormDraft).then(() => {
+      void handleSaveAndTransition(data as DatasetFormDraft).then(isSaved => {
         setIsExitModalOpen(false)
+        if (isSaved) setIsReadOnly(true)
       })
     })()
   }
@@ -321,12 +340,13 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       buttons: [],
       content: (
         <>
-          <PipelineList datasetId={dataset.id} pipelines={pipelineList} canAdd={canUpdate && canReadDatasources} />
+          <PipelineList datasetId={dataset.id} pipelines={pipelineList} canCreatePipeline={canCreatePipeline} />
           <div className="border-t" />
           <ApiList
             datasetId={dataset.id}
             apis={namedApiList}
-            canEdit={canUpdate}
+            canEdit={canRead && canUpdate && canReadDatastructures}
+            canView={canRead && canReadDatastructures}
             isPublished={dataset.dataSetStatus === DATASET_STATUS_TYPES.AVAILABLE}
             isOpenDataAccess={dataset.openDataAccess}
           />
@@ -399,8 +419,9 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       status={dataSetStatus}
       onStatusChange={handleStatusChange}
       statusOptions={Object.values(DATASET_STATUS_TYPES)}
-      canSetAvailable={canSetAvailable}
+      canStage={canStage}
       canRelease={canRelease}
+      availableHint={!canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined}
       confirmButtonType="submit"
       formId="dataset-form"
       isConfirmButtonDisabled={!hasUnsavedChanges || isLoading}
@@ -457,6 +478,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         onDiscard={handleDiscardAndExit}
         onConfirm={handleSaveAndExit}
         isLoading={isLoading}
+        onOpenChange={setIsExitModalOpen}
       />
     </PageContainer>
   )

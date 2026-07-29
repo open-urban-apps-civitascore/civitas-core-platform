@@ -11,6 +11,7 @@ package de.civitascore.configadapter.keycloak;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -46,6 +47,7 @@ class GroupResourceHandlerTest {
   private Keycloak keycloakClient;
   private ResultPublisher resultPublisher;
   private RoleSyncHelper roleSyncHelper;
+  private GroupSyncHelper groupSyncHelper;
   private GroupResourceHandler handler;
 
   @BeforeEach
@@ -53,10 +55,12 @@ class GroupResourceHandlerTest {
     keycloakClient = mock(Keycloak.class);
     resultPublisher = mock(ResultPublisher.class);
     roleSyncHelper = mock(RoleSyncHelper.class);
+    groupSyncHelper = mock(GroupSyncHelper.class);
     ObjectMapper objectMapper = new ObjectMapper();
     objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     handler =
-        new GroupResourceHandler(keycloakClient, objectMapper, resultPublisher, roleSyncHelper);
+        new GroupResourceHandler(
+            keycloakClient, objectMapper, resultPublisher, roleSyncHelper, groupSyncHelper);
   }
 
   private ConfigEvent groupEvent(String groupName, String parentId) {
@@ -102,6 +106,7 @@ class GroupResourceHandlerTest {
       handler.create("test-realm", event);
 
       verify(groupsResource).add(any(GroupRepresentation.class));
+      verify(groupSyncHelper).syncGroupMembers(any(), eq("group-id"), any());
       verify(resultPublisher).publish(event, SuccessCode.GROUP_CREATE_SUCCESS, "group-id");
     }
 
@@ -157,6 +162,7 @@ class GroupResourceHandlerTest {
       handler.update("test-realm", "group-id", event);
 
       verify(groupResource).update(any(GroupRepresentation.class));
+      verify(groupSyncHelper).syncGroupMembers(any(), eq("group-id"), any());
       verify(resultPublisher).publish(event, SuccessCode.GROUP_UPDATE_SUCCESS, "group-id");
     }
 

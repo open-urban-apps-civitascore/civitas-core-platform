@@ -124,6 +124,39 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
   }
 
   @Test
+  void testDeleteStillReferencedByRouteIsRetryable() {
+    // APISIX resolves the reference against each worker's etcd-synced route cache, so a route that
+    // is already deleted can still block the upstream delete. Retryable, not a DLQ-bound 4xx.
+    givenMockDeleteReturns(
+        400,
+        "{\"error_msg\":\"can not delete this upstream, route [rid-things] is still using it now\"}");
+
+    ConfigEvent event =
+        ApisixTestFixtures.upstreamEvent(
+            Operation.DELETE, "upstreams/test-upstream-id", (ApisixConfigValue) null);
+
+    RetryableAdapterException exception =
+        assertThrows(
+            RetryableAdapterException.class,
+            () -> adapter.processConfigEvent("de.civitascore.api.backend.deleted", event));
+
+    assertEquals(AdapterErrorCode.SERVICE_UNAVAILABLE, exception.getErrorCode());
+  }
+
+  @Test
+  void testDeleteUnrelatedBadRequestStaysFatal() {
+    givenMockDeleteReturns(400, "{\"error_msg\":\"invalid configuration\"}");
+
+    ConfigEvent event =
+        ApisixTestFixtures.upstreamEvent(
+            Operation.DELETE, "upstreams/test-upstream-id", (ApisixConfigValue) null);
+
+    assertThrows(
+        FatalAdapterException.class,
+        () -> adapter.processConfigEvent("de.civitascore.api.backend.deleted", event));
+  }
+
+  @Test
   void testUnknownResourceType() {
     ApisixConfigValue config = new ApisixConfigValue();
     config.setType("roundrobin");

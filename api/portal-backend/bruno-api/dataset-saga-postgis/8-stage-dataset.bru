@@ -1,0 +1,41 @@
+meta {
+  name: 8. Stage DataSet
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/stage
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{pgDataSetId}}
+}
+
+tests {
+  test("Staged", function() {
+    const status = res.getStatus();
+    // 200=staged
+    expect(status).to.equal(200);
+  });
+}
+
+docs {
+  **PostGIS saga step 8** — Stage the dataset before releasing it.
+
+  Transitions the dataset from `DRAFT` to `READY`. No saga is triggered here.
+
+  **Precondition:** `pgDataSetId` is set; dataset is in `DRAFT` state with its POSTGIS sink and pipeline attached.
+
+  **Expected Response:** 200 OK (status `READY`). 400 if not in `DRAFT` state.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet status → `READY` |
+  | Config Adapter | — |
+  | External System | — |
+}

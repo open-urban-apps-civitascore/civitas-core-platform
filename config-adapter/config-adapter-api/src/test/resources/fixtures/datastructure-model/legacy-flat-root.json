@@ -1,0 +1,10 @@
+{
+  "$id": "http://civitas.org/model/Legacy/1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Legacy",
+  "type": "object",
+  "properties": {
+    "attribut": { "type": "string" }
+  },
+  "required": ["attribut"]
+}

@@ -252,11 +252,48 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("POST returns 400 when FROST configuration is non-empty")
-    void postRejectsFrostWithNonEmptyConfiguration() {
+    @DisplayName("POST returns 400 when FROST configuration carries an unknown key")
+    void postRejectsFrostWithUnknownConfigurationKey() {
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.FROST);
       input.setConfiguration(Map.of("unexpected", "value"));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("POST accepts a FROST DataSink referencing its mapping's target structure")
+    void postAcceptsFrostWithDataStructureVersionId() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.FROST);
+      input.setConfiguration(Map.of("dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<DataSinkOutputDTO> response =
+          exchange(
+              getEndpointPath(),
+              HttpMethod.POST,
+              createAuthHeaders(),
+              input,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("POST returns 400 when the FROST dataStructureVersionId does not exist")
+    void postRejectsFrostWithUnknownDataStructureVersion() {
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.FROST);
+      input.setConfiguration(Map.of("dataStructureVersionId", UUID.randomUUID().toString()));
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);

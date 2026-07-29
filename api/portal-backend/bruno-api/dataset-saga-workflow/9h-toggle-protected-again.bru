@@ -2,9 +2,6 @@ meta {
   name: 9h. Toggle openDataAccess → false (triggers UPDATE saga)
   type: http
   seq: 29
-  tags: [
-    requires-nifi
-  ]
 }
 
 put {
@@ -43,22 +40,34 @@ script:pre-request {
     '&username=' + encodeURIComponent(bru.getEnvVar('username')) +
     '&password=' + encodeURIComponent(bru.getEnvVar('password'));
 
+  // Fail loudly if readiness can't be proven — otherwise every poll below 401s, `pending` never
+  // leaves its sentinel, and the PUT hits the very 409 race this guard exists to remove.
   let bearer = '';
   try {
     const tok = await axios.post(`${kc}/realms/${realm}/protocol/openid-connect/token`, form, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: 10000,
     });
     bearer = tok.data && tok.data.access_token;
-  } catch (e) { /* token fetch failed; the PUT below will surface a clear error */ }
+  } catch (e) {
+    throw new Error(`Settle-check token fetch failed: ${e.message}`);
+  }
+  if (!bearer) {
+    throw new Error('Settle-check token fetch returned no access_token');
+  }
 
+  let settled = false;
   for (let i = 0; i < 30; i++) {
-    let pending = 'unknown';
+    let pending = 'unknown'; // sentinel: a failed read stays "not settled", never breaks the loop
     try {
-      const r = await axios.get(`${base}/datasets/${id}`, { headers: { Authorization: `Bearer ${bearer}` } });
+      const r = await axios.get(`${base}/datasets/${id}`, { headers: { Authorization: `Bearer ${bearer}` }, timeout: 10000 });
       pending = r.data.pendingSagaType;
     } catch (e) { /* transient; retry */ }
-    if (pending === null || pending === undefined) break;
+    if (pending === null || pending === undefined) { settled = true; break; }
     await new Promise(res => setTimeout(res, 2000));
+  }
+  if (!settled) {
+    throw new Error('Dataset did not settle (pendingSagaType still set) — refusing to update during an active saga');
   }
 }
 
@@ -75,9 +84,9 @@ tests {
 docs {
   **Saga step 9h of 18** — Flip the dataset back to protected (issue #1368, journey J3).
 
-  Mirrors 9f in reverse: `openDataAccess: false` triggers a DATASET_UPDATE saga that re-attaches the APISIX auth plugin + FROST upstream credentials and clears the FROST `public` flag. This exercises the `previousPublic` capture on the second update and confirms the toggle is reversible.
+  Mirrors 9f in reverse: `openDataAccess: false` persists the flag back to protected. The route is always protected anyway, so nothing is re-attached and there is no FROST `public` flag to clear; OPA simply re-reads the now-`false` flag and stops granting anonymous access (after its attribute-cache TTL). Confirms the toggle is reversible — now a pure OPA-read change, not a route/FROST reconfiguration.
 
   **Precondition:** the open-flip saga (9f) has settled (polled in pre-request).
 
-  **Expected Response:** 200 OK, body `openDataAccess: false`. The route is re-protected (verified in 9i).
+  **Expected Response:** 200 OK, body `openDataAccess: false`. The route was protected all along; OPA stops granting anonymous access once it re-reads the flag (verified in 9i).
 }

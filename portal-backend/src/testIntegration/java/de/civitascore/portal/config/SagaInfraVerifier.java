@@ -15,7 +15,7 @@ import java.util.UUID;
 
 /**
  * Shared verification and polling helpers for saga integration tests. Provides methods to await
- * saga completion and verify infrastructure state (FROST, Redpanda).
+ * saga completion and verify infrastructure state (FROST).
  */
 public class SagaInfraVerifier {
 
@@ -23,13 +23,10 @@ public class SagaInfraVerifier {
 
   private final DataSetRepository dataSetRepository;
   private final String frostExternalUrl;
-  private final String redpandaExternalUrl;
 
-  public SagaInfraVerifier(
-      DataSetRepository dataSetRepository, String frostExternalUrl, String redpandaExternalUrl) {
+  public SagaInfraVerifier(DataSetRepository dataSetRepository, String frostExternalUrl) {
     this.dataSetRepository = dataSetRepository;
     this.frostExternalUrl = frostExternalUrl;
-    this.redpandaExternalUrl = redpandaExternalUrl;
   }
 
   /** Waits for a CREATE saga to complete: pendingSagaType=null and projectId set. */
@@ -120,27 +117,6 @@ public class SagaInfraVerifier {
                       "FROST should contain a Thing named '%s' from pipeline data flow",
                       expectedThingName)
                   .contains(expectedThingName);
-            });
-  }
-
-  public void verifyRedpandaPipelineExists(UUID pipelineId) throws Exception {
-    HttpResponse<String> response = httpGet(redpandaExternalUrl + "/streams/" + pipelineId);
-    assertThat(response.statusCode())
-        .as("Redpanda GET /streams/%s should return 200", pipelineId)
-        .isEqualTo(200);
-  }
-
-  public void verifyRedpandaPipelineDeleted(UUID pipelineId) {
-    await()
-        .atMost(10, SECONDS)
-        .pollInterval(1, SECONDS)
-        .untilAsserted(
-            () -> {
-              HttpResponse<String> response =
-                  httpGet(redpandaExternalUrl + "/streams/" + pipelineId);
-              assertThat(response.statusCode())
-                  .as("Redpanda GET /streams/%s should return 404 after deletion", pipelineId)
-                  .isEqualTo(404);
             });
   }
 

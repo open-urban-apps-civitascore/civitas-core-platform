@@ -1,0 +1,42 @@
+meta {
+  name: 15b. Cleanup - Unrelease DataSource
+  type: http
+  seq: 24
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{pgDataSourceId}}
+}
+
+tests {
+  test("DataSource unreleased", function() {
+    const status = res.getStatus();
+    // 200=unreleased (AVAILABLE → DRAFT). Pipeline is already deleted (step 14) and the run
+    // starts from a clean DB, so the datasource is AVAILABLE here; a non-200 is a real failure.
+    expect(status).to.equal(200);
+  });
+}
+
+docs {
+  **PostGIS saga step 15b** — Unrelease the datasource before deleting it.
+
+  Reverts the datasource from `AVAILABLE` to `DRAFT`. A datasource can only be deleted (step 16) while in `DRAFT`, and it can only be unreleased once no pipeline references it — hence this runs after the pipeline delete (step 14).
+
+  **Precondition:** `pgDataSourceId` is set; pipeline deleted (step 14); datasource is `AVAILABLE` (released in step 4a).
+
+  **Expected Response:** 200 OK (status `DRAFT`).
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource status → `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

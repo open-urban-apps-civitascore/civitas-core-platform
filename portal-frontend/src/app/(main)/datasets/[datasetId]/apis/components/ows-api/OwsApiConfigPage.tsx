@@ -7,27 +7,26 @@ import { useEffect, useMemo, useState } from 'react'
 import { FieldPath, useFieldArray, useForm, UseFormReturn } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { useGetDatasinks } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useDeleteLayer, useGetLayers } from '@/app/services/api/datasets/layers/clientRequests'
 import { useDeleteStyle, useGetStyles } from '@/app/services/api/datasets/styles/clientRequests'
 import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { ContentCard } from '@/components/content-card/ContentCard'
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { Form } from '@/components/ui/form'
 import { Dataset } from '@/types/datasets'
 import { DATASINK_TYPES } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
+import { LayerFormData } from '@/types/layers'
 import {
   API_TYPE_QUERY,
   DEFAULTS_BY_TYPE,
-  LayerFormData,
   NamedApi,
   OwsApiFormData,
   OwsApiFormSchema,
   StaApiFormData,
-  StyleFormData,
 } from '@/types/namedApis'
-import { getNativeCRSFromDatasink, mapApiLayerToFormData, mapApiStyleToFormData } from '@/utils/namedApis'
+import { StyleFormData } from '@/types/styles'
+import { getNativeCRSFromDataSink, mapApiLayerToFormData, mapApiStyleToFormData } from '@/utils/namedApis'
 
 import { useApiConfig } from '../../hooks/useApiConfig'
 import { ApiConfigTab, ApiConfigWrapper } from '../ApiConfigWrapper'
@@ -89,17 +88,20 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   const formSchema = useMemo(() => OwsApiFormSchema({ existingSlugs }), [existingSlugs])
   const initialSlug = existingApi?.slug ?? defaults.defaultSlug
 
-  const { data: datasinksData, isPending: isDatasinksLoading } = useGetDatasinks(dataset.id)
+  const { data: dataSinksData, isPending: isDataSinksLoading } = useGetDataSinks(dataset.id)
   const { data: layersData, isPending: isLayersLoading } = useGetLayers(dataset.id)
   const { data: stylesData, isPending: isStylesLoading } = useGetStyles(dataset.id)
 
-  const postgisDatasinks = useMemo(
-    () => (datasinksData?.data || []).filter(datasink => datasink.dataSinkType === DATASINK_TYPES.POSTGIS),
-    [datasinksData],
-  )
-  const datastructuresToFetch = postgisDatasinks?.map(datasink => ({
-    datastructureId: datasink.configuration.dataStructureVersion.dataStructureId,
-    versionId: datasink.configuration.dataStructureVersion.id,
+  const postgisDataSinks = useMemo(() => {
+    const currentPipelineIds = dataset.pipelines.map(pipeline => pipeline.id)
+    return (dataSinksData?.data || []).filter(
+      dataSink => dataSink.dataSinkType === DATASINK_TYPES.POSTGIS && currentPipelineIds.includes(dataSink.pipelineId),
+    )
+  }, [dataSinksData, dataset.pipelines])
+
+  const datastructuresToFetch = postgisDataSinks?.map(dataSink => ({
+    datastructureId: dataSink.configuration.dataStructureVersion.dataStructureId,
+    versionId: dataSink.configuration.dataStructureVersion.id,
   }))
 
   const postgisDatastructureQueries = useQueries({
@@ -120,7 +122,7 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   })
   const postgisDatastructures = postgisDatastructureQueries.data
   const isDataLoading =
-    isLayersLoading || isStylesLoading || isDatasinksLoading || postgisDatastructureQueries.isPending
+    isLayersLoading || isStylesLoading || isDataSinksLoading || postgisDatastructureQueries.isPending
 
   const layers = useMemo(
     () =>
@@ -128,12 +130,12 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
         // setting the nativeLayer here is necessary since in the API response it gets returned as null
         // TODO: remove this section once this is fixed in the backend
         if (!layer.nativeCRS && layer.dataSinkId) {
-          const nativeCRS = getNativeCRSFromDatasink(layer.dataSinkId, postgisDatasinks, postgisDatastructures)
+          const nativeCRS = getNativeCRSFromDataSink(layer.dataSinkId, postgisDataSinks, postgisDatastructures)
           return { ...layer, nativeCRS }
         }
         return layer
       }),
-    [layersData, postgisDatasinks, postgisDatastructures],
+    [layersData, postgisDataSinks, postgisDatastructures],
   )
   const apiStyles = useMemo(() => stylesData?.data || [], [stylesData])
   const styleFormData = useMemo(() => mapApiStyleToFormData(apiStyles), [apiStyles])
@@ -182,7 +184,7 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   const isBaseInfoValid = formSchema.shape.baseInfo.safeParse(baseInfoValues).success
 
   const layersValues = form.watch('layers')
-  const isLayersValid = formSchema.shape.layers.safeParse(layersValues).success
+  const isLayersValid = layersValues.length > 0 && formSchema.shape.layers.safeParse(layersValues).success
 
   const stylesValues = form.watch('styles')
   const isStylesValid = formSchema.shape.styles.safeParse(stylesValues).success
@@ -278,12 +280,12 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
     setSelectedStyleIndex(remaining === 0 ? null : Math.min(selectedStyleIndex, remaining - 1))
   }
 
-  const handleTableChange = (datasinkId: string) => {
+  const handleTableChange = (dataSinkId: string) => {
     if (selectedLayerIndex === null) return
-    form.setValue(`layers.${selectedLayerIndex}.dataSinkId` as FieldPath<OwsApiFormData>, datasinkId, {
+    form.setValue(`layers.${selectedLayerIndex}.dataSinkId` as FieldPath<OwsApiFormData>, dataSinkId, {
       shouldDirty: true,
     })
-    const nativeCRS = getNativeCRSFromDatasink(datasinkId, postgisDatasinks, postgisDatastructures)
+    const nativeCRS = getNativeCRSFromDataSink(dataSinkId, postgisDataSinks, postgisDatastructures)
     form.setValue(`layers.${selectedLayerIndex}.nativeCRS` as FieldPath<OwsApiFormData>, nativeCRS, {
       shouldDirty: true,
     })
@@ -296,10 +298,11 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
 
   return (
     <ApiConfigWrapper
+      dataset={dataset}
       isReadOnly={isReadOnly}
       hasUnsavedChanges={form.formState.isDirty}
       isFormValid={form.formState.isValid}
-      isLoading={isLoading}
+      isLoading={isLoading || isDataLoading}
       tabs={tabs}
       selectedTab={selectedTab}
       onTabChange={setSelectedTab}
@@ -314,52 +317,48 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
       onSaveAndExit={handleSaveAndExit}
       onSubmit={handleSubmit}
     >
-      {isDataLoading ? (
-        <LoadingSpinner className="h-full" />
-      ) : (
-        <Form {...form}>
-          {selectedTab === 'basicInfo' && (
-            <ContentCard>
-              <BaseInfoForm
-                form={form as unknown as UseFormReturn<StaApiFormData>}
-                apiType={apiType}
-                isReadOnly={isReadOnly}
-                datasetId={dataset.id}
-                typeLabel={typeLabel}
-                urlPreviewSlug={urlPreviewSlug}
-                onSlugBlur={handleSlugBlur}
-              />
-            </ContentCard>
-          )}
-          {selectedTab === 'layer' && (
-            <LayerConfig
-              form={form}
-              styles={apiStyles}
-              postgisDatasinks={postgisDatasinks}
-              postGisDatastructures={postgisDatastructures}
-              selectedLayerIndex={selectedLayerIndex}
+      <Form {...form}>
+        {selectedTab === 'basicInfo' && (
+          <ContentCard>
+            <BaseInfoForm
+              form={form as unknown as UseFormReturn<StaApiFormData>}
+              apiType={apiType}
               isReadOnly={isReadOnly}
-              isDeleteLayerLoading={deleteLayer.isPending}
-              onSelectLayer={handleSelectLayer}
-              onAddLayer={handleAddLayer}
-              onDeleteLayer={handleDeleteLayer}
-              onTableChange={handleTableChange}
+              datasetId={dataset.id}
+              typeLabel={typeLabel}
+              urlPreviewSlug={urlPreviewSlug}
+              onSlugBlur={handleSlugBlur}
             />
-          )}
-          {selectedTab === 'styles' && (
-            <StylesConfig
-              form={form}
-              existingStyles={styleFields}
-              selectedStyleIndex={selectedStyleIndex}
-              isReadOnly={isReadOnly}
-              isDeleteStyleLoading={deleteStyle.isPending}
-              onSelectStyle={handleSelectStyle}
-              onAddStyle={handleAddStyle}
-              onDeleteStyle={handleDeleteStyle}
-            />
-          )}
-        </Form>
-      )}
+          </ContentCard>
+        )}
+        {selectedTab === 'layer' && (
+          <LayerConfig
+            form={form}
+            styles={apiStyles}
+            postgisDataSinks={postgisDataSinks}
+            postGisDatastructures={postgisDatastructures}
+            selectedLayerIndex={selectedLayerIndex}
+            isReadOnly={isReadOnly}
+            isDeleteLayerLoading={deleteLayer.isPending}
+            onSelectLayer={handleSelectLayer}
+            onAddLayer={handleAddLayer}
+            onDeleteLayer={handleDeleteLayer}
+            onTableChange={handleTableChange}
+          />
+        )}
+        {selectedTab === 'styles' && (
+          <StylesConfig
+            form={form}
+            existingStyles={styleFields}
+            selectedStyleIndex={selectedStyleIndex}
+            isReadOnly={isReadOnly}
+            isDeleteStyleLoading={deleteStyle.isPending}
+            onSelectStyle={handleSelectStyle}
+            onAddStyle={handleAddStyle}
+            onDeleteStyle={handleDeleteStyle}
+          />
+        )}
+      </Form>
     </ApiConfigWrapper>
   )
 }

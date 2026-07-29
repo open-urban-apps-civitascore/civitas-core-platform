@@ -7,6 +7,7 @@ import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -36,6 +37,7 @@ public class DataStructureService
   private final DataStructureVersionRepository dataStructureVersionRepository;
   private final AssignmentFactory assignmentFactory;
   private final DataSourceRepository dataSourceRepository;
+  private final DataSinkRepository dataSinkRepository;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -182,12 +184,12 @@ public class DataStructureService
   }
 
   /**
-   * Validates that none of the data structure's versions are in use by a data source before
-   * allowing deletion.
+   * Validates that none of the data structure's versions are in use by a data source or a data sink
+   * before allowing deletion.
    *
    * @param id the data structure ID to delete
    * @return the data structure entity to be deleted
-   * @throws ResourceInUseException if any version is referenced by a data source
+   * @throws ResourceInUseException if any version is referenced by a data source or a data sink
    */
   @Override
   protected DataStructure preProcessDelete(UUID id) {
@@ -204,11 +206,12 @@ public class DataStructureService
     if (versionIds.isEmpty()) {
       return;
     }
-    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)) {
+    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
+        || dataSinkRepository.existsByDataStructureVersionIdIn(versionIds)) {
       throw new ResourceInUseException(
           "DataStructure",
           dataStructure.getId(),
-          "Cannot modify DataStructure because one or more of its versions is referenced by a DataSource.");
+          "Cannot modify DataStructure because one or more of its versions is referenced by a DataSource or DataSink.");
     }
   }
 }

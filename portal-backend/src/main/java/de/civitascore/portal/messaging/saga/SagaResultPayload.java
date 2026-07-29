@@ -32,7 +32,8 @@ public record SagaResultPayload(
     // SAGA_FAILED fields
     String failedStep,
     String error,
-    Boolean compensated) {
+    Boolean compensated,
+    Map<String, Object> pipelineStatus) {
 
   /** {@code dashboardId} is the platform UUID echoed back as the correlation key for the result. */
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -75,6 +76,7 @@ public record SagaResultPayload(
         pipelineIds,
         failedStep,
         error,
-        compensated);
+        compensated,
+        null);
   }
 }

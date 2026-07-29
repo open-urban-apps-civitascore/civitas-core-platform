@@ -1,0 +1,72 @@
+meta {
+  name: 9g4. Verify open data is universal — anonymous OWS payload (no token → 200)
+  type: http
+  seq: 28
+  tags: [
+    requires-nifi
+  ]
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/{{sagaOwsSlug}}
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  // The dataset carries TWO named APIs: STA (things, FROST upstream) and OWS (map, GeoServer
+  // upstream). 9g already proved the STA payload opens anonymously; this proves the SAME OPA
+  // open-data grant applies to the OWS route, i.e. open data is universal across routable backends
+  // (the rule is standard-agnostic — every dataset route carries the same service_id, so OPA
+  // dispatches both to the path-based frost_server policy). Poll the OWS data-plane WITHOUT a token
+  // until 200, max ~50s (25 × 2s), to absorb propagation (DB commit + OPA fetch). While protected
+  // the gateway answers 401; QuickJS axios throws on non-2xx, so catch and read the status.
+  const axios = require('axios');
+  // Resolve the OWS slug once and pin it so the request URL ({{sagaOwsSlug}}) and this warm-up loop
+  // hit the SAME endpoint even if the variable was not set upstream.
+  const slug = bru.getVar('sagaOwsSlug') || 'map';
+  bru.setVar('sagaOwsSlug', slug);
+  const url = `${bru.getEnvVar('apisixApiUrl')}/v1/datasets/${bru.getVar('sagaDataSetId')}/${slug}`;
+  for (let i = 0; i < 25; i++) {
+    let status = 0;
+    try { status = (await axios.get(url)).status; }
+    catch (e) { status = e.response ? e.response.status : 0; }
+    if (status === 200) break;
+    await new Promise(res => setTimeout(res, 2000));
+  }
+}
+
+tests {
+  test("Anonymous OWS payload of an open dataset is reachable through the gateway (200)", function() {
+    // 200 proves the anonymous request traversed APISIX → OIDC (unauth_action: pass) → OPA
+    // (open-data ABAC grant) → the OWS (GeoServer) upstream end-to-end — not a FROST-only path.
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response came from the OWS (GeoServer) upstream — echoed path is the OWS rewrite", function() {
+    // The geoserver-mock stub echoes the request it received. The OWS route's proxy-rewrite maps
+    // /v1/datasets/{id}/map → /geoserver/{workspace}/ows, so the echoed `path` proves the request
+    // actually reached the GeoServer/OWS upstream (a FROST hit would echo /FROST-Server/...).
+    expect(res.body).to.be.an('object');
+    expect(res.body.path, 'echoed upstream path').to.be.a('string');
+    expect(res.body.path).to.match(/^\/geoserver\/.+\/ows(\/|\?|$)/);
+  });
+}
+
+docs {
+  **Saga step 9g4** — Open Data Access is **universal across routable backends (STA + OWS)**.
+
+  The saga dataset publishes two named APIs: `things` (STA → FROST upstream) and `map` (OWS → GeoServer
+  upstream). 9g proved the STA payload opens anonymously; this step proves the **OWS** payload does too,
+  via the **same** OPA open-data decision. It is the direct evidence for the acceptance criterion
+  "anonymous GET to an open dataset's payload (STA **and** OWS) returns 200": the request goes through
+  APISIX → OIDC (`unauth_action: pass`) → OPA (open-data ABAC) → the OWS upstream and returns 200.
+
+  The OWS upstream is a lightweight HTTP echo stub (`geoserver-mock`) standing in for GeoServer — an OWS
+  named API provisions only the APISIX route to `apisix.geoserver.url`, not a GeoServer workspace, so no
+  real GeoServer is needed to exercise the gateway/authz chain.
+
+  **Precondition:** runs while the dataset is open (after 9f, before 9h); pre-request polled until 200.
+
+  **Expected Response:** 200 OK from the OWS upstream — no bearer token sent.
+}

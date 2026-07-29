@@ -1,12 +1,19 @@
 # Bruno CLI quirks for the NiFi demo
 
+> **Authentication:** NiFi is secured with OpenID Connect. The `get_token`
+> requests obtain an access token from Keycloak via the client-credentials grant
+> (the `nifi` service account) and stash `access_token` in `nifiToken`; NiFi
+> validates it against Keycloak. There is no NiFi single-user `/access/token`
+> endpoint anymore.
+
 ## Cookie/CSRF gotcha (handled automatically — incl. multipart upload)
 
-`POST /nifi-api/access/token` responds with both the JWT body **and** a
+Historically `POST /nifi-api/access/token` set a
 `Set-Cookie: __Secure-Authorization-Bearer=<JWT>; HttpOnly; Secure; SameSite=Strict`
-header. Bruno's CLI maintains a shared cookie jar across requests in a folder
-run, so every subsequent request carries this cookie alongside the
-`Authorization: Bearer` header.
+header alongside the JWT body. Under OIDC the demo no longer calls that endpoint,
+so the cookie is not set — but the collection-level pre-request `clear()` (below)
+is kept as a harmless safeguard. Bruno's CLI otherwise maintains a shared cookie
+jar across requests in a folder run.
 
 NiFi treats the bearer cookie as an authentication source separate from the
 header. When the cookie is present on a state-changing request (PUT/POST/DELETE)
@@ -82,14 +89,12 @@ If a request fails with
 
 ```
 Unauthorized error="invalid_token",
-error_description="Signed JWT rejected: Another algorithm expected,
-or no matching key(s) found"
+error_description="Signed JWT rejected: ... no matching key(s) found"
 ```
 
-NiFi has been (re)started with a fresh signing keypair (Ed25519, generated on
-first boot, stored in the `nifi_nifi_state` / `nifi_nifi_conf` volumes). The
-`nifiToken` cached in Bruno's runtime env was issued by the previous keypair
-and no longer validates. Re-run `01_get_token.bru` (or the `00_get_token.bru`
-in whichever folder you're driving) to mint a fresh JWT. With `bru run
-01_deploy/02_verify/03_cleanup` this happens automatically; only single-file
-runs need a manual token refresh first.
+the `nifiToken` cached in Bruno's runtime env has expired, or Keycloak was
+restarted with a fresh signing keypair, so NiFi can no longer validate it
+against the realm's JWKS. Re-run `01_get_token.bru` (or the `00_get_token.bru`
+in whichever folder you're driving) to mint a fresh token from Keycloak. With
+`bru run 01_deploy/02_verify/03_cleanup` this happens automatically; only
+single-file runs need a manual token refresh first.

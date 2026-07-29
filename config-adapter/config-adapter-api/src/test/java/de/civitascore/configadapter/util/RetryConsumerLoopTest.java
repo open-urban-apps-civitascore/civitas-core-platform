@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +36,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 class RetryConsumerLoopTest {
+
+  static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+  }
 
   private static final Logger LOG = LoggerFactory.getLogger(RetryConsumerLoopTest.class);
   private static final BackoffCalculator FAST_BACKOFF = new BackoffCalculator(1L, 10L);

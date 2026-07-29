@@ -129,8 +129,8 @@ export const BreadcrumbNavigation = () => {
     </BreadcrumbSeparator>
   )
 
-  const hasBackButton = breadcrumbs.some(crumb => crumb.isLast && crumb.isDynamic)
   const parentPath = pathname ? pathname.split('/').slice(0, -1).join('/') || '/' : undefined
+  const hasBackButton = parentPath !== undefined && parentPath !== '/'
 
   if (!pathname) return null
 

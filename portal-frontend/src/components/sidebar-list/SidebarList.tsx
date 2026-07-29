@@ -36,7 +36,7 @@ export const SidebarList = ({
               onClick={() => onSelectItem(index)}
               className={cn(
                 'w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm hover:bg-accent',
-                selectedItemIndex === index && 'bg-muted font-medium',
+                selectedItemIndex === index && 'bg-accent font-medium',
                 item.hasError && 'text-destructive',
               )}
             >

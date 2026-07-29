@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.postgis.ddl;
 
+import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.ColumnType;
 import de.civitascore.configadapter.model.postgis.GeometryColumnConfig;
@@ -21,6 +22,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Derives the table columns for a PostGIS sink from the JSON Schema the portal-backend stores on
@@ -33,10 +36,22 @@ import java.util.regex.Pattern;
  * EPSG:25832}), defaulting to 4326 (the GeoServer handler's CRS default). Any other {@code $ref} is
  * a nested object and maps to {@code JSONB}.
  *
+ * <p>A non-excluded property carrying {@code x-core-primaryKey: true} contributes its name to the
+ * table's primary key, in schema property order. A non-scalar column (geometry, {@code JSONB}
+ * object/array) cannot back a B-tree primary key, so such a marker is skipped.
+ *
  * <p>Names in {@code excludedNames} (explicitly configured geometry columns) are skipped so they
  * are not duplicated as derived columns.
+ *
+ * <p>A subclass's own properties live outside the root (under {@code allOf}), so columns are
+ * gathered by resolving {@code allOf} branches and their local {@code $ref} parents, not just the
+ * root {@code properties}. Inherited columns come first, and on a name collision the subclass wins
+ * the column type while the column keeps its first-seen position. A property-level {@code $ref}
+ * stays {@code JSONB}; only node-level parents are followed.
  */
 public final class DataStructureTableMapper {
+
+  private static final Logger logger = LoggerFactory.getLogger(DataStructureTableMapper.class);
 
   private static final int DEFAULT_SRID = 4326;
 
@@ -48,24 +63,34 @@ public final class DataStructureTableMapper {
 
   private DataStructureTableMapper() {}
 
-  /** Derived non-spatial and geometry columns for one sink table. */
   public record TableColumns(
-      List<ColumnConfig> columns, List<GeometryColumnConfig> geometryColumns) {}
+      List<ColumnConfig> columns,
+      List<GeometryColumnConfig> geometryColumns,
+      List<String> primaryKey) {}
 
   /**
    * @throws IllegalArgumentException if the schema contains no usable definition with properties
    */
   public static TableColumns deriveColumns(Map<String, Object> schema, Set<String> excludedNames) {
-    Map<String, Object> definition = selectDefinition(schema);
-    Map<String, Object> properties = mapValue(definition.get("properties"));
+    // Resolve the table definition through the shared DataStructureSchema (allOf-aware) so the
+    // columns and the primary key are derived from the SAME merged definition — no divergence.
+    DataStructureSchema.ResolvedDefinition resolved = DataStructureSchema.resolveDefinition(schema);
+    Map<String, Object> properties = resolved.properties();
     if (properties.isEmpty()) {
       throw new IllegalArgumentException(
-          "dataStructure JSON Schema has no properties; cannot derive sink table columns");
+          "dataStructure JSON Schema has no usable definition with properties; cannot derive sink"
+              + " table columns");
     }
-    List<String> required =
-        definition.get("required") instanceof List<?> list
-            ? list.stream().map(String::valueOf).toList()
-            : List.of();
+    List<String> required = List.copyOf(resolved.required());
+    // The primary-key LIST is derived centrally by DataStructureSchema (shared by the PostGIS and
+    // NiFi adapters, non-scalar markers already dropped) so the table PRIMARY KEY and the NiFi
+    // UPSERT keys cannot diverge. An excluded name (an explicitly configured geometry column, not a
+    // derived scalar column here) is dropped from the key too.
+    List<String> primaryKey =
+        DataStructureSchema.primaryKeyColumns(schema).stream()
+            .filter(name -> !excludedNames.contains(name))
+            .toList();
+    Set<String> primaryKeyNames = Set.copyOf(primaryKey);
 
     List<ColumnConfig> columns = new ArrayList<>();
     List<GeometryColumnConfig> geometryColumns = new ArrayList<>();
@@ -75,7 +100,8 @@ public final class DataStructureTableMapper {
         continue;
       }
       Map<String, Object> spec = mapValue(property.getValue());
-      Boolean nullable = required.contains(name) ? false : null;
+      // A primary-key column must be NOT NULL even if the schema's `required` list omits it.
+      Boolean nullable = (required.contains(name) || primaryKeyNames.contains(name)) ? false : null;
 
       GeometryType geometryType = geometryType(stringValue(spec.get("$ref")));
       if (geometryType != null) {
@@ -85,64 +111,9 @@ public final class DataStructureTableMapper {
                 name, geometryType, srid != null ? srid : DEFAULT_SRID, null, nullable));
         continue;
       }
-      ColumnType type = columnType(spec);
-      columns.add(new ColumnConfig(name, type, null, null, null, nullable));
+      columns.add(new ColumnConfig(name, columnType(spec), null, null, null, nullable));
     }
-    return new TableColumns(columns, geometryColumns);
-  }
-
-  /** Root {@code properties} if present, else the single (or title-matching) definition. */
-  private static Map<String, Object> selectDefinition(Map<String, Object> schema) {
-    if (!mapValue(schema.get("properties")).isEmpty()) {
-      return schema;
-    }
-    Map<String, Object> definitions = definitions(schema);
-    if (definitions.size() == 1) {
-      return mapValue(definitions.values().iterator().next());
-    }
-    String title = stringValue(schema.get("title"));
-    if (title != null && definitions.get(title) instanceof Map) {
-      return mapValue(definitions.get(title));
-    }
-    Map<String, Object> single = singlePropertyDefinition(definitions);
-    if (single != null) {
-      return single;
-    }
-    throw new IllegalArgumentException(
-        definitions.isEmpty()
-            ? "dataStructure JSON Schema has empty definitions; cannot derive sink table columns"
-            : "dataStructure JSON Schema has "
-                + definitions.size()
-                + " definitions and none matches the title '"
-                + stringValue(schema.get("title"))
-                + "'; the sink table mapping requires exactly one");
-  }
-
-  /**
-   * Named type definitions, merging draft 2020-12 {@code $defs} with the older {@code definitions}.
-   */
-  private static Map<String, Object> definitions(Map<String, Object> schema) {
-    Map<String, Object> merged = new LinkedHashMap<>(mapValue(schema.get("definitions")));
-    merged.putAll(mapValue(schema.get("$defs")));
-    return merged;
-  }
-
-  /**
-   * The only definition that carries properties, if exactly one does. Referenced type definitions
-   * (e.g. an inlined geometry class) have none and do not count as table candidates.
-   */
-  private static Map<String, Object> singlePropertyDefinition(Map<String, Object> definitions) {
-    Map<String, Object> match = null;
-    for (Object value : definitions.values()) {
-      Map<String, Object> definition = mapValue(value);
-      if (!mapValue(definition.get("properties")).isEmpty()) {
-        if (match != null) {
-          return null;
-        }
-        match = definition;
-      }
-    }
-    return match;
+    return new TableColumns(columns, geometryColumns, primaryKey);
   }
 
   /**

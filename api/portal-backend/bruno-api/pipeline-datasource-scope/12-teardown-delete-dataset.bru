@@ -1,0 +1,27 @@
+meta {
+  name: 12. Teardown - delete dataset
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{baseUrl}}/datasets/{{scopeDataSetId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: in [200, 204, 400, 404, 409]
+}
+
+tests {
+  test("Dataset cleanup tolerated", function() {
+    expect([200, 204, 400, 404, 409]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  Teardown for the scope-violation scenario. Deleting the DRAFT dataset first frees Pool A
+  (a datapool with assigned datasets cannot be deleted → 409). Lenient: a re-run with stale
+  vars or partial prior teardown must not fail the suite.
+}

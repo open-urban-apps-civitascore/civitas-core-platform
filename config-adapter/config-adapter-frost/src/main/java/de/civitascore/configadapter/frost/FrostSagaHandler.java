@@ -29,7 +29,10 @@ import org.owasp.encoder.Encode;
  * <ul>
  *   <li>{@code CREATE_PROJECT} — POST /Projects
  *   <li>{@code UPDATE_PROJECT} — PATCH /Projects({projectId})
- *   <li>{@code DELETE_PROJECT} — DELETE /Projects({projectId})
+ *   <li>{@code DELETE_PROJECT} — DELETE all Things of the project (cascades to their Datastreams
+ *       and Observations), then DELETE /Projects({projectId}). As a CREATE_PROJECT compensation it
+ *       is a no-op when the create only reused a pre-existing project ({@code created=false}), so a
+ *       later step's failure cannot destroy the data the unrelease flow preserves.
  *   <li>{@code RESTORE_PROJECT} — PATCH /Projects({projectId}) with previous state (update
  *       compensation)
  * </ul>
@@ -37,11 +40,15 @@ import org.owasp.encoder.Encode;
  * <p>Compensation operations: {@code DELETE_PROJECT} to compensate a {@code CREATE_PROJECT}, {@code
  * RESTORE_PROJECT} to compensate an {@code UPDATE_PROJECT}.
  */
+// One method per saga operation (CREATE/UPDATE/DELETE/RESTORE_PROJECT) plus focused helpers — the
+// method count and coupling are inherent to a per-operation dispatch handler, not a God Class.
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.GodClass"})
 public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
   private static final String KEY_PROJECT_ID = "projectId";
+  private static final String KEY_CREATED = "created";
   private static final String KEY_NAME = "name";
   private static final String KEY_DESCRIPTION = "description";
   private static final String KEY_PUBLIC = "public";
@@ -105,43 +112,44 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String datasetName = requireString(command, "datasetName");
     String datasetId = requireString(command, "datasetId");
     String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
-    boolean openDataAccess =
-        Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
 
     String projectName = frostProjectName(datasetName, datasetId);
+
+    // Find-or-create: the project name carries the globally-unique datasetId, so a pre-existing
+    // project can only be this dataset's own — a prior CREATE_PROJECT that already ran (re-release,
+    // retried saga). Reusing it keeps the FROST data (Things → Datastreams → Observations) intact
+    // instead of orphaning it behind a second project. Idempotency no longer hinges on the
+    // version-specific 500 "Failed to store data." string; that path stays only as a race guard.
+    SagaCommandResult existing = findExistingProjectByName(command, projectName);
+    if (existing != null) {
+      return existing;
+    }
+
+    return createNewProject(command, projectName, description);
+  }
+
+  /** POSTs a new private FROST project, with a duplicate-name race guard (409 or 500). */
+  private SagaCommandResult createNewProject(
+      SagaCommandMessage command, String projectName, String description) {
     Map<String, Object> body = new HashMap<>();
     body.put(KEY_NAME, projectName);
     body.put(KEY_DESCRIPTION, description);
-    body.put(KEY_PUBLIC, openDataAccess);
+    // The FROST project is ALWAYS created private. Open data access is an authorization
+    // decision made by OPA at request time (ABAC on the dataset's openDataAccess flag), not by
+    // FROST project visibility — anonymous open-data reads flow through the gateway → OPA, never
+    // around it via a publicly readable FROST project. (Replaces the former
+    // public=openDataAccess bypass.)
+    body.put(KEY_PUBLIC, false);
 
     try (Response response =
         authStrategy
             .apply(client().target(serverUrl).path("Projects").request(MediaType.APPLICATION_JSON))
             .post(Entity.json(body))) {
 
-      // FROST returns HTTP 500 with "Failed to store data." on UNIQUE constraint violations
-      // (duplicate project name) instead of the expected HTTP 409 Conflict.
-      // Fall back to a name lookup so CREATE_PROJECT is idempotent.
-      if (response.getStatus() == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
-        String responseBody = response.readEntity(String.class);
-        if (responseBody != null
-            && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA)) {
-          log.info(
-              "FROST returned 500 'Failed to store data.' for CREATE_PROJECT"
-                  + " — checking for existing project with name '{}', saga={}",
-              Encode.forJava(projectName),
-              Encode.forJava(command.sagaId()));
-          return findExistingProjectByName(command, projectName);
-        }
-        // An HTTP 500 that is NOT the known duplicate-name case is a genuine FROST-side failure.
-        // Log the full body at WARN so operators see the real cause — the exception message is
-        // surfaced to the saga but may be truncated/sanitized downstream.
-        log.warn(
-            "FROST returned HTTP 500 for CREATE_PROJECT that is not the known 'Failed to store"
-                + " data.' duplicate case — body: {}, saga={}",
-            Encode.forJava(responseBody),
-            Encode.forJava(command.sagaId()));
-        throw new SagaApiException("CREATE_PROJECT failed: HTTP 500 — " + responseBody, 500);
+      int status = response.getStatus();
+      if (status == Response.Status.CONFLICT.getStatusCode()
+          || status == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
+        return handleCreateProjectConflict(command, projectName, response);
       }
 
       checkResponse(response, "CREATE_PROJECT");
@@ -150,7 +158,8 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       String baseUrl = projectBaseUrl(projectId);
 
       Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
-      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId);
+      // created=true: this execution POSTed the project, so its compensation may safely DELETE it.
+      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId, KEY_CREATED, true);
 
       log.info(
           "FROST project created: projectId={}, saga={}",
@@ -162,6 +171,60 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     }
   }
 
+  /**
+   * Handles an HTTP 409 or 500 from the CREATE_PROJECT POST. This is a race guard: the up-front
+   * find-or-create lookup already ran, but a concurrent CREATE may have inserted the project in
+   * between — so re-run the name lookup and reuse the winner.
+   *
+   * <p>FROST-Server core &gt;= 2.7.0 answers a UNIQUE constraint violation (duplicate project name)
+   * with 409 Conflict; earlier cores answer 500 with a {@code "Failed to store data."} body, which
+   * is otherwise indistinguishable from a genuine server error and must be checked for before
+   * treating it as a duplicate.
+   */
+  private SagaCommandResult handleCreateProjectConflict(
+      SagaCommandMessage command, String projectName, Response response) {
+    int status = response.getStatus();
+    String responseBody = response.readEntity(String.class);
+    boolean isDuplicate =
+        status == Response.Status.CONFLICT.getStatusCode()
+            || (responseBody != null
+                && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA));
+    if (isDuplicate) {
+      log.info(
+          "FROST returned {} for CREATE_PROJECT — re-checking for existing project with name"
+              + " '{}', saga={}",
+          status,
+          Encode.forJava(projectName),
+          Encode.forJava(command.sagaId()));
+      SagaCommandResult recovered = findExistingProjectByName(command, projectName);
+      if (recovered != null) {
+        return recovered;
+      }
+      throw new SagaApiException(
+          "CREATE_PROJECT failed: HTTP "
+              + status
+              + " — no existing project found with name '"
+              + projectName
+              + "'",
+          status);
+    }
+    // An HTTP 500 that is NOT the known duplicate-name case is a genuine FROST-side failure.
+    // Log the full body at WARN so operators see the real cause — the exception message is
+    // surfaced to the saga but may be truncated/sanitized downstream.
+    log.warn(
+        "FROST returned HTTP 500 for CREATE_PROJECT that is not the known 'Failed to store"
+            + " data.' duplicate case — body: {}, saga={}",
+        Encode.forJava(responseBody),
+        Encode.forJava(command.sagaId()));
+    throw new SagaApiException("CREATE_PROJECT failed: HTTP 500 — " + responseBody, 500);
+  }
+
+  /**
+   * Looks up a project by its globally-unique {@code "{datasetName} ({datasetId})"} name. Returns a
+   * successful {@link SagaCommandResult} bound to the existing project, or {@code null} if none
+   * exists. The datasetId in the name guarantees any match is this dataset's own project, never a
+   * foreign same-display-named one.
+   */
   private SagaCommandResult findExistingProjectByName(SagaCommandMessage command, String name) {
     String escapedName = name.replace("'", "''");
     try (Response response =
@@ -182,28 +245,21 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       List<Map<String, Object>> projects = (List<Map<String, Object>>) result.get("value");
 
       if (projects == null || projects.isEmpty()) {
-        throw new SagaApiException(
-            "CREATE_PROJECT failed: HTTP 500 — Failed to store data."
-                + " (no existing project found with name '"
-                + name
-                + "')",
-            500);
+        return null;
       }
 
       String projectId = String.valueOf(projects.get(0).get("@iot.id"));
       String baseUrl = projectBaseUrl(projectId);
 
       Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
-      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId);
+      // created=false: this project pre-existed and holds data the unrelease flow intentionally
+      // preserves — a CREATE_PROJECT compensation must NOT delete it, or a later step's failure
+      // would destroy exactly the storage re-release is meant to reuse.
+      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId, KEY_CREATED, false);
 
-      // Recovery from an HTTP 500 by binding to a PRE-EXISTING project matched by the unique name
-      // "{datasetName} ({datasetId})". Because the name carries the globally-unique datasetId, this
-      // only ever re-binds the dataset to its OWN project (a retried CREATE_PROJECT) — never a
-      // foreign same-display-named one. Kept at WARN so the 500-recovery path stays
-      // operator-visible.
-      log.warn(
-          "FROST CREATE_PROJECT recovered from a 500 by reusing the existing project with the same"
-              + " unique (datasetName + datasetId) name: projectId={}, saga={}",
+      log.info(
+          "FROST CREATE_PROJECT reused the existing project matched by unique name: projectId={},"
+              + " saga={}",
           Encode.forJava(projectId),
           Encode.forJava(command.sagaId()));
 
@@ -217,13 +273,10 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String datasetName = requireString(command, "datasetName");
     String datasetId = requireString(command, "datasetId");
     String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
-    boolean openDataAccess =
-        Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
 
     // Read current state before updating (needed for compensation)
     String previousName;
     String previousDescription;
-    boolean previousPublic;
     try (Response getResponse =
         authStrategy
             .apply(
@@ -237,14 +290,19 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> currentProject = getResponse.readEntity(Map.class);
       previousName = (String) currentProject.getOrDefault(KEY_NAME, "");
       previousDescription = (String) currentProject.getOrDefault(KEY_DESCRIPTION, "");
-      previousPublic = Boolean.TRUE.equals(currentProject.getOrDefault(KEY_PUBLIC, false));
     }
 
+    // Always force the project private (see handleCreateProject). New projects are never created
+    // public, so a public project can only be legacy/pre-migration data; re-provisioning flips it
+    // back to private, closing the old OPA-bypass path.
     Map<String, Object> body =
         Map.of(
-            KEY_NAME, frostProjectName(datasetName, datasetId),
-            KEY_DESCRIPTION, description,
-            KEY_PUBLIC, openDataAccess);
+            KEY_NAME,
+            frostProjectName(datasetName, datasetId),
+            KEY_DESCRIPTION,
+            description,
+            KEY_PUBLIC,
+            false);
 
     try (Response response =
         authStrategy
@@ -261,13 +319,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
       Map<String, Object> compensationData =
           new HashMap<>(
-              Map.of(
-                  KEY_PROJECT_ID,
-                  projectId,
-                  "previousDescription",
-                  previousDescription,
-                  "previousPublic",
-                  previousPublic));
+              Map.of(KEY_PROJECT_ID, projectId, "previousDescription", previousDescription));
       if (previousName.isBlank()) {
         // FROST returned no usable name (unexpected). Capturing "" would make a later
         // RESTORE_PROJECT blank the project name and break the unique-name duplicate-recovery
@@ -295,6 +347,25 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String projectId = requireString(command, KEY_PROJECT_ID);
     boolean compensating = "COMPENSATE_STEP".equals(command.type());
 
+    // created=false marks a reused, data-bearing project; deleting it as a CREATE_PROJECT
+    // compensation would destroy the storage re-release reuses. Forward deletes omit the flag.
+    if (compensating && Boolean.FALSE.equals(command.payload().get(KEY_CREATED))) {
+      log.info(
+          "DELETE_PROJECT compensation skipped: project {} was reused, not created by this saga —"
+              + " preserving its data. saga={}",
+          Encode.forJava(projectId),
+          Encode.forJava(command.sagaId()));
+      return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
+    }
+
+    FrostProjectCleanup cleanup =
+        new FrostProjectCleanup(client(), authStrategy, serverUrl, command.sagaId());
+    // Parse (and thereby validate) the provisioned ids before anything is deleted — a malformed
+    // payload must fail the step up front, not after the Things are already gone.
+    Map<String, List<String>> provisionedEntities = provisionedEntities(command);
+    cleanup.deleteProjectThings(projectId);
+    cleanup.deleteProvisionedEntities(provisionedEntities);
+
     try (Response response =
         authStrategy
             .apply(
@@ -304,17 +375,17 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
                     .request(MediaType.APPLICATION_JSON))
             .delete()) {
 
-      // Idempotent compensation: a 404 means the project is already gone — which is exactly the
-      // goal state of a DELETE_PROJECT rollback. Treat it as success on a compensation re-run
-      // (retry / partial earlier cleanup) rather than failing the saga rollback. A forward delete
-      // keeps the stricter checkResponse so genuine drift stays visible.
-      if (compensating && response.getStatus() == 404) {
+      // A 404 means the project is already gone — the exact goal state of a DELETE_PROJECT, in both
+      // directions. A forward delete of a dataset whose project a prior run (or a failed saga's
+      // compensation) already removed must succeed too, not strand the delete saga on the 404.
+      if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
         log.info(
-            "DELETE_PROJECT compensation: project {} already absent (404) — treating as success."
-                + " saga={}",
+            "DELETE_PROJECT: project {} already absent (404) — treating as success. saga={}",
             Encode.forJava(projectId),
             Encode.forJava(command.sagaId()));
-        return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
+        return compensating
+            ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
+            : SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
       }
 
       checkResponse(response, "DELETE_PROJECT");
@@ -330,6 +401,57 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     }
   }
 
+  /**
+   * Optional payload map of provisioned FROST entity ids per entity set (payload key {@code
+   * "provisionedEntities"}), filled by the portal once Datastream provisioning exists. Absent or
+   * malformed → empty (nothing to delete).
+   */
+  private static Map<String, List<String>> provisionedEntities(SagaCommandMessage command) {
+    Object raw = command.payload().get("provisionedEntities");
+    // Absent key = payload predates (or doesn't use) the contract — nothing to delete. A PRESENT
+    // key with the wrong shape is a broken producer and must fail loudly, like a malformed id.
+    if (raw == null) {
+      return Map.of();
+    }
+    if (!(raw instanceof Map<?, ?> bySet)) {
+      throw new IllegalArgumentException(
+          "DELETE_PROJECT payload field 'provisionedEntities' is not a map: "
+              + raw.getClass().getSimpleName());
+    }
+    Map<String, List<String>> result = new HashMap<>();
+    for (Map.Entry<?, ?> entry : bySet.entrySet()) {
+      if (!(entry.getValue() instanceof List<?> ids)) {
+        throw new IllegalArgumentException(
+            "DELETE_PROJECT payload field 'provisionedEntities."
+                + entry.getKey()
+                + "' is not a list");
+      }
+      result.put(
+          String.valueOf(entry.getKey()),
+          ids.stream().map(rawId -> scalarId(entry.getKey(), rawId)).toList());
+    }
+    return result;
+  }
+
+  /**
+   * A provisioned entity id must be a non-blank scalar. Anything else (null, object, blank) is a
+   * broken producer — failing loudly beats silently skipping the id, which would silently retain
+   * the entity in FROST.
+   */
+  private static String scalarId(Object entitySet, Object rawId) {
+    if (rawId instanceof Number number) {
+      return String.valueOf(number);
+    }
+    if (rawId instanceof String id && !id.isBlank()) {
+      return id;
+    }
+    throw new IllegalArgumentException(
+        "DELETE_PROJECT payload field 'provisionedEntities."
+            + entitySet
+            + "' contains a non-scalar or blank id: "
+            + rawId);
+  }
+
   private SagaCommandResult handleRestoreProject(SagaCommandMessage command) {
     String projectId = requireString(command, KEY_PROJECT_ID);
     Object previousName = command.payload().get("previousName");
@@ -338,7 +460,8 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     Map<String, Object> body = new HashMap<>();
     // Only restore the name when the UPDATE saga captured a usable one. PATCHing "" would blank
     // the project identity and break the unique-name duplicate-recovery lookup; leaving the field
-    // unset preserves the current value via PATCH semantics (same guard as previousPublic below).
+    // unset preserves the current value via PATCH semantics. (The public flag is not restored —
+    // it is unconditionally forced false below, since FROST projects are never public.)
     if (previousName instanceof String name && !name.isBlank()) {
       body.put(KEY_NAME, name);
     } else {
@@ -349,22 +472,9 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
           Encode.forJava(command.sagaId()));
     }
     body.put(KEY_DESCRIPTION, previousDescription);
-    // Only restore previousPublic when the UPDATE saga captured it (older sagas may
-    // predate this field — leaving it unset preserves the current value via PATCH semantics).
-    Object previousPublic = command.payload().get("previousPublic");
-    if (previousPublic != null) {
-      body.put(KEY_PUBLIC, Boolean.TRUE.equals(previousPublic));
-    } else {
-      // Privacy-relevant edge: without a captured previousPublic (e.g. an in-flight saga across a
-      // deploy) the FROST project's public flag is left as-is rather than reverted. Surface it so
-      // an
-      // operator can verify the access state after such a rollback.
-      log.info(
-          "RESTORE_PROJECT: previousPublic not captured — leaving the FROST public flag unchanged"
-              + " for projectId={}, saga={}",
-          Encode.forJava(projectId),
-          Encode.forJava(command.sagaId()));
-    }
+    // Force private on restore as well: FROST projects are never public in the OPA-decides model,
+    // so a compensation must not resurrect a public flag. (No previousPublic is captured anymore.)
+    body.put(KEY_PUBLIC, false);
 
     try (Response response =
         authStrategy

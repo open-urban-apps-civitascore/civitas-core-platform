@@ -113,7 +113,7 @@ class SagaStepTest {
     @Test
     @DisplayName("sets SKIPPED status and clears all data")
     void shouldTransitionToSkipped() {
-      SagaStep step = SagaStep.pending("deploy-pipelines", "redpanda", "DEPLOY_PIPELINES");
+      SagaStep step = SagaStep.pending("deploy-pipelines", "nifi", "DEPLOY_PIPELINES");
 
       SagaStep skipped = step.asSkipped();
 

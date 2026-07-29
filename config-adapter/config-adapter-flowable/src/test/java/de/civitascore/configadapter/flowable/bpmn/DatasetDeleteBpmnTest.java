@@ -39,24 +39,24 @@ class DatasetDeleteBpmnTest {
 
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
-  private SagaCommandHandler redpandaHandler;
+  private SagaCommandHandler pipelineHandler;
   private SagaCommandHandler geoserverHandler;
 
   @BeforeEach
   void setUp() {
     frostHandler = mock(SagaCommandHandler.class);
     apisixHandler = mock(SagaCommandHandler.class);
-    redpandaHandler = mock(SagaCommandHandler.class);
+    pipelineHandler = mock(SagaCommandHandler.class);
     geoserverHandler = mock(SagaCommandHandler.class);
     when(frostHandler.adapter()).thenReturn("frost");
     when(apisixHandler.adapter()).thenReturn("apisix");
-    when(redpandaHandler.adapter()).thenReturn("redpanda");
+    when(pipelineHandler.adapter()).thenReturn("nifi");
     when(geoserverHandler.adapter()).thenReturn("geoserver");
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
-    registry.register(redpandaHandler);
+    registry.register(pipelineHandler);
     registry.register(geoserverHandler);
 
     processEngine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
@@ -79,7 +79,7 @@ class DatasetDeleteBpmnTest {
 
   @Test
   void shouldCompleteHappyPathWithPipelines() {
-    stubRedpandaDeleteSuccess();
+    stubPipelineDeleteSuccess();
     stubApisixDeleteSuccess();
     stubFrostDeleteSuccess();
 
@@ -88,18 +88,18 @@ class DatasetDeleteBpmnTest {
 
     assertProcessCompleted(instance.getId());
 
-    verify(redpandaHandler).handle(any());
+    verify(pipelineHandler).handle(any());
     verify(apisixHandler).handle(any());
     verify(frostHandler).handle(any());
 
-    var inOrder = inOrder(redpandaHandler, apisixHandler, frostHandler);
-    inOrder.verify(redpandaHandler).handle(any());
+    var inOrder = inOrder(pipelineHandler, apisixHandler, frostHandler);
+    inOrder.verify(pipelineHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
     inOrder.verify(frostHandler).handle(any());
   }
 
   @Test
-  void shouldSkipRedpandaWhenNoPipelines() {
+  void shouldSkipPipelineWhenNoPipelines() {
     stubApisixDeleteSuccess();
     stubFrostDeleteSuccess();
 
@@ -108,7 +108,7 @@ class DatasetDeleteBpmnTest {
 
     assertProcessCompleted(instance.getId());
 
-    verify(redpandaHandler, never()).handle(any());
+    verify(pipelineHandler, never()).handle(any());
 
     var inOrder = inOrder(apisixHandler, frostHandler);
     inOrder.verify(apisixHandler).handle(any());
@@ -117,7 +117,7 @@ class DatasetDeleteBpmnTest {
 
   @Test
   void shouldContinueOnStepFailureBestEffort() {
-    stubRedpandaDeleteSuccess();
+    stubPipelineDeleteSuccess();
     when(apisixHandler.handle(any()))
         .thenReturn(SagaCommandResult.failure("saga-test-123", "delete-route", "APISIX down"));
     stubFrostDeleteSuccess();
@@ -127,16 +127,16 @@ class DatasetDeleteBpmnTest {
 
     assertProcessFinished(instance.getId());
 
-    verify(redpandaHandler).handle(any());
+    verify(pipelineHandler).handle(any());
     verify(apisixHandler).handle(any());
     verify(frostHandler).handle(any());
   }
 
   @Test
   void shouldContinueEvenWhenMultipleStepsFail() {
-    when(redpandaHandler.handle(any()))
+    when(pipelineHandler.handle(any()))
         .thenReturn(
-            SagaCommandResult.failure("saga-test-123", "delete-pipelines", "Redpanda down"));
+            SagaCommandResult.failure("saga-test-123", "delete-pipelines", "Pipeline down"));
     when(apisixHandler.handle(any()))
         .thenReturn(SagaCommandResult.failure("saga-test-123", "delete-route", "APISIX down"));
     when(frostHandler.handle(any()))
@@ -147,7 +147,7 @@ class DatasetDeleteBpmnTest {
 
     assertProcessFinished(instance.getId());
 
-    verify(redpandaHandler).handle(any());
+    verify(pipelineHandler).handle(any());
     verify(apisixHandler).handle(any());
     verify(frostHandler).handle(any());
   }
@@ -181,8 +181,8 @@ class DatasetDeleteBpmnTest {
     FlowableTestSupport.assertProcessFinished(historyService, processInstanceId);
   }
 
-  private void stubRedpandaDeleteSuccess() {
-    when(redpandaHandler.handle(any()))
+  private void stubPipelineDeleteSuccess() {
+    when(pipelineHandler.handle(any()))
         .thenReturn(
             SagaCommandResult.success("saga-test-123", "delete-pipelines", Map.of(), Map.of()));
   }

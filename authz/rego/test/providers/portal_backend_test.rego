@@ -236,3 +236,58 @@ test_not_collection_endpoint_sub_resource if {
 test_not_collection_endpoint_users_me if {
 	not portal_backend.is_collection_endpoint with input as portal_request("GET", "/v1/users/me")
 }
+
+# =============================================================================
+# DATAPOOL ENDPOINT TESTS
+# =============================================================================
+
+test_endpoints_contains_datapools if {
+	portal_backend.endpoints["/v1/datapools"]
+}
+
+test_endpoints_contains_datapools_id if {
+	portal_backend.endpoints["/v1/datapools/{id}"]
+}
+
+test_endpoints_contains_datapools_assignments if {
+	portal_backend.endpoints["/v1/datapools/{id}/assignments"]
+}
+
+test_path_pattern_datapools_collection if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datapools")
+	result == "/v1/datapools"
+}
+
+test_path_pattern_datapools_with_id if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datapools/pool-123")
+	result == "/v1/datapools/{id}"
+}
+
+test_path_pattern_datapools_assignments if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datapools/pool-123/assignments")
+	result == "/v1/datapools/{id}/assignments"
+}
+
+# Datapools are scoped by DATAPOOL (the {id} is the scopeId)
+test_scope_type_datapools if {
+	result := portal_backend.expected_scope_type with input as portal_request("GET", "/v1/datapools/pool-123")
+	result == "DATAPOOL"
+}
+
+# Sub-resource resource_id is the parent pool ID (parts[2])
+test_resource_id_datapools_assignments if {
+	result := portal_backend.resource_id with input as portal_request("GET", "/v1/datapools/pool-123/assignments")
+	result == "pool-123"
+}
+
+test_is_resource_endpoint_datapools if {
+	portal_backend.is_resource_endpoint with input as portal_request("GET", "/v1/datapools/pool-123")
+}
+
+test_is_collection_endpoint_datapools if {
+	portal_backend.is_collection_endpoint with input as portal_request("GET", "/v1/datapools")
+}
+
+test_not_collection_endpoint_datapools_resource if {
+	not portal_backend.is_collection_endpoint with input as portal_request("GET", "/v1/datapools/pool-123")
+}

@@ -1,6 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -37,10 +38,17 @@ interface UseDatastructureProps {
   datastructure: Datastructure
   assignedGroups: GroupRoleAssignmentTable[]
   initialAssignments: GroupRoleAssignmentTable[]
+  canRelease: boolean
 }
 
-export const useDatastructure = ({ datastructure, assignedGroups, initialAssignments }: UseDatastructureProps) => {
+export const useDatastructure = ({
+  datastructure,
+  assignedGroups,
+  initialAssignments,
+  canRelease,
+}: UseDatastructureProps) => {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
   const { handleFormValidationError } = useError()
@@ -84,7 +92,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     [datastructure.dataStructureVersions],
   )
 
-  const canSetAvailable = useMemo(
+  const canStage = useMemo(
     () => DatastructureFormAvailableSchema.safeParse(formValues).success && hasAvailableVersion,
     [formValues, hasAvailableVersion],
   )
@@ -103,11 +111,11 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
   }, [form, isDraftMode])
 
   useEffect(() => {
-    if (datastructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+    if (datastructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canStage) {
       form.setValue('dataStructureStatus', DATASTRUCTURE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
-  }, [canSetAvailable, form, datastructureStatus, tCommon])
+  }, [canStage, form, datastructureStatus, tCommon])
 
   const completedTabs = useMemo((): DatastructureTab[] => {
     const completed: DatastructureTab[] = []
@@ -168,7 +176,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     }
   }
 
-  const handleUpdateDatastructure = async (parsedValues: DatastructureFormDraft) => {
+  const handleUpdateDatastructure = async (parsedValues: DatastructureFormDraft, shouldRefresh = true) => {
     const dirtyFields = form.formState.dirtyFields
 
     const fieldsToUpdate = pickDirtyValues(parsedValues, dirtyFields)
@@ -184,15 +192,21 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     if (shouldUnrelease)
       datastructureResponse = await handleStatusUpdate(parsedValues.id, unreleaseDatastructure.mutateAsync)
 
+    // Invalidation of datastructure version queries on datastructure name change
+    // since the datastructure name is embedded in every version response
+    if (datastructureResponse && datastructureResponse.name !== datastructure.name) {
+      queryClient.invalidateQueries({ queryKey: [`datastructures/${datastructure.id}/versions`] })
+    }
+
     const updatedFormValues = datastructureResponse
       ? mapDatastructureApiToFormData(datastructureResponse)
       : parsedValues
 
     form.reset(updatedFormValues)
-    router.refresh()
+    if (shouldRefresh) router.refresh()
   }
 
-  const saveDatastructure = async () => {
+  const saveDatastructure = async (shouldRefresh = true) => {
     const values = form.getValues()
     const parsed = isDraftMode
       ? DatastructureFormDraftSchema.safeParse(values)
@@ -203,7 +217,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     }
 
     try {
-      await handleUpdateDatastructure(parsed.data)
+      await handleUpdateDatastructure(parsed.data, shouldRefresh)
       return true
     } catch (error) {
       console.error('An error occurred while submitting datastructure data.', (error as AxiosError).message)
@@ -216,7 +230,8 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     form.reset(defaultValues)
   }
 
-  const statusHint = !canSetDraft ? t('messages.isInUseStatusHint') : undefined
+  const statusDraftHint = !canSetDraft ? t('messages.isInUseStatusHint') : undefined
+  const statusAvailableHint = !canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined
 
   const isConfirmButtonDisabled = useMemo(
     () =>
@@ -229,14 +244,15 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
 
   return {
     areAssignmentsDirty,
-    canSetAvailable,
+    canStage,
     canSetDraft,
     completedTabs,
     form,
     isConfirmButtonDisabled,
     isLoading,
     saveDatastructure,
-    statusHint,
+    statusHint: statusDraftHint,
+    statusAvailableHint,
     datastructureStatus,
     selectedTab,
     handleStatusChange,

@@ -3,6 +3,7 @@ package de.civitascore.portal.model.input;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -16,7 +17,14 @@ public class LayerInputDTO extends BaseInputDTO {
 
   @NotNull private UUID dataSinkId;
 
-  @NotBlank private String layerName;
+  // Becomes a GeoServer WFS feature-type name, which must be safe as an XML element name; an unsafe
+  // value would otherwise only fail later, opaquely, when the publish saga hits GeoServer.
+  @NotBlank @Pattern(
+      regexp = "^[A-Za-z_-][A-Za-z0-9_-]*$",
+      message =
+          "Layer name must contain only letters, digits, underscores or hyphens"
+              + " and must not start with a digit")
+  private String layerName;
 
   private String title;
   private String description;

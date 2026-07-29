@@ -65,10 +65,10 @@ class FlowableSagaOrchestratorCleanupTest {
   }
 
   @Test
-  void initialize_withoutRedpandaHandler_succeeds() {
-    // redpanda is the conditional pipeline adapter — a deployment without it (e.g. mid NiFi
+  void initialize_withoutPipelineHandler_succeeds() {
+    // pipeline is the conditional pipeline adapter — a deployment without it (e.g. mid NiFi
     // migration) must still boot; only pipeline sagas need it, and they fail gracefully per step.
-    AdapterConfig config = jdbcConfig("jdbc:h2:mem:no-redpanda", "sa", "");
+    AdapterConfig config = jdbcConfig("jdbc:h2:mem:no-pipeline", "sa", "");
 
     SagaCommandHandler frost = mock(SagaCommandHandler.class);
     when(frost.adapter()).thenReturn("frost");
@@ -96,11 +96,11 @@ class FlowableSagaOrchestratorCleanupTest {
     when(frost.adapter()).thenReturn("frost");
     SagaCommandHandler apisix = mock(SagaCommandHandler.class);
     when(apisix.adapter()).thenReturn("apisix");
-    SagaCommandHandler redpanda = mock(SagaCommandHandler.class);
-    when(redpanda.adapter()).thenReturn("redpanda");
+    SagaCommandHandler pipeline = mock(SagaCommandHandler.class);
+    when(pipeline.adapter()).thenReturn("nifi");
 
     Map<String, SagaCommandHandler> mutableMap =
-        new HashMap<>(Map.of("frost", frost, "apisix", apisix, "redpanda", redpanda));
+        new HashMap<>(Map.of("frost", frost, "apisix", apisix, "nifi", pipeline));
 
     FlowableSagaOrchestrator sut = orchestratorWith("jdbc:h2:mem:copy-test", "sa", "", mutableMap);
 
@@ -144,8 +144,8 @@ class FlowableSagaOrchestratorCleanupTest {
     when(frost.adapter()).thenReturn("frost");
     SagaCommandHandler apisix = mock(SagaCommandHandler.class);
     when(apisix.adapter()).thenReturn("apisix");
-    SagaCommandHandler redpanda = mock(SagaCommandHandler.class);
-    when(redpanda.adapter()).thenReturn("redpanda");
-    return Map.of("frost", frost, "apisix", apisix, "redpanda", redpanda);
+    SagaCommandHandler pipeline = mock(SagaCommandHandler.class);
+    when(pipeline.adapter()).thenReturn("nifi");
+    return Map.of("frost", frost, "apisix", apisix, "nifi", pipeline);
   }
 }

@@ -46,16 +46,19 @@ class GroupResourceHandler implements KeycloakResourceHandler {
   private final ObjectMapper objectMapper;
   private final ResultPublisher resultPublisher;
   private final RoleSyncHelper roleSyncHelper;
+  private final GroupSyncHelper groupSyncHelper;
 
   GroupResourceHandler(
       Keycloak keycloakClient,
       ObjectMapper objectMapper,
       ResultPublisher resultPublisher,
-      RoleSyncHelper roleSyncHelper) {
+      RoleSyncHelper roleSyncHelper,
+      GroupSyncHelper groupSyncHelper) {
     this.keycloakClient = keycloakClient;
     this.objectMapper = objectMapper;
     this.resultPublisher = resultPublisher;
     this.roleSyncHelper = roleSyncHelper;
+    this.groupSyncHelper = groupSyncHelper;
   }
 
   @Override
@@ -72,6 +75,8 @@ class GroupResourceHandler implements KeycloakResourceHandler {
 
       assignRolesToGroup(
           realmResource, groupId, groupConfig.getRealmRoles(), groupConfig.getClientRoles());
+
+      groupSyncHelper.syncGroupMembers(groupConfig.getMembers(), groupId, realmResource);
 
       logger.info(
           "Created group: {} (ID: {}) in realm: {}",
@@ -102,6 +107,8 @@ class GroupResourceHandler implements KeycloakResourceHandler {
 
       assignRolesToGroup(
           realmResource, groupId, groupConfig.getRealmRoles(), groupConfig.getClientRoles());
+
+      groupSyncHelper.syncGroupMembers(groupConfig.getMembers(), groupId, realmResource);
 
       logger.info(
           "Updated group: {} in realm: {}", Encode.forJava(maskId(groupId)), Encode.forJava(realm));

@@ -1,0 +1,146 @@
+meta {
+  name: 7. Create Pipeline (geoPoint mapping)
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sqlDataSetId}}
+}
+
+body:json {
+  {
+    "name": "SQL Saga Pipeline",
+    "description": "Pipeline mapping lon/lat scalars to a PostGIS Point via the geoPoint op",
+    "dataSourceIds": ["{{sqlDataSourceId}}"],
+    "dataSinkIds": ["{{sqlDataSinkId}}"],
+    "model": {
+      "viewport": { "x": 0, "y": 0, "zoom": 1 },
+      "nodePositions": {
+        "33333333-3333-4000-8000-000000000001": { "x": 360, "y": -40 },
+        "33333333-3333-4000-8000-000000000004": { "x": 360, "y": 30 },
+        "33333333-3333-4000-8000-000000000005": { "x": 140, "y": 100 },
+        "33333333-3333-4000-8000-000000000002": { "x": 320, "y": 100 },
+        "33333333-3333-4000-8000-000000000006": { "x": 520, "y": 100 },
+        "33333333-3333-4000-8000-000000000003": { "x": 740, "y": 80 }
+      },
+      "nodes": [
+        {
+          "id": "33333333-3333-4000-8000-000000000001",
+          "type": "start",
+          "position": { "x": 360, "y": -40 },
+          "data": { "nodeType": "start", "label": "Start", "configured": true, "description": "Entry point of the pipeline. Execution begins here." },
+          "measured": { "width": 32, "height": 32 }
+        },
+        {
+          "id": "33333333-3333-4000-8000-000000000004",
+          "type": "cron",
+          "position": { "x": 360, "y": 30 },
+          "data": { "nodeType": "cron", "label": "CRON", "configured": true, "cronExpression": "0 0 6 * * ?" },
+          "measured": { "width": 160, "height": 48 }
+        },
+        {
+          "id": "33333333-3333-4000-8000-000000000005",
+          "type": "dataSource",
+          "position": { "x": 140, "y": 100 },
+          "data": { "label": "SQL Source", "configured": true, "entityType": "datasource", "entityId": "{{sqlDataSourceId}}", "entityMetadata": { "connector": "SQL" } },
+          "measured": { "width": 160, "height": 48 }
+        },
+        {
+          "id": "33333333-3333-4000-8000-000000000002",
+          "type": "mapping",
+          "position": { "x": 320, "y": 100 },
+          "data": {
+            "label": "Mapping",
+            "configured": true,
+            "mappingConfig": {
+              "$schema": "https://civitasconnect.digital/core/mapping/v1",
+              "source": "urn:core:tenant:civitas:datastructure:demo:GeoSensorSource:0000000001:1.0.0",
+              "target": "urn:core:tenant:civitas:datastructure:demo:GeoSensorTarget:0000000002:1.0.0",
+              "fields": {
+                "$.stationid": "$.stationid",
+                "$.geo": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }
+              },
+              "positions": {}
+            },
+            "sourceDatastructureId": "{{sqlSourceDataStructureId}}",
+            "sourceVersionId": "{{sqlSourceVersionId}}",
+            "sourceName": "GeoSensorSource",
+            "targetDatastructureId": "{{sqlTargetDataStructureId}}",
+            "targetVersionId": "{{sqlTargetVersionId}}",
+            "targetName": "GeoSensorTarget"
+          },
+          "measured": { "width": 160, "height": 66 },
+          "selected": false,
+          "dragging": false
+        },
+        {
+          "id": "33333333-3333-4000-8000-000000000006",
+          "type": "geoPersistence",
+          "position": { "x": 520, "y": 100 },
+          "data": { "label": "Geospatial Data Storage", "configured": true, "entityType": "persistence", "entityId": "{{sqlDataSinkId}}", "tableName": "saga_sql_observations", "dataStructureVersionId": "{{sqlTargetDataStructureId}}/{{sqlTargetVersionId}}", "dataStructureName": "GeoSensorTarget" },
+          "measured": { "width": 160, "height": 48 }
+        },
+        {
+          "id": "33333333-3333-4000-8000-000000000003",
+          "type": "end",
+          "position": { "x": 740, "y": 80 },
+          "data": { "nodeType": "end", "label": "End", "configured": true, "description": "Exit point of the pipeline. Execution completes here." },
+          "measured": { "width": 32, "height": 32 }
+        }
+      ],
+      "edges": [
+        { "id": "33333333-3333-4000-8000-0000000000e1", "source": "33333333-3333-4000-8000-000000000001", "target": "33333333-3333-4000-8000-000000000004", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "33333333-3333-4000-8000-0000000000e3", "source": "33333333-3333-4000-8000-000000000004", "target": "33333333-3333-4000-8000-000000000005", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "33333333-3333-4000-8000-0000000000e4", "source": "33333333-3333-4000-8000-000000000005", "target": "33333333-3333-4000-8000-000000000002", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "33333333-3333-4000-8000-0000000000e5", "source": "33333333-3333-4000-8000-000000000002", "target": "33333333-3333-4000-8000-000000000006", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "33333333-3333-4000-8000-0000000000e2", "source": "33333333-3333-4000-8000-000000000006", "target": "33333333-3333-4000-8000-000000000003", "type": "smoothstep", "data": { "label": "" } }
+      ]
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sqlPipelineId', res.body.id);
+  }
+}
+
+tests {
+  test("Pipeline created", function() {
+    const status = res.getStatus();
+    // 201=created. This collection assumes a clean DB per run (CI uses an ephemeral stack); a 409
+    // would mean a previous run leaked — fail loudly rather than carry a stale id downstream.
+    expect(status).to.equal(201);
+  });
+}
+
+docs {
+  **SQL saga step 7** — Prerequisites: DataSource AVAILABLE (step 4a), DataSet created (step 5), POSTGIS DataSink created (step 6).
+
+  Creates the pipeline attached to the dataset, modelled as a CORE intermediate-representation graph. The graph is the mandatory linear data flow `start → cron → dataSource → mapping → geoPersistence → end` (the cron trigger is wired in front of the pull source): the wired SQL source node (`entityId` = `sqlDataSourceId`) feeds the mapping, which feeds the wired POSTGIS sink node (`entityId` = `sqlDataSinkId`). The adapter derives source and sink per pipeline from the graph's `entityId`s, which must also appear in `dataSourceIds`/`dataSinkIds`; a graph without a wired source or sink node is rejected at deploy.
+
+  The mapping node carries an inline `mappingConfig` whose `fields` use the **geoPoint** op:
+  `"$.geo": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }`.
+  The adapter compiles this to a WKT `POINT(<lon> <lat>)` literal that the `GEOMETRY(POINT,4326)` column parses on insert; `$.stationid` is a straight copy. `source`/`target` are versioned CORE URNs (opaque labels for the mapping parser); `$schema` and `positions` are accepted-but-ignored.
+
+  When the dataset is released, the saga deploys this pipeline to the pipeline engine writing to the PostGIS sink.
+
+  **Expected Response:** 201 Created, body contains `id`. A 409 means a previous run leaked (the test asserts a strict 201 and fails).
+
+  **Post-condition:** Save `sqlPipelineId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Pipeline record created in `portal_backend` DB linked to the dataset; DataSink `pipeline_id` set |
+  | Config Adapter | — |
+  | Pipeline engine | Pipeline is deployed only after the DATASET_CREATE saga runs (step 9) |
+}

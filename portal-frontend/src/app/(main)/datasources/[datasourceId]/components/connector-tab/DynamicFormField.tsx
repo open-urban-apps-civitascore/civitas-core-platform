@@ -5,10 +5,12 @@ import { FormSelect } from '@/components/form/fields/FormSelect'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { InputPropsWithoutForm, SelectOption } from '@/types/common'
+import { FormInputType } from '@/types/datasources'
 
 export interface DynamicFormFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
   id: string
   type: 'textArea' | 'input' | 'select' | 'checkbox'
+  inputType?: FormInputType
   form: UseFormReturn<T>
   label: string
   name: Path<T>
@@ -21,6 +23,7 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
   const {
     id,
     type,
+    inputType,
     form,
     label,
     name,
@@ -82,6 +85,7 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
           shouldShowErrors={shouldShowErrors}
           formItemProps={{ className }}
           disabled={disabled}
+          type={inputType}
         />
       )
   }

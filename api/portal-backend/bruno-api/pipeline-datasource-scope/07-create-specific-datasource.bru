@@ -1,0 +1,59 @@
+meta {
+  name: 07. Create SPECIFIC-scoped DataSource (Pool B)
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Scope Test DataSource {{scopeRunId}}",
+    "description": "SPECIFIC-scoped to Pool B; must be rejected for a Pool A dataset",
+    "connectorType": "MQTT",
+    "configuration": {
+      "urls": ["tcp://broker.hivemq.com:1883"],
+      "topics": ["civitas/core/scope-test/+"],
+      "client_id": "civitas-scope-test",
+      "qos": 1,
+      "connect_timeout": "5s",
+      "keepalive": "30s",
+      "tls": { "enabled": false }
+    },
+    "dataStructureVersionId": null,
+    "datapoolScope": {
+      "type": "SPECIFIC",
+      "datapoolIds": ["{{scopePoolBId}}"]
+    },
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('scopeDataSourceId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("scopeDataSourceId is set", function() {
+    expect(bru.getVar('scopeDataSourceId')).to.be.a('string');
+  });
+  test("datapoolScope type is SPECIFIC", function() {
+    expect(res.body.datapoolScope.type).to.equal('SPECIFIC');
+  });
+}
+
+docs {
+  Creates the DataSource scoped to **Pool B** only. Created in `DRAFT` with a null version; the
+  version is attached in step 08 and the source released to `AVAILABLE` in step 09.
+
+  **Post-condition:** saves `scopeDataSourceId`.
+}

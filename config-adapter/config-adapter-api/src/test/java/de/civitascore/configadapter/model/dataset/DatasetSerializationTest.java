@@ -44,7 +44,6 @@ class DatasetSerializationTest {
   void shouldDeserializeDatasetFields() {
     assertEquals("b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a", dataset.id());
     assertEquals("Neustadt Traffic Counts 2025", dataset.name());
-    assertTrue(dataset.openDataAccess());
   }
 
   @Test
@@ -136,6 +135,28 @@ class DatasetSerializationTest {
   }
 
   @Test
+  void absentSourceAndSinkIdsDeserializeAsEmptyLists() {
+    // Triggers published before the per-pipeline association existed omit the fields; the record
+    // normalizes them so consumers never see null.
+    DataPipeline pipeline = dataset.datapipelines().getFirst();
+    assertEquals(List.of(), pipeline.dataSourceIds());
+    assertEquals(List.of(), pipeline.dataSinkIds());
+  }
+
+  @Test
+  void shouldDeserializeSourceAndSinkIds() throws Exception {
+    DataPipeline pipeline =
+        objectMapper.readValue(
+            """
+            {"id":"p1","version":"1","action":"ADD","data":{},
+             "dataSourceIds":["src-1"],"dataSinkIds":["sink-1","sink-2"]}
+            """,
+            DataPipeline.class);
+    assertEquals(List.of("src-1"), pipeline.dataSourceIds());
+    assertEquals(List.of("sink-1", "sink-2"), pipeline.dataSinkIds());
+  }
+
+  @Test
   void shouldDeserializeNamedApis() {
     assertNotNull(dataset.namedApis());
     assertEquals(2, dataset.namedApis().size());
@@ -207,7 +228,6 @@ class DatasetSerializationTest {
     Dataset roundTripped = objectMapper.readValue(json, Dataset.class);
     assertEquals(dataset.id(), roundTripped.id());
     assertEquals(dataset.name(), roundTripped.name());
-    assertEquals(dataset.openDataAccess(), roundTripped.openDataAccess());
     assertEquals(dataset.datasources().size(), roundTripped.datasources().size());
     assertEquals(dataset.datapipelines().size(), roundTripped.datapipelines().size());
     assertEquals(dataset.datasources().get(0), roundTripped.datasources().get(0));

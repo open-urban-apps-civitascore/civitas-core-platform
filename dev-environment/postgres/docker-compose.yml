@@ -1,6 +1,6 @@
 services:
   postgres-portal:
-    image: postgres:18.1-alpine
+    image: postgres:16-alpine
     container_name: civitas-postgres-portal
     environment:
       POSTGRES_DB: portal_backend
@@ -19,6 +19,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_portal_data:/var/lib/postgresql/data
+      # Bootstrap the Flowable saga database on a fresh volume (runs after init, race-free).
+      - ./initdb:/docker-entrypoint-initdb.d:ro
     networks:
       - civitas-network
     healthcheck:

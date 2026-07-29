@@ -1,0 +1,28 @@
+meta {
+  name: Get All Styles
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/styles
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+  ~name: default
+}
+
+docs {
+  **Precondition:** `dataSetId` is set.
+
+  **Expected Response:** 200 OK, paginated list of Styles belonging to the data set.
+}

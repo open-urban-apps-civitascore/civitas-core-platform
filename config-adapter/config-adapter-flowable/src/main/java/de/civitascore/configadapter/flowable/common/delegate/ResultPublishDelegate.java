@@ -53,7 +53,12 @@ public class ResultPublishDelegate extends AbstractSagaDelegate {
       String error = stringVar(execution, "sagaError");
       boolean hasCompensation = !"false".equals(resolveString(supportsCompensation, execution));
       boolean compensated = hasCompensation && !hasCompensationErrors(execution);
-      publisher.publishFailed(new SagaFailure(sagaId, datasetId, failedStep, error, compensated));
+      Object status = execution.getVariable("pipelineStatus");
+      @SuppressWarnings("unchecked")
+      Map<String, Object> pipelineStatus =
+          status instanceof Map<?, ?> map ? (Map<String, Object>) map : null;
+      publisher.publishFailed(
+          new SagaFailure(sagaId, datasetId, failedStep, error, compensated, pipelineStatus));
     }
   }
 

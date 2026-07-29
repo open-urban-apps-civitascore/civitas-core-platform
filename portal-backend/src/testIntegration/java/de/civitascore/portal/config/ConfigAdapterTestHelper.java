@@ -60,7 +60,10 @@ public class ConfigAdapterTestHelper implements AutoCloseable {
             ",",
             Topics.USER_CREATED.getValue(),
             Topics.USER_UPDATED.getValue(),
-            Topics.USER_DELETED.getValue()));
+            Topics.USER_DELETED.getValue(),
+            Topics.GROUP_CREATED.getValue(),
+            Topics.GROUP_UPDATED.getValue(),
+            Topics.GROUP_DELETED.getValue()));
 
     AppConfig config = new AppConfig(new MapConfiguration(props));
 
@@ -76,7 +79,7 @@ public class ConfigAdapterTestHelper implements AutoCloseable {
     kafkaConsumer.start();
 
     // Wait for consumer to be ready
-    ContainerTestUtils.waitForAssignment(kafkaConsumer, 3);
+    ContainerTestUtils.waitForAssignment(kafkaConsumer, 6);
 
     log.info("Config Adapter test helper initialized and listening for events");
   }
@@ -96,7 +99,10 @@ public class ConfigAdapterTestHelper implements AutoCloseable {
         new ContainerProperties(
             Topics.USER_CREATED.getValue(),
             Topics.USER_UPDATED.getValue(),
-            Topics.USER_DELETED.getValue());
+            Topics.USER_DELETED.getValue(),
+            Topics.GROUP_CREATED.getValue(),
+            Topics.GROUP_UPDATED.getValue(),
+            Topics.GROUP_DELETED.getValue());
 
     KafkaMessageListenerContainer<String, CloudEvent> container =
         new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);

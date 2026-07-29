@@ -9,6 +9,7 @@ import { useCreateDataset } from '@/app/services/api/datasets/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormSelect } from '@/components/form/fields/FormSelect'
+import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -46,6 +47,7 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
     defaultValues: {
       name: '',
       datapoolId: datapoolId,
+      description: '',
     },
   })
 
@@ -55,6 +57,7 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
     try {
       const { data } = await createDataset.mutateAsync({
         name: formData.name,
+        description: formData.description,
         ...(formData.datapoolId && { datapoolId: formData.datapoolId }),
       })
       toast.success(t('messages.createSuccess'))
@@ -108,7 +111,7 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
     <PageContainer testId="createDatasetPage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <PageHeader title={t('create.title')} subtitle={t('create.subtitle')} customElement={customElementCreateMode} />
       <PageBackground className="overflow-y-auto" hasBackground>
-        <ContentCard className={cn('h-full overflow-auto')}>
+        <ContentCard className={cn('overflow-auto')}>
           <Form {...form}>
             <form
               id="dataset-create-form"
@@ -122,9 +125,9 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
             >
               <DetailsFieldContainer className="pt-0 border-b-0">
                 <SubHeader
-                  title={t('create.title')}
+                  title={t('create.basicInfo.title')}
                   titleClassName="text-2xl leading-none font-bold"
-                  subtitle={t('create.subtitle')}
+                  subtitle={tCommon('info.creationSubtitle')}
                 />
               </DetailsFieldContainer>
               {isLoading ? (
@@ -154,6 +157,19 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
                       />
                     </DetailsFieldContainer>
                   ) : null}
+                  <DetailsFieldContainer className="max-w-300" hasBorder={false}>
+                    <FormTextArea
+                      id="datasetDescription"
+                      form={form}
+                      label={t('form.description')}
+                      name="description"
+                      placeholder={t('form.description')}
+                      hint={t('form.descriptionHint')}
+                      maxLength={150}
+                      hasCharacterCount
+                      className="min-h-[100px] resize-none"
+                    />
+                  </DetailsFieldContainer>
                 </>
               )}
             </form>

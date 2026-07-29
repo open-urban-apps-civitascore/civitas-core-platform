@@ -112,6 +112,41 @@ else
     exit 1
 fi
 
+# Check 4: Runtime env contract
+# Every opa.runtime().env.<KEY> read must be declared in policy/env_contract.rego.
+echo -n "  Checking runtime env contract... "
+
+# Env keys read in the rego source.
+USED_ENV=$(grep -rhoE 'opa\.runtime\(\)\.env\.[A-Za-z_][A-Za-z0-9_]*' \
+  "${SCRIPT_DIR}/policy" "${SCRIPT_DIR}/lib" "${SCRIPT_DIR}/providers" 2>/dev/null \
+  | sed -E 's/.*\.env\.//' | sort -u)
+
+# Env keys declared in the contract.
+DECLARED_ENV=$(docker run --rm \
+  -v "${SCRIPT_DIR}/policy:/rego/policy:ro" \
+  -v "${SCRIPT_DIR}/lib:/rego/lib:ro" \
+  -v "${SCRIPT_DIR}/providers:/rego/providers:ro" \
+  ${OPA_IMAGE} \
+  eval -f raw -d /rego/policy -d /rego/lib -d /rego/providers \
+  'data.civitas.authz.env_contract.required_env[_]' 2>/dev/null | sort -u)
+
+UNDECLARED=""
+for key in ${USED_ENV}; do
+    if ! printf '%s\n' "${DECLARED_ENV}" | grep -qx "${key}"; then
+        UNDECLARED="${UNDECLARED} ${key}"
+    fi
+done
+
+if [ -z "${UNDECLARED}" ]; then
+    echo "OK"
+else
+    echo "FAILED"
+    echo ""
+    echo "Env vars read but NOT declared in policy/env_contract.rego:${UNDECLARED}"
+    echo "Add them to required_env."
+    exit 1
+fi
+
 echo ""
 
 # =============================================================================

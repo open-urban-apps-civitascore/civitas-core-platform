@@ -23,16 +23,18 @@ interface TabProps {
   isActive: boolean
   onSelect: (sessionId: string) => void
   onRename: (sessionId: string, newName: string) => void
+  canEdit: boolean
 }
 
-const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onRename }) => {
+const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onRename, canEdit }) => {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(session.name)
 
   const handleDoubleClick = useCallback(() => {
+    if (!canEdit) return
     setIsEditing(true)
     setEditName(session.name)
-  }, [session.name])
+  }, [canEdit, session.name])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -99,6 +101,9 @@ interface PipelineTabBarProps {
   onSelectSession: (sessionId: string) => void
   onRenameSession: (sessionId: string, newName: string) => void
   onCreateSession: () => void
+  /** When false, tabs cannot be created or renamed (user lacks edit permission). */
+  canEdit?: boolean
+  canCreate?: boolean
 }
 
 /**
@@ -111,6 +116,8 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
   onSelectSession,
   onRenameSession,
   onCreateSession,
+  canEdit = true,
+  canCreate = true,
 }) => {
   const t = useTranslations('pipelineEditor')
 
@@ -125,18 +132,21 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
             isActive={session.id === activeSessionId}
             onSelect={onSelectSession}
             onRename={onRenameSession}
+            canEdit={canEdit}
           />
         ))}
       </div>
 
       {/* New Tab Button */}
-      <button
-        onClick={onCreateSession}
-        className="flex-shrink-0 border-r border-border p-2 transition-colors hover:bg-muted"
-        title={t('tabs.newPipeline')}
-      >
-        <Plus className="h-4 w-4 text-muted-foreground" />
-      </button>
+      {canCreate && (
+        <button
+          onClick={onCreateSession}
+          className="flex-shrink-0 border-r border-border p-2 transition-colors hover:bg-muted"
+          title={t('tabs.newPipeline')}
+        >
+          <Plus className="h-4 w-4 text-muted-foreground" />
+        </button>
+      )}
 
       {/* Fill remaining space */}
       <div className="flex-1 bg-muted/30" />

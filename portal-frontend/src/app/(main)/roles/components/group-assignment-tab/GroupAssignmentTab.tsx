@@ -58,6 +58,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const router = useRouter()
   const { hasPermission } = usePermissions()
   const canCreateAssignment = hasPermission(PERMISSION_NAMES.ASSIGNMENT_CREATE)
+  const canDeleteAssignment = hasPermission(PERMISSION_NAMES.ASSIGNMENT_DELETE)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedScope, setSelectedScope] = useState<AssignmentScope>(ASSIGNMENT_SCOPE_TYPES.TENANT)
   const [groupToRemove, setGroupToRemove] = useState<GroupTableRow | null>(null)
@@ -253,7 +254,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         totalPages={totalPages}
         onRowClick={canEdit ? undefined : onRowClick}
         isEditMode={canEdit}
-        onRemoveGroup={canEdit ? group => setGroupToRemove(group) : undefined}
+        onRemoveGroup={canEdit && canDeleteAssignment ? group => setGroupToRemove(group) : undefined}
       />
       {isTenantScope && (
         <GroupAssignmentModal
