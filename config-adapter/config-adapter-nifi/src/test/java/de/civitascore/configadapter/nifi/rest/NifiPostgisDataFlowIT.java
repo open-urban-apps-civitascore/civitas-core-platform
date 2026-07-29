@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.awaitility.core.ConditionTimeoutException;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
@@ -268,7 +269,14 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
             + "{\"ts\":\"2026-01-01T00:00:00Z\",\"value\":1},"
             + "{\"ts\":\"2026-01-01T00:15:00Z\",\"value\":2},"
             + "{\"ts\":\"2026-01-01T00:30:00Z\",\"value\":3}]}",
-        publisher -> fanoutRowsLanded());
+        publisher -> rowCount("fanout_observation", "stationid = 'S5'") >= 3);
+
+    settleBeforeCounting();
+    assertEquals(List.of(1, 2, 3), fanoutValues(), "one row per element, no cross product");
+    // distinct timestamps prove each row took its own element's value rather than a broadcast
+    assertEquals(
+        List.of("2026-01-01T00:00:00Z", "2026-01-01T00:15:00Z", "2026-01-01T00:30:00Z"),
+        fanoutTimestamps());
   }
 
   /** Builds a single-mapping-node graph; every fan-out scenario differs only in the field map. */
@@ -480,10 +488,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
             + "{\"ts\":\"2026-08-01T00:00:00Z\"},{\"ts\":\"2026-08-01T00:15:00Z\"}]}",
         publisher -> rowCount("chained_fanout_observation", "stationid = 'S18'") >= 2);
 
-    // Asserted after the poll, not inside it: a predicate that waits for '>= 2' and then asserts
-    // '== 2' can never see the over-fork it exists to catch, since the extra rows only make the
-    // guard pass sooner. Settling first and then counting does.
-    Thread.sleep(Duration.ofSeconds(6).toMillis());
+    settleBeforeCounting();
     assertEquals(
         2,
         rowCount("chained_fanout_observation", "stationid = 'S18'"),
@@ -621,10 +626,15 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
   }
 
   /**
-   * A payload-driven poll step: republishes and reports whether the expected outcome has landed.
-   * Republishing on every attempt is what the existing tests do — ConsumeMQTT may not be scheduled
-   * yet when the first message is sent.
+   * Waits out any row still in flight before an exact count is taken. A readiness poll asks for a
+   * lower bound, which an over-fork only makes true sooner — so the surplus rows it exists to catch
+   * arrive after the poll returns, and counting straight away would miss exactly them.
    */
+  private static void settleBeforeCounting() throws InterruptedException {
+    Thread.sleep(Duration.ofSeconds(6).toMillis());
+  }
+
+  /** Reports whether the expected outcome has landed; the publisher is available for redelivery. */
   private interface PollStep {
     boolean check(MqttPublisher publisher) throws Exception;
   }
@@ -666,13 +676,24 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     // Republishing only while the sink is still empty resolves both: a lost delivery is retried
     // until the subscription exists, and once any row has landed no further payload is sent, so the
     // count stays exact. Bounded, because a flow that never delivers must fail rather than hang.
+    //
+    // Each attempt must wait long enough that an empty sink really means "the broker dropped it",
+    // not "it is still in flight": a delivery already consumed by ConsumeMQTT but not yet committed
+    // by PutDatabaseRecord would otherwise draw a second, independent payload into the same flow
+    // and double every row.
     String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
     try (MqttPublisher publisher = new MqttPublisher(brokerUrl)) {
-      for (int attempt = 0;
-          attempt < 20 && rowCount(sinkSpec.tableName(), "true") == 0;
-          attempt++) {
+      for (int attempt = 0; attempt < 6 && rowCount(sinkSpec.tableName(), "true") == 0; attempt++) {
         publisher.publishOnce(topic, payload);
-        Thread.sleep(Duration.ofSeconds(3).toMillis());
+        try {
+          await()
+              .atMost(Duration.ofSeconds(20))
+              .pollInterval(Duration.ofSeconds(1))
+              .ignoreExceptions()
+              .until(() -> rowCount(sinkSpec.tableName(), "true") > 0);
+        } catch (ConditionTimeoutException stillEmpty) {
+          // No row within the window: treat the delivery as lost and republish.
+        }
       }
       await()
           .atMost(Duration.ofSeconds(120))
@@ -705,35 +726,33 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     }
   }
 
-  /**
-   * Asserts EXACTLY one row per source array element from a single delivery, each carrying the
-   * parent-level station id and its own timestamp. The exact count is the point: a cross product
-   * over two array contexts, or a broadcast of one element's values onto all rows, both produce a
-   * row count that a lower-bound check would accept.
-   */
-  private boolean fanoutRowsLanded() throws Exception {
+  private List<Integer> fanoutValues() throws Exception {
+    List<Integer> values = new ArrayList<>();
+    forEachFanoutRow(rs -> values.add(rs.getInt("value")));
+    return values;
+  }
+
+  private List<String> fanoutTimestamps() throws Exception {
+    List<String> timestamps = new ArrayList<>();
+    forEachFanoutRow(rs -> timestamps.add(rs.getString("measured_at")));
+    return timestamps;
+  }
+
+  private void forEachFanoutRow(RowConsumer consumer) throws Exception {
     try (Connection c = dbConnection();
         Statement st = c.createStatement();
         ResultSet rs =
             st.executeQuery(
                 "SELECT measured_at, value FROM fanout_observation"
                     + " WHERE stationid = 'S5' ORDER BY value")) {
-      List<Integer> values = new ArrayList<>();
-      List<String> timestamps = new ArrayList<>();
       while (rs.next()) {
-        values.add(rs.getInt("value"));
-        timestamps.add(rs.getString("measured_at"));
+        consumer.accept(rs);
       }
-      if (values.size() < 3) {
-        return false;
-      }
-      assertEquals(List.of(1, 2, 3), values, "one row per element, no cross product");
-      // distinct timestamps prove each row took its own element's value rather than a broadcast
-      assertEquals(
-          List.of("2026-01-01T00:00:00Z", "2026-01-01T00:15:00Z", "2026-01-01T00:30:00Z"),
-          timestamps);
-      return true;
     }
+  }
+
+  private interface RowConsumer {
+    void accept(ResultSet rs) throws Exception;
   }
 
   /** Queries PostgreSQL and asserts the row is present with the int column correctly coerced. */
