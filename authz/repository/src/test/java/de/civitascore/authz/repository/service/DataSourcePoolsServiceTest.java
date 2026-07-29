@@ -61,19 +61,33 @@ class DataSourcePoolsServiceTest {
     }
 
     @Test
-    @DisplayName("an unrestricted data source is assigned to no pool")
-    void scopeAll_isAssignedToNoPool() {
+    @DisplayName("an unrestricted data source is usable in every pool and names none")
+    void scopeAll_isUsableInAllPools() {
       when(dataSourceRepository.findById(DATA_SOURCE_ID))
           .thenReturn(Optional.of(dataSource(DatapoolScopeType.ALL)));
 
       DataSourcePoolsResponse result =
           dataSourcePoolsService.getDataSourcePools(DATA_SOURCE_ID).orElseThrow();
 
+      assertThat(result.isUsableInAllPools()).isTrue();
       assertThat(result.getPoolIds()).isEmpty();
     }
 
     @Test
-    @DisplayName("an assigned data source reports exactly the pools it names")
+    @DisplayName("an unrestricted data source keeps naming no pool even when it has scoped pools")
+    void scopeAll_ignoresScopedPools() {
+      when(dataSourceRepository.findById(DATA_SOURCE_ID))
+          .thenReturn(Optional.of(dataSource(DatapoolScopeType.ALL, POOL_ID)));
+
+      DataSourcePoolsResponse result =
+          dataSourcePoolsService.getDataSourcePools(DATA_SOURCE_ID).orElseThrow();
+
+      assertThat(result.isUsableInAllPools()).isTrue();
+      assertThat(result.getPoolIds()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a confined data source reports exactly the pools it names")
     void scopeSpecific_reportsScopedPools() {
       when(dataSourceRepository.findById(DATA_SOURCE_ID))
           .thenReturn(Optional.of(dataSource(DatapoolScopeType.SPECIFIC, POOL_ID)));
@@ -82,11 +96,12 @@ class DataSourcePoolsServiceTest {
           dataSourcePoolsService.getDataSourcePools(DATA_SOURCE_ID).orElseThrow();
 
       assertThat(result.getPoolIds()).containsExactly(POOL_ID);
+      assertThat(result.isUsableInAllPools()).isFalse();
     }
 
     @Test
-    @DisplayName("a data source usable in no pipeline is assigned to no pool either")
-    void scopeNone_isAssignedToNoPool() {
+    @DisplayName("a data source usable in no pipeline is usable in no pool either")
+    void scopeNone_isUsableNowhere() {
       when(dataSourceRepository.findById(DATA_SOURCE_ID))
           .thenReturn(Optional.of(dataSource(DatapoolScopeType.NONE, POOL_ID)));
 
@@ -94,6 +109,7 @@ class DataSourcePoolsServiceTest {
           dataSourcePoolsService.getDataSourcePools(DATA_SOURCE_ID).orElseThrow();
 
       assertThat(result.getPoolIds()).isEmpty();
+      assertThat(result.isUsableInAllPools()).isFalse();
     }
   }
 }

@@ -60,11 +60,12 @@ public final class ScopeFilteringSpecification {
   }
 
   /**
-   * Filter data sources by directly scoped IDs OR by assignment to an authorized datapool.
+   * Filter data sources by directly scoped IDs OR by usability in an authorized datapool.
    *
-   * <p>The pool branch matches the data sources <em>assigned</em> to an authorized pool. An
-   * unrestricted data source is assigned to no pool in particular and is therefore not reached this
-   * way — only through a direct scope id.
+   * <p>The pool branch matches the data sources that may be <em>used in</em> an authorized pool, so
+   * a pool-scoped steward sees exactly what they may build a pipeline from: an unrestricted data
+   * source counts for every pool, a confined one for the pools it names, and one usable nowhere for
+   * none.
    *
    * <p>The scoped-pool membership test is a correlated EXISTS subquery rather than a join, so a
    * data source confined to several authorized pools still yields a single row in paginated
@@ -82,8 +83,7 @@ public final class ScopeFilteringSpecification {
     return scopeOrPool(
         scopeIds,
         poolIds,
-        (root, query, cb) ->
-            DataSourceDatapoolUsability.confinedToAnyPool(root, query, cb, poolIds));
+        (root, query, cb) -> DataSourceDatapoolUsability.usableInAnyPool(root, query, cb, poolIds));
   }
 
   /**

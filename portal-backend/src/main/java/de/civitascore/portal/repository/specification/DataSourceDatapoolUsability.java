@@ -20,12 +20,12 @@ import java.util.UUID;
  *   <li>{@link #usableInAnyPool} — may it be used in a pipeline of that pool? {@code ALL} counts
  *       for every pool, {@code SPECIFIC} for the pools it names, {@code NONE} for none. Mirrors
  *       {@code DataSourceDatapoolScopeValidator}, which enforces the same rule on loaded entities.
- *   <li>{@link #confinedToAnyPool} — is it assigned to that pool? Only {@code SPECIFIC} counts.
+ *   <li>{@link #confinedToAnyPool} — does it name that pool explicitly? Only {@code SPECIFIC}
+ *       counts.
  * </ul>
  *
- * <p>Read access inherited from a datapool grant uses the second. Deriving it from usability
- * instead would make every unrestricted data source readable through any pool grant, and
- * unrestricted is the entity default.
+ * <p>Read access inherited from a datapool grant uses the first, so what a pool-scoped steward may
+ * read matches what they may build a pipeline from.
  */
 final class DataSourceDatapoolUsability {
 
@@ -49,11 +49,11 @@ final class DataSourceDatapoolUsability {
   /**
    * Builds {@code scopeType = SPECIFIC AND EXISTS scopedDataPools ∩ poolIds}.
    *
-   * <p>Uses a correlated EXISTS subquery rather than a join, so a data source assigned to several
-   * of the given pools still yields a single row in paginated results.
+   * <p>Uses a correlated EXISTS subquery rather than a join, so a data source naming several of the
+   * given pools still yields a single row in paginated results.
    *
-   * @param poolIds the datapools to test assignment against; an empty set matches nothing
-   * @return the assignment predicate
+   * @param poolIds the datapools to test confinement against; an empty set matches nothing
+   * @return the confinement predicate
    */
   static Predicate confinedToAnyPool(
       Root<DataSource> root, CriteriaQuery<?> query, CriteriaBuilder cb, Collection<UUID> poolIds) {

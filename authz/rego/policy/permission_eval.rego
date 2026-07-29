@@ -326,18 +326,17 @@ qualifying_datapool_ids contains pool_id if {
 # =============================================================================
 # DATAPOOL → DATASOURCE INHERITANCE
 # =============================================================================
-# A DATAPOOL-scoped grant conveys READ on the data sources ASSIGNED to that pool, so a
-# pool-scoped steward can see what their pipelines are built from. Assignment, not
-# usability: an unrestricted data source is usable in every pool but assigned to none, so
-# deriving read from usability would expose every data source nobody has scoped yet —
-# unrestricted is the entity default.
+# A DATAPOOL-scoped grant conveys READ on the data sources USABLE IN that pool, so a
+# pool-scoped steward can see what their pipelines may be built from. The same rule the
+# portal applies when a pipeline references a data source: unrestricted counts for every
+# pool, confined for the pools it names.
 #
 # READ ONLY: an unrestricted data source is shared across pools, so inheriting a write
 # would let one pool's steward mutate a source another pool depends on.
 datasource_pool_inheritable_permissions := {"DATASOURCE_READ"}
 
-# Resource endpoint: the requested data source must itself be assigned to a qualifying
-# pool, so the decision is per entity rather than per route. assigned_to_pool() consumes a
+# Resource endpoint: the requested data source must itself be usable in a qualifying pool,
+# so the decision is per entity rather than per route. usable_in_pool() consumes a
 # pre-computed answer from the AuthZ Repository — the DatapoolScopeType rule stays there,
 # not in this policy. OPA memoizes http.send per evaluation, so several pool grants cost
 # one round-trip.
@@ -346,14 +345,14 @@ datasource_pool_inheritable_permissions := {"DATASOURCE_READ"}
 # decision and the emitted header derived from the same set: one pool that carries every
 # required permission.
 #
-# Fail-secure: if the lookup is unavailable, assigned_to_pool() is undefined and this branch
+# Fail-secure: if the lookup is unavailable, usable_in_pool() is undefined and this branch
 # does not grant — direct and tenant-wide grants keep working.
 user_has_permission(permission) if {
 	resource_mapping.is_resource_endpoint
 	resource_mapping.expected_scope_type == "DATASOURCE"
 	some pool_id in qualifying_datapool_ids
 	datapool_has_permission(permission, pool_id)
-	datasource_pool_fetcher.assigned_to_pool(resource_mapping.resource_id, pool_id)
+	datasource_pool_fetcher.usable_in_pool(resource_mapping.resource_id, pool_id)
 }
 
 # Data source routes feed the same qualifying-pool set as datasets, so the collection

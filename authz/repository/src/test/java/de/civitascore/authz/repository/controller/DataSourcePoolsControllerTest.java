@@ -23,9 +23,10 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * Pins the wire contract of the datasource-pools endpoint.
  *
- * <p>The JSON field name {@code poolIds} is the sole coupling to the OPA policy, which reads it by
- * name from an untyped body, so a rename would silently deny every pool-inherited read. Asserted on
- * the raw response rather than through the DTO, which would change along with the field.
+ * <p>The JSON field names {@code poolIds} and {@code usableInAllPools} are the sole coupling to the
+ * OPA policy, which reads them by name from an untyped body, so a rename would silently deny every
+ * pool-inherited read. Asserted on the raw response rather than through the DTO, which would change
+ * along with the fields.
  */
 @WebMvcTest(controllers = DataSourcePoolsController.class)
 @ContextConfiguration(classes = {DataSourcePoolsController.class, ValidationExceptionHandler.class})
@@ -40,29 +41,43 @@ class DataSourcePoolsControllerTest {
   @MockitoBean private DataSourcePoolsService dataSourcePoolsService;
 
   @Test
-  @DisplayName("Serializes the assigned pools under the poolIds field OPA reads")
-  void getDataSourcePools_whenAssigned_serializesPoolIdsField() throws Exception {
+  @DisplayName("Serializes a confined data source under the field names OPA reads")
+  void getDataSourcePools_whenConfined_serializesBothFields() throws Exception {
     when(dataSourcePoolsService.getDataSourcePools(any()))
-        .thenReturn(Optional.of(new DataSourcePoolsResponse(List.of(POOL_ID))));
+        .thenReturn(Optional.of(new DataSourcePoolsResponse(List.of(POOL_ID), false)));
 
     mockMvc
         .perform(get("/api/v1/datasource-pools/{id}", DATA_SOURCE_ID))
         .andExpect(status().isOk())
-        .andExpect(content().json("{\"poolIds\":[\"" + POOL_ID + "\"]}", true));
+        .andExpect(
+            content().json("{\"poolIds\":[\"" + POOL_ID + "\"],\"usableInAllPools\":false}", true));
+  }
+
+  @Test
+  @DisplayName("Serializes an unrestricted data source with the flag set and no pool ids")
+  void getDataSourcePools_whenUnrestricted_serializesFlag() throws Exception {
+    when(dataSourcePoolsService.getDataSourcePools(any()))
+        .thenReturn(Optional.of(new DataSourcePoolsResponse(List.of(), true)));
+
+    mockMvc
+        .perform(get("/api/v1/datasource-pools/{id}", DATA_SOURCE_ID))
+        .andExpect(status().isOk())
+        .andExpect(content().json("{\"poolIds\":[],\"usableInAllPools\":true}", true));
   }
 
   @Test
   @DisplayName(
-      "Serializes an unassigned data source as an empty poolIds array, not a missing field")
-  void getDataSourcePools_whenUnassigned_serializesEmptyArray() throws Exception {
+      "Serializes a data source usable nowhere as an empty poolIds array, not a missing field")
+  void getDataSourcePools_whenUsableNowhere_serializesEmptyArray() throws Exception {
     when(dataSourcePoolsService.getDataSourcePools(any()))
-        .thenReturn(Optional.of(new DataSourcePoolsResponse(List.of())));
+        .thenReturn(Optional.of(new DataSourcePoolsResponse(List.of(), false)));
 
     mockMvc
         .perform(get("/api/v1/datasource-pools/{id}", DATA_SOURCE_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.poolIds").isArray())
-        .andExpect(jsonPath("$.poolIds").isEmpty());
+        .andExpect(jsonPath("$.poolIds").isEmpty())
+        .andExpect(jsonPath("$.usableInAllPools").value(false));
   }
 
   @Test

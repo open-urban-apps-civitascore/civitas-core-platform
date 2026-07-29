@@ -23,20 +23,18 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * Pins the two questions the DataSource→DataPool relation answers, against one shared truth table:
- * <em>linkability</em> (may it be used in a pipeline of that pool) and <em>pool-inherited
- * visibility</em> (does a grant on that pool convey read on it).
+ * Pins one rule — may this data source be used in that datapool — across the three places that
+ * decide it independently: the entity validator that rejects a pipeline reference, the picker
+ * filter behind the {@code datapoolId} query parameter, and the scope filter that grants
+ * pool-inherited read. Nothing but this test keeps them from drifting.
  *
- * <p>They agree except for an unrestricted data source, which is linkable everywhere but assigned
- * to no pool. Each question has two independent implementations — the entity validator and the
- * picker filter for linkability, the scope filter for visibility — and nothing but this test keeps
- * them from drifting.
+ * <p>Pool-inherited read follows the same rule deliberately, so what a pool-scoped steward may read
+ * matches what they may build a pipeline from.
  *
- * <p>{@code DataSourcePoolsService} in {@code authz-repository} implements the visibility rule a
- * third time, for OPA's per-entity decisions, and is out of this test's reach. Widening it to
- * report a pool for an unrestricted data source would grant pool-inherited read on every unscoped
- * data source while the scope filter kept hiding those rows, so the symptom would read as a filter
- * bug rather than a privilege widening.
+ * <p>{@code DataSourcePoolsService} in {@code authz-repository} answers the same question a fourth
+ * time, for OPA's per-entity decisions, and is out of this test's reach. Narrowing it would deny
+ * single reads that the collection still lists, so the symptom would read as a filter bug rather
+ * than a policy divergence.
  */
 @DisplayName("DataSource Datapool Usability Contract Integration Tests")
 class DataSourceDatapoolUsabilityContractIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -51,30 +49,23 @@ class DataSourceDatapoolUsabilityContractIntegrationTest extends BaseKeycloakInt
   }
 
   /**
-   * scopeType, whether the data source names the candidate pool, expected linkability, expected
-   * visibility through a grant on that pool.
-   *
-   * <p>The two columns differ for {@code ALL}: an unrestricted data source may be used in every
-   * pipeline, but it is assigned to no pool and therefore conveys no read through a pool grant.
+   * scopeType, whether the data source names the candidate pool, expected usability in that pool.
    */
   private static List<Arguments> truthTable() {
     return List.of(
-        Arguments.of(DatapoolScopeType.ALL, false, true, false),
-        Arguments.of(DatapoolScopeType.ALL, true, true, false),
-        Arguments.of(DatapoolScopeType.SPECIFIC, true, true, true),
-        Arguments.of(DatapoolScopeType.SPECIFIC, false, false, false),
-        Arguments.of(DatapoolScopeType.NONE, false, false, false),
-        Arguments.of(DatapoolScopeType.NONE, true, false, false));
+        Arguments.of(DatapoolScopeType.ALL, false, true),
+        Arguments.of(DatapoolScopeType.ALL, true, true),
+        Arguments.of(DatapoolScopeType.SPECIFIC, true, true),
+        Arguments.of(DatapoolScopeType.SPECIFIC, false, false),
+        Arguments.of(DatapoolScopeType.NONE, false, false),
+        Arguments.of(DatapoolScopeType.NONE, true, false));
   }
 
-  @ParameterizedTest(name = "{0}, names candidate pool: {1} → linkable: {2}, visible: {3}")
+  @ParameterizedTest(name = "{0}, names candidate pool: {1} → usable: {2}")
   @MethodSource("truthTable")
-  @DisplayName("Linkability and pool-inherited visibility each hold on every case")
-  void bothImplementationsAgree(
-      DatapoolScopeType scopeType,
-      boolean namesCandidate,
-      boolean expectedLinkable,
-      boolean expectedVisible) {
+  @DisplayName("All three implementations agree on every case")
+  void allImplementationsAgree(
+      DatapoolScopeType scopeType, boolean namesCandidate, boolean expectedUsable) {
     DataPool candidate = portalData.dataPool();
     DataPool other = portalData.dataPool();
     DataPool scopedTo = namesCandidate ? candidate : other;
@@ -83,17 +74,17 @@ class DataSourceDatapoolUsabilityContractIntegrationTest extends BaseKeycloakInt
             b -> b.datapoolScopeType(scopeType).scopedDataPools(new HashSet<>(Set.of(scopedTo))));
 
     assertThat(validatorSaysUsable(dataSource, candidate))
-        .as("entity validator (linkability)")
-        .isEqualTo(expectedLinkable);
+        .as("entity validator (pipeline reference)")
+        .isEqualTo(expectedUsable);
     assertThat(pickerSaysUsable(dataSource.getId(), candidate.getId()))
-        .as("datapoolId query filter (linkability)")
-        .isEqualTo(expectedLinkable);
+        .as("datapoolId query filter (picker)")
+        .isEqualTo(expectedUsable);
     assertThat(scopeFilterSaysVisible(dataSource.getId(), candidate.getId()))
-        .as("scope filter (pool-inherited visibility)")
-        .isEqualTo(expectedVisible);
+        .as("scope filter (pool-inherited read)")
+        .isEqualTo(expectedUsable);
   }
 
-  /** The user-facing picker filter, which answers linkability. */
+  /** The user-facing picker filter behind the {@code datapoolId} query parameter. */
   private boolean pickerSaysUsable(UUID dataSourceId, UUID poolId) {
     return dataSourceRepository
         .findAll(
@@ -105,9 +96,8 @@ class DataSourceDatapoolUsabilityContractIntegrationTest extends BaseKeycloakInt
 
   /**
    * The scope filter with no direct scope ids, so only the pool branch can match. {@link
-   * ScopeAccessAuthorizer} reuses this specification, so the visibility column is also what a
-   * pool-scoped caller may reference in a request body — an unrestricted data source is linkable
-   * but not referenceable, and that divergence is intentional.
+   * ScopeAccessAuthorizer} reuses this specification, so this column also covers what a pool-scoped
+   * caller may reference in a request body.
    */
   private boolean scopeFilterSaysVisible(UUID dataSourceId, UUID poolId) {
     return dataSourceRepository

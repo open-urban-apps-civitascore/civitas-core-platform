@@ -14,10 +14,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST controller exposing which datapools a data source is assigned to.
+ * REST controller exposing which datapools a data source may be used in.
  *
  * <p>Consumed by OPA to apply datapool inheritance to data sources (a DATAPOOL-scoped grant conveys
- * read access to the data sources assigned to that pool). Returns 404 when the data source does not
+ * read access to the data sources usable in that pool). Returns 404 when the data source does not
  * exist.
  *
  * <p>Like {@link UserContextController}, this endpoint has no application-level authentication —

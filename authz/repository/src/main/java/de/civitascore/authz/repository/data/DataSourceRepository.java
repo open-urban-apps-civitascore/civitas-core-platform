@@ -6,10 +6,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * Repository for datasource→datapool assignment lookups, used read-only.
+ * Repository for datasource→datapool usability lookups, used read-only.
  *
  * <p>Used by {@link de.civitascore.authz.repository.service.DataSourcePoolsService} to resolve
- * which datapools a single data source is assigned to. Reads the same portal database as the portal
+ * which datapools a single data source may be used in. Reads the same portal database as the portal
  * backend via the shared {@code portal-model} entities.
  */
 @Repository

@@ -2,7 +2,7 @@
 #
 # A DATAPOOL grant carrying DATASOURCE_READ authorizes the data source read routes and
 # emits X-Allowed-Pool-Ids; writes stay behind a DATASOURCE-scoped or tenant-wide grant.
-# Single reads are decided per data source, against the assignment answer from the AuthZ
+# Single reads are decided per data source, against the usability answer from the AuthZ
 # Repository; the collection is narrowed by the pool header the backend filters with.
 
 package civitas.authz.datasource_pool_inheritance_test
@@ -31,7 +31,7 @@ steward_context := mock_http.user_with_scoped_permissions(
 )
 
 # A Data Steward scoped only to pool-1; the requested data source is confined to pool-1.
-mock_pool_steward(req) := {"status_code": 200, "body": {"poolIds": ["pool-1"]}} if {
+mock_pool_steward(req) := {"status_code": 200, "body": {"poolIds": ["pool-1"], "usableInAllPools": false}} if {
 	contains(req.url, "datasource-pools")
 }
 
@@ -40,7 +40,7 @@ mock_pool_steward(req) := {"status_code": 200, "body": steward_context} if {
 }
 
 # A pool grant that does not carry DATASOURCE_READ at all.
-mock_pool_without_read(req) := {"status_code": 200, "body": {"poolIds": []}} if {
+mock_pool_without_read(req) := {"status_code": 200, "body": {"poolIds": [], "usableInAllPools": false}} if {
 	contains(req.url, "datasource-pools")
 }
 
@@ -96,9 +96,9 @@ test_reads_datasource_assignments if {
 # =============================================================================
 # THE SINGLE READ IS DECIDED PER DATA SOURCE
 # =============================================================================
-# Same steward, same pool grant — only the data source's assignment differs.
+# Same steward, same pool grant — only the data source's datapool scope differs.
 
-mock_other_pool(req) := {"status_code": 200, "body": {"poolIds": ["pool-2"]}} if {
+mock_other_pool(req) := {"status_code": 200, "body": {"poolIds": ["pool-2"], "usableInAllPools": false}} if {
 	contains(req.url, "datasource-pools")
 }
 
@@ -106,7 +106,7 @@ mock_other_pool(req) := {"status_code": 200, "body": steward_context} if {
 	contains(req.url, "user-context")
 }
 
-mock_unrestricted(req) := {"status_code": 200, "body": {"poolIds": []}} if {
+mock_unrestricted(req) := {"status_code": 200, "body": {"poolIds": [], "usableInAllPools": true}} if {
 	contains(req.url, "datasource-pools")
 }
 
@@ -114,7 +114,7 @@ mock_unrestricted(req) := {"status_code": 200, "body": steward_context} if {
 	contains(req.url, "user-context")
 }
 
-mock_unusable(req) := {"status_code": 200, "body": {"poolIds": []}} if {
+mock_unusable(req) := {"status_code": 200, "body": {"poolIds": [], "usableInAllPools": false}} if {
 	contains(req.url, "datasource-pools")
 }
 
@@ -130,18 +130,18 @@ mock_lookup_down(req) := {"status_code": 200, "body": steward_context} if {
 	contains(req.url, "user-context")
 }
 
-# An unrestricted data source is assigned to no pool, so a pool grant conveys nothing on
-# it. Without this, every data source nobody has scoped yet would be readable through any
-# datapool grant — and unrestricted is the entity default.
-test_denies_unrestricted_datasource if {
+# An unrestricted data source is usable in every pool, so a pool grant reaches it — the same
+# rule that lets the steward reference it from a pipeline of that pool.
+test_reads_unrestricted_datasource if {
 	result := authz.decision with http.send as mock_unrestricted
 		with data.config as mock_http.mock_config
 		with input as request("GET", "/v1/datasources/src-1")
-	result.allow == false
-	result.reason == "permission_denied"
+	result.allow == true
+	result.reason == "permission_granted"
 }
 
-test_denies_datasource_assigned_to_other_pool if {
+# A data source confined to another pool is usable in none of the granted pools.
+test_denies_datasource_confined_to_other_pool if {
 	result := authz.decision with http.send as mock_other_pool
 		with data.config as mock_http.mock_config
 		with input as request("GET", "/v1/datasources/src-1")
@@ -149,15 +149,16 @@ test_denies_datasource_assigned_to_other_pool if {
 	result.reason == "permission_denied"
 }
 
-test_denies_datasource_assigned_to_no_pool if {
+# A data source usable in no pipeline at all is reached by no pool grant either.
+test_denies_datasource_usable_nowhere if {
 	result := authz.decision with http.send as mock_unusable
 		with data.config as mock_http.mock_config
 		with input as request("GET", "/v1/datasources/src-1")
 	result.allow == false
 }
 
-# Fail-secure: an unavailable assignment lookup must not grant.
-test_denies_when_assignment_lookup_is_down if {
+# Fail-secure: an unavailable usability lookup must not grant.
+test_denies_when_usability_lookup_is_down if {
 	result := authz.decision with http.send as mock_lookup_down
 		with data.config as mock_http.mock_config
 		with input as request("GET", "/v1/datasources/src-1")
@@ -196,7 +197,7 @@ test_pool_grant_without_read_denies_collection if {
 # Two pool grants, only one carrying DATASOURCE_READ. The decision and the emitted pool
 # set must both come from that pool alone — a non-qualifying pool must not widen the
 # filter the backend applies.
-mock_two_pools(req) := {"status_code": 200, "body": {"poolIds": ["pool-1"]}} if {
+mock_two_pools(req) := {"status_code": 200, "body": {"poolIds": ["pool-1"], "usableInAllPools": false}} if {
 	contains(req.url, "datasource-pools")
 }
 
@@ -217,7 +218,7 @@ test_only_the_qualifying_pool_reaches_the_header if {
 
 # A DATAPOOL assignment without a scope id cannot identify a pool. It must not enter the
 # qualifying set, where it would end up in the header the backend filters by.
-mock_null_scope_id(req) := {"status_code": 200, "body": {"poolIds": []}} if {
+mock_null_scope_id(req) := {"status_code": 200, "body": {"poolIds": [], "usableInAllPools": false}} if {
 	contains(req.url, "datasource-pools")
 }
 
@@ -277,7 +278,7 @@ role_permissions := {
 # Roles that carry DATASOURCE_READ, i.e. the ones the inheritance is meant to serve.
 datasource_readers := {"DATA_ARCHITECT", "DATA_STEWARD", "DATA_OWNER", "DATA_GATEKEEPER"}
 
-mock_role(req) := {"status_code": 200, "body": {"poolIds": ["pool-1"]}} if {
+mock_role(req) := {"status_code": 200, "body": {"poolIds": ["pool-1"], "usableInAllPools": false}} if {
 	contains(req.url, "datasource-pools")
 }
 
@@ -385,7 +386,7 @@ test_direct_grant_on_other_datasource_is_refused_by_opa if {
 	result.status_code == 403
 }
 
-mock_tenant_grant(req) := {"status_code": 200, "body": {"poolIds": []}} if {
+mock_tenant_grant(req) := {"status_code": 200, "body": {"poolIds": [], "usableInAllPools": false}} if {
 	contains(req.url, "datasource-pools")
 }
 

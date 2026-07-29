@@ -41,9 +41,9 @@ import org.springframework.stereotype.Component;
  *       assignment carrying the type's READ permission grants all; failing that, every referenced
  *       ID must be covered by an assignment of the matching scope type carrying that permission.
  *   <li>Referenced DATASOURCE IDs are additionally covered by a DATAPOOL-scoped assignment carrying
- *       DATASOURCE_READ when the data source is assigned to that pool — the inheritance that lets a
- *       pool-scoped steward build pipelines from the pool's data sources. An unrestricted data
- *       source is assigned to no pool, so it needs a DATASOURCE-scoped or tenant-wide grant.
+ *       DATASOURCE_READ when the data source is usable in that pool — the inheritance that lets a
+ *       pool-scoped steward build pipelines from the pool's data sources. A data source usable in
+ *       no pool needs a DATASOURCE-scoped or tenant-wide grant.
  *   <li>A missing scope header (direct backend access bypassing APISIX/OPA) denies.
  * </ul>
  *
@@ -130,7 +130,7 @@ public class ScopeAccessAuthorizer {
     List<UUID> notDirectlyPermitted =
         requestedIds.stream().filter(id -> !permittedIds.contains(id)).toList();
 
-    // A DATAPOOL-scoped grant conveys read access to the data sources assigned to that pool, so a
+    // A DATAPOOL-scoped grant conveys read access to the data sources usable in that pool, so a
     // pool-scoped steward can build pipelines from them. Resolved from the assignments rather than
     // the pool header, because the header is typed to the route (a pipeline route carries the pools
     // that grant DATASET_UPDATE, not necessarily DATASOURCE_READ).

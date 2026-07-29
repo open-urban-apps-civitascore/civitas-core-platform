@@ -16,7 +16,7 @@ import rego.v1
 import data.civitas.authz
 import data.test.helpers.mock_http
 
-mock_ctx(req) := {"status_code": 200, "body": {"poolIds": ["pool-1"]}} if {
+mock_ctx(req) := {"status_code": 200, "body": {"poolIds": ["pool-1"], "usableInAllPools": false}} if {
 	contains(req.url, "datasource-pools")
 }
 

@@ -23,7 +23,7 @@ import org.springframework.web.context.annotation.RequestScope;
  * <p>OPA additionally returns X-Allowed-Pool-Ids: the datapools that carry every permission the
  * requested route needs — not simply every pool the user holds a grant on. Dataset filtering ORs
  * the direct scope IDs with the datasets in those pools; data source filtering ORs them with the
- * data sources assigned to those pools.
+ * data sources usable in those pools.
  *
  * <p>Spring manages the lifecycle - no manual cleanup needed.
  *

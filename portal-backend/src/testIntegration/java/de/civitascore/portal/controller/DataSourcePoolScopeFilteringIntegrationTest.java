@@ -37,8 +37,8 @@ import org.springframework.http.ResponseEntity;
  *
  * <p>Exercises the full path against the real database: AllowedScopesFilter → AllowedScopes bean →
  * DataSourceController.scopeSpecification() → ScopeFilteringSpecification.dataSourceByScopeOrPool()
- * → SQL. In particular it confirms that the pool branch matches assignment, not linkability (only
- * data sources assigned to an authorized pool) and that a data source confined to several
+ * → SQL. In particular it confirms that the pool branch matches usability (unrestricted data
+ * sources included, ones confined elsewhere excluded) and that a data source confined to several
  * authorized pools yields no duplicate rows.
  */
 @DisplayName("DataSource Pool-Inherited Scope Filtering Integration Tests")
@@ -103,7 +103,7 @@ class DataSourcePoolScopeFilteringIntegrationTest
   class PoolInheritedFiltering {
 
     @Test
-    @DisplayName("A pool-only caller sees the data sources assigned to that pool")
+    @DisplayName("A pool-only caller sees the data sources usable in that pool")
     void poolOnlySeesUsableDataSources() {
       DataPool pool = portalData.dataPool();
       DataPool otherPool = portalData.dataPool();
@@ -116,13 +116,13 @@ class DataSourcePoolScopeFilteringIntegrationTest
 
       assertThat(page.getContent())
           .extracting(DataSourceOutputDTO::getId)
-          .as("only the data sources assigned to the pool")
-          .containsExactly(confinedToPool.getId())
-          .doesNotContain(unrestricted.getId(), confinedToOther.getId(), unusable.getId());
+          .as("the unrestricted one and the one confined to the pool")
+          .containsExactlyInAnyOrder(unrestricted.getId(), confinedToPool.getId())
+          .doesNotContain(confinedToOther.getId(), unusable.getId());
     }
 
     @Test
-    @DisplayName("A data source assigned to no pool is never inherited")
+    @DisplayName("A data source usable in no pipeline is never inherited")
     void unusableDataSourceIsNeverInherited() {
       DataPool pool = portalData.dataPool();
       DataSource unusable = unusableDataSource();

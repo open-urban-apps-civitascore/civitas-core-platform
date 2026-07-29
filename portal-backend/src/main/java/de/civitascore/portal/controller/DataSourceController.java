@@ -61,8 +61,8 @@ public class DataSourceController
    * {@inheritDoc}
    *
    * <p>Widens data source scope filtering with datapool inheritance: in addition to directly scoped
-   * data source IDs, the data sources assigned to a datapool the caller has a DATAPOOL-scoped grant
-   * on are visible, so a pool-scoped steward can see what their pipelines are built from.
+   * data source IDs, the data sources usable in a datapool the caller has a DATAPOOL-scoped grant
+   * on are visible, so a pool-scoped steward can see what their pipelines may be built from.
    */
   @Override
   protected Specification<DataSource> scopeSpecification(AllowedScopes scopes) {
