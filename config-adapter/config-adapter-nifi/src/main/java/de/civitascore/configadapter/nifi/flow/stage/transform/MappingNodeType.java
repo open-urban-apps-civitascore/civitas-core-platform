@@ -123,15 +123,11 @@ public final class MappingNodeType implements TransformNodeType {
             "mapping node '"
                 + ownNodes.get(i).id()
                 + "' declares "
-                + (ownSource == null
-                    ? "no source structure"
-                    : "source structure '" + ownSource + "'")
+                + describe("source", ownSource)
                 + " while the preceding node '"
                 + ownNodes.get(i - 1).id()
                 + "' declares "
-                + (upstreamTarget == null
-                    ? "no target structure"
-                    : "target structure '" + upstreamTarget + "'")
+                + describe("target", upstreamTarget)
                 + ": the handover between them cannot be verified; re-open both mappings and save"
                 + " them again");
       }
@@ -150,6 +146,13 @@ public final class MappingNodeType implements TransformNodeType {
                 + " mapping and rebuild it against the current structure");
       }
     }
+  }
+
+  private static String describe(String side, String structure) {
+    if (structure == null) {
+      return "no " + side + " structure";
+    }
+    return side + " structure '" + structure + "'";
   }
 
   /** Parses each node's config, in flow order. */
