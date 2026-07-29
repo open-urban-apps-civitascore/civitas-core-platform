@@ -277,12 +277,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         }}
         customElement={
           <PageEditControls<DatasourceStatusType>
-            status={dataSourceStatus}
-            onStatusChange={handleStatusChange}
-            statusOptions={Object.values(DATASOURCE_STATUS_TYPES)}
-            canStage={canStage}
-            canRelease={canRelease}
-            availableHint={!canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined}
+            statusProps={{
+              status: dataSourceStatus,
+              onStatusChange: handleStatusChange,
+              statusOptions: Object.values(DATASOURCE_STATUS_TYPES),
+              canStage,
+              canRelease,
+              availableHint: !canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined,
+            }}
             confirmButtonType="button"
             onConfirmClick={handleSave}
             isConfirmButtonDisabled={isConfirmButtonDisabled}

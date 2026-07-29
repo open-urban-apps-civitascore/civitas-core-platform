@@ -190,13 +190,16 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
         }}
         customElement={
           <PageEditControls<DatastructureStatusType>
-            status={datastructureStatus}
-            onStatusChange={handleStatusChange}
-            statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
-            canStage={canStage}
-            canRelease={canRelease}
-            statusHint={statusHint}
-            availableHint={statusAvailableHint}
+            statusProps={{
+              status: datastructureStatus,
+              onStatusChange: handleStatusChange,
+              statusOptions: Object.values(DATASTRUCTURE_STATUS_TYPES),
+              canStage,
+              canRelease,
+              canSetDraft,
+              statusHint,
+              availableHint: statusAvailableHint,
+            }}
             confirmButtonType="button"
             onConfirmClick={() => handleSave()}
             isConfirmButtonDisabled={isConfirmButtonDisabled}
@@ -212,7 +215,6 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             onEditClick={() => updateMode(true)}
             cancelButtonTitle={tCommon('actions.exit')}
             wrapperClassname="w-auto"
-            canSetDraft={canSetDraft}
           />
         }
       />
