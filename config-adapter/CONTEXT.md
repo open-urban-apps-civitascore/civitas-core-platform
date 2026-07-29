@@ -38,6 +38,13 @@ and mints NiFi processors from the curated fragment whitelist at build time. Sta
 hand-wired into a closed registry — deliberately not classpath-discovered, so minting flow
 components stays a reviewed decision.
 
+## HTTP Response Use
+
+What an HTTP request in a sink's build region does with its response — read it as content, capture it
+into an attribute for the error sink, or end there. It is one decision with the relationship the
+request's success continues on, never two: the pairing is what makes the request's own work
+reachable, so a stage states the use and the relationship follows.
+
 ## Sink Spec
 
 The resolved, typed configuration of one pipeline's sink — one sealed variant per sink kind, each

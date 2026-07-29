@@ -986,13 +986,9 @@ class NifiFlowBuilderTest {
   @Test
   void aCreatedEntityContinuesOnOriginalBecauseTheResponseIsCapturedIntoAnAttribute()
       throws Exception {
-    // Two settings on the entity POST are coupled, and nothing else asserts it: capturing the
-    // response body into an attribute makes InvokeHTTP suppress the response FlowFile on success,
-    // so
-    // 'Response' never fires and only 'Original' carries the 2xx onwards. Chaining 'Response' would
-    // strand every newly created entity — the POST succeeds, FROST stores it, and the FlowFile
-    // vanishes with no error, no failure route and no bulletin. A first delivery then writes no
-    // observation at all while a redelivery hides it by taking the lookup-hit path.
+    // Chained onto 'Response', a first delivery would write no observation at all while a
+    // redelivery
+    // hid it by taking the lookup-hit path — no error, no failure route, no bulletin.
     JsonNode flow = build(NifiTestFixtures.frostSinkWithThingOnlyMapping());
 
     JsonNode post = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "POST");
