@@ -37,7 +37,9 @@ export type DatastructureVersionSource =
 
 export const DatastructureVersionApiResponseSchema = z.object({
   id: z.string(),
-  version: z.string(),
+  // Null on fresh drafts: the backend column is nullable (V1_2_9) and a version created
+  // without a saved model carries no version number yet; release-time validation enforces SemVer.
+  version: z.string().nullable(),
   description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
   dataStructureVersionSource: DatastructureVersionSourceEnum,
@@ -54,7 +56,8 @@ export const DatastructureVersionApiResponseSchema = z.object({
 
 export const DatastructureVersionSummaryApiResponseSchema = z.object({
   id: z.string(),
-  version: z.string(),
+  // Null on fresh drafts — see DatastructureVersionApiResponseSchema.version.
+  version: z.string().nullable(),
   description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
   dataStructureVersionSource: DatastructureVersionSourceEnum,

@@ -28,6 +28,9 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
     const highestVersion: DatastructureVersionSummary | null =
       datastructure.dataStructureVersions.reduce<DatastructureVersionSummary | null>((highest, current) => {
         if (!highest) return current
+        // Drafts without a version number sort lowest.
+        if (current.version === null) return highest
+        if (highest.version === null) return current
         return current.version.localeCompare(highest.version, undefined, { numeric: true }) > 0 ? current : highest
       }, null)
     return {
@@ -43,7 +46,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       versions: datastructure.dataStructureVersions.map(version => ({
         id: version.id,
         versionNumber: version.version,
-        name: `Version ${version.version}`,
+        name: `Version ${version.version ?? '—'}`,
         description: version.description || '-',
         status: version.dataStructureVersionStatus,
         source: version.dataStructureVersionSource,
@@ -58,8 +61,9 @@ export const mapDatastructureVersionsApiToListData = (
 ): DatastructureVersionsListData[] =>
   versions.map(version => ({
     id: version.id,
-    versionNumber: version.version,
-    name: `Version ${version.version}`,
+    // A draft saved without a model has no version number yet — render a placeholder.
+    versionNumber: version.version ?? '—',
+    name: `Version ${version.version ?? '—'}`,
     description: version.description || '-',
     status: version.dataStructureVersionStatus,
     source: version.dataStructureVersionSource,
@@ -67,7 +71,8 @@ export const mapDatastructureVersionsApiToListData = (
 
 export const mapDatastructureVersionApiToFormData = (version: DatastructureVersion): DatastructureVersionFormData => ({
   id: version.id,
-  version: version.version,
+  // Empty string keeps the form schema's required/SemVer validation in charge for drafts.
+  version: version.version ?? '',
   description: version.description || '',
   dataStructureVersionStatus: version.dataStructureVersionStatus,
   dataStructureVersionSource: version.dataStructureVersionSource,

@@ -46,5 +46,5 @@ export const useDatastructureVersionInfo = (dataStructureVersionId: string | und
   if (!canReadDatastructures) return { name: t('geoPersistencePanel.anonymousDataStructure'), versionNumber: undefined }
 
   const version = data?.data
-  return { name: version?.dataStructure?.name, versionNumber: version?.version }
+  return { name: version?.dataStructure?.name, versionNumber: version?.version ?? undefined }
 }
