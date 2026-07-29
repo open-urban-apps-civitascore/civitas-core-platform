@@ -5,15 +5,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Catalog;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.DataSetInputDTO;
@@ -21,6 +25,8 @@ import de.civitascore.portal.model.output.assembler.DataSetAssembler;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -44,6 +50,8 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private PortalTestDataFactory portalData;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private CatalogRepository catalogRepository;
+  @Autowired private DataSinkRepository dataSinkRepository;
+  @Autowired private LayerRepository layerRepository;
 
   @AfterEach
   void cleanup() {
@@ -336,6 +344,56 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThatThrownBy(() -> dataSetService.stage(dataSet.getId()))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DataSet must contain at least one Pipeline before staging");
+    }
+  }
+
+  @Nested
+  @DisplayName("Delete With Layers Tests")
+  class DeleteWithLayersTests {
+
+    /**
+     * Without a cascade from the sink into its layers, the delete leaves the layers behind and
+     * Hibernate nulls their non-null {@code datasink_id}, rolling the whole transaction back — the
+     * dataset then survives a saga whose infrastructure teardown already succeeded.
+     */
+    @Test
+    @DisplayName(
+        "Should remove layers together with their sink when a provisioned dataset is torn"
+            + " down")
+    void shouldRemoveLayersWithSinkOnSagaDeleteCompleted() {
+      DataSet dataSet = createInitialDataSet();
+      DataSink sink = portalData.dataSink(dataSet);
+      Layer layer = portalData.layer(dataSet, sink);
+
+      dataSet.setDataSetStatus(DataSetStatus.READY);
+      dataSet.setProvisioned(true);
+      dataSet.setPendingSagaType(PendingSagaType.DELETE);
+      dataSetRepository.save(dataSet);
+
+      dataSetService.handleSagaCompleted(dataSet.getId(), deleteResultFor(dataSet.getId()));
+
+      assertThat(layerRepository.findById(layer.getId())).isEmpty();
+      assertThat(dataSinkRepository.findById(sink.getId())).isEmpty();
+      assertThat(dataSetRepository.findById(dataSet.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should remove a dataset that was never provisioned together with its layers")
+    void shouldRemoveLayersWithSinkOnDirectDelete() {
+      DataSet dataSet = createInitialDataSet();
+      DataSink sink = portalData.dataSink(dataSet);
+      Layer layer = portalData.layer(dataSet, sink);
+
+      dataSetService.deleteById(dataSet.getId());
+
+      assertThat(layerRepository.findById(layer.getId())).isEmpty();
+      assertThat(dataSinkRepository.findById(sink.getId())).isEmpty();
+      assertThat(dataSetRepository.findById(dataSet.getId())).isEmpty();
+    }
+
+    private SagaResultPayload deleteResultFor(UUID datasetId) {
+      return new SagaResultPayload(
+          datasetId.toString(), null, null, null, null, null, null, null, null, null, null);
     }
   }
 }

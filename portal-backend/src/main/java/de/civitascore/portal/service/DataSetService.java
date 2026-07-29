@@ -699,7 +699,14 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * sink additionally carries a {@code pipeline_id} FK into one of the cascade-removed pipelines.
    * Deleting the sinks first — after detaching them from their pipeline — clears both FKs before
    * the dataset delete cascades into the pipelines, avoiding the FK violation that would otherwise
-   * roll the transaction back.
+   * roll the transaction back. Each sink cascades into its own layers.
+   *
+   * <p>Going through the repository deliberately bypasses the layer guard that rejects a standalone
+   * {@code DELETE /datasinks/{id}}: that guard protects a sink whose dataset lives on, whereas here
+   * the whole aggregate goes away.
+   *
+   * <p>Flushing here keeps a constraint violation inside this call instead of surfacing it at
+   * commit, after a caller has already logged the removal as done.
    */
   private void deleteWithSinks(DataSet dataSet) {
     dataSinkRepository
@@ -710,6 +717,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
               dataSinkRepository.delete(sink);
             });
     dataSetRepository.delete(dataSet);
+    dataSetRepository.flush();
   }
 
   /**

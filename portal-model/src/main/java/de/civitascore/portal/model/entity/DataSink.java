@@ -2,6 +2,7 @@ package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.base.BaseEntity;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -9,9 +10,13 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -56,4 +61,16 @@ public class DataSink extends BaseEntity {
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "configuration", columnDefinition = "jsonb")
   private Map<String, Object> configuration;
+
+  /**
+   * Layers derived from this sink. A Layer's {@code datasink_id} is non-null, so the layers must go
+   * with the sink; without this collection Hibernate would try to null the column instead.
+   */
+  @OneToMany(
+      mappedBy = "dataSink",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
+  private Set<Layer> layers = new HashSet<>();
 }
