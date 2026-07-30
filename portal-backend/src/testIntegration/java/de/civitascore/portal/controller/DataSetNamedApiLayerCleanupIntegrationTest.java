@@ -165,11 +165,15 @@ class DataSetNamedApiLayerCleanupIntegrationTest extends BaseKeycloakIntegration
   void droppingStaKeepsLayersWhileOwsRemains() {
     OwsFixture fixture = datasetWithOwsNamedApiAndLayer();
     UUID id = fixture.dataSet().getId();
-    patchNamedApis(
-        id,
-        List.of(
-            Map.of("name", "OWS Service", "slug", "ows", "standard", "OWS"),
-            Map.of("name", "Sensor Service", "slug", "sta", "standard", "STA")));
+    // Asserted like the act below: a silently rejected setup would leave the fixture's own OWS API
+    // and layer in place, so the retention assertion would pass without the STA ever existing.
+    ResponseEntity<JsonNode> setup =
+        patchNamedApis(
+            id,
+            List.of(
+                Map.of("name", "OWS Service", "slug", "ows", "standard", "OWS"),
+                Map.of("name", "Sensor Service", "slug", "sta", "standard", "STA")));
+    assertThat(setup.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(remainingLayers(id)).isEqualTo(1);
 
     // Drop the STA, keep the OWS: layers stay because the cleanup is OWS-specific, not

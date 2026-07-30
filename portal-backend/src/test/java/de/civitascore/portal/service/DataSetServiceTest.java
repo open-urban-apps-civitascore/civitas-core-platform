@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -1742,6 +1743,100 @@ class DataSetServiceTest {
 
       verify(dataSetRepository).delete(ds);
       verify(sagaPublisher, never()).publishDeleteRequested(any());
+    }
+  }
+
+  @Nested
+  @DisplayName("orphaned-layer cleanup on namedApis reconciliation")
+  class OwsLayerCleanupTests {
+
+    @BeforeEach
+    void mapIncomingApis() {
+      // Every case here adds at least one slug the entity does not carry yet, which routes through
+      // the mapper.
+      lenient()
+          .when(dataSetMapper.toNamedApiEntity(any()))
+          .thenAnswer(
+              inv -> {
+                NamedApiInputDTO dto = inv.getArgument(0);
+                return NamedApi.builder()
+                    .name(dto.getName())
+                    .slug(dto.getSlug())
+                    .standard(dto.getStandard())
+                    .build();
+              });
+    }
+
+    private DataSetInputDTO inputWithApis(NamedApiInputDTO... apis) {
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(List.of(apis));
+      return input;
+    }
+
+    private NamedApiInputDTO api(String slug, ApiStandard standard) {
+      NamedApiInputDTO dto = new NamedApiInputDTO();
+      dto.setName(slug);
+      dto.setSlug(slug);
+      dto.setStandard(standard);
+      return dto;
+    }
+
+    /** A persisted dataset already exposing one OWS named API, as the update path sees it. */
+    private DataSet persistedWithOwsApi(UUID id) {
+      DataSet entity = new DataSet();
+      entity.setId(id);
+      entity.setNamedApis(
+          new HashSet<>(
+              Set.of(
+                  NamedApi.builder().name("Maps").slug("maps").standard(ApiStandard.OWS).build())));
+      return entity;
+    }
+
+    @Test
+    @DisplayName("deletes the layers when the reconciled state has no OWS named API left")
+    void deletesLayersWhenNoOwsApiRemains() {
+      UUID id = UUID.randomUUID();
+      DataSet entity = persistedWithOwsApi(id);
+
+      createService().postConvertToEntity(entity, inputWithApis(api("sensors", ApiStandard.STA)));
+
+      verify(layerRepository).deleteByDataSetId(id);
+    }
+
+    @Test
+    @DisplayName("keeps the layers while an OWS named API remains")
+    void keepsLayersWhileOwsApiRemains() {
+      UUID id = UUID.randomUUID();
+      DataSet entity = persistedWithOwsApi(id);
+
+      createService()
+          .postConvertToEntity(
+              entity, inputWithApis(api("maps", ApiStandard.OWS), api("sensors", ApiStandard.STA)));
+
+      verify(layerRepository, never()).deleteByDataSetId(any());
+    }
+
+    @Test
+    @DisplayName("keeps the layers when the OWS named API is replaced by a differently-slugged one")
+    void keepsLayersWhenOwsApiIsReslugged() {
+      // The remove+add of the row must not read as "no OWS API left" — the cleanup keys on the
+      // reconciled state, not on the removed entry.
+      UUID id = UUID.randomUUID();
+      DataSet entity = persistedWithOwsApi(id);
+
+      createService().postConvertToEntity(entity, inputWithApis(api("maps-v2", ApiStandard.OWS)));
+
+      verify(layerRepository, never()).deleteByDataSetId(any());
+    }
+
+    @Test
+    @DisplayName("does not touch layers on create, where the dataset has no id yet")
+    void skipsCleanupOnCreate() {
+      // A create cannot have orphaned anything, and deleteByDataSetId(null) would be meaningless.
+      createService()
+          .postConvertToEntity(new DataSet(), inputWithApis(api("sensors", ApiStandard.STA)));
+
+      verify(layerRepository, never()).deleteByDataSetId(any());
     }
   }
 }
