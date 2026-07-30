@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 export type SidebarListItem = {
@@ -32,22 +31,17 @@ export const SidebarList = ({
       <ul className="flex flex-col gap-2">
         {items.map((item, index) => (
           <li key={item.value}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => onSelectItem(index)}
-                  className={cn(
-                    'w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm hover:bg-accent line-clamp-2 max-h-14 overflow-hidden',
-                    selectedItemIndex === index && 'bg-accent font-medium',
-                    item.hasError && 'text-destructive',
-                  )}
-                >
-                  {item.displayTitle}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent variant="secondary">{item.displayTitle}</TooltipContent>
-            </Tooltip>
+            <button
+              type="button"
+              onClick={() => onSelectItem(index)}
+              className={cn(
+                'w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm hover:bg-accent break-words',
+                selectedItemIndex === index && 'bg-accent font-medium',
+                item.hasError && 'text-destructive',
+              )}
+            >
+              {item.displayTitle}
+            </button>
           </li>
         ))}
       </ul>
