@@ -488,6 +488,9 @@
                 "reserved": "Dieser Slug ist reserviert und kann nicht verwendet werden",
                 "notUnique": "Dieser Slug existiert bereits in diesem Datensatz"
               },
+              "layerName": {
+                "notUnique": "Dieser Layer-Name wird in diesem Datensatz bereits verwendet"
+              },
               "description": {
                 "tooLong": "Beschreibung darf maximal 150 Zeichen lang sein"
               },

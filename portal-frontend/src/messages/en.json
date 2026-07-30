@@ -489,6 +489,9 @@
                 "reserved": "This slug is reserved and cannot be used",
                 "notUnique": "This slug already exists in this dataset"
               },
+              "layerName": {
+                "notUnique": "This layer name is already used in this dataset"
+              },
               "description": {
                 "tooLong": "Description must be at most 150 characters"
               },

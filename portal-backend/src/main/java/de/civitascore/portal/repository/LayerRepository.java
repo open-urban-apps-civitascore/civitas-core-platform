@@ -12,7 +12,9 @@ public interface LayerRepository extends BaseRepository<Layer, UUID> {
 
   boolean existsByDataSinkId(UUID dataSinkId);
 
-  Optional<Layer> findByDataSinkIdAndLayerName(UUID dataSinkId, String layerName);
+  boolean existsByDataSetId(UUID dataSetId);
+
+  Optional<Layer> findByDataSetIdAndLayerName(UUID dataSetId, String layerName);
 
   boolean existsByDefaultStyleIdOrAlternativeStylesId(UUID defaultStyleId, UUID alternativeStyleId);
 
