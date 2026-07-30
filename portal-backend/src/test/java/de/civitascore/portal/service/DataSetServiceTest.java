@@ -1,6 +1,7 @@
 package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
@@ -18,10 +19,12 @@ import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -121,6 +124,20 @@ class DataSetServiceTest {
     ds.setPublicUrl("https://example.com");
     ds.setPipelineIds(List.of("pipe-1"));
     return ds;
+  }
+
+  private static DataSink postgisSink() {
+    DataSink sink = new DataSink();
+    sink.setId(UUID.randomUUID());
+    sink.setDataSinkType(DataSinkType.POSTGIS);
+    return sink;
+  }
+
+  private static DataSink frostSink() {
+    DataSink sink = new DataSink();
+    sink.setId(UUID.randomUUID());
+    sink.setDataSinkType(DataSinkType.FROST);
+    return sink;
   }
 
   private DataSet draftDataSet(UUID id) {
@@ -318,6 +335,59 @@ class DataSetServiceTest {
 
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
       assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.CREATE);
+      verify(sagaPublisher).publishCreateRequested(result);
+    }
+
+    @Test
+    @DisplayName("rejects layers with no OWS named API to serve them")
+    void rejectsLayersWithoutOwsApi() {
+      // Layers and the OWS route are gated independently downstream, so this would provision
+      // feature types that no route can reach and still report the release successful.
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      when(layerRepository.existsByDataSetId(id)).thenReturn(true);
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("no OWS named API");
+
+      verify(sagaPublisher, never()).publishCreateRequested(any());
+    }
+
+    @Test
+    @DisplayName("rejects an OWS named API with no POSTGIS sink behind it")
+    void rejectsOwsApiWithoutPostgisSink() {
+      // The route would rewrite to a workspace that is only provisioned when a POSTGIS sink
+      // exists — without one the published endpoint 404s.
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.getNamedApis().forEach(api -> api.setStandard(ApiStandard.OWS));
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      when(layerRepository.existsByDataSetId(id)).thenReturn(false);
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(frostSink()));
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("no POSTGIS data sink");
+
+      verify(sagaPublisher, never()).publishCreateRequested(any());
+    }
+
+    @Test
+    @DisplayName("releases layers served by an OWS named API backed by a POSTGIS sink")
+    void releasesCompleteMapSurface() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.getNamedApis().forEach(api -> api.setStandard(ApiStandard.OWS));
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      when(layerRepository.existsByDataSetId(id)).thenReturn(true);
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(postgisSink()));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet result = createService().release(id);
+
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
       verify(sagaPublisher).publishCreateRequested(result);
     }
   }
@@ -643,6 +713,57 @@ class DataSetServiceTest {
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Duplicate named-API slug")
           .hasMessageContaining("traffic");
+    }
+
+    @Test
+    @DisplayName("rejects a second OWS named API on the same dataset")
+    void rejectsSecondOwsNamedApi() {
+      // Both would route to the one workspace derived from the dataset id and serve the same
+      // layers, and the layer cleanup could no longer tell which API the layers belong to.
+      DataSet entity = new DataSet();
+      NamedApiInputDTO maps = new NamedApiInputDTO();
+      maps.setName("Maps");
+      maps.setSlug("maps");
+      maps.setStandard(ApiStandard.OWS);
+      NamedApiInputDTO alias = new NamedApiInputDTO();
+      alias.setName("Maps Alias");
+      alias.setSlug("maps-alias");
+      alias.setStandard(ApiStandard.OWS);
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(List.of(maps, alias));
+
+      assertThatThrownBy(() -> createService().postConvertToEntity(entity, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("at most one OWS named API");
+    }
+
+    @Test
+    @DisplayName("accepts one OWS named API alongside other standards")
+    void acceptsOneOwsApiWithOtherStandards() {
+      DataSet entity = new DataSet();
+      NamedApiInputDTO maps = new NamedApiInputDTO();
+      maps.setName("Maps");
+      maps.setSlug("maps");
+      maps.setStandard(ApiStandard.OWS);
+      NamedApiInputDTO sensors = new NamedApiInputDTO();
+      sensors.setName("Sensors");
+      sensors.setSlug("sensors");
+      sensors.setStandard(ApiStandard.STA);
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(List.of(maps, sensors));
+      when(dataSetMapper.toNamedApiEntity(any()))
+          .thenAnswer(
+              inv -> {
+                NamedApiInputDTO dto = inv.getArgument(0);
+                NamedApi api = new NamedApi();
+                api.setName(dto.getName());
+                api.setSlug(dto.getSlug());
+                api.setStandard(dto.getStandard());
+                return api;
+              });
+
+      assertThatCode(() -> createService().postConvertToEntity(entity, input))
+          .doesNotThrowAnyException();
     }
 
     @Test
@@ -1581,6 +1702,46 @@ class DataSetServiceTest {
 
       DataSet result = createService().postConvertToEntity(entity, input);
       assertThat(result.getDataPool()).isSameAs(pool);
+    }
+  }
+
+  @Nested
+  @DisplayName("deleteById() — teardown routing")
+  class DeleteByIdTests {
+
+    @Test
+    @DisplayName("routes a PostGIS-only dataset through the saga even though provisioned is false")
+    void routesPostgisOnlyDatasetThroughSaga() {
+      // provisioned tracks the FROST projectId, so a dataset whose only sink is POSTGIS never sets
+      // it — yet it owns a PostGIS schema and a GeoServer workspace. The direct path would strand
+      // both with no dataset left to reclaim them.
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setProvisioned(false);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(postgisSink()));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().deleteById(id);
+
+      assertThat(ds.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
+      verify(sagaPublisher).publishDeleteRequested(ds);
+      verify(dataSetRepository, never()).delete(any(DataSet.class));
+    }
+
+    @Test
+    @DisplayName("removes a dataset with no infrastructure directly, without a saga")
+    void removesBareDatasetDirectly() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setProvisioned(false);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of());
+
+      createService().deleteById(id);
+
+      verify(dataSetRepository).delete(ds);
+      verify(sagaPublisher, never()).publishDeleteRequested(any());
     }
   }
 }

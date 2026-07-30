@@ -5,6 +5,7 @@ import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataPool;
@@ -234,6 +235,19 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
                   + "' — named-API slugs must be unique within a dataset");
         }
       }
+      // One OWS API per dataset: all of them route to the same GeoServer workspace and serve the
+      // same layers, since workspace and route target are both derived from the dataset id alone.
+      // A second one is an alias, not a second surface — and it would make the layer cleanup below
+      // ambiguous about which API the layers belong to.
+      long owsCount = incoming.stream().filter(dto -> dto.getStandard() == ApiStandard.OWS).count();
+      if (owsCount > 1) {
+        throw new InvalidInputException(
+            "namedApis",
+            entity.getId(),
+            "A dataset can expose at most one OWS named API; got "
+                + owsCount
+                + ". They would all serve the same layers from the same workspace.");
+      }
       Map<String, NamedApi> existingBySlug = new HashMap<>();
       for (NamedApi api : entity.getNamedApis()) {
         existingBySlug.put(api.getSlug(), api);
@@ -259,10 +273,12 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   /**
    * A {@link de.civitascore.portal.model.entity.Layer Layer} is an OWS-only published view, served
-   * through the dataset's OWS {@link NamedApi}s. Once no OWS NamedApi remains — regardless of how
-   * many there were — nothing publishes the layers, so they are removed. Keyed on the
-   * post-reconcile state rather than on the removed entry, so removing one of several OWS APIs, or
-   * replacing an OWS API with a differently-slugged one, keeps the layers.
+   * through the dataset's OWS {@link NamedApi}. Once no OWS NamedApi remains, nothing publishes the
+   * layers, so they are removed. Keyed on the post-reconcile state rather than on the removed
+   * entry, so replacing an OWS API with a differently-slugged one keeps the layers.
+   *
+   * <p>Dataset-wide rather than per-API: every OWS route resolves to the one workspace derived from
+   * the dataset id, so a layer is never bound to a particular API.
    *
    * <p>Deletes via the repository rather than clearing {@code entity.getLayers()}: the update path
    * loads the dataset without the {@code layers} graph, so the collection is an uninitialised lazy
@@ -440,7 +456,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    *
    * @param id the dataset ID
    * @return the released dataset
-   * @throws InvalidInputException if dataset is not in READY status
+   * @throws InvalidInputException if dataset is not in READY status, or if its layers and OWS named
+   *     APIs do not both resolve to a servable map surface (see {@link
+   *     #verifyMapSurfaceIsServable})
    * @throws ResourceInUseException if a saga is already in-flight
    */
   @Override
@@ -464,6 +482,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     revalidatePipelineDataSourcesAgainstPool(dataSet);
+    verifyMapSurfaceIsServable(dataSet);
 
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
     dataSet.setPendingSagaType(PendingSagaType.CREATE);
@@ -472,6 +491,44 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     sagaPublisher.publishCreateRequested(saved);
 
     return saved;
+  }
+
+  /**
+   * Rejects a release whose map surface would be provisioned but unreachable, or routed but empty.
+   * Layers and the OWS route are gated independently downstream — layers on the presence of layers,
+   * the route on the presence of an OWS named API, the GeoServer workspace on the presence of a
+   * POSTGIS sink — so each without its counterpart provisions half a surface and reports success.
+   *
+   * <p>A workspace without an OWS named API is deliberately NOT rejected: that is the state an
+   * unrelease leaves behind, and the data is meant to survive it.
+   *
+   * @throws InvalidInputException if layers exist without an OWS named API to serve them, or an OWS
+   *     named API exists without a POSTGIS sink to back its workspace
+   */
+  private void verifyMapSurfaceIsServable(DataSet dataSet) {
+    boolean hasOwsApi =
+        dataSet.getNamedApis().stream().anyMatch(api -> api.getStandard() == ApiStandard.OWS);
+
+    if (layerRepository.existsByDataSetId(dataSet.getId()) && !hasOwsApi) {
+      throw new InvalidInputException(
+          "namedApis",
+          dataSet.getId(),
+          "DataSet has layers but no OWS named API to serve them. Add an OWS named API or remove"
+              + " the layers.");
+    }
+
+    if (hasOwsApi && !hasPostgisSink(dataSet)) {
+      throw new InvalidInputException(
+          "dataSinks",
+          dataSet.getId(),
+          "DataSet has an OWS named API but no POSTGIS data sink to back its map service. The"
+              + " route would resolve to a workspace that is never provisioned.");
+    }
+  }
+
+  private boolean hasPostgisSink(DataSet dataSet) {
+    return dataSinkRepository.findByDataSetId(dataSet.getId()).stream()
+        .anyMatch(sink -> sink.getDataSinkType() == DataSinkType.POSTGIS);
   }
 
   /**
@@ -657,11 +714,10 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   /**
    * Deletes a dataset. An AVAILABLE dataset must be unreleased first — its ingest and consumer
-   * access are still live, so it cannot be deleted directly. Otherwise: a dataset that was never
-   * provisioned (no PostGIS table / FROST project) is removed immediately, and a dataset that still
-   * holds a provisioned sink from a prior release goes through a DATASET_DELETE saga that tears
-   * down the full infrastructure including the data-holding sink; the entity is removed once the
-   * saga completes (see {@link #handleSagaCompleted}).
+   * access are still live, so it cannot be deleted directly. Otherwise: a dataset with no
+   * infrastructure behind it is removed immediately, and one that still holds provisioned
+   * infrastructure from a prior release goes through a DATASET_DELETE saga that tears it down; the
+   * entity is removed once the saga completes (see {@link #handleSagaCompleted}).
    */
   @Override
   @Transactional
@@ -675,7 +731,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "Cannot delete an AVAILABLE dataset. Unrelease it first (POST /datasets/{id}/unrelease)");
     }
 
-    if (!dataSet.isProvisioned()) {
+    if (!hasProvisionedInfrastructure(dataSet)) {
       deleteWithSinks(dataSet);
       return;
     }
@@ -691,6 +747,20 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     DataSet saved = dataSetRepository.save(dataSet);
 
     sagaPublisher.publishDeleteRequested(saved);
+  }
+
+  /**
+   * Whether a teardown saga has anything to do. {@code provisioned} alone does not answer this: it
+   * tracks the FROST {@code projectId} and is documented as an indicator for the data-loss warning,
+   * not a lifecycle gate. A dataset whose only sink is POSTGIS never sets it, yet it owns a PostGIS
+   * schema and a GeoServer workspace — deleting it on the direct path would strand both, with no
+   * dataset left to ever reclaim them.
+   *
+   * <p>An unreleased dataset still counts: the unrelease teardown covers the route and the pipeline
+   * but deliberately keeps the sink, so the workspace and the tables outlive it.
+   */
+  private boolean hasProvisionedInfrastructure(DataSet dataSet) {
+    return dataSet.isProvisioned() || hasPostgisSink(dataSet);
   }
 
   /**
