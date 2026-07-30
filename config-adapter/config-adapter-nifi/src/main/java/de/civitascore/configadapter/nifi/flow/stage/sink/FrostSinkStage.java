@@ -750,8 +750,8 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
   private record Tail(Processor processor, String relationship) {
     Tail {
       // A nameless relationship survives connect() — "unmatched".equals(null) is merely false — and
-      // reaches the snapshot as a connection selecting nothing, which NiFi accepts and never
-      // transfers over: the same silent dead edge this stage's response uses exist to prevent.
+      // would reach the snapshot as a connection selecting nothing, so nothing is ever transferred
+      // over it.
       if (relationship == null) {
         throw new IllegalArgumentException(
             "tail of '" + processor.id() + "' names no relationship for the next stage");

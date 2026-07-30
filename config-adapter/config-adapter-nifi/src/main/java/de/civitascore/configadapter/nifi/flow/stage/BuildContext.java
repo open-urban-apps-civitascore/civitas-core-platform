@@ -29,9 +29,9 @@ import java.util.UUID;
  * the sole path to the classpath fragment loader, so only {@link Fragment} constants can ever
  * become flow components.
  *
- * <p>All component ids are name-based UUIDs over stable seeds — they are the redeploy-idempotency
- * key against a live NiFi. Array append order and property-put order are byte-significant: the
- * snapshot serializes insertion-ordered.
+ * <p>All component ids are name-based UUIDs over stable seeds, so the same flow serializes to the
+ * same bytes and a redeploy is diffable against the last one. Array append order and property-put
+ * order are byte-significant: the snapshot serializes insertion-ordered.
  */
 public final class BuildContext {
 

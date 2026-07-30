@@ -11,6 +11,7 @@ package de.civitascore.configadapter.nifi.mapping;
 
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * The compiled output of one mapping node — the unit the flow builder turns into that node's own
@@ -25,5 +26,6 @@ public record CompiledMapping(List<UpdateRecordProperty> properties, ForkPlan fo
     implements CompiledTransform {
   public CompiledMapping {
     properties = List.copyOf(properties);
+    Objects.requireNonNull(fork, "fork");
   }
 }
