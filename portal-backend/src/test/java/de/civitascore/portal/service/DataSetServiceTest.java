@@ -24,7 +24,6 @@ import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -125,20 +124,6 @@ class DataSetServiceTest {
     ds.setPublicUrl("https://example.com");
     ds.setPipelineIds(List.of("pipe-1"));
     return ds;
-  }
-
-  private static DataSink postgisSink() {
-    DataSink sink = new DataSink();
-    sink.setId(UUID.randomUUID());
-    sink.setDataSinkType(DataSinkType.POSTGIS);
-    return sink;
-  }
-
-  private static DataSink frostSink() {
-    DataSink sink = new DataSink();
-    sink.setId(UUID.randomUUID());
-    sink.setDataSinkType(DataSinkType.FROST);
-    return sink;
   }
 
   private DataSet draftDataSet(UUID id) {
@@ -366,7 +351,8 @@ class DataSetServiceTest {
       ds.getNamedApis().forEach(api -> api.setStandard(ApiStandard.OWS));
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
       when(layerRepository.existsByDataSetId(id)).thenReturn(false);
-      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(frostSink()));
+      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
+          .thenReturn(false);
 
       assertThatThrownBy(() -> createService().release(id))
           .isInstanceOf(InvalidInputException.class)
@@ -383,7 +369,8 @@ class DataSetServiceTest {
       ds.getNamedApis().forEach(api -> api.setStandard(ApiStandard.OWS));
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
       when(layerRepository.existsByDataSetId(id)).thenReturn(true);
-      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(postgisSink()));
+      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
+          .thenReturn(true);
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSet result = createService().release(id);
@@ -1718,7 +1705,8 @@ class DataSetServiceTest {
       DataSet ds = readyDataSet(id);
       ds.setProvisioned(false);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
-      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(postgisSink()));
+      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
+          .thenReturn(true);
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       createService().deleteById(id);
@@ -1735,6 +1723,8 @@ class DataSetServiceTest {
       DataSet ds = readyDataSet(id);
       ds.setProvisioned(false);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
+          .thenReturn(false);
       when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of());
 
       createService().deleteById(id);

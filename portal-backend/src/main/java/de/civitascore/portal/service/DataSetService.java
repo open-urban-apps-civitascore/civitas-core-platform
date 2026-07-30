@@ -511,8 +511,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   private boolean hasPostgisSink(DataSet dataSet) {
-    return dataSinkRepository.findByDataSetId(dataSet.getId()).stream()
-        .anyMatch(sink -> sink.getDataSinkType() == DataSinkType.POSTGIS);
+    return dataSinkRepository.existsByDataSetIdAndDataSinkType(
+        dataSet.getId(), DataSinkType.POSTGIS);
   }
 
   /**
