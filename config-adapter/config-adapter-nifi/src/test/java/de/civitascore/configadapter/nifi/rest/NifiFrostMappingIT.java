@@ -321,18 +321,16 @@ class NifiFrostMappingIT extends AbstractNifiIT {
             + "{\"sensorId\":\"B\",\"measuredValues\":["
             + "{\"ts\":\"2026-02-01T01:00:00Z\",\"value\":3.5}]}]}";
 
-    // Deployed here rather than in @BeforeAll: while the array gap is open this rejects at compile
-    // time, and a class-level deploy would abort every other test in this class.
+    // Deployed here rather than in @BeforeAll: this pipeline is the only one in the class whose
+    // deploy can fail on its own mapping, and a class-level deploy would abort every other test.
     deployFanoutPipeline();
 
-    try (MqttPublisher publisher = publisher("civitas-it-fanout")) {
-      publisher.publishOnce(FANOUT_TOPIC, payload);
-      await()
-          .atMost(Duration.ofSeconds(120))
-          .pollInterval(Duration.ofSeconds(3))
-          .ignoreExceptions()
-          .until(() -> observations(dsFanoutId).size() >= 3);
-    }
+    publishOnceIntoTheFlow(
+        "civitas-it-fanout", FANOUT_TOPIC, payload, () -> observations(dsFanoutId).size() >= 3);
+
+    // The poll above is a lower bound, so it turns true sooner under an over-fork. Settle before
+    // counting, or a run producing 6 observations passes with 3 still in flight.
+    settleBeforeCounting();
 
     // result AND phenomenonTime per observation: the reported defect is about the timestamp field,
     // and a fix that fans out the result while broadcasting the first timestamp onto every
@@ -391,14 +389,9 @@ class NifiFrostMappingIT extends AbstractNifiIT {
 
     deployPartialPipeline();
 
-    try (MqttPublisher publisher = publisher("civitas-it-partial")) {
-      publisher.publishOnce(PARTIAL_TOPIC, payload);
-      await()
-          .atMost(Duration.ofSeconds(120))
-          .pollInterval(Duration.ofSeconds(3))
-          .ignoreExceptions()
-          .until(() -> observations(dsPartialId).size() >= 2);
-    }
+    publishOnceIntoTheFlow(
+        "civitas-it-partial", PARTIAL_TOPIC, payload, () -> observations(dsPartialId).size() >= 2);
+    settleBeforeCounting();
 
     List<Double> results = new ArrayList<>();
     for (JsonNode observation : observations(dsPartialId)) {
@@ -1180,6 +1173,53 @@ class NifiFrostMappingIT extends AbstractNifiIT {
 
   private MqttPublisher publisher(String clientId) throws Exception {
     return new MqttPublisher("tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883), clientId);
+  }
+
+  /** Reports whether the expected outcome has landed. */
+  private interface Landed {
+    boolean check() throws Exception;
+  }
+
+  /**
+   * Delivers the payload exactly once <em>into the flow</em>, then polls the assertion. Needed
+   * wherever the expected count is exact, so retention is not an option: ConsumeMQTT re-receives a
+   * retained message on every resubscribe and would keep producing entities for the whole window.
+   *
+   * <p>But a non-retained publish is discarded while no subscriber exists, and {@code deployFlow}
+   * only waits for NiFi to report the processor RUNNING, which precedes the MQTT CONNECT/SUBSCRIBE
+   * — so the first delivery can be lost outright and the test would fail on a timeout that names
+   * the wrong cause. Republishing only while nothing has landed retries a lost delivery without
+   * ever sending a second payload into a flow that already received one.
+   */
+  private void publishOnceIntoTheFlow(String clientId, String topic, String payload, Landed landed)
+      throws Exception {
+    try (MqttPublisher publisher = publisher(clientId)) {
+      for (int attempt = 0; attempt < 6 && !landed.check(); attempt++) {
+        publisher.publishOnce(topic, payload);
+        try {
+          await()
+              .atMost(Duration.ofSeconds(20))
+              .pollInterval(Duration.ofSeconds(1))
+              .ignoreExceptions()
+              .until(landed::check);
+        } catch (ConditionTimeoutException nothingLanded) {
+          // Treat the delivery as lost to the broker and republish.
+        }
+      }
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(landed::check);
+    }
+  }
+
+  /**
+   * Lets the flow drain before an exact count. A lower-bound poll turns true sooner under an
+   * over-fork, so counting immediately would let a run producing too many entities pass.
+   */
+  private static void settleBeforeCounting() throws InterruptedException {
+    Thread.sleep(Duration.ofSeconds(6).toMillis());
   }
 
   private static String postgresDriverJar() {

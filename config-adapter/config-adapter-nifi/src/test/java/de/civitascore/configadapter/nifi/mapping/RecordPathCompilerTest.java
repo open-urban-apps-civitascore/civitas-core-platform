@@ -12,6 +12,7 @@ package de.civitascore.configadapter.nifi.mapping;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
@@ -180,6 +181,7 @@ class RecordPathCompilerTest {
                         + " \"$.items[].name\": \"$.items[].sourceName\" }"));
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+    assertTrue(error.getMessage().contains("in-place array target"), error.getMessage());
   }
 
   @Test
@@ -195,6 +197,7 @@ class RecordPathCompilerTest {
                         + " \"$.ts\": \"$.measurements[].ts\" }"));
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+    assertTrue(error.getMessage().contains("in-place array target"), error.getMessage());
   }
 
   @Test
@@ -207,6 +210,7 @@ class RecordPathCompilerTest {
             () -> compile("{ \"$.a\": \"$.id\", \"$.b\": \"$.readings[].id\" }"));
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+    assertTrue(error.getMessage().contains("after the fan-out over"), error.getMessage());
   }
 
   @Test
@@ -254,6 +258,35 @@ class RecordPathCompilerTest {
         assertThrows(FatalAdapterException.class, () -> compile("{ \"$.temp\": \"$.temps[]\" }"));
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+    // Four compilers share this error code, so the code alone would not show which rule fired.
+    assertTrue(error.getMessage().contains("selects the array itself"), error.getMessage());
+  }
+
+  @Test
+  void aFixedElementOfTheForkedArrayIsRejected() throws Exception {
+    // The index carries no array context of its own, so it survives into the UpdateRecord
+    // unchanged — but ForkRecord drops the forked array from the record it emits, so the rule would
+    // read nothing and write NULL on every row without failing.
+    FatalAdapterException error =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compile("{ \"$.x\": \"$.items[].x\", \"$.y\": \"$.items[0].y\" }"));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+    assertTrue(error.getMessage().contains("reads a fixed element"), error.getMessage());
+  }
+
+  @Test
+  void anExpressionLanguageReferenceInAPathIsRejected() throws Exception {
+    // A source segment reaches ForkRecord's EL-enabled fork property as its VALUE, where NiFi would
+    // expand it against the process environment — and escaping is not available there, because the
+    // escaped form can render the processor invalid, which NiFi skips silently on start.
+    FatalAdapterException error =
+        assertThrows(
+            FatalAdapterException.class, () -> compile("{ \"$.v\": \"$.${HOSTNAME}[].v\" }"));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+    assertTrue(error.getMessage().contains("Expression Language"), error.getMessage());
   }
 
   @Test
@@ -269,6 +302,7 @@ class RecordPathCompilerTest {
                     "{ \"$.ts\": \"$.measurements[].ts\"," + " \"$.code\": \"$.alarms[].code\" }"));
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
+    assertTrue(error.getMessage().contains("independent source arrays"), error.getMessage());
   }
 
   @Test
