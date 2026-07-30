@@ -222,10 +222,24 @@ class NifiFlowBuilderTest {
         componentByProperty(
             flow, "UpdateRecord", "Replacement Value Strategy", "record-path-value");
     String forkId = fork.get("identifier").asText();
+
+    // The guard sits between the two: a fan-out that extracted nothing must not travel the chain as
+    // an empty, successful FlowFile.
+    JsonNode guard =
+        componentByProperty(flow, "RouteOnAttribute", "failure", "${record.count:equals('0')}");
+    String guardId = guard.get("identifier").asText();
+    assertEquals(
+        guardId,
+        destinationOf(flow, forkId, "fork"),
+        "the fork must feed the guard over its 'fork' relationship");
     assertEquals(
         update.get("identifier").asText(),
-        destinationOf(flow, forkId, "fork"),
-        "the fork must feed the mapping over its 'fork' relationship");
+        destinationOf(flow, guardId, "unmatched"),
+        "records that survived the guard must feed the mapping");
+    assertEquals(
+        component(flow, "processors", "LogMessage").get("identifier").asText(),
+        destinationOf(flow, guardId, "failure"),
+        "an empty fan-out must reach the error sink");
 
     // The forked records must reach the pre-region's SplitJson — that is what turns N records into
     // N FlowFiles and therefore N observations. Without it the fan-out would produce one FlowFile
