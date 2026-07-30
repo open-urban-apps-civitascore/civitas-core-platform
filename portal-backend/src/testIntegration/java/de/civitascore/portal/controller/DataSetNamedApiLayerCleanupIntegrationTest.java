@@ -111,8 +111,6 @@ class DataSetNamedApiLayerCleanupIntegrationTest extends BaseKeycloakIntegration
   @Test
   @DisplayName("PATCH with two OWS named APIs is rejected — they would be aliases of one surface")
   void multipleOwsNamedApisAreRejected() {
-    // Both would route to the one workspace derived from the dataset id and serve the same layers,
-    // which also leaves the layer cleanup with no way to tell which API a layer belongs to.
     DataSet ds = portalData.dataSet();
     UUID id = ds.getId();
 
@@ -149,9 +147,8 @@ class DataSetNamedApiLayerCleanupIntegrationTest extends BaseKeycloakIntegration
     OwsFixture fixture = datasetWithOwsNamedApiAndLayer();
     UUID id = fixture.dataSet().getId();
 
-    // Whole-array replace: the old 'ows' entry is removed and a new 'ows-v2' entry is added. Since
-    // an OWS API still exists afterwards, the layers must survive — proving the cleanup keys on the
-    // standard, not on the slug of the removed entry.
+    // A per-entry cleanup would read the removed 'ows' entry as "the last OWS API is gone" and
+    // delete the layers.
     ResponseEntity<JsonNode> patch =
         patchNamedApis(
             id, List.of(Map.of("name", "OWS Service", "slug", "ows-v2", "standard", "OWS")));
@@ -176,8 +173,6 @@ class DataSetNamedApiLayerCleanupIntegrationTest extends BaseKeycloakIntegration
     assertThat(setup.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(remainingLayers(id)).isEqualTo(1);
 
-    // Drop the STA, keep the OWS: layers stay because the cleanup is OWS-specific, not
-    // "any named API removed".
     ResponseEntity<JsonNode> patch =
         patchNamedApis(
             id, List.of(Map.of("name", "OWS Service", "slug", "ows", "standard", "OWS")));

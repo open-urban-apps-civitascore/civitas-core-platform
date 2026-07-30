@@ -235,10 +235,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
                   + "' — named-API slugs must be unique within a dataset");
         }
       }
-      // One OWS API per dataset: all of them route to the same GeoServer workspace and serve the
-      // same layers, since workspace and route target are both derived from the dataset id alone.
-      // A second one is an alias, not a second surface — and it would make the layer cleanup below
-      // ambiguous about which API the layers belong to.
       long owsCount = incoming.stream().filter(dto -> dto.getStandard() == ApiStandard.OWS).count();
       if (owsCount > 1) {
         throw new InvalidInputException(
@@ -246,7 +242,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
             entity.getId(),
             "A dataset can expose at most one OWS named API; got "
                 + owsCount
-                + ". They would all serve the same layers from the same workspace.");
+                + ". Workspace and route target both derive from the dataset id, so they would all"
+                + " serve the same layers from the same workspace, leaving no way to tell which"
+                + " API a layer belongs to.");
       }
       Map<String, NamedApi> existingBySlug = new HashMap<>();
       for (NamedApi api : entity.getNamedApis()) {
@@ -272,20 +270,11 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * A {@link de.civitascore.portal.model.entity.Layer Layer} is an OWS-only published view, served
-   * through the dataset's OWS {@link NamedApi}. Once no OWS NamedApi remains, nothing publishes the
-   * layers, so they are removed. Keyed on the post-reconcile state rather than on the removed
-   * entry, so replacing an OWS API with a differently-slugged one keeps the layers.
-   *
-   * <p>Dataset-wide rather than per-API: every OWS route resolves to the one workspace derived from
-   * the dataset id, so a layer is never bound to a particular API.
-   *
-   * <p>Deletes via the repository rather than clearing {@code entity.getLayers()}: the update path
-   * loads the dataset without the {@code layers} graph, so the collection is an uninitialised lazy
-   * proxy and a {@code clear()} would not trigger orphan removal.
+   * Layers are published only through the dataset's OWS {@link NamedApi}, so once none remains
+   * nothing serves them. Keyed on the post-reconcile state rather than on the removed entry, so
+   * replacing an OWS API with a differently-slugged one keeps the layers.
    */
   private void cleanUpOrphanedOwsLayers(DataSet entity) {
-    // A create has no persisted layers yet, so only the update path (non-null id) can orphan any.
     if (entity.getId() == null) {
       return;
     }
@@ -456,9 +445,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    *
    * @param id the dataset ID
    * @return the released dataset
-   * @throws InvalidInputException if dataset is not in READY status, or if its layers and OWS named
-   *     APIs do not both resolve to a servable map surface (see {@link
-   *     #verifyMapSurfaceIsServable})
+   * @throws InvalidInputException if dataset is not in READY status, or if its map surface is only
+   *     half configured
    * @throws ResourceInUseException if a saga is already in-flight
    */
   @Override
@@ -495,15 +483,11 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   /**
    * Rejects a release whose map surface would be provisioned but unreachable, or routed but empty.
-   * Layers and the OWS route are gated independently downstream — layers on the presence of layers,
-   * the route on the presence of an OWS named API, the GeoServer workspace on the presence of a
-   * POSTGIS sink — so each without its counterpart provisions half a surface and reports success.
+   * Layers and the OWS route are gated independently downstream, so each without its counterpart
+   * provisions half a surface and reports success.
    *
    * <p>A workspace without an OWS named API is deliberately NOT rejected: that is the state an
    * unrelease leaves behind, and the data is meant to survive it.
-   *
-   * @throws InvalidInputException if layers exist without an OWS named API to serve them, or an OWS
-   *     named API exists without a POSTGIS sink to back its workspace
    */
   private void verifyMapSurfaceIsServable(DataSet dataSet) {
     boolean hasOwsApi =
@@ -750,14 +734,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Whether a teardown saga has anything to do. {@code provisioned} alone does not answer this: it
-   * tracks the FROST {@code projectId} and is documented as an indicator for the data-loss warning,
-   * not a lifecycle gate. A dataset whose only sink is POSTGIS never sets it, yet it owns a PostGIS
-   * schema and a GeoServer workspace — deleting it on the direct path would strand both, with no
-   * dataset left to ever reclaim them.
+   * Whether a teardown saga has anything to do. {@code provisioned} tracks only the FROST {@code
+   * projectId}, so a dataset whose only sink is POSTGIS never sets it, yet owns a PostGIS schema
+   * and a GeoServer workspace — the direct path would strand both with no dataset left to reclaim
+   * them.
    *
-   * <p>An unreleased dataset still counts: the unrelease teardown covers the route and the pipeline
-   * but deliberately keeps the sink, so the workspace and the tables outlive it.
+   * <p>An unreleased dataset still counts: its teardown keeps the sink, so the workspace and tables
+   * outlive it.
    */
   private boolean hasProvisionedInfrastructure(DataSet dataSet) {
     return dataSet.isProvisioned() || hasPostgisSink(dataSet);
@@ -769,7 +752,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * sink additionally carries a {@code pipeline_id} FK into one of the cascade-removed pipelines.
    * Deleting the sinks first — after detaching them from their pipeline — clears both FKs before
    * the dataset delete cascades into the pipelines, avoiding the FK violation that would otherwise
-   * roll the transaction back. Each sink cascades into its own layers.
+   * roll the transaction back.
    *
    * <p>Going through the repository deliberately bypasses the layer guard that rejects a standalone
    * {@code DELETE /datasinks/{id}}: that guard protects a sink whose dataset lives on, whereas here

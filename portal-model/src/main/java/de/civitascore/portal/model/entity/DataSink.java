@@ -62,10 +62,7 @@ public class DataSink extends BaseEntity {
   @Column(name = "configuration", columnDefinition = "jsonb")
   private Map<String, Object> configuration;
 
-  /**
-   * Layers derived from this sink. A Layer's {@code datasink_id} is non-null, so the layers must go
-   * with the sink; without this collection Hibernate would try to null the column instead.
-   */
+  /** A Layer's {@code datasink_id} is non-null, so layers cannot outlive their sink. */
   @OneToMany(
       mappedBy = "dataSink",
       fetch = FetchType.LAZY,

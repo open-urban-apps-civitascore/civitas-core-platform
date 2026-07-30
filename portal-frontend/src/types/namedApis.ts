@@ -141,10 +141,9 @@ export const OwsApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
   z.object({
     type: z.literal(API_TYPE_QUERY.OWS),
     baseInfo: NamedApiBaseInfoFormSchema({ existingSlugs }),
-    // Layer names must be unique across the whole dataset, not per data sink: GeoServer publishes
-    // every layer of a dataset into one workspace and addresses feature types by name alone, so a
-    // duplicate would silently overwrite its twin. Checked on the array because it compares
-    // siblings; the backend rejects it too, this only keeps it out of the form.
+    // Layer names are unique per dataset, not per sink — a duplicate would silently overwrite its
+    // twin in GeoServer. The backend and a DB constraint are the authority; this only keeps it out
+    // of the form.
     layers: z.array(LayerFormSchema).superRefine((layers, ctx) => {
       const seen = new Set<string>()
       layers.forEach((layer, index) => {

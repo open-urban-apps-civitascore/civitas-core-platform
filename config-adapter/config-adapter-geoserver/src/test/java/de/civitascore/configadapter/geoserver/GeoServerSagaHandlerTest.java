@@ -248,9 +248,8 @@ class GeoServerSagaHandlerTest {
     @Test
     void provisionLayersNeverPrunesWhatItWasNotAskedAbout() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        // The create path is gated on hasLayers and may carry a partial set, so an absent layer
-        // means "not mine", never "delete it". Pruning here would drop live layers of a workspace
-        // that a re-release is only topping up.
+        // Pruning on the provisioning path would drop live layers of a workspace that a re-release
+        // is only topping up.
         Response snapshot = snapshotResponse("already_published");
         when(mockBuilder.get()).thenReturn(snapshot);
         Response created = mock(Response.class);

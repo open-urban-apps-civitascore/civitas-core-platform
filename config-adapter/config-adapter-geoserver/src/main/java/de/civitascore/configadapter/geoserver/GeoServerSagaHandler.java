@@ -550,9 +550,9 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * so a layer deleted in the portal would otherwise stay served until the whole workspace is
    * dropped.
    *
-   * <p>Only safe where the command carries the dataset's complete layer set — {@code
-   * UPDATE_WORKSPACE} does, the create path does not (it is gated on {@code hasLayers} and would
-   * read an empty list as "remove everything").
+   * <p>Only reached from the update path, whose command carries the dataset's complete layer set.
+   * The provisioning paths may carry a partial one, where an absent layer means "not mine" rather
+   * than "delete it".
    */
   private void pruneFeatureTypesAbsentFrom(
       String workspaceName, String datastoreName, List<Map<String, Object>> layers) {

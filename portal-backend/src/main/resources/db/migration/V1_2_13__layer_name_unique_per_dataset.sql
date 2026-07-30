@@ -8,8 +8,7 @@
 -- with their own id. Renaming rather than deleting — the losing rows were never separately
 -- published anyway, so this surfaces the hidden conflict instead of cementing it. The id is used
 -- as the suffix because a counter could collide with a name already present in the dataset
--- ('a' + 'a' both renamed to 'a-2' when 'a-2' exists), and it keeps the result reproducible
--- without a retry loop. Truncated to fit VARCHAR(255).
+-- ('a' + 'a' both renamed to 'a-2' when 'a-2' exists). Truncated to fit VARCHAR(255).
 WITH ranked AS (SELECT id,
                        ROW_NUMBER() OVER (PARTITION BY dataset_id, layer_name
                            ORDER BY created_at, id) AS position

@@ -719,8 +719,6 @@ class DataSetServiceTest {
     @Test
     @DisplayName("rejects a second OWS named API on the same dataset")
     void rejectsSecondOwsNamedApi() {
-      // Both would route to the one workspace derived from the dataset id and serve the same
-      // layers, and the layer cleanup could no longer tell which API the layers belong to.
       DataSet entity = new DataSet();
       NamedApiInputDTO maps = new NamedApiInputDTO();
       maps.setName("Maps");
