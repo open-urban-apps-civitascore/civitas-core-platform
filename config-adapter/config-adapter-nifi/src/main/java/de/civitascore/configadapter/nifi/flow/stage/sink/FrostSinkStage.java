@@ -683,7 +683,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     ctx.routeFailure(renderBody, errorSink);
     routeHttpFailures(ctx, post, errorSink);
 
-    return List.of(Tail.of(post), updated);
+    return List.of(Tail.continuing(post), updated);
   }
 
   /** Resolves a single-valued navigation entity and PATCHes the concrete entity by its id. */
@@ -743,7 +743,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     openContinuation(patch);
     ctx.routeFailure(updateBody, errorSink);
     routeHttpFailures(ctx, patch, errorSink);
-    return Tail.of(patch);
+    return Tail.continuing(patch);
   }
 
   /** A stage outcome: the processor and the relationship the next stage consumes. */
@@ -759,7 +759,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     }
 
     /** The tail of an InvokeHTTP, continuing on the relationship it was loaded to leave on. */
-    static Tail of(Processor http) {
+    static Tail continuing(Processor http) {
       return new Tail(http, http.outRelationship());
     }
   }
