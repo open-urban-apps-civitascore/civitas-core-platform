@@ -360,6 +360,15 @@ public final class NifiTestFixtures {
         : List.of(new CompiledMapping(properties, ForkPlan.NONE));
   }
 
+  /**
+   * Wraps a FROST compilation, keeping its fan-out. Taking the compilation rather than its
+   * properties is what keeps a fixture from silently losing the fork and asserting on a flow that
+   * does not fan out.
+   */
+  static List<CompiledTransform> compiled(FrostMappingCompiler.FrostCompilation compilation) {
+    return List.of(compilation.mapping());
+  }
+
   static List<UpdateRecordProperty> mapping() {
     return List.of(
         new UpdateRecordProperty(
@@ -454,7 +463,7 @@ public final class NifiTestFixtures {
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
             "7"),
-        compiled(compilation.flatProperties()),
+        compiled(compilation),
         Map.of(),
         null,
         compilation.plan());
@@ -489,7 +498,7 @@ public final class NifiTestFixtures {
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
             "7"),
-        compiled(compilation.flatProperties()),
+        compiled(compilation),
         Map.of(),
         null,
         compilation.plan());
@@ -527,7 +536,7 @@ public final class NifiTestFixtures {
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
             "7"),
-        List.of(new CompiledMapping(compilation.flatProperties(), compilation.fork())),
+        compiled(compilation),
         Map.of(),
         null,
         compilation.plan());
@@ -580,7 +589,7 @@ public final class NifiTestFixtures {
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
             "7"),
-        compiled(compilation.flatProperties()),
+        compiled(compilation),
         Map.of(),
         null,
         compilation.plan());

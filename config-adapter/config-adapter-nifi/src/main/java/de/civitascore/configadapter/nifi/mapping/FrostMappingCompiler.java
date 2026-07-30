@@ -173,6 +173,15 @@ public class FrostMappingCompiler {
     public FrostCompilation {
       flatProperties = List.copyOf(flatProperties);
     }
+
+    /**
+     * The flat properties paired with the fan-out they were compiled against. Handing the two out
+     * separately invites a caller to wrap the properties alone and lose the fork, which deploys a
+     * flow that quietly does not fan out.
+     */
+    public CompiledMapping mapping() {
+      return new CompiledMapping(flatProperties, fork);
+    }
   }
 
   public FrostMappingCompiler(RecordPathCompiler recordPathCompiler) {
