@@ -12,19 +12,23 @@ package de.civitascore.configadapter.nifi.flow.stage.transform;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.configadapter.nifi.flow.stage.MappingSupport;
 import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.TransformNodeType;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import de.civitascore.configadapter.nifi.graph.NodeKind;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
+import de.civitascore.configadapter.nifi.mapping.ForkPlan;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
+import de.civitascore.configadapter.nifi.mapping.ValueNode;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -66,11 +70,11 @@ public final class MappingNodeType implements TransformNodeType {
   public Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink, SinkSpec sinkSpec)
       throws FatalAdapterException {
     List<MappingConfig> mappingConfigs = parse(ownNodes);
-    requireChainedStructures(ownNodes, mappingConfigs);
     if (sink.mappingSupport() == MappingSupport.NONE) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, sink.mappingRejectionMessage());
     }
+    requireChainedStructures(ownNodes, mappingConfigs);
     List<CompiledTransform> units = new ArrayList<>();
     if (sink.mappingSupport() == MappingSupport.ENVELOPE) {
       // The last mapping targets the sink's Thing-shaped structure; the ones before it are
@@ -88,13 +92,51 @@ public final class MappingNodeType implements TransformNodeType {
       FrostMappingCompiler.FrostCompilation compilation =
           frostMappingCompiler.compile(
               mappingConfigs.get(mappingConfigs.size() - 1), frost.staProperties());
-      units.add(new CompiledMapping(compilation.flatProperties(), compilation.fork()));
+      units.add(compilation.mapping());
       return new Compilation(units, compilation.plan());
     }
     for (MappingConfig config : mappingConfigs) {
-      units.add(recordPathCompiler.compile(config, sink.geometryEncoding()));
+      CompiledMapping compiled = recordPathCompiler.compile(config, sink.geometryEncoding());
+      requireElementLevelKey(compiled, config, sinkSpec);
+      units.add(compiled);
     }
     return new Compilation(units, null);
+  }
+
+  /**
+   * Rejects a fan-out whose rows all carry the same primary key. With a key the sink writes UPSERT
+   * keyed on it, and {@code PutDatabaseRecord} batches each record as its own {@code ON CONFLICT DO
+   * UPDATE}: N elements sharing one key overwrite each other down to a single row, last element
+   * winning, with no failure route and no error — the batching is what keeps Postgres from raising
+   * its usual "cannot affect row a second time".
+   *
+   * <p>A key column is element-level when its rule reads a source below the fork's innermost array,
+   * which is exactly what {@link ForkPlan#required()} rewrites to a root-level path.
+   */
+  private static void requireElementLevelKey(
+      CompiledMapping compiled, MappingConfig config, SinkSpec sinkSpec)
+      throws FatalAdapterException {
+    if (!compiled.fork().required() || !(sinkSpec instanceof PostgisSinkSpec postgis)) {
+      return;
+    }
+    List<String> keyColumns = postgis.primaryKeyColumns();
+    if (keyColumns.isEmpty() || keyColumns.stream().anyMatch(key -> readsAnElement(config, key))) {
+      return;
+    }
+    throw new FatalAdapterException(
+        AdapterErrorCode.NIFI_MAPPING_ERROR,
+        "the fan-out over '"
+            + compiled.fork().recordPath()
+            + "' writes one row per element, but every primary-key column ("
+            + String.join(", ", keyColumns)
+            + ") is mapped from outside that array, so all rows would share one key and overwrite"
+            + " each other down to one; map a field from below the array onto a key column");
+  }
+
+  /** Whether the rule writing {@code column} reads a source below the fan-out's innermost array. */
+  private static boolean readsAnElement(MappingConfig config, String column) {
+    ValueNode rule = config.fields().get("$." + column);
+    return rule != null && ForkPlan.readsBelowTheArray(rule);
   }
 
   /**
@@ -103,11 +145,14 @@ public final class MappingNodeType implements TransformNodeType {
    * so a stale declaration is not recoverable at runtime: paths resolve against nothing, and an
    * array selector makes the fan-out target an array the record no longer has.
    *
-   * <p>The URNs are compared verbatim — a new structure version is a different shape.
+   * <p>Compared on structure identity and version, not on the URN string: the name segment is a
+   * display name, so a rename leaves the shape untouched and must not fail a deploy. A version bump
+   * is a different shape and does fail — the downstream node's paths were authored against the old
+   * one.
    *
-   * <p>A pair that declares neither URN is left alone: they are optional on a mapping. Only one
-   * side declaring is a corrupt payload rather than a legacy one, since the editor writes both or
-   * neither.
+   * <p>A pair that declares neither URN is left alone: they are optional on a mapping. One side
+   * declaring is rejected because the handover cannot be verified at all — the editor writes both
+   * URNs or neither, but a chain half-migrated by editing only one node reaches this too.
    */
   private static void requireChainedStructures(
       List<GraphNode> ownNodes, List<MappingConfig> configs) throws FatalAdapterException {
@@ -131,7 +176,7 @@ public final class MappingNodeType implements TransformNodeType {
                 + ": the handover between them cannot be verified; re-open both mappings and save"
                 + " them again");
       }
-      if (!upstreamTarget.equals(ownSource)) {
+      if (!CoreUrn.sameStructureVersion(upstreamTarget, ownSource)) {
         throw new FatalAdapterException(
             AdapterErrorCode.NIFI_MAPPING_ERROR,
             "mapping node '"

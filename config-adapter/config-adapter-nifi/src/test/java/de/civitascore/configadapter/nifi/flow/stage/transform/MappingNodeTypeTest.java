@@ -18,6 +18,8 @@ import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkAuth;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
+import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
@@ -39,6 +41,8 @@ class MappingNodeTypeTest {
       "urn:core:platform:civitas:datastructure:common:StructureB:0000000002:1.0.0";
   private static final String STRUCTURE_B_V2 =
       "urn:core:platform:civitas:datastructure:common:StructureB:0000000002:2.0.0";
+  private static final String STRUCTURE_B_RENAMED =
+      "urn:core:platform:civitas:datastructure:common:StructureBRenamed:0000000002:1.0.0";
 
   private static GraphNode mappingNode(String id, Map<String, Object> fields) {
     return new GraphNode(id, "mapping", Map.of("mappingConfig", Map.of("fields", fields)));
@@ -81,6 +85,68 @@ class MappingNodeTypeTest {
             new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())));
 
     assertEquals(2, compilation.units().size());
+  }
+
+  @Test
+  void renamingTheStructureBetweenTwoNodesDeploysUnchanged() throws Exception {
+    // The name segment is a display name; renaming a structure changes neither its identity nor its
+    // shape. Comparing the URNs verbatim would fail a deploy that was correct before the rename,
+    // and the remedy would be re-authoring both mappings for nothing.
+    GraphNode first =
+        mappingNode("m1", STRUCTURE_A, STRUCTURE_B_RENAMED, Map.of("$.name", "$.raw"));
+    GraphNode last =
+        mappingNode("m2", STRUCTURE_B, STRUCTURE_A, Map.of("$.properties.reference", "$.name"));
+
+    var compilation =
+        mappingNodeType.compile(
+            List.of(first, last),
+            envelopeSink,
+            new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())));
+
+    assertEquals(2, compilation.units().size());
+  }
+
+  @Test
+  void aFanOutWhoseKeyColumnsAllSitAboveTheArrayIsRejected() {
+    // With a key the sink writes UPSERT, and PutDatabaseRecord batches each record as its own ON
+    // CONFLICT DO UPDATE — so N elements sharing the parent's key overwrite each other down to one
+    // row, last element winning, with no failure route and no bulletin.
+    GraphNode mapping =
+        mappingNode(
+            "m1", Map.of("$.stationid", "$.stationid", "$.value", "$.measurements[].value"));
+
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                mappingNodeType.compile(
+                    List.of(mapping),
+                    new PostgisSinkStage(null),
+                    new PostgisSinkSpec("readings", List.of("stationid"))));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+    assertTrue(ex.getMessage().contains("every primary-key column"), ex.getMessage());
+  }
+
+  @Test
+  void aFanOutWithOneElementLevelKeyColumnCompiles() throws Exception {
+    // The counterpart: one key column read from below the array makes the rows distinct, which is
+    // the shape the IT deploys.
+    GraphNode mapping =
+        mappingNode(
+            "m1",
+            Map.of(
+                "$.stationid", "$.stationid",
+                "$.measured_at", "$.measurements[].ts",
+                "$.value", "$.measurements[].value"));
+
+    var compilation =
+        mappingNodeType.compile(
+            List.of(mapping),
+            new PostgisSinkStage(null),
+            new PostgisSinkSpec("readings", List.of("stationid", "measured_at")));
+
+    assertEquals(1, compilation.units().size());
   }
 
   private FatalAdapterException compileExpectingRejection(GraphNode... nodes) {
