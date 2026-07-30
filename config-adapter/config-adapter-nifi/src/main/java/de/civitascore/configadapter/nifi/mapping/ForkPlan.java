@@ -19,10 +19,9 @@ import de.civitascore.configadapter.nifi.mapping.ValueNode.GeoPointNode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * The array fan-out a mapping requires: one {@code ForkRecord} over the innermost source array, so
@@ -79,9 +78,9 @@ public record ForkPlan(String recordPath) {
    */
   public static ForkPlan forMapping(MappingConfig mapping, boolean targetsKeepTheirShape)
       throws FatalAdapterException {
-    Set<List<String>> contexts = new LinkedHashSet<>();
+    Map<List<String>, String> contexts = new LinkedHashMap<>();
     List<String> inPlaceTargets = new ArrayList<>();
-    List<String> sourcePaths = new ArrayList<>();
+    List<Read> reads = new ArrayList<>();
     for (Map.Entry<String, ValueNode> field : mapping.fields().entrySet()) {
       if (targetsKeepTheirShape && keepsItsArrayLevel(field.getKey())) {
         // Only collected, not decided: whether an in-place rule survives depends on the fan-out the
@@ -89,7 +88,7 @@ public record ForkPlan(String recordPath) {
         inPlaceTargets.add(field.getKey());
         continue;
       }
-      collectArrayContexts(field.getValue(), contexts, sourcePaths);
+      collectArrayContexts(field.getKey(), field.getValue(), contexts, reads);
     }
     if (contexts.isEmpty()) {
       return NONE;
@@ -101,44 +100,84 @@ public record ForkPlan(String recordPath) {
     if (!inPlaceTargets.isEmpty()) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_MAPPING_ERROR,
-          "cannot combine the in-place array target '"
-              + inPlaceTargets.get(0)
-              + "' with the fan-out over source array '"
+          "cannot combine the in-place array target(s) "
+              + quoted(inPlaceTargets)
+              + " with the fan-out over source array '"
               + describe(innermost)
-              + "': the fan-out flattens each record to one element, leaving no array for that"
-              + " target to rewrite; map the array-valued rule in its own mapping node instead");
+              + "' (from rule '"
+              + contexts.get(innermost)
+              + "'): the fan-out flattens each record to one element, leaving no array for those"
+              + " targets to rewrite; map the array-valued rules in their own mapping node instead");
     }
+    rejectIndexedReadsInsideFork(innermost, reads);
     ForkPlan plan = new ForkPlan(forkRecordPath(innermost));
-    plan.rejectCollidingSources(sourcePaths);
+    plan.rejectCollidingSources(reads);
     return plan;
   }
+
+  /** One source path a rule reads, and the target field the rule writes. */
+  private record Read(String targetPath, String sourcePath) {}
 
   /**
    * The innermost of several array contexts, which must all lie on one hierarchical line — the
    * outer levels then ride along as parent fields.
+   *
+   * @param contexts each array context mapped to the target field of the rule that introduced it
    */
-  private static List<String> innermostSharedContext(Set<List<String>> contexts)
+  private static List<String> innermostSharedContext(Map<List<String>, String> contexts)
       throws FatalAdapterException {
     List<String> innermost =
-        contexts.stream().max(Comparator.comparingInt(List::size)).orElseThrow();
-    for (List<String> context : contexts) {
-      if (!isPrefixOf(context, innermost)) {
+        contexts.keySet().stream().max(Comparator.comparingInt(List::size)).orElseThrow();
+    for (Map.Entry<List<String>, String> context : contexts.entrySet()) {
+      if (!isPrefixOf(context.getKey(), innermost)) {
         throw new FatalAdapterException(
             AdapterErrorCode.NIFI_MAPPING_ERROR,
             "cannot map independent source arrays '"
-                + describe(context)
-                + "' and '"
+                + describe(context.getKey())
+                + "' (rule '"
+                + context.getValue()
+                + "') and '"
                 + describe(innermost)
-                + "' onto one target: their elements pair in no defined order");
+                + "' (rule '"
+                + contexts.get(innermost)
+                + "') onto one target: their elements pair in no defined order; map them in"
+                + " separate mapping nodes");
       }
     }
     return innermost;
   }
 
+  /**
+   * Rejects a source that reads a concrete array index inside the array the fan-out consumes.
+   * {@code ForkRecord} drops the forked array field from the record it emits, so the indexed path
+   * resolves against nothing and the rule writes NULL on every fanned-out record without failing.
+   */
+  private static void rejectIndexedReadsInsideFork(List<String> innermost, List<Read> reads)
+      throws FatalAdapterException {
+    List<String> forkedField = withoutSelectors(innermost);
+    for (Read read : reads) {
+      List<String> segments = withoutSelectors(parse(read.sourcePath()).segments());
+      if (parse(read.sourcePath()).hasArrayContext() || !isPrefixOf(forkedField, segments)) {
+        continue;
+      }
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_MAPPING_ERROR,
+          "source '"
+              + read.sourcePath()
+              + "' (rule '"
+              + read.targetPath()
+              + "') reads a fixed element of '"
+              + describe(innermost)
+              + "', the array the fan-out consumes: the fanned-out record no longer carries that"
+              + " array, so the rule would read nothing; map it in its own mapping node instead");
+    }
+  }
+
   /** Rejects two sources that read different payload fields but the same post-fork one. */
-  private void rejectCollidingSources(List<String> sourcePaths) throws FatalAdapterException {
+  private void rejectCollidingSources(List<Read> reads) throws FatalAdapterException {
     Map<String, String> originBySelection = new LinkedHashMap<>();
-    for (String sourcePath : sourcePaths) {
+    for (Read read : reads) {
+      String sourcePath = read.sourcePath();
       String selection = rewriteSource(parse(sourcePath));
       String collides = originBySelection.putIfAbsent(selection, sourcePath);
       if (collides != null && !collides.equals(sourcePath)) {
@@ -166,9 +205,10 @@ public record ForkPlan(String recordPath) {
    * which is why the segments below a path's innermost array are exactly what remains.
    *
    * <p>The copy is skipped where an element field and an ancestor field share a name: the element
-   * wins and the ancestor value is no longer reachable under any path. Reading both is therefore
-   * not expressible after a fan-out, and the element value is the defensible one — it is the more
-   * specific of the two.
+   * wins wherever it carries a value, and the ancestor value is then no longer reachable under any
+   * path. (Where the element field is null or absent, the ancestor's value is copied up after all.)
+   * Reading both is therefore not expressible after a fan-out, and the element value is the
+   * defensible one — it is the more specific of the two.
    *
    * @param source the parsed source path
    * @return the RecordPath to read after the fan-out
@@ -194,18 +234,44 @@ public record ForkPlan(String recordPath) {
     return "/" + String.join("/", segments.stream().map(ForkPlan::allElements).toList());
   }
 
+  /**
+   * Whether a rule reads at least one source from below an array — a value that varies per element
+   * rather than being shared by every record the fan-out produces.
+   *
+   * @param rule the rule's value node; a rule with no source at all (a literal) reads no element
+   */
+  public static boolean readsBelowTheArray(ValueNode rule) {
+    return switch (rule) {
+      case CopyNode copy -> {
+        try {
+          yield JsonPaths.parse(copy.sourcePath()).hasArrayContext();
+        } catch (IllegalArgumentException malformed) {
+          // Left for the compiler to reject with its own message rather than second-guessed here.
+          yield false;
+        }
+      }
+      case ConstNode ignored -> false;
+      case ConcatNode concat -> concat.inputs().stream().anyMatch(ForkPlan::readsBelowTheArray);
+      case ConvertNode convert -> readsBelowTheArray(convert.input());
+      case GeoPointNode geoPoint ->
+          readsBelowTheArray(geoPoint.lon()) || readsBelowTheArray(geoPoint.lat());
+    };
+  }
+
   private static void collectArrayContexts(
-      ValueNode node, Set<List<String>> contexts, List<String> sourcePaths)
+      String targetPath, ValueNode node, Map<List<String>, String> contexts, List<Read> reads)
       throws FatalAdapterException {
     switch (node) {
       case CopyNode copy -> {
-        sourcePaths.add(copy.sourcePath());
+        reads.add(new Read(targetPath, copy.sourcePath()));
         JsonPaths.ParsedPath path = parse(copy.sourcePath());
         if (path.hasArrayContext()) {
           if (path.suffixWithinArray().isEmpty()) {
             // The path stops at the array itself, so its elements are values rather than records.
             // ForkRecord's extract mode only emits RECORD elements and skips anything else without
-            // failing, which would deploy a healthy-looking flow that writes nothing at all.
+            // failing. This catches only the spelling that names the array: '$.temps[].value' also
+            // describes a scalar array and cannot be told apart without the declared source
+            // structure. The zero-record guard on the fork's output is the backstop for the rest.
             throw new FatalAdapterException(
                 AdapterErrorCode.NIFI_MAPPING_ERROR,
                 "cannot fan out source '"
@@ -213,21 +279,20 @@ public record ForkPlan(String recordPath) {
                     + "': it selects the array itself, so its elements carry no field to map; select"
                     + " a field below the array instead");
           }
-          contexts.add(path.arrayContext());
+          contexts.putIfAbsent(path.arrayContext(), targetPath);
         }
       }
-      case ConstNode ignored -> {
-        // a literal reads no source
-      }
+      case ConstNode ignored -> {}
       case ConcatNode concat -> {
         for (ValueNode input : concat.inputs()) {
-          collectArrayContexts(input, contexts, sourcePaths);
+          collectArrayContexts(targetPath, input, contexts, reads);
         }
       }
-      case ConvertNode convert -> collectArrayContexts(convert.input(), contexts, sourcePaths);
+      case ConvertNode convert ->
+          collectArrayContexts(targetPath, convert.input(), contexts, reads);
       case GeoPointNode geoPoint -> {
-        collectArrayContexts(geoPoint.lon(), contexts, sourcePaths);
-        collectArrayContexts(geoPoint.lat(), contexts, sourcePaths);
+        collectArrayContexts(targetPath, geoPoint.lon(), contexts, reads);
+        collectArrayContexts(targetPath, geoPoint.lat(), contexts, reads);
       }
     }
   }
@@ -237,7 +302,9 @@ public record ForkPlan(String recordPath) {
       return JsonPaths.parse(path);
     } catch (IllegalArgumentException e) {
       throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_MAPPING_ERROR, e, "invalid source CORE path '" + path + "'");
+          AdapterErrorCode.NIFI_MAPPING_ERROR,
+          e,
+          "invalid source CORE path '" + path + "': " + e.getMessage());
     }
   }
 
@@ -262,7 +329,16 @@ public record ForkPlan(String recordPath) {
     return segment.replace("[]", "[*]");
   }
 
+  /** Segments stripped of every selector, so {@code items[]} and {@code items[0]} compare equal. */
+  private static List<String> withoutSelectors(List<String> segments) {
+    return segments.stream().map(segment -> segment.replaceAll("\\[[^]]*]", "")).toList();
+  }
+
   private static String describe(List<String> context) {
     return "$." + String.join(".", context);
+  }
+
+  private static String quoted(List<String> paths) {
+    return paths.stream().map(path -> "'" + path + "'").collect(Collectors.joining(", "));
   }
 }

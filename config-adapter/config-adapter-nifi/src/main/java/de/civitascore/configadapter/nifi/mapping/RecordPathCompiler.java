@@ -161,7 +161,18 @@ public class RecordPathCompiler {
   private String renderCopy(CopyNode copy, JsonPaths.ParsedPath target, ForkPlan fork)
       throws FatalAdapterException {
     JsonPaths.ParsedPath source = parsePath(copy.sourcePath(), "source");
-    if (fork.required() && !target.hasArrayContext()) {
+    if (fork.required()) {
+      if (target.hasArrayContext()) {
+        // ForkPlan rejects this pairing before compilation: an in-place array target cannot share a
+        // mapping with a fan-out. Falling through would emit a relative '../field' against an
+        // already-flattened record — wrong output, no error.
+        throw reject(
+            "target '"
+                + target.recordPath()
+                + "' keeps an array level while the mapping fans out over '"
+                + fork.recordPath()
+                + "'");
+      }
       return fork.rewriteSource(source);
     }
     if (!source.hasArrayContext()) {
