@@ -199,6 +199,8 @@ export const LayerConfig = (props: LayerConfigProps) => {
                     required
                     disabled={isReadOnly}
                     formItemProps={wideField}
+                    maxLength={LAYER_TITLE_MAX_LENGTH}
+                    hasCharacterCount
                   />
                 </DetailsFieldContainer>
                 <DetailsFieldContainer className="border-b-0 py-2 pb-6">

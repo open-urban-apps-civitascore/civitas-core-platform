@@ -81,6 +81,7 @@ export const LayerFormSchema = z
       .string()
       .trim()
       .min(1, 'common.errors.required')
+      .max(LAYER_TITLE_MAX_LENGTH, 'datasets.overview.completion.apis.config.errors.layerName.tooLong')
       .regex(/^[A-Za-z0-9_-]*$/, 'common.errors.invalidCharacters')
       .regex(/^[^0-9]/, 'common.errors.mustNotStartWithNumber'),
     description: z

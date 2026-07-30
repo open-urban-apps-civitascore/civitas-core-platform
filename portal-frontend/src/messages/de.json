@@ -494,6 +494,9 @@
               },
               "title": {
                 "tooLong": "Titel darf maximal 80 Zeichen lang sein"
+              },
+              "layerName": {
+                "tooLong": "Technischer Name darf maximal 80 Zeichen lang sein"
               }
             }
           }
