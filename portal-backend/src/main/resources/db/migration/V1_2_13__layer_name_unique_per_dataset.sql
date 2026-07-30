@@ -9,15 +9,38 @@
 -- published anyway, so this surfaces the hidden conflict instead of cementing it. The id is used
 -- as the suffix because a counter could collide with a name already present in the dataset
 -- ('a' + 'a' both renamed to 'a-2' when 'a-2' exists). Truncated to fit VARCHAR(255).
-WITH ranked AS (SELECT id,
-                       ROW_NUMBER() OVER (PARTITION BY dataset_id, layer_name
-                           ORDER BY created_at, id) AS position
-                FROM layers)
-UPDATE layers l
-SET layer_name = LEFT(l.layer_name, 218) || '-' || REPLACE(l.id::TEXT, '-', '')
-FROM ranked
-WHERE l.id = ranked.id
-  AND ranked.position > 1;
+--
+-- Repeated because layer_name is free text: a dataset may already hold a row literally named
+-- 'roads-<id of the row being renamed>', so one pass can rename onto another existing name. The
+-- pass counter is part of the suffix so a rename always changes the name — without it a row whose
+-- name already has the target shape maps to itself, and the loop never converges.
+DO
+$$
+    DECLARE
+        renamed_rows BIGINT;
+    BEGIN
+        FOR pass IN 1..10
+            LOOP
+                WITH ranked AS (SELECT id,
+                                       ROW_NUMBER() OVER (PARTITION BY dataset_id, layer_name
+                                           ORDER BY created_at, id) AS position
+                                FROM layers)
+                UPDATE layers l
+                SET layer_name = LEFT(l.layer_name, 215)
+                    || '-' || pass || '-' || REPLACE(l.id::TEXT, '-', '')
+                FROM ranked
+                WHERE l.id = ranked.id
+                  AND ranked.position > 1;
+
+                GET DIAGNOSTICS renamed_rows = ROW_COUNT;
+                EXIT WHEN renamed_rows = 0;
+            END LOOP;
+
+        IF renamed_rows > 0 THEN
+            RAISE EXCEPTION 'layer name deduplication did not converge; % rows still duplicated', renamed_rows;
+        END IF;
+    END
+$$;
 
 ALTER TABLE layers
     DROP CONSTRAINT uk_layers_datasink_layer_name;
