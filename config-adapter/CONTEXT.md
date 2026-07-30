@@ -31,6 +31,16 @@ and instances unbounded (N mappings in a chain are legal). Each transform kind o
 node-payload parsing and its compiled contribution to the processor chain, behind the
 transform-node-type descriptor seam.
 
+**Chained mapping nodes are only shallowly supported.** Each node compiles in isolation,
+against the paths it was authored with — nothing derives the shape its predecessor actually
+emits, so a node's compilation cannot depend on what came before it. Two consequences worth
+knowing before extending this: the handover between neighbours is checked on declared
+structure URNs rather than on real shapes, and a node deriving a fan-out from its own source
+paths is blind to a fan-out an earlier node already applied (the array is gone from the
+record, so its `ForkRecord` fails loudly on the `failure` route). Carrying the emitted shape
+along the chain is the change that would fix these at the root; until then, treat a
+multi-node mapping chain as a thin path rather than a supported general case.
+
 ## Stage
 
 The deployable half of a source/sink/transform: binds resolved configuration at plan time

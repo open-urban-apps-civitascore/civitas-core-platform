@@ -95,6 +95,14 @@ public final class MappingNodeType implements TransformNodeType {
       units.add(compilation.mapping());
       return new Compilation(units, compilation.plan());
     }
+    // Each node compiles in isolation, against the paths it was authored with: nothing here derives
+    // the shape its predecessor emits. So a second node deriving its own fan-out is blind to one an
+    // earlier node already applied, and its ForkRecord targets an array the record has lost. That
+    // shape is unreachable while both nodes declare structure URNs — a node that fans out has no
+    // array target, so its declared target is flat and the handover rule forces the next node's
+    // source to be that flat structure — but nothing enforces it on the undeclared path. It fails
+    // loudly there (ClassCastException onto the failure route), so it is left to the chain-shape
+    // refactoring rather than papered over with a third rule saying what two already imply.
     for (MappingConfig config : mappingConfigs) {
       CompiledMapping compiled = recordPathCompiler.compile(config, sink.geometryEncoding());
       requireElementLevelKey(compiled, config, sinkSpec);
