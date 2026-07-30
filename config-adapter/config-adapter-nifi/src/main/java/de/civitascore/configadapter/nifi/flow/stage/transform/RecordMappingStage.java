@@ -80,7 +80,9 @@ public final class RecordMappingStage implements TransformStage {
     List<Processor> result = new ArrayList<>();
     List<Processor> failureSources = new ArrayList<>();
     if (mapping.fork().required()) {
-      result.add(buildFork(ctx));
+      Processor fork = buildFork(ctx);
+      result.add(fork);
+      failureSources.add(fork);
       Processor guard = buildForkGuard(ctx);
       result.add(guard);
       failureSources.add(guard);
@@ -106,7 +108,9 @@ public final class RecordMappingStage implements TransformStage {
    * snapshot stays byte-stable except for the fan-out itself.
    *
    * <p>Output leaves on {@code fork}, not {@code success} — {@code original} carries the unforked
-   * input and is auto-terminated by the fragment.
+   * input and is auto-terminated by the fragment. Its third relationship, {@code failure}, carries
+   * a FlowFile whose records the reader could not parse at all; the sink stage routes it to the
+   * error sink like any other failure source, which is also what keeps the processor valid.
    */
   private Processor buildFork(BuildContext ctx) throws FatalAdapterException {
     Processor fork =

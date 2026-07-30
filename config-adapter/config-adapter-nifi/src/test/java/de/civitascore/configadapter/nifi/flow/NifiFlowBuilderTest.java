@@ -215,6 +215,14 @@ class NifiFlowBuilderTest {
             .anyMatch(r -> "original".equals(r.asText())),
         "the unforked original must be auto-terminated");
 
+    // ForkRecord's third relationship. Left neither connected nor auto-terminated, the processor is
+    // INVALID and NiFi silently never runs it, so every deploy of a fan-out flow fails.
+    assertFalse(autoTerminates(fork, "failure"), "the fork must not auto-terminate failure");
+    assertEquals(
+        component(flow, "processors", "LogMessage").get("identifier").asText(),
+        destinationOf(flow, fork.get("identifier").asText(), "failure"),
+        "an unreadable FlowFile must reach the error sink");
+
     // Selected by strategy, not by first-match: the fixture mixes a const rule with copies, so the
     // flow holds a literal-value AND a record-path-value UpdateRecord and the fork feeds the
     // latter.
