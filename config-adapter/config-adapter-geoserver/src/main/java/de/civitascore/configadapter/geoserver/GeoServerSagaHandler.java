@@ -310,7 +310,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     for (Map<String, Object> current : readCurrentFeatureTypes(workspaceName, datastoreName)) {
       String name = (String) current.get("name");
       if (name != null && !previousNames.contains(name)) {
-        deleteFeatureType(workspaceName, datastoreName, name);
+        deleteFeatureType(workspaceName, datastoreName, name, "RESTORE_WORKSPACE");
       }
     }
 
@@ -481,7 +481,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * Iterates the command's {@code layers}, provisioning a GeoServer feature type for each. The
    * native PostGIS table is taken from the layer's {@code nativeName}, falling back to the first
    * {@code POSTGIS} data sink's {@code tableName}, then to the layer name. When {@code upsert} is
-   * true an existing feature type is updated (used by {@code UPDATE_WORKSPACE}); otherwise an
+   * true an existing feature type is updated and feature types absent from the command are removed
+   * (used by {@code UPDATE_WORKSPACE}, which carries the dataset's full layer set); otherwise an
    * existing feature type is left unchanged (idempotent provisioning).
    */
   private void processLayers(
@@ -537,6 +538,37 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       }
       if ((defaultStyle != null && !defaultStyle.isBlank()) || !alternativeStyles.isEmpty()) {
         assignLayerStyles(workspaceName, layerName, defaultStyle, alternativeStyles);
+      }
+    }
+    if (upsert) {
+      pruneFeatureTypesAbsentFrom(workspaceName, datastoreName, layers);
+    }
+  }
+
+  /**
+   * Removes published feature types the command no longer asks for. Publishing alone is additive,
+   * so a layer deleted in the portal would otherwise stay served until the whole workspace is
+   * dropped.
+   *
+   * <p>Only safe where the command carries the dataset's complete layer set — {@code
+   * UPDATE_WORKSPACE} does, the create path does not (it is gated on {@code hasLayers} and would
+   * read an empty list as "remove everything").
+   */
+  private void pruneFeatureTypesAbsentFrom(
+      String workspaceName, String datastoreName, List<Map<String, Object>> layers) {
+    Set<String> desired =
+        layers.stream()
+            .map(layer -> stringValue(layer, "layerName"))
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    for (Map<String, Object> current : readCurrentFeatureTypes(workspaceName, datastoreName)) {
+      String name = (String) current.get("name");
+      if (name != null && !desired.contains(name)) {
+        deleteFeatureType(workspaceName, datastoreName, name, "UPDATE_WORKSPACE");
+        log.info(
+            "GeoServer feature type pruned: workspaceName={}, featureType={}",
+            Encode.forJava(workspaceName),
+            Encode.forJava(name));
       }
     }
   }
@@ -1010,8 +1042,13 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     return names;
   }
 
-  /** Deletes a feature type recursively (its implicitly published layer is removed too). */
-  private void deleteFeatureType(String workspaceName, String datastoreName, String ftName) {
+  /**
+   * Deletes a feature type recursively (its implicitly published layer is removed too). {@code
+   * step} names the calling saga step so a failure is attributable — the same delete serves
+   * compensation and reconciliation.
+   */
+  private void deleteFeatureType(
+      String workspaceName, String datastoreName, String ftName, String step) {
     requireSafeName(ftName, "featureType name");
     try (Response response =
         auth.apply(
@@ -1023,7 +1060,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
             .delete()) {
       int status = response.getStatus();
       if (status != 200 && status != 404) {
-        checkResponse(response, "RESTORE_WORKSPACE/delete-featuretype/" + ftName);
+        checkResponse(response, step + "/delete-featuretype/" + ftName);
       }
     }
   }
