@@ -1,0 +1,68 @@
+{
+  "name": "fan-out",
+  "comments": "",
+  "position": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "type": "org.apache.nifi.processors.standard.ForkRecord",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-standard-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "Record Reader": "${CS:JsonTreeReader}",
+    "Record Writer": "${CS:JsonRecordSetWriter}",
+    "Mode": "extract",
+    "Include Parent Fields": "true"
+  },
+  "propertyDescriptors": {
+    "Record Reader": {
+      "name": "Record Reader",
+      "displayName": "Record Reader",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Record Writer": {
+      "name": "Record Writer",
+      "displayName": "Record Writer",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Mode": {
+      "name": "Mode",
+      "displayName": "Mode",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Include Parent Fields": {
+      "name": "Include Parent Fields",
+      "displayName": "Include Parent Fields",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "style": {},
+  "schedulingPeriod": "0 sec",
+  "schedulingStrategy": "TIMER_DRIVEN",
+  "executionNode": "ALL",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "autoTerminatedRelationships": [
+    "original"
+  ],
+  "scheduledState": "ENABLED",
+  "retryCount": 10,
+  "retriedRelationships": [],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins",
+  "componentType": "PROCESSOR"
+}
