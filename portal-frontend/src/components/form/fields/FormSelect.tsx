@@ -21,6 +21,7 @@ export interface AccessibleSelectProps<T extends FieldValues> {
   required?: boolean
   // eslint-disable-next-line react/boolean-prop-naming
   disabled?: boolean
+  hasPlaceholderWhenDisabled?: boolean
   selectTriggerProps?: SelectTriggerProps
   onChange?: (value: string) => void
   formItemProps?: DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>
@@ -36,6 +37,7 @@ export const FormSelect = <T extends FieldValues>(props: AccessibleSelectProps<T
     name,
     required = false,
     disabled = false,
+    hasPlaceholderWhenDisabled = false,
     selectTriggerProps,
     onChange,
     formItemProps,
@@ -78,7 +80,7 @@ export const FormSelect = <T extends FieldValues>(props: AccessibleSelectProps<T
                 )}
                 disabled={disabled}
               >
-                <SelectValue placeholder={disabled ? undefined : placeholder} />
+                <SelectValue placeholder={disabled && !hasPlaceholderWhenDisabled ? undefined : placeholder} />
               </SelectTrigger>
               <SelectContent data-testid={`${name}SelectContent`}>
                 {placeholder && (

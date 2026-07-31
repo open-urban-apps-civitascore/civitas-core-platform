@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { toast } from 'sonner'
 import { vi } from 'vitest'
+
+import { usePermissions } from '@/hooks/use-permissions'
 
 import { DatasetCreateForm } from './DatasetCreateForm'
 
@@ -40,6 +42,19 @@ vi.mock('@/contexts/unsaved-changes/UnsavedChangesContext', () => ({
   }),
 }))
 
+vi.mock('@/hooks/use-permissions', () => ({
+  usePermissions: vi.fn(),
+}))
+
+const mockCanReadDatapools = (canRead: boolean) => {
+  vi.mocked(usePermissions).mockReturnValue({
+    hasPermission: vi.fn().mockReturnValue(canRead),
+    hasPermissionInScope: vi.fn(),
+    hasAnyPermission: vi.fn(),
+    hasScopedPermission: vi.fn(),
+  })
+}
+
 const setup = () => {
   const client = new QueryClient()
   return render(
@@ -54,6 +69,7 @@ describe('DatasetCreateForm', () => {
     vi.clearAllMocks()
     mockSearchParams = new URLSearchParams('page=1')
     mockMutateAsync.mockResolvedValue({ data: { id: 'test-id-123' } })
+    mockCanReadDatapools(true)
   })
 
   test('renders the form with correct elements', () => {
@@ -139,37 +155,25 @@ describe('DatasetCreateForm', () => {
   })
 
   describe('Datapool select', () => {
-    test('does not render the datapool select without URL params', () => {
+    test('renders the datapool select', () => {
       setup()
-      expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
-    })
-
-    test('renders the datapool select when only datapoolId param is set', () => {
-      mockSearchParams = new URLSearchParams('datapoolId=dp-42')
-      const client = new QueryClient()
-      render(
-        <QueryClientProvider client={client}>
-          <DatasetCreateForm datapoolOptions={[{ value: 'dp-42', label: 'Datapool 42' }]} />
-        </QueryClientProvider>,
-      )
       expect(screen.getByRole('combobox')).toBeInTheDocument()
     })
 
-    test('does not render the datapool select when only source=datapools param is set', () => {
-      mockSearchParams = new URLSearchParams('source=datapools')
+    test('is enabled and shows the placeholder when the user can read datapools', () => {
+      mockCanReadDatapools(true)
       setup()
-      expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+      const trigger = screen.getByRole('combobox')
+      expect(trigger).toBeEnabled()
+      expect(within(trigger).getByText('form.datapoolSelectPlaceholder')).toBeInTheDocument()
     })
 
-    test('renders the datapool select when datapoolId and source=datapools are set', () => {
-      mockSearchParams = new URLSearchParams('datapoolId=dp-42&source=datapools')
-      const client = new QueryClient()
-      render(
-        <QueryClientProvider client={client}>
-          <DatasetCreateForm datapoolOptions={[{ value: 'dp-42', label: 'Datapool 42' }]} />
-        </QueryClientProvider>,
-      )
-      expect(screen.getByRole('combobox')).toBeInTheDocument()
+    test('is disabled and shows notAvailable when the user cannot read datapools', () => {
+      mockCanReadDatapools(false)
+      setup()
+      const trigger = screen.getByRole('combobox')
+      expect(trigger).toBeDisabled()
+      expect(within(trigger).getByText('info.notAvailable')).toBeInTheDocument()
     })
 
     test('prefills the datapool select with the datapoolId from URL params', () => {
