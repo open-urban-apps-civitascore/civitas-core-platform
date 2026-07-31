@@ -281,7 +281,15 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     boolean hasOwsApi =
         entity.getNamedApis().stream().anyMatch(api -> api.getStandard() == ApiStandard.OWS);
     if (!hasOwsApi) {
-      layerRepository.deleteByDataSetId(entity.getId());
+      int removed = layerRepository.deleteByDataSetId(entity.getId());
+      if (removed > 0) {
+        // The response is an ordinary 200 on the dataset, so without this the layer rows are gone
+        // with no record of it anywhere.
+        log.info(
+            "Removed {} layer(s) of dataset {}: no OWS named API left to serve them",
+            removed,
+            entity.getId());
+      }
     }
   }
 
@@ -698,10 +706,14 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   /**
    * Deletes a dataset. An AVAILABLE dataset must be unreleased first — its ingest and consumer
-   * access are still live, so it cannot be deleted directly. Otherwise: a dataset with no
-   * infrastructure behind it is removed immediately, and one that still holds provisioned
-   * infrastructure from a prior release goes through a DATASET_DELETE saga that tears it down; the
-   * entity is removed once the saga completes (see {@link #handleSagaCompleted}).
+   * access are still live, so it cannot be deleted directly. Otherwise: a dataset that was never
+   * released is removed immediately, and one that still holds provisioned infrastructure from a
+   * prior release goes through a DATASET_DELETE saga that tears it down; the entity is removed once
+   * the saga completes (see {@link #handleSagaCompleted}).
+   *
+   * <p>{@code provisioned} is the discriminator because a release always runs {@code
+   * create-project} and thereby sets it. Keying on a configured sink instead would route a
+   * never-released dataset into the saga, whose teardown steps have no infrastructure to address.
    */
   @Override
   @Transactional
@@ -715,7 +727,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "Cannot delete an AVAILABLE dataset. Unrelease it first (POST /datasets/{id}/unrelease)");
     }
 
-    if (!hasProvisionedInfrastructure(dataSet)) {
+    if (!dataSet.isProvisioned()) {
       deleteWithSinks(dataSet);
       return;
     }
@@ -731,19 +743,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     DataSet saved = dataSetRepository.save(dataSet);
 
     sagaPublisher.publishDeleteRequested(saved);
-  }
-
-  /**
-   * Whether a teardown saga has anything to do. {@code provisioned} tracks only the FROST {@code
-   * projectId}, so a dataset whose only sink is POSTGIS never sets it, yet owns a PostGIS schema
-   * and a GeoServer workspace — the direct path would strand both with no dataset left to reclaim
-   * them.
-   *
-   * <p>An unreleased dataset still counts: its teardown keeps the sink, so the workspace and tables
-   * outlive it.
-   */
-  private boolean hasProvisionedInfrastructure(DataSet dataSet) {
-    return dataSet.isProvisioned() || hasPostgisSink(dataSet);
   }
 
   /**

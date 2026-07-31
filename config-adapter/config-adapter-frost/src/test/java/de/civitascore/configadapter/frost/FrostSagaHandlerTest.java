@@ -590,6 +590,25 @@ class FrostSagaHandlerTest {
     }
 
     @Test
+    @DisplayName("succeeds without touching FROST when the dataset has no project")
+    void shouldSucceedWhenNoProjectWasProvisioned() {
+      try (FrostSagaHandler handler = createHandler()) {
+        // A dataset that never reached a release carries no projectId, and this step is not gated
+        // on
+        // one. Demanding it failed the teardown of a dataset that owns no FROST project — leaving
+        // the row behind, with every retry repeating the same failure.
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("datasetId", "ds-1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertNull(result.error());
+        verify(mockBuilder, never()).delete();
+      }
+    }
+
+    @Test
     @DisplayName("deletes the project's Things in one batch request before deleting the project")
     void shouldDeleteThingsBeforeProject() {
       try (FrostSagaHandler handler = createHandler()) {

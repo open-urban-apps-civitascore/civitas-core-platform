@@ -1696,17 +1696,12 @@ class DataSetServiceTest {
   class DeleteByIdTests {
 
     @Test
-    @DisplayName("routes a PostGIS-only dataset through the saga even though provisioned is false")
-    void routesPostgisOnlyDatasetThroughSaga() {
-      // provisioned tracks the FROST projectId, so a dataset whose only sink is POSTGIS never sets
-      // it — yet it owns a PostGIS schema and a GeoServer workspace. The direct path would strand
-      // both with no dataset left to reclaim them.
+    @DisplayName("routes a released dataset through the teardown saga")
+    void routesReleasedDatasetThroughSaga() {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
-      ds.setProvisioned(false);
+      ds.setProvisioned(true);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
-      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
-          .thenReturn(true);
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       createService().deleteById(id);
@@ -1717,14 +1712,16 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("removes a dataset with no infrastructure directly, without a saga")
-    void removesBareDatasetDirectly() {
+    @DisplayName(
+        "removes a never-released dataset directly, even when it configures a PostGIS sink")
+    void removesNeverReleasedPostgisDatasetDirectly() {
+      // A sink row exists from the moment it is configured, long before anything is provisioned.
+      // Routing on it would hand the saga a dataset with no projectId, failing its teardown and
+      // leaving the row behind with every retry repeating the failure.
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
       ds.setProvisioned(false);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
-      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
-          .thenReturn(false);
       when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of());
 
       createService().deleteById(id);

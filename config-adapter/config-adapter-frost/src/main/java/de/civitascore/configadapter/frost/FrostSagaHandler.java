@@ -344,8 +344,20 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleDeleteProject(SagaCommandMessage command) {
-    String projectId = requireString(command, KEY_PROJECT_ID);
     boolean compensating = "COMPENSATE_STEP".equals(command.type());
+
+    // No project id is the same goal state as the 404 below: there is nothing to delete. A dataset
+    // that never reached a release has none, and this step is not gated on one — demanding it here
+    // would fail the teardown of a dataset that owns no FROST project at all.
+    if (!(command.payload().get(KEY_PROJECT_ID) instanceof String projectId)
+        || projectId.isBlank()) {
+      log.info(
+          "DELETE_PROJECT: no project provisioned for this dataset — nothing to delete. saga={}",
+          Encode.forJava(command.sagaId()));
+      return compensating
+          ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
+          : SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
+    }
 
     // created=false marks a reused, data-bearing project; deleting it as a CREATE_PROJECT
     // compensation would destroy the storage re-release reuses. Forward deletes omit the flag.
