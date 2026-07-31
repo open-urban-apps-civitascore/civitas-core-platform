@@ -580,6 +580,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       return;
     }
 
+    warnAboutStaleFeatureTypes(datasetId, result);
+
     switch (pendingType) {
       case CREATE -> {
         applyInfrastructureResult(dataSet, result);
@@ -692,6 +694,21 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
+   * A saga reports feature types it could not unpublish. They keep being served for layers the
+   * dataset no longer has, and no portal query can find them — the layer table is already correct.
+   */
+  private void warnAboutStaleFeatureTypes(UUID datasetId, SagaResultPayload result) {
+    if (result.staleFeatureTypes() == null || result.staleFeatureTypes().isEmpty()) {
+      return;
+    }
+    log.warn(
+        "Dataset {} still serves {} feature type(s) for removed layers: {}",
+        datasetId,
+        result.staleFeatureTypes().size(),
+        Encode.forJava(String.join(", ", result.staleFeatureTypes())));
+  }
+
+  /**
    * Logs a teardown-saga failure. An uncompensated failure is confirmed leaked infrastructure, not
    * a transient — signal it at ERROR so it is not lost among ordinary warnings.
    */
@@ -711,9 +728,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * prior release goes through a DATASET_DELETE saga that tears it down; the entity is removed once
    * the saga completes (see {@link #handleSagaCompleted}).
    *
-   * <p>{@code provisioned} is the discriminator because a release always runs {@code
-   * create-project} and thereby sets it. Keying on a configured sink instead would route a
-   * never-released dataset into the saga, whose teardown steps have no infrastructure to address.
+   * <p>{@code provisioned} is the discriminator: a release always runs the unconditional {@code
+   * create-project} step and thereby sets it.
    */
   @Override
   @Transactional

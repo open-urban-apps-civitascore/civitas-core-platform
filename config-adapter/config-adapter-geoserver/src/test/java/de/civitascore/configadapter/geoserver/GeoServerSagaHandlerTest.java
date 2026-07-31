@@ -1324,9 +1324,8 @@ class GeoServerSagaHandlerTest {
     @Test
     void updateWorkspaceLeavesStaleFeatureTypesToThePruneStep() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        // Deleting inside UPDATE_WORKSPACE would sit in the compensable window, where a later
-        // step's
-        // failure triggers a RESTORE_WORKSPACE that cannot bring a deleted feature type back.
+        // A delete here would sit in the compensable window, where RESTORE_WORKSPACE cannot undo
+        // it.
         Response snapshot = snapshotResponse("t1", "removed_layer");
         when(mockBuilder.get()).thenReturn(snapshot);
         Response conflict = mock(Response.class);
@@ -1371,9 +1370,8 @@ class GeoServerSagaHandlerTest {
     @Test
     void updatesFeatureTypeWhenGeoServerReportsTheConflictAsHttp500() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        // 409 is not among the status codes GeoServer's REST API documents; an existing resource
-        // also surfaces as a 500 whose body says so. Failing on it would break every metadata edit
-        // on a released dataset with layers, since an update re-publishes all of them.
+        // Otherwise every metadata edit on a released dataset with layers fails, since an update
+        // re-publishes all of them.
         Response snapshot = snapshotResponse("t1");
         when(mockBuilder.get()).thenReturn(snapshot);
         Response conflict = mock(Response.class);
@@ -1462,11 +1460,32 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void reportsFeatureTypesItCouldNotUnpublishAndPrunesTheRest() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // Failing the step would report an applied update as failed; staying silent would leave the
+        // layer served with nothing in the portal able to see it.
+        Response snapshot = snapshotResponse("t1", "stuck", "removable");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response locked = mock(Response.class);
+        when(locked.getStatus()).thenReturn(500);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(locked, ok);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "PRUNE_FEATURE_TYPES", updatePayload("t1")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(List.of("stuck"), result.resultData().get("staleFeatureTypes"));
+        verify(mockBuilder, times(2)).delete();
+      }
+    }
+
+    @Test
     void prunesEveryFeatureTypeWhenTheDatasetHasNoLayersLeft() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        // An absent layers field means the dataset has no layers, not "unknown" — the portal builds
-        // it from the full layer set. This is also what clears feature types whose layer rows were
-        // orphaned before the portal began removing them, so an empty set must not be skipped.
+        // An empty desired set must prune, not be treated as "unknown" and skipped.
         Response snapshot = snapshotResponse("t1", "t2");
         when(mockBuilder.get()).thenReturn(snapshot);
         Response ok = mock(Response.class);
