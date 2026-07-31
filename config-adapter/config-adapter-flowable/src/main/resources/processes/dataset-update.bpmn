@@ -399,17 +399,16 @@
           <dc:Bounds height="14.0" width="19.0" x="911.0" y="176.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_11" bpmnElement="flow-gateway-skip" sourceElement="BPMNShape_ExclusiveGateway_2" targetElement="BPMNShape_ServiceTask_8">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_11" bpmnElement="flow-gateway-skip" sourceElement="BPMNShape_ExclusiveGateway_2" targetElement="BPMNShape_ExclusiveGateway_3">
         <di:waypoint xsi:type="dc:Point" x="870.0" y="150.0"/>
         <di:waypoint xsi:type="dc:Point" x="870.0" y="140.0"/>
         <di:waypoint xsi:type="dc:Point" x="1124.0" y="140.0"/>
         <di:waypoint xsi:type="dc:Point" x="1124.0" y="150.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1144.0" y="166.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_25">
           <dc:Bounds height="14.0" width="14.0" x="1009.0" y="141.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_12" bpmnElement="flow-pipeline-success" sourceElement="BPMNShape_ServiceTask_4" targetElement="BPMNShape_ServiceTask_8">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_12" bpmnElement="flow-pipeline-success" sourceElement="BPMNShape_ServiceTask_4" targetElement="BPMNShape_ExclusiveGateway_3">
         <di:waypoint xsi:type="dc:Point" x="1054.0" y="175.0"/>
         <di:waypoint xsi:type="dc:Point" x="1076.0" y="175.0"/>
         <di:waypoint xsi:type="dc:Point" x="1099.0" y="175.0"/>
