@@ -39,7 +39,7 @@ $$
 
         -- The loop's last ROW_COUNT says nothing about the outcome: a pass that renames rows may be
         -- the one that resolves the last collision, and one that renames none may have started from
-        -- a clean table. Only the constraint about to be added can decide.
+        -- a clean table.
         SELECT count(*)
         INTO duplicate_groups
         FROM (SELECT 1 FROM layers GROUP BY dataset_id, layer_name HAVING count(*) > 1) d;

@@ -1716,12 +1716,13 @@ class DataSetServiceTest {
         "removes a never-released dataset directly, even when it configures a PostGIS sink")
     void removesNeverReleasedPostgisDatasetDirectly() {
       // A sink row exists from the moment it is configured, long before anything is provisioned.
-      // Routing on it would hand the saga a dataset with no projectId, failing its teardown and
-      // leaving the row behind with every retry repeating the failure.
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
       ds.setProvisioned(false);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      lenient()
+          .when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
+          .thenReturn(true);
       when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of());
 
       createService().deleteById(id);

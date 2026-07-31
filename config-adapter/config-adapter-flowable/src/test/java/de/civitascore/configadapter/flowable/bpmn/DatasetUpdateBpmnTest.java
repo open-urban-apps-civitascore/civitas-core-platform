@@ -277,9 +277,6 @@ class DatasetUpdateBpmnTest {
     FlowableTestSupport.assertProcessCompleted(historyService, processInstanceId);
   }
 
-  /**
-   * The result-publishing tasks the run passed through — the only place success and failure differ.
-   */
   private List<String> publishTaskIds(String processInstanceId) {
     return historyService
         .createHistoricActivityInstanceQuery()

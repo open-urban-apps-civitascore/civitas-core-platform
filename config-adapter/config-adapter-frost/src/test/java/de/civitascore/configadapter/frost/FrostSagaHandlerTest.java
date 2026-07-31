@@ -593,10 +593,8 @@ class FrostSagaHandlerTest {
     @DisplayName("succeeds without touching FROST when the dataset has no project")
     void shouldSucceedWhenNoProjectWasProvisioned() {
       try (FrostSagaHandler handler = createHandler()) {
-        // A dataset that never reached a release carries no projectId, and this step is not gated
-        // on
-        // one. Demanding it failed the teardown of a dataset that owns no FROST project — leaving
-        // the row behind, with every retry repeating the same failure.
+        // Without this, the delete saga strands the dataset row and every retry repeats the
+        // failure.
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("datasetId", "ds-1"));
 
