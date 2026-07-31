@@ -1,6 +1,7 @@
 package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
@@ -18,6 +19,7 @@ import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataPool;
@@ -30,6 +32,7 @@ import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
@@ -42,6 +45,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -59,6 +63,7 @@ class DataSetServiceTest {
 
   @Mock private DataSetRepository dataSetRepository;
   @Mock private DataSinkRepository dataSinkRepository;
+  @Mock private LayerRepository layerRepository;
   @Mock private DataSetMapper dataSetMapper;
   @Mock private DataPoolRepository dataPoolRepository;
   @Mock private AssignmentFactory assignmentFactory;
@@ -74,6 +79,7 @@ class DataSetServiceTest {
     return new DataSetService(
         dataSetRepository,
         dataSinkRepository,
+        layerRepository,
         dataSetMapper,
         dataPoolRepository,
         assignmentFactory,
@@ -315,6 +321,61 @@ class DataSetServiceTest {
 
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
       assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.CREATE);
+      verify(sagaPublisher).publishCreateRequested(result);
+    }
+
+    @Test
+    @DisplayName("rejects layers with no OWS named API to serve them")
+    void rejectsLayersWithoutOwsApi() {
+      // Layers and the OWS route are gated independently downstream, so this would provision
+      // feature types that no route can reach and still report the release successful.
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      when(layerRepository.existsByDataSetId(id)).thenReturn(true);
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("no OWS named API");
+
+      verify(sagaPublisher, never()).publishCreateRequested(any());
+    }
+
+    @Test
+    @DisplayName("rejects an OWS named API with no POSTGIS sink behind it")
+    void rejectsOwsApiWithoutPostgisSink() {
+      // The route would rewrite to a workspace that is only provisioned when a POSTGIS sink
+      // exists — without one the published endpoint 404s.
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.getNamedApis().forEach(api -> api.setStandard(ApiStandard.OWS));
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      when(layerRepository.existsByDataSetId(id)).thenReturn(false);
+      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
+          .thenReturn(false);
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("no POSTGIS data sink");
+
+      verify(sagaPublisher, never()).publishCreateRequested(any());
+    }
+
+    @Test
+    @DisplayName("releases layers served by an OWS named API backed by a POSTGIS sink")
+    void releasesCompleteMapSurface() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.getNamedApis().forEach(api -> api.setStandard(ApiStandard.OWS));
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      when(layerRepository.existsByDataSetId(id)).thenReturn(true);
+      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
+          .thenReturn(true);
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet result = createService().release(id);
+
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
       verify(sagaPublisher).publishCreateRequested(result);
     }
   }
@@ -640,6 +701,55 @@ class DataSetServiceTest {
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Duplicate named-API slug")
           .hasMessageContaining("traffic");
+    }
+
+    @Test
+    @DisplayName("rejects a second OWS named API on the same dataset")
+    void rejectsSecondOwsNamedApi() {
+      DataSet entity = new DataSet();
+      NamedApiInputDTO maps = new NamedApiInputDTO();
+      maps.setName("Maps");
+      maps.setSlug("maps");
+      maps.setStandard(ApiStandard.OWS);
+      NamedApiInputDTO alias = new NamedApiInputDTO();
+      alias.setName("Maps Alias");
+      alias.setSlug("maps-alias");
+      alias.setStandard(ApiStandard.OWS);
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(List.of(maps, alias));
+
+      assertThatThrownBy(() -> createService().postConvertToEntity(entity, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("at most one OWS named API");
+    }
+
+    @Test
+    @DisplayName("accepts one OWS named API alongside other standards")
+    void acceptsOneOwsApiWithOtherStandards() {
+      DataSet entity = new DataSet();
+      NamedApiInputDTO maps = new NamedApiInputDTO();
+      maps.setName("Maps");
+      maps.setSlug("maps");
+      maps.setStandard(ApiStandard.OWS);
+      NamedApiInputDTO sensors = new NamedApiInputDTO();
+      sensors.setName("Sensors");
+      sensors.setSlug("sensors");
+      sensors.setStandard(ApiStandard.STA);
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(List.of(maps, sensors));
+      when(dataSetMapper.toNamedApiEntity(any()))
+          .thenAnswer(
+              inv -> {
+                NamedApiInputDTO dto = inv.getArgument(0);
+                NamedApi api = new NamedApi();
+                api.setName(dto.getName());
+                api.setSlug(dto.getSlug());
+                api.setStandard(dto.getStandard());
+                return api;
+              });
+
+      assertThatCode(() -> createService().postConvertToEntity(entity, input))
+          .doesNotThrowAnyException();
     }
 
     @Test
@@ -1578,6 +1688,155 @@ class DataSetServiceTest {
 
       DataSet result = createService().postConvertToEntity(entity, input);
       assertThat(result.getDataPool()).isSameAs(pool);
+    }
+  }
+
+  @Nested
+  @DisplayName("deleteById() — teardown routing")
+  class DeleteByIdTests {
+
+    @Test
+    @DisplayName("routes a released dataset through the teardown saga")
+    void routesReleasedDatasetThroughSaga() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setProvisioned(true);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().deleteById(id);
+
+      assertThat(ds.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
+      verify(sagaPublisher).publishDeleteRequested(ds);
+      verify(dataSetRepository, never()).delete(any(DataSet.class));
+    }
+
+    @Test
+    @DisplayName(
+        "removes a never-released dataset directly, even when it configures a PostGIS sink")
+    void removesNeverReleasedPostgisDatasetDirectly() {
+      // A sink row exists from the moment it is configured, long before anything is provisioned.
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setProvisioned(false);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      lenient()
+          .when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
+          .thenReturn(true);
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of());
+
+      createService().deleteById(id);
+
+      verify(dataSetRepository).delete(ds);
+      verify(sagaPublisher, never()).publishDeleteRequested(any());
+    }
+  }
+
+  @Nested
+  @DisplayName("orphaned-layer cleanup on namedApis reconciliation")
+  class OwsLayerCleanupTests {
+
+    @BeforeEach
+    void mapIncomingApis() {
+      // Every case here adds at least one slug the entity does not carry yet, which routes through
+      // the mapper.
+      lenient()
+          .when(dataSetMapper.toNamedApiEntity(any()))
+          .thenAnswer(
+              inv -> {
+                NamedApiInputDTO dto = inv.getArgument(0);
+                return NamedApi.builder()
+                    .name(dto.getName())
+                    .slug(dto.getSlug())
+                    .standard(dto.getStandard())
+                    .build();
+              });
+    }
+
+    private DataSetInputDTO inputWithApis(NamedApiInputDTO... apis) {
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(List.of(apis));
+      return input;
+    }
+
+    private NamedApiInputDTO api(String slug, ApiStandard standard) {
+      NamedApiInputDTO dto = new NamedApiInputDTO();
+      dto.setName(slug);
+      dto.setSlug(slug);
+      dto.setStandard(standard);
+      return dto;
+    }
+
+    /** A persisted dataset already exposing one OWS named API, as the update path sees it. */
+    private DataSet persistedWithOwsApi(UUID id) {
+      DataSet entity = new DataSet();
+      entity.setId(id);
+      entity.setNamedApis(
+          new HashSet<>(
+              Set.of(
+                  NamedApi.builder().name("Maps").slug("maps").standard(ApiStandard.OWS).build())));
+      return entity;
+    }
+
+    @Test
+    @DisplayName("deletes the layers when the reconciled state has no OWS named API left")
+    void deletesLayersWhenNoOwsApiRemains() {
+      UUID id = UUID.randomUUID();
+      DataSet entity = persistedWithOwsApi(id);
+
+      createService().postConvertToEntity(entity, inputWithApis(api("sensors", ApiStandard.STA)));
+
+      verify(layerRepository).deleteByDataSetId(id);
+    }
+
+    @Test
+    @DisplayName("deletes the layers of a dataset that never had an OWS named API")
+    void deletesLayersWhenNoOwsApiEverExisted() {
+      // Keying on a disappeared OWS entry instead would leave these layers unserved indefinitely.
+      UUID id = UUID.randomUUID();
+      DataSet entity = new DataSet();
+      entity.setId(id);
+      entity.setNamedApis(new HashSet<>());
+
+      createService().postConvertToEntity(entity, inputWithApis(api("sensors", ApiStandard.STA)));
+
+      verify(layerRepository).deleteByDataSetId(id);
+    }
+
+    @Test
+    @DisplayName("keeps the layers while an OWS named API remains")
+    void keepsLayersWhileOwsApiRemains() {
+      UUID id = UUID.randomUUID();
+      DataSet entity = persistedWithOwsApi(id);
+
+      createService()
+          .postConvertToEntity(
+              entity, inputWithApis(api("maps", ApiStandard.OWS), api("sensors", ApiStandard.STA)));
+
+      verify(layerRepository, never()).deleteByDataSetId(any());
+    }
+
+    @Test
+    @DisplayName("keeps the layers when the OWS named API is replaced by a differently-slugged one")
+    void keepsLayersWhenOwsApiIsReslugged() {
+      // The remove+add of the row must not read as "no OWS API left" — the cleanup keys on the
+      // reconciled state, not on the removed entry.
+      UUID id = UUID.randomUUID();
+      DataSet entity = persistedWithOwsApi(id);
+
+      createService().postConvertToEntity(entity, inputWithApis(api("maps-v2", ApiStandard.OWS)));
+
+      verify(layerRepository, never()).deleteByDataSetId(any());
+    }
+
+    @Test
+    @DisplayName("does not touch layers on create, where the dataset has no id yet")
+    void skipsCleanupOnCreate() {
+      // A create cannot have orphaned anything, and deleteByDataSetId(null) would be meaningless.
+      createService()
+          .postConvertToEntity(new DataSet(), inputWithApis(api("sensors", ApiStandard.STA)));
+
+      verify(layerRepository, never()).deleteByDataSetId(any());
     }
   }
 }
