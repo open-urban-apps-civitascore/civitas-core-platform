@@ -273,6 +273,35 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void provisionLayersAcceptsAnAlreadyPublishedFeatureTypeReportedAsHttp500() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // A re-release republishes the feature types the unrelease left behind. Failing on them
+        // makes provision-layers compensate, which drops the workspace and the PostGIS schema the
+        // sink-preserving unrelease kept the data in.
+        Response snapshot = snapshotResponse("traffic_counts");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response duplicate = mock(Response.class);
+        when(duplicate.getStatus()).thenReturn(500);
+        when(duplicate.readEntity(String.class))
+            .thenReturn("Resource named 'traffic_counts' already exists in store: 'ds'");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(duplicate);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "layers",
+                        List.of(Map.of("layerName", "traffic_counts", "crs", "EPSG:4326")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+      }
+    }
+
+    @Test
     void failsWhenLayerMissingLayerName() {
       try (GeoServerSagaHandler handler = createHandler()) {
         // A requested layer without a layerName can't be published — the step must fail rather than
@@ -1241,10 +1270,11 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void deletesPublishedFeatureTypeTheUpdateNoLongerAsksFor() {
+    void updateWorkspaceLeavesStaleFeatureTypesToThePruneStep() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        // The workspace still serves a layer the portal has deleted; publishing alone is additive,
-        // so without the prune it would stay served until the workspace itself is dropped.
+        // Deleting inside UPDATE_WORKSPACE would sit in the compensable window, where a later
+        // step's
+        // failure triggers a RESTORE_WORKSPACE that cannot bring a deleted feature type back.
         Response snapshot = snapshotResponse("t1", "removed_layer");
         when(mockBuilder.get()).thenReturn(snapshot);
         Response conflict = mock(Response.class);
@@ -1253,7 +1283,6 @@ class GeoServerSagaHandlerTest {
         Response ok = mock(Response.class);
         when(ok.getStatus()).thenReturn(200);
         when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
-        when(mockBuilder.delete()).thenReturn(ok);
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
@@ -1261,10 +1290,7 @@ class GeoServerSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(1)).delete();
-        assertTrue(
-            capturedPaths().stream().anyMatch(path -> path.endsWith("/featuretypes/removed_layer")),
-            "the stale feature type must be the one deleted");
+        verify(mockBuilder, times(0)).delete();
       }
     }
 
@@ -1287,6 +1313,121 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         verify(mockBuilder, times(0)).delete();
+      }
+    }
+
+    @Test
+    void updatesFeatureTypeWhenGeoServerReportsTheConflictAsHttp500() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // 409 is not among the status codes GeoServer's REST API documents; an existing resource
+        // also surfaces as a 500 whose body says so. Failing on it would break every metadata edit
+        // on a released dataset with layers, since an update re-publishes all of them.
+        Response snapshot = snapshotResponse("t1");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response conflict = mock(Response.class);
+        when(conflict.getStatus()).thenReturn(409);
+        Response duplicate = mock(Response.class);
+        when(duplicate.getStatus()).thenReturn(500);
+        when(duplicate.readEntity(String.class))
+            .thenReturn("Resource named 't1' already exists in store: 'ds'");
+        // The workspace and datastore POSTs precede the feature type's and share this mock.
+        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict, conflict, duplicate);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertTrue(
+            capturedPaths().stream().anyMatch(path -> path.endsWith("/featuretypes/t1")),
+            "the conflict must fall through to the PUT that converges the definition");
+      }
+    }
+
+    @Test
+    void failsWhenAFeatureTypePostReturnsAnUnrelatedHttp500() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response snapshot = snapshotResponse("t1");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response conflict = mock(Response.class);
+        when(conflict.getStatus()).thenReturn(409);
+        Response serverError = mock(Response.class);
+        when(serverError.getStatus()).thenReturn(500);
+        when(serverError.readEntity(String.class)).thenReturn("java.lang.NullPointerException");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict, conflict, serverError);
+
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+      }
+    }
+  }
+
+  @Nested
+  class PruneFeatureTypes {
+
+    @Test
+    void deletesPublishedFeatureTypesTheDatasetNoLongerHasALayerFor() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response snapshot = snapshotResponse("t1", "removed_layer");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(ok);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "PRUNE_FEATURE_TYPES", updatePayload("t1")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, times(1)).delete();
+        assertTrue(
+            capturedPaths().stream().anyMatch(path -> path.endsWith("/featuretypes/removed_layer")),
+            "the stale feature type must be the one deleted");
+      }
+    }
+
+    @Test
+    void keepsFeatureTypesTheDatasetStillHasALayerFor() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response snapshot = snapshotResponse("t1");
+        when(mockBuilder.get()).thenReturn(snapshot);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "PRUNE_FEATURE_TYPES", updatePayload("t1")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, times(0)).delete();
+      }
+    }
+
+    @Test
+    void prunesEveryFeatureTypeWhenTheDatasetHasNoLayersLeft() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // An absent layers field means the dataset has no layers, not "unknown" — the portal builds
+        // it from the full layer set. This is also what clears feature types whose layer rows were
+        // orphaned before the portal began removing them, so an empty set must not be skipped.
+        Response snapshot = snapshotResponse("t1", "t2");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(ok);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP", "PRUNE_FEATURE_TYPES", Map.of("datasetId", "ds-abc")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, times(2)).delete();
       }
     }
   }

@@ -48,6 +48,9 @@ import org.owasp.encoder.Encode;
  *   <li>{@code UPDATE_WORKSPACE} — idempotently ensures the workspace and PostGIS datastore exist
  *       (UPDATE may be the first time geo is provisioned for a dataset), then upserts feature types
  *       from {@code layers}; captures current state for compensation
+ *   <li>{@code PRUNE_FEATURE_TYPES} — removes feature types the dataset no longer has a layer for.
+ *       A terminal step with no compensation: the {@code UPDATE_WORKSPACE} snapshot cannot restore
+ *       a deleted feature type, so this must run after the last failable step
  *   <li>{@code DELETE_WORKSPACE} — deletes the workspace recursively (compensation for the create
  *       steps and the teardown step in the delete saga)
  *   <li>{@code RESTORE_WORKSPACE} — restores the previous feature type state (compensation for
@@ -154,6 +157,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       case "PROVISION_LAYERS" -> handleProvisionLayers(command);
       case "PROVISION_WORKSPACE" -> handleProvisionWorkspace(command);
       case "UPDATE_WORKSPACE" -> handleUpdateWorkspace(command);
+      case "PRUNE_FEATURE_TYPES" -> handlePruneFeatureTypes(command);
       case "DELETE_WORKSPACE" -> handleDeleteWorkspace(command);
       case "RESTORE_WORKSPACE" -> handleRestoreWorkspace(command);
       default -> unknownOperation(command);
@@ -449,7 +453,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       // The body is single-read, so buffer it once and branch on it: an "already exists" signal
       // (409, or a 500 whose body says so) falls through to the PUT; anything else is a real error.
       String body = createResponse.readEntity(String.class);
-      if (!datastoreAlreadyExists(status, body)) {
+      if (!alreadyExists(status, body)) {
         throw new SagaApiException(
             "CREATE_DATASTORE/" + datastoreName + " failed: HTTP " + status + " — " + body, status);
       }
@@ -466,11 +470,11 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Whether a datastore POST failed only because the datastore already exists. GeoServer signals
-   * this either as HTTP 409, or as HTTP 500 with an {@code "already exists"} message body — both
-   * mean "converge via PUT", not "abort".
+   * Whether a POST failed only because the resource already exists. GeoServer signals this either
+   * as HTTP 409, or as HTTP 500 carrying an {@code "already exists"} message body — 409 is not
+   * among the status codes its REST API documents. Both mean "converge via PUT", not "abort".
    */
-  private static boolean datastoreAlreadyExists(int status, String body) {
+  private static boolean alreadyExists(int status, String body) {
     return status == Response.Status.CONFLICT.getStatusCode()
         || (status == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()
             && body != null
@@ -481,9 +485,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * Iterates the command's {@code layers}, provisioning a GeoServer feature type for each. The
    * native PostGIS table is taken from the layer's {@code nativeName}, falling back to the first
    * {@code POSTGIS} data sink's {@code tableName}, then to the layer name. When {@code upsert} is
-   * true an existing feature type is updated and feature types absent from the command are removed
-   * (used by {@code UPDATE_WORKSPACE}, which carries the dataset's full layer set); otherwise an
-   * existing feature type is left unchanged (idempotent provisioning).
+   * true an existing feature type is converged to the command's definition (used by {@code
+   * UPDATE_WORKSPACE}); otherwise it is left unchanged (idempotent provisioning).
    */
   private void processLayers(
       SagaCommandMessage command, String workspaceName, String datastoreName, boolean upsert) {
@@ -540,37 +543,44 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
         assignLayerStyles(workspaceName, layerName, defaultStyle, alternativeStyles);
       }
     }
-    if (upsert) {
-      pruneFeatureTypesAbsentFrom(workspaceName, datastoreName, layers);
-    }
   }
 
   /**
-   * Removes published feature types the command no longer asks for. Publishing alone is additive,
-   * so a layer deleted in the portal would otherwise stay served until the whole workspace is
-   * dropped.
+   * Removes published feature types the dataset no longer has a layer for. Publishing alone is
+   * additive, so a layer deleted in the portal would otherwise stay served over WFS/WMS until the
+   * whole workspace is dropped.
    *
-   * <p>Only reached from the update path, whose command carries the dataset's complete layer set.
-   * The provisioning paths may carry a partial one, where an absent layer means "not mine" rather
-   * than "delete it".
+   * <p>Runs as its own terminal saga step, after the last failable one, and has no compensation: a
+   * deleted feature type cannot be restored from the {@code UPDATE_WORKSPACE} snapshot, which is
+   * the collection listing and carries no definitions. Inside the compensable window a later
+   * failure would leave the layer deleted and report the compensation failed.
+   *
+   * <p>An absent {@code layers} field means the dataset has no layers left, not "unknown" — the
+   * portal builds the field from the dataset's full layer set — so an empty desired set
+   * legitimately prunes everything the workspace still serves.
    */
-  private void pruneFeatureTypesAbsentFrom(
-      String workspaceName, String datastoreName, List<Map<String, Object>> layers) {
+  private SagaCommandResult handlePruneFeatureTypes(SagaCommandMessage command) {
+    String workspaceName = resolveWorkspaceName(command);
+    String datastoreName = datastoreName(workspaceName);
+
     Set<String> desired =
-        layers.stream()
+        mapList(command, "layers").stream()
             .map(layer -> stringValue(layer, "layerName"))
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
     for (Map<String, Object> current : readCurrentFeatureTypes(workspaceName, datastoreName)) {
       String name = (String) current.get("name");
       if (name != null && !desired.contains(name)) {
-        deleteFeatureType(workspaceName, datastoreName, name, "UPDATE_WORKSPACE");
+        deleteFeatureType(workspaceName, datastoreName, name, "PRUNE_FEATURE_TYPES");
         log.info(
             "GeoServer feature type pruned: workspaceName={}, featureType={}",
             Encode.forJava(workspaceName),
             Encode.forJava(name));
       }
     }
+
+    return SagaCommandResult.success(
+        command.sagaId(), command.stepId(), Map.of("workspaceName", workspaceName), Map.of());
   }
 
   /**
@@ -792,7 +802,11 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     return nativeBBox != null ? "latlonbbox" : "nativebbox,latlonbbox";
   }
 
-  /** Creates a feature type idempotently: HTTP 409 (already exists) is treated as success. */
+  /**
+   * Creates a feature type idempotently: an already-published one is treated as success. A
+   * re-release finds the feature types an unrelease left behind, so failing on them would let the
+   * compensation drop the workspace and the PostGIS schema holding the data.
+   */
   private void createFeatureType(
       String workspaceName,
       String datastoreName,
@@ -809,16 +823,27 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
                     .queryParam("recalculate", recalculateFor(nativeBBox))
                     .request(MediaType.APPLICATION_JSON))
             .post(Entity.json(featureTypePayload(name, nativeName, crs, nativeCrs, nativeBBox)))) {
-      if (response.getStatus() != 201 && response.getStatus() != 409) {
-        checkResponse(response, "create-featuretype/" + name);
+      int status = response.getStatus();
+      if (status == 201) {
+        return;
+      }
+      String body = response.readEntity(String.class);
+      if (!alreadyExists(status, body)) {
+        throw new SagaApiException(
+            "create-featuretype/" + name + " failed: HTTP " + status + " — " + body, status);
       }
     }
   }
 
   /**
-   * Creates a feature type, or updates it via PUT if it already exists (HTTP 409). A plain POST
-   * returns 409 for existing feature types and would otherwise leave them unchanged — so {@code
-   * UPDATE_WORKSPACE} would report success without applying any change.
+   * Creates a feature type, or updates it via PUT if it already exists. A plain POST leaves an
+   * existing feature type unchanged, so {@code UPDATE_WORKSPACE} would report success without
+   * applying any change.
+   *
+   * <p>An update re-publishes every layer of the dataset, so hitting an already-published feature
+   * type is the ordinary case, not an error. Treating GeoServer's 500 variant of "already exists"
+   * as a hard failure makes any metadata edit on a released dataset with layers fail, and lets a
+   * re-release compensate by dropping the workspace and the PostGIS schema behind it.
    */
   private void upsertFeatureType(
       String workspaceName,
@@ -838,12 +863,15 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
                     .queryParam("recalculate", recalculate)
                     .request(MediaType.APPLICATION_JSON))
             .post(Entity.json(payload))) {
-      if (createResponse.getStatus() == 201) {
+      int status = createResponse.getStatus();
+      if (status == 201) {
         return;
       }
-      if (createResponse.getStatus() != 409) {
-        checkResponse(createResponse, "update-featuretype/create/" + name);
-        return;
+      // The body is single-read, so buffer it once before branching on it.
+      String body = createResponse.readEntity(String.class);
+      if (!alreadyExists(status, body)) {
+        throw new SagaApiException(
+            "update-featuretype/create/" + name + " failed: HTTP " + status + " — " + body, status);
       }
     }
     try (Response updateResponse =
