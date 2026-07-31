@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.ForkPlan;
 import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan;
@@ -32,6 +33,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -112,6 +114,69 @@ class NifiFlowBuilderTest {
       }
     }
     assertTrue(found, "DBCP reference must point to a real controller service");
+  }
+
+  @Test
+  void mqttTlsAddsOneJvmTruststoreSslContextServiceAndReferencesIt() throws Exception {
+    FlowBuildSpec plain = mqttToPostgis(mapping());
+    Map<String, String> tlsProperties = new LinkedHashMap<>(plain.sourceProperties());
+    tlsProperties.put("Broker URI", "ssl://mqtt:8883");
+    tlsProperties.put(
+        "SSL Context Service", "${CS:" + MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE + "}");
+    FlowBuildSpec tls =
+        new FlowBuildSpec(
+            plain.processGroupName(),
+            plain.sourceType(),
+            tlsProperties,
+            plain.sinkType(),
+            plain.sinkProperties(),
+            plain.transforms(),
+            plain.controllerServiceProperties(),
+            plain.sourceCron(),
+            plain.sinkPreRegion());
+
+    JsonNode flow = build(tls);
+    JsonNode services = flow.path("flowContents").path("controllerServices");
+    assertEquals(4, services.size());
+    JsonNode sslContext = component(flow, "controllerServices", "StandardSSLContextService");
+    assertEquals("TLS", sslContext.path("properties").path("TLS Protocol").asText());
+    assertEquals(
+        "${TRUSTSTORE_PATH}", sslContext.path("properties").path("Truststore Filename").asText());
+    assertEquals(
+        "#{TRUSTSTORE_PASSWORD}",
+        sslContext.path("properties").path("Truststore Password").asText());
+    assertEquals("PKCS12", sslContext.path("properties").path("Truststore Type").asText());
+    assertEquals(
+        MqttSourceStage.NODE_TRUSTSTORE_PARAMETER_CONTEXT,
+        flow.path("flowContents").path("parameterContextName").asText());
+    JsonNode truststorePassword =
+        flow.path("parameterContexts")
+            .path(MqttSourceStage.NODE_TRUSTSTORE_PARAMETER_CONTEXT)
+            .path("parameters")
+            .path(0);
+    assertEquals(
+        MqttSourceStage.TRUSTSTORE_PASSWORD_PARAMETER, truststorePassword.path("name").asText());
+    assertTrue(truststorePassword.path("sensitive").asBoolean());
+    assertTrue(truststorePassword.path("value").isMissingNode());
+    assertTrue(sslContext.path("properties").path("Keystore Filename").isNull());
+    assertEquals(
+        sslContext.path("identifier").asText(),
+        component(flow, "processors", "ConsumeMQTT")
+            .path("properties")
+            .path("SSL Context Service")
+            .asText());
+    assertEquals(builder.build(tls), builder.build(tls), "TLS snapshot must remain deterministic");
+  }
+
+  @Test
+  void mqttWithoutTlsDoesNotAddOrReferenceSslContextService() throws Exception {
+    JsonNode flow = build(mqttToPostgis(mapping()));
+    assertEquals(3, flow.path("flowContents").path("controllerServices").size());
+    assertTrue(
+        component(flow, "processors", "ConsumeMQTT")
+            .path("properties")
+            .path("SSL Context Service")
+            .isNull());
   }
 
   @Test

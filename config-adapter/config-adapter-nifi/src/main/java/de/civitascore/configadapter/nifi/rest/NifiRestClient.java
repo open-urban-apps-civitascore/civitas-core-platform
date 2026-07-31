@@ -19,6 +19,7 @@ import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
@@ -678,12 +679,14 @@ public class NifiRestClient implements AutoCloseable {
       // A service whose configuration is INVALID will never reach ENABLED, so polling for it is
       // pointless: fail fast and FATALLY (a retryable timeout would loop forever under redelivery).
       if (awaitingEnabled && "INVALID".equals(component.path("validationStatus").asText())) {
+        String name = component.path("name").asText();
         throw new FatalAdapterException(
             AdapterErrorCode.NIFI_FLOW_ERROR,
             "controller service '"
-                + component.path("name").asText()
+                + name
                 + "' is INVALID and will never enable: "
-                + validationErrors(component));
+                + validationErrors(component)
+                + provisioningHint(name));
       }
       if (!state.equals(component.path("state").asText())) {
         allInState = false;
@@ -708,6 +711,23 @@ public class NifiRestClient implements AutoCloseable {
       joined.append(error.asText());
     }
     return joined.toString();
+  }
+
+  /**
+   * Points at the deployment-owned parameter context behind the MQTT SSL Context Service. Its
+   * sensitive password is never carried in the flow snapshot, so on a NiFi where the deployment has
+   * not provisioned it the snapshot import creates the context empty and the service fails
+   * validation on an unrelated-looking truststore-password error.
+   */
+  private static String provisioningHint(String serviceName) {
+    if (!MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE.equals(serviceName)) {
+      return "";
+    }
+    return " — check that parameter context '"
+        + MqttSourceStage.NODE_TRUSTSTORE_PARAMETER_CONTEXT
+        + "' provides a value for the sensitive parameter '"
+        + MqttSourceStage.TRUSTSTORE_PASSWORD_PARAMETER
+        + "'";
   }
 
   /**

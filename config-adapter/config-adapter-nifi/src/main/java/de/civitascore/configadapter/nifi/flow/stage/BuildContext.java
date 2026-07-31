@@ -170,6 +170,18 @@ public final class BuildContext {
     ((ObjectNode) processor.node().get("properties")).put(key, value);
   }
 
+  /** Sets a processor property to the deterministic id of an already registered service. */
+  public void setControllerServiceProp(Processor processor, String key, String friendlyName)
+      throws FatalAdapterException {
+    String id = csIdByName.get(friendlyName);
+    if (id == null) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_FLOW_ERROR,
+          "unresolved controller-service reference: " + friendlyName);
+    }
+    setProp(processor, key, id);
+  }
+
   /**
    * Switches the entry processor to cron-driven scheduling. A {@code null} cron leaves the source
    * fragment's built-in schedule. Only the source's schedule drives the flow — downstream
