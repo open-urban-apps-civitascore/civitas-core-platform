@@ -346,7 +346,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   // ============== HELPERS ==============
 
-  /** Creates the workspace idempotently: HTTP 409 (already exists) is treated as success. */
+  /** Creates the workspace idempotently: an already-existing one is treated as success. */
   private void createWorkspace(String workspaceName, String serviceTitle) {
     // Create the workspace isolated: its content is reachable only through the per-workspace
     // virtual OWS services (matching geoserver.web.globalServices=false) and it gets its own
@@ -365,9 +365,13 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
                 Entity.json(
                     Map.of("workspace", Map.of("name", workspaceName, "isolated", true))))) {
       status = response.getStatus();
-      if (status != 201 && status != 409) {
-        checkResponse(response, "CREATE_WORKSPACE/" + workspaceName);
-        return;
+      if (status != 201) {
+        String body = response.readEntity(String.class);
+        if (!alreadyExists(status, body)) {
+          throw new SagaApiException(
+              "CREATE_WORKSPACE/" + workspaceName + " failed: HTTP " + status + " — " + body,
+              status);
+        }
       }
     }
     // On fresh creation, enable the per-workspace WMS virtual service so a map client (QGIS, …)

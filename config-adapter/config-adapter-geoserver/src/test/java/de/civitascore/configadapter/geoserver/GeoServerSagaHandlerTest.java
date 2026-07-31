@@ -1090,6 +1090,58 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void treatsDuplicateWorkspaceReportedAsHttp500Idempotent() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response duplicate = mock(Response.class);
+        when(duplicate.getStatus()).thenReturn(500);
+        when(duplicate.readEntity(String.class))
+            .thenReturn("Workspace 'ds_existing' already exists");
+
+        Response createdResponse = mock(Response.class);
+        when(createdResponse.getStatus()).thenReturn(201);
+
+        when(mockBuilder.post(any(Entity.class)))
+            .thenReturn(duplicate) // workspace already exists, reported as 500
+            .thenReturn(createdResponse); // datastore
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "PROVISION_WORKSPACE",
+                Map.of("datasetId", "ds-existing", "layers", List.of()));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // Only a fresh 201 may configure the WMS service — doing it here would overwrite the
+        // service title of a workspace that already serves data.
+        assertTrue(
+            capturedPaths().stream().noneMatch(path -> path.contains("/services/wms/")),
+            "an existing workspace must keep its WMS service settings");
+      }
+    }
+
+    @Test
+    void failsWhenWorkspaceCreationReturnsAnUnrelatedHttp500() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response serverError = mock(Response.class);
+        when(serverError.getStatus()).thenReturn(500);
+        when(serverError.readEntity(String.class)).thenReturn("java.lang.NullPointerException");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(serverError);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "PROVISION_WORKSPACE",
+                Map.of("datasetId", "ds-broken", "layers", List.of()));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+      }
+    }
+
+    @Test
     void createsWorkspaceAndDatastoreButNoFeatureTypesWhenNoLayers() {
       try (GeoServerSagaHandler handler = createHandler()) {
         Response created = mock(Response.class);
