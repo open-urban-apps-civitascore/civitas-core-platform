@@ -368,11 +368,11 @@
 						<ignoredNonTestScopedDependency>org.apache.kafka:*</ignoredNonTestScopedDependency>
 						<ignoredNonTestScopedDependency>org.keycloak:*</ignoredNonTestScopedDependency>
 					</ignoredNonTestScopedDependencies>
-	<!-- The used-undeclared check is off: compiling against a starter's or aggregator's
-	     transitive closure is deliberate here, so every finding is a false positive. -->
-	<ignoredUsedUndeclaredDependencies>
-		<ignoredUsedUndeclaredDependency>*:*</ignoredUsedUndeclaredDependency>
-	</ignoredUsedUndeclaredDependencies>
+					<!-- The used-undeclared check is off: compiling against a starter's or aggregator's
+					     transitive closure is deliberate here, so every finding is a false positive. -->
+					<ignoredUsedUndeclaredDependencies>
+						<ignoredUsedUndeclaredDependency>*:*</ignoredUsedUndeclaredDependency>
+					</ignoredUsedUndeclaredDependencies>
 				</configuration>
 				<executions>
 					<execution>
