@@ -1187,8 +1187,21 @@ describe('exportToJsonSchema', () => {
     const schema = exportToJsonSchema(diagram)
     // In a def key, '~' would make '#/$defs/<key>' an invalid JSON Pointer and '/' a valid one
     // that resolves to the wrong, nested location.
-    expect(schema.properties).toEqual({ RoadSegmentPart: { $ref: '#/$defs/Road-Segment-Part' } })
-    expect((schema.$defs as Record<string, unknown>)['Road-Segment-Part']).toBeDefined()
+    expect(schema.properties).toEqual({ RoadSegmentPart: { $ref: '#/$defs/RoadSegmentPart' } })
+    expect((schema.$defs as Record<string, unknown>).RoadSegmentPart).toBeDefined()
+  })
+
+  it('romanizes umlauts in $defs keys so refs stay ASCII', () => {
+    const diagram = baseDiagram({
+      name: 'S',
+      nodes: [cls('a', 'Straßenlärm', [{ id: 'a1', name: 'a1' }])] as unknown as UMLDiagram['nodes'],
+      edges: [],
+    } as Partial<UMLDiagram>)
+
+    const schema = exportToJsonSchema(diagram)
+
+    expect(schema.properties).toEqual({ Strassenlaerm: { $ref: '#/$defs/Strassenlaerm' } })
+    expect((schema.$defs as Record<string, unknown>).Strassenlaerm).toBeDefined()
   })
 
   it('exports the designated root (isRoot) when the derivation alone would be ambiguous', () => {

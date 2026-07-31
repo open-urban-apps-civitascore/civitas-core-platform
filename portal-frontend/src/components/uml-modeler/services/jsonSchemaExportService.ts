@@ -88,6 +88,9 @@ const PROPERTY_KEY_SEPARATORS = /[^A-Za-z0-9_]+/
 /** Used when a name sanitizes to nothing at all (e.g. an attribute named `___`). */
 export const PROPERTY_KEY_FALLBACK = 'Field'
 
+/** The same, for an unnamed or fully unsanitizable element in `$defs`. */
+const DEF_KEY_FALLBACK = 'Type'
+
 /**
  * Normalizes a UML name into a JSON Schema property key: letters, digits and underscore survive,
  * German umlauts are transliterated, and every other character separates words, which are then
@@ -303,23 +306,17 @@ const buildClassSchema = (
 
 /**
  * Maps every element id to a stable, unique `$defs` key (name-based, `_n`-suffixed on collision).
- * The keys are embedded verbatim in `#/$defs/<key>` refs, which the platform resolvers match by
- * prefix-stripping rather than JSON-Pointer evaluation — so instead of `~0`/`~1`-escaping the refs
- * (which those resolvers would not unescape), pointer-special characters are kept out of the keys
- * themselves, making every emitted ref a valid JSON Pointer for standard tooling too.
+ * The keys go through the same normalization as property keys, so a `#/$defs/<key>` ref stays ASCII
+ * and free of JSON-Pointer-special characters. That matters twice over: the platform resolvers match
+ * these refs by prefix-stripping rather than JSON-Pointer evaluation and would not unescape a
+ * `~0`/`~1` sequence, and standard tooling still sees a valid pointer.
  */
 export const assignDefKeys = (elements: UMLElement[]): Map<string, string> => {
   const defKeyById = new Map<string, string>()
   const usedKeys = new Set<string>()
   for (const element of elements) {
-    const key = (element.name || 'Type').replace(/[~/]/g, '-')
-    let candidate = key
-    let suffix = 1
-    while (usedKeys.has(candidate)) {
-      candidate = `${key}_${suffix++}`
-    }
-    usedKeys.add(candidate)
-    defKeyById.set(element.id, candidate)
+    const key = sanitizePropertyKey(element.name) || DEF_KEY_FALLBACK
+    defKeyById.set(element.id, reservePropertyKey(key, usedKeys))
   }
   return defKeyById
 }
