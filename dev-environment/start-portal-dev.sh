@@ -639,6 +639,23 @@ fi
 
 if $DOCKER_COMPOSE up -d 2>&1; then
     echo "  Apache NiFi started"
+    # The MQTT-TLS flows resolve their truststore password from a parameter context that the
+    # snapshot deliberately carries no value for, so it has to exist before the first deploy.
+    echo "  Waiting for NiFi to become healthy to provision parameter contexts..."
+    nifi_healthy=false
+    for _ in $(seq 1 60); do
+        if [ "$(docker inspect --format='{{.State.Health.Status}}' civitas-nifi 2>/dev/null)" = "healthy" ]; then
+            nifi_healthy=true
+            break
+        fi
+        sleep 5
+    done
+    if [ "$nifi_healthy" = true ] && $DOCKER_COMPOSE run --rm nifi-parameter-contexts 2>&1; then
+        echo "  NiFi parameter contexts provisioned"
+    else
+        echo "  WARNING: could not provision NiFi parameter contexts"
+        echo "           MQTT sources with TLS enabled will fail to deploy."
+    fi
 else
     echo "  WARNING: Apache NiFi failed to start"
     echo "           Dataset pipeline deployment will not work."

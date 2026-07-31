@@ -1,5 +1,5 @@
 meta {
-  name: 11a. Verify UNRELEASE saga complete
+  name: 11a. Verify DELETE saga complete
   type: http
   seq: 19
 }
@@ -15,7 +15,7 @@ params:path {
 }
 
 script:pre-request {
-  // Wait for the DATASET_UNRELEASE saga to finish (pendingSagaType cleared, status READY)
+  // Wait for the DATASET_DELETE saga to finish (pendingSagaType cleared, status READY)
   // before unstaging/deleting. Without this wait, unstage (step 12) and delete (step 15)
   // would 400 with a still-pending saga and the teardown would leak resources.
   const axios = require('axios');
@@ -47,6 +47,7 @@ script:pre-request {
         validateStatus: () => true,
       }
     );
+    if (resp.status === 404) break; // already deleted by a previous run
     if (resp.status === 200 && resp.data && resp.data.pendingSagaType === null
         && resp.data.dataSetStatus === 'READY') {
       break;
@@ -56,26 +57,24 @@ script:pre-request {
 }
 
 tests {
-  test("Status code is 200", function() {
-    // The unrelease saga preserves the sink and keeps the dataset — it is never deleted here.
-    expect(res.getStatus()).to.equal(200);
+  test("Status code is 200 or 404", function() {
+    const status = res.getStatus();
+    // 200=present (saga done), 404=already deleted in a previous run
+    expect(status === 200 || status === 404).to.be.true;
   });
 
-  test("UNRELEASE saga completed (pendingSagaType cleared, status READY)", function() {
-    expect(res.body.pendingSagaType).to.be.null;
-    expect(res.body.dataSetStatus).to.equal('READY');
-  });
-
-  test("Sink stays provisioned (data preserved)", function() {
-    // The PostGIS table survives the unrelease; the dataset remains flagged provisioned.
-    expect(res.body.provisioned).to.equal(true);
+  test("DELETE saga completed (pendingSagaType cleared, status READY)", function() {
+    if (res.getStatus() === 200) {
+      expect(res.body.pendingSagaType).to.be.null;
+      expect(res.body.dataSetStatus).to.equal('READY');
+    }
   });
 }
 
 docs {
-  **SQL saga step 11a** — Poll until the DATASET_UNRELEASE saga has completed.
+  **SQL saga step 11a** — Poll until the DATASET_DELETE saga has completed.
 
-  Mirrors step 10 but waits for the unrelease saga: polls (up to 60s) until `pendingSagaType` is `null` and status is `READY`. Required so the unstage (step 12) step doesn't 400 on a still-pending saga. Unlike a delete, the dataset is **not** removed — it returns to `READY` with its sink (PostGIS table) intact and `provisioned` still `true`, ready for a re-release without data loss.
+  Mirrors step 10 but waits for the delete saga: polls (up to 60s) until `pendingSagaType` is `null`. Required so the unstage (step 12) and delete (step 15) steps don't 400 on a still-pending saga. Tolerates 404 if a previous run already deleted the dataset.
 
-  **Expected Response:** 200 OK with `pendingSagaType: null`, `dataSetStatus: READY`, `provisioned: true`.
+  **Expected Response:** 200 OK with `pendingSagaType: null` (delete saga done), or 404 if already gone.
 }

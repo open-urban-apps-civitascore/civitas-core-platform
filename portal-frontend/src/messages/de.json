@@ -949,6 +949,8 @@
     "errors": {
       "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
       "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)",
+      "unsupportedBrokerScheme": "Verwenden Sie für MQTT eine unterstützte URL (tcp://, ws://, mqtt://, ssl://, mqtts:// oder wss://).",
+      "brokerTlsMismatch": "Broker-URL und TLS-Einstellung passen nicht zusammen.",
       "topicInvalidChars": "Das Topic darf keine Kommas, Semikolons oder Leerzeichen enthalten.",
       "topicSingle": "Es ist nur ein Topic erlaubt.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
