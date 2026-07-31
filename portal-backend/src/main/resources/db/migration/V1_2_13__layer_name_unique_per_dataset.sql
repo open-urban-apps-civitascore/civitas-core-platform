@@ -17,7 +17,8 @@
 DO
 $$
     DECLARE
-        renamed_rows BIGINT;
+        renamed_rows      BIGINT;
+        duplicate_groups  BIGINT;
     BEGIN
         FOR pass IN 1..10
             LOOP
@@ -36,8 +37,15 @@ $$
                 EXIT WHEN renamed_rows = 0;
             END LOOP;
 
-        IF renamed_rows > 0 THEN
-            RAISE EXCEPTION 'layer name deduplication did not converge; % rows still duplicated', renamed_rows;
+        -- The loop's last ROW_COUNT says nothing about the outcome: a pass that renames rows may be
+        -- the one that resolves the last collision, and one that renames none may have started from
+        -- a clean table. Only the constraint about to be added can decide.
+        SELECT count(*)
+        INTO duplicate_groups
+        FROM (SELECT 1 FROM layers GROUP BY dataset_id, layer_name HAVING count(*) > 1) d;
+
+        IF duplicate_groups > 0 THEN
+            RAISE EXCEPTION 'layer name deduplication did not converge; % (dataset_id, layer_name) groups still duplicated', duplicate_groups;
         END IF;
     END
 $$;
