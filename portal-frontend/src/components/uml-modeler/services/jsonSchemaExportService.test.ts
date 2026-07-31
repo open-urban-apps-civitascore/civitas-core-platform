@@ -6,6 +6,7 @@ import {
   canMultiplicityBePrimaryKey,
   exportToJsonSchema,
   sanitizeName,
+  sanitizePropertyKey,
   SchemaExportError,
 } from './jsonSchemaExportService'
 
@@ -61,6 +62,41 @@ describe('sanitizeName', () => {
   })
 })
 
+describe('sanitizePropertyKey', () => {
+  it.each([
+    ['attribut', 'Attribut'],
+    ['Composition Edge', 'CompositionEdge'],
+    ['mein feld', 'MeinFeld'],
+    ['NeueAufzählung', 'NeueAufzaehlung'],
+    ['Größe in m²', 'GroesseInM'],
+    ['Bänke & Stühle', 'BaenkeStuehle'],
+    ['air-quality.level', 'AirQualityLevel'],
+    ['straße', 'Strasse'],
+  ])('normalizes %o to %o', (input, expected) => {
+    expect(sanitizePropertyKey(input)).toBe(expected)
+  })
+
+  it('keeps underscores, which are legal inside a key', () => {
+    expect(sanitizePropertyKey('air_quality')).toBe('Air_quality')
+  })
+
+  it('drops leading underscores, which are not', () => {
+    expect(sanitizePropertyKey('_id')).toBe('Id')
+    expect(sanitizePropertyKey('__internal_value')).toBe('Internal_value')
+  })
+
+  it('prefixes a leading digit instead of stripping it, so distinct names stay distinct', () => {
+    expect(sanitizePropertyKey('1Value')).toBe('N1Value')
+    expect(sanitizePropertyKey('2Value')).toBe('N2Value')
+  })
+
+  it('returns empty when nothing usable remains, leaving the fallback to the caller', () => {
+    expect(sanitizePropertyKey('___')).toBe('')
+    expect(sanitizePropertyKey('!!!')).toBe('')
+    expect(sanitizePropertyKey('')).toBe('')
+  })
+})
+
 // The document root is always the (virtual) data structure; a class's own schema lives under $defs.
 // This helper returns the named class definition so field-level assertions read against the class,
 // not the virtual root.
@@ -86,15 +122,42 @@ describe('exportToJsonSchema', () => {
     const def = classDef(exportToJsonSchema(baseDiagram()), 'TrafficSensor')
     const properties = def.properties as Record<string, Record<string, unknown>>
 
-    expect(properties.stationId).toEqual({ type: 'string', 'x-core-primaryKey': true })
-    expect(properties.temperature).toEqual({ type: 'number' })
+    expect(properties.StationId).toEqual({ type: 'string', 'x-core-primaryKey': true })
+    expect(properties.Temperature).toEqual({ type: 'number' })
+  })
+
+  it('keeps attributes apart whose names sanitize to the same key', () => {
+    const rootNode = baseDiagram().nodes[0]
+    const diagram = baseDiagram({
+      nodes: [
+        {
+          ...rootNode,
+          data: {
+            ...rootNode.data,
+            element: {
+              ...rootNode.data.element,
+              attributes: [
+                { id: 'a1', name: 'mein feld', type: 'String' },
+                { id: 'a2', name: 'MeinFeld', type: 'Integer', multiplicity: '0..1' },
+              ],
+            },
+          },
+        },
+      ] as unknown as UMLDiagram['nodes'],
+    })
+
+    const properties = classDef(exportToJsonSchema(diagram), 'TrafficSensor').properties as Record<string, unknown>
+
+    // Without the collision suffix the second attribute would silently overwrite the first.
+    expect(properties.MeinFeld).toEqual({ type: 'string' })
+    expect(properties.MeinFeld_1).toEqual({ type: 'integer' })
   })
 
   it('maps "*" multiplicity attributes to arrays', () => {
     const def = classDef(exportToJsonSchema(baseDiagram()), 'TrafficSensor')
     const properties = def.properties as Record<string, Record<string, unknown>>
 
-    expect(properties.tags).toEqual({ type: 'array', items: { type: 'string' } })
+    expect(properties.Tags).toEqual({ type: 'array', items: { type: 'string' } })
   })
 
   // Every cardinality offered by the property dropdown (issue #1707) and its
@@ -140,11 +203,11 @@ describe('exportToJsonSchema', () => {
       const def = classDef(exportToJsonSchema(diagram), 'TrafficSensor')
       const properties = def.properties as Record<string, Record<string, unknown>>
 
-      expect(properties.tags).toEqual(expectedProp)
+      expect(properties.Tags).toEqual(expectedProp)
       if (required) {
-        expect((def.required as string[]) ?? []).toContain('tags')
+        expect((def.required as string[]) ?? []).toContain('Tags')
       } else {
-        expect((def.required as string[]) ?? []).not.toContain('tags')
+        expect((def.required as string[]) ?? []).not.toContain('Tags')
       }
     },
   )
@@ -154,22 +217,22 @@ describe('exportToJsonSchema', () => {
     const properties = def.properties as Record<string, Record<string, unknown>>
 
     // stationId has no multiplicity set -> plain scalar, and required.
-    expect(properties.stationId).toEqual({ type: 'string', 'x-core-primaryKey': true })
-    expect(def.required).toContain('stationId')
+    expect(properties.StationId).toEqual({ type: 'string', 'x-core-primaryKey': true })
+    expect(def.required).toContain('StationId')
   })
 
   it('adds id attributes to required', () => {
     const def = classDef(exportToJsonSchema(baseDiagram()), 'TrafficSensor')
-    expect(def.required).toEqual(['stationId'])
+    expect(def.required).toEqual(['StationId'])
   })
 
   it('marks the {id} attribute with x-core-primaryKey, others not', () => {
     const def = classDef(exportToJsonSchema(baseDiagram()), 'TrafficSensor')
     const properties = def.properties as Record<string, Record<string, unknown>>
     // conceptual identity marker for adapters (PostGIS UPSERT, FROST reference, …)
-    expect(properties.stationId['x-core-primaryKey']).toBe(true)
-    expect(properties.temperature).not.toHaveProperty('x-core-primaryKey')
-    expect(properties.tags).not.toHaveProperty('x-core-primaryKey')
+    expect(properties.StationId['x-core-primaryKey']).toBe(true)
+    expect(properties.Temperature).not.toHaveProperty('x-core-primaryKey')
+    expect(properties.Tags).not.toHaveProperty('x-core-primaryKey')
   })
 
   it('does not emit x-core-primaryKey for an array-valued id attribute', () => {
@@ -196,8 +259,8 @@ describe('exportToJsonSchema', () => {
     const def = classDef(exportToJsonSchema(diagram), 'TrafficSensor')
     const properties = def.properties as Record<string, Record<string, unknown>>
 
-    expect(properties.ids).toEqual({ type: 'array', items: { type: 'string' } })
-    expect(properties.ids).not.toHaveProperty('x-core-primaryKey')
+    expect(properties.Ids).toEqual({ type: 'array', items: { type: 'string' } })
+    expect(properties.Ids).not.toHaveProperty('x-core-primaryKey')
     // A many-valued isId cannot be a primary key, so it must not force required either.
     expect((def.required as string[]) ?? []).not.toContain('ids')
   })
@@ -237,7 +300,7 @@ describe('exportToJsonSchema', () => {
     )
     const def = classDef(schema, 'TrafficSensor')
     const properties = def.properties as Record<string, Record<string, unknown>>
-    expect(properties.optId).not.toHaveProperty('x-core-primaryKey')
+    expect(properties.OptId).not.toHaveProperty('x-core-primaryKey')
     expect((def.required as string[]) ?? []).not.toContain('optId')
   })
 
@@ -274,10 +337,10 @@ describe('exportToJsonSchema', () => {
     )
     const def = classDef(schema, 'Composite')
     const properties = def.properties as Record<string, Record<string, unknown>>
-    expect(properties.tenant['x-core-primaryKey']).toBe(true)
-    expect(properties.id['x-core-primaryKey']).toBe(true)
-    expect(properties.value).not.toHaveProperty('x-core-primaryKey')
-    expect(def.required).toEqual(['tenant', 'id'])
+    expect(properties.Tenant['x-core-primaryKey']).toBe(true)
+    expect(properties.Id['x-core-primaryKey']).toBe(true)
+    expect(properties.Value).not.toHaveProperty('x-core-primaryKey')
+    expect(def.required).toEqual(['Tenant', 'Id'])
   })
 
   it('carries documentation into description', () => {
@@ -366,7 +429,7 @@ describe('exportToJsonSchema', () => {
     const def = classDef(exportToJsonSchema(diagram), 'TrafficSensor')
     const properties = def.properties as Record<string, Record<string, unknown>>
 
-    expect(properties.location).toEqual({
+    expect(properties.Location).toEqual({
       $ref: 'https://geojson.org/schema/Point.json',
       crs: 'EPSG:25832',
     })
@@ -402,8 +465,8 @@ describe('exportToJsonSchema', () => {
     const def = classDef(exportToJsonSchema(diagram), 'TrafficSensor')
     const properties = def.properties as Record<string, Record<string, unknown>>
 
-    expect(properties.location).toEqual({ $ref: 'https://geojson.org/schema/Point.json' })
-    expect(properties.location.crs).toBeUndefined()
+    expect(properties.Location).toEqual({ $ref: 'https://geojson.org/schema/Point.json' })
+    expect(properties.Location.crs).toBeUndefined()
   })
 
   it('emits only enum keyword (no type) when the diagram contains only an enumeration', () => {
@@ -534,7 +597,7 @@ describe('exportToJsonSchema', () => {
     // The single non-enumeration class is the root class, referenced from the data-structure root.
     expect(schema.type).toBe('object')
     expect(schema.title).toBe('TrafficSensor')
-    expect(schema.properties).toEqual({ trafficsensor: { $ref: '#/$defs/TrafficSensor' } })
+    expect(schema.properties).toEqual({ TrafficSensor: { $ref: '#/$defs/TrafficSensor' } })
 
     // Enumeration is still emitted in $defs.
     const defs = schema.$defs as Record<string, Record<string, unknown>>
@@ -588,7 +651,7 @@ describe('exportToJsonSchema', () => {
 
     const schema = exportToJsonSchema(diagram)
     const properties = classDef(schema, 'TrafficSensor').properties as Record<string, Record<string, unknown>>
-    expect(properties.level).toEqual({ $ref: '#/$defs/Quality' })
+    expect(properties.Level).toEqual({ $ref: '#/$defs/Quality' })
 
     const defs = schema.$defs as Record<string, Record<string, unknown>>
     expect(defs.Quality).toEqual({ title: 'Quality', enum: ['GOOD', 'POOR'] })
@@ -621,7 +684,7 @@ describe('exportToJsonSchema', () => {
     })
 
     const properties = classDef(exportToJsonSchema(diagram), 'TrafficSensor').properties as Record<string, unknown>
-    expect(properties).toHaveProperty('reading')
+    expect(properties).toHaveProperty('Reading')
     expect(properties).not.toHaveProperty('Composition Edge')
   })
 
@@ -672,7 +735,7 @@ describe('exportToJsonSchema', () => {
 
     const def = classDef(exportToJsonSchema(diagram), 'TrafficSensor')
     const properties = def.properties as Record<string, Record<string, unknown>>
-    expect(properties.readings).toEqual({ type: 'array', items: { $ref: '#/$defs/Reading' } })
+    expect(properties.Readings).toEqual({ type: 'array', items: { $ref: '#/$defs/Reading' } })
 
     const defs = exportToJsonSchema(diagram).$defs as Record<string, Record<string, unknown>>
     expect(defs.Reading).toBeDefined()
@@ -746,7 +809,7 @@ describe('exportToJsonSchema', () => {
       // composition's `sensorReading` reference to Reading survives. Both classes are emitted.
       const properties = classDef(schema, 'TrafficSensor').properties as Record<string, unknown>
       expect(Object.keys(properties)).not.toContain('reading')
-      expect(properties.sensorReading).toEqual({ $ref: '#/$defs/Reading' })
+      expect(properties.SensorReading).toEqual({ $ref: '#/$defs/Reading' })
       const defs = schema.$defs as Record<string, Record<string, unknown>>
       expect(defs.TrafficSensor).toBeDefined()
       expect(defs.Reading).toBeDefined()
@@ -839,7 +902,7 @@ describe('exportToJsonSchema', () => {
 
     const schema = exportToJsonSchema(diagram)
     const properties = classDef(schema, 'TrafficSensor').properties as Record<string, unknown>
-    expect(properties.reading).toEqual({ $ref: '#/$defs/Reading' })
+    expect(properties.Reading).toEqual({ $ref: '#/$defs/Reading' })
     expect(Object.keys(properties)).not.toContain('owner')
     // All three classes still emitted; only the association contributes nothing.
     const defs = schema.$defs as Record<string, Record<string, unknown>>
@@ -890,7 +953,7 @@ describe('exportToJsonSchema', () => {
     // Title is the data structure (diagram name); the subclass Dog is the root class referenced
     // from it, and its allOf lives in $defs.
     expect(schema.title).toBe('Animal')
-    expect(schema.properties).toEqual({ dog: { $ref: '#/$defs/Dog' } })
+    expect(schema.properties).toEqual({ Dog: { $ref: '#/$defs/Dog' } })
     expect(classDef(schema, 'Dog').allOf).toEqual([
       { $ref: '#/$defs/Animal' },
       expect.objectContaining({ type: 'object', title: 'Dog' }),
@@ -943,7 +1006,7 @@ describe('exportToJsonSchema', () => {
 
     const schema = exportToJsonSchema(diagram)
     expect(schema.title).toBe('Base')
-    expect(schema.properties).toEqual({ leaf: { $ref: '#/$defs/Leaf' } })
+    expect(schema.properties).toEqual({ Leaf: { $ref: '#/$defs/Leaf' } })
     expect(classDef(schema, 'Leaf').allOf).toEqual([
       { $ref: '#/$defs/Mid' },
       expect.objectContaining({ title: 'Leaf' }),
@@ -969,7 +1032,7 @@ describe('exportToJsonSchema', () => {
     // Diagram is named after the leaf, but the document root is still the (virtual) data structure;
     // the leaf is its root-class $ref property and carries the allOf in $defs.
     expect(schema.title).toBe('Leaf')
-    expect(schema.properties).toEqual({ leaf: { $ref: '#/$defs/Leaf' } })
+    expect(schema.properties).toEqual({ Leaf: { $ref: '#/$defs/Leaf' } })
     expect(classDef(schema, 'Leaf').allOf).toEqual([
       { $ref: '#/$defs/P1' },
       { $ref: '#/$defs/P2' },
@@ -1124,7 +1187,7 @@ describe('exportToJsonSchema', () => {
     const schema = exportToJsonSchema(diagram)
     // In a def key, '~' would make '#/$defs/<key>' an invalid JSON Pointer and '/' a valid one
     // that resolves to the wrong, nested location.
-    expect(schema.properties).toEqual({ 'road-segment-part': { $ref: '#/$defs/Road-Segment-Part' } })
+    expect(schema.properties).toEqual({ RoadSegmentPart: { $ref: '#/$defs/Road-Segment-Part' } })
     expect((schema.$defs as Record<string, unknown>)['Road-Segment-Part']).toBeDefined()
   })
 
@@ -1140,8 +1203,8 @@ describe('exportToJsonSchema', () => {
     } as Partial<UMLDiagram>)
 
     const schema = exportToJsonSchema(diagram)
-    expect(schema.properties).toEqual({ alpha: { $ref: '#/$defs/Alpha' } })
-    expect((classDef(schema, 'Alpha').properties as Record<string, unknown>).beta).toEqual({ $ref: '#/$defs/Beta' })
+    expect(schema.properties).toEqual({ Alpha: { $ref: '#/$defs/Alpha' } })
+    expect((classDef(schema, 'Alpha').properties as Record<string, unknown>).Beta).toEqual({ $ref: '#/$defs/Beta' })
   })
 
   it('does not collapse an ambiguous diagram onto a diagram-name-matching class', () => {

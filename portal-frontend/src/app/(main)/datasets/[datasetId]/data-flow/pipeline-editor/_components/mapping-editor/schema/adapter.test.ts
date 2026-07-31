@@ -53,15 +53,15 @@ describe('umlDiagramToSchemaTree — required derivation', () => {
   it('marks fields required from {id} and multiplicity lower bound', () => {
     const tree = treeOf(diagram, 'thing')
     const required = (name: string) => tree.fields.find(f => f.name === name)?.required
-    expect(required('id')).toBe(true) // {id}
-    expect(required('name')).toBe(true) // 1
-    expect(required('nick')).toBeFalsy() // 0..1 optional — the factory omits the flag when false
-    expect(required('tags')).toBe(true) // 1..*
-    expect(required('note')).toBe(true) // unset = single required
+    expect(required('Id')).toBe(true) // {id}
+    expect(required('Name')).toBe(true) // 1
+    expect(required('Nick')).toBeFalsy() // 0..1 optional — the factory omits the flag when false
+    expect(required('Tags')).toBe(true) // 1..*
+    expect(required('Note')).toBe(true) // unset = single required
   })
 
   it('requiredFieldPaths returns only the required field paths', () => {
-    expect(requiredFieldPaths(treeOf(diagram, 'thing'))).toEqual(['$.id', '$.name', '$.tags', '$.note'])
+    expect(requiredFieldPaths(treeOf(diagram, 'thing'))).toEqual(['$.Id', '$.Name', '$.Tags', '$.Note'])
   })
 })
 
@@ -78,11 +78,11 @@ describe('umlDiagramToSchemaTree', () => {
     const tree = treeOf(diagram, 'thing')
 
     expect(tree.name).toBe('Thing')
-    expect(tree.fields.map(f => f.name)).toEqual(['name', 'id', 'properties'])
-    const nested = tree.fields.find(f => f.name === 'properties')
+    expect(tree.fields.map(f => f.name)).toEqual(['Name', 'Id', 'Properties'])
+    const nested = tree.fields.find(f => f.name === 'Properties')
     expect(nested?.type).toBe('object')
-    expect(nested?.children?.map(c => c.name)).toEqual(['reference', 'source'])
-    expect(nested?.children?.map(c => c.path)).toEqual(['$.properties.reference', '$.properties.source'])
+    expect(nested?.children?.map(c => c.name)).toEqual(['Reference', 'Source'])
+    expect(nested?.children?.map(c => c.path)).toEqual(['$.Properties.Reference', '$.Properties.Source'])
   })
 
   it('ignores an out-of-scope aggregation edge: the part is not nested', () => {
@@ -99,8 +99,8 @@ describe('umlDiagramToSchemaTree', () => {
     const tree = treeOf(diagram, 'whole')
 
     expect(tree.name).toBe('Whole')
-    expect(tree.fields.find(f => f.name === 'parts')).toBeUndefined()
-    expect(tree.fields.map(f => f.name)).toEqual(['label', 'owned'])
+    expect(tree.fields.find(f => f.name === 'Parts')).toBeUndefined()
+    expect(tree.fields.map(f => f.name)).toEqual(['Label', 'Owned'])
   })
 
   it('ignores an out-of-scope association edge: the target is not nested', () => {
@@ -120,8 +120,8 @@ describe('umlDiagramToSchemaTree', () => {
     const tree = treeOf(diagram, 'order')
 
     expect(tree.name).toBe('Order')
-    expect(tree.fields.find(f => f.name === 'customer')).toBeUndefined()
-    expect(tree.fields.map(f => f.name)).toEqual(['orderNo', 'owned'])
+    expect(tree.fields.find(f => f.name === 'Customer')).toBeUndefined()
+    expect(tree.fields.map(f => f.name)).toEqual(['OrderNo', 'Owned'])
   })
 
   it('reads the part multiplicity from the source end for composition (* -> array)', () => {
@@ -130,7 +130,7 @@ describe('umlDiagramToSchemaTree', () => {
       edges: [edge('composition', 'r-id', 'thing-id', { sourceRole: 'readings', sourceMultiplicity: '*' })],
     } as unknown as UMLDiagram
 
-    const nested = treeOf(diagram, 'thing').fields.find(f => f.name === 'readings')
+    const nested = treeOf(diagram, 'thing').fields.find(f => f.name === 'Readings')
     expect(nested?.type).toBe('array')
   })
 
@@ -145,7 +145,7 @@ describe('umlDiagramToSchemaTree', () => {
       ],
     } as unknown as UMLDiagram
 
-    expect(treeOf(diagram, 'order').fields.find(f => f.name === 'items')).toBeUndefined()
+    expect(treeOf(diagram, 'order').fields.find(f => f.name === 'Items')).toBeUndefined()
   })
 
   it('never roots on an embedded part even when fallbackName matches it', () => {
@@ -183,8 +183,8 @@ describe('umlDiagramToSchemaTree', () => {
 
     const tree = treeOf(diagram, 'animal')
     expect(tree.name).toBe('Dog')
-    expect(tree.fields.map(f => f.name)).toEqual(['name', 'breed'])
-    expect(tree.fields.map(f => f.path)).toEqual(['$.name', '$.breed'])
+    expect(tree.fields.map(f => f.name)).toEqual(['Name', 'Breed'])
+    expect(tree.fields.map(f => f.path)).toEqual(['$.Name', '$.Breed'])
   })
 
   it('ignores realization rather than inlining it like inheritance', () => {
@@ -198,10 +198,10 @@ describe('umlDiagramToSchemaTree', () => {
 
     const tree = treeOf(diagram, 'iface')
     expect(tree.name).toBe('IFace')
-    expect(tree.fields.map(f => f.name)).toEqual(['y', 'impl'])
-    const nested = tree.fields.find(f => f.name === 'impl')
+    expect(tree.fields.map(f => f.name)).toEqual(['Y', 'Impl'])
+    const nested = tree.fields.find(f => f.name === 'Impl')
     expect(nested?.type).toBe('object')
-    expect(nested?.children?.map(c => c.name)).toEqual(['x'])
+    expect(nested?.children?.map(c => c.name)).toEqual(['X'])
   })
 
   it('inlines multi-level inheritance (A → B → C) top-down', () => {
@@ -216,7 +216,7 @@ describe('umlDiagramToSchemaTree', () => {
 
     const tree = treeOf(diagram, 'leaf')
     expect(tree.name).toBe('Leaf')
-    expect(tree.fields.map(f => f.name)).toEqual(['a', 'b', 'c'])
+    expect(tree.fields.map(f => f.name)).toEqual(['A', 'B', 'C'])
   })
 
   it('inlines multiple inheritance in parent-edge order', () => {
@@ -231,7 +231,7 @@ describe('umlDiagramToSchemaTree', () => {
 
     const tree = treeOf(diagram, 'leaf')
     expect(tree.name).toBe('Leaf')
-    expect(tree.fields.map(f => f.name)).toEqual(['x', 'y', 'own'])
+    expect(tree.fields.map(f => f.name)).toEqual(['X', 'Y', 'Own'])
   })
 
   it('lets the subclass override an inherited attribute of the same name (keeping position)', () => {
@@ -244,7 +244,7 @@ describe('umlDiagramToSchemaTree', () => {
     } as unknown as UMLDiagram
 
     const tree = treeOf(diagram, 'child')
-    expect(tree.fields.map(f => f.name)).toEqual(['value'])
+    expect(tree.fields.map(f => f.name)).toEqual(['Value'])
     expect(tree.fields[0].type).toBe('int')
   })
 
@@ -259,7 +259,7 @@ describe('umlDiagramToSchemaTree', () => {
     } as unknown as UMLDiagram
 
     const tree = treeOf(diagram, 'leaf')
-    expect(tree.fields.map(f => f.name)).toEqual(['code', 'own'])
+    expect(tree.fields.map(f => f.name)).toEqual(['Code', 'Own'])
     expect(tree.fields[0].type).toBe('str')
   })
 
@@ -275,8 +275,8 @@ describe('umlDiagramToSchemaTree', () => {
 
     const tree = treeOf(diagram, 'car')
     expect(tree.name).toBe('Car')
-    expect(tree.fields.map(f => f.name)).toEqual(['vin', 'doors', 'engine'])
-    expect(tree.fields.find(f => f.name === 'engine')?.children?.map(c => c.name)).toEqual(['power'])
+    expect(tree.fields.map(f => f.name)).toEqual(['Vin', 'Doors', 'Engine'])
+    expect(tree.fields.find(f => f.name === 'Engine')?.children?.map(c => c.name)).toEqual(['Power'])
   })
 
   it('inlines a structural child that hangs off an inherited parent', () => {
@@ -291,8 +291,8 @@ describe('umlDiagramToSchemaTree', () => {
 
     const tree = treeOf(diagram, 'car')
     expect(tree.name).toBe('Car')
-    expect(tree.fields.map(f => f.name)).toEqual(['vin', 'doors', 'engine'])
-    expect(tree.fields.find(f => f.name === 'engine')?.children?.map(c => c.name)).toEqual(['power'])
+    expect(tree.fields.map(f => f.name)).toEqual(['Vin', 'Doors', 'Engine'])
+    expect(tree.fields.find(f => f.name === 'Engine')?.children?.map(c => c.name)).toEqual(['Power'])
   })
 
   it('yields an empty tree for a cyclic inheritance without a derivable top', () => {

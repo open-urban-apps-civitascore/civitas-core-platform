@@ -33,6 +33,8 @@
  * enumeration keeps its `enum` at the document root instead.
  */
 
+import { transliterate } from '@/utils/urn'
+
 import type { UMLDiagram } from '../types/diagram'
 import type { UMLAttribute, UMLElement, UMLEnumeration, UMLRelationship, UMLType } from '../types/uml'
 import { hasAttributes } from '../types/uml'
@@ -77,8 +79,45 @@ const GEOMETRY_TYPES = new Set([
  */
 export const GEOJSON_REF_BASE = 'https://geojson.org/schema'
 
-/** Lower-cases the first character, leaving the rest untouched. */
-const lowerFirst = (value: string): string => value.charAt(0).toLowerCase() + value.slice(1)
+/** Upper-cases the first character, leaving the rest untouched. */
+const upperFirst = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1)
+
+/** Runs of characters a property key may not contain; they separate words rather than survive. */
+const PROPERTY_KEY_SEPARATORS = /[^A-Za-z0-9_]+/
+
+/** Used when a name sanitizes to nothing at all (e.g. an attribute named `___`). */
+export const PROPERTY_KEY_FALLBACK = 'Field'
+
+/**
+ * Normalizes a UML name into a JSON Schema property key: letters, digits and underscore survive,
+ * German umlauts are transliterated, and every other character separates words, which are then
+ * PascalCase-joined — `air quality` becomes `AirQuality`. The key must start with an uppercase
+ * letter, so a leading underscore is dropped and a leading digit is prefixed with `N`. The digit is
+ * prefixed rather than stripped because stripping would collapse `1Value` and `2Value` onto one key.
+ *
+ * Returns an empty string when nothing usable remains; callers substitute their own fallback.
+ */
+export const sanitizePropertyKey = (name: string): string => {
+  const pascalCased = transliterate(name).split(PROPERTY_KEY_SEPARATORS).filter(Boolean).map(upperFirst).join('')
+  const withoutLeadingUnderscores = pascalCased.replace(/^_+/, '')
+  if (!withoutLeadingUnderscores) return ''
+  return upperFirst(/^\d/.test(withoutLeadingUnderscores) ? `N${withoutLeadingUnderscores}` : withoutLeadingUnderscores)
+}
+
+/**
+ * Reserves a unique key within one class's `properties`. Sanitization is lossy — `mein feld` and
+ * `meinFeld` both yield `MeinFeld` — so without this the second property would silently overwrite
+ * the first. Collisions are `_n`-suffixed, mirroring {@link assignDefKeys}.
+ */
+const reservePropertyKey = (candidate: string, usedKeys: Set<string>): string => {
+  let key = candidate
+  let suffix = 1
+  while (usedKeys.has(key)) {
+    key = `${candidate}_${suffix++}`
+  }
+  usedKeys.add(key)
+  return key
+}
 
 /**
  * Sanitizes a name for use in URIs and `$defs` keys.
@@ -197,11 +236,15 @@ const buildClassSchema = (
 
   const properties: JsonSchemaObject = {}
   const required: string[] = []
+  // Attributes and containment properties share one `properties` map, so they must draw their keys
+  // from one reservation set.
+  const usedPropertyKeys = new Set<string>()
 
   if (hasAttributes(element)) {
     for (const attr of element.attributes) {
-      properties[attr.name] = attributeToSchema(attr, classDefKeyById)
-      if (isAttributeRequired(attr)) required.push(attr.name)
+      const key = reservePropertyKey(sanitizePropertyKey(attr.name) || PROPERTY_KEY_FALLBACK, usedPropertyKeys)
+      properties[key] = attributeToSchema(attr, classDefKeyById)
+      if (isAttributeRequired(attr)) required.push(key)
     }
   }
 
@@ -215,8 +258,14 @@ const buildClassSchema = (
     if (!partDefKey) continue
 
     const partElement = (diagram.nodes ?? []).find(node => node.data?.element?.id === containment.partId)?.data?.element
-    const propName =
-      containment.role || (partElement ? lowerFirst(partElement.name) : '') || sanitizeName(partDefKey) || partDefKey
+    // The role names the part as seen from its container, which is exactly what the property needs
+    // to be called. The relationship's own name is deliberately not consulted: it labels the edge
+    // ("works for"), carries no per-property meaning, is not unique among a class's edges, and is
+    // free text that would land verbatim in a JSON key.
+    const propName = reservePropertyKey(
+      sanitizePropertyKey(containment.role || partElement?.name || partDefKey) || PROPERTY_KEY_FALLBACK,
+      usedPropertyKeys,
+    )
     const { lower, upper } = parseMultiplicity(containment.multiplicity)
     const ref: JsonSchemaObject = { $ref: `#/$defs/${partDefKey}` }
 
@@ -339,7 +388,7 @@ export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): Json
 
   const rootDefKey = classDefKeyById.get(rootElement.id) as string
   schema.properties = {
-    [sanitizeName(rootElement.name) || rootDefKey]: { $ref: `#/$defs/${rootDefKey}` },
+    [sanitizePropertyKey(rootElement.name) || rootDefKey]: { $ref: `#/$defs/${rootDefKey}` },
   }
   schema.$defs = buildDefs(elements, diagram, classDefKeyById)
   return schema
