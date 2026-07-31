@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
-import { usePatchDataset } from '@/app/services/api/datasets/clientRequests'
+import { usePatchDataset, useUpdateReleasedDatasetMeta } from '@/app/services/api/datasets/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { GenericAssignmentsList } from '@/components/access-management/GenericAssignmentsList'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
@@ -19,7 +19,7 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { Dataset } from '@/types/datasets'
+import { Dataset, DATASET_STATUS_TYPES } from '@/types/datasets'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 
 type AssignmentsListProps = {
@@ -50,6 +50,9 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
   const [isLoading, setIsLoading] = useState(false)
 
   const { mutateAsync: patchDataset } = usePatchDataset()
+  const { mutateAsync: updateReleasedMeta } = useUpdateReleasedDatasetMeta()
+
+  const isDraft = dataset.dataSetStatus === DATASET_STATUS_TYPES.DRAFT
 
   const hasChanges = hasAssignmentChanges(assignedGroups, initialAssignments)
 
@@ -59,10 +62,22 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
     setIsLoading(true)
     const areAssignmentsInvalid = assignedGroups.some(group => group.assignedRoles.length === 0)
     try {
-      await patchDataset({
-        id: dataset.id,
-        assignments: mapGroupRoleAssignmentsToApiPayload(assignedGroups),
-      })
+      const assignments = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
+      if (isDraft) {
+        await patchDataset({ id: dataset.id, assignments })
+      } else {
+        // PATCH /datasets/{id} rejects any non-DRAFT dataset, so released datasets go through
+        // released/meta. That endpoint is a full PUT: fields left out are nulled, hence the
+        // unchanged name/description/openDataAccess are re-sent. datapoolId stays omitted (only an
+        // explicit null clears the pool) and namedApis are immutable while released.
+        await updateReleasedMeta({
+          id: dataset.id,
+          name: dataset.name,
+          description: dataset.description,
+          openDataAccess: dataset.openDataAccess,
+          assignments,
+        })
+      }
       toast.success(t('messages.updateSuccess'))
       if (areAssignmentsInvalid) {
         toast.warning(t('messages.groupsWithoutRoles'))
@@ -75,8 +90,10 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
     } catch (error) {
       console.error('Error updating dataset assignments:', error)
       const axiosError = error as AxiosError
-      if (axiosError?.response?.status === 400) {
+      if (isDraft && axiosError?.response?.status === 400) {
         toast.error(t('messages.updateErrorNotDraft'))
+      } else if (!isDraft && axiosError?.response?.status === 409) {
+        toast.error(t('messages.updateErrorSagaInFlight'))
       } else {
         toast.error(tCommon('errors.unexpectedError'))
       }
