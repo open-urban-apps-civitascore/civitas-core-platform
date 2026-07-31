@@ -332,7 +332,74 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
-				<version>3.9.0</version>
+				<version>3.10.0</version>
+				<configuration>
+					<!-- JUnit and Mockito aggregators pull the API/engine artifacts the tests
+					     actually import; they carry no code themselves. -->
+					<ignoredUnusedDeclaredDependencies>
+						<ignoredUnusedDeclaredDependency>org.junit.jupiter:junit-jupiter</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.mockito:mockito-junit-jupiter</ignoredUnusedDeclaredDependency>
+						<!-- Commons Configuration2 instantiates it reflectively via BeanHelper -->
+						<ignoredUnusedDeclaredDependency>commons-beanutils:commons-beanutils</ignoredUnusedDeclaredDependency>
+						<!-- Registers its EventFormat via META-INF/services; no direct import -->
+						<ignoredUnusedDeclaredDependency>io.cloudevents:cloudevents-json-jackson</ignoredUnusedDeclaredDependency>
+						<!-- Core artifacts backing the module-specific Testcontainers deps -->
+						<ignoredUnusedDeclaredDependency>org.testcontainers:testcontainers</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.testcontainers:testcontainers-junit-jupiter</ignoredUnusedDeclaredDependency>
+						<!-- Shared test fixtures; the analyzer cannot attribute test-jar classifiers -->
+						<ignoredUnusedDeclaredDependency>de.civitas-core:config-adapter-api</ignoredUnusedDeclaredDependency>
+						<!-- Test-scoped AppConfig: adapters build config via the concrete
+						     implementation while compiling only against AdapterConfig -->
+						<ignoredUnusedDeclaredDependency>de.civitas-core:config-adapter-configuration</ignoredUnusedDeclaredDependency>
+						<!-- Jersey discovers its injection and JSON providers on the classpath;
+						     jersey-client backs the JAX-RS API the adapters and their tests use -->
+						<ignoredUnusedDeclaredDependency>org.glassfish.jersey.core:jersey-client</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.glassfish.jersey.inject:jersey-hk2</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.glassfish.jersey.media:jersey-media-json-jackson</ignoredUnusedDeclaredDependency>
+						<!-- Configured in abstract IT bases; the awaiting happens in subclasses -->
+						<ignoredUnusedDeclaredDependency>org.awaitility:awaitility</ignoredUnusedDeclaredDependency>
+						<!-- JDBC drivers: loaded by name at runtime -->
+						<ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>com.h2database:h2</ignoredUnusedDeclaredDependency>
+						<!-- Sibling adapters on the saga engine's test classpath: discovered via
+						     ServiceLoader and addressed by name, never imported -->
+						<ignoredUnusedDeclaredDependency>de.civitas-core:config-adapter-frost</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>de.civitas-core:config-adapter-apisix</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>de.civitas-core:config-adapter-postgis</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>de.civitas-core:config-adapter-nifi</ignoredUnusedDeclaredDependency>
+						<!-- Registers the JavaTimeModule Jackson discovers at runtime -->
+						<ignoredUnusedDeclaredDependency>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</ignoredUnusedDeclaredDependency>
+						<!-- Wired via META-INF/services (EventPublisher, EventConsumer) -->
+						<ignoredUnusedDeclaredDependency>de.civitas-core:event-handler-kafka</ignoredUnusedDeclaredDependency>
+						<!-- Test runners/containers wired by their engine, not by import -->
+						<ignoredUnusedDeclaredDependency>com.tngtech.archunit:archunit-junit5</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.testcontainers:testcontainers-kafka</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.testcontainers:testcontainers-postgresql</ignoredUnusedDeclaredDependency>
+						<!-- Backs the MapConfiguration the tests hand to AppConfig -->
+						<ignoredUnusedDeclaredDependency>org.apache.commons:commons-configuration2</ignoredUnusedDeclaredDependency>
+					</ignoredUnusedDeclaredDependencies>
+					<!-- Required at runtime by the adapters' REST clients and JSON mapping;
+					     the analyzer sees direct imports only in test code. -->
+					<ignoredNonTestScopedDependencies>
+						<ignoredNonTestScopedDependency>org.glassfish.jersey.core:jersey-client</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>com.fasterxml.jackson.core:*</ignoredNonTestScopedDependency>
+						<!-- Flowable's job service is driven by the embedded engine at runtime -->
+						<ignoredNonTestScopedDependency>org.flowable:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>org.postgresql:postgresql</ignoredNonTestScopedDependency>
+						<!-- The application bundles adapters and the event handler into the shade
+						     JAR for ServiceLoader discovery; it imports none of them directly. -->
+						<ignoredNonTestScopedDependency>de.civitas-core:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>org.apache.commons:commons-configuration2</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>io.cloudevents:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>org.apache.kafka:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>org.keycloak:*</ignoredNonTestScopedDependency>
+					</ignoredNonTestScopedDependencies>
+	<!-- The used-undeclared check is off: compiling against a starter's or aggregator's
+	     transitive closure is deliberate here, so every finding is a false positive. -->
+	<ignoredUsedUndeclaredDependencies>
+		<ignoredUsedUndeclaredDependency>*:*</ignoredUsedUndeclaredDependency>
+	</ignoredUsedUndeclaredDependencies>
+				</configuration>
 				<executions>
 					<execution>
 						<id>generate-dependency-tree</id>
