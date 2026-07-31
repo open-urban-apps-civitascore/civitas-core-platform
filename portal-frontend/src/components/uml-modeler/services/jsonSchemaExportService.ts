@@ -216,11 +216,7 @@ const buildClassSchema = (
 
     const partElement = (diagram.nodes ?? []).find(node => node.data?.element?.id === containment.partId)?.data?.element
     const propName =
-      containment.role ||
-      rel.name ||
-      (partElement ? lowerFirst(partElement.name) : '') ||
-      sanitizeName(partDefKey) ||
-      partDefKey
+      containment.role || (partElement ? lowerFirst(partElement.name) : '') || sanitizeName(partDefKey) || partDefKey
     const { lower, upper } = parseMultiplicity(containment.multiplicity)
     const ref: JsonSchemaObject = { $ref: `#/$defs/${partDefKey}` }
 

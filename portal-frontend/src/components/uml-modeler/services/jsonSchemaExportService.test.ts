@@ -594,6 +594,37 @@ describe('exportToJsonSchema', () => {
     expect(defs.Quality).toEqual({ title: 'Quality', enum: ['GOOD', 'POOR'] })
   })
 
+  it('names a role-less composition property after the part, ignoring the relationship name', () => {
+    const diagram = baseDiagram({
+      nodes: [...baseDiagram().nodes, readingNode],
+      edges: [
+        {
+          id: 'edge-1',
+          type: 'composition',
+          source: 'node-2',
+          target: 'node-1',
+          data: {
+            // The edge label a user typed in the inspector; it must not become the JSON key.
+            relationship: {
+              id: 'rel-1',
+              name: 'Composition Edge',
+              type: 'composition',
+              source: 'elem-2',
+              target: 'elem-1',
+            },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+      ],
+    })
+
+    const properties = classDef(exportToJsonSchema(diagram), 'TrafficSensor').properties as Record<string, unknown>
+    expect(properties).toHaveProperty('reading')
+    expect(properties).not.toHaveProperty('Composition Edge')
+  })
+
   it('links contained classes via $ref through composition', () => {
     const diagram = baseDiagram({
       nodes: [
