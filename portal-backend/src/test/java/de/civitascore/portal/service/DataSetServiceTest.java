@@ -1790,6 +1790,20 @@ class DataSetServiceTest {
     }
 
     @Test
+    @DisplayName("deletes the layers of a dataset that never had an OWS named API")
+    void deletesLayersWhenNoOwsApiEverExisted() {
+      // Keying on a disappeared OWS entry instead would leave these layers unserved indefinitely.
+      UUID id = UUID.randomUUID();
+      DataSet entity = new DataSet();
+      entity.setId(id);
+      entity.setNamedApis(new HashSet<>());
+
+      createService().postConvertToEntity(entity, inputWithApis(api("sensors", ApiStandard.STA)));
+
+      verify(layerRepository).deleteByDataSetId(id);
+    }
+
+    @Test
     @DisplayName("keeps the layers while an OWS named API remains")
     void keepsLayersWhileOwsApiRemains() {
       UUID id = UUID.randomUUID();
