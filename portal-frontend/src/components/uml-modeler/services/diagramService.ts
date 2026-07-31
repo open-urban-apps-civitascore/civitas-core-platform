@@ -308,8 +308,10 @@ export const validateRelationshipConnection = (
 
     case 'composition':
     case 'aggregation':
-      // The "whole" must be a class or abstract class; the "part" can be any element
-      return sourceType === 'class' || sourceType === 'abstractClass'
+      // The "whole" sits at the edge target — that is where the diamond is drawn (markerEnd) and
+      // what umlContainment reads as the container. It must be a class or abstract class; the
+      // "part" at the source can be any element, an enumeration included.
+      return targetType === 'class' || targetType === 'abstractClass'
 
     case 'association':
     case 'dependency':

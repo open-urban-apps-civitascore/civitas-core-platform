@@ -541,6 +541,59 @@ describe('exportToJsonSchema', () => {
     expect(defs.SensorType.enum).toEqual(['TRAFFIC', 'WEATHER'])
   })
 
+  it('links an enumeration via $ref through composition', () => {
+    const diagram = baseDiagram({
+      nodes: [
+        ...baseDiagram().nodes,
+        {
+          id: 'node-enum',
+          type: 'enumeration',
+          position: { x: 300, y: 0 },
+          data: {
+            element: {
+              id: 'elem-enum',
+              name: 'Quality',
+              type: 'enumeration',
+              literals: [
+                { id: 'l1', name: 'GOOD' },
+                { id: 'l2', name: 'POOR' },
+              ],
+            },
+            label: 'Quality',
+          },
+        },
+      ],
+      // Diamond at the target (TrafficSensor = container), the enumeration is the part.
+      edges: [
+        {
+          id: 'edge-enum',
+          type: 'composition',
+          source: 'node-enum',
+          target: 'node-1',
+          data: {
+            relationship: {
+              id: 'rel-enum',
+              type: 'composition',
+              source: 'elem-enum',
+              target: 'elem-1',
+              sourceRole: 'level',
+            },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+      ],
+    })
+
+    const schema = exportToJsonSchema(diagram)
+    const properties = classDef(schema, 'TrafficSensor').properties as Record<string, Record<string, unknown>>
+    expect(properties.level).toEqual({ $ref: '#/$defs/Quality' })
+
+    const defs = schema.$defs as Record<string, Record<string, unknown>>
+    expect(defs.Quality).toEqual({ title: 'Quality', enum: ['GOOD', 'POOR'] })
+  })
+
   it('links contained classes via $ref through composition', () => {
     const diagram = baseDiagram({
       nodes: [
