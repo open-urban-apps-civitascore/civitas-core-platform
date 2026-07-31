@@ -66,10 +66,7 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
       if (isDraft) {
         await patchDataset({ id: dataset.id, assignments })
       } else {
-        // PATCH /datasets/{id} rejects any non-DRAFT dataset, so released datasets go through
-        // released/meta. That endpoint is a full PUT: fields left out are nulled, hence the
-        // unchanged name/description/openDataAccess are re-sent. datapoolId stays omitted (only an
-        // explicit null clears the pool) and namedApis are immutable while released.
+        // Released datasets go through the released/meta PUT endpoint
         await updateReleasedMeta({
           id: dataset.id,
           name: dataset.name,
