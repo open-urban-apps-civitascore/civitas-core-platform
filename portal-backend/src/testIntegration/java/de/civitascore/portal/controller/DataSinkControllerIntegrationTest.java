@@ -592,7 +592,9 @@ class DataSinkControllerIntegrationTest
       first.setDataSinkType(DataSinkType.POSTGIS);
       first.setConfiguration(
           Map.of("tableName", "t_one", "dataStructureVersionId", dsv.getId().toString()));
-      assertThat(performCreate(first).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      ResponseEntity<DataSinkOutputDTO> existing = performCreate(first);
+      assertThat(existing.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(existing.getBody()).isNotNull();
 
       DataSinkInputDTO second = new DataSinkInputDTO();
       second.setDataSinkType(DataSinkType.POSTGIS);
@@ -621,6 +623,14 @@ class DataSinkControllerIntegrationTest
           .contains("T_ONE")
           .contains(testDataSetId.toString())
           .doesNotContain("confirmDataLoss");
+      assertThat(dataSinkRepository.findById(existing.getBody().getId()))
+          .isPresent()
+          .get()
+          .satisfies(s -> assertThat(s.getConfiguration()).containsEntry("tableName", "t_one"));
+      assertThat(dataSinkRepository.findById(created.getBody().getId()))
+          .isPresent()
+          .get()
+          .satisfies(s -> assertThat(s.getConfiguration()).containsEntry("tableName", "t_two"));
     }
 
     @Test
