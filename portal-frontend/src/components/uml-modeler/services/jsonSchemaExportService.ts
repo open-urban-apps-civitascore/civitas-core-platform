@@ -26,11 +26,12 @@
  * `isRoot`-designated element or, absent a designation, the one class not
  * embedded by any structural or inheritance edge — is referenced from the
  * document root via a `$ref` property, so the structure's name — not an
- * arbitrary class — is always the top level. Every other element must be
- * reachable from the root; otherwise (or when no unique root exists) the
- * export throws {@link SchemaExportError} instead of guessing. An empty
- * diagram exports an empty object schema; a diagram consisting of a single
- * enumeration keeps its `enum` at the document root instead.
+ * arbitrary class — is always the top level. An element with no containment
+ * edge is still emitted, just unreferenced; a diagram without a unique root,
+ * or one whose relations point away from it, throws
+ * {@link SchemaExportError} instead of guessing. An empty diagram exports an
+ * empty object schema; a diagram consisting of a single enumeration keeps its
+ * `enum` at the document root instead.
  */
 
 import { transliterate } from '@/utils/urn'
@@ -322,8 +323,8 @@ export const assignDefKeys = (elements: UMLElement[]): Map<string, string> => {
 }
 
 /**
- * The diagram cannot be exported as a schema: it has no unique root class or leaves elements
- * unreachable from it. Carries the typed {@link RootResolutionFailure} so callers can render a
+ * The diagram cannot be exported as a schema: it has no unique root class, or a relation points
+ * away from that root. Carries the typed {@link RootResolutionFailure} so callers can render a
  * precise, actionable message.
  */
 export class SchemaExportError extends Error {
@@ -336,7 +337,7 @@ export class SchemaExportError extends Error {
 /**
  * Main export function - converts a UMLDiagram into a JSON Schema document.
  *
- * @throws SchemaExportError when the diagram has no unique root class or elements are unreachable
+ * @throws SchemaExportError when the diagram has no unique root class, or a relation points away
  *   from it — callers surface this as a validation message instead of persisting a guessed schema
  */
 export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): JsonSchemaObject => {

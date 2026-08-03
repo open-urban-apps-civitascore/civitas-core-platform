@@ -169,12 +169,42 @@ describe('resolveRootElement', () => {
     })
   })
 
-  it('flags an isolated enumeration as unreachable from the root', () => {
-    const els = [element('r', 'Root'), element('e', 'Status', 'enumeration')]
-    expect(resolveRootElement(fullDiagram(els))).toEqual({
-      kind: 'invalid',
-      failure: { code: 'unreachable', rootName: 'Root', unreachableNames: ['Status'] },
+  it('accepts an isolated enumeration next to the root instead of refusing the diagram', () => {
+    // The single class is the root whether or not anything is wired up to it; the enumeration is
+    // simply not referenced yet, which is a normal state while modelling.
+    const root = element('r', 'Root')
+    expect(resolveRootElement(fullDiagram([root, element('e', 'Status', 'enumeration')]))).toEqual({
+      kind: 'class',
+      root,
     })
+  })
+
+  it('reports a composition drawn away from the root as misdirected', () => {
+    const root = { ...element('r', 'Root'), isRoot: true } as UMLElement
+    const other = element('o', 'Other')
+    // Drawn root → other, so the diamond sits on Other: Other contains the root instead of the
+    // other way round, and nothing reaches Other.
+    const d = fullDiagram([root, other], [edge(relationship({ type: 'composition', source: 'r', target: 'o' }))])
+    expect(resolveRootElement(d)).toEqual({
+      kind: 'invalid',
+      failure: { code: 'misdirected', name1: 'Root', name2: 'Other' },
+    })
+  })
+
+  it('accepts the same two classes once the composition points at the root', () => {
+    const root = { ...element('r', 'Root'), isRoot: true } as UMLElement
+    const other = element('o', 'Other')
+    const d = fullDiagram([root, other], [edge(relationship({ type: 'composition', source: 'o', target: 'r' }))])
+    expect(resolveRootElement(d)).toEqual({ kind: 'class', root })
+  })
+
+  it('ignores an element wired up only by an out-of-scope edge', () => {
+    const root = { ...element('r', 'Root'), isRoot: true } as UMLElement
+    const other = element('o', 'Other')
+    // Association carries no containment semantics, so Other can never be reached through it —
+    // treating that as misdirected would leave the diagram permanently unsavable.
+    const d = fullDiagram([root, other], [edge(relationship({ type: 'association', source: 'r', target: 'o' }))])
+    expect(resolveRootElement(d)).toEqual({ kind: 'class', root })
   })
 
   it('keeps the single-enumeration diagram as an enum root, rejects several enums', () => {
@@ -205,13 +235,12 @@ describe('resolveRootElement', () => {
     expect(resolveRootElement(d)).toEqual({ kind: 'class', root: alpha })
   })
 
-  it('checks reachability from the designated root too', () => {
+  it('accepts an unconnected class alongside a designated root', () => {
     const alpha = { ...element('a', 'Alpha'), isRoot: true } as UMLElement
     const beta = element('b', 'Beta')
-    expect(resolveRootElement(fullDiagram([alpha, beta]))).toEqual({
-      kind: 'invalid',
-      failure: { code: 'unreachable', rootName: 'Alpha', unreachableNames: ['Beta'] },
-    })
+    // Without the flag these two would be an ambiguous derivation; the designation states the entry
+    // point, and Beta is then a work-in-progress rather than a reason to refuse the diagram.
+    expect(resolveRootElement(fullDiagram([alpha, beta]))).toEqual({ kind: 'class', root: alpha })
   })
 
   it('rejects several designated roots (corrupt persisted state) as ambiguous', () => {
@@ -223,15 +252,15 @@ describe('resolveRootElement', () => {
     })
   })
 
-  it('prefers the designated root over the containment derivation', () => {
+  it('reports a designated root that is itself embedded as misdirected', () => {
     const part = { ...element('p', 'Part'), isRoot: true } as UMLElement
     const whole = element('w', 'Whole')
-    // The flagged class is embedded; its container is then unreachable from it — surfaced as such
-    // rather than silently ignoring the designation.
+    // "Part is the entry point" and "Part is contained in Whole" contradict each other: Whole is
+    // wired up yet cannot be reached from the designated root, so the edge points the wrong way.
     const d = fullDiagram([whole, part], [edge(relationship({ type: 'composition', source: 'p', target: 'w' }))])
     expect(resolveRootElement(d)).toEqual({
       kind: 'invalid',
-      failure: { code: 'unreachable', rootName: 'Part', unreachableNames: ['Whole'] },
+      failure: { code: 'misdirected', name1: 'Part', name2: 'Whole' },
     })
   })
 })

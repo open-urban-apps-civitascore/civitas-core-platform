@@ -24,16 +24,12 @@ describe('rootFailureMessage', () => {
     expect(t).toHaveBeenCalledWith('rootValidation.ambiguousRoot', { names: 'Alpha, Beta' })
   })
 
-  it('renders the unreachable key with the root and the joined unreachable names', () => {
+  it('renders the misdirected key with both ends of the relation', () => {
     const t = translator()
-    const failure: RootResolutionFailure = {
-      code: 'unreachable',
-      rootName: 'Root',
-      unreachableNames: ['Gamma', 'Delta'],
-    }
+    const failure: RootResolutionFailure = { code: 'misdirected', name1: 'Gamma', name2: 'Delta' }
 
     rootFailureMessage(t, failure)
 
-    expect(t).toHaveBeenCalledWith('rootValidation.unreachable', { root: 'Root', names: 'Gamma, Delta' })
+    expect(t).toHaveBeenCalledWith('rootValidation.misdirected', { name1: 'Gamma', name2: 'Delta' })
   })
 })

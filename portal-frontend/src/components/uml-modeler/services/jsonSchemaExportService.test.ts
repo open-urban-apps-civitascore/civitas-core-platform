@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality } from '../constants/umlTypes'
-import type { UMLDiagram } from '../types/diagram'
+import type { UMLDiagram, UMLNode } from '../types/diagram'
+import { hasAttributes } from '../types/uml'
 import {
   canMultiplicityBePrimaryKey,
   exportToJsonSchema,
@@ -55,6 +56,25 @@ const baseDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
   isDirty: false,
   ...overrides,
 })
+
+/**
+ * The base diagram's root class node with `extraAttributes` appended. Spreading `data.element`
+ * directly would widen to the `UMLElement` union, whose interface member carries no `attributes`;
+ * the guard narrows it back to the class the fixture actually is.
+ */
+const rootNodeWithAttributes = (extraAttributes: Record<string, unknown>[]): UMLNode => {
+  const rootNode = baseDiagram().nodes[0]
+  const element = rootNode.data.element
+  if (!hasAttributes(element)) throw new Error('base diagram root is expected to be a class with attributes')
+
+  return {
+    ...rootNode,
+    data: {
+      ...rootNode.data,
+      element: { ...element, attributes: [...element.attributes, ...extraAttributes] },
+    },
+  } as unknown as UMLNode
+}
 
 describe('sanitizeName', () => {
   it('lowercases and dashes non-alphanumerics', () => {
@@ -357,22 +377,9 @@ describe('exportToJsonSchema', () => {
   it('emits enumerations using the enum keyword', () => {
     // The root reaches the enum through an attribute typed by it; association edges are out of scope
     // and would leave the enum unreachable.
-    const rootNode = baseDiagram().nodes[0]
     const diagram = baseDiagram({
       nodes: [
-        {
-          ...rootNode,
-          data: {
-            ...rootNode.data,
-            element: {
-              ...rootNode.data.element,
-              attributes: [
-                ...rootNode.data.element.attributes,
-                { id: 'a4', name: 'status', type: { id: 'elem-2' }, visibility: 'public' },
-              ],
-            },
-          },
-        },
+        rootNodeWithAttributes([{ id: 'a4', name: 'status', type: { id: 'elem-2' }, visibility: 'public' }]),
         {
           id: 'node-2',
           type: 'enumeration',
@@ -556,22 +563,9 @@ describe('exportToJsonSchema', () => {
   it('enumerations alone do not count as roots — single class stays the root class', () => {
     // The class reaches the enum through an attribute typed by it, keeping it reachable without an
     // out-of-scope association edge.
-    const rootNode = baseDiagram().nodes[0]
     const diagram = baseDiagram({
       nodes: [
-        {
-          ...rootNode,
-          data: {
-            ...rootNode.data,
-            element: {
-              ...rootNode.data.element,
-              attributes: [
-                ...rootNode.data.element.attributes,
-                { id: 'a4', name: 'sensorType', type: { id: 'elem-enum' }, visibility: 'public' },
-              ],
-            },
-          },
-        },
+        rootNodeWithAttributes([{ id: 'a4', name: 'sensorType', type: { id: 'elem-enum' }, visibility: 'public' }]),
         {
           id: 'node-enum',
           type: 'enumeration',
@@ -1091,7 +1085,7 @@ describe('exportToJsonSchema', () => {
     })
   })
 
-  it('rejects an isolated enumeration as unreachable from the root class', () => {
+  it('emits an isolated enumeration into $defs, unreferenced, instead of refusing the export', () => {
     const diagram = baseDiagram({
       name: 'S',
       nodes: [
@@ -1114,18 +1108,14 @@ describe('exportToJsonSchema', () => {
       edges: [],
     } as Partial<UMLDiagram>)
 
-    let thrown: unknown
-    try {
-      exportToJsonSchema(diagram)
-    } catch (error) {
-      thrown = error
-    }
-    expect(thrown).toBeInstanceOf(SchemaExportError)
-    expect((thrown as SchemaExportError).failure).toEqual({
-      code: 'unreachable',
-      rootName: 'Root',
-      unreachableNames: ['Status'],
-    })
+    const schema = exportToJsonSchema(diagram)
+    const defs = schema.$defs as Record<string, Record<string, unknown>>
+
+    // Root is the single class; the enumeration is kept but nothing points at it, so it carries no
+    // data until the modeller wires it up.
+    expect(schema.properties).toEqual({ Root: { $ref: '#/$defs/Root' } })
+    expect(defs.Status.enum).toEqual(['ON'])
+    expect(defs.Root.properties).not.toHaveProperty('Status')
   })
 
   it('rejects several enumerations without any class as ambiguous', () => {
