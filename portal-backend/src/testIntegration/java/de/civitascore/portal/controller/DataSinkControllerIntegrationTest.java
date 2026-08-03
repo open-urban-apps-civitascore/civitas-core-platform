@@ -1,6 +1,7 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -249,6 +251,105 @@ class DataSinkControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
       assertThat(response.getBody().getDataSetId()).isEqualTo(testDataSetId);
+    }
+
+    @Test
+    @DisplayName("POST returns 409 when a sibling POSTGIS sink already uses the tableName")
+    void postRejectsDuplicatePostgisTableName() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO first = new DataSinkInputDTO();
+      first.setDataSinkType(DataSinkType.POSTGIS);
+      first.setConfiguration(
+          Map.of("tableName", "shared_table", "dataStructureVersionId", dsv.getId().toString()));
+      assertThat(performCreate(first).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+      DataSinkInputDTO duplicate = new DataSinkInputDTO();
+      duplicate.setDataSinkType(DataSinkType.POSTGIS);
+      duplicate.setConfiguration(
+          Map.of("tableName", "shared_table", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), duplicate);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("POST returns 409 when the tableName differs from a sibling only in case")
+    void postRejectsCaseOnlyDuplicatePostgisTableName() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO first = new DataSinkInputDTO();
+      first.setDataSinkType(DataSinkType.POSTGIS);
+      first.setConfiguration(
+          Map.of("tableName", "case_table", "dataStructureVersionId", dsv.getId().toString()));
+      assertThat(performCreate(first).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+      DataSinkInputDTO duplicate = new DataSinkInputDTO();
+      duplicate.setDataSinkType(DataSinkType.POSTGIS);
+      duplicate.setConfiguration(
+          Map.of("tableName", "CASE_TABLE", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), duplicate);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    /**
+     * The service check is a non-locking read, so two concurrent creates can both pass it. Saving
+     * straight through the repository is the only way to reach the constraint that closes that
+     * window — every path through the service is rejected earlier.
+     */
+    @Test
+    @DisplayName("The database rejects a duplicate tableName that bypasses the service check")
+    void databaseRejectsDuplicateTableNameBypassingTheService() {
+      ensureTestData();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+
+      DataSink first = new DataSink();
+      first.setDataSet(dataSet);
+      first.setDataSinkType(DataSinkType.POSTGIS);
+      first.setConfiguration(Map.of("tableName", "raced_table"));
+      dataSinkRepository.saveAndFlush(first);
+
+      DataSink duplicate = new DataSink();
+      duplicate.setDataSet(dataSet);
+      duplicate.setDataSinkType(DataSinkType.POSTGIS);
+      duplicate.setConfiguration(Map.of("tableName", "RACED_TABLE"));
+
+      assertThatThrownBy(() -> dataSinkRepository.saveAndFlush(duplicate))
+          .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("POST returns 400 when the POSTGIS tableName is not a plain identifier")
+    void postRejectsNonIdentifierPostgisTableName() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.POSTGIS);
+      input.setConfiguration(
+          Map.of(
+              "tableName", "  padded_table  ", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

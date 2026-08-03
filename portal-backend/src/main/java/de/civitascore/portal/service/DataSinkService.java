@@ -17,11 +17,13 @@ import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,21 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
+
+  /**
+   * A POSTGIS sink's tableName becomes a PostgreSQL identifier verbatim — the adapter quotes it, so
+   * anything the API accepts is created as-is. Restricting it to unquoted-identifier syntax keeps
+   * SQL's own folding rules applicable, so the uniqueness check cannot disagree with the database
+   * about what a duplicate is.
+   */
+  private static final Pattern TABLE_NAME_PATTERN = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
+  /**
+   * PostgreSQL truncates a longer identifier instead of rejecting it, which would silently detach
+   * the sink from the table it names. Bytes and characters coincide because the pattern above
+   * admits ASCII only.
+   */
+  private static final int MAX_TABLE_NAME_LENGTH = 63;
 
   private final DataSinkRepository dataSinkRepository;
   private final DataSinkMapper dataSinkMapper;
@@ -175,6 +192,48 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   }
 
   /**
+   * @throws UniqueConstraintViolationException if a sibling POSTGIS sink of the same dataset
+   *     already claims this {@code tableName}
+   */
+  @Override
+  protected DataSink preSave(DataSink entity) {
+    validateUniquePostgisTableName(entity);
+    return super.preSave(entity);
+  }
+
+  /**
+   * The dataset's POSTGIS sinks share one schema, so one {@code tableName} is one physical table.
+   * Case-insensitive: two tables differing only in case are never intended.
+   */
+  private void validateUniquePostgisTableName(DataSink entity) {
+    if (entity.getDataSinkType() != DataSinkType.POSTGIS) {
+      return;
+    }
+    String tableName = (String) entity.getConfiguration().get("tableName");
+
+    dataSinkRepository.findByDataSetIdWithoutFlush(entity.getDataSet().getId()).stream()
+        .filter(sibling -> !Objects.equals(sibling.getId(), entity.getId()))
+        .filter(sibling -> sibling.getDataSinkType() == DataSinkType.POSTGIS)
+        .filter(sibling -> tableName.equalsIgnoreCase(siblingTableName(sibling)))
+        .findFirst()
+        .ifPresent(
+            _ -> {
+              throw new UniqueConstraintViolationException(
+                  getEntityName(),
+                  "configuration.tableName",
+                  tableName,
+                  "dataSetId",
+                  entity.getDataSet().getId().toString());
+            });
+  }
+
+  /** {@code null} for a stored sink whose configuration carries no comparable name. */
+  private static String siblingTableName(DataSink sink) {
+    Map<String, Object> config = sink.getConfiguration();
+    return config != null && config.get("tableName") instanceof String tableName ? tableName : null;
+  }
+
+  /**
    * Detaches every DataSink belonging to the given pipeline by clearing its {@code pipeline}
    * reference. DataSinks themselves survive — they remain owned by their parent dataset and can be
    * reattached to a different pipeline later.
@@ -244,6 +303,19 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
     if (!(tableNameRaw instanceof String tableName) || tableName.isBlank()) {
       throw new InvalidInputException(
           "DataSink", "configuration.tableName", "tableName is required for POSTGIS sinks");
+    }
+    if (!TABLE_NAME_PATTERN.matcher(tableName).matches()) {
+      throw new InvalidInputException(
+          "DataSink",
+          "configuration.tableName",
+          "tableName must start with a letter or underscore and contain only letters, digits and"
+              + " underscores");
+    }
+    if (tableName.length() > MAX_TABLE_NAME_LENGTH) {
+      throw new InvalidInputException(
+          "DataSink",
+          "configuration.tableName",
+          "tableName must be at most " + MAX_TABLE_NAME_LENGTH + " characters");
     }
 
     Object dsvIdRaw = config.get("dataStructureVersionId");
