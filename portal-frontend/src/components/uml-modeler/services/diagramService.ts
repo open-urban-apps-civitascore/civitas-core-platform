@@ -8,7 +8,7 @@ import {
 } from '@xyflow/react'
 
 import type { DiagramAction, UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
-import type { UMLRelationship } from '../types/uml'
+import type { UMLElementType, UMLRelationship } from '../types/uml'
 
 const hasSemanticNodeChanges = (changes: NodeChange[]) =>
   changes.some(change => change.type !== 'select' && change.type !== 'dimensions')
@@ -273,26 +273,15 @@ export const validateConnection = (diagram: UMLDiagram, connection: Connection):
   return true
 }
 
-// Validation for specific UML relationship types
-export const validateRelationshipConnection = (
-  diagram: UMLDiagram,
-  connection: Connection,
+/**
+ * Separate from {@link validateRelationshipConnection} so retyping an existing edge can reuse these
+ * rules without the duplicate check, which would reject that edge as a duplicate of itself.
+ */
+export const isRelationshipAllowedBetween = (
+  sourceType: UMLElementType,
+  targetType: UMLElementType,
   relationshipType: string,
 ): boolean => {
-  if (!validateConnection(diagram, connection)) {
-    return false
-  }
-
-  const sourceNode = findNodeById(diagram, connection.source!)
-  const targetNode = findNodeById(diagram, connection.target!)
-
-  if (!sourceNode || !targetNode) {
-    return false
-  }
-
-  const sourceType = sourceNode.data.element.type
-  const targetType = targetNode.data.element.type
-
   switch (relationshipType) {
     case 'inheritance':
       // Classes/abstract classes can inherit from classes/abstract classes
@@ -320,6 +309,25 @@ export const validateRelationshipConnection = (
     default:
       return true
   }
+}
+
+export const validateRelationshipConnection = (
+  diagram: UMLDiagram,
+  connection: Connection,
+  relationshipType: string,
+): boolean => {
+  if (!validateConnection(diagram, connection)) {
+    return false
+  }
+
+  const sourceNode = findNodeById(diagram, connection.source!)
+  const targetNode = findNodeById(diagram, connection.target!)
+
+  if (!sourceNode || !targetNode) {
+    return false
+  }
+
+  return isRelationshipAllowedBetween(sourceNode.data.element.type, targetNode.data.element.type, relationshipType)
 }
 
 // Diagram serialization

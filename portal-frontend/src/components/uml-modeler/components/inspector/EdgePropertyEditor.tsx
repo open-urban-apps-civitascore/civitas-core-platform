@@ -6,6 +6,7 @@ import { RELATIONSHIP_PALETTE_ITEMS } from '../../constants/paletteItems'
 import { MULTIPLICITY_VALUES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
+import { findNodeById, isRelationshipAllowedBetween } from '../../services/diagramService'
 import type { UMLEdge } from '../../types/diagram'
 import type { UMLRelationshipType } from '../../types/uml'
 
@@ -17,10 +18,21 @@ interface EdgePropertyEditorProps {
 }
 
 export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) => {
-  const { updateEdge } = useActiveDiagram()
+  const { diagram, updateEdge } = useActiveDiagram()
   const { isReadOnly } = useReadOnly()
 
   const relationship = edge.data.relationship
+
+  // The current type is kept even when disallowed, so a legacy edge does not read as another type.
+  const sourceType = findNodeById(diagram, edge.source)?.data.element.type
+  const targetType = findNodeById(diagram, edge.target)?.data.element.type
+  const typeOptions =
+    sourceType && targetType
+      ? RELATIONSHIP_TYPE_OPTIONS.filter(
+          option =>
+            option.value === relationship.type || isRelationshipAllowedBetween(sourceType, targetType, option.value),
+        )
+      : RELATIONSHIP_TYPE_OPTIONS
 
   const handleTypeChange = useCallback(
     (event: ChangeEvent<HTMLSelectElement>) => {
@@ -95,7 +107,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           disabled={isReadOnly}
         >
-          {RELATIONSHIP_TYPE_OPTIONS.map(type => (
+          {typeOptions.map(type => (
             <option key={type.value} value={type.value}>
               {type.label}
             </option>

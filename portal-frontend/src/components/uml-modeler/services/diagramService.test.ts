@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { UMLDiagram, UMLNode } from '../types/diagram'
 import type { UMLElement, UMLElementType } from '../types/uml'
-import { diagramReducer, validateRelationshipConnection } from './diagramService'
+import { diagramReducer, isRelationshipAllowedBetween, validateRelationshipConnection } from './diagramService'
 import { classifyStructuralEdge } from './umlContainment'
 
 const node = (id: string, name: string, isRoot?: boolean): UMLNode =>
@@ -110,5 +110,25 @@ describe('validateRelationshipConnection composition/aggregation direction', () 
     })
 
     expect(containment).toEqual(expect.objectContaining({ containerId: 'Whole', partId: 'Quality' }))
+  })
+})
+
+describe('isRelationshipAllowedBetween', () => {
+  it('allows an enumeration as a composition part but never as a subclass or superclass', () => {
+    expect(isRelationshipAllowedBetween('enumeration', 'class', 'composition')).toBe(true)
+    expect(isRelationshipAllowedBetween('enumeration', 'class', 'inheritance')).toBe(false)
+    expect(isRelationshipAllowedBetween('class', 'enumeration', 'inheritance')).toBe(false)
+  })
+
+  it('answers without any diagram state, so retyping an existing edge is not read as a duplicate', () => {
+    const state = {
+      ...diagram([typedNode('Quality', 'enumeration'), typedNode('Whole', 'class')]),
+      edges: [{ id: 'e1', source: 'Quality', target: 'Whole' }],
+    } as unknown as UMLDiagram
+    const existing = connect('Quality', 'Whole')
+
+    // Both calls describe the same pair; only the first one sees the edge and rejects it.
+    expect(validateRelationshipConnection(state, existing, 'composition')).toBe(false)
+    expect(isRelationshipAllowedBetween('enumeration', 'class', 'composition')).toBe(true)
   })
 })
