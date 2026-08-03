@@ -15,9 +15,11 @@ const RELATIONSHIP_TYPE_OPTIONS = RELATIONSHIP_PALETTE_ITEMS.map(item => ({ valu
 
 interface EdgePropertyEditorProps {
   edge: UMLEdge
+  /** Off until navigability is supported end to end. */
+  isNavigationVisible?: boolean
 }
 
-export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) => {
+export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge, isNavigationVisible = false }) => {
   const { diagram, updateEdge } = useActiveDiagram()
   const { isReadOnly } = useReadOnly()
 
@@ -191,39 +193,41 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
       </div>
 
       {/* Navigation Properties */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-gray-700">Navigation</h4>
+      {isNavigationVisible && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-gray-700">Navigation</h4>
 
-        <div className="space-y-2">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id={`navigable-${edge.id}`}
-              checked={relationship.isNavigable || false}
-              onChange={handleNavigableChange}
-              className="mr-2"
-              disabled={isReadOnly}
-            />
-            <label htmlFor={`navigable-${edge.id}`} className="text-sm text-gray-600">
-              Navigable relationship
-            </label>
-          </div>
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id={`navigable-${edge.id}`}
+                checked={relationship.isNavigable || false}
+                onChange={handleNavigableChange}
+                className="mr-2"
+                disabled={isReadOnly}
+              />
+              <label htmlFor={`navigable-${edge.id}`} className="text-sm text-gray-600">
+                Navigable relationship
+              </label>
+            </div>
 
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id={`bidirectional-${edge.id}`}
-              checked={relationship.isBidirectional || false}
-              onChange={handleBidirectionalChange}
-              className="mr-2"
-              disabled={isReadOnly}
-            />
-            <label htmlFor={`bidirectional-${edge.id}`} className="text-sm text-gray-600">
-              Bidirectional navigation
-            </label>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id={`bidirectional-${edge.id}`}
+                checked={relationship.isBidirectional || false}
+                onChange={handleBidirectionalChange}
+                className="mr-2"
+                disabled={isReadOnly}
+              />
+              <label htmlFor={`bidirectional-${edge.id}`} className="text-sm text-gray-600">
+                Bidirectional navigation
+              </label>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Relationship Info */}
       <div className="bg-gray-50 p-3 rounded-md">
