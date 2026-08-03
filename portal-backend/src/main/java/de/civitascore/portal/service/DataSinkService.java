@@ -38,17 +38,14 @@ import org.springframework.stereotype.Service;
 public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
 
   /**
-   * A POSTGIS sink's tableName becomes a PostgreSQL identifier verbatim — the adapter quotes it, so
-   * anything the API accepts is created as-is. Restricting it to unquoted-identifier syntax keeps
-   * SQL's own folding rules applicable, so the uniqueness check cannot disagree with the database
-   * about what a duplicate is.
+   * ASCII-only keeps Postgres' {@code LOWER()} in the unique index and Java's {@code
+   * equalsIgnoreCase} in the uniqueness check from disagreeing about what counts as a duplicate.
    */
   private static final Pattern TABLE_NAME_PATTERN = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
   /**
    * PostgreSQL truncates a longer identifier instead of rejecting it, which would silently detach
-   * the sink from the table it names. Bytes and characters coincide because the pattern above
-   * admits ASCII only.
+   * the sink from the table it names.
    */
   private static final int MAX_TABLE_NAME_LENGTH = 63;
 
@@ -191,10 +188,6 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
     return super.postConvertToEntity(entity, input);
   }
 
-  /**
-   * @throws UniqueConstraintViolationException if a sibling POSTGIS sink of the same dataset
-   *     already claims this {@code tableName}
-   */
   @Override
   protected DataSink preSave(DataSink entity) {
     validateUniquePostgisTableName(entity);
@@ -203,7 +196,6 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
 
   /**
    * The dataset's POSTGIS sinks share one schema, so one {@code tableName} is one physical table.
-   * Case-insensitive: two tables differing only in case are never intended.
    */
   private void validateUniquePostgisTableName(DataSink entity) {
     if (entity.getDataSinkType() != DataSinkType.POSTGIS) {
@@ -227,7 +219,6 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
             });
   }
 
-  /** {@code null} for a stored sink whose configuration carries no comparable name. */
   private static String siblingTableName(DataSink sink) {
     Map<String, Object> config = sink.getConfiguration();
     return config != null && config.get("tableName") instanceof String tableName ? tableName : null;

@@ -36,9 +36,6 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
    * Reads the dataset's sinks without flushing pending changes, so a caller validating an
    * already-mutated managed sink sees the stored siblings rather than triggering an INSERT/UPDATE
    * of the very entity it is about to accept or reject.
-   *
-   * @param dataSetId the parent dataset ID
-   * @return the dataset's sinks as currently stored
    */
   @QueryHints(@QueryHint(name = HibernateHints.HINT_FLUSH_MODE, value = "COMMIT"))
   @Query("SELECT s FROM DataSink s WHERE s.dataSet.id = :dataSetId")
