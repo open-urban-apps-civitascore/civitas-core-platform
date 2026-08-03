@@ -139,6 +139,10 @@ const namesOf = (elements: UMLElement[]): string[] => elements.map(e => e.name |
  * merged into the subclass), and attribute type references (an element used as an attribute's type
  * is embedded without any edge). A subclass of a reached class is deliberately NOT reached — its
  * own properties never appear in the record.
+ *
+ * Currently unused: root resolution refuses only a root that is itself embedded, not elements it
+ * cannot reach. Kept for the planned editor warning that marks what will not carry data — do not
+ * drop it as dead code.
  */
 export const collectReachableIds = (diagram: UMLDiagram, rootId: string): Set<string> => {
   const partsByContainer = new Map<string, string[]>()
@@ -179,26 +183,17 @@ export const collectReachableIds = (diagram: UMLDiagram, rootId: string): Set<st
   return reachable
 }
 
-/**
- * The first relation whose ends do not both reach the record, named by both ends. Only relations
- * that can actually embed something are considered — composition and inheritance; an out-of-scope
- * edge (association, dependency) carries no semantics, so an element wired up with nothing but
- * those counts as unwired rather than as permanently misdirected.
- *
- * Only the first is reported: fixing it changes what the rest can reach, so listing them all would
- * name relations that are fine once the first is turned around. The next one surfaces on the next
- * attempt.
- */
-const findMisdirectedRelation = (
-  diagram: UMLDiagram,
-  reachable: Set<string>,
-): { name1: string; name2: string } | null => {
+/** Names both ends of the first relation that embeds the root: composition part or inheritance parent. */
+const findRelationEmbeddingRoot = (diagram: UMLDiagram, rootId: string): { name1: string; name2: string } | null => {
   const nameById = new Map(elementsOf(diagram).map(e => [e.id, e.name || e.type]))
   for (const edge of diagram.edges ?? []) {
     const rel = edge.data?.relationship
     if (!rel) continue
-    if (!INHERITANCE_RELATIONS.has(rel.type) && !classifyStructuralEdge(rel)) continue
-    if (reachable.has(rel.source) && reachable.has(rel.target)) continue
+
+    const isRootEmbedded = INHERITANCE_RELATIONS.has(rel.type)
+      ? rel.target === rootId
+      : classifyStructuralEdge(rel)?.partId === rootId
+    if (!isRootEmbedded) continue
 
     const name1 = nameById.get(rel.source)
     const name2 = nameById.get(rel.target)
@@ -215,12 +210,9 @@ const findMisdirectedRelation = (
  * order-dependent guess would silently pick someone's entry point for them. A diagram consisting of
  * exactly one enumeration keeps its special enum-root form.
  *
- * Whether an element the root cannot reach is a failure depends on how it got there. An element
- * with no composition/inheritance edge at all is unfinished work — a normal intermediate state,
- * saved as an unreferenced `$defs` entry so the modelling survives. An element that *is* wired up
- * and still does not reach the record is a contradiction: the relation was drawn in the opposite
- * direction to what was meant (`misdirected`). Both directions are valid UML, so only this mismatch
- * with the root makes the mistake detectable at all.
+ * Elements the root cannot reach are no failure — not wired up yet is a normal intermediate state,
+ * kept as unreferenced `$defs` entries. Refused is only a root that is itself embedded by a
+ * relation, since it cannot both start the record and sit inside another element (`misdirected`).
  */
 export const resolveRootElement = (diagram: UMLDiagram): RootResolution => {
   const elements = elementsOf(diagram)
@@ -235,7 +227,7 @@ export const resolveRootElement = (diagram: UMLDiagram): RootResolution => {
   const root = designatedRoot(nonEnum) ?? derivedRoot(nonEnum, diagram)
   if ('failure' in root) return { kind: 'invalid', failure: root.failure }
 
-  const misdirected = findMisdirectedRelation(diagram, collectReachableIds(diagram, root.element.id))
+  const misdirected = findRelationEmbeddingRoot(diagram, root.element.id)
   if (misdirected) return { kind: 'invalid', failure: { code: 'misdirected', ...misdirected } }
 
   return { kind: 'class', root: root.element }

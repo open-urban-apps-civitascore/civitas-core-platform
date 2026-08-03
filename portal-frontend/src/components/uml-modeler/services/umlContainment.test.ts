@@ -182,13 +182,35 @@ describe('resolveRootElement', () => {
   it('reports a composition drawn away from the root as misdirected', () => {
     const root = { ...element('r', 'Root'), isRoot: true } as UMLElement
     const other = element('o', 'Other')
-    // Drawn root → other, so the diamond sits on Other: Other contains the root instead of the
-    // other way round, and nothing reaches Other.
+    // Drawn root → other, so the diamond sits on Other and the root becomes its part.
     const d = fullDiagram([root, other], [edge(relationship({ type: 'composition', source: 'r', target: 'o' }))])
     expect(resolveRootElement(d)).toEqual({
       kind: 'invalid',
       failure: { code: 'misdirected', name1: 'Root', name2: 'Other' },
     })
+  })
+
+  it('reports an inheritance that makes the root a superclass as misdirected', () => {
+    const root = { ...element('r', 'Root'), isRoot: true } as UMLElement
+    const other = element('o', 'Other')
+    // Drawn other → root, so the root becomes the superclass and is merged into Other.
+    const d = fullDiagram([root, other], [edge(relationship({ type: 'inheritance', source: 'o', target: 'r' }))])
+    expect(resolveRootElement(d)).toEqual({
+      kind: 'invalid',
+      failure: { code: 'misdirected', name1: 'Other', name2: 'Root' },
+    })
+  })
+
+  it('accepts an island of correctly drawn relations that does not reach the root yet', () => {
+    const root = { ...element('r', 'Root'), isRoot: true } as UMLElement
+    const island = element('i', 'Island')
+    const status = element('e', 'Status', 'enumeration')
+    // The composition is correct (diamond at Island); only Island is not wired up to the root yet.
+    const d = fullDiagram(
+      [root, island, status],
+      [edge(relationship({ type: 'composition', source: 'e', target: 'i' }))],
+    )
+    expect(resolveRootElement(d)).toEqual({ kind: 'class', root })
   })
 
   it('accepts the same two classes once the composition points at the root', () => {
