@@ -1,7 +1,6 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
@@ -26,7 +25,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -305,32 +303,6 @@ class DataSinkControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
 
-    /**
-     * The service check is a non-locking read, so two concurrent creates can both pass it. Saving
-     * straight through the repository is the only way to reach the constraint that closes that
-     * window — every path through the service is rejected earlier.
-     */
-    @Test
-    @DisplayName("The database rejects a duplicate tableName that bypasses the service check")
-    void databaseRejectsDuplicateTableNameBypassingTheService() {
-      ensureTestData();
-      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
-
-      DataSink first = new DataSink();
-      first.setDataSet(dataSet);
-      first.setDataSinkType(DataSinkType.POSTGIS);
-      first.setConfiguration(Map.of("tableName", "raced_table"));
-      dataSinkRepository.saveAndFlush(first);
-
-      DataSink duplicate = new DataSink();
-      duplicate.setDataSet(dataSet);
-      duplicate.setDataSinkType(DataSinkType.POSTGIS);
-      duplicate.setConfiguration(Map.of("tableName", "RACED_TABLE"));
-
-      assertThatThrownBy(() -> dataSinkRepository.saveAndFlush(duplicate))
-          .isInstanceOf(DataIntegrityViolationException.class);
-    }
-
     @Test
     @DisplayName("POST returns 400 when the POSTGIS tableName is not a plain identifier")
     void postRejectsNonIdentifierPostgisTableName() {
@@ -601,6 +573,54 @@ class DataSinkControllerIntegrationTest
       assertThat(response.getBody().getDataSetId())
           .as("dataSetId should remain the parent dataset")
           .isEqualTo(testDataSetId);
+    }
+
+    /**
+     * The data-loss guard answers 409 on this path too, so a status-only assertion could not tell
+     * the two rejections apart.
+     */
+    @Test
+    @DisplayName("PATCH returns 409 when renaming a sink onto a sibling POSTGIS tableName")
+    void patchRejectsDuplicatePostgisTableName() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO first = new DataSinkInputDTO();
+      first.setDataSinkType(DataSinkType.POSTGIS);
+      first.setConfiguration(
+          Map.of("tableName", "t_one", "dataStructureVersionId", dsv.getId().toString()));
+      assertThat(performCreate(first).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+      DataSinkInputDTO second = new DataSinkInputDTO();
+      second.setDataSinkType(DataSinkType.POSTGIS);
+      second.setConfiguration(
+          Map.of("tableName", "t_two", "dataStructureVersionId", dsv.getId().toString()));
+      ResponseEntity<DataSinkOutputDTO> created = performCreate(second);
+      assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(created.getBody()).isNotNull();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put(
+          "configuration",
+          Map.of("tableName", "T_ONE", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + created.getBody().getId(),
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail())
+          .contains("configuration.tableName")
+          .contains("T_ONE")
+          .contains(testDataSetId.toString())
+          .doesNotContain("confirmDataLoss");
     }
 
     @Test

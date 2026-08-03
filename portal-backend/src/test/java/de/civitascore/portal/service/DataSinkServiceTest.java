@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -397,7 +398,7 @@ class DataSinkServiceTest {
 
       DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
       stubCreate(dataSetId, dsvId, input);
-      when(dataSinkRepository.findByDataSetId(dataSetId))
+      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
           .thenReturn(List.of(postgisSink(UUID.randomUUID(), dataSetId, "messwerte")));
 
       assertThatThrownBy(() -> dataSinkService.create(input))
@@ -413,7 +414,7 @@ class DataSinkServiceTest {
 
       DataSinkInputDTO input = postgisInput(dataSetId, "MESSWERTE", dsvId);
       stubCreate(dataSetId, dsvId, input);
-      when(dataSinkRepository.findByDataSetId(dataSetId))
+      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
           .thenReturn(List.of(postgisSink(UUID.randomUUID(), dataSetId, "messwerte")));
 
       assertThatThrownBy(() -> dataSinkService.create(input))
@@ -434,7 +435,8 @@ class DataSinkServiceTest {
 
       DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
       stubCreate(dataSetId, dsvId, input);
-      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of(frostSibling));
+      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
+          .thenReturn(List.of(frostSibling));
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       assertThat(dataSinkService.create(input)).isNotNull();
@@ -448,7 +450,7 @@ class DataSinkServiceTest {
 
       DataSinkInputDTO input = postgisInput(dataSetId, "andere_tabelle", dsvId);
       stubCreate(dataSetId, dsvId, input);
-      when(dataSinkRepository.findByDataSetId(dataSetId))
+      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
           .thenReturn(List.of(postgisSink(UUID.randomUUID(), dataSetId, "messwerte")));
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -490,7 +492,7 @@ class DataSinkServiceTest {
 
       DataSinkInputDTO input = postgisInput(dataSetId, "t".repeat(63), dsvId);
       stubCreate(dataSetId, dsvId, input);
-      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of());
+      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId)).thenReturn(List.of());
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       assertThat(dataSinkService.create(input)).isNotNull();
@@ -526,11 +528,53 @@ class DataSinkServiceTest {
           .thenReturn(Optional.of(dataStructureVersion(dsvId)));
       // A separate instance for the same row, as a fresh query returns: sharing the entity's
       // reference would let the test pass on identity alone, without the id comparison.
-      when(dataSinkRepository.findByDataSetId(dataSetId))
+      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
           .thenReturn(List.of(postgisSink(sinkId, dataSetId, "messwerte")));
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       assertThat(dataSinkService.update(sinkId, input)).isNotNull();
+    }
+
+    /**
+     * Self-exclusion and duplicate detection share one stream, so broadening the identity check
+     * would disable uniqueness for every update while the self-exclusion test above stays green.
+     */
+    @Test
+    @DisplayName("Should reject renaming a sink onto a sibling's tableName")
+    void shouldRejectDuplicateTableNameOnUpdate() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID sinkId = UUID.randomUUID();
+      UUID siblingId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSink existing = postgisSink(sinkId, dataSetId, "andere_tabelle");
+      existing.getConfiguration().put("dataStructureVersionId", dsvId.toString());
+
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
+
+      when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(existing));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      when(dataStructureVersionRepository.findById(dsvId))
+          .thenReturn(Optional.of(dataStructureVersion(dsvId)));
+      // Stands in for the mapper writing the incoming configuration onto the loaded entity, which
+      // is what makes the renamed sink collide.
+      doAnswer(
+              inv -> {
+                inv.<DataSink>getArgument(0).setConfiguration(input.getConfiguration());
+                return null;
+              })
+          .when(dataSinkMapper)
+          .updateEntity(any(), any());
+      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
+          .thenReturn(
+              List.of(
+                  postgisSink(sinkId, dataSetId, "andere_tabelle"),
+                  postgisSink(siblingId, dataSetId, "messwerte")));
+
+      assertThatThrownBy(() -> dataSinkService.update(sinkId, input))
+          .isInstanceOf(UniqueConstraintViolationException.class)
+          .hasMessageContaining("messwerte")
+          .hasMessageContaining(dataSetId.toString());
     }
   }
 
