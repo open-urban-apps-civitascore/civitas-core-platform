@@ -466,7 +466,9 @@ class DataSinkServiceTest {
           "mess-werte",
           "messwerte;",
           "Meßwerte",
-          "mess\"werte"
+          "mess\"werte",
+          "mess.werte",
+          "1"
         })
     @DisplayName("Should reject a tableName that is not a plain unquoted identifier")
     void shouldRejectNonIdentifierTableName(String tableName) {
@@ -475,7 +477,6 @@ class DataSinkServiceTest {
           .hasMessageContaining("letters, digits and underscores");
     }
 
-    /** PostgreSQL truncates rather than rejects, which would detach the sink from its table. */
     @Test
     @DisplayName("Should reject a tableName longer than a PostgreSQL identifier")
     void shouldRejectOverlongTableName() {
@@ -506,10 +507,7 @@ class DataSinkServiceTest {
       dataSinkService.create(input);
     }
 
-    /**
-     * An update re-reads the dataset's sinks including the entity being updated, so without an
-     * identity check every PATCH/PUT of a POSTGIS sink would collide with itself.
-     */
+    /** Without the id comparison every PATCH of a POSTGIS sink would collide with itself. */
     @Test
     @DisplayName("Should not treat the updated sink itself as a conflicting sibling")
     void shouldExcludeItselfOnUpdate() {
@@ -526,8 +524,6 @@ class DataSinkServiceTest {
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
       when(dataStructureVersionRepository.findById(dsvId))
           .thenReturn(Optional.of(dataStructureVersion(dsvId)));
-      // A separate instance for the same row, as a fresh query returns: sharing the entity's
-      // reference would let the test pass on identity alone, without the id comparison.
       when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
           .thenReturn(List.of(postgisSink(sinkId, dataSetId, "messwerte")));
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -537,7 +533,7 @@ class DataSinkServiceTest {
 
     /**
      * Self-exclusion and duplicate detection share one stream, so broadening the identity check
-     * would disable uniqueness for every update while the self-exclusion test above stays green.
+     * would disable uniqueness for every update while the self-exclusion test stays green.
      */
     @Test
     @DisplayName("Should reject renaming a sink onto a sibling's tableName")
@@ -556,8 +552,6 @@ class DataSinkServiceTest {
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
       when(dataStructureVersionRepository.findById(dsvId))
           .thenReturn(Optional.of(dataStructureVersion(dsvId)));
-      // Stands in for the mapper writing the incoming configuration onto the loaded entity, which
-      // is what makes the renamed sink collide.
       doAnswer(
               inv -> {
                 inv.<DataSink>getArgument(0).setConfiguration(input.getConfiguration());
