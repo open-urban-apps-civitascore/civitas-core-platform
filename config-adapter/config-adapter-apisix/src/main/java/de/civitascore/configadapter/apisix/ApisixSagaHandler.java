@@ -16,6 +16,7 @@ import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.model.dataset.NamedApiHelper;
 import jakarta.ws.rs.client.Client;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,10 @@ import org.owasp.encoder.Encode;
  * determinism and is pinned end-to-end by {@code
  * ApisixSagaHandlerRoutingIT#shouldWinOverV1CatchAllOnSameHost}.
  */
+// One method per saga operation (CREATE/UPDATE/DELETE/RESTORE_ROUTE) plus focused helpers — the
+// method count is inherent to a per-operation dispatch handler. Splitting the upstream resolution
+// out of route provisioning keeps each method single-purpose, which is the trade this accepts.
+@SuppressWarnings("PMD.TooManyMethods")
 public class ApisixSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "apisix";
@@ -178,39 +183,29 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
       String datasetId,
       List<String> slugs,
       Map<String, RouteUpstreamKind> kindBySlug) {
-    boolean hasSta = kindBySlug.containsValue(RouteUpstreamKind.STA);
-    boolean hasOws = kindBySlug.containsValue(RouteUpstreamKind.OWS);
-    RouteUpstreams.Target mapUpstream = hasOws ? upstreams.map(datasetId) : null;
-    // The FROST upstream URL exists only once a FROST project was provisioned, which is conditional
-    // on the dataset having a FROST data sink. Required — and parsed, so a malformed value fails
-    // before any gateway state is touched — only when a slug routes to the STA upstream.
-    RouteUpstreams.Target frostUpstream =
-        hasSta ? RouteUpstreams.frost(requireString(command, "upstreamUrl")) : null;
+    Map<RouteUpstreamKind, RouteUpstreams.Target> targets =
+        resolveUpstreamTargets(command, datasetId, kindBySlug);
 
     List<String> createdUpstreamIds = new ArrayList<>();
     Map<String, String> routeIds = new LinkedHashMap<>();
     try {
-      if (hasSta) {
-        adminClient.putUpstream(datasetId, RouteUpstreams.body(frostUpstream), "CREATE upstream");
-        createdUpstreamIds.add(datasetId);
-      }
-      if (hasOws) {
-        String owsUpstreamId = RouteUpstreams.owsUpstreamId(datasetId);
-        adminClient.putUpstream(
-            owsUpstreamId, RouteUpstreams.body(mapUpstream), "CREATE map upstream");
-        createdUpstreamIds.add(owsUpstreamId);
-      }
+      targets.forEach(
+          (kind, target) -> {
+            String upstreamId = upstreamId(datasetId, kind);
+            adminClient.putUpstream(
+                upstreamId, RouteUpstreams.body(target), "CREATE " + kind + " upstream");
+            createdUpstreamIds.add(upstreamId);
+          });
       for (String slug : slugs) {
         RouteUpstreamKind kind = kindBySlug.get(slug);
-        RouteUpstreams.Target upstream =
-            kind == RouteUpstreamKind.OWS ? mapUpstream : frostUpstream;
-        String upstreamId =
-            kind == RouteUpstreamKind.OWS ? RouteUpstreams.owsUpstreamId(datasetId) : datasetId;
         String routeId = NamedApiHelper.derive(datasetId, slug);
         adminClient.putRoute(
             routeId,
             authConfigurer.newRouteBody(
-                DATASETS_PATH_PREFIX + datasetId + "/" + slug, upstreamId, upstream.path(), kind),
+                DATASETS_PATH_PREFIX + datasetId + "/" + slug,
+                upstreamId(datasetId, kind),
+                targets.get(kind).path(),
+                kind),
             "CREATE route");
         routeIds.put(slug, routeId);
       }
@@ -226,6 +221,32 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
       throw e;
     }
     return routeIds;
+  }
+
+  /**
+   * The upstream target per routing kind, holding only the kinds a slug actually routes to. The
+   * same map decides which upstreams get created and which one each route binds to, so a route
+   * bound to an upstream that was never created is not representable.
+   *
+   * <p>Resolved before any gateway state is touched, so a malformed URL or a missing {@code
+   * upstreamUrl} fails the step up front. The FROST target is required only for STA: its URL exists
+   * only once a FROST project was provisioned, which is conditional on a FROST data sink.
+   */
+  private Map<RouteUpstreamKind, RouteUpstreams.Target> resolveUpstreamTargets(
+      SagaCommandMessage command, String datasetId, Map<String, RouteUpstreamKind> kindBySlug) {
+    Map<RouteUpstreamKind, RouteUpstreams.Target> targets = new EnumMap<>(RouteUpstreamKind.class);
+    if (kindBySlug.containsValue(RouteUpstreamKind.STA)) {
+      targets.put(
+          RouteUpstreamKind.STA, RouteUpstreams.frost(requireString(command, "upstreamUrl")));
+    }
+    if (kindBySlug.containsValue(RouteUpstreamKind.OWS)) {
+      targets.put(RouteUpstreamKind.OWS, upstreams.map(datasetId));
+    }
+    return targets;
+  }
+
+  private static String upstreamId(String datasetId, RouteUpstreamKind kind) {
+    return kind == RouteUpstreamKind.OWS ? RouteUpstreams.owsUpstreamId(datasetId) : datasetId;
   }
 
   private SagaCommandResult handleUpdateRoute(SagaCommandMessage command) {
