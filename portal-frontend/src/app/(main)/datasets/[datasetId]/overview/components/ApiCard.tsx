@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { ApiStandard, NamedApi, namedApiPathPrefix, NamedApiPayload } from '@/types/namedApis'
+import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 
 const STANDARD_ICONS: Record<ApiStandard, ComponentType<{ className?: string }>> = {
   STA: Timer,
@@ -43,8 +44,8 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
   const typeLabel = tStandard(api.standard)
   const pathPrefix = namedApiPathPrefix(datasetId)
 
-  const goToEdit = () => router.push(`/datasets/${datasetId}/apis/${api.slug}?mode=edit`)
-  const goToView = () => router.push(`/datasets/${datasetId}/apis/${api.slug}`)
+  const viewUrl = `/datasets/${datasetId}/apis/${api.slug}`
+  const editUrl = `/datasets/${datasetId}/apis/${api.slug}?mode=edit`
 
   const handleCopyPath = async () => {
     try {
@@ -78,10 +79,11 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
 
   return (
     <>
-      <div
+      <GuardedLink
         data-testid={`apiCard-${api.slug}`}
         className={cn('flex flex-col bg-white border rounded-sm overflow-hidden group ', canView && 'cursor-pointer')}
-        onClick={canView ? goToView : undefined}
+        // onClick={canView ? goToView : undefined}
+        href={viewUrl}
       >
         <div className="flex items-start gap-3 p-5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted">
@@ -125,25 +127,13 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {canEdit && (
-                <DropdownMenuItem
-                  onClick={e => {
-                    e.stopPropagation()
-                    goToEdit()
-                  }}
-                  data-testid={`apiCardMenuEdit-${api.slug}`}
-                >
-                  {t('actions.edit')}
+                <DropdownMenuItem data-testid={`apiCardMenuEdit-${api.slug}`}>
+                  <GuardedLink href={editUrl}> {t('actions.edit')}</GuardedLink>
                 </DropdownMenuItem>
               )}
               {canView && (
-                <DropdownMenuItem
-                  onClick={e => {
-                    e.stopPropagation()
-                    goToView()
-                  }}
-                  data-testid={`apiCardMenuView-${api.slug}`}
-                >
-                  {t('actions.view')}
+                <DropdownMenuItem data-testid={`apiCardMenuView-${api.slug}`}>
+                  <GuardedLink href={viewUrl}> {t('actions.view')}</GuardedLink>
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem
@@ -190,7 +180,7 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
             <Copy className="h-4 w-4" />
           </button>
         </div>
-      </div>
+      </GuardedLink>
 
       <WarningModal
         open={isDeleteOpen}
