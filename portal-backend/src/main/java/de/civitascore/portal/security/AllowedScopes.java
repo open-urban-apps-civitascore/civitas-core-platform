@@ -20,10 +20,9 @@ import org.springframework.web.context.annotation.RequestScope;
  *   <li>"" or missing - No scopes (return empty results)
  * </ul>
  *
- * <p>OPA additionally returns X-Allowed-Pool-Ids: the datapools that carry every permission the
- * requested route needs — not simply every pool the user holds a grant on. Dataset filtering ORs
- * the direct scope IDs with the datasets in those pools; data source filtering ORs them with the
- * data sources usable in those pools.
+ * <p>OPA additionally returns X-Allowed-Pool-Ids for the dataset collection (Epic 1 union): the
+ * datapools whose datasets the user may see via a DATAPOOL-scoped grant. Dataset filtering ORs the
+ * direct scope IDs with these pool IDs ({@code id IN (...) OR datapool_id IN (...)}).
  *
  * <p>Spring manages the lifecycle - no manual cleanup needed.
  *
@@ -50,8 +49,8 @@ public class AllowedScopes {
   private Set<UUID> scopeIds = Set.of();
 
   /**
-   * Datapool IDs the user may access via DATAPOOL-scoped grants. ORed with {@link #scopeIds} during
-   * dataset and data source filtering.
+   * Datapool IDs the user may access via DATAPOOL-scoped grants (Epic 1 union). Relevant only for
+   * the dataset collection; ORed with {@link #scopeIds} during dataset filtering.
    */
   private Set<UUID> poolIds = Set.of();
 
@@ -81,18 +80,10 @@ public class AllowedScopes {
    * Set the datapool IDs the user may access (Epic 1 union). Marks the scope header as present so a
    * user whose only grant is pool-based is still scoped (not treated as direct backend access).
    *
-   * <p>Ignored for a wildcard caller, who is not filtered at all — this upholds the invariant
-   * {@link #setWildcard()} documents, since OPA emits both headers for a tenant-wide reader who
-   * also holds a pool grant. Requires the scope header to have been parsed first: a later {@link
-   * #setScopeIds} clears the wildcard flag without clearing the pool IDs.
-   *
    * @param ids the authorized datapool IDs, or empty set for none
    */
   public void setPoolIds(Set<UUID> ids) {
     this.headerPresent = true;
-    if (this.wildcard) {
-      return;
-    }
     this.poolIds = ids != null ? Set.copyOf(ids) : Set.of();
   }
 }

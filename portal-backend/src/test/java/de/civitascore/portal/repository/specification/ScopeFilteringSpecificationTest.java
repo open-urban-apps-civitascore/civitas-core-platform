@@ -3,12 +3,10 @@ package de.civitascore.portal.repository.specification;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.DataSource;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Path;
@@ -17,7 +15,6 @@ import jakarta.persistence.criteria.Root;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -166,62 +163,5 @@ class ScopeFilteringSpecificationTest {
     assertThat(result).isEqualTo(orPredicate);
     verify(idPath).in(scopeIds);
     verify(poolIdPath).in(poolIds);
-  }
-
-  /**
-   * The pool branch builds a correlated subquery, which is only meaningful against a real schema —
-   * its semantics (ALL / SPECIFIC / NONE, and no duplicate rows) are covered by {@code
-   * DataSourcePoolScopeFilteringIntegrationTest}. These cases pin the fail-secure and scope-only
-   * paths, which need no subquery.
-   */
-  @Nested
-  @DisplayName("dataSourceByScopeOrPool")
-  class DataSourceByScopeOrPool {
-
-    @Mock private Root<DataSource> dataSourceRoot;
-
-    @Test
-    @DisplayName("returns disjunction (false) when both sets are empty")
-    void bothEmpty_returnsDisjunction() {
-      Predicate falsePredicate = mock(Predicate.class);
-      when(cb.disjunction()).thenReturn(falsePredicate);
-
-      Specification<DataSource> spec =
-          ScopeFilteringSpecification.dataSourceByScopeOrPool(Set.of(), Set.of());
-
-      assertThat(spec.toPredicate(dataSourceRoot, query, cb)).isEqualTo(falsePredicate);
-    }
-
-    @Test
-    @DisplayName("returns disjunction (false) when both sets are null")
-    void bothNull_returnsDisjunction() {
-      Predicate falsePredicate = mock(Predicate.class);
-      when(cb.disjunction()).thenReturn(falsePredicate);
-
-      Specification<DataSource> spec =
-          ScopeFilteringSpecification.dataSourceByScopeOrPool(null, null);
-
-      assertThat(spec.toPredicate(dataSourceRoot, query, cb)).isEqualTo(falsePredicate);
-    }
-
-    @Test
-    @DisplayName("filters by id IN and builds no subquery when only scope IDs given")
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    void scopeOnly_doesNotTouchPoolBranch() {
-      Set<UUID> scopeIds = Set.of(UUID.randomUUID());
-      Path idPath = mock(Path.class);
-      Predicate idIn = mock(Predicate.class);
-      Predicate orPredicate = mock(Predicate.class);
-      when(dataSourceRoot.get("id")).thenReturn(idPath);
-      when(idPath.in(scopeIds)).thenReturn(idIn);
-      when(cb.or(any(Predicate[].class))).thenReturn(orPredicate);
-
-      Specification<DataSource> spec =
-          ScopeFilteringSpecification.dataSourceByScopeOrPool(scopeIds, Set.of());
-
-      assertThat(spec.toPredicate(dataSourceRoot, query, cb)).isEqualTo(orPredicate);
-      verify(idPath).in(scopeIds);
-      verify(query, never()).subquery(UUID.class);
-    }
   }
 }

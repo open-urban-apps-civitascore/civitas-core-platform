@@ -6,8 +6,6 @@ import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataSourceAssembler;
 import de.civitascore.portal.repository.specification.DataSourceSpec;
-import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
-import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.service.DataSourceService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -20,7 +18,6 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -55,19 +52,6 @@ public class DataSourceController
   @Override
   protected ScopeType getScopeType() {
     return ScopeType.DATASOURCE;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * <p>Widens data source scope filtering with datapool inheritance: in addition to directly scoped
-   * data source IDs, the data sources usable in a datapool the caller has a DATAPOOL-scoped grant
-   * on are visible, so a pool-scoped steward can see what their pipelines may be built from.
-   */
-  @Override
-  protected Specification<DataSource> scopeSpecification(AllowedScopes scopes) {
-    return ScopeFilteringSpecification.dataSourceByScopeOrPool(
-        scopes.getScopeIds(), scopes.getPoolIds());
   }
 
   @Parameters({

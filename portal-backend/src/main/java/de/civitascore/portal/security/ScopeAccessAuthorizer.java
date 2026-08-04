@@ -3,9 +3,6 @@ package de.civitascore.portal.security;
 import de.civitascore.portal.model.embedded.PermissionName;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
-import de.civitascore.portal.model.entity.DataSource;
-import de.civitascore.portal.repository.DataSourceRepository;
-import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import de.civitascore.portal.service.AssignmentService;
 import java.util.Collection;
@@ -17,7 +14,6 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -40,10 +36,6 @@ import org.springframework.stereotype.Component;
  *   <li>Otherwise the caller's assignments are resolved from the database: an unscoped/TENANT
  *       assignment carrying the type's READ permission grants all; failing that, every referenced
  *       ID must be covered by an assignment of the matching scope type carrying that permission.
- *   <li>Referenced DATASOURCE IDs are additionally covered by a DATAPOOL-scoped assignment carrying
- *       DATASOURCE_READ when the data source is usable in that pool — the inheritance that lets a
- *       pool-scoped steward build pipelines from the pool's data sources. A data source usable in
- *       no pool needs a DATASOURCE-scoped or tenant-wide grant.
  *   <li>A missing scope header (direct backend access bypassing APISIX/OPA) denies.
  * </ul>
  *
@@ -61,15 +53,11 @@ public class ScopeAccessAuthorizer {
           ScopeType.DATASET, PermissionName.DATASET_READ);
 
   private final AssignmentService assignmentService;
-  private final DataSourceRepository dataSourceRepository;
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   public ScopeAccessAuthorizer(
-      AssignmentService assignmentService,
-      DataSourceRepository dataSourceRepository,
-      ObjectProvider<AllowedScopes> allowedScopesProvider) {
+      AssignmentService assignmentService, ObjectProvider<AllowedScopes> allowedScopesProvider) {
     this.assignmentService = assignmentService;
-    this.dataSourceRepository = dataSourceRepository;
     this.allowedScopesProvider = allowedScopesProvider;
   }
 
@@ -127,17 +115,8 @@ public class ScopeAccessAuthorizer {
     }
 
     Set<UUID> permittedIds = permittedScopeIds(assignments, scopeType, readPermission);
-    List<UUID> notDirectlyPermitted =
-        requestedIds.stream().filter(id -> !permittedIds.contains(id)).toList();
-
-    // A DATAPOOL-scoped grant conveys read access to the data sources usable in that pool, so a
-    // pool-scoped steward can build pipelines from them. Resolved from the assignments rather than
-    // the pool header, because the header is typed to the route (a pipeline route carries the pools
-    // that grant DATASET_UPDATE, not necessarily DATASOURCE_READ).
     List<UUID> unauthorized =
-        scopeType == ScopeType.DATASOURCE
-            ? withoutPoolInheritedDataSources(notDirectlyPermitted, assignments, readPermission)
-            : notDirectlyPermitted;
+        requestedIds.stream().filter(id -> !permittedIds.contains(id)).toList();
 
     if (!unauthorized.isEmpty()) {
       log.warn(
@@ -151,9 +130,8 @@ public class ScopeAccessAuthorizer {
     }
 
     log.info(
-        "{} access granted ({}) for user {} referencing {}",
+        "{} access granted (scoped) for user {} referencing {}",
         scopeType,
-        notDirectlyPermitted.isEmpty() ? "scoped" : "pool-inherited",
         Encode.forJava(externalId),
         requestedIds);
   }
@@ -174,29 +152,6 @@ public class ScopeAccessAuthorizer {
     return assignments.stream()
         .filter(a -> a.getScopeType() == null || a.getScopeType() == ScopeType.TENANT)
         .anyMatch(a -> grantsPermission(a, readPermission));
-  }
-
-  /**
-   * Narrows the given not-directly-permitted data source IDs to those the caller may still not
-   * reference, after applying datapool inheritance. Uses the same specification as the data source
-   * collection filter, so what a pool-scoped caller may reference matches what they can see.
-   */
-  private List<UUID> withoutPoolInheritedDataSources(
-      List<UUID> candidateIds, List<Assignment> assignments, PermissionName readPermission) {
-    Set<UUID> grantedPoolIds = permittedScopeIds(assignments, ScopeType.DATAPOOL, readPermission);
-    if (candidateIds.isEmpty() || grantedPoolIds.isEmpty()) {
-      return candidateIds;
-    }
-
-    Specification<DataSource> usableInGrantedPool =
-        ScopeFilteringSpecification.dataSourceByScopeOrPool(Set.of(), grantedPoolIds)
-            .and((root, query, cb) -> root.get("id").in(candidateIds));
-    Set<UUID> poolInherited =
-        dataSourceRepository.findAll(usableInGrantedPool).stream()
-            .map(DataSource::getId)
-            .collect(Collectors.toSet());
-
-    return candidateIds.stream().filter(id -> !poolInherited.contains(id)).toList();
   }
 
   private Set<UUID> permittedScopeIds(

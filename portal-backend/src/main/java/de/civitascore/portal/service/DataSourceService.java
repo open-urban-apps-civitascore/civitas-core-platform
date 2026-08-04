@@ -19,6 +19,7 @@ import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.repository.specification.DataSourceDatapoolUsability;
 import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.connector.ConnectorHandler;
@@ -34,6 +35,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -537,6 +541,26 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       throw new InvalidInputException(
           getEntityName(), entity.getId(), "Invalid configuration: " + String.join("; ", errors));
     }
+  }
+
+  /**
+   * Returns the AVAILABLE data sources a dataset in the given datapool may build a pipeline from,
+   * ordered by name.
+   *
+   * <p>Restricted to AVAILABLE because {@code PipelineService} rejects anything else on save, so
+   * offering a DRAFT source would only produce a failure one step later.
+   *
+   * @param dataPool the datapool of the dataset, or {@code null} for a pool-less dataset
+   * @return the usable data sources, ordered by name
+   */
+  @Transactional(readOnly = true)
+  public List<DataSource> findUsableIn(DataPool dataPool) {
+    Specification<DataSource> usable =
+        DataSourceDatapoolUsability.usableInPool(dataPool == null ? null : dataPool.getId())
+            .and(
+                (root, query, cb) ->
+                    cb.equal(root.get("dataSourceStatus"), DataSourceStatus.AVAILABLE));
+    return findAll(usable, Pageable.unpaged(Sort.by(Sort.Direction.ASC, "name"))).getContent();
   }
 
   /**

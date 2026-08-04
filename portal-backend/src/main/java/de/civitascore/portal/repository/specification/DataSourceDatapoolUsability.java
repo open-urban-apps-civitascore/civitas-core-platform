@@ -9,62 +9,54 @@ import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
-import java.util.Collection;
 import java.util.UUID;
+import org.springframework.data.jpa.domain.Specification;
 
 /**
- * Query-level expressions relating a DataSource to a DataPool. Two different questions,
- * deliberately not the same predicate:
+ * The query-level form of one question: may this DataSource be used in that DataPool? {@code ALL}
+ * counts for every pool, {@code SPECIFIC} for the pools it names, {@code NONE} for none.
  *
- * <ul>
- *   <li>{@link #usableInAnyPool} — may it be used in a pipeline of that pool? {@code ALL} counts
- *       for every pool, {@code SPECIFIC} for the pools it names, {@code NONE} for none. Mirrors
- *       {@code DataSourceDatapoolScopeValidator}, which enforces the same rule on loaded entities.
- *   <li>{@link #confinedToAnyPool} — does it name that pool explicitly? Only {@code SPECIFIC}
- *       counts.
- * </ul>
- *
- * <p>Read access inherited from a datapool grant uses the first, so what a pool-scoped steward may
- * read matches what they may build a pipeline from.
+ * <p>{@code DataSourceDatapoolScopeValidator} decides the same question on loaded entities, when a
+ * pipeline establishes the relationship. The two must agree, and nothing but {@code
+ * DataSourceDatapoolUsabilityContractIntegrationTest} keeps them from drifting.
  */
-final class DataSourceDatapoolUsability {
+public final class DataSourceDatapoolUsability {
 
   private DataSourceDatapoolUsability() {}
 
   /**
-   * Builds {@code scopeType = ALL OR (scopeType = SPECIFIC AND EXISTS scopedDataPools ∩ poolIds)}.
+   * Filters DataSources to those usable in the given datapool.
    *
-   * @param poolIds the datapools to test usability against; an empty set matches nothing
-   * @return the usability predicate
+   * @param poolId the datapool to test usability against, or {@code null} for a pool-less dataset
+   * @return the usability specification
    */
-  static Predicate usableInAnyPool(
-      Root<DataSource> root, CriteriaQuery<?> query, CriteriaBuilder cb, Collection<UUID> poolIds) {
-    if (poolIds == null || poolIds.isEmpty()) {
-      return cb.disjunction();
-    }
-    Predicate isUnrestricted = cb.equal(root.get("datapoolScopeType"), DatapoolScopeType.ALL);
-    return cb.or(isUnrestricted, confinedToAnyPool(root, query, cb, poolIds));
+  public static Specification<DataSource> usableInPool(UUID poolId) {
+    return (root, query, cb) -> {
+      Predicate isUnrestricted = cb.equal(root.get("datapoolScopeType"), DatapoolScopeType.ALL);
+      if (poolId == null) {
+        // A pool-less dataset may not carry a SPECIFIC-scoped source: pool-confined data must not
+        // leak into a dataset bound to no pool.
+        return isUnrestricted;
+      }
+      return cb.or(isUnrestricted, confinedTo(root, query, cb, poolId));
+    };
   }
 
   /**
-   * Builds {@code scopeType = SPECIFIC AND EXISTS scopedDataPools ∩ poolIds}.
+   * Builds {@code scopeType = SPECIFIC AND EXISTS scopedDataPools ∩ {poolId}}.
    *
-   * <p>Uses a correlated EXISTS subquery rather than a join, so a data source naming several of the
-   * given pools still yields a single row in paginated results.
-   *
-   * @param poolIds the datapools to test confinement against; an empty set matches nothing
-   * @return the confinement predicate
+   * <p>A correlated EXISTS subquery rather than a join on the outer query, because this predicate
+   * is ORed with the {@code ALL} branch: joining {@code scopedDataPools} on the root would be an
+   * inner join and would drop every data source that names no pool at all — which is exactly the
+   * unrestricted ones the other branch must still match. It also keeps a source naming several
+   * pools to a single row.
    */
-  static Predicate confinedToAnyPool(
-      Root<DataSource> root, CriteriaQuery<?> query, CriteriaBuilder cb, Collection<UUID> poolIds) {
-    if (poolIds == null || poolIds.isEmpty()) {
-      return cb.disjunction();
-    }
-
+  private static Predicate confinedTo(
+      Root<DataSource> root, CriteriaQuery<?> query, CriteriaBuilder cb, UUID poolId) {
     Subquery<UUID> scopedPool = query.subquery(UUID.class);
     Root<DataSource> subRoot = scopedPool.correlate(root);
     Join<DataSource, DataPool> scopedPools = subRoot.join("scopedDataPools");
-    scopedPool.select(scopedPools.get("id")).where(scopedPools.get("id").in(poolIds));
+    scopedPool.select(scopedPools.get("id")).where(cb.equal(scopedPools.get("id"), poolId));
 
     return cb.and(
         cb.equal(root.get("datapoolScopeType"), DatapoolScopeType.SPECIFIC), cb.exists(scopedPool));

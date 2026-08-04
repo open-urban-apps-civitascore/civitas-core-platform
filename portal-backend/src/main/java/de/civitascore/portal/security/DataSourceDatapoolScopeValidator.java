@@ -46,7 +46,16 @@ public class DataSourceDatapoolScopeValidator {
     }
   }
 
-  private boolean isPermitted(DataSource dataSource, DataPool dataPool) {
+  /**
+   * Whether a single DataSource is in scope for {@code dataPool} ({@code null} for a pool-less
+   * dataset). The predicate form of {@link #validate}, for callers that need to collect the
+   * offending ids rather than fail on the first one.
+   *
+   * @param dataSource the DataSource to check
+   * @param dataPool the datapool it would feed, or {@code null} for a pool-less dataset
+   * @return true if the DataSource may feed that datapool
+   */
+  public boolean isPermitted(DataSource dataSource, DataPool dataPool) {
     return switch (dataSource.getDatapoolScopeType()) {
       case ALL -> true;
       case NONE -> false;

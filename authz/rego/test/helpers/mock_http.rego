@@ -27,7 +27,6 @@ import rego.v1
 mock_config := {
 	"authz_repository_url": "http://test-authz-repo:8091/api/v1/user-context",
 	"dataset_pool_membership_url": "http://test-authz-repo:8091/api/v1/dataset-pool",
-	"datasource_pools_url": "http://test-authz-repo:8091/api/v1/datasource-pools",
 }
 
 # =============================================================================

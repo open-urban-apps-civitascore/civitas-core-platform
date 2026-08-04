@@ -12,7 +12,6 @@ import rego.v1
 required_config := {
 	"authz_repository_url",
 	"dataset_pool_membership_url",
-	"datasource_pools_url",
 }
 
 # Keys with a policy-side default, safe to omit from an environment's config.

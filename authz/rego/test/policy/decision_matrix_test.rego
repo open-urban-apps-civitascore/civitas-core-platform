@@ -16,13 +16,7 @@ import rego.v1
 import data.civitas.authz
 import data.test.helpers.mock_http
 
-mock_ctx(req) := {"status_code": 200, "body": {"poolIds": ["pool-1"], "usableInAllPools": false}} if {
-	contains(req.url, "datasource-pools")
-}
-
-mock_ctx(req) := {"status_code": 200, "body": data.fixture.ctx} if {
-	not contains(req.url, "datasource-pools")
-}
+mock_ctx(_) := {"status_code": 200, "body": data.fixture.ctx}
 
 request(method, path) := {
 	"request": {"method": method, "path": path, "headers": {"x-userinfo": mock_http.encode_userinfo("u")}},
@@ -81,18 +75,6 @@ allow_cases := [
 		"ctx": mock_http.user_with_unscoped_permissions(["DATASET_READ"]),
 		"method": "GET", "path": "/v1/datasets", "scope": "*",
 	},
-	# Datapool inheritance: a DATAPOOL grant conveys READ on the pool's data sources.
-	# No direct scope id exists, so the header is empty and the pool set carries the filter.
-	{
-		"name": "datasource resource, inherited from DATAPOOL scope",
-		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_READ"], "DATAPOOL", "pool-1"),
-		"method": "GET", "path": "/v1/datasources/ds-1", "scope": "", "pool": "pool-1",
-	},
-	{
-		"name": "datasource collection, inherited from DATAPOOL scope",
-		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_READ"], "DATAPOOL", "pool-1"),
-		"method": "GET", "path": "/v1/datasources", "scope": "", "pool": "pool-1",
-	},
 ]
 
 test_matrix_allow if {
@@ -104,19 +86,7 @@ test_matrix_allow if {
 		result.allow == true
 		result.reason == "permission_granted"
 		result.headers["X-Allowed-Scope-Ids"] == case.scope
-		expected_pool_header(case, result)
 	}
-}
-
-# A case declaring "pool" must emit exactly that X-Allowed-Pool-Ids; a case without it
-# must emit none, so an unexpected pool grant cannot slip past the matrix.
-expected_pool_header(case, result) if {
-	result.headers["X-Allowed-Pool-Ids"] == case.pool
-}
-
-expected_pool_header(case, result) if {
-	not case.pool
-	not result.headers["X-Allowed-Pool-Ids"]
 }
 
 # --- DENY cases: {name, ctx, method, path} → permission_denied, no scope header ---
@@ -151,19 +121,6 @@ deny_cases := [
 		"name": "datasource collection, scope-type mismatch",
 		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_READ"], "DATASET", "dataset-1"),
 		"method": "GET", "path": "/v1/datasources",
-	},
-	{
-		# Datapool inheritance is read-only: a write is not conveyed even when the pool
-		# grant carries the write permission.
-		"name": "datasource update, not inherited from DATAPOOL scope",
-		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_READ", "DATASOURCE_UPDATE"], "DATAPOOL", "pool-1"),
-		"method": "PUT", "path": "/v1/datasources/ds-1",
-	},
-	{
-		# A pool grant without DATASOURCE_READ conveys nothing on data sources.
-		"name": "datasource resource, DATAPOOL grant lacking DATASOURCE_READ",
-		"ctx": mock_http.user_with_scoped_permissions(["DATAPOOL_READ"], "DATAPOOL", "pool-1"),
-		"method": "GET", "path": "/v1/datasources/ds-1",
 	},
 ]
 

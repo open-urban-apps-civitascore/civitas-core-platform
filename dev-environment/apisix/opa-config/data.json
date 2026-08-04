@@ -1,6 +1,5 @@
 {
   "authz_repository_url": "http://civitas-authz-repository:8091/api/v1/user-context",
   "dataset_pool_membership_url": "http://civitas-authz-repository:8091/api/v1/dataset-pool",
-  "datasource_pools_url": "http://civitas-authz-repository:8091/api/v1/datasource-pools",
   "authz_cache_duration_seconds": 0
 }

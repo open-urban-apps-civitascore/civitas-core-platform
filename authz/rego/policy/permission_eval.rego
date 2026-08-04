@@ -31,7 +31,6 @@ package civitas.authz.permission_eval
 import rego.v1
 
 import data.civitas.authz.dataset_pool_fetcher
-import data.civitas.authz.datasource_pool_fetcher
 import data.civitas.authz.resource_mapping
 import data.civitas.authz.user_context_fetcher
 
@@ -284,87 +283,38 @@ user_has_permission(permission) if {
 }
 
 # Collection endpoint: granted when a single datapool carries ALL required
-# permissions (qualifying_datapool_ids). WHICH entities are visible is narrowed
+# permissions (qualifying_datapool_ids). WHICH datasets are visible is narrowed
 # by the X-Allowed-Pool-Ids header (main.rego), built from the SAME set — so the
 # allow decision is always faithfully filterable, including for AND-permission
-# endpoints. Serves dataset and data source collections alike.
+# endpoints.
 user_has_permission(permission) if {
 	resource_mapping.is_collection_endpoint
 	some pool_id in qualifying_datapool_ids
 	datapool_has_permission(permission, pool_id)
 }
 
-# Pools whose DATAPOOL-scoped assignment carries ALL required permissions on its own, so a
-# permission split across two pools grants nothing. Shared by both route families below so
-# the invariant cannot diverge between them.
-pools_carrying_required_permissions contains pool_id if {
-	count(required_permissions) > 0
-	some group in user_context_fetcher.user_context.groups
-	some assignment in group.assignments
-	assignment.scopeType == "DATAPOOL"
-	pool_id := assignment.scopeId
-	pool_id != null
-	every perm in required_permissions {
-		datapool_has_permission(perm, pool_id)
-	}
-}
-
-# DATAPOOL scope IDs that carry ALL required permissions for the requested route
+# DATAPOOL scope IDs that carry ALL required permissions for a dataset endpoint
 # (Epic 1 union). Single source of truth shared with main.rego's X-Allowed-Pool-Ids
-# header, so the allow-decision and the backend filter can never diverge. One body per
-# route family: datasets below, data sources further down.
+# header, so the allow-decision and the backend filter can never diverge (e.g. a
+# perm split across two pools must not grant unfiltered access).
 #
 # Computed for BOTH collection AND resource dataset endpoints: a resource request
 # (e.g. GET /datasets/{id}/apis) granted purely via DATAPOOL inheritance must also
 # carry the pool header, otherwise the backend's scope-OR-pool filter sees no pool
 # id and 404s a dataset the user is legitimately allowed to read.
 qualifying_datapool_ids contains pool_id if {
+	count(required_permissions) > 0
 	resource_mapping.expected_scope_type == "DATASET"
-	some pool_id in pools_carrying_required_permissions
-}
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	assignment.scopeType == "DATAPOOL"
+	pool_id := assignment.scopeId
+	pool_id != null
 
-# =============================================================================
-# DATAPOOL → DATASOURCE INHERITANCE
-# =============================================================================
-# A DATAPOOL-scoped grant conveys READ on the data sources USABLE IN that pool, so a
-# pool-scoped steward can see what their pipelines may be built from. The same rule the
-# portal applies when a pipeline references a data source: unrestricted counts for every
-# pool, confined for the pools it names.
-#
-# READ ONLY: an unrestricted data source is shared across pools, so inheriting a write
-# would let one pool's steward mutate a source another pool depends on.
-datasource_pool_inheritable_permissions := {"DATASOURCE_READ"}
-
-# Resource endpoint: the requested data source must itself be usable in a qualifying pool,
-# so the decision is per entity rather than per route. usable_in_pool() consumes a
-# pre-computed answer from the AuthZ Repository — the DatapoolScopeType rule stays there,
-# not in this policy. OPA memoizes http.send per evaluation, so several pool grants cost
-# one round-trip.
-#
-# Drawing on qualifying_datapool_ids rather than walking the assignments again keeps the
-# decision and the emitted header derived from the same set: one pool that carries every
-# required permission.
-#
-# Fail-secure: if the lookup is unavailable, usable_in_pool() is undefined and this branch
-# does not grant — direct and tenant-wide grants keep working.
-user_has_permission(permission) if {
-	resource_mapping.is_resource_endpoint
-	resource_mapping.expected_scope_type == "DATASOURCE"
-	some pool_id in qualifying_datapool_ids
-	datapool_has_permission(permission, pool_id)
-	datasource_pool_fetcher.usable_in_pool(resource_mapping.resource_id, pool_id)
-}
-
-# Data source routes feed the same qualifying-pool set as datasets, so the collection
-# rule and main.rego's header need no second code path. The inheritable-permission guard
-# keeps writes out, including POST /v1/datasources — collection classification is
-# method-agnostic.
-qualifying_datapool_ids contains pool_id if {
-	resource_mapping.expected_scope_type == "DATASOURCE"
+	# Only include this pool if it alone carries ALL required permissions
 	every perm in required_permissions {
-		perm in datasource_pool_inheritable_permissions
+		datapool_has_permission(perm, pool_id)
 	}
-	some pool_id in pools_carrying_required_permissions
 }
 
 # Helper: does a DATAPOOL-scoped assignment for target_pool_id carry perm?

@@ -6,7 +6,6 @@ import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import java.io.Serial;
-import java.util.Set;
 import java.util.UUID;
 import net.kaczmarzyk.spring.data.jpa.utils.Converter;
 import net.kaczmarzyk.spring.data.jpa.utils.QueryContext;
@@ -42,6 +41,6 @@ public class DataSourceScopedDatapoolSpec implements Specification<DataSource> {
   @Override
   public Predicate toPredicate(Root<DataSource> root, CriteriaQuery<?> query, CriteriaBuilder cb) {
     UUID datapoolId = UUID.fromString(httpParamValues[0]);
-    return DataSourceDatapoolUsability.usableInAnyPool(root, query, cb, Set.of(datapoolId));
+    return DataSourceDatapoolUsability.usableInPool(datapoolId).toPredicate(root, query, cb);
   }
 }
