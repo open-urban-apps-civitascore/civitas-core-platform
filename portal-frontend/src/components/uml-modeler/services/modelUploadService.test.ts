@@ -105,7 +105,7 @@ describe('buildUMLModelPayload', () => {
     // The document root is the data structure, titled after the diagram; the root class MyClass is
     // referenced from it, with its own schema (and MyInterface) under $defs.
     expect(payload.model.title).toBe('Test Diagram')
-    expect(payload.model.properties).toEqual({ MyClass: { $ref: '#/$defs/MyClass' } })
+    expect(payload.model.properties).toEqual({ myclass: { $ref: '#/$defs/MyClass' } })
     expect((payload.model.$defs as Record<string, unknown>).MyClass).toBeDefined()
   })
 

@@ -32,11 +32,7 @@ const UMLAUT_TRANSLITERATIONS: Record<string, string> = {
   ß: 'ss',
 }
 
-/**
- * Replaces German umlauts with their ASCII digraphs. Shared with the JSON Schema export so display
- * names are romanized identically wherever they become a technical identifier.
- */
-export const transliterate = (value: string): string =>
+const transliterate = (value: string): string =>
   value.replace(/[äöüÄÖÜß]/g, char => UMLAUT_TRANSLITERATIONS[char] ?? char)
 
 /**

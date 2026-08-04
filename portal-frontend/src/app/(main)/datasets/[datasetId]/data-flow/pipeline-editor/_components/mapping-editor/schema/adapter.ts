@@ -1,8 +1,4 @@
-import {
-  isAttributeRequired,
-  PROPERTY_KEY_FALLBACK,
-  sanitizePropertyKey,
-} from '@/components/uml-modeler/services/jsonSchemaExportService'
+import { isAttributeRequired } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import type { RootResolutionFailure } from '@/components/uml-modeler/services/umlContainment'
 import {
   classifyStructuralEdge,
@@ -33,12 +29,7 @@ export const PRIMITIVE: Record<string, FieldType> = {
   Date: 'date',
 }
 
-/**
- * Field names must be the JSON Schema property keys the export would emit, not the raw UML names:
- * these paths are the mapping contract, and the editor must address the same fields whether it reads
- * the live diagram (here) or the persisted model (modelAdapter).
- */
-const propertyKeyOf = (name: string): string => sanitizePropertyKey(name) || PROPERTY_KEY_FALLBACK
+const lowerFirst = (value: string): string => value.charAt(0).toLowerCase() + value.slice(1)
 
 // Geometries map to their concrete type name (Point, Polygon, …) so Point vs Polygon
 // mismatches are caught by exact-type matching; other primitives map via PRIMITIVE.
@@ -78,9 +69,10 @@ const indexDiagram = (diagram: UMLDiagram): DiagramIndex => {
       const part = byKey.get(containment.partId)
       if (!container || !part) continue
 
-      // Mirrors the export's chain: the role names the part, else the part's own name. The
-      // relationship name is deliberately not consulted — see buildClassSchema.
-      const name = propertyKeyOf(containment.role || part.name)
+      // Mirrors the export's chain, which deliberately skips the relationship name — see
+      // buildClassSchema. Both walkers must yield the same field paths, they are the mapping
+      // contract.
+      const name = containment.role || lowerFirst(part.name)
       const list = outgoing.get(container.id) ?? []
       list.push({ target: part, name, many: containment.isMany })
       outgoing.set(container.id, list)
@@ -136,23 +128,23 @@ const mergeInherited = <T>(
 }
 
 const attributeEntries = (el: UMLElement): [string, UMLAttribute][] =>
-  hasAttributes(el) ? el.attributes.map(attr => [propertyKeyOf(attr.name), attr]) : []
+  hasAttributes(el) ? el.attributes.map(attr => [attr.name, attr]) : []
 
 const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited: Set<string>): FieldNode[] => {
   const fields: FieldNode[] = []
   const childEntries = (e: UMLElement): [string, StructuralChild][] =>
     (index.outgoing.get(e.id) ?? []).map(child => [child.name, child])
 
-  for (const [key, attr] of mergeInherited(el, index, visited, attributeEntries)) {
-    const path = `${base}.${key}`
+  for (const attr of mergeInherited(el, index, visited, attributeEntries).values()) {
+    const path = `${base}.${attr.name}`
     const ref = resolveRef(attr.type, index)
     const required = isAttributeRequired(attr)
     if (ref && hasAttributes(ref) && !visited.has(ref.id)) {
       const type: FieldType = isManyMultiplicity(attr.multiplicity) ? 'array' : 'object'
       const children = buildFields(ref, path + (type === 'array' ? '[]' : ''), index, new Set([...visited, el.id]))
-      fields.push(field(path, key, type, required, children))
+      fields.push(field(path, attr.name, type, required, children))
     } else {
-      fields.push(field(path, key, scalarType(attr.type), required))
+      fields.push(field(path, attr.name, scalarType(attr.type), required))
     }
   }
 

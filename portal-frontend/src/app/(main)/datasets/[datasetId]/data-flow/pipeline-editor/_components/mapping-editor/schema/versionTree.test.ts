@@ -58,7 +58,7 @@ describe('versionToSchemaTree', () => {
     const { tree, isModelBroken } = versionToSchemaTree(version({ model: brokenModel, styles }), 'fallback')
     expect(isModelBroken).toBe(true)
     expect(tree.name).toBe('FromDiagram')
-    expect(tree.fields.map(f => f.name)).toEqual(['DiagramField'])
+    expect(tree.fields.map(f => f.name)).toEqual(['diagramField'])
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
   })
