@@ -1274,7 +1274,7 @@
         "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld NiFi-Syntax sein.",
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
         "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben",
-        "duplicateTableName": "Zwei Geo-Persistenz-Speicher dürfen nicht den gleichen Namen haben",
+        "duplicateTableName": "Der Tabellenname \"{tableName}\" wird bereits in der Pipeline \"{pipeline}\" verwendet",
         "cronMqttIncompatible": "Ein CRON-Trigger kann nicht mit einer MQTT-Datenquelle verwendet werden. Bitte eine SQL-Quelle (Pull) verwenden.",
         "cronSourceConnectorUnknown": "Der Quell-Konnektor konnte nicht ermittelt werden; ein CRON-Trigger funktioniert nur mit einer SQL-Quelle (Pull), nicht mit MQTT.",
         "sqlSourceNoScheduleDefaultPoll": "Diese SQL-Quelle hat keinen CRON-Knoten und pollt im Standardintervall (alle 5 Minuten). Für einen expliziten Zeitplan bitte einen CRON-Knoten hinzufügen.",
@@ -1295,15 +1295,15 @@
         "mappingDataCorrupt": "{label} trägt keine gültigen Mapping-Daten — bitte den Knoten löschen und neu anlegen",
         "edgeEndpointMissing": "Eine Kante verweist auf einen nicht vorhandenen Knoten — bitte die Kante entfernen",
         "sourceNodeRequired": "Pipeline hat keinen Datenquellen-Knoten; genau eine verdrahtete Datenquelle ist erforderlich",
-        "sinkNodeRequired": "Pipeline hat keinen Datensenken-Knoten (Sensor- oder Geodaten-Speicher); genau eine verdrahtete Datensenke ist erforderlich",
+        "sinkNodeRequired": "Pipeline hat keinen Datenspeicher-Knoten (Sensor- oder Geodaten-Speicher); genau ein Datenspeicher ist erforderlich",
         "multipleSourceNodes": "{label} ist ein zusätzlicher Datenquellen-Knoten; eine Pipeline unterstützt genau einen",
-        "multipleSinkNodes": "{label} ist ein zusätzlicher Datensenken-Knoten; eine Pipeline unterstützt genau einen",
+        "multipleSinkNodes": "{label} ist ein zusätzlicher Datenspeicher-Knoten; eine Pipeline unterstützt genau einen",
         "nodeUnsupportedPosition": "{label} ist an einer nicht unterstützten Position verdrahtet",
         "unknownNodeInFlow": "{label} hat einen nicht unterstützten Knotentyp und kann nicht in den Datenfluss verdrahtet werden",
         "flowBranches": "Der Datenfluss verzweigt bei {label}; ein linearer Fluss von Quelle zu Senke ist erforderlich",
         "flowCycle": "Der Datenfluss enthält einen Zyklus bei {label}",
-        "noDataPath": "Es gibt keinen Datenfluss-Pfad von der Datenquelle zur Datensenke",
-        "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datensenke",
+        "noDataPath": "Es gibt keinen Datenfluss-Pfad von der Datenquelle zum Datenspeicher",
+        "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datenspeicher",
         "cronTriggerCapacity": "{label} ist ein zusätzlicher Zeitplan-Trigger an der Datenquelle; der Trigger-Port fasst höchstens einen",
         "edgeFormIncompatible": "{label} kann {form} von {upstreamLabel} nicht verarbeiten; akzeptiert wird: {accepted}",
         "mappingChainStructureMismatch": "Die Output-Datenstruktur in Mapping-Node {upstreamLabel} und die Input-Datenstruktur in Mapping-Node {label} sind inkompatibel"
@@ -1334,7 +1334,8 @@
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
       "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
-      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt."
+      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt.",
+      "tableNameConflict": "{names} kann nicht gespeichert werden: Ein Geo-Persistenz-Tabellenname wird bereits von einem anderen Datenspeicher dieses Datensatzes verwendet."
     },
     "tabs": {
       "closeTab": "Tab schließen",

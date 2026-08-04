@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+import { useActivePipeline } from '../../../_hooks/use-active-pipeline'
 import { parseCompositeKey, useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
 import { usePipelinePermissions } from '../../../_hooks/use-pipeline-permissions'
 import type { GeoPersistenceNodeData } from '../../../_types/nodes'
@@ -31,7 +32,10 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
   const t = useTranslations('pipelineEditor')
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canReadDatastructures } = usePipelinePermissions(datasetId)
+  const { selectedNode, pipelineUsingTableName } = useActivePipeline()
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+
+  const conflictingPipeline = selectedNode ? pipelineUsingTableName(selectedNode.id, data.tableName) : null
 
   const { name: dataStructureName, versionNumber } = useDatastructureVersionInfo(data.dataStructureVersionId)
 
@@ -69,7 +73,16 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
           value={data.tableName}
           onChange={handleTableNameChange}
           placeholder={t('geoPersistencePanel.tableNamePlaceholder')}
+          aria-invalid={conflictingPipeline !== null}
         />
+        {conflictingPipeline !== null && (
+          <p className="text-xs text-destructive">
+            {t('validation.messages.duplicateTableName', {
+              tableName: data.tableName.trim(),
+              pipeline: conflictingPipeline,
+            })}
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
