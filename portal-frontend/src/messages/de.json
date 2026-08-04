@@ -195,7 +195,8 @@
     "messages": {
       "updateSuccess": "Berechtigungen wurden erfolgreich aktualisiert.",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert.",
-      "updateErrorNotDraft": "Berechtigungen können nur aktualisiert werden, wenn der Datensatz im Entwurfsstatus ist."
+      "updateErrorNotDraft": "Berechtigungen können nur aktualisiert werden, wenn der Datensatz im Entwurfsstatus ist.",
+      "updateErrorSagaInFlight": "Der Datensatz wird gerade bereitgestellt. Bitte versuchen Sie es in einem Moment erneut."
     }
   },
   "sidebar": {

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
+import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
@@ -12,12 +13,14 @@ import { hasAssignmentChanges } from '@/utils/assignments'
 import { AssignmentsList } from './AssignmentsList'
 
 const mockPatchDataset = vi.fn().mockResolvedValue(undefined)
+const mockUpdateReleasedMeta = vi.fn().mockResolvedValue(undefined)
 const mockPush = vi.fn()
 const mockRefresh = vi.fn()
 let mockSearchParams = new URLSearchParams()
 
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   usePatchDataset: () => ({ mutateAsync: mockPatchDataset, isPending: false }),
+  useUpdateReleasedDatasetMeta: () => ({ mutateAsync: mockUpdateReleasedMeta, isPending: false }),
 }))
 
 vi.mock('@/app/services/api/groups/clientRequests', () => ({
@@ -99,12 +102,18 @@ const allPermissions = [
   PERMISSION_NAMES.ROLE_READ,
 ]
 
-const renderList = (initialAssignments = mockAssignments) =>
+const renderList = (initialAssignments = mockAssignments, datasetOverrides: Partial<Dataset> = {}) =>
   render(
     <NextIntlClientProvider locale="de" messages={messages}>
-      <AssignmentsList dataset={dataset} initialAssignments={initialAssignments} />
+      <AssignmentsList dataset={{ ...dataset, ...datasetOverrides }} initialAssignments={initialAssignments} />
     </NextIntlClientProvider>,
   )
+
+const submitInEditMode = async () => {
+  fireEvent.click(screen.getByRole('button', { name: /bearbeiten/i }))
+  await waitFor(() => screen.getByRole('button', { name: /speichern/i }))
+  fireEvent.click(screen.getByRole('button', { name: /speichern/i }))
+}
 
 describe('AssignmentsList', () => {
   beforeEach(() => {
@@ -238,6 +247,54 @@ describe('AssignmentsList', () => {
 
     await waitFor(() => expect(mockPatchDataset).toHaveBeenCalled())
     expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  it('patches the dataset when it is in DRAFT status', async () => {
+    vi.mocked(hasAssignmentChanges).mockReturnValue(true)
+    renderList()
+
+    await submitInEditMode()
+
+    await waitFor(() =>
+      expect(mockPatchDataset).toHaveBeenCalledWith({
+        id: 'ds-1',
+        assignments: [{ groupId: '1', roleId: '1' }],
+      }),
+    )
+    expect(mockUpdateReleasedMeta).not.toHaveBeenCalled()
+  })
+
+  it.each(['READY', 'AVAILABLE'] as const)(
+    'sends the assignments together with the unchanged metadata to released/meta in %s status',
+    async dataSetStatus => {
+      vi.mocked(hasAssignmentChanges).mockReturnValue(true)
+      renderList(mockAssignments, { dataSetStatus })
+
+      await submitInEditMode()
+
+      await waitFor(() =>
+        expect(mockUpdateReleasedMeta).toHaveBeenCalledWith({
+          id: 'ds-1',
+          name: 'Test Dataset',
+          description: 'A test dataset',
+          openDataAccess: false,
+          assignments: [{ groupId: '1', roleId: '1' }],
+        }),
+      )
+      expect(mockPatchDataset).not.toHaveBeenCalled()
+    },
+  )
+
+  it('shows the provisioning hint when released/meta conflicts with an in-flight saga', async () => {
+    mockUpdateReleasedMeta.mockRejectedValueOnce({ response: { status: 409 } })
+    vi.mocked(hasAssignmentChanges).mockReturnValue(true)
+    renderList(mockAssignments, { dataSetStatus: 'AVAILABLE' })
+
+    await submitInEditMode()
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(messages.accessManagement.messages.updateErrorSagaInFlight),
+    )
   })
 
   it('does not patch the dataset while the submit button is disabled', async () => {

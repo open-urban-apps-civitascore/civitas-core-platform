@@ -196,7 +196,8 @@
     "messages": {
       "updateSuccess": "Permissions have been successfully updated.",
       "groupsWithoutRoles": "Groups without assigned roles have not been saved.",
-      "updateErrorNotDraft": "Permissions can only be updated when the Dataset is in draft status."
+      "updateErrorNotDraft": "Permissions can only be updated when the Dataset is in draft status.",
+      "updateErrorSagaInFlight": "The dataset is currently being provisioned. Please try again in a moment."
     }
   },
   "sidebar": {
