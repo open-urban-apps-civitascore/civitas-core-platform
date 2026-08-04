@@ -63,8 +63,8 @@ public class DataSetOutputDTO extends BaseOutputDTO {
 
   @Schema(
       description =
-          "Whether the data-holding sink has been physically provisioned at least once (a PostGIS"
-              + " table / FROST project exists). Stays true across an unrelease. Used to warn"
+          "Whether a provisioning saga has run, so the dataset's configured sinks physically exist"
+              + " (a PostGIS table / FROST project). Stays true across an unrelease. Used to warn"
               + " before a destructive sink change that would rebuild the table.",
       accessMode = Schema.AccessMode.READ_ONLY)
   private Boolean provisioned;

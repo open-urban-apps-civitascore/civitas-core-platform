@@ -177,6 +177,7 @@ class DatasetCreateFlowableIT {
     variables.put("datasetName", "Flowable E2E Test Dataset");
     variables.put("description", "Integration test via Flowable");
     variables.put("hasPipelines", false);
+    variables.put("hasFrostSink", true);
     variables.put("datasources", List.of());
     variables.put("dataPipelines", List.of());
     // Per-NamedApi route model (#1311/#1379): CREATE_ROUTE provisions one route per named-API
@@ -265,6 +266,7 @@ class DatasetCreateFlowableIT {
     variables.put("datasetName", "Flowable Fail Test");
     variables.put("description", "Should compensate");
     variables.put("hasPipelines", false);
+    variables.put("hasFrostSink", true);
     variables.put("datasources", List.of());
     variables.put("dataPipelines", List.of());
     // Without a named API the APISIX step is a contract-mandated no-op (no route, no upstream),

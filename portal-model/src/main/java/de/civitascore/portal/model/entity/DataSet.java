@@ -168,13 +168,12 @@ public class DataSet extends BaseDataEntity {
   private PendingSagaType pendingSagaType;
 
   /**
-   * Whether the data-holding sink has been physically provisioned at least once (PostGIS table
-   * exists / FROST project created). Set on any provisioning saga's completion once a sink
-   * identifier is present, and left untouched by unrelease — the sink survives an unrelease. (There
+   * Whether a provisioning saga has run for this dataset, so its configured sinks physically exist
+   * (PostGIS table / FROST project). Set on any provisioning saga's completion regardless of which
+   * sinks the dataset has, and left untouched by unrelease — the sinks survive an unrelease. (There
    * is no reset path: the row is removed on DELETE-saga completion.) Distinguishes "never released,
-   * no table yet" from "table exists, holds data" so a destructive sink edit only warns once a
-   * table is actually at risk. This is an indicator for the data-loss warning, NOT a lifecycle
-   * gate.
+   * nothing provisioned yet" from "infrastructure exists, holds data" so a destructive sink edit
+   * only warns once data is actually at risk, and so a delete knows a teardown saga is required.
    */
   @Column(name = "provisioned", nullable = false)
   private boolean provisioned = false;

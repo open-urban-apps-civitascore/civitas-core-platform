@@ -23,6 +23,7 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.flowable.FlowableTestSupport;
 import de.civitascore.configadapter.flowable.common.SagaHandlerRegistry;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -114,6 +115,62 @@ class DatasetCreateBpmnTest {
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
     verify(pipelineHandler, never()).handle(any());
+  }
+
+  @Test
+  void shouldSkipFrostProjectWhenDatasetHasNoFrostSink() {
+    stubApisixSuccess();
+
+    ProcessInstance instance = startProcessWithGeo(false, false, false, false);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+
+    // A dataset with no FROST sink gets no FROST project — and the route step must still run
+    // without the upstream URL that project would have supplied.
+    verify(frostHandler, never()).handle(any());
+    verify(apisixHandler).handle(any());
+  }
+
+  @Test
+  void shouldSkipFrostCompensationWhenDatasetHasNoFrostSink() {
+    stubApisixFailure("APISIX connection refused");
+
+    ProcessInstance instance = startProcessWithGeo(false, false, false, false);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+
+    // The route failure routes through the compensation gateway straight to publish-failure: there
+    // is no project to delete, so FROST is never called in either direction.
+    verify(frostHandler, never()).handle(any());
+  }
+
+  @Test
+  void shouldSkipFrostCompensationOnPipelineFailureWithoutFrostSink() {
+    stubApisixSuccess();
+    stubPipelineFailure("Pipeline deployment failed");
+    stubPipelineCompensationSuccess();
+    stubApisixCompensationSuccess();
+
+    ProcessInstance instance = startProcessWithGeo(true, false, false, false);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+
+    // The route is still rolled back; only the FROST leg is skipped.
+    ArgumentCaptor<SagaCommandMessage> apisixCaptor =
+        ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(apisixHandler, times(2)).handle(apisixCaptor.capture());
+    assertEquals(
+        "DELETE_ROUTE",
+        apisixCaptor.getAllValues().stream()
+            .filter(c -> "COMPENSATE_STEP".equals(c.type()))
+            .findFirst()
+            .orElseThrow()
+            .operation());
+
+    verify(frostHandler, never()).handle(any());
   }
 
   @Test
@@ -349,6 +406,11 @@ class DatasetCreateBpmnTest {
 
   private ProcessInstance startProcessWithGeo(
       boolean hasPipelines, boolean hasGeoSink, boolean hasLayers) {
+    return startProcessWithGeo(hasPipelines, hasGeoSink, hasLayers, true);
+  }
+
+  private ProcessInstance startProcessWithGeo(
+      boolean hasPipelines, boolean hasGeoSink, boolean hasLayers, boolean hasFrostSink) {
     Map<String, Object> variables = new HashMap<>();
     variables.put("sagaId", "saga-test-123");
     variables.put("datasetId", "ds-456");
@@ -356,15 +418,22 @@ class DatasetCreateBpmnTest {
     variables.put("description", "A test dataset");
     variables.put("hasPipelines", hasPipelines);
     variables.put("hasGeoSink", hasGeoSink);
+    variables.put("hasFrostSink", hasFrostSink);
     variables.put("hasLayers", hasLayers);
     if (hasPipelines) {
       variables.put("dataPipelines", List.of(Map.of("id", "p-1", "data", "{}")));
       variables.put("datasources", List.of(Map.of("id", "src-1", "type", "postgresql")));
     }
+    // Keep the sink list consistent with the flags the consumer would have derived from it.
+    List<Map<String, Object>> datasinks = new ArrayList<>();
     if (hasGeoSink) {
-      variables.put(
-          "datasinks",
-          List.of(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "t1"))));
+      datasinks.add(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "t1")));
+    }
+    if (hasFrostSink) {
+      datasinks.add(Map.of("type", "FROST", "configuration", Map.of()));
+    }
+    if (!datasinks.isEmpty()) {
+      variables.put("datasinks", datasinks);
     }
     if (hasLayers) {
       variables.put("layers", List.of(Map.of("layerName", "t1", "crs", "EPSG:4326")));

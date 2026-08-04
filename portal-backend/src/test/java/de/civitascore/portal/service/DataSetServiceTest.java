@@ -317,6 +317,8 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.FROST))
+          .thenReturn(true);
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSetService service = createService();
@@ -360,6 +362,25 @@ class DataSetServiceTest {
       assertThatThrownBy(() -> createService().release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("no POSTGIS data sink");
+
+      verify(sagaPublisher, never()).publishCreateRequested(any());
+    }
+
+    @Test
+    @DisplayName("rejects an STA named API with no FROST sink behind it")
+    void rejectsStaApiWithoutFrostSink() {
+      // The FROST project is only provisioned when a FROST sink exists — without one the published
+      // STA endpoint has no upstream at all.
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      when(layerRepository.existsByDataSetId(id)).thenReturn(false);
+      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.FROST))
+          .thenReturn(false);
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("no FROST data sink");
 
       verify(sagaPublisher, never()).publishCreateRequested(any());
     }
@@ -441,6 +462,8 @@ class DataSetServiceTest {
       addPipelineWithSource(ds, dataSource(UUID.randomUUID(), DatapoolScopeType.SPECIFIC, poolB));
 
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.FROST))
+          .thenReturn(true);
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSet result = createService().release(id);
@@ -615,6 +638,28 @@ class DataSetServiceTest {
       DataSet result = createService().updateReleasedMeta(id, input);
       assertThat(result).isNotNull();
       verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+
+    @Test
+    @DisplayName("publishes an update for a provisioned dataset that has no FROST project")
+    void publishesUpdateForProvisionedDatasetWithoutFrostProject() {
+      // A dataset with no FROST sink has no projectId, so keying the publish on one would silently
+      // stop all UPDATE sagas for it — no route auth re-apply, no GeoServer prune.
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setProvisioned(true);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      DataSet result = createService().updateReleasedMeta(id, input);
+
+      assertThat(result.getProjectId()).isNull();
+      assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.UPDATE);
+      verify(sagaPublisher).publishUpdateRequested(eq(result), any());
     }
 
     @Test
@@ -1060,8 +1105,8 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("UPDATE: a completion that yields a project id marks the dataset provisioned")
-    void updateMarksProvisionedWhenSinkExists() {
+    @DisplayName("UPDATE: a successful completion marks the dataset provisioned")
+    void updateMarksProvisioned() {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
       ds.setDataSetStatus(DataSetStatus.AVAILABLE);
@@ -1547,6 +1592,31 @@ class DataSetServiceTest {
     }
 
     @Test
+    @DisplayName("CREATE: marks a dataset with no FROST project provisioned")
+    void createMarksProvisionedWithoutFrostProject() {
+      // A dataset with no FROST sink gets no project, so the flag cannot be inferred from one — and
+      // without the flag its delete would skip the teardown saga and leak the rest of its
+      // infrastructure.
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService()
+          .handleSagaCompleted(
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
+
+      ArgumentCaptor<DataSet> savedWithoutProject = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(savedWithoutProject.capture());
+      assertThat(savedWithoutProject.getValue().getProjectId()).isNull();
+      assertThat(savedWithoutProject.getValue().isProvisioned()).isTrue();
+    }
+
+    @Test
     @DisplayName("no pending saga: skips save (duplicate delivery)")
     void noPendingSagaSkipsSave() {
       UUID id = UUID.randomUUID();
@@ -1931,6 +2001,8 @@ class DataSetServiceTest {
 
       createService().deleteById(id);
 
+      // No FROST project on this dataset: the teardown must still run for its other infrastructure.
+      assertThat(ds.getProjectId()).isNull();
       assertThat(ds.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
       verify(sagaPublisher).publishDeleteRequested(ds);
       verify(dataSetRepository, never()).delete(any(DataSet.class));

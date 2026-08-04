@@ -166,6 +166,30 @@ class DatasetUpdateBpmnTest {
   }
 
   @Test
+  void shouldSkipFrostUpdateWhenDatasetHasNoFrostSink() {
+    stubApisixSuccess();
+
+    ProcessInstance instance = startProcess(false, false, false);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+    verify(frostHandler, never()).handle(any());
+    verify(apisixHandler).handle(any());
+  }
+
+  @Test
+  void shouldSkipFrostCompensationWhenDatasetHasNoFrostSink() {
+    stubApisixFailure("APISIX connection refused");
+
+    ProcessInstance instance = startProcess(false, false, false);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+    // Nothing was updated in FROST, so there is no previous project state to restore.
+    verify(frostHandler, never()).handle(any());
+  }
+
+  @Test
   void shouldSkipPipelineWhenNoPipelines() {
     stubFrostSuccess();
     stubApisixSuccess();
@@ -251,6 +275,11 @@ class DatasetUpdateBpmnTest {
   }
 
   private ProcessInstance startProcess(boolean hasPipelines, boolean hasGeoSink) {
+    return startProcess(hasPipelines, hasGeoSink, true);
+  }
+
+  private ProcessInstance startProcess(
+      boolean hasPipelines, boolean hasGeoSink, boolean hasFrostSink) {
     Map<String, Object> variables = new HashMap<>();
     variables.put("sagaId", "saga-test-123");
     variables.put("datasetId", "ds-456");
@@ -261,6 +290,7 @@ class DatasetUpdateBpmnTest {
     variables.put("serviceId", "s-1");
     variables.put("hasPipelines", hasPipelines);
     variables.put("hasGeoSink", hasGeoSink);
+    variables.put("hasFrostSink", hasFrostSink);
     if (hasPipelines) {
       variables.put("dataPipelines", List.of(Map.of("id", "p-1", "action", "UPDATE")));
       variables.put("datasources", List.of(Map.of("id", "src-1")));

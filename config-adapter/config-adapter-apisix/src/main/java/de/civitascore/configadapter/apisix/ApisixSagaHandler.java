@@ -122,11 +122,6 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
 
   private SagaCommandResult handleCreateRoute(SagaCommandMessage command) {
     String datasetId = requireString(command, "datasetId");
-    // The FROST upstream URL is always carried by the saga (the FROST project is provisioned for
-    // every dataset). Parsed up front so a malformed value fails the step before any gateway state
-    // is touched; the FROST upstream itself is only created when an STA named API actually uses it.
-    RouteUpstreams.Target frostUpstream =
-        RouteUpstreams.frost(requireString(command, "upstreamUrl"));
 
     RoutePayload routePayload = RoutePayload.decode(command);
     List<String> slugs = routePayload.slugs();
@@ -149,8 +144,7 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     // Resolve every slug's routing kind up front (standard → upstream); a non-routable standard
     // (CUSTOM/unknown) fails fast here, before any gateway state is created.
     Map<String, RouteUpstreamKind> kindBySlug = routePayload.routingKinds();
-    Map<String, String> routeIds =
-        provisionRoutes(command, datasetId, slugs, kindBySlug, frostUpstream);
+    Map<String, String> routeIds = provisionRoutes(command, datasetId, slugs, kindBySlug);
 
     String publicUrl = settings.apiPublicUrl() + DATASETS_PATH_PREFIX + datasetId;
     Map<String, Object> resultData =
@@ -183,11 +177,15 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
       SagaCommandMessage command,
       String datasetId,
       List<String> slugs,
-      Map<String, RouteUpstreamKind> kindBySlug,
-      RouteUpstreams.Target frostUpstream) {
+      Map<String, RouteUpstreamKind> kindBySlug) {
     boolean hasSta = kindBySlug.containsValue(RouteUpstreamKind.STA);
     boolean hasOws = kindBySlug.containsValue(RouteUpstreamKind.OWS);
     RouteUpstreams.Target mapUpstream = hasOws ? upstreams.map(datasetId) : null;
+    // The FROST upstream URL exists only once a FROST project was provisioned, which is conditional
+    // on the dataset having a FROST data sink. Required — and parsed, so a malformed value fails
+    // before any gateway state is touched — only when a slug routes to the STA upstream.
+    RouteUpstreams.Target frostUpstream =
+        hasSta ? RouteUpstreams.frost(requireString(command, "upstreamUrl")) : null;
 
     List<String> createdUpstreamIds = new ArrayList<>();
     Map<String, String> routeIds = new LinkedHashMap<>();

@@ -35,9 +35,11 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(FlowableSagaOrchestrator.class);
 
-  // Only the unconditional saga steps require a handler at startup. The pipeline adapter
-  // (pipeline/nifi) is conditional — it runs only when hasPipelines==true — so it is resolved
-  // lazily per step and a saga that has no pipelines runs fine without it. See SagaStepDelegate.
+  // Conditional steps are resolved lazily per step, so a saga that skips them runs fine without
+  // their adapter (pipeline/nifi on hasPipelines, geoserver/postgis on hasGeoSink). See
+  // SagaStepDelegate. FROST is conditional per dataset too (hasFrostSink) but stays required here
+  // deliberately: it is the sink type every deployment ships, so a missing handler is a packaging
+  // fault worth failing fast on rather than a supported topology.
   private static final Set<String> REQUIRED_HANDLERS = Set.of("frost", "apisix");
 
   private final AdapterConfig config;

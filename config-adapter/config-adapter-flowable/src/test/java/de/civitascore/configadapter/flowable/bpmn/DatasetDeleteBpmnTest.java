@@ -163,6 +163,7 @@ class DatasetDeleteBpmnTest {
     variables.put("routeId", "r-1");
     variables.put("serviceId", "s-1");
     variables.put("hasPipelines", hasPipelines);
+    variables.put("hasFrostSink", true);
     if (hasPipelines) {
       variables.put("pipelineIds", List.of("p-1"));
     }

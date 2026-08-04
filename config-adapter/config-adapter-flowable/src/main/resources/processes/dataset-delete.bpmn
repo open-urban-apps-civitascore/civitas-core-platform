@@ -72,15 +72,20 @@
       <outgoing>flow-sink-error</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_5" errorRef="stepFailedError"/>
     </boundaryEvent>
+    <exclusiveGateway id="frost-gateway" name="Has FROST Sink?" default="flow-frost-skip">
+      <incoming>flow-geo-skip</incoming>
+      <incoming>flow-sink-frost</incoming>
+      <incoming>flow-sink-error</incoming>
+      <outgoing>flow-frost-delete</outgoing>
+      <outgoing>flow-frost-skip</outgoing>
+    </exclusiveGateway>
     <serviceTask id="delete-project" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Delete FROST Project">
       <extensionElements>
         <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="frost"/>
         <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DELETE_PROJECT"/>
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="delete-project"/>
       </extensionElements>
-      <incoming>flow-geo-skip</incoming>
-      <incoming>flow-sink-frost</incoming>
-      <incoming>flow-sink-error</incoming>
+      <incoming>flow-frost-delete</incoming>
       <outgoing>SequenceFlow_4</outgoing>
     </serviceTask>
     <boundaryEvent id="frost-error" name="Step Failed" attachedToRef="delete-project">
@@ -105,6 +110,7 @@
     <exclusiveGateway id="result-gateway" name="Has Errors?" default="flow-result-success">
       <incoming>SequenceFlow_3</incoming>
       <incoming>SequenceFlow_4</incoming>
+      <incoming>flow-frost-skip</incoming>
       <outgoing>flow-result-failure</outgoing>
       <outgoing>flow-result-success</outgoing>
     </exclusiveGateway>
@@ -122,10 +128,14 @@
     <sequenceFlow id="flow-geo-workspace" name="yes" sourceRef="geo-gateway" targetRef="delete-workspace">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_2">${execution.getVariable('hasGeoSink') == true}</conditionExpression>
     </sequenceFlow>
-    <sequenceFlow id="flow-geo-skip" name="no" sourceRef="geo-gateway" targetRef="delete-project"/>
+    <sequenceFlow id="flow-geo-skip" name="no" sourceRef="geo-gateway" targetRef="frost-gateway"/>
     <sequenceFlow id="flow-workspace-sink" sourceRef="delete-workspace" targetRef="deprovision-sink"/>
-    <sequenceFlow id="flow-sink-frost" sourceRef="deprovision-sink" targetRef="delete-project"/>
-    <sequenceFlow id="flow-sink-error" sourceRef="deprovision-sink-error" targetRef="delete-project"/>
+    <sequenceFlow id="flow-sink-frost" sourceRef="deprovision-sink" targetRef="frost-gateway"/>
+    <sequenceFlow id="flow-sink-error" sourceRef="deprovision-sink-error" targetRef="frost-gateway"/>
+    <sequenceFlow id="flow-frost-delete" name="yes" sourceRef="frost-gateway" targetRef="delete-project">
+      <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_4">${execution.getVariable('hasFrostSink') == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-frost-skip" name="no" sourceRef="frost-gateway" targetRef="result-gateway"/>
     <sequenceFlow id="flow-result-failure" name="has error" sourceRef="result-gateway" targetRef="publish-failure">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_3">${execution.getVariable('sagaError') != null}</conditionExpression>
     </sequenceFlow>
@@ -168,6 +178,12 @@
         <dc:Bounds height="50.0" width="50.0" x="555.0" y="175.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_5" labelStyle="BPMNLabelStyle_1">
           <dc:Bounds height="28.0" width="57.0" x="552.0" y="225.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_5" bpmnElement="frost-gateway" isMarkerVisible="true">
+        <dc:Bounds height="50.0" width="50.0" x="968.0" y="176.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_44" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="66.0" x="960.0" y="130.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_3" bpmnElement="delete-workspace">
@@ -301,13 +317,29 @@
           <dc:Bounds height="14.0" width="19.0" x="631.0" y="201.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_9" bpmnElement="flow-geo-skip" sourceElement="BPMNShape_ExclusiveGateway_2" targetElement="BPMNShape_ServiceTask_4">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_9" bpmnElement="flow-geo-skip" sourceElement="BPMNShape_ExclusiveGateway_2" targetElement="BPMNShape_ExclusiveGateway_5">
         <di:waypoint xsi:type="dc:Point" x="580.0" y="175.0"/>
         <di:waypoint xsi:type="dc:Point" x="580.0" y="94.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1075.0" y="94.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1075.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="993.0" y="94.0"/>
+        <di:waypoint xsi:type="dc:Point" x="993.0" y="176.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_21">
           <dc:Bounds height="14.0" width="14.0" x="822.0" y="95.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_24" bpmnElement="flow-frost-delete" sourceElement="BPMNShape_ExclusiveGateway_5" targetElement="BPMNShape_ServiceTask_4">
+        <di:waypoint xsi:type="dc:Point" x="1018.0" y="201.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1020.0" y="201.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_42">
+          <dc:Bounds height="14.0" width="19.0" x="1000.0" y="182.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_25" bpmnElement="flow-frost-skip" sourceElement="BPMNShape_ExclusiveGateway_5" targetElement="BPMNShape_ExclusiveGateway_4">
+        <di:waypoint xsi:type="dc:Point" x="993.0" y="226.0"/>
+        <di:waypoint xsi:type="dc:Point" x="993.0" y="300.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1355.0" y="300.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1355.0" y="226.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_43">
+          <dc:Bounds height="14.0" width="15.0" x="1000.0" y="232.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_10" bpmnElement="flow-workspace-sink" sourceElement="BPMNShape_ServiceTask_3">
