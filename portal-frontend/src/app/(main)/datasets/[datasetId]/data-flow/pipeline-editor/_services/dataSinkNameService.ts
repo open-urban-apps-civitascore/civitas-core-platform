@@ -4,6 +4,12 @@ import type { PipelineSession } from '../_types/session'
 /** Matches the backend comparison: trimmed and case-insensitive. */
 export const normalizeTableName = (tableName: string): string => tableName.trim().toLowerCase()
 
+/** Mirrors DataSinkService.TABLE_NAME_PATTERN and MAX_TABLE_NAME_LENGTH. */
+const TABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
+export const MAX_TABLE_NAME_LENGTH = 63
+
+export const isValidTableName = (tableName: string): boolean => TABLE_NAME_PATTERN.test(tableName)
+
 /** Normalized table name → name of the pipeline using it. */
 export type TableNameOwners = Readonly<Record<string, string>>
 

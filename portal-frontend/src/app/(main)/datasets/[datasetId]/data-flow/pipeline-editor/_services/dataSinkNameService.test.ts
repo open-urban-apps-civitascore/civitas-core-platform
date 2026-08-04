@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import type { PipelineNode } from '../_types/pipeline'
 import type { PipelineSession } from '../_types/session'
-import { normalizeTableName, tableNameOwnerOutsideNode, tableNameOwnersOutsideSession } from './dataSinkNameService'
+import {
+  isValidTableName,
+  normalizeTableName,
+  tableNameOwnerOutsideNode,
+  tableNameOwnersOutsideSession,
+} from './dataSinkNameService'
 import { createEmptyPipeline } from './pipelineService'
 
 const geoNode = (nodeId: string, tableName: string): PipelineNode =>
@@ -25,6 +30,16 @@ const session = (sessionId: string, pipelineName: string, nodes: PipelineNode[])
 describe('normalizeTableName', () => {
   it('trims and lowercases', () => {
     expect(normalizeTableName('  Roads  ')).toBe('roads')
+  })
+})
+
+describe('isValidTableName', () => {
+  it.each(['roads', '_roads', 'Roads_2024', 'r'])('accepts %s', tableName => {
+    expect(isValidTableName(tableName)).toBe(true)
+  })
+
+  it.each(['', '2roads', 'roads-2024', 'roads 2024', 'roads;drop', 'straßen', ' roads'])('rejects %s', tableName => {
+    expect(isValidTableName(tableName)).toBe(false)
   })
 })
 

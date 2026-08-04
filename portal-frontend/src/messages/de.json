@@ -1231,6 +1231,7 @@
       "title": "Geodaten-Speicher",
       "tableName": "Tabellenname",
       "tableNamePlaceholder": "Tabellennamen eingeben...",
+      "tableNameInvalid": "Erlaubt sind nur Buchstaben (a–z, A–Z), Ziffern und Unterstriche. Das erste Zeichen muss ein Buchstabe oder ein Unterstrich sein.",
       "dataStructureVersion": "Datenstruktur-Version",
       "importDataStructure": "Datenstruktur importieren",
       "changeDataStructure": "Datenstruktur ändern",

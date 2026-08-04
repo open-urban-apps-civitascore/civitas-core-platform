@@ -1244,6 +1244,7 @@
       "title": "Geospatial Data Storage",
       "tableName": "Table Name",
       "tableNamePlaceholder": "Enter table name...",
+      "tableNameInvalid": "Only letters (a–z, A–Z), digits and underscores are allowed. The first character must be a letter or an underscore.",
       "dataStructureVersion": "Data Structure Version",
       "importDataStructure": "Import Data Structure",
       "changeDataStructure": "Change Data Structure",
