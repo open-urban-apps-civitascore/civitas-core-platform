@@ -15,9 +15,11 @@ import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataStructureRepository;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,6 +48,7 @@ class DataStructureImportServiceTest {
   @Mock private DataStructureVersionService dataStructureVersionService;
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private DataStructureRepository dataStructureRepository;
+  @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @InjectMocks private DataStructureImportService importService;
 
   /** Stubs the guard chain for inputs that carry the valid datastructure URN. */
@@ -159,5 +162,62 @@ class DataStructureImportServiceTest {
 
     verify(dataStructureService, never()).create(any());
     verify(dataStructureVersionService, never()).create(any());
+  }
+
+  @Test
+  void importOrReuse_whenIdentityInstalledWithIdenticalContent_reusesWithoutCreating() {
+    stubValidUrn();
+    DataStructureVersion installed = new DataStructureVersion();
+    installed.setModelUrn(DATASTRUCTURE_URN + ":1.0.0");
+    when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(DATASTRUCTURE_URN + ":"))
+        .thenReturn(Optional.of(installed));
+    when(modelRegistryGateway.isUnchanged(
+            org.mockito.ArgumentMatchers.eq(DATASTRUCTURE_URN + ":1.0.0"), any(), any()))
+        .thenReturn(true);
+
+    DataStructureImportService.ImportResolution resolution =
+        importService.importOrReuse(importInput());
+
+    assertThat(resolution.reused()).isTrue();
+    assertThat(resolution.version()).isSameAs(installed);
+    verify(dataStructureService, never()).create(any());
+    verify(dataStructureVersionService, never()).create(any());
+  }
+
+  @Test
+  void importOrReuse_whenIdentityInstalledWithDifferentContent_rejectsWith409() {
+    stubValidUrn();
+    DataStructureVersion installed = new DataStructureVersion();
+    installed.setModelUrn(DATASTRUCTURE_URN + ":1.0.0");
+    when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(DATASTRUCTURE_URN + ":"))
+        .thenReturn(Optional.of(installed));
+    when(modelRegistryGateway.isUnchanged(
+            org.mockito.ArgumentMatchers.eq(DATASTRUCTURE_URN + ":1.0.0"), any(), any()))
+        .thenReturn(false);
+
+    assertThatThrownBy(() -> importService.importOrReuse(importInput()))
+        .isInstanceOf(UniqueConstraintViolationException.class)
+        .hasMessageContaining("different content");
+
+    verify(dataStructureService, never()).create(any());
+  }
+
+  @Test
+  void importOrReuse_whenIdentityUnknown_createsLikeTheSingleImport() {
+    stubValidUrn();
+    when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(DATASTRUCTURE_URN + ":"))
+        .thenReturn(Optional.empty());
+    DataStructure structure = new DataStructure();
+    structure.setId(UUID.randomUUID());
+    when(dataStructureService.create(any(DataStructureInputDTO.class))).thenReturn(structure);
+    DataStructureVersion created = new DataStructureVersion();
+    when(dataStructureVersionService.create(any(DataStructureVersionInputDTO.class)))
+        .thenReturn(created);
+
+    DataStructureImportService.ImportResolution resolution =
+        importService.importOrReuse(importInput());
+
+    assertThat(resolution.reused()).isFalse();
+    assertThat(resolution.version()).isSameAs(created);
   }
 }

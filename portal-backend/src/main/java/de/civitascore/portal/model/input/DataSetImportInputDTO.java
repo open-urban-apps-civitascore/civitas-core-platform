@@ -1,0 +1,45 @@
+package de.civitascore.portal.model.input;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import java.util.List;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+/**
+ * Self-contained dataset import bundle: the dataset shell plus the artifacts it ships. One call,
+ * one transaction — the backend orchestrates the graph; the caller never has to replay the UI's
+ * cascade of requests.
+ *
+ * <p>Increment 1 accepts the dataset shell, data structures and data sources. The fields for the
+ * remaining artifact types exist so that callers sending them get an explicit 400 ("not yet
+ * supported") instead of silent dropping.
+ */
+@Data
+@EqualsAndHashCode(callSuper = true)
+public class DataSetImportInputDTO extends BaseDataEntityInputDTO {
+
+  @NotBlank(message = "Name is required and must be between 3 and 255 characters") @Size(min = 3, max = 255, message = "Name must be between 3 and 255 characters") private String name;
+
+  private String description;
+
+  @Schema(description = "Optional datapool the dataset belongs to")
+  private java.util.UUID datapoolId;
+
+  @Valid @Schema(description = "Data structures shipped with this bundle (created or reused by URN)")
+  private List<DataStructureImportInputDTO> dataStructures = List.of();
+
+  @Valid @Schema(description = "Data sources shipped with this bundle, referencing structures by URN")
+  private List<DataSourceImportInputDTO> dataSources = List.of();
+
+  @Schema(description = "Not yet supported by the import — sending a non-empty list yields 400")
+  private List<Object> mappings;
+
+  @Schema(description = "Not yet supported by the import — sending a non-empty list yields 400")
+  private List<Object> pipelines;
+
+  @Schema(description = "Not yet supported by the import — sending a non-empty list yields 400")
+  private List<Object> dataSinks;
+}

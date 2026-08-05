@@ -216,6 +216,10 @@
       "_collection": true,
       "POST": "DATASTRUCTURE_CREATE"
     },
+    "/v1/imports/datasets": {
+      "_collection": true,
+      "POST": "DATASET_CREATE"
+    },
     "/v1/datapools": {
       "_collection": true,
       "GET": "DATAPOOL_READ",

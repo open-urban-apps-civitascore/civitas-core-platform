@@ -8,8 +8,10 @@ import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataStructureRepository;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +41,13 @@ public class DataStructureImportService {
   private final DataStructureVersionService dataStructureVersionService;
   private final ModelRegistryGateway modelRegistryGateway;
   private final DataStructureRepository dataStructureRepository;
+  private final DataStructureVersionRepository dataStructureVersionRepository;
+
+  /**
+   * A bundle-import resolution: the version a containing artifact should reference, and whether it
+   * came from an already installed structure ({@code reused}) or was created by this call.
+   */
+  public record ImportResolution(DataStructureVersion version, boolean reused) {}
 
   /**
    * Creates a data structure with its first version and model content.
@@ -56,7 +65,46 @@ public class DataStructureImportService {
   public DataStructureVersion importDataStructure(DataStructureImportInputDTO input) {
     String modelId = requireDataStructureId(input);
     rejectAlreadyInstalled(modelId);
+    return create(input);
+  }
 
+  /**
+   * Bundle variant of {@link #importDataStructure}: instead of rejecting an already installed model
+   * identity, it resolves it — per contained structure the dataset import distinguishes create (URN
+   * unknown), reuse (URN installed with identical content; two use cases sharing one Fachmodell is
+   * the point of URN identity) and conflict (URN installed with different content).
+   *
+   * @param input the import input for one bundled structure
+   * @return the version to reference, flagged whether it was reused or created
+   * @throws de.civitascore.portal.util.UniqueConstraintViolationException if the identity is
+   *     installed with different content (409)
+   */
+  @Transactional
+  public ImportResolution importOrReuse(DataStructureImportInputDTO input) {
+    String modelId = requireDataStructureId(input);
+    String logicalUrn = modelRegistryGateway.logicalUrn(modelId);
+
+    Optional<DataStructureVersion> installed =
+        dataStructureVersionRepository.findFirstByModelUrnStartingWith(logicalUrn + ":");
+    if (installed.isPresent()) {
+      DataStructureVersion version = installed.get();
+      if (!modelRegistryGateway.isUnchanged(
+          version.getModelUrn(), input.getModel(), input.getStyles())) {
+        throw new UniqueConstraintViolationException(
+            ("A data structure for model '%s' is already installed with different content."
+                    + " Updating an existing installation is not supported yet.")
+                .formatted(logicalUrn));
+      }
+      return new ImportResolution(version, true);
+    }
+
+    // No pinned version found. The shell turnstile still applies: a shell without a resolvable
+    // version pin (e.g. a half-built UI draft) must conflict rather than gain a twin.
+    rejectAlreadyInstalled(modelId);
+    return new ImportResolution(create(input), false);
+  }
+
+  private DataStructureVersion create(DataStructureImportInputDTO input) {
     DataStructureInputDTO structureInput = new DataStructureInputDTO();
     structureInput.setName(input.getName());
     structureInput.setDescription(input.getDescription());
