@@ -7,6 +7,7 @@ import { ComponentType, useState } from 'react'
 import { toast } from 'sonner'
 
 import { usePatchDataset } from '@/app/services/api/datasets/clientRequests'
+import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,7 +15,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { ApiStandard, NamedApi, namedApiPathPrefix, NamedApiPayload } from '@/types/namedApis'
-import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 
 const STANDARD_ICONS: Record<ApiStandard, ComponentType<{ className?: string }>> = {
   STA: Timer,
@@ -82,7 +82,6 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
       <GuardedLink
         data-testid={`apiCard-${api.slug}`}
         className={cn('flex flex-col bg-white border rounded-sm overflow-hidden group ', canView && 'cursor-pointer')}
-        // onClick={canView ? goToView : undefined}
         href={viewUrl}
       >
         <div className="flex items-start gap-3 p-5">
@@ -127,13 +126,13 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {canEdit && (
-                <DropdownMenuItem data-testid={`apiCardMenuEdit-${api.slug}`}>
-                  <GuardedLink href={editUrl}> {t('actions.edit')}</GuardedLink>
+                <DropdownMenuItem asChild data-testid={`apiCardMenuEdit-${api.slug}`}>
+                  <GuardedLink href={editUrl}>{t('actions.edit')}</GuardedLink>
                 </DropdownMenuItem>
               )}
               {canView && (
-                <DropdownMenuItem data-testid={`apiCardMenuView-${api.slug}`}>
-                  <GuardedLink href={viewUrl}> {t('actions.view')}</GuardedLink>
+                <DropdownMenuItem asChild data-testid={`apiCardMenuView-${api.slug}`}>
+                  <GuardedLink href={viewUrl}>{t('actions.view')}</GuardedLink>
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem
