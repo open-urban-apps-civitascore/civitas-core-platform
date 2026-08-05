@@ -36,7 +36,10 @@ build-config-adapter-for-backend:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
     key:
-      prefix: config-adapter-maven
+      # Own cache key (distinct from config-adapter-maven) so this job never races with
+      # lint-config-adapter/build-config-adapter/etc. writing the same cache bucket when an MR
+      # touches both config-adapter and portal-backend.
+      prefix: backend-config-adapter-maven
       files:
         - config-adapter/pom.xml
     paths:
