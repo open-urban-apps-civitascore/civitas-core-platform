@@ -40,6 +40,8 @@ dataset_read_subresource_paths := {
 	"/v1/datasets/dataset-abc/styles/style-1",
 	"/v1/datasets/dataset-abc/pipelines",
 	"/v1/datasets/dataset-abc/pipelines/pipe-1",
+	"/v1/datasets/dataset-abc/visualizations",
+	"/v1/datasets/dataset-abc/visualizations/visualization-1",
 }
 
 # The matching DATASET scope grants read and carries the dataset id as the scope header.
@@ -115,4 +117,51 @@ test_group_assignments_and_permission_partial_denied if {
 		with input as portal_request("PUT", "/v1/groups/group-1/assignments")
 	result.allow == false
 	result.reason == "permission_denied"
+}
+
+# =============================================================================
+# VISUALIZATIONS SUB-RESOURCE — WRITE SIDE ONLY
+# =============================================================================
+# /v1/datasets/{id}/visualizations(/{id})'s GET is covered above, alongside every other
+# sub-resource (DATASET_READ). Its write side (POST/PUT/DELETE) is the one part of this
+# sub-resource that stays on its own permission, DATASET_DASHBOARD_UPDATE — deliberately not
+# DATASET_UPDATE, so dashboard authoring can be granted independently of general dataset editing.
+
+mock_send_dataset_abc_dashboard_reader(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_DASHBOARD_READ"], "DATASET", "dataset-abc")}
+
+mock_send_dataset_abc_dashboard_writer(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_DASHBOARD_UPDATE"], "DATASET", "dataset-abc")}
+
+# Regression guard: DATASET_DASHBOARD_READ alone (without DATASET_READ) must NOT grant GET —
+# reading a visualization list is DATASET_READ's job now, not this permission's.
+test_visualizations_read_denied_with_only_dashboard_read_permission if {
+	result := authz.decision with http.send as mock_send_dataset_abc_dashboard_reader
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets/dataset-abc/visualizations")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+test_visualizations_write_requires_dashboard_write if {
+	result := authz.decision with http.send as mock_send_dataset_abc_dashboard_reader
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datasets/dataset-abc/visualizations")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+test_visualizations_write_allowed_with_dashboard_write if {
+	result := authz.decision with http.send as mock_send_dataset_abc_dashboard_writer
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datasets/dataset-abc/visualizations")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {"DATASET_DASHBOARD_UPDATE"}
+}
+
+test_visualizations_delete_allowed_with_dashboard_write if {
+	result := authz.decision with http.send as mock_send_dataset_abc_dashboard_writer
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/datasets/dataset-abc/visualizations/vis-1")
+	result.allow == true
+	result.reason == "permission_granted"
 }

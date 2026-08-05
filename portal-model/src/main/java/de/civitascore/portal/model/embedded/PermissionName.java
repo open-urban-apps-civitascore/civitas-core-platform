@@ -63,7 +63,7 @@ public enum PermissionName implements GrantedAuthority {
 
   DATASET_DASHBOARD_READ(
       PermissionType.DATA, PermissionCategory.DATA, PermissionSource.DATASET_DASHBOARD),
-  DATASET_DASHBOARD_WRITE(
+  DATASET_DASHBOARD_UPDATE(
       PermissionType.DATA, PermissionCategory.DATA, PermissionSource.DATASET_DASHBOARD),
 
   DATASOURCE_CREATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
