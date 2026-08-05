@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { LayerFormSchema } from './layers'
+import { LayersFormSchema } from './layers'
 import { StyleFormSchema } from './styles'
 
 export const SLUG_MAX_LENGTH = 32
@@ -148,13 +148,11 @@ const addDuplicateLayerNameIssues = (layers: { layerName: string }[], ctx: z.Ref
 }
 
 export const OwsApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
-  z
-    .object({
-      type: z.literal(API_TYPE_QUERY.OWS),
-      baseInfo: NamedApiBaseInfoFormSchema({ existingSlugs }),
-      layers: z.array(LayerFormSchema),
-      styles: z.array(StyleFormSchema),
-    })
-    .superRefine((data, ctx) => addDuplicateLayerNameIssues(data.layers, ctx))
+  z.object({
+    type: z.literal(API_TYPE_QUERY.OWS),
+    baseInfo: NamedApiBaseInfoFormSchema({ existingSlugs }),
+    layers: LayersFormSchema,
+    styles: z.array(StyleFormSchema),
+  })
 
 export type OwsApiFormData = z.infer<ReturnType<typeof OwsApiFormSchema>>
