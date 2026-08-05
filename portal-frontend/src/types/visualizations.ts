@@ -58,3 +58,9 @@ export type DeleteVisualizationInput = {
   datasetId: string
   visualizationId: string
 }
+
+export type UpdateVisualizationInput = {
+  datasetId: string
+  visualizationId: string
+  visualization: VisualizationFormData
+}

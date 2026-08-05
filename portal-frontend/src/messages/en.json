@@ -547,7 +547,8 @@
               "descriptionPlaceholder": "Optional descriptive metadata if needed later."
             },
             "messages": {
-              "saveSuccess": "Visualization created successfully",
+              "createSuccess": "Visualization created successfully",
+              "updateSuccess": "Visualization updated successfully",
               "saveError": "An error occurred while saving. Please try again."
             }
           }

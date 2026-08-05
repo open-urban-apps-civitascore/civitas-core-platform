@@ -546,7 +546,8 @@
               "descriptionPlaceholder": "Optionale Beschreibung, falls später benötigt."
             },
             "messages": {
-              "saveSuccess": "Visualisierung erfolgreich erstellt",
+              "createSuccess": "Visualisierung erfolgreich erstellt",
+              "updateSuccess": "Visualisierung erfolgreich aktualisiert",
               "saveError": "Beim Speichern ist ein Fehler aufgetreten. Bitte versuche es erneut."
             }
           }

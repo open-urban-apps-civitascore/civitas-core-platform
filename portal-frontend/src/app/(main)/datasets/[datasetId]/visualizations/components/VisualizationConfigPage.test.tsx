@@ -5,17 +5,23 @@ import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Dataset } from '@/types/datasets'
-import { VISUALIZATION_TYPE_QUERY, VisualizationFormData } from '@/types/visualizations'
+import { Visualization, VISUALIZATION_TYPE_QUERY, VisualizationFormData } from '@/types/visualizations'
 
 import { VisualizationConfigPage } from './VisualizationConfigPage'
 
 // --- mocks ---
 
 const mockPush = vi.fn()
+const mockReplace = vi.fn()
 const mockCreateVisualization = vi.fn().mockResolvedValue(undefined)
+const mockUpdateVisualization = vi.fn().mockResolvedValue(undefined)
+let mockCanEdit = true
+let mockSearchParams = new URLSearchParams()
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace, refresh: vi.fn() }),
+  usePathname: () => '/datasets/test-id/visualizations/vis-1',
+  useSearchParams: () => mockSearchParams,
 }))
 
 vi.mock('next-intl', () => ({
@@ -26,19 +32,37 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
+vi.mock('@/hooks/use-permissions', () => ({
+  usePermissions: () => ({ hasScopedPermission: () => mockCanEdit }),
+}))
+
 vi.mock('@/app/services/api/visualizations/clientRequests', () => ({
   useCreateVisualization: () => ({ mutateAsync: mockCreateVisualization, isPending: false }),
+  useUpdateVisualization: () => ({ mutateAsync: mockUpdateVisualization, isPending: false }),
 }))
 
 vi.mock('./VisualizationConfigForm', () => ({
-  VisualizationConfigForm: ({ form }: { form: UseFormReturn<VisualizationFormData> }) => (
-    <input data-testid="nameInput" {...form.register('name')} />
-  ),
+  VisualizationConfigForm: ({
+    form,
+    isReadOnly,
+  }: {
+    form: UseFormReturn<VisualizationFormData>
+    isReadOnly?: boolean
+  }) => <input data-testid="nameInput" disabled={isReadOnly} {...form.register('name')} />,
 }))
 
 vi.mock('@/components/page-header/PageHeader', () => ({
-  PageHeader: ({ customElement, badgeTitle }: { customElement?: React.ReactNode; badgeTitle?: string }) => (
+  PageHeader: ({
+    title,
+    customElement,
+    badgeTitle,
+  }: {
+    title?: string
+    customElement?: React.ReactNode
+    badgeTitle?: string
+  }) => (
     <div data-testid="pageHeader">
+      {title && <h1>{title}</h1>}
       {badgeTitle && <span>{badgeTitle}</span>}
       {customElement}
     </div>
@@ -72,11 +96,19 @@ const makeDataset = (overrides: Partial<Dataset> = {}): Dataset => ({
   ...overrides,
 })
 
-const renderComponent = (props: { dataset?: Dataset } = {}) =>
+const makeVisualization = (overrides: Partial<Visualization> = {}): Visualization => ({
+  id: 'vis-1',
+  name: 'Sales Dashboard',
+  type: 'dashboard',
+  ...overrides,
+})
+
+const renderComponent = (props: { dataset?: Dataset; existingVisualization?: Visualization } = {}) =>
   render(
     <VisualizationConfigPage
       dataset={props.dataset ?? makeDataset()}
-      visualizationType={VISUALIZATION_TYPE_QUERY.DASHBOARD}
+      visualizationType={props.existingVisualization ? undefined : VISUALIZATION_TYPE_QUERY.DASHBOARD}
+      existingVisualization={props.existingVisualization}
     />,
   )
 
@@ -86,6 +118,9 @@ describe('VisualizationConfigPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockCreateVisualization.mockResolvedValue(undefined)
+    mockUpdateVisualization.mockResolvedValue(undefined)
+    mockCanEdit = true
+    mockSearchParams = new URLSearchParams()
   })
 
   describe('Cancel / exit without unsaved changes', () => {
@@ -154,6 +189,77 @@ describe('VisualizationConfigPage', () => {
     it('shows the open data badge when openDataAccess is true', () => {
       renderComponent({ dataset: makeDataset({ openDataAccess: true }) })
       expect(screen.getByText('openDataBadge')).toBeInTheDocument()
+    })
+  })
+
+  describe('Edit mode (existing visualization)', () => {
+    it('shows the visualization name as the page title', () => {
+      renderComponent({ existingVisualization: makeVisualization({ name: 'Sales Dashboard' }) })
+      expect(screen.getByText('Sales Dashboard')).toBeInTheDocument()
+    })
+
+    it('starts read-only and shows an Edit button when the viewer can edit', () => {
+      renderComponent({ existingVisualization: makeVisualization() })
+      expect(screen.getByTestId('nameInput')).toBeDisabled()
+      expect(screen.getByTestId('editButton')).toBeInTheDocument()
+    })
+
+    it('hides the Edit button when the viewer lacks update permission', () => {
+      mockCanEdit = false
+      renderComponent({ existingVisualization: makeVisualization() })
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+    })
+
+    it('switches to editable mode and updates the URL when Edit is clicked', async () => {
+      renderComponent({ existingVisualization: makeVisualization() })
+      await userEvent.click(screen.getByTestId('editButton'))
+      expect(screen.getByTestId('nameInput')).not.toBeDisabled()
+      expect(mockReplace).toHaveBeenCalledWith('/datasets/test-id/visualizations/vis-1?mode=edit', { scroll: false })
+    })
+
+    it('starts editable when the mode=edit query param is present', () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      renderComponent({ existingVisualization: makeVisualization() })
+      expect(screen.getByTestId('nameInput')).not.toBeDisabled()
+    })
+
+    it('updates the visualization, returns to read-only, and refreshes on success', async () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      renderComponent({ existingVisualization: makeVisualization({ id: 'vis-1' }) })
+      await userEvent.clear(screen.getByTestId('nameInput'))
+      await userEvent.type(screen.getByTestId('nameInput'), 'Updated Name')
+      fireEvent.submit(screen.getByTestId('visualizationConfigForm'))
+      await waitFor(() => {
+        expect(mockUpdateVisualization).toHaveBeenCalledWith({
+          datasetId: 'test-id',
+          visualizationId: 'vis-1',
+          visualization: expect.objectContaining({ name: 'Updated Name' }),
+        })
+      })
+      expect(toast.success).toHaveBeenCalled()
+      expect(mockPush).not.toHaveBeenCalled()
+      await waitFor(() => {
+        expect(screen.getByTestId('nameInput')).toBeDisabled()
+      })
+    })
+
+    it('returns to read-only without navigating away when cancel is clicked with no changes', () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      renderComponent({ existingVisualization: makeVisualization() })
+      fireEvent.click(screen.getByTestId('cancelButton'))
+      expect(mockPush).not.toHaveBeenCalled()
+      expect(screen.getByTestId('nameInput')).toBeDisabled()
+    })
+
+    it('opens the exit warning modal when cancel is clicked with unsaved changes, and discarding returns to read-only', async () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      renderComponent({ existingVisualization: makeVisualization() })
+      await userEvent.type(screen.getByTestId('nameInput'), ' extra')
+      fireEvent.click(screen.getByTestId('cancelButton'))
+      expect(screen.getByTestId('exitWarningModal')).toBeInTheDocument()
+      fireEvent.click(screen.getByTestId('discardButton'))
+      expect(mockPush).not.toHaveBeenCalled()
+      expect(screen.getByTestId('nameInput')).toBeDisabled()
     })
   })
 })

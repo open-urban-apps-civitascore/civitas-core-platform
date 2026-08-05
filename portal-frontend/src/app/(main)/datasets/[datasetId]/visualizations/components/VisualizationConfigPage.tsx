@@ -1,13 +1,13 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { FormEvent, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { useCreateVisualization } from '@/app/services/api/visualizations/clientRequests'
+import { useCreateVisualization, useUpdateVisualization } from '@/app/services/api/visualizations/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -15,10 +15,19 @@ import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
+import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Dataset } from '@/types/datasets'
-import { VisualizationFormData, visualizationFormSchema, VisualizationTypeQuery } from '@/types/visualizations'
+import {
+  Visualization,
+  VisualizationFormData,
+  visualizationFormSchema,
+  VisualizationTypeQuery,
+} from '@/types/visualizations'
 
 import { VisualizationConfigForm } from './VisualizationConfigForm'
 
@@ -26,33 +35,56 @@ type VisualizationConfigTab = 'basicInfo'
 
 interface VisualizationConfigPageProps {
   dataset: Dataset
-  visualizationType: VisualizationTypeQuery
+  visualizationType?: VisualizationTypeQuery
+  existingVisualization?: Visualization
   testId?: string
 }
 
-export const VisualizationConfigPage = ({ dataset, visualizationType, testId }: VisualizationConfigPageProps) => {
+export const VisualizationConfigPage = ({
+  dataset,
+  visualizationType,
+  existingVisualization,
+  testId,
+}: VisualizationConfigPageProps) => {
   const t = useTranslations('datasets.overview.completion.visualizations.config')
   const tCommon = useTranslations('common')
 
+  const isCreate = !existingVisualization
+  const resolvedType = visualizationType ?? existingVisualization!.type
+
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [selectedTab, setSelectedTab] = useState<VisualizationConfigTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+  const [isReadOnly, setIsReadOnly] = useState(isCreate ? false : searchParams.get('mode') !== 'edit')
   const createVisualization = useCreateVisualization()
+  const updateVisualization = useUpdateVisualization()
+
+  const { hasScopedPermission } = usePermissions()
+  const canEdit = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
+
+  const defaultValues: VisualizationFormData = {
+    name: existingVisualization?.name ?? '',
+    description: existingVisualization?.description ?? '',
+  }
 
   const form = useForm<VisualizationFormData>({
     resolver: zodResolver(visualizationFormSchema),
     mode: 'onChange',
-    defaultValues: {
-      name: '',
-      description: '',
-    },
+    defaultValues,
   })
 
   const hasUnsavedChanges = form.formState.isDirty
   const isFormValid = form.formState.isValid
 
-  const pageTitle = t(`title.${visualizationType}`)
-  const typeLabel = t(`type.${visualizationType}`)
+  const pageTitle = existingVisualization?.name ?? t(`title.${resolvedType}`)
+  const typeLabel = t(`type.${resolvedType}`)
 
   const tabs: Tab<VisualizationConfigTab>[] = useMemo(
     () => [{ value: 'basicInfo', label: 'datasets.overview.completion.visualizations.config.tabs.basicInfo' }],
@@ -63,34 +95,66 @@ export const VisualizationConfigPage = ({ dataset, visualizationType, testId }: 
 
   const badgeTitle = dataset.openDataAccess ? t('openDataBadge') : t('protectedBadge')
 
+  const updateMode = (isEditing: boolean) => {
+    setIsReadOnly(!isEditing)
+    const params = new URLSearchParams(searchParams.toString())
+    if (isEditing) {
+      params.set('mode', 'edit')
+    } else {
+      params.delete('mode')
+    }
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }
+
   const handleExit = () => {
     if (hasUnsavedChanges) {
       setIsExitModalOpen(true)
       return
     }
-    router.push(`/datasets/${dataset.id}`)
+    if (isCreate) {
+      router.push(`/datasets/${dataset.id}`)
+    } else {
+      form.reset(defaultValues)
+      updateMode(false)
+    }
   }
 
   const handleDiscardAndExit = () => {
     setIsExitModalOpen(false)
-    router.push(`/datasets/${dataset.id}`)
+    if (isCreate) {
+      router.push(`/datasets/${dataset.id}`)
+      return
+    }
+    form.reset(defaultValues)
+    updateMode(false)
   }
 
   const handleSave = async (): Promise<boolean> => {
     let isSaved = false
     await form.handleSubmit(async data => {
       try {
-        await createVisualization.mutateAsync({ datasetId: dataset.id, visualization: data })
-        toast.success(t('messages.saveSuccess'))
+        if (isCreate) {
+          await createVisualization.mutateAsync({ datasetId: dataset.id, visualization: data })
+          toast.success(t('messages.createSuccess'))
+          router.push(`/datasets/${dataset.id}`)
+        } else {
+          await updateVisualization.mutateAsync({
+            datasetId: dataset.id,
+            visualizationId: existingVisualization.id,
+            visualization: data,
+          })
+          toast.success(t('messages.updateSuccess'))
+          form.reset(data)
+          updateMode(false)
+          router.refresh()
+        }
         isSaved = true
       } catch {
         toast.error(t('messages.saveError'))
         isSaved = false
       }
     })()
-    if (isSaved) {
-      router.push(`/datasets/${dataset.id}`)
-    }
     return isSaved
   }
 
@@ -107,7 +171,11 @@ export const VisualizationConfigPage = ({ dataset, visualizationType, testId }: 
 
   useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
 
-  const buttonGroup = (
+  const buttonGroup = isReadOnly ? (
+    <Button data-testid="editButton" type="button" onClick={() => updateMode(true)}>
+      {tCommon('actions.edit')}
+    </Button>
+  ) : (
     <ActionButtons
       confirmButtonType="submit"
       formId="visualization-config-form"
@@ -123,7 +191,7 @@ export const VisualizationConfigPage = ({ dataset, visualizationType, testId }: 
       <PageHeader
         title={pageTitle}
         badgeTitle={badgeTitle}
-        customElement={buttonGroup}
+        customElement={isCreate || canEdit ? buttonGroup : undefined}
         segmentedControlBarProps={{
           tabs,
           selectedTab,
@@ -143,7 +211,9 @@ export const VisualizationConfigPage = ({ dataset, visualizationType, testId }: 
             className="h-full"
           >
             <ContentCard>
-              {selectedTab === 'basicInfo' && <VisualizationConfigForm form={form} typeLabel={typeLabel} />}
+              {selectedTab === 'basicInfo' && (
+                <VisualizationConfigForm form={form} typeLabel={typeLabel} isReadOnly={isReadOnly} />
+              )}
             </ContentCard>
           </form>
         </Form>

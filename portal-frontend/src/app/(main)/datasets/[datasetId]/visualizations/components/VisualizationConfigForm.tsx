@@ -14,9 +14,10 @@ import { VISUALIZATION_DESCRIPTION_MAX_LENGTH, VisualizationFormData } from '@/t
 interface VisualizationConfigFormProps {
   form: UseFormReturn<VisualizationFormData>
   typeLabel: string
+  isReadOnly?: boolean
 }
 
-export const VisualizationConfigForm = ({ form, typeLabel }: VisualizationConfigFormProps) => {
+export const VisualizationConfigForm = ({ form, typeLabel, isReadOnly = false }: VisualizationConfigFormProps) => {
   const t = useTranslations('datasets.overview.completion.visualizations.config')
   const isMobile = useIsMobile()
 
@@ -45,6 +46,7 @@ export const VisualizationConfigForm = ({ form, typeLabel }: VisualizationConfig
           name="name"
           placeholder={t('form.titlePlaceholder')}
           required
+          disabled={isReadOnly}
           formItemProps={formItemProps}
         />
       </DetailsFieldContainer>
@@ -59,6 +61,7 @@ export const VisualizationConfigForm = ({ form, typeLabel }: VisualizationConfig
           hint={t('form.descriptionHint')}
           maxLength={VISUALIZATION_DESCRIPTION_MAX_LENGTH}
           hasCharacterCount
+          disabled={isReadOnly}
           className="min-h-[100px] resize-none"
           formItemProps={formItemProps}
         />
