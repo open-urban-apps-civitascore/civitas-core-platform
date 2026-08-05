@@ -1040,6 +1040,7 @@ class DataSetServiceTest {
               null,
               null,
               null,
+              null,
               null);
 
       createService().handleSagaCompleted(id, result);
@@ -1092,6 +1093,7 @@ class DataSetServiceTest {
               null,
               null,
               null,
+              null,
               null);
 
       createService().handleSagaCompleted(id, result);
@@ -1134,6 +1136,7 @@ class DataSetServiceTest {
               null,
               null,
               null,
+              null,
               null);
 
       // The bad id is logged as drift and skipped; the handler must not throw and must clear
@@ -1167,6 +1170,7 @@ class DataSetServiceTest {
               null,
               null,
               List.of(new SagaResultPayload.DashboardResult(unknownId.toString(), "engine-9")),
+              null,
               null,
               null,
               null,
