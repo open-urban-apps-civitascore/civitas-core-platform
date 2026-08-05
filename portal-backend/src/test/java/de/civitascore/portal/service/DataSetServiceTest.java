@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -787,6 +788,51 @@ class DataSetServiceTest {
 
       DataSet result = createService().updateReleasedMeta(id, input);
       assertThat(result.getNamedApis()).extracting(NamedApi::getSlug).containsExactly("traffic");
+    }
+
+    @Test
+    @DisplayName("publishes an UPDATE saga with the pre-update pipelines for a provisioned dataset")
+    void publishesUpdateSagaForAvailableDataSet() {
+      // The saga trigger is the only path that propagates a metadata edit to the provisioned
+      // infrastructure; without this test, removing it leaves the DB updated and NiFi/APISIX stale
+      // with nothing failing. The pipeline snapshot must predate the update, since the publisher
+      // derives removals from it.
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      Pipeline existing = new Pipeline();
+      existing.setId(UUID.randomUUID());
+      ds.getPipelines().add(existing);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      DataSet result = createService().updateReleasedMeta(id, input);
+
+      assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.UPDATE);
+      @SuppressWarnings("unchecked")
+      ArgumentCaptor<Set<Pipeline>> previousPipelines = ArgumentCaptor.forClass(Set.class);
+      verify(sagaPublisher).publishUpdateRequested(eq(result), previousPipelines.capture());
+      assertThat(previousPipelines.getValue()).containsExactly(existing);
+    }
+
+    @Test
+    @DisplayName("publishes no saga for an AVAILABLE dataset that was never provisioned")
+    void publishesNoSagaWithoutProjectId() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setProjectId(null);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      DataSet result = createService().updateReleasedMeta(id, input);
+
+      assertThat(result.getPendingSagaType()).isNull();
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
     }
   }
 
