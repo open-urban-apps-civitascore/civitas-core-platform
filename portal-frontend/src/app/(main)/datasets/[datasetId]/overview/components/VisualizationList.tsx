@@ -17,23 +17,8 @@ interface VisualizationListProps {
   isOpenDataAccess: boolean
 }
 
-// Disabled, since the component is still using dummy data and will be implemented in the future
-// eslint-disable-next-line unused-imports/no-unused-vars
 export const VisualizationList = ({ datasetId, visualizations, canEdit, isOpenDataAccess }: VisualizationListProps) => {
   const t = useTranslations('datasets.overview.completion.visualizations')
-  const visualizationsDummyData: Visualization[] = [
-    {
-      id: '1',
-      name: 'Sales Dashboard',
-      type: 'dashboard',
-    },
-    {
-      id: '2',
-      name: 'Customer Insights',
-      description: 'A dashboard to analyze customer behavior and preferences.',
-      type: 'dashboard',
-    },
-  ]
 
   return (
     <div>
@@ -59,9 +44,9 @@ export const VisualizationList = ({ datasetId, visualizations, canEdit, isOpenDa
         </DropdownMenu>
       </div>
 
-      {visualizationsDummyData.length > 0 ? (
+      {visualizations.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          {visualizationsDummyData.map(visualization => (
+          {visualizations.map(visualization => (
             <VisualizationCard
               key={visualization.id}
               visualization={visualization}

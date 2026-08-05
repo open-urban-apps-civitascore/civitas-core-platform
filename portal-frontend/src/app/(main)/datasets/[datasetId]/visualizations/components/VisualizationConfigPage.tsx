@@ -7,6 +7,7 @@ import { FormEvent, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
+import { useCreateVisualization } from '@/app/services/api/visualizations/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -36,6 +37,7 @@ export const VisualizationConfigPage = ({ dataset, visualizationType, testId }: 
   const router = useRouter()
   const [selectedTab, setSelectedTab] = useState<VisualizationConfigTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+  const createVisualization = useCreateVisualization()
 
   const form = useForm<VisualizationFormData>({
     resolver: zodResolver(visualizationFormSchema),
@@ -76,16 +78,19 @@ export const VisualizationConfigPage = ({ dataset, visualizationType, testId }: 
 
   const handleSave = async (): Promise<boolean> => {
     let isSaved = false
-    await form.handleSubmit(async _data => {
+    await form.handleSubmit(async data => {
       try {
-        // TODO: call createVisualization mutation when API is available
-        toast.error(t('messages.saveError'))
-        isSaved = false
+        await createVisualization.mutateAsync({ datasetId: dataset.id, visualization: data })
+        toast.success(t('messages.saveSuccess'))
+        isSaved = true
       } catch {
         toast.error(t('messages.saveError'))
         isSaved = false
       }
     })()
+    if (isSaved) {
+      router.push(`/datasets/${dataset.id}`)
+    }
     return isSaved
   }
 

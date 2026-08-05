@@ -68,11 +68,6 @@ export const DatasetApiResponseSchema = z.object({
   ),
   namedApis: z.array(NamedApiSchema).optional(),
   datapool: DatapoolItemSchema.nullable(),
-  visualizations: z
-    .array(
-      z.object({ id: z.string(), name: z.string(), description: z.string().optional(), type: z.enum(['dashboard']) }),
-    )
-    .optional(),
   // True once the data-holding sink (PostGIS table / FROST project) physically exists. Stays true
   // across an unrelease. Drives the data-loss warning before a destructive sink change.
   provisioned: z.boolean().optional(),

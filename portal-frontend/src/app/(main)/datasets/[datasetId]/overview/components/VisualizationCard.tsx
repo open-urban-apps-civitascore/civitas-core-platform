@@ -4,7 +4,9 @@ import { ExternalLink, MoreVertical, PieChart } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { ComponentType, useState } from 'react'
+import { toast } from 'sonner'
 
+import { useDeleteVisualization } from '@/app/services/api/visualizations/clientRequests'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -30,6 +32,7 @@ export const VisualizationCard = ({ visualization, datasetId, canEdit, isOpenDat
 
   const router = useRouter()
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const deleteVisualization = useDeleteVisualization()
 
   const Icon = TYPE_ICONS[visualization.type]
   const typeLabel = tConfig(`type.${visualization.type}`)
@@ -37,7 +40,12 @@ export const VisualizationCard = ({ visualization, datasetId, canEdit, isOpenDat
   const goToView = () => router.push(`/datasets/${datasetId}/visualizations/${visualization.id}`)
 
   const handleConfirmDelete = async () => {
-    // TODO: call deleteVisualization mutation when API is available
+    try {
+      await deleteVisualization.mutateAsync({ datasetId, visualizationId: visualization.id })
+      toast.success(tCard('messages.deleteSuccess'))
+    } catch {
+      toast.error(tCard('messages.deleteError'))
+    }
     setIsDeleteOpen(false)
     router.refresh()
   }

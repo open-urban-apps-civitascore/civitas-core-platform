@@ -20,6 +20,13 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
+const makeVisualization = (overrides: Partial<Visualization> = {}): Visualization => ({
+  id: '1',
+  name: 'Sales Dashboard',
+  type: 'dashboard',
+  ...overrides,
+})
+
 const defaultProps = {
   datasetId: 'dataset-123',
   visualizations: [] as Visualization[],
@@ -56,17 +63,20 @@ describe('VisualizationList', () => {
   })
 
   describe('Visualization cards', () => {
-    it('renders a VisualizationCard for each item in the dummy data', () => {
-      renderComponent()
-      // VisualizationList renders internal dummy data with ids '1' and '2'
+    it('renders a VisualizationCard for each passed-in visualization', () => {
+      renderComponent({ visualizations: [makeVisualization({ id: '1' }), makeVisualization({ id: '2' })] })
       expect(screen.getByTestId('visualizationCard-1')).toBeInTheDocument()
       expect(screen.getByTestId('visualizationCard-2')).toBeInTheDocument()
     })
 
     it('passes canEdit to each VisualizationCard', () => {
-      renderComponent({ canEdit: false })
+      renderComponent({ visualizations: [makeVisualization({ id: '1' })], canEdit: false })
       expect(screen.getByTestId('visualizationCard-1')).toHaveAttribute('data-can-edit', 'false')
-      expect(screen.getByTestId('visualizationCard-2')).toHaveAttribute('data-can-edit', 'false')
+    })
+
+    it('shows the empty state when there are no visualizations', () => {
+      renderComponent({ visualizations: [] })
+      expect(screen.getByText('empty')).toBeInTheDocument()
     })
   })
 })

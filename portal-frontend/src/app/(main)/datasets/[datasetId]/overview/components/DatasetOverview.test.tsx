@@ -31,6 +31,10 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
 }))
 
+vi.mock('@/app/services/api/visualizations/clientRequests', () => ({
+  useGetVisualizations: () => ({ data: undefined }),
+}))
+
 const mockCurrentUser = (permissions: PermissionName[]) => {
   vi.mocked(useGetCurrentUser).mockReturnValue({
     data: {

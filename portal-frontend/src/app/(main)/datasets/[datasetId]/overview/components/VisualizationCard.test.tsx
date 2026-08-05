@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Visualization } from '@/types/visualizations'
@@ -8,6 +9,7 @@ import { VisualizationCard } from './VisualizationCard'
 
 const mockPush = vi.fn()
 const mockRefresh = vi.fn()
+const mockDeleteVisualization = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
@@ -15,6 +17,14 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
+}))
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}))
+
+vi.mock('@/app/services/api/visualizations/clientRequests', () => ({
+  useDeleteVisualization: () => ({ mutateAsync: mockDeleteVisualization, isPending: false }),
 }))
 
 vi.mock('@/components/modals/warning-modal/WarningModal', () => ({
@@ -48,6 +58,7 @@ const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
 describe('VisualizationCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockDeleteVisualization.mockResolvedValue(undefined)
   })
 
   describe('Rendering', () => {
@@ -125,6 +136,29 @@ describe('VisualizationCard', () => {
       await waitFor(() => {
         expect(mockRefresh).toHaveBeenCalled()
       })
+    })
+
+    it('calls the delete mutation with the dataset and visualization ids', async () => {
+      renderComponent()
+      await userEvent.click(screen.getByTestId('visualizationCardMenu-vis-1'))
+      await userEvent.click(screen.getByTestId('visualizationCardMenuDelete-vis-1'))
+      fireEvent.click(screen.getByTestId('confirmButton'))
+      await waitFor(() => {
+        expect(mockDeleteVisualization).toHaveBeenCalledWith({ datasetId: 'dataset-123', visualizationId: 'vis-1' })
+      })
+      expect(toast.success).toHaveBeenCalled()
+    })
+
+    it('shows an error toast but still refreshes when the mutation fails', async () => {
+      mockDeleteVisualization.mockRejectedValueOnce(new Error('network'))
+      renderComponent()
+      await userEvent.click(screen.getByTestId('visualizationCardMenu-vis-1'))
+      await userEvent.click(screen.getByTestId('visualizationCardMenuDelete-vis-1'))
+      fireEvent.click(screen.getByTestId('confirmButton'))
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalled()
+      })
+      expect(mockRefresh).toHaveBeenCalled()
     })
   })
 })

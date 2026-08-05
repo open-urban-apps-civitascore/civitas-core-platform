@@ -15,6 +15,7 @@ import {
   useUnstageDataset,
   useUpdateReleasedDatasetMeta,
 } from '@/app/services/api/datasets/clientRequests'
+import { useGetVisualizations } from '@/app/services/api/visualizations/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FooterElement } from '@/components/form/FooterElement'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -44,6 +45,7 @@ import {
   DatasetUpdateApiData,
   DatasetUpdateApiSchema,
 } from '@/types/datasets'
+import { toVisualization } from '@/types/visualizations'
 import { isDatapoolScopeViolationError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
@@ -100,6 +102,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const { pipelines, namedApis } = dataset
   const pipelineList = pipelines ?? []
   const namedApiList = namedApis ?? []
+
+  const { data: visualizationsData } = useGetVisualizations(dataset.id)
+  const visualizationList = useMemo(
+    () => (visualizationsData?.data ?? []).map(toVisualization),
+    [visualizationsData?.data],
+  )
 
   const router = useRouter()
   const { handleFormValidationError } = useError()
@@ -356,12 +364,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     {
       title: t('overview.completion.visualizations.title'),
       showSeparator: true,
-      isCompleted: (dataset.visualizations ?? []).length > 0,
+      isCompleted: visualizationList.length > 0,
       buttons: [],
       content: (
         <VisualizationList
           datasetId={dataset.id}
-          visualizations={dataset.visualizations ?? []}
+          visualizations={visualizationList}
           canEdit={canUpdate}
           isOpenDataAccess={dataset.openDataAccess}
         />

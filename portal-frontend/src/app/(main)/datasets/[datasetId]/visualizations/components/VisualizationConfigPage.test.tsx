@@ -12,6 +12,7 @@ import { VisualizationConfigPage } from './VisualizationConfigPage'
 // --- mocks ---
 
 const mockPush = vi.fn()
+const mockCreateVisualization = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -23,6 +24,10 @@ vi.mock('next-intl', () => ({
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
+}))
+
+vi.mock('@/app/services/api/visualizations/clientRequests', () => ({
+  useCreateVisualization: () => ({ mutateAsync: mockCreateVisualization, isPending: false }),
 }))
 
 vi.mock('./VisualizationConfigForm', () => ({
@@ -80,6 +85,7 @@ const renderComponent = (props: { dataset?: Dataset } = {}) =>
 describe('VisualizationConfigPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockCreateVisualization.mockResolvedValue(undefined)
   })
 
   describe('Cancel / exit without unsaved changes', () => {
@@ -108,13 +114,29 @@ describe('VisualizationConfigPage', () => {
   })
 
   describe('Save', () => {
-    it('shows an error toast on submit (API not yet implemented)', async () => {
+    it('creates the visualization and navigates to the dataset overview on success', async () => {
+      renderComponent()
+      await userEvent.type(screen.getByTestId('nameInput'), 'My Dashboard')
+      fireEvent.submit(screen.getByTestId('visualizationConfigForm'))
+      await waitFor(() => {
+        expect(mockCreateVisualization).toHaveBeenCalledWith({
+          datasetId: 'test-id',
+          visualization: expect.objectContaining({ name: 'My Dashboard' }),
+        })
+      })
+      expect(toast.success).toHaveBeenCalled()
+      expect(mockPush).toHaveBeenCalledWith('/datasets/test-id')
+    })
+
+    it('shows an error toast and does not navigate when the mutation fails', async () => {
+      mockCreateVisualization.mockRejectedValueOnce(new Error('network'))
       renderComponent()
       await userEvent.type(screen.getByTestId('nameInput'), 'My Dashboard')
       fireEvent.submit(screen.getByTestId('visualizationConfigForm'))
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalled()
       })
+      expect(mockPush).not.toHaveBeenCalled()
     })
 
     it('confirm button is disabled when there are no unsaved changes', () => {
