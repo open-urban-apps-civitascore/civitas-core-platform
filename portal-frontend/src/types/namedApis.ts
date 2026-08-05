@@ -137,16 +137,6 @@ export type StaApiFormData = z.input<ReturnType<typeof StaApiFormSchema>>
 // Types for OWS-API
 // ============================================================================
 
-const addDuplicateLayerNameIssues = (layers: { layerName: string }[], ctx: z.RefinementCtx) => {
-  const seenNames = new Set<string>()
-  layers.forEach((layer, index) => {
-    if (!layer.layerName) return
-    if (seenNames.has(layer.layerName))
-      ctx.addIssue({ code: 'custom', message: 'common.errors.nameExists', path: ['layers', index, 'layerName'] })
-    seenNames.add(layer.layerName)
-  })
-}
-
 export const OwsApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
   z.object({
     type: z.literal(API_TYPE_QUERY.OWS),
