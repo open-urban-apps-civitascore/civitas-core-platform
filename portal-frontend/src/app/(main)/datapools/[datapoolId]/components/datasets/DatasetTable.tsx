@@ -31,6 +31,7 @@ export const DatasetTable = (props: DatasetTableProps) => {
   } = props
 
   const t = useTranslations('datapools.overview.datasetsTab')
+  const tCommon = useTranslations('common')
 
   const locale = useLocale()
 
@@ -45,7 +46,7 @@ export const DatasetTable = (props: DatasetTableProps) => {
 
     return (
       <div className="flex items-center gap-2">
-        {statusIconMap[value as keyof typeof statusIconMap]} {t(`tableValues.${value.toLowerCase()}`)}
+        {statusIconMap[value as keyof typeof statusIconMap]} {tCommon(`status.${value}`)}
       </div>
     )
   }

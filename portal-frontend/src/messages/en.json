@@ -1593,11 +1593,6 @@
           "contact": "Contact Person",
           "modifiedAt": "Updated",
           "status": "Status"
-        },
-        "tableValues": {
-          "draft": "Draft",
-          "available": "Available",
-          "ready": "Ready"
         }
       }
     },

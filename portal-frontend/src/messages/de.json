@@ -1580,11 +1580,6 @@
           "contact": "Ansprechperson",
           "modifiedAt": "Aktualisiert",
           "status": "Status"
-        },
-        "tableValues": {
-          "draft": "Entwurf",
-          "available": "Verfügbar",
-          "ready": "Fertig"
         }
       }
     },
