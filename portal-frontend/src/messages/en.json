@@ -512,8 +512,10 @@
             "actions": {
               "edit": "Edit",
               "view": "View",
-              "delete": "Delete"
+              "delete": "Delete",
+              "openInSuperset": "Open in Superset"
             },
+            "notYetProvisionedTooltip": "The dashboard is not yet available in Superset.",
             "deleteConfirm": {
               "title": "Delete Visualization",
               "description": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",

@@ -100,6 +100,7 @@ const makeVisualization = (overrides: Partial<Visualization> = {}): Visualizatio
   id: 'vis-1',
   name: 'Sales Dashboard',
   type: 'dashboard',
+  externalDashboardId: null,
   ...overrides,
 })
 

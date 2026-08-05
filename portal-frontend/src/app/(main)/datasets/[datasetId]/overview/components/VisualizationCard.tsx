@@ -39,6 +39,10 @@ export const VisualizationCard = ({ visualization, datasetId, canEdit, isOpenDat
 
   const goToView = () => router.push(`/datasets/${datasetId}/visualizations/${visualization.id}`)
 
+  const supersetUrl = visualization.externalDashboardId
+    ? `${process.env.NEXT_PUBLIC_SUPERSET_URL}/dashboard/${visualization.externalDashboardId}/`
+    : undefined
+
   const handleConfirmDelete = async () => {
     try {
       await deleteVisualization.mutateAsync({ datasetId, visualizationId: visualization.id })
@@ -87,18 +91,37 @@ export const VisualizationCard = ({ visualization, datasetId, canEdit, isOpenDat
           </div>
 
           <div className="flex items-center shrink-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              aria-label={visualization.name}
-              onClick={e => {
-                e.stopPropagation()
-                goToView()
-              }}
-            >
-              <ExternalLink className="h-4 w-4" />
-            </Button>
+            {supersetUrl ? (
+              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                <a
+                  href={supersetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={tCard('actions.openInSuperset')}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </Button>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled
+                      aria-label={tCard('actions.openInSuperset')}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{tCard('notYetProvisionedTooltip')}</TooltipContent>
+              </Tooltip>
+            )}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

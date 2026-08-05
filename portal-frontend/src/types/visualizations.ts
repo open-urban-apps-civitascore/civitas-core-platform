@@ -14,6 +14,8 @@ export interface Visualization {
   name: string
   description?: string
   type: VisualizationTypeQuery
+  // Null until the rendering engine (Superset) has materialized the dashboard.
+  externalDashboardId: string | null
 }
 
 // --- Backend schema (DashboardOutputDTO; visualizationType is the DTO's uppercase discriminator
@@ -38,6 +40,7 @@ export const toVisualization = (dto: VisualizationApiResponse): Visualization =>
   name: dto.name,
   description: dto.description ?? undefined,
   type: VISUALIZATION_TYPE_QUERY.DASHBOARD,
+  externalDashboardId: dto.externalDashboardId,
 })
 
 export const VISUALIZATION_DESCRIPTION_MAX_LENGTH = 150

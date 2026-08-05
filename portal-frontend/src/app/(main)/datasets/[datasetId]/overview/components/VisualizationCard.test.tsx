@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Visualization } from '@/types/visualizations'
 
@@ -42,6 +42,7 @@ const makeVisualization = (overrides: Partial<Visualization> = {}): Visualizatio
   id: 'vis-1',
   name: 'Sales Dashboard',
   type: 'dashboard',
+  externalDashboardId: null,
   ...overrides,
 })
 
@@ -59,6 +60,11 @@ describe('VisualizationCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockDeleteVisualization.mockResolvedValue(undefined)
+    process.env.NEXT_PUBLIC_SUPERSET_URL = 'http://localhost:8092'
+  })
+
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_SUPERSET_URL
   })
 
   describe('Rendering', () => {
@@ -108,6 +114,30 @@ describe('VisualizationCard', () => {
       renderComponent()
       fireEvent.click(screen.getByTestId('visualizationCard-vis-1'))
       expect(mockPush).toHaveBeenCalledWith('/datasets/dataset-123/visualizations/vis-1')
+    })
+  })
+
+  describe('Superset deep link', () => {
+    it('links directly to the dashboard when externalDashboardId is set', () => {
+      renderComponent({ visualization: makeVisualization({ externalDashboardId: '42' }) })
+      const link = screen.getByRole('link', { name: 'actions.openInSuperset' })
+      expect(link).toHaveAttribute('href', 'http://localhost:8092/dashboard/42/')
+      expect(link).toHaveAttribute('target', '_blank')
+    })
+
+    it('does not navigate to the internal detail page when the link is clicked', () => {
+      renderComponent({ visualization: makeVisualization({ externalDashboardId: '42' }) })
+      fireEvent.click(screen.getByRole('link', { name: 'actions.openInSuperset' }))
+      expect(mockPush).not.toHaveBeenCalled()
+    })
+
+    it('shows a disabled button with a tooltip when the dashboard is not yet provisioned', async () => {
+      renderComponent({ visualization: makeVisualization({ externalDashboardId: null }) })
+      expect(screen.queryByRole('link', { name: 'actions.openInSuperset' })).not.toBeInTheDocument()
+      const button = screen.getByRole('button', { name: 'actions.openInSuperset' })
+      expect(button).toBeDisabled()
+      await userEvent.hover(button)
+      expect((await screen.findAllByText('notYetProvisionedTooltip')).length).toBeGreaterThan(0)
     })
   })
 
