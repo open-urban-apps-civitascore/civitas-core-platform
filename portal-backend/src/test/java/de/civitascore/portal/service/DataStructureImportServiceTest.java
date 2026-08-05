@@ -14,7 +14,9 @@ import de.civitascore.portal.model.input.DataStructureImportInputDTO;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -43,7 +45,14 @@ class DataStructureImportServiceTest {
   @Mock private DataStructureService dataStructureService;
   @Mock private DataStructureVersionService dataStructureVersionService;
   @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private DataStructureRepository dataStructureRepository;
   @InjectMocks private DataStructureImportService importService;
+
+  /** Stubs the guard chain for inputs that carry the valid datastructure URN. */
+  private void stubValidUrn() {
+    when(modelRegistryGateway.isDataStructureUrn(DATASTRUCTURE_URN)).thenReturn(true);
+    when(modelRegistryGateway.logicalUrn(DATASTRUCTURE_URN)).thenReturn(DATASTRUCTURE_URN);
+  }
 
   @Captor private ArgumentCaptor<DataStructureInputDTO> structureInputCaptor;
   @Captor private ArgumentCaptor<DataStructureVersionInputDTO> versionInputCaptor;
@@ -65,7 +74,7 @@ class DataStructureImportServiceTest {
 
   @Test
   void importDataStructure_threadsFieldsIntoBothCreates() {
-    when(modelRegistryGateway.isDataStructureUrn(DATASTRUCTURE_URN)).thenReturn(true);
+    stubValidUrn();
     UUID structureId = UUID.randomUUID();
     DataStructure structure = new DataStructure();
     structure.setId(structureId);
@@ -96,7 +105,7 @@ class DataStructureImportServiceTest {
 
   @Test
   void importDataStructure_whenStructureCreateFails_neverCreatesVersion() {
-    when(modelRegistryGateway.isDataStructureUrn(DATASTRUCTURE_URN)).thenReturn(true);
+    stubValidUrn();
     when(dataStructureService.create(any(DataStructureInputDTO.class)))
         .thenThrow(
             new InvalidInputException("DataStructure", "name", "Name cannot be null or blank"));
@@ -134,6 +143,19 @@ class DataStructureImportServiceTest {
   void importDataStructure_withNonStringModelId_rejectsBeforeCreatingAnything() {
     assertThatThrownBy(() -> importService.importDataStructure(importInput(Map.of("$id", 42))))
         .isInstanceOf(InvalidInputException.class);
+
+    verify(dataStructureService, never()).create(any());
+    verify(dataStructureVersionService, never()).create(any());
+  }
+
+  @Test
+  void importDataStructure_whenModelAlreadyInstalled_rejectsWith409() {
+    stubValidUrn();
+    when(dataStructureRepository.existsByModelLogicalUrn(DATASTRUCTURE_URN)).thenReturn(true);
+
+    assertThatThrownBy(() -> importService.importDataStructure(importInput()))
+        .isInstanceOf(UniqueConstraintViolationException.class)
+        .hasMessageContaining("already installed");
 
     verify(dataStructureService, never()).create(any());
     verify(dataStructureVersionService, never()).create(any());

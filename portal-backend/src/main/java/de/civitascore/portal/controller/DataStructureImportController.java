@@ -64,6 +64,12 @@ public class DataStructureImportController {
           "Invalid input (model has no ':datastructure:' URN as $id, or is not a valid JSON"
               + " Schema); nothing is created",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "A data structure for this model identity is already installed (a shell already pins"
+              + " the model's logical URN); nothing is created",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @PostMapping("/datastructures")
   @ResponseStatus(HttpStatus.CREATED)
   public ResponseEntity<DataStructureVersionOutputDTO> importDataStructure(

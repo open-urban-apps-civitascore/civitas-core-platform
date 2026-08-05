@@ -7,7 +7,9 @@ import de.civitascore.portal.model.input.DataStructureImportInputDTO;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +38,7 @@ public class DataStructureImportService {
   private final DataStructureService dataStructureService;
   private final DataStructureVersionService dataStructureVersionService;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final DataStructureRepository dataStructureRepository;
 
   /**
    * Creates a data structure with its first version and model content.
@@ -45,10 +48,14 @@ public class DataStructureImportService {
    * @throws de.civitascore.portal.util.InvalidInputException if the model does not declare a {@code
    *     :datastructure:} URN as {@code $id}, or is not a valid JSON Schema (the whole import is
    *     rolled back)
+   * @throws de.civitascore.portal.util.UniqueConstraintViolationException if a shell already pins
+   *     this model identity — re-importing would duplicate the shell (409); updating an existing
+   *     installation is a separate, not-yet-built flow
    */
   @Transactional
   public DataStructureVersion importDataStructure(DataStructureImportInputDTO input) {
-    requireDataStructureId(input);
+    String modelId = requireDataStructureId(input);
+    rejectAlreadyInstalled(modelId);
 
     DataStructureInputDTO structureInput = new DataStructureInputDTO();
     structureInput.setName(input.getName());
@@ -67,10 +74,10 @@ public class DataStructureImportService {
     return dataStructureVersionService.create(versionInput);
   }
 
-  private void requireDataStructureId(DataStructureImportInputDTO input) {
+  private String requireDataStructureId(DataStructureImportInputDTO input) {
     Object id = input.getModel().get("$id");
     if (id instanceof String urn && modelRegistryGateway.isDataStructureUrn(urn)) {
-      return;
+      return urn;
     }
     throw new InvalidInputException(
         "DataStructure",
@@ -79,5 +86,20 @@ public class DataStructureImportService {
             + " 'datastructure' (urn:core:<scope>:<owner>:datastructure:<domain>:<name>:"
             + "<disambiguator>). Without it the model would be registered as a plain Element and"
             + " re-imports would create duplicates instead of new versions.");
+  }
+
+  /**
+   * Rejects the import when a shell already pins this model identity. The registry itself is
+   * idempotent (same URN → same artifact), but the shell layer is not — without this guard every
+   * repeated install would add another {@code data_structures} row pointing at the same artifact.
+   */
+  private void rejectAlreadyInstalled(String modelId) {
+    String logicalUrn = modelRegistryGateway.logicalUrn(modelId);
+    if (dataStructureRepository.existsByModelLogicalUrn(logicalUrn)) {
+      throw new UniqueConstraintViolationException(
+          ("A data structure for model '%s' is already installed. Re-importing would create a"
+                  + " duplicate; updating an existing installation is not supported yet.")
+              .formatted(logicalUrn));
+    }
   }
 }
