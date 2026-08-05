@@ -51,6 +51,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -833,6 +835,183 @@ class DataSetServiceTest {
 
       assertThat(result.getPendingSagaType()).isNull();
       verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+  }
+
+  @Nested
+  @DisplayName("updateReadyMeta()")
+  class UpdateReadyMetaTests {
+
+    @Test
+    @DisplayName("applies the updated fields to a READY dataset")
+    void updatesReadyDataSet() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+      input.setDescription("updated description");
+
+      DataSet result = createService().updateReadyMeta(id, input);
+
+      verify(dataSetMapper).updateEntity(ds, input);
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+      assertThat(result.getPendingSagaType()).isNull();
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+
+    @Test
+    @DisplayName("rejects a DRAFT dataset")
+    void rejectsDraftDataSet() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(draftDataSet(id)));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      assertThatThrownBy(() -> createService().updateReadyMeta(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("requires a READY dataset")
+          .hasMessageContaining("DRAFT");
+    }
+
+    @Test
+    @DisplayName("rejects an AVAILABLE dataset — releasing it makes /released/meta the only path")
+    void rejectsAvailableDataSet() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(availableDataSet(id)));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      assertThatThrownBy(() -> createService().updateReadyMeta(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("requires a READY dataset")
+          .hasMessageContaining("AVAILABLE");
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+  }
+
+  private enum MetaEndpoint {
+    READY,
+    RELEASED;
+
+    DataSet update(DataSetService service, UUID id, DataSetInputDTO input) {
+      return this == READY
+          ? service.updateReadyMeta(id, input)
+          : service.updateReleasedMeta(id, input);
+    }
+  }
+
+  /**
+   * Both endpoints delegate to the same private helper, so the shared guards are asserted against
+   * both entry points rather than against one. A guard added to a single public method instead of
+   * the helper fails here.
+   */
+  @Nested
+  @DisplayName("shared metadata-update behaviour of /ready/meta and /released/meta")
+  class SharedMetaUpdateTests {
+
+    private DataSetInputDTO renameInput() {
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+      return input;
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(MetaEndpoint.class)
+    @DisplayName("accepts the same editable field set")
+    void acceptsSameFieldSet(MetaEndpoint endpoint) {
+      UUID id = UUID.randomUUID();
+      UUID poolId = UUID.randomUUID();
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+      DataSet ds = readyDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataPoolRepository.findById(poolId)).thenReturn(Optional.of(pool));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+      input.setDescription("updated description");
+      input.setOpenDataAccess(true);
+      input.setDatapoolId(poolId);
+
+      DataSet result = endpoint.update(createService(), id, input);
+
+      verify(dataSetMapper).updateEntity(ds, input);
+      assertThat(result.getDataPool()).isEqualTo(pool);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(MetaEndpoint.class)
+    @DisplayName("rejects any non-null namedApis")
+    void rejectsNamedApis(MetaEndpoint endpoint) {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(readyDataSet(id)));
+
+      DataSetInputDTO input = renameInput();
+      input.setNamedApis(List.of());
+
+      assertThatThrownBy(() -> endpoint.update(createService(), id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("cannot be changed")
+          .hasMessageContaining("READY");
+      verify(dataSetMapper, never()).updateEntity(any(), any());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(MetaEndpoint.class)
+    @DisplayName("rejects an in-flight saga")
+    void rejectsInFlightSaga(MetaEndpoint endpoint) {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> endpoint.update(createService(), id, renameInput()))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining("CREATE");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(MetaEndpoint.class)
+    @DisplayName("enforces the datapool scope rule on a pool switch")
+    void rejectsPoolSwitchWithOutOfScopeDataSource(MetaEndpoint endpoint) {
+      UUID id = UUID.randomUUID();
+      UUID poolAId = UUID.randomUUID();
+      UUID poolBId = UUID.randomUUID();
+      DataPool poolA = new DataPool();
+      poolA.setId(poolAId);
+      DataPool poolB = new DataPool();
+      poolB.setId(poolBId);
+
+      DataSet ds = readyDataSet(id);
+      ds.setDataPool(poolA);
+      UUID offendingId = UUID.randomUUID();
+      DataSource specificToA = new DataSource();
+      specificToA.setId(offendingId);
+      specificToA.setDatapoolScopeType(DatapoolScopeType.SPECIFIC);
+      specificToA.setScopedDataPools(new HashSet<>(Set.of(poolA)));
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(Set.of(specificToA)));
+      ds.getPipelines().add(p);
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataPoolRepository.findById(poolBId)).thenReturn(Optional.of(poolB));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setDatapoolId(poolBId);
+
+      assertThatThrownBy(() -> endpoint.update(createService(), id, input))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(offendingId));
     }
   }
 

@@ -249,6 +249,36 @@ public class DataSetController
     return ResponseEntity.ok(output);
   }
 
+  @PutMapping("/{id}/ready/meta")
+  @Operation(
+      operationId = "updateReadyDataSetMeta",
+      summary = "Update READY dataset metadata",
+      description =
+          "Updates the metadata of a dataset in READY status, requiring only DATASET_UPDATE — unlike"
+              + " PUT /datasets/{id}/released/meta, which also requires DATASET_RELEASE. Rejects"
+              + " DRAFT and AVAILABLE datasets. namedApis are immutable — unrelease the dataset and"
+              + " edit it in DRAFT.")
+  @ApiResponse(responseCode = "200", description = "Dataset metadata updated successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description = "Dataset is not READY, or the input carries namedApis",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "422",
+      description = "A datapool switch leaves a pipeline DataSource out of scope",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<DataSetOutputDTO> updateReadyMeta(
+      @PathVariable UUID id, @Valid @RequestBody DataSetInputDTO input) {
+    DataSetInputDTO preProcessedInput = preProcessInput(input);
+    DataSet updated = dataSetService.updateReadyMeta(id, preProcessedInput);
+    DataSetOutputDTO output = dataSetAssembler.toOutput(updated);
+    return ResponseEntity.ok(output);
+  }
+
   /**
    * Deletes a dataset. An AVAILABLE dataset must be unreleased first. A never-provisioned dataset
    * is removed immediately; a dataset that still holds a provisioned sink is torn down

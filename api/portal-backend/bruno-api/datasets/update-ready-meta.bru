@@ -1,0 +1,53 @@
+meta {
+  name: Update Ready Dataset Meta
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/datasets/:id/ready/meta
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+params:path {
+  id: {{dataSetId}}
+}
+
+body:json {
+  {
+    "name": "Updated Dataset Name",
+    "description": "Updated description for ready dataset",
+    "openDataAccess": false,
+    "datapoolId": "{{dataPoolId}}",
+    "assignments": []
+  }
+}
+
+tests {
+  test("Updated or not ready", function() {
+    const status = res.getStatus();
+    // 200=updated, 400=dataset not READY, 409=saga in-flight
+    expect(status === 200 || status === 400 || status === 409).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` is set and in READY state (run Stage DataSet first). `dataPoolId` is set if a pool assignment should be preserved.
+
+  **Expected Response:** 200 OK, READY metadata is updated.
+
+  Gated by `DATASET_UPDATE` alone — no `DATASET_RELEASE` required.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | READY DataSet name/description updated |
+  | Config Adapter | — |
+  | External System | — |
+}

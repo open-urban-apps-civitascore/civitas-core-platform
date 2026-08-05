@@ -116,3 +116,38 @@ test_group_assignments_and_permission_partial_denied if {
 	result.allow == false
 	result.reason == "permission_denied"
 }
+
+# The next two tests are a pair: the same DATASET_UPDATE-only caller must pass on
+# /ready/meta and fail on /released/meta. Either test alone still passes if the
+# /ready/meta mapping silently gains DATASET_RELEASE.
+
+test_ready_meta_allowed_with_update_alone if {
+	result := authz.decision with http.send as mock_send_dataset_abc_editor
+		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v1/datasets/dataset-abc/ready/meta")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {"DATASET_UPDATE"}
+	result.headers["X-Allowed-Scope-Ids"] == "dataset-abc"
+}
+
+test_released_meta_denied_with_update_alone if {
+	result := authz.decision with http.send as mock_send_dataset_abc_editor
+		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v1/datasets/dataset-abc/released/meta")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+test_ready_meta_denied_with_read_only if {
+	result := authz.decision with http.send as mock_send_dataset_abc_reader
+		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v1/datasets/dataset-abc/ready/meta")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+test_ready_meta_denied_unauthenticated if {
+	result := authz.decision with input as portal_request_no_auth("PUT", "/v1/datasets/dataset-abc/ready/meta")
+	result.allow == false
+}
