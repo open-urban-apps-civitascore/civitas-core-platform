@@ -1,4 +1,5 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
+import { CheckIcon, CircleDashed, UserCheck } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 
 import { ContactCell } from '@/components/table/contact-cell/ContactCell'
@@ -34,6 +35,20 @@ export const DatasetTable = (props: DatasetTableProps) => {
   const locale = useLocale()
 
   const columnHelper = createColumnHelper<BaseDatasetTableData>()
+
+  const statusCell = ({ value }: { value: string }) => {
+    const statusIconMap = {
+      DRAFT: <CircleDashed className="w-4 h-4 text-muted-foreground" />,
+      AVAILABLE: <UserCheck className="w-4 h-4 text-muted-foreground" />,
+      READY: <CheckIcon className="w-4 h-4 text-muted-foreground" />,
+    } as const
+
+    return (
+      <div className="flex items-center gap-2">
+        {statusIconMap[value as keyof typeof statusIconMap]} {t(`tableValues.${value.toLowerCase()}`)}
+      </div>
+    )
+  }
 
   const columns = [
     columnHelper.accessor('id', {
@@ -82,7 +97,7 @@ export const DatasetTable = (props: DatasetTableProps) => {
     }),
     columnHelper.accessor('dataSetStatus', {
       header: t('tableHeaders.status'),
-      cell: info => info.getValue(),
+      cell: info => (info.getValue() ? statusCell({ value: info.getValue() }) : '-'),
       meta: {
         truncate: true,
         style: {
