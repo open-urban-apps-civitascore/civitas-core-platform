@@ -10,12 +10,12 @@ import {
   VisualizationApiResponse,
 } from '@/types/visualizations'
 
-const key = 'visualizations'
-
+// Deliberately no queryKey override here (unlike some other nested resources): the cache key must
+// include datasetId, or switching datasets serves the previous dataset's cached list instead of
+// refetching. `key` is already dataset-scoped, so it doubles as the cache key correctly.
 export const useGetVisualizations = (datasetId: string, isEnabled = true) =>
   useDataQuery<VisualizationApiResponse[]>({
     key: `datasets/${datasetId}/visualizations`,
-    queryKey: key,
     isEnabled,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while loading visualizations.',
@@ -32,8 +32,8 @@ export const useCreateVisualization = () => {
         data: visualization,
         errorMessage: 'An error occurred while creating the visualization.',
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+    onSuccess: (_data, { datasetId }) => {
+      queryClient.invalidateQueries({ queryKey: [`datasets/${datasetId}/visualizations`] })
     },
     onError: error => {
       console.error('Error creating visualization:', error.message)
@@ -52,8 +52,8 @@ export const useUpdateVisualization = () => {
         data: visualization,
         errorMessage: 'An error occurred while updating the visualization.',
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+    onSuccess: (_data, { datasetId }) => {
+      queryClient.invalidateQueries({ queryKey: [`datasets/${datasetId}/visualizations`] })
     },
     onError: error => {
       console.error('Error updating visualization:', error.message)
@@ -71,8 +71,8 @@ export const useDeleteVisualization = () => {
         headers: { 'x-api-request': 'true' },
         errorMessage: 'An error occurred while deleting the visualization.',
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+    onSuccess: (_data, { datasetId }) => {
+      queryClient.invalidateQueries({ queryKey: [`datasets/${datasetId}/visualizations`] })
     },
     onError: error => {
       console.error('Error deleting visualization:', error.message)
