@@ -8,8 +8,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
- * Input DTO for importing a complete data structure in a single call: the data structure shell,
- * its first version and the model content stored in Model Forge.
+ * Input DTO for importing a complete data structure in a single call: the data structure shell, its
+ * first version and the model content stored in Model Forge.
  *
  * <p>Combines the fields of {@link DataStructureInputDTO} and {@link DataStructureVersionInputDTO}
  * that make sense for an import: lifecycle status is not a client input (everything starts in

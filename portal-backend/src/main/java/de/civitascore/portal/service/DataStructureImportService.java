@@ -6,20 +6,28 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureImportInputDTO;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.util.InvalidInputException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Imports a complete data structure in one call: creates the {@link DataStructure} shell, its
- * first {@link DataStructureVersion}, and stores the model in Model Forge — the same path the
- * two-step UI flow takes, composed into a single transaction.
+ * Imports a complete data structure in one call: creates the {@link DataStructure} shell, its first
+ * {@link DataStructureVersion}, and stores the model in Model Forge — the same path the two-step UI
+ * flow takes, composed into a single transaction.
  *
  * <p>All heavy lifting stays in the existing services: {@link DataStructureVersionService}
  * validates the model as a JSON Schema and stores it via the registry gateway, mirroring the
- * assigned version and URN pin onto the shell. Because both creates join this method's
- * transaction, a rejected model rolls the shell back too — the caller never ends up with an empty
- * structure. Everything is created in DRAFT; releasing stays a separate, permission-gated step.
+ * assigned version and URN pin onto the shell. Because both creates join this method's transaction,
+ * a rejected model rolls the shell back too — the caller never ends up with an empty structure.
+ * Everything is created in DRAFT; releasing stays a separate, permission-gated step.
+ *
+ * <p>The model must declare a {@code $id} that is a {@code :datastructure:} CORE URN. The registry
+ * types the stored artifact solely from that {@code $id}: without it the model would silently be
+ * registered as a plain Element — the shell would pin the wrong artifact type, and every re-import
+ * would mint a fresh identity (duplicates) instead of versioning the same artifact. The UI's UML
+ * editor stamps this URN itself; an import caller has to bring it.
  */
 @Service
 @RequiredArgsConstructor
@@ -27,17 +35,21 @@ public class DataStructureImportService {
 
   private final DataStructureService dataStructureService;
   private final DataStructureVersionService dataStructureVersionService;
+  private final ModelRegistryGateway modelRegistryGateway;
 
   /**
    * Creates a data structure with its first version and model content.
    *
    * @param input the import input carrying structure metadata, the model and optional styles
    * @return the created first version, with the parent structure and the registry pin set
-   * @throws de.civitascore.portal.util.InvalidInputException if the model is not a valid JSON
-   *     Schema (the whole import is rolled back)
+   * @throws de.civitascore.portal.util.InvalidInputException if the model does not declare a {@code
+   *     :datastructure:} URN as {@code $id}, or is not a valid JSON Schema (the whole import is
+   *     rolled back)
    */
   @Transactional
   public DataStructureVersion importDataStructure(DataStructureImportInputDTO input) {
+    requireDataStructureId(input);
+
     DataStructureInputDTO structureInput = new DataStructureInputDTO();
     structureInput.setName(input.getName());
     structureInput.setDescription(input.getDescription());
@@ -53,5 +65,19 @@ public class DataStructureImportService {
     versionInput.setModel(input.getModel());
     versionInput.setStyles(input.getStyles());
     return dataStructureVersionService.create(versionInput);
+  }
+
+  private void requireDataStructureId(DataStructureImportInputDTO input) {
+    Object id = input.getModel().get("$id");
+    if (id instanceof String urn && modelRegistryGateway.isDataStructureUrn(urn)) {
+      return;
+    }
+    throw new InvalidInputException(
+        "DataStructure",
+        input.getName(),
+        "The model must declare its identity: '$id' has to be a CORE URN of artifact type"
+            + " 'datastructure' (urn:core:<scope>:<owner>:datastructure:<domain>:<name>:"
+            + "<disambiguator>). Without it the model would be registered as a plain Element and"
+            + " re-imports would create duplicates instead of new versions.");
   }
 }

@@ -149,6 +149,18 @@ test_endpoints_contains_datastructures_id if {
 	portal_backend.endpoints["/v1/datastructures/{id}"]
 }
 
+test_endpoints_contains_imports_datastructures if {
+	portal_backend.endpoints["/v1/imports/datastructures"]
+}
+
+# The import path must resolve via EXACT match — without its own registry entry,
+# "datastructures" would be read as an {id} under /v1/imports/{id} (or the path
+# would stay unknown) and POST could never be authorized.
+test_path_pattern_imports_exact_match if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/imports/datastructures")
+	result == "/v1/imports/datastructures"
+}
+
 # =============================================================================
 # DATASPACES AND CATALOGS — removed from v2.0 (see #989)
 # OPA should deny these as unknown_endpoint.

@@ -27,11 +27,13 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
  * Imports a complete data structure in a single call, for API clients that provision structures
  * programmatically (the UI flow creates the shell and the version in two steps instead).
  *
- * <p>Deliberately mapped under the existing {@code /datastructures} resource so the import shares
- * that resource's gateway routing and authorization surface rather than introducing a new one.
+ * <p>Mapped under a flat {@code /imports} resource with the artifact type as the sub-path. Each
+ * importable artifact type gets its own path (this one today, datasets later), because the
+ * gateway's policy engine authorizes by path+method and cannot look into request bodies — a
+ * per-type path maps cleanly onto one required permission per type.
  */
 @RestController
-@RequestMapping("/datastructures")
+@RequestMapping("/imports")
 @RequiredArgsConstructor
 @Tag(
     name = "Data Structure Import",
@@ -58,9 +60,11 @@ public class DataStructureImportController {
   @ApiResponse(responseCode = "201", description = "Data structure and version created")
   @ApiResponse(
       responseCode = "400",
-      description = "Invalid input (e.g. model is not a valid JSON Schema); nothing is created",
+      description =
+          "Invalid input (model has no ':datastructure:' URN as $id, or is not a valid JSON"
+              + " Schema); nothing is created",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @PostMapping("/import")
+  @PostMapping("/datastructures")
   @ResponseStatus(HttpStatus.CREATED)
   public ResponseEntity<DataStructureVersionOutputDTO> importDataStructure(
       @Valid @RequestBody DataStructureImportInputDTO input) {

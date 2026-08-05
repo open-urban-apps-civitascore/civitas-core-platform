@@ -212,6 +212,10 @@
     "/v1/datastructures/{id}/versions/{id}/released/meta": {
       "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
     },
+    "/v1/imports/datastructures": {
+      "_collection": true,
+      "POST": "DATASTRUCTURE_CREATE"
+    },
     "/v1/datapools": {
       "_collection": true,
       "GET": "DATAPOOL_READ",

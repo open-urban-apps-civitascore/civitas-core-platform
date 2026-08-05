@@ -13,6 +13,7 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureImportInputDTO;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.Map;
 import java.util.UUID;
@@ -27,32 +28,44 @@ import org.mockito.junit.jupiter.MockitoExtension;
 /**
  * Unit tests for {@link DataStructureImportService}: a thin orchestration over the existing
  * structure and version services. The services are mocked; these tests pin how the import input is
- * split into the two create calls (field threading, forced defaults, ordering) — transactional
+ * split into the two create calls (field threading, forced defaults, ordering) and the {@code $id}
+ * guard that keeps models without a datastructure identity out of the registry — transactional
  * rollback is the container's job and is not unit-testable here.
  */
 @ExtendWith(MockitoExtension.class)
 class DataStructureImportServiceTest {
 
+  private static final String DATASTRUCTURE_URN =
+      "urn:core:city:openurbanapps:datastructure:environment:airqualitystation:default";
+  private static final String ELEMENT_URN =
+      "urn:core:city:openurbanapps:element:environment:messwert:default";
+
   @Mock private DataStructureService dataStructureService;
   @Mock private DataStructureVersionService dataStructureVersionService;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
   @InjectMocks private DataStructureImportService importService;
 
   @Captor private ArgumentCaptor<DataStructureInputDTO> structureInputCaptor;
   @Captor private ArgumentCaptor<DataStructureVersionInputDTO> versionInputCaptor;
 
-  private static DataStructureImportInputDTO importInput() {
+  private static DataStructureImportInputDTO importInput(Map<String, Object> model) {
     DataStructureImportInputDTO input = new DataStructureImportInputDTO();
     input.setName("Air Quality Station");
     input.setDescription("Structure description");
     input.setVersionDescription("Version description");
     input.setModelName("AirQualityStation");
-    input.setModel(Map.of("$defs", Map.of()));
+    input.setModel(model);
     input.setStyles(Map.of("nodes", Map.of()));
     return input;
   }
 
+  private static DataStructureImportInputDTO importInput() {
+    return importInput(Map.of("$id", DATASTRUCTURE_URN, "$defs", Map.of()));
+  }
+
   @Test
   void importDataStructure_threadsFieldsIntoBothCreates() {
+    when(modelRegistryGateway.isDataStructureUrn(DATASTRUCTURE_URN)).thenReturn(true);
     UUID structureId = UUID.randomUUID();
     DataStructure structure = new DataStructure();
     structure.setId(structureId);
@@ -83,6 +96,7 @@ class DataStructureImportServiceTest {
 
   @Test
   void importDataStructure_whenStructureCreateFails_neverCreatesVersion() {
+    when(modelRegistryGateway.isDataStructureUrn(DATASTRUCTURE_URN)).thenReturn(true);
     when(dataStructureService.create(any(DataStructureInputDTO.class)))
         .thenThrow(
             new InvalidInputException("DataStructure", "name", "Name cannot be null or blank"));
@@ -90,6 +104,38 @@ class DataStructureImportServiceTest {
     assertThatThrownBy(() -> importService.importDataStructure(importInput()))
         .isInstanceOf(InvalidInputException.class);
 
+    verify(dataStructureVersionService, never()).create(any());
+  }
+
+  @Test
+  void importDataStructure_withoutModelId_rejectsBeforeCreatingAnything() {
+    assertThatThrownBy(
+            () -> importService.importDataStructure(importInput(Map.of("$defs", Map.of()))))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("$id");
+
+    verify(dataStructureService, never()).create(any());
+    verify(dataStructureVersionService, never()).create(any());
+  }
+
+  @Test
+  void importDataStructure_withElementId_rejectsBeforeCreatingAnything() {
+    // Default mock behaviour: isDataStructureUrn(ELEMENT_URN) returns false.
+    assertThatThrownBy(
+            () -> importService.importDataStructure(importInput(Map.of("$id", ELEMENT_URN))))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("datastructure");
+
+    verify(dataStructureService, never()).create(any());
+    verify(dataStructureVersionService, never()).create(any());
+  }
+
+  @Test
+  void importDataStructure_withNonStringModelId_rejectsBeforeCreatingAnything() {
+    assertThatThrownBy(() -> importService.importDataStructure(importInput(Map.of("$id", 42))))
+        .isInstanceOf(InvalidInputException.class);
+
+    verify(dataStructureService, never()).create(any());
     verify(dataStructureVersionService, never()).create(any());
   }
 }
