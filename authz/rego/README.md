@@ -227,3 +227,16 @@ curl -X POST http://localhost:8181/v1/data/civitas/authz/decision \
 
 - ADR-001: Collection Endpoint Filtering — see official ADR repository
 - AuthZ Deployment Guide — see MR comments (Team 3)
+
+## The allowall variant is generated — never edit or commit it
+
+`data/backends-allowall/` is derived from `data/backends/` by
+`generate-allowall.sh` (permissions nulled, internal flags like `_collection`
+stripped) and is gitignored; `start-portal-dev.sh --authz=allowall`
+regenerates it on every start.
+
+After adding or changing an endpoint in `data/backends/<backend>/data.json`:
+
+1. run `./generate-allowall.sh` — only needed when you reload OPA without a
+   full dev-stack restart, and
+2. restart the OPA container (data files are read at startup).
