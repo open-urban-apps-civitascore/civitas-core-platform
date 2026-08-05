@@ -511,7 +511,9 @@ services:
     image: ${CI_REGISTRY_IMAGE}/config-adapter:${IMAGE_TAG:-develop}
     environment:
       HEALTHCHECK_PORT: 8088
-      ADAPTERS: keycloak,apisix,frost
+      # ConfigAdapter names only — SagaCommandHandlers (nifi among them) are discovered from the
+      # classpath independently, so listing a handler-only module here aborts the boot.
+      ADAPTERS: keycloak,apisix,frost,postgis,geoserver
       EVENTHANDLER_NAME: kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_GROUP_ID: config-adapter-group
@@ -636,6 +638,22 @@ services:
     environment:
       APISIX_ADMIN_URL: http://apisix:9180
       APISIX_ADMIN_KEY: edd1c9f034335f136f87ad84b625c8f1
+
+  # ── NiFi Parameter Contexts (one-shot, run via: docker compose run --rm nifi-parameter-contexts)
+  # The sensitive truststore password reaches the SSL context service through a parameter context,
+  # never through the deployed flow, so without this every MQTT-TLS pipeline deploy fails validation.
+  nifi-parameter-contexts:
+    profiles: [seed]
+    image: curlimages/curl:8.11.1
+    entrypoint: ["sh", "/provision-parameter-contexts.sh"]
+    environment:
+      NIFI_SECURITY_USER_OIDC_CLIENT_SECRET: "${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}"
+      TRUSTSTORE_PASSWORD: "changeit"
+      NIFI_HOST: "nifi"
+      NIFI_HOST_HEADER: "nifi:8443"
+      KEYCLOAK_HOST: "keycloak"
+    volumes:
+      - ../nifi/provision-parameter-contexts.sh:/provision-parameter-contexts.sh:ro
 
 networks:
   default:

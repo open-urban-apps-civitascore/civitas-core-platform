@@ -103,7 +103,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const router = useRouter()
   const { handleFormValidationError } = useError()
-  const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
+  const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit' || !canUpdate)
   const [dataSetStatus, setDataSetStatus] = useState<DatasetStatusTypes>(
     dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT,
   )
@@ -416,12 +416,14 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const customElementEditMode = (
     <PageEditControls<DatasetStatusTypes>
-      status={dataSetStatus}
-      onStatusChange={handleStatusChange}
-      statusOptions={Object.values(DATASET_STATUS_TYPES)}
-      canStage={canStage}
-      canRelease={canRelease}
-      availableHint={!canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined}
+      statusProps={{
+        status: dataSetStatus,
+        onStatusChange: handleStatusChange,
+        statusOptions: Object.values(DATASET_STATUS_TYPES),
+        canStage,
+        canRelease,
+        availableHint: !canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined,
+      }}
       confirmButtonType="submit"
       formId="dataset-form"
       isConfirmButtonDisabled={!hasUnsavedChanges || isLoading}

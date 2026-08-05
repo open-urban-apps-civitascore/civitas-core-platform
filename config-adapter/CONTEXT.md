@@ -31,12 +31,31 @@ and instances unbounded (N mappings in a chain are legal). Each transform kind o
 node-payload parsing and its compiled contribution to the processor chain, behind the
 transform-node-type descriptor seam.
 
+**Chained mapping nodes are only shallowly supported.** Each node compiles in isolation,
+against the paths it was authored with — nothing derives the shape its predecessor actually
+emits, so a node's compilation cannot depend on what came before it. Two consequences worth
+knowing before extending this: the handover between neighbours is checked on declared
+structure URNs rather than on real shapes, and a node deriving a fan-out from its own source
+paths is blind to a fan-out an earlier node already applied (the array is gone from the
+record, so its `ForkRecord` fails loudly on the `failure` route). Carrying the emitted shape
+along the chain is the change that would fix these at the root; until then, treat a
+multi-node mapping chain as a thin path rather than a supported general case.
+
 ## Stage
 
 The deployable half of a source/sink/transform: binds resolved configuration at plan time
 and mints NiFi processors from the curated fragment whitelist at build time. Stages are
 hand-wired into a closed registry — deliberately not classpath-discovered, so minting flow
 components stays a reviewed decision.
+
+## HTTP Response Use
+
+What an HTTP request in a sink's build region does with its response: read it as content (a
+downstream EvaluateJsonPath needs the body), capture it into an attribute for the error sink,
+capture and end, or end there. It is one decision with the relationship the request's success
+continues on, never two — capturing the body suppresses the response FlowFile, so the continuation
+follows from the use rather than being chosen beside it. A stage states the use; the relationship
+follows.
 
 ## Sink Spec
 
@@ -65,6 +84,22 @@ The compiled unit of one on-path transform node, carried in flow order in the bu
 Its chain index counts positions **within its own kind** (not globally across all
 transforms), so inserting a node of another kind later never shifts existing NiFi
 component ids — redeploy stability depends on this.
+
+## Fan-out
+
+One record per element of a source array, materialised as a `ForkRecord` ahead of a mapping
+node's own processors. Derived from the mapping's **source** paths only: how many records a
+payload carries is a question the target side cannot answer, since a target array selector
+marks an entity tier (FROST) or selects into an array the record already carries (PostGIS).
+Several source paths on one hierarchical line fork on the **innermost** array; outer levels
+ride along as parent fields. A rule whose *target* keeps its array level is an **in-place
+rewrite** instead — it needs its array to survive, so it cannot share a mapping with a fan-out.
+Paths compiled against the forked record are **post-fork paths**: the element's own fields sit
+at the root, so they are plain root-level selections rather than relative ones.
+
+Shapes that would fan out into nothing, into ambiguity, or into silently duplicated data are
+rejected at compile time; a fan-out that still yields zero records at runtime is routed to the
+error sink rather than travelling the chain as an empty success.
 
 ## Trigger Binding
 

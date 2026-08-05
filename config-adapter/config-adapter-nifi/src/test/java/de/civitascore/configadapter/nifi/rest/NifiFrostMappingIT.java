@@ -94,6 +94,12 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String CRON_EVERY_SECOND = "* * * * * ?";
 
   private static final String TOPIC = "civitas/it/frost-mapping";
+  private static final String FANOUT_TOPIC = "civitas/it/frost-fanout";
+  private static final String REF_FANOUT = "REF-FANOUT-1";
+  private static final String DS_FANOUT = "DS-FANOUT-1";
+  private static final String PARTIAL_TOPIC = "civitas/it/frost-partial";
+  private static final String REF_PARTIAL = "REF-PARTIAL-1";
+  private static final String DS_PARTIAL = "DS-PARTIAL-1";
   private static final String CREATABLE_TOPIC = "civitas/it/frost-creatable";
   private static final String REF_CREATE = "REF-CREATE-1";
 
@@ -134,6 +140,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static long dsBadTsId;
   private static long dsSqlId;
   private static long dsFoiId;
+  private static long dsFanoutId;
+  private static long dsPartialId;
 
   private final HttpClient http = HttpClient.newHttpClient();
 
@@ -212,6 +220,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     dsBadTsId = createDatastream(DS_BADTS, REF_BADTS, "HOLDER-BADTS");
     dsSqlId = createDatastream(DS_SQL, REF_SQL, "HOLDER-SQL");
     dsFoiId = createDatastream(DS_FOI, REF_FOI, "HOLDER-FOI");
+    dsFanoutId = createDatastream(DS_FANOUT, REF_FANOUT, "HOLDER-FANOUT");
+    dsPartialId = createDatastream(DS_PARTIAL, REF_PARTIAL, "HOLDER-PARTIAL");
 
     deployMqttPipeline();
     deploySqlPipeline();
@@ -293,6 +303,103 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     assertTrue(
         observation.path("phenomenonTime").asText().startsWith("2026-01-01T00:00:00"),
         "phenomenonTime must survive as the mapped ISO instant");
+  }
+
+  @Test
+  void arraySourceProducesOneObservationPerElement() throws Exception {
+    // The defect from the report, end to end: one MQTT message carrying three readings across two
+    // array levels must yield THREE observations on the datastream — not one, and not a deploy-time
+    // rejection. The entity bodies are static EL templates, so the explode has to happen upstream
+    // of
+    // them; this asserts the sink-observable consequence, not the compiled paths.
+    String payload =
+        "{\"station\":\"Gateway station\",\"ref\":\""
+            + REF_FANOUT
+            + "\",\"measurements\":[{\"sensorId\":\"A\",\"measuredValues\":["
+            + "{\"ts\":\"2026-02-01T00:00:00Z\",\"value\":1.5},"
+            + "{\"ts\":\"2026-02-01T00:15:00Z\",\"value\":2.5}]},"
+            + "{\"sensorId\":\"B\",\"measuredValues\":["
+            + "{\"ts\":\"2026-02-01T01:00:00Z\",\"value\":3.5}]}]}";
+
+    // Deployed here rather than in @BeforeAll: this pipeline is the only one in the class whose
+    // deploy can fail on its own mapping, and a class-level deploy would abort every other test.
+    deployFanoutPipeline();
+
+    publishOnceIntoTheFlow(
+        "civitas-it-fanout", FANOUT_TOPIC, payload, () -> observations(dsFanoutId).size() >= 3);
+
+    // The poll above is a lower bound, so it turns true sooner under an over-fork. Settle before
+    // counting, or a run producing 6 observations passes with 3 still in flight.
+    settleBeforeCounting();
+
+    // result AND phenomenonTime per observation: the reported defect is about the timestamp field,
+    // and a fix that fans out the result while broadcasting the first timestamp onto every
+    // observation would pass a result-only assertion. Pairing them also detects values bleeding
+    // across the two source levels.
+    List<String> pairs = new ArrayList<>();
+    for (JsonNode observation : observations(dsFanoutId)) {
+      pairs.add(
+          observation.path("result").asDouble()
+              + "@"
+              + observation.path("phenomenonTime").asText().substring(0, 19));
+    }
+    pairs.sort(null);
+    assertEquals(
+        List.of("1.5@2026-02-01T00:00:00", "2.5@2026-02-01T00:15:00", "3.5@2026-02-01T01:00:00"),
+        pairs,
+        "every array element must become its own observation with its own timestamp");
+
+    // Only the OBSERVATION tier multiplies. The mapping also writes the Thing and Datastream tiers,
+    // whose target paths carry [] as well — those are entity-tier markers, so they must stay
+    // singular. A fan-out derived from the target side instead of the source side would create one
+    // Datastream per element here; the pre-provisioned Datastream is resolved by the find path, so
+    // this stays exact.
+    assertEquals(
+        1,
+        countDatastreamsByFilter(REF_FANOUT, DS_FANOUT),
+        "the Datastream tier must not multiply with the array");
+
+    // The Thing tier is CREATED here (nothing carries REF_FANOUT up front), and the siblings all
+    // pass the lookup before the first create is visible in FROST — so find-or-create is not
+    // idempotent across them and the tier currently multiplies. That race belongs to the entity
+    // stage, not to the array fan-out: a SQL batch delivering several rows for one Thing hits it
+    // the same way, and resolving it needs an identity the sink can collide on (a derived
+    // @iot.id) rather than a lookup. Asserted as "at least one" so this test keeps covering the
+    // fan-out; the exact count returns once entity identity is deterministic.
+    assertTrue(
+        countThings(REF_FANOUT) >= 1, "the mapped Thing tier must be created for the array source");
+  }
+
+  @Test
+  void oneBadElementDoesNotDiscardTheRemainingOnes() throws Exception {
+    // The key guard acts per record, so a fanned-out element with an empty match key must go to the
+    // error sink while its siblings still land. An implementation routing the whole FlowFile on the
+    // first bad element would lose all N readings — and would look green in every other scenario.
+    String payload =
+        "{\"station\":\"Partial gateway\",\"ref\":\""
+            + REF_PARTIAL
+            + "\",\"measurements\":[{\"measuredValues\":["
+            + "{\"ts\":\"2026-02-02T00:00:00Z\",\"value\":10.5,\"dsref\":\""
+            + REF_PARTIAL
+            + "\"},"
+            + "{\"ts\":\"2026-02-02T00:15:00Z\",\"value\":11.5,\"dsref\":\"\"},"
+            + "{\"ts\":\"2026-02-02T00:30:00Z\",\"value\":12.5,\"dsref\":\""
+            + REF_PARTIAL
+            + "\"}]}]}";
+
+    deployPartialPipeline();
+
+    publishOnceIntoTheFlow(
+        "civitas-it-partial", PARTIAL_TOPIC, payload, () -> observations(dsPartialId).size() >= 2);
+    settleBeforeCounting();
+
+    List<Double> results = new ArrayList<>();
+    for (JsonNode observation : observations(dsPartialId)) {
+      results.add(observation.path("result").asDouble());
+    }
+    results.sort(null);
+    assertEquals(
+        List.of(10.5, 12.5), results, "the valid elements must survive one unusable sibling");
   }
 
   @Test
@@ -493,7 +600,12 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     // >= 1, not == 1: the per-second cron can re-read row 1 and race a second first-sight message
     // into a duplicate Thing before the first commits (see mappedMqtt…). The invariant is that the
     // chain reached FROST, not an exact dedup count under concurrent first contact.
-    assertTrue(countThings(REF_SQL) >= 1, "the first row's Thing must exist");
+    //
+    // Sampled only once the count holds still across several cron ticks: a create still in flight
+    // would otherwise land after the sample and fail the comparison below even though row 2
+    // correctly reused the Thing.
+    int thingsAfterFirstRow = settledThingCount(REF_SQL);
+    assertTrue(thingsAfterFirstRow >= 1, "the first row's Thing must exist");
 
     // Row 2 (same reference) now makes every batch a 2-record array: its observation can only
     // appear if the $[*] split really turns the record-writer array into individual STA elements.
@@ -513,9 +625,14 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         .ignoreExceptions()
         .until(() -> resultValues(dsSqlId).contains(31.5));
 
-    // both rows share the reference — steady-state re-reads must not keep minting Things (the
-    // count stabilises once the first Thing is committed; >= 1 tolerates only the initial race).
-    assertTrue(countThings(REF_SQL) >= 1, "same-reference rows must share the Thing(s)");
+    // Both rows share the reference, and by now the first Thing is long committed — so the lookup
+    // hits and the second row must mint NO further Thing. Compared against the earlier count rather
+    // than a literal: the initial first-contact race may have produced more than one, but once past
+    // it the count must stop growing, which a bare '>= 1' would never notice.
+    assertEquals(
+        thingsAfterFirstRow,
+        countThings(REF_SQL),
+        "a same-reference row must reuse the existing Thing instead of minting another");
   }
 
   // ─── Deployment ─────────────────────────────────────────────────────────────
@@ -677,6 +794,90 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     deploy("pipeline-frost-map-sql-it", graph, source);
   }
 
+  /**
+   * The reported structure: readings nested two array levels deep under a gateway. Each leaf
+   * element must become its own observation, with the gateway-level reference carried along — so
+   * the source array has to be exploded before the entity bodies are rendered.
+   */
+  private static void deployFanoutPipeline() throws Exception {
+    Map<String, Object> graph =
+        json(
+            """
+            { "nodes": [
+                { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
+                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": {
+                    "$.name": "$.station",
+                    "$.description": { "op": "const", "value": "Gateway with nested readings" },
+                    "$.properties.reference": "$.ref",
+                    "$.Datastreams[].properties.reference": "$.ref",
+                    "$.Datastreams[].Observations[].result":
+                        { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
+                    "$.Datastreams[].Observations[].phenomenonTime":
+                        "$.measurements[].measuredValues[].ts"
+                  } } } },
+                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
+                { "id": "e", "type": "end", "data": {} } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+
+    Datasource source = new Datasource();
+    source.setId("mqtt-frost-fanout");
+    source.setType("MQTT");
+    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
+    source.handleUnknownProperty("topics", List.of(FANOUT_TOPIC));
+    source.handleUnknownProperty("client_id", "civitas-frost-fanout");
+    source.handleUnknownProperty("qos", 1);
+
+    deploy("pipeline-frost-fanout-it", graph, source);
+  }
+
+  /**
+   * Like the fan-out pipeline, but the Datastream match key is taken from inside the array element
+   * — so a single element with an empty key is unusable while its siblings stay resolvable.
+   */
+  private static void deployPartialPipeline() throws Exception {
+    Map<String, Object> graph =
+        json(
+            """
+            { "nodes": [
+                { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
+                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": {
+                    "$.name": "$.station",
+                    "$.description": { "op": "const", "value": "Partial delivery gateway" },
+                    "$.properties.reference": "$.ref",
+                    "$.Datastreams[].properties.reference":
+                        "$.measurements[].measuredValues[].dsref",
+                    "$.Datastreams[].Observations[].result":
+                        { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
+                    "$.Datastreams[].Observations[].phenomenonTime":
+                        "$.measurements[].measuredValues[].ts"
+                  } } } },
+                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
+                { "id": "e", "type": "end", "data": {} } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+
+    Datasource source = new Datasource();
+    source.setId("mqtt-frost-partial");
+    source.setType("MQTT");
+    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
+    source.handleUnknownProperty("topics", List.of(PARTIAL_TOPIC));
+    source.handleUnknownProperty("client_id", "civitas-frost-partial");
+    source.handleUnknownProperty("qos", 1);
+
+    deploy("pipeline-frost-partial-it", graph, source);
+  }
+
   private static void deploy(String pipelineId, Map<String, Object> graph, Datasource source)
       throws Exception {
     byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
@@ -777,6 +978,22 @@ class NifiFrostMappingIT extends AbstractNifiIT {
 
   private int countThings(String reference) throws Exception {
     return thingsByReference(reference).size();
+  }
+
+  /**
+   * The Thing count once it has stopped changing, so a create still in flight cannot land after the
+   * caller sampled it. The per-second cron keeps re-reading the source, so "no more Things appear"
+   * can only be established by observing several ticks, never from a single read.
+   */
+  private int settledThingCount(String reference) throws Exception {
+    int previous = -1;
+    for (int stableTicks = 0; stableTicks < 4; ) {
+      Thread.sleep(Duration.ofSeconds(3).toMillis());
+      int current = countThings(reference);
+      stableTicks = current == previous ? stableTicks + 1 : 0;
+      previous = current;
+    }
+    return previous;
   }
 
   private JsonNode thingByReference(String reference) throws Exception {
@@ -958,6 +1175,53 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     return new MqttPublisher("tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883), clientId);
   }
 
+  /** Reports whether the expected outcome has landed. */
+  private interface Landed {
+    boolean check() throws Exception;
+  }
+
+  /**
+   * Delivers the payload exactly once <em>into the flow</em>, then polls the assertion. Needed
+   * wherever the expected count is exact, so retention is not an option: ConsumeMQTT re-receives a
+   * retained message on every resubscribe and would keep producing entities for the whole window.
+   *
+   * <p>But a non-retained publish is discarded while no subscriber exists, and {@code deployFlow}
+   * only waits for NiFi to report the processor RUNNING, which precedes the MQTT CONNECT/SUBSCRIBE
+   * — so the first delivery can be lost outright and the test would fail on a timeout that names
+   * the wrong cause. Republishing only while nothing has landed retries a lost delivery without
+   * ever sending a second payload into a flow that already received one.
+   */
+  private void publishOnceIntoTheFlow(String clientId, String topic, String payload, Landed landed)
+      throws Exception {
+    try (MqttPublisher publisher = publisher(clientId)) {
+      for (int attempt = 0; attempt < 6 && !landed.check(); attempt++) {
+        publisher.publishOnce(topic, payload);
+        try {
+          await()
+              .atMost(Duration.ofSeconds(20))
+              .pollInterval(Duration.ofSeconds(1))
+              .ignoreExceptions()
+              .until(landed::check);
+        } catch (ConditionTimeoutException nothingLanded) {
+          // Treat the delivery as lost to the broker and republish.
+        }
+      }
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(landed::check);
+    }
+  }
+
+  /**
+   * Lets the flow drain before an exact count. A lower-bound poll turns true sooner under an
+   * over-fork, so counting immediately would let a run producing too many entities pass.
+   */
+  private static void settleBeforeCounting() throws InterruptedException {
+    Thread.sleep(Duration.ofSeconds(6).toMillis());
+  }
+
   private static String postgresDriverJar() {
     try {
       return new File(
@@ -987,6 +1251,18 @@ class NifiFrostMappingIT extends AbstractNifiIT {
       MqttMessage message = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
       message.setQos(1);
       message.setRetained(true);
+      mqtt.publish(topic, message);
+    }
+
+    /**
+     * Publishes without retention, for scenarios asserting an exact observation count. A retained
+     * message is redelivered on every ConsumeMQTT resubscribe, so it would keep producing
+     * observations for the whole poll window — the values stay correct but the count becomes a
+     * function of test duration.
+     */
+    void publishOnce(String topic, String payload) throws Exception {
+      MqttMessage message = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
+      message.setQos(1);
       mqtt.publish(topic, message);
     }
 

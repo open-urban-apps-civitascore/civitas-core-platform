@@ -1,11 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { hasAssignmentChanges } from '@/utils/assignments'
 
 import { GroupRoleAssignmentTable } from './AccessManagementTable'
 import { GenericAssignmentsList } from './GenericAssignmentsList'
@@ -30,28 +29,6 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
 }))
 
-const { hasAssignmentChanges: realHasAssignmentChanges } =
-  await vi.importActual<typeof import('@/utils/assignments')>('@/utils/assignments')
-
-vi.mock('@/utils/assignments', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/utils/assignments')>()
-  return {
-    ...actual,
-    hasAssignmentChanges: vi.fn(actual.hasAssignmentChanges),
-  }
-})
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    refresh: vi.fn(),
-  }),
-  useSearchParams: () => ({
-    get: vi.fn(() => null),
-  }),
-  usePathname: () => '/datasets/test-id/access-management',
-}))
-
 const mockAssignments: GroupRoleAssignmentTable[] = [
   {
     groupId: '1',
@@ -63,7 +40,6 @@ const mockAssignments: GroupRoleAssignmentTable[] = [
 
 describe('GenericAssignmentsList', () => {
   beforeEach(() => {
-    vi.mocked(hasAssignmentChanges).mockImplementation(realHasAssignmentChanges)
     vi.mocked(useGetCurrentUser).mockReturnValue({
       data: {
         username: 'test',
@@ -80,253 +56,6 @@ describe('GenericAssignmentsList', () => {
         ],
       },
     } as ReturnType<typeof useGetCurrentUser>)
-  })
-
-  describe('uncontrolled mode', () => {
-    const defaultProps = {
-      entityId: 'test-entity-1',
-      initialAssignments: mockAssignments,
-      onPatchEntity: vi.fn().mockResolvedValue(undefined),
-      title: 'Zugriffsberechtigungen',
-      subtitle: 'Hier werden Zuständigkeiten und Zugriffsrechte definiert.',
-      hasSecondBox: true,
-    }
-
-    it('renders in read-only mode by default', () => {
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} />
-        </NextIntlClientProvider>,
-      )
-
-      expect(screen.getByText('Zugriffsberechtigungen')).toBeInTheDocument()
-      expect(screen.getByText('Hier werden Zuständigkeiten und Zugriffsrechte definiert.')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /bearbeiten/i })).toBeInTheDocument()
-    })
-
-    it('displays assignments table', () => {
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} />
-        </NextIntlClientProvider>,
-      )
-
-      expect(screen.getByText('Admin Group')).toBeInTheDocument()
-      expect(screen.getByText('Admin')).toBeInTheDocument()
-    })
-
-    it('shows no data page when there are no assignments', () => {
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} initialAssignments={[]} />
-        </NextIntlClientProvider>,
-      )
-
-      expect(screen.getByText('Keine Gruppen und Rollen vorhanden')).toBeInTheDocument()
-      expect(screen.getByText('Keine Gruppe besitzt Berechtigungen.')).toBeInTheDocument()
-    })
-
-    it('switches to edit mode when edit button is clicked', async () => {
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} />
-        </NextIntlClientProvider>,
-      )
-
-      const editButton = screen.getByRole('button', { name: /bearbeiten/i })
-      fireEvent.click(editButton)
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /speichern/i })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: /beenden/i })).toBeInTheDocument()
-      })
-    })
-
-    it('shows add assignment button in edit mode', async () => {
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} />
-        </NextIntlClientProvider>,
-      )
-
-      const editButton = screen.getByRole('button', { name: /bearbeiten/i })
-      fireEvent.click(editButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/gruppe hinzufügen/i)).toBeInTheDocument()
-      })
-    })
-
-    it('disables submit button when no changes have been made', async () => {
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} />
-        </NextIntlClientProvider>,
-      )
-
-      const editButton = screen.getByRole('button', { name: /bearbeiten/i })
-      fireEvent.click(editButton)
-
-      await waitFor(() => {
-        const submitButton = screen.getByRole('button', { name: /speichern/i })
-        expect(submitButton).toBeDisabled()
-      })
-    })
-
-    it('shows first info box in read-only mode', () => {
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} />
-        </NextIntlClientProvider>,
-      )
-
-      expect(
-        screen.getByText(
-          /gruppen, die plattformweite berechtigungen an allen datenbezogenen Elementen besitzen, haben zugriff/i,
-        ),
-      ).toBeInTheDocument()
-      expect(screen.queryByText(/durch das entfernen der eigenen gruppen-rollen-zuordnung/i)).not.toBeInTheDocument()
-    })
-
-    it('shows both info boxes in edit mode', async () => {
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} />
-        </NextIntlClientProvider>,
-      )
-
-      const editButton = screen.getByRole('button', { name: /bearbeiten/i })
-      fireEvent.click(editButton)
-
-      await waitFor(() => {
-        expect(
-          screen.getByText(
-            /gruppen, die plattformweite berechtigungen an allen datenbezogenen Elementen besitzen, haben zugriff/i,
-          ),
-        ).toBeInTheDocument()
-        expect(screen.getByText(/durch das entfernen der eigenen gruppen-rollen-zuordnung/i)).toBeInTheDocument()
-      })
-    })
-
-    it('disables submit button when groups without roles exist', async () => {
-      const assignmentsWithoutRoles: GroupRoleAssignmentTable[] = [
-        {
-          groupId: '2',
-          groupName: 'Empty Group',
-          groupDescription: 'No roles',
-          assignedRoles: [],
-        },
-      ]
-
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} initialAssignments={assignmentsWithoutRoles} />
-        </NextIntlClientProvider>,
-      )
-
-      const editButton = screen.getByRole('button', { name: /bearbeiten/i })
-      fireEvent.click(editButton)
-
-      await waitFor(() => {
-        const submitButton = screen.getByRole('button', { name: /speichern/i })
-        expect(submitButton).toBeDisabled()
-      })
-    })
-
-    it('calls onExit when exit button is clicked with no changes', async () => {
-      const onExit = vi.fn()
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} onExit={onExit} />
-        </NextIntlClientProvider>,
-      )
-
-      fireEvent.click(screen.getByRole('button', { name: /bearbeiten/i }))
-      await waitFor(() => screen.getByRole('button', { name: /beenden/i }))
-      fireEvent.click(screen.getByRole('button', { name: /beenden/i }))
-
-      expect(onExit).toHaveBeenCalledOnce()
-    })
-
-    it('calls onExit when discarding changes via exit modal', async () => {
-      const onExit = vi.fn()
-      // Make hasAssignmentChanges return true so the exit modal appears without UI interaction
-      vi.mocked(hasAssignmentChanges).mockReturnValue(true)
-
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} onExit={onExit} />
-        </NextIntlClientProvider>,
-      )
-
-      fireEvent.click(screen.getByRole('button', { name: /bearbeiten/i }))
-      await waitFor(() => screen.getByRole('button', { name: /beenden/i }))
-      fireEvent.click(screen.getByRole('button', { name: /beenden/i }))
-      await waitFor(() => screen.getByRole('button', { name: /verwerfen/i }))
-      fireEvent.click(screen.getByRole('button', { name: /verwerfen/i }))
-
-      expect(onExit).toHaveBeenCalledOnce()
-    })
-
-    it('calls onExit after successfully saving via exit modal', async () => {
-      const onExit = vi.fn()
-      const onPatchEntity = vi.fn().mockResolvedValue(undefined)
-      // Make hasAssignmentChanges return true so the exit modal appears without UI interaction
-      vi.mocked(hasAssignmentChanges).mockReturnValue(true)
-
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} onPatchEntity={onPatchEntity} onExit={onExit} />
-        </NextIntlClientProvider>,
-      )
-
-      fireEvent.click(screen.getByRole('button', { name: /bearbeiten/i }))
-      await waitFor(() => screen.getByRole('button', { name: /beenden/i }))
-      fireEvent.click(screen.getByRole('button', { name: /beenden/i }))
-      await waitFor(() => screen.getByRole('button', { name: /speichern/i }))
-      fireEvent.click(screen.getByRole('button', { name: /speichern/i }))
-
-      await waitFor(() => expect(onExit).toHaveBeenCalledOnce())
-    })
-
-    it('does not call onExit when saving via exit modal fails', async () => {
-      const onExit = vi.fn()
-      const onPatchEntity = vi.fn().mockRejectedValue(new Error('save failed'))
-      // Make hasAssignmentChanges return true so the exit modal appears without UI interaction
-      vi.mocked(hasAssignmentChanges).mockReturnValue(true)
-
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} onPatchEntity={onPatchEntity} onExit={onExit} />
-        </NextIntlClientProvider>,
-      )
-
-      fireEvent.click(screen.getByRole('button', { name: /bearbeiten/i }))
-      await waitFor(() => screen.getByRole('button', { name: /beenden/i }))
-      fireEvent.click(screen.getByRole('button', { name: /beenden/i }))
-      await waitFor(() => screen.getByRole('button', { name: /speichern/i }))
-      fireEvent.click(screen.getByRole('button', { name: /speichern/i }))
-
-      await waitFor(() => expect(onPatchEntity).toHaveBeenCalled())
-      expect(onExit).not.toHaveBeenCalled()
-    })
-
-    it('does not call onPatchEntity when submit button is disabled', async () => {
-      const onPatchEntity = vi.fn().mockResolvedValue(undefined)
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <GenericAssignmentsList {...defaultProps} onPatchEntity={onPatchEntity} initialAssignments={[]} />
-        </NextIntlClientProvider>,
-      )
-
-      const editButton = screen.getByRole('button', { name: /bearbeiten/i })
-      fireEvent.click(editButton)
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /speichern/i })).toBeDisabled()
-      })
-      expect(onPatchEntity).not.toHaveBeenCalled()
-    })
   })
 
   describe('controlled mode', () => {

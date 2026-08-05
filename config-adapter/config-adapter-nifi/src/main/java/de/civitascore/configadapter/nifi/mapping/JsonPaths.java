@@ -86,11 +86,33 @@ final class JsonPaths {
         throw new IllegalArgumentException(
             "CORE path contains an empty property segment: " + jsonPath);
       }
+      rejectExpressionLanguage(segment, jsonPath);
       segments.add(segment);
       if (segment.contains("[]")) {
         lastArraySegment = segments.size() - 1;
       }
     }
     return new ParsedPath(segments, lastArraySegment);
+  }
+
+  /**
+   * Rejects the Expression Language metacharacters in a property segment. A path segment reaches
+   * {@code ForkRecord}'s EL-enabled fork property as the property <em>value</em>, where escaping is
+   * not an option: {@code $$} is handed to NiFi's RecordPathValidator and can render the processor
+   * invalid, which NiFi skips on start — trading a wrong read for a queue that never drains. No
+   * legitimate CORE property name contains these, so rejecting is free.
+   */
+  private static void rejectExpressionLanguage(String segment, String jsonPath) {
+    for (char metacharacter : new char[] {'$', '{', '}'}) {
+      if (segment.indexOf(metacharacter) >= 0) {
+        throw new IllegalArgumentException(
+            "CORE path segment '"
+                + segment
+                + "' contains '"
+                + metacharacter
+                + "', which NiFi would evaluate as an Expression Language reference: "
+                + jsonPath);
+      }
+    }
   }
 }

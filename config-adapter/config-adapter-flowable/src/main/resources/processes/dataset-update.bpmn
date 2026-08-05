@@ -113,12 +113,32 @@
       <incoming>flow-comp-apisix-frost</incoming>
       <outgoing>flow-comp-frost-fail</outgoing>
     </serviceTask>
+    <exclusiveGateway id="prune-gateway" name="Has Geo Sink?" default="flow-prune-skip">
+      <incoming>flow-gateway-skip</incoming>
+      <incoming>flow-pipeline-success</incoming>
+      <outgoing>flow-prune-featuretypes</outgoing>
+      <outgoing>flow-prune-skip</outgoing>
+    </exclusiveGateway>
+    <serviceTask id="prune-featuretypes" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Prune Stale GeoServer Feature Types">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="geoserver"/>
+        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="PRUNE_FEATURE_TYPES"/>
+        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="prune-featuretypes"/>
+      </extensionElements>
+      <incoming>flow-prune-featuretypes</incoming>
+      <outgoing>flow-prune-success</outgoing>
+    </serviceTask>
+    <boundaryEvent id="prune-error" name="Step Failed" attachedToRef="prune-featuretypes">
+      <outgoing>flow-prune-error</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_5" errorRef="stepFailedError"/>
+    </boundaryEvent>
     <serviceTask id="publish-success" flowable:async="true" flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate" name="Publish Success Result">
       <extensionElements>
         <flowable:field xsi:type="xs:anyType" name="resultType" stringValue="success"/>
       </extensionElements>
-      <incoming>flow-gateway-skip</incoming>
-      <incoming>flow-pipeline-success</incoming>
+      <incoming>flow-prune-skip</incoming>
+      <incoming>flow-prune-success</incoming>
+      <incoming>flow-prune-error</incoming>
       <outgoing>flow-publish-success-end</outgoing>
     </serviceTask>
     <serviceTask id="publish-failure" flowable:async="true" flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate" name="Publish Failure Result">
@@ -146,8 +166,16 @@
     <sequenceFlow id="flow-gateway-pipeline" name="yes" sourceRef="pipeline-gateway" targetRef="update-pipelines">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_2">${hasPipelines == true}</conditionExpression>
     </sequenceFlow>
-    <sequenceFlow id="flow-gateway-skip" name="no" sourceRef="pipeline-gateway" targetRef="publish-success"/>
-    <sequenceFlow id="flow-pipeline-success" sourceRef="update-pipelines" targetRef="publish-success"/>
+    <sequenceFlow id="flow-gateway-skip" name="no" sourceRef="pipeline-gateway" targetRef="prune-gateway"/>
+    <sequenceFlow id="flow-pipeline-success" sourceRef="update-pipelines" targetRef="prune-gateway"/>
+    <sequenceFlow id="flow-prune-featuretypes" name="yes" sourceRef="prune-gateway" targetRef="prune-featuretypes">
+      <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_4">${execution.getVariable('hasGeoSink') == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-prune-skip" name="no" sourceRef="prune-gateway" targetRef="publish-success"/>
+    <sequenceFlow id="flow-prune-success" sourceRef="prune-featuretypes" targetRef="publish-success"/>
+    <!-- A failed cleanup must not turn a successful update into a failed saga: the prune is not part
+         of the update's success criteria, and it has nothing to compensate. -->
+    <sequenceFlow id="flow-prune-error" sourceRef="prune-error" targetRef="publish-success"/>
     <sequenceFlow id="flow-publish-success-end" sourceRef="publish-success" targetRef="end"/>
     <sequenceFlow id="flow-frost-error" sourceRef="frost-error" targetRef="publish-failure"/>
     <sequenceFlow id="flow-apisix-error" sourceRef="apisix-error" targetRef="compensate-frost"/>
@@ -237,10 +265,28 @@
           <dc:Bounds height="42.0" width="95.0" x="312.0" y="284.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_3" bpmnElement="prune-gateway" isMarkerVisible="true">
+        <dc:Bounds height="50.0" width="50.0" x="1099.0" y="150.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_40" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="54.0" x="1097.0" y="200.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ServiceTask_10" bpmnElement="prune-featuretypes">
+        <dc:Bounds height="50.0" width="110.0" x="1214.0" y="150.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_41" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="99.0" x="1219.0" y="161.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_5" bpmnElement="prune-error">
+        <dc:Bounds height="36.0" width="36.0" x="1250.0" y="182.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_42" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="62.0" x="1237.0" y="218.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_8" bpmnElement="publish-success">
-        <dc:Bounds height="50.0" width="110.0" x="1144.0" y="150.0"/>
+        <dc:Bounds height="50.0" width="110.0" x="1444.0" y="150.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_11" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="28.0" width="99.0" x="1149.0" y="161.0"/>
+          <dc:Bounds height="28.0" width="99.0" x="1449.0" y="161.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_9" bpmnElement="publish-failure">
@@ -250,7 +296,7 @@
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_EndEvent_1" bpmnElement="end">
-        <dc:Bounds height="36.0" width="36.0" x="1294.0" y="157.0"/>
+        <dc:Bounds height="36.0" width="36.0" x="1594.0" y="157.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_13" labelStyle="BPMNLabelStyle_1">
           <dc:Bounds height="28.0" width="60.0" x="1282.0" y="193.0"/>
         </bpmndi:BPMNLabel>
@@ -353,20 +399,19 @@
           <dc:Bounds height="14.0" width="19.0" x="911.0" y="176.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_11" bpmnElement="flow-gateway-skip" sourceElement="BPMNShape_ExclusiveGateway_2" targetElement="BPMNShape_ServiceTask_8">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_11" bpmnElement="flow-gateway-skip" sourceElement="BPMNShape_ExclusiveGateway_2" targetElement="BPMNShape_ExclusiveGateway_3">
         <di:waypoint xsi:type="dc:Point" x="870.0" y="150.0"/>
         <di:waypoint xsi:type="dc:Point" x="870.0" y="140.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1075.0" y="140.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1075.0" y="166.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1144.0" y="166.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1124.0" y="140.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1124.0" y="150.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_25">
           <dc:Bounds height="14.0" width="14.0" x="1009.0" y="141.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_12" bpmnElement="flow-pipeline-success" sourceElement="BPMNShape_ServiceTask_4" targetElement="BPMNShape_ServiceTask_8">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_12" bpmnElement="flow-pipeline-success" sourceElement="BPMNShape_ServiceTask_4" targetElement="BPMNShape_ExclusiveGateway_3">
         <di:waypoint xsi:type="dc:Point" x="1054.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1076.0" y="175.0"/>
         <di:waypoint xsi:type="dc:Point" x="1099.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1144.0" y="175.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_26"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_13" bpmnElement="flow-pipeline-error" sourceElement="BPMNShape_BoundaryEvent_4" targetElement="BPMNShape_compensate_pipelines">
@@ -411,10 +456,36 @@
         <di:waypoint xsi:type="dc:Point" x="255.0" y="305.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_30"/>
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_30" bpmnElement="flow-prune-featuretypes" sourceElement="BPMNShape_ExclusiveGateway_3" targetElement="BPMNShape_ServiceTask_10">
+        <di:waypoint xsi:type="dc:Point" x="1149.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1181.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1214.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_43"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_31" bpmnElement="flow-prune-skip" sourceElement="BPMNShape_ExclusiveGateway_3" targetElement="BPMNShape_ServiceTask_8">
+        <di:waypoint xsi:type="dc:Point" x="1124.0" y="150.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1124.0" y="115.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1499.0" y="115.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1499.0" y="150.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_44"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_32" bpmnElement="flow-prune-success" sourceElement="BPMNShape_ServiceTask_10" targetElement="BPMNShape_ServiceTask_8">
+        <di:waypoint xsi:type="dc:Point" x="1324.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1384.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1444.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_45"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_33" bpmnElement="flow-prune-error" sourceElement="BPMNShape_BoundaryEvent_5" targetElement="BPMNShape_ServiceTask_8">
+        <di:waypoint xsi:type="dc:Point" x="1268.0" y="218.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1268.0" y="245.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1499.0" y="245.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1499.0" y="200.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_46"/>
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_17" bpmnElement="flow-publish-success-end" sourceElement="BPMNShape_ServiceTask_8" targetElement="BPMNShape_EndEvent_1">
-        <di:waypoint xsi:type="dc:Point" x="1254.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1274.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1294.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1554.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1574.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1594.0" y="175.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_31"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_18" bpmnElement="flow-publish-failure-end" sourceElement="BPMNShape_ServiceTask_9" targetElement="BPMNShape_EndEvent_2">

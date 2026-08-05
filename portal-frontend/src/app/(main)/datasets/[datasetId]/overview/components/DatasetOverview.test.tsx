@@ -63,9 +63,11 @@ const mockCurrentUserWithDatapoolScope = (permissions: PermissionName[], datapoo
   } as unknown as ReturnType<typeof useGetCurrentUser>)
 }
 
+let mockSearchParams = new URLSearchParams()
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockSearchParams,
   usePathname: () => '/datasets/ds-1',
 }))
 
@@ -138,6 +140,7 @@ const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
 describe('DatasetOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSearchParams = new URLSearchParams()
     mockCurrentUser([PERMISSION_NAMES.DATASET_UPDATE, PERMISSION_NAMES.DATASET_RELEASE])
   })
 
@@ -184,6 +187,24 @@ describe('DatasetOverview', () => {
   })
 
   describe('Edit mode UI', () => {
+    it('starts in edit mode when mode=edit param is present', () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      renderComponent()
+
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      expect(screen.getByTestId('nameTextField')).not.toBeDisabled()
+    })
+
+    it('stays in read-only mode when mode=edit param is present but the user lacks DATASET_UPDATE', () => {
+      mockCurrentUser([])
+      mockSearchParams = new URLSearchParams('mode=edit')
+      renderComponent()
+
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('cancelButton')).not.toBeInTheDocument()
+      expect(screen.getByTestId('nameTextField')).toBeDisabled()
+    })
+
     it('enters edit mode when Edit button is clicked', async () => {
       renderComponent()
       clickEditButton()

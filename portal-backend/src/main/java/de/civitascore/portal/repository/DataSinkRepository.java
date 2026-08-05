@@ -1,5 +1,6 @@
 package de.civitascore.portal.repository;
 
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSink;
 import java.util.Collection;
 import java.util.List;
@@ -27,6 +28,8 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
   List<DataSink> findByPipelineId(UUID pipelineId);
 
   List<DataSink> findByDataSetId(UUID dataSetId);
+
+  boolean existsByDataSetIdAndDataSinkType(UUID dataSetId, DataSinkType dataSinkType);
 
   /**
    * Check if any data sink references the given data structure version. Sinks (POSTGIS and FROST)

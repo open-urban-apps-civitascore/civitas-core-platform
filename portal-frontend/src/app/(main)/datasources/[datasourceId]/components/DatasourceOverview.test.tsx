@@ -247,6 +247,14 @@ describe('DatasourceOverview', () => {
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
     })
+
+    it('stays in read-only mode when mode=edit param is present but the user lacks DATASOURCE_UPDATE', () => {
+      mockCurrentUser([])
+      mockSearchParams = new URLSearchParams('mode=edit')
+      render(<DatasourceOverview {...defaultProps} />)
+      expect(screen.queryByTestId('cancelButton')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+    })
   })
 
   describe('Mode transitions', () => {

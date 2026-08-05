@@ -107,6 +107,16 @@ export const LayerFormSchema = z
     }
   })
 
+export const LayersFormSchema = z.array(LayerFormSchema).superRefine((layers, ctx) => {
+  const seenNames = new Set<string>()
+  layers.forEach((layer, index) => {
+    if (!layer.layerName) return
+    if (seenNames.has(layer.layerName))
+      ctx.addIssue({ code: 'custom', message: 'common.errors.nameExists', path: [index, 'layerName'] })
+    seenNames.add(layer.layerName)
+  })
+})
+
 export const LayerPayloadSchema = LayerBaseSchema.extend({
   defaultStyleId: z.uuid().optional().nullable(),
   bboxAutoCalculate: z.boolean(),

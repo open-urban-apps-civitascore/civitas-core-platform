@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
@@ -21,15 +22,23 @@ import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
 import jakarta.ws.rs.core.Response;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyStore;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
@@ -41,6 +50,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.utility.MountableFile;
 
 /**
  * End-to-end wiring test for the FROST <b>find-or-create</b> sub-flow built by {@link
@@ -59,6 +69,7 @@ class NifiDataFlowIT extends AbstractNifiIT {
   private static final int HOST_PORT = 18444;
   // The FROST project id the deployed flows are scoped to (required by the builder).
   private static final String PROJECT_ID = "1";
+  private static final String MQTT_TRUSTSTORE_PASSWORD = "mqtt-test-changeit";
   private static final String ENVELOPE =
       "{\"things\":[{\"name\":\"Sensor S1\",\"properties\":{\"reference\":\"S1\"}}]}";
   private static final String ENVELOPE_OBS =
@@ -69,6 +80,7 @@ class NifiDataFlowIT extends AbstractNifiIT {
   private static Network network;
   private static GenericContainer<?> mosquitto;
   private static GenericContainer<?> sink;
+  private static Path mqttTruststore;
 
   private final HttpClient http = HttpClient.newHttpClient();
 
@@ -78,13 +90,26 @@ class NifiDataFlowIT extends AbstractNifiIT {
 
     network = Network.newNetwork();
 
+    Path mqttCerts = generateMqttTlsMaterial();
+    mqttTruststore = mqttCerts.resolve("mqtt-truststore.p12");
+
     mosquitto =
         new GenericContainer<>(DockerImageName.parse(TestContainerImages.MOSQUITTO))
             .withNetwork(network)
             .withNetworkAliases("mqtt")
-            .withExposedPorts(1883)
-            .withCommand("mosquitto", "-c", "/mosquitto-no-auth.conf")
-            .waitingFor(Wait.forListeningPort());
+            .withExposedPorts(1883, 8883)
+            .withCopyToContainer(
+                MountableFile.forClasspathResource("mosquitto-tls.conf"),
+                "/mosquitto/config/mosquitto.conf")
+            .withCopyToContainer(
+                MountableFile.forHostPath(mqttCerts.resolve("ca.crt")), "/mosquitto/certs/ca.crt")
+            .withCopyToContainer(
+                MountableFile.forHostPath(mqttCerts.resolve("server.crt")),
+                "/mosquitto/certs/server.crt")
+            .withCopyToContainer(
+                MountableFile.forHostPath(mqttCerts.resolve("server.key"), 0644),
+                "/mosquitto/certs/server.key")
+            .waitingFor(Wait.forListeningPorts(1883, 8883));
     mosquitto.start();
 
     sink =
@@ -95,7 +120,17 @@ class NifiDataFlowIT extends AbstractNifiIT {
             .waitingFor(Wait.forHttp("/__admin/health").forStatusCode(200).forStatusCode(404));
     sink.start();
 
-    startNifi(HOST_PORT, network);
+    startNifi(
+        HOST_PORT,
+        network,
+        container ->
+            container
+                .withCopyFileToContainer(
+                    MountableFile.forHostPath(mqttTruststore), "/opt/certs/mqtt-truststore.p12")
+                // Mirror the apache-nifi-helm node-truststore contract used in deployment.
+                .withEnv("TRUSTSTORE_PATH", "/opt/certs/mqtt-truststore.p12")
+                .withEnv("TRUSTSTORE_TYPE", "PKCS12")
+                .withEnv("TRUSTSTORE_PASSWORD", MQTT_TRUSTSTORE_PASSWORD));
   }
 
   @AfterAll
@@ -123,6 +158,20 @@ class NifiDataFlowIT extends AbstractNifiIT {
     publishUntil(
         "civitas/it/thing-new",
         "civitas-it-new",
+        () -> postedBodyContains(thingsPath(basePath), "\"reference\":\"S1\""));
+  }
+
+  @Test
+  void tlsMqttUsesNifiEnvironmentTruststoreAndReachesSink() throws Exception {
+    String basePath = "/tls";
+    String topic = "civitas/it/tls";
+    stub(getStub(thingsPath(basePath), "{\"value\":[]}"));
+    stub(postStub(thingsPath(basePath), 201));
+    deployFrost("pipeline-frost-tls", topic, basePath, "ssl://mqtt:8883", true);
+
+    publishUntilTls(
+        topic,
+        "civitas-it-tls",
         () -> postedBodyContains(thingsPath(basePath), "\"reference\":\"S1\""));
   }
 
@@ -191,13 +240,26 @@ class NifiDataFlowIT extends AbstractNifiIT {
   // ─── Helpers ──────────────────────────────────────────────────────────────────
 
   private void deployFrost(String pipelineId, String topic, String basePath) throws Exception {
+    deployFrost(pipelineId, topic, basePath, "tcp://mqtt:1883", false);
+  }
+
+  private void deployFrost(
+      String pipelineId, String topic, String basePath, String brokerUri, boolean tls)
+      throws Exception {
+    Map<String, String> sourceProperties = new LinkedHashMap<>();
+    sourceProperties.put("Broker URI", brokerUri);
+    sourceProperties.put("Topic Filter", topic);
+    if (tls) {
+      sourceProperties.put(
+          "SSL Context Service", "${CS:" + MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE + "}");
+    }
     String snapshot =
         NifiTestFixtures.flowBuilder()
             .build(
                 new FlowBuildSpec(
                     pipelineId,
                     SourceType.MQTT,
-                    Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", topic),
+                    sourceProperties,
                     SinkType.FROST,
                     Map.of(
                         FrostSinkStage.FROST_BASE_URL,
@@ -208,6 +270,28 @@ class NifiDataFlowIT extends AbstractNifiIT {
                     Map.of(),
                     null,
                     null));
+    if (tls) {
+      // First simulate the deployment bootstrap creating the sensitive Parameter Context. Then
+      // redeploy the real, secret-free snapshot below: NiFi must reuse the existing context rather
+      // than replacing it with the declaration that deliberately contains no value.
+      JsonNode root = mapper.readTree(snapshot);
+      boolean passwordParameterFound = false;
+      for (JsonNode parameter :
+          root.path("parameterContexts")
+              .path(MqttSourceStage.NODE_TRUSTSTORE_PARAMETER_CONTEXT)
+              .path("parameters")) {
+        if (MqttSourceStage.TRUSTSTORE_PASSWORD_PARAMETER.equals(parameter.path("name").asText())) {
+          ((ObjectNode) parameter).put("value", MQTT_TRUSTSTORE_PASSWORD);
+          passwordParameterFound = true;
+          break;
+        }
+      }
+      if (!passwordParameterFound) {
+        throw new IllegalStateException(
+            "TLS flow does not declare " + MqttSourceStage.TRUSTSTORE_PASSWORD_PARAMETER);
+      }
+      client.deployFlow(new DeploymentPlan(pipelineId, mapper.writeValueAsString(root), Map.of()));
+    }
     client.deployFlow(new DeploymentPlan(pipelineId, snapshot, Map.of()));
   }
 
@@ -237,6 +321,84 @@ class NifiDataFlowIT extends AbstractNifiIT {
                 publisher.publish(topic, payload);
                 return condition.check();
               });
+    }
+  }
+
+  private void publishUntilTls(String topic, String clientId, AwaitCondition condition)
+      throws Exception {
+    String brokerUrl = "ssl://" + dockerHost + ":" + mosquitto.getMappedPort(8883);
+    try (MqttPublisher publisher = new MqttPublisher(brokerUrl, clientId, mqttClientSslContext())) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(topic, ENVELOPE);
+                return condition.check();
+              });
+    }
+  }
+
+  private static SSLContext mqttClientSslContext() throws Exception {
+    KeyStore truststore = KeyStore.getInstance("PKCS12");
+    try (InputStream input = Files.newInputStream(mqttTruststore)) {
+      truststore.load(input, MQTT_TRUSTSTORE_PASSWORD.toCharArray());
+    }
+    TrustManagerFactory trustManagers =
+        TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+    trustManagers.init(truststore);
+    SSLContext sslContext = SSLContext.getInstance("TLS");
+    sslContext.init(null, trustManagers.getTrustManagers(), null);
+    return sslContext;
+  }
+
+  /** Generates the CA/server PEM files in a disposable OpenSSL container and a node truststore. */
+  private static Path generateMqttTlsMaterial() {
+    String publisherHostSan =
+        dockerHost.matches("\\d{1,3}(\\.\\d{1,3}){3}") ? ",IP:" + dockerHost : ",DNS:" + dockerHost;
+    GenericContainer<?> openssl =
+        new GenericContainer<>(DockerImageName.parse("alpine/openssl:3.5.4"))
+            .withCreateContainerCmdModifier(command -> command.withEntrypoint("sh"))
+            .withCommand(
+                "-c",
+                "mkdir -p /certs && "
+                    + "openssl req -x509 -newkey rsa:2048 -nodes -days 2 "
+                    + "-keyout /certs/ca.key -out /certs/ca.crt -subj /CN=Civitas-MQTT-Test-CA && "
+                    + "openssl req -newkey rsa:2048 -nodes -keyout /certs/server.key "
+                    + "-out /certs/server.csr -subj /CN=mqtt "
+                    + "-addext subjectAltName=DNS:mqtt,DNS:localhost,IP:127.0.0.1"
+                    + publisherHostSan
+                    + " && "
+                    + "openssl x509 -req -in /certs/server.csr -CA /certs/ca.crt "
+                    + "-CAkey /certs/ca.key -CAcreateserial -days 2 -out /certs/server.crt "
+                    + "-copy_extensions copyall && echo PKI_READY && sleep 600")
+            .waitingFor(Wait.forLogMessage(".*PKI_READY.*", 1));
+    try {
+      openssl.start();
+      Path dir = Files.createTempDirectory("mqtt-tls-certs");
+      openssl.copyFileFromContainer("/certs/ca.crt", dir.resolve("ca.crt").toString());
+      openssl.copyFileFromContainer("/certs/server.crt", dir.resolve("server.crt").toString());
+      openssl.copyFileFromContainer("/certs/server.key", dir.resolve("server.key").toString());
+      runKeytool(
+          System.getProperty("java.home") + "/bin/keytool",
+          "-importcert",
+          "-alias",
+          "mqtt-test-ca",
+          "-keystore",
+          dir.resolve("mqtt-truststore.p12").toString(),
+          "-storetype",
+          "PKCS12",
+          "-storepass",
+          MQTT_TRUSTSTORE_PASSWORD,
+          "-noprompt",
+          "-file",
+          dir.resolve("ca.crt").toString());
+      return dir;
+    } catch (Exception e) {
+      throw new IllegalStateException("failed to generate MQTT test PKI", e);
+    } finally {
+      openssl.stop();
     }
   }
 
@@ -361,9 +523,17 @@ class NifiDataFlowIT extends AbstractNifiIT {
     private final MqttClient mqtt;
 
     MqttPublisher(String brokerUrl, String clientId) throws Exception {
+      this(brokerUrl, clientId, null);
+    }
+
+    MqttPublisher(String brokerUrl, String clientId, SSLContext sslContext) throws Exception {
       mqtt = new MqttClient(brokerUrl, clientId, new MemoryPersistence());
       MqttConnectOptions options = new MqttConnectOptions();
       options.setCleanSession(true);
+      if (sslContext != null) {
+        options.setSocketFactory(sslContext.getSocketFactory());
+        options.setHttpsHostnameVerificationEnabled(true);
+      }
       mqtt.connect(options);
     }
 

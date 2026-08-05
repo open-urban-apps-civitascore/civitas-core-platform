@@ -20,6 +20,10 @@ script:post-response {
     if (match) {
       bru.setVar('sagaDataSinkId', match.id);
     }
+    const postgis = res.body.content.find(s => s.dataSinkType === 'POSTGIS');
+    if (postgis) {
+      bru.setVar('sagaPostgisDataSinkId', postgis.id);
+    }
   }
 }
 
@@ -32,9 +36,9 @@ tests {
 }
 
 docs {
-  **Purpose:** Idempotency guard — checks whether the FROST DataSink for the existing dataset already exists. If found, `sagaDataSinkId` is populated so step 4c can be skipped (a repeated POST would create a duplicate sink) and cleanup step 12b targets the correct record.
+  **Purpose:** Idempotency guard — checks whether the dataset's DataSinks already exist. If found, `sagaDataSinkId` (FROST) and `sagaPostgisDataSinkId` (POSTGIS) are populated so steps 4c/4d can be skipped (a repeated POST would create a duplicate sink) and cleanup steps 12b/12c target the correct records.
 
   **Expected Response:** 200 OK with paginated list, or 400/404 if the dataset does not exist yet (first run).
 
-  **Post-condition:** If a FROST sink is found, saves `sagaDataSinkId` from `body.content[].id`.
+  **Post-condition:** If found, saves `sagaDataSinkId` and `sagaPostgisDataSinkId` from `body.content[].id`.
 }

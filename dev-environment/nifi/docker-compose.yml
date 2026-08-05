@@ -98,6 +98,22 @@ services:
     networks:
       - civitas-network
 
+  # One-shot, run via: docker compose run --rm nifi-parameter-contexts
+  # The sensitive truststore password reaches the SSL context service through a parameter context,
+  # never through the deployed flow, so without this every MQTT-TLS pipeline deploy fails validation.
+  # Kept out of `up` (profile) because a task container that exits would fail a `--wait` startup.
+  nifi-parameter-contexts:
+    profiles: [seed]
+    image: curlimages/curl:8.11.1
+    entrypoint: ["sh", "/provision-parameter-contexts.sh"]
+    environment:
+      NIFI_SECURITY_USER_OIDC_CLIENT_SECRET: "${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}"
+      TRUSTSTORE_PASSWORD: "changeit"
+    volumes:
+      - ./provision-parameter-contexts.sh:/provision-parameter-contexts.sh:ro
+    networks:
+      - civitas-network
+
 volumes:
   nifi_database_repository:
   nifi_flowfile_repository:

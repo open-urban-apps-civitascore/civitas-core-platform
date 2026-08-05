@@ -79,15 +79,18 @@ public class LayerService extends BaseService<Layer, LayerInputDTO> {
   }
 
   /**
-   * Rejects saves that would create a duplicate layerName within the same dataSink.
+   * Rejects saves that would create a duplicate layerName within the same dataset. The dataset is
+   * the scope GeoServer publishes into — one workspace and one datastore per dataset, addressing
+   * feature types by layer name alone — so two sinks of one dataset cannot carry the same layer
+   * name even though they are distinct parents.
    *
    * @throws UniqueConstraintViolationException (409) if another Layer with the same layerName
-   *     exists in the dataSink
+   *     exists in the dataset
    */
   @Override
   protected Layer preSave(Layer entity) {
     layerRepository
-        .findByDataSinkIdAndLayerName(entity.getDataSink().getId(), entity.getLayerName())
+        .findByDataSetIdAndLayerName(entity.getDataSet().getId(), entity.getLayerName())
         .filter(existing -> !existing.getId().equals(entity.getId()))
         .ifPresent(
             _ -> {
@@ -95,8 +98,8 @@ public class LayerService extends BaseService<Layer, LayerInputDTO> {
                   getEntityName(),
                   "layerName",
                   entity.getLayerName(),
-                  "dataSinkId",
-                  entity.getDataSink().getId().toString());
+                  "dataSetId",
+                  entity.getDataSet().getId().toString());
             });
     return super.preSave(entity);
   }

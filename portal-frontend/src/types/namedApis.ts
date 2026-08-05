@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { LayerFormSchema } from './layers'
+import { LayersFormSchema } from './layers'
 import { StyleFormSchema } from './styles'
 
 export const SLUG_MAX_LENGTH = 32
@@ -141,7 +141,7 @@ export const OwsApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
   z.object({
     type: z.literal(API_TYPE_QUERY.OWS),
     baseInfo: NamedApiBaseInfoFormSchema({ existingSlugs }),
-    layers: z.array(LayerFormSchema),
+    layers: LayersFormSchema,
     styles: z.array(StyleFormSchema),
   })
 

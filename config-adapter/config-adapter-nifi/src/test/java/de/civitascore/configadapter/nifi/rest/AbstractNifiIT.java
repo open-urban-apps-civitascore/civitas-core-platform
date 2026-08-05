@@ -205,7 +205,7 @@ abstract class AbstractNifiIT {
     }
   }
 
-  private static void runKeytool(String... cmd) throws Exception {
+  protected static void runKeytool(String... cmd) throws Exception {
     Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
     if (!process.waitFor(60, TimeUnit.SECONDS)) {
       process.destroyForcibly();

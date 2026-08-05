@@ -1,11 +1,13 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 
 import { STATUS_TYPES } from '@/types/common'
 import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
 import { LayerFormData } from '@/types/layers'
-import { API_TYPE_QUERY, OwsApiFormData } from '@/types/namedApis'
+import { API_TYPE_QUERY, OwsApiFormData, OwsApiFormSchema } from '@/types/namedApis'
 import { Style } from '@/types/styles'
 
 import { LayerConfig } from './LayerConfig'
@@ -136,10 +138,88 @@ const Wrapper = ({
   )
 }
 
+const WrapperWithSchema = ({ layers, initialIndex }: { layers: LayerFormData[]; initialIndex: number }) => {
+  const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(initialIndex)
+  const form = useForm<OwsApiFormData>({
+    resolver: zodResolver(OwsApiFormSchema({ existingSlugs: [] })),
+    mode: 'onChange',
+    defaultValues: {
+      type: API_TYPE_QUERY.OWS,
+      baseInfo: { name: 'Test API', slug: 'test-api', description: '', persistence: 'postgis' },
+      layers,
+      styles: [],
+    },
+  })
+  return (
+    <FormProvider {...form}>
+      <LayerConfig
+        form={form}
+        styles={mockStyleList}
+        postgisDataSinks={[mockDataSink]}
+        postGisDatastructures={[mockDatastructureVersion]}
+        selectedLayerIndex={selectedLayerIndex}
+        isReadOnly={false}
+        onSelectLayer={setSelectedLayerIndex}
+        onAddLayer={vi.fn()}
+        onTableChange={vi.fn()}
+      />
+    </FormProvider>
+  )
+}
+
 describe('LayerConfig', () => {
   beforeEach(() => {
     layerIdCounter = 0
     vi.clearAllMocks()
+  })
+
+  describe('Duplicate layer name', () => {
+    const twoLayers = () => [
+      makeLayer({ title: 'Layer A', layerName: 'layer_a' }),
+      makeLayer({ title: 'Layer B', layerName: 'layer_b' }),
+    ]
+
+    it('shows an error on the edited layer when the name is already used by another layer', async () => {
+      render(<WrapperWithSchema layers={twoLayers()} initialIndex={1} />)
+
+      fireEvent.change(screen.getByTestId('layers.1.layerNameTextField'), { target: { value: 'layer_a' } })
+
+      expect(await screen.findByTestId('layers.1.layerNameFormMessage')).toHaveTextContent('common.errors.nameExists')
+    })
+
+    it('shows no error on the first layer holding the name', async () => {
+      render(<WrapperWithSchema layers={twoLayers()} initialIndex={1} />)
+      fireEvent.change(screen.getByTestId('layers.1.layerNameTextField'), { target: { value: 'layer_a' } })
+      await screen.findByTestId('layers.1.layerNameFormMessage')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Layer A' }))
+
+      expect(screen.queryByTestId('layers.0.layerNameFormMessage')).not.toBeInTheDocument()
+    })
+
+    it('shows no error on a third layer with a unique name', async () => {
+      const layers = [...twoLayers(), makeLayer({ title: 'Layer C', layerName: 'layer_c' })]
+      render(<WrapperWithSchema layers={layers} initialIndex={1} />)
+      fireEvent.change(screen.getByTestId('layers.1.layerNameTextField'), { target: { value: 'layer_a' } })
+      await screen.findByTestId('layers.1.layerNameFormMessage')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Layer C' }))
+
+      expect(screen.queryByTestId('layers.2.layerNameFormMessage')).not.toBeInTheDocument()
+    })
+
+    it('clears the error once the duplicate name is changed again', async () => {
+      render(<WrapperWithSchema layers={twoLayers()} initialIndex={1} />)
+      const layerNameField = screen.getByTestId('layers.1.layerNameTextField')
+      fireEvent.change(layerNameField, { target: { value: 'layer_a' } })
+      await screen.findByTestId('layers.1.layerNameFormMessage')
+
+      fireEvent.change(layerNameField, { target: { value: 'layer_b' } })
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('layers.1.layerNameFormMessage')).not.toBeInTheDocument()
+      })
+    })
   })
 
   describe('Rendering', () => {

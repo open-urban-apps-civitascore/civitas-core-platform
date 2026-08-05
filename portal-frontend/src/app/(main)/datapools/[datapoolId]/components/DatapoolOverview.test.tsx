@@ -80,6 +80,7 @@ const mockDatapool: Datapool = {
 const renderComponent = (datapool: Datapool = mockDatapool) => render(<DatapoolOverview datapool={datapool} />)
 
 const renderInEditMode = (datapool: Datapool = mockDatapool) => {
+  mockCurrentUser([PERMISSION_NAMES.DATAPOOL_UPDATE])
   mockSearchParams = new URLSearchParams('mode=edit')
   return render(<DatapoolOverview datapool={datapool} />)
 }
@@ -154,6 +155,16 @@ describe('DatapoolOverview', () => {
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       expect(screen.getByTestId('confirmButton')).toBeInTheDocument()
       expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
+    })
+
+    it('stays read-only when mode=edit param is present but the user lacks DATAPOOL_UPDATE', () => {
+      mockCurrentUser([])
+      mockSearchParams = new URLSearchParams('mode=edit')
+      render(<DatapoolOverview datapool={mockDatapool} />)
+
+      expect(screen.queryByTestId('confirmButton')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      expect(screen.getByTestId('nameTextField')).toBeDisabled()
     })
 
     it('enables form fields when mode=edit param is present', () => {

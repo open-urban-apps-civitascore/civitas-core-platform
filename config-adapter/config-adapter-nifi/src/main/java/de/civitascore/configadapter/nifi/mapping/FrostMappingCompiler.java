@@ -168,9 +168,19 @@ public class FrostMappingCompiler {
    * The two halves of one compilation: the flat mapping properties (for the UpdateRecord chain) and
    * the entity plan (for the sink's find-or-create chain).
    */
-  public record FrostCompilation(List<UpdateRecordProperty> flatProperties, FrostEntityPlan plan) {
+  public record FrostCompilation(
+      List<UpdateRecordProperty> flatProperties, FrostEntityPlan plan, ForkPlan fork) {
     public FrostCompilation {
       flatProperties = List.copyOf(flatProperties);
+    }
+
+    /**
+     * The flat properties paired with the fan-out they were compiled against. Handing the two out
+     * separately invites a caller to wrap the properties alone and lose the fork, which deploys a
+     * flow that quietly does not fan out.
+     */
+    public CompiledMapping mapping() {
+      return new CompiledMapping(flatProperties, fork);
     }
   }
 
@@ -202,11 +212,15 @@ public class FrostMappingCompiler {
       index++;
     }
 
+    // Every target is compiled into a flat sta_* field below, so no target keeps an array level:
+    // the declared Locations[]/Datastreams[]/Observations[] selectors are entity-tier markers, not
+    // arrays to preserve.
+    ForkPlan fork = ForkPlan.forMapping(normalizedMapping, false);
     List<UpdateRecordProperty> flatProperties = new ArrayList<>();
     for (Map.Entry<String, ValueNode> field : normalizedMapping.fields().entrySet()) {
       flatProperties.add(
           recordPathCompiler.compileField(
-              "/" + flatKeyByPath.get(field.getKey()), field.getValue()));
+              "/" + flatKeyByPath.get(field.getKey()), field.getValue(), fork));
     }
 
     boolean thingCreatable = hasCompleteCreateSet(normalizedMapping, StaEntity.THING);
@@ -249,7 +263,8 @@ public class FrostMappingCompiler {
             datastreamBodies.update(),
             datastreamBodies.sensor(),
             datastreamBodies.observedProperty(),
-            observationBody));
+            observationBody),
+        fork);
   }
 
   private EntityBodies renderThingBodies(

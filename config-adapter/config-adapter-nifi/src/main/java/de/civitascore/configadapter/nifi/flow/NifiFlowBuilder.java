@@ -185,7 +185,25 @@ public class NifiFlowBuilder {
     ObjectNode root = mapper.createObjectNode();
     root.set("flowContents", flow);
     root.putObject("externalControllerServices");
-    root.putObject("parameterContexts");
+    ObjectNode parameterContexts = root.putObject("parameterContexts");
+    sourceStage
+        .parameterContext(ctx)
+        .ifPresent(
+            context -> {
+              flow.put("parameterContextName", context.name());
+              ObjectNode parameterContext = parameterContexts.putObject(context.name());
+              parameterContext.put("name", context.name());
+              ArrayNode parameters = parameterContext.putArray("parameters");
+              for (SourceStage.ParameterSpec parameter : context.parameters()) {
+                ObjectNode declaration = parameters.addObject();
+                declaration.put("name", parameter.name());
+                declaration.put("description", parameter.description());
+                declaration.put("sensitive", parameter.sensitive());
+                declaration.put("provided", false);
+              }
+              parameterContext.putArray("inheritedParameterContexts");
+              parameterContext.put("componentType", "PARAMETER_CONTEXT");
+            });
     root.putObject("parameterProviders");
     root.put("flowEncodingVersion", "1.0");
     root.put("latest", false);

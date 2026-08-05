@@ -74,8 +74,9 @@ public final class CoreUrn {
           + NAME
           + ":(?<disambiguator>"
           + DISAMBIGUATOR
-          + "):"
-          + VERSION;
+          + "):(?<version>"
+          + VERSION
+          + ")";
 
   /** Compiled form of {@link #PATTERN}. */
   public static final Pattern COMPILED_PATTERN = Pattern.compile(PATTERN);
@@ -117,6 +118,27 @@ public final class CoreUrn {
         && "platform".equals(matcher.group("scope"))
         && "datastructure".equals(matcher.group("artifactType"))
         && matcher.group("disambiguator").equals(disambiguatorFor(id));
+  }
+
+  /**
+   * Whether two URNs name the same DataStructure at the same version, and therefore the same shape.
+   * Only the disambiguator and the version are compared: the disambiguator is derived from the
+   * DataStructure id and the version is the shape, while the name segment is a display name that a
+   * rename changes without touching the structure. Comparing the URNs verbatim would reject a chain
+   * whose shape never changed.
+   *
+   * @return false if either URN is null or malformed — an unverifiable pair is not a matching one
+   */
+  public static boolean sameStructureVersion(String one, String other) {
+    if (one == null || other == null) {
+      return false;
+    }
+    Matcher first = COMPILED_PATTERN.matcher(one);
+    Matcher second = COMPILED_PATTERN.matcher(other);
+    return first.matches()
+        && second.matches()
+        && first.group("disambiguator").equals(second.group("disambiguator"))
+        && first.group("version").equals(second.group("version"));
   }
 
   private CoreUrn() {}

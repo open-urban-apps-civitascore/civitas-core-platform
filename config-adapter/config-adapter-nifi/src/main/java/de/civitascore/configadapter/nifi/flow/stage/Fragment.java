@@ -22,6 +22,7 @@ public enum Fragment {
   QUERY_DATABASE_TABLE_RECORD("query_database_table_record"),
   CONVERT_RECORD("convert_record"),
   UPDATE_RECORD("update_record"),
+  FORK_RECORD("fork_record"),
   PUT_DATABASE_RECORD("put_database_record"),
   INVOKE_HTTP("invoke_http"),
   LOG_MESSAGE("log_message"),
@@ -31,6 +32,7 @@ public enum Fragment {
   ROUTE_ON_ATTRIBUTE("route_on_attribute"),
   JSON_TREE_READER("json_tree_reader"),
   JSON_RECORD_SET_WRITER("json_record_set_writer"),
+  MQTT_SSL_CONTEXT_SERVICE("mqtt_ssl_context_service"),
   DBCP_CONNECTION_POOL("dbcp_connection_pool");
 
   private final String resource;

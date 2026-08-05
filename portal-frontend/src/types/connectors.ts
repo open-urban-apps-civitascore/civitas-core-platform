@@ -84,13 +84,45 @@ const brokerUrlArray = (inner: z.ZodTypeAny) =>
     .preprocess(parseStringArray, inner)
     .refine(urls => !urls || (urls as string[]).every(isValidUri), 'datasources.errors.invalidBrokerUrl')
 
-export const MqttLooseSchema = MqttBaseSchema.partial().extend({
-  urls: brokerUrlArray(z.array(z.string()).optional()),
-  topics: singleTopic
-    .optional()
-    .transform(parseStringArray)
-    .pipe(z.array(z.string()).max(1, 'datasources.errors.topicSingle').optional()),
-})
+const MQTT_PLAINTEXT_SCHEMES = new Set(['tcp:', 'ws:', 'mqtt:'])
+const MQTT_TLS_SCHEMES = new Set(['ssl:', 'mqtts:', 'wss:'])
+
+const validateMqttSchemes = (configuration: { urls?: unknown; tls?: boolean }, ctx: z.RefinementCtx) => {
+  const urls = Array.isArray(configuration.urls)
+    ? configuration.urls.filter((url): url is string => typeof url === 'string')
+    : []
+  for (const value of urls) {
+    if (!isValidUri(value)) continue
+    const scheme = new URL(value).protocol.toLowerCase()
+    if (!MQTT_PLAINTEXT_SCHEMES.has(scheme) && !MQTT_TLS_SCHEMES.has(scheme)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['urls'],
+        message: 'datasources.errors.unsupportedBrokerScheme',
+      })
+      return
+    }
+    const schemeUsesTls = MQTT_TLS_SCHEMES.has(scheme)
+    if (schemeUsesTls !== (configuration.tls ?? false)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['urls'],
+        message: 'datasources.errors.brokerTlsMismatch',
+      })
+      return
+    }
+  }
+}
+
+export const MqttLooseSchema = MqttBaseSchema.partial()
+  .extend({
+    urls: brokerUrlArray(z.array(z.string()).optional()),
+    topics: singleTopic
+      .optional()
+      .transform(parseStringArray)
+      .pipe(z.array(z.string()).max(1, 'datasources.errors.topicSingle').optional()),
+  })
+  .superRefine(validateMqttSchemes)
 
 export const MqttStrictSchema = MqttBaseSchema.partial()
   .required({ qos: true })
@@ -100,6 +132,7 @@ export const MqttStrictSchema = MqttBaseSchema.partial()
       .transform(v => parseStringArray(v) ?? [])
       .pipe(z.array(z.string()).min(1, 'common.errors.required').max(1, 'datasources.errors.topicSingle')),
   })
+  .superRefine(validateMqttSchemes)
 
 export const MqttApiToFormSchema = MqttApiResponseSchema.transform(({ urls, topics, tls, qos, ...rest }) => ({
   ...Object.fromEntries(

@@ -11,6 +11,7 @@ package de.civitascore.configadapter.nifi.mapping;
 
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * The compiled output of one mapping node — the unit the flow builder turns into that node's own
@@ -18,9 +19,13 @@ import java.util.List;
  * compiled properties separate so the processors materialize per node, in flow order.
  *
  * @param properties the node's {@code UpdateRecord} properties, in mapping order
+ * @param fork the array fan-out this node needs ahead of its own properties; the properties are
+ *     already compiled against the post-fork record shape
  */
-public record CompiledMapping(List<UpdateRecordProperty> properties) implements CompiledTransform {
+public record CompiledMapping(List<UpdateRecordProperty> properties, ForkPlan fork)
+    implements CompiledTransform {
   public CompiledMapping {
     properties = List.copyOf(properties);
+    Objects.requireNonNull(fork, "fork");
   }
 }

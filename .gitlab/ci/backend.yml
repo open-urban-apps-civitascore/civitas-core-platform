@@ -318,6 +318,8 @@ api-test-backend:
       }
     # Seed APISIX routes (services, plugin config, portal-backend route)
     - docker compose -p api-test $COMPOSE_FILES run --rm apisix-seed
+    # Provision the NiFi parameter context the MQTT-TLS flows resolve their truststore password from
+    - docker compose -p api-test $COMPOSE_FILES run --rm nifi-parameter-contexts
     # Run Bruno API tests from a container on the same Compose network
     - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
     - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/

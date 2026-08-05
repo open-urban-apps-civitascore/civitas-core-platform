@@ -61,12 +61,12 @@ export const DatapoolOverview = (props: DatapoolOverviewProps) => {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const { subTabValue, setSubTabValueParam } = useQueryParams()
-  const isReadOnly = !isCreateMode && searchParams.get('mode') !== 'edit'
-  const [savedAssignments, setSavedAssignments] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
-  const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
-
   const { hasScopedPermission } = usePermissions()
   const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATAPOOL_UPDATE, ASSIGNMENT_SCOPE_TYPES.DATAPOOL, datapool.id)
+
+  const isReadOnly = !isCreateMode && (searchParams.get('mode') !== 'edit' || !canUpdate)
+  const [savedAssignments, setSavedAssignments] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
+  const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
 
   const { mutateAsync: createDatapool, isPending: isCreating } = useCreateDatapool()
   const { mutate: updateDatapool, isPending: isUpdating } = usePatchDatapool()
