@@ -1137,7 +1137,7 @@
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
       "versionAlreadyExists": "Es existiert bereits eine Version mit der gleichen Versionsnummer in dieser Datenstruktur.",
       "versionFormat": "Die Versionsnummer muss dem Format X.Y.Z folgen (z. B. 1.0.0).",
-      "releaseInvalidModel": "Die Version kann nicht veröffentlicht werden: {reason}"
+      "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}"
     }
   },
   "pipelineEditor": {
@@ -1454,7 +1454,7 @@
     "rootValidation": {
       "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",
       "ambiguousRoot": "Das Diagramm hat mehrere mögliche Wurzelklassen ({names}). Markieren Sie die Wurzelklasse in den Klasseneigenschaften oder verbinden Sie die Klassen zu einer Hierarchie.",
-      "unreachable": "Diese Elemente sind von der Wurzelklasse „{root}“ aus nicht erreichbar: {names}. Verbinden Sie sie mit der Hierarchie oder entfernen Sie sie."
+      "misdirected": "Die Beziehung zwischen {name1} und {name2} ist falsch herum gezeichnet."
     }
   },
   "datapools": {

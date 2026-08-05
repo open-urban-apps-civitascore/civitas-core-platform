@@ -6,6 +6,7 @@ import { RELATIONSHIP_PALETTE_ITEMS } from '../../constants/paletteItems'
 import { MULTIPLICITY_VALUES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
+import { findNodeById, isRelationshipAllowedBetween } from '../../services/diagramService'
 import type { UMLEdge } from '../../types/diagram'
 import type { UMLRelationshipType } from '../../types/uml'
 
@@ -14,13 +15,26 @@ const RELATIONSHIP_TYPE_OPTIONS = RELATIONSHIP_PALETTE_ITEMS.map(item => ({ valu
 
 interface EdgePropertyEditorProps {
   edge: UMLEdge
+  /** Off until navigability is supported end to end. */
+  isNavigationVisible?: boolean
 }
 
-export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) => {
-  const { updateEdge } = useActiveDiagram()
+export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge, isNavigationVisible = false }) => {
+  const { diagram, updateEdge } = useActiveDiagram()
   const { isReadOnly } = useReadOnly()
 
   const relationship = edge.data.relationship
+
+  // The current type is kept even when disallowed, so a legacy edge does not read as another type.
+  const sourceType = findNodeById(diagram, edge.source)?.data.element.type
+  const targetType = findNodeById(diagram, edge.target)?.data.element.type
+  const typeOptions =
+    sourceType && targetType
+      ? RELATIONSHIP_TYPE_OPTIONS.filter(
+          option =>
+            option.value === relationship.type || isRelationshipAllowedBetween(sourceType, targetType, option.value),
+        )
+      : RELATIONSHIP_TYPE_OPTIONS
 
   const handleTypeChange = useCallback(
     (event: ChangeEvent<HTMLSelectElement>) => {
@@ -95,7 +109,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           disabled={isReadOnly}
         >
-          {RELATIONSHIP_TYPE_OPTIONS.map(type => (
+          {typeOptions.map(type => (
             <option key={type.value} value={type.value}>
               {type.label}
             </option>
@@ -179,39 +193,41 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
       </div>
 
       {/* Navigation Properties */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-gray-700">Navigation</h4>
+      {isNavigationVisible && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-gray-700">Navigation</h4>
 
-        <div className="space-y-2">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id={`navigable-${edge.id}`}
-              checked={relationship.isNavigable || false}
-              onChange={handleNavigableChange}
-              className="mr-2"
-              disabled={isReadOnly}
-            />
-            <label htmlFor={`navigable-${edge.id}`} className="text-sm text-gray-600">
-              Navigable relationship
-            </label>
-          </div>
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id={`navigable-${edge.id}`}
+                checked={relationship.isNavigable || false}
+                onChange={handleNavigableChange}
+                className="mr-2"
+                disabled={isReadOnly}
+              />
+              <label htmlFor={`navigable-${edge.id}`} className="text-sm text-gray-600">
+                Navigable relationship
+              </label>
+            </div>
 
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id={`bidirectional-${edge.id}`}
-              checked={relationship.isBidirectional || false}
-              onChange={handleBidirectionalChange}
-              className="mr-2"
-              disabled={isReadOnly}
-            />
-            <label htmlFor={`bidirectional-${edge.id}`} className="text-sm text-gray-600">
-              Bidirectional navigation
-            </label>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id={`bidirectional-${edge.id}`}
+                checked={relationship.isBidirectional || false}
+                onChange={handleBidirectionalChange}
+                className="mr-2"
+                disabled={isReadOnly}
+              />
+              <label htmlFor={`bidirectional-${edge.id}`} className="text-sm text-gray-600">
+                Bidirectional navigation
+              </label>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Relationship Info */}
       <div className="bg-gray-50 p-3 rounded-md">
