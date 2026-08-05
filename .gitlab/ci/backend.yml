@@ -18,6 +18,22 @@
         - .gitlab/ci/backend.yml
         - .gitlab/ci/portal-model.yml # Also run when portal-model changes since backend depends on it
 
+# Resolve which config-adapter version the backend builds against.
+# Prefer the per-MR snapshot (set by setup-version-config-adapter and published
+# before the build stage when an MR also changes config-adapter) if it exists in
+# the registry; otherwise fall back to the pin in portal-backend/pom.xml.
+# Exported as CA_OVERRIDE, appended to the backend mvn calls (empty => pom pin).
+.resolve-config-adapter-version:
+  - |
+    CA_OVERRIDE=""
+    if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ] && [ -n "$CONFIG_ADAPTER_VERSION" ]; then
+      PROBE_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven/de/civitas-core/config-adapter-api/${CONFIG_ADAPTER_VERSION}/maven-metadata.xml"
+      HTTP_CODE=$(curl -sL --max-time 30 -o /dev/null -w '%{http_code}' -H "JOB-TOKEN: ${CI_JOB_TOKEN}" "$PROBE_URL") || HTTP_CODE="000"
+      if [ "$HTTP_CODE" = "200" ]; then
+        CA_OVERRIDE="-Dconfig-adapter.version=${CONFIG_ADAPTER_VERSION}"
+      fi
+    fi
+    export CA_OVERRIDE
 
 # Generate maven dependency graph JSON for license scanning
 # This must always run (needs: []) to ensure dependency scanning has the graph
@@ -83,6 +99,10 @@ dependency-prune-backend:
       artifacts: true
     - job: publish-portal-model
       optional: true
+    - job: setup-version-config-adapter
+      artifacts: true
+    - job: publish-config-adapter
+      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -92,9 +112,12 @@ dependency-prune-backend:
         - portal-backend/pom.xml
     paths:
       - .m2/repository
-  script:
+  before_script:
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
+    - !reference [.resolve-config-adapter-version]
     - cd portal-backend
-    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Dportal-model.version=$PORTAL_MODEL_VERSION -DfailOnWarning=true -DignoreNonCompile=false -s ci_settings.xml
+  script:
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Dportal-model.version=$PORTAL_MODEL_VERSION $CA_OVERRIDE -DfailOnWarning=true -DignoreNonCompile=false -s ci_settings.xml
 
 test-backend:
   extends: .only-backend-changes
@@ -106,6 +129,8 @@ test-backend:
     - job: setup-version
       artifacts: true
     - job: setup-version-portal-model
+      artifacts: true
+    - job: setup-version-config-adapter
       artifacts: true
     - job: publish-config-adapter
       optional: true
@@ -121,10 +146,11 @@ test-backend:
       - .m2/repository
   before_script:
     - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
+    - !reference [.resolve-config-adapter-version]
     - cd portal-backend
   script:
     # Compile test sources, then run unit tests
-    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent surefire:test jacoco:report -Dportal-model.version=$PORTAL_MODEL_VERSION -s ci_settings.xml
+    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent surefire:test jacoco:report -Dportal-model.version=$PORTAL_MODEL_VERSION $CA_OVERRIDE -s ci_settings.xml
   artifacts:
     when: always
     expire_in: 1 month
@@ -147,6 +173,8 @@ integration-test-backend:
       artifacts: true
     - job: setup-version-portal-model
       artifacts: true
+    - job: setup-version-config-adapter
+      artifacts: true
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
@@ -166,10 +194,11 @@ integration-test-backend:
       - .m2/repository
   before_script:
     - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
+    - !reference [.resolve-config-adapter-version]
     - cd portal-backend
   script:
     # Compile test sources, then run integration tests only. Saga-tagged tests are excluded via pom.xml (run in saga-e2e-test-backend)
-    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION
+    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION $CA_OVERRIDE
   artifacts:
     when: always
     expire_in: 1 month
@@ -193,6 +222,8 @@ saga-e2e-test-backend:
     - job: setup-version
       artifacts: true
     - job: setup-version-portal-model
+      artifacts: true
+    - job: setup-version-config-adapter
       artifacts: true
     - job: publish-config-adapter
       optional: true
@@ -225,9 +256,10 @@ saga-e2e-test-backend:
       - .m2/repository
   before_script:
     - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
+    - !reference [.resolve-config-adapter-version]
     - cd portal-backend
   script:
-    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION -Psaga -Dfailsafe.rerunFailingTestsCount=1
+    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION $CA_OVERRIDE -Psaga -Dfailsafe.rerunFailingTestsCount=1
   artifacts:
     when: always
     expire_in: 1 month
@@ -394,6 +426,8 @@ build-backend:
       artifacts: true
     - job: setup-version-portal-model
       artifacts: true
+    - job: setup-version-config-adapter
+      artifacts: true
     - lint-backend
     - job: publish-config-adapter
       optional: true
@@ -409,11 +443,12 @@ build-backend:
       - .m2/repository
   before_script:
     - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
+    - !reference [.resolve-config-adapter-version]
     - cd portal-backend
   script:
     # Use GitLab Maven repository for config-adapter and portal-model dependencies
     - |
-      mvn package -DskipTests -Dportal-model.version=$PORTAL_MODEL_VERSION -s ci_settings.xml
+      mvn package -DskipTests -Dportal-model.version=$PORTAL_MODEL_VERSION $CA_OVERRIDE -s ci_settings.xml
   artifacts:
     when: on_success
     paths:
