@@ -15,6 +15,7 @@ const mockStageDataset = vi.fn().mockResolvedValue(undefined)
 const mockUnstageDataset = vi.fn().mockResolvedValue(undefined)
 const mockReleaseDataset = vi.fn().mockResolvedValue(undefined)
 const mockUnreleaseDataset = vi.fn().mockResolvedValue(undefined)
+const mockUpdateReadyDatasetMeta = vi.fn().mockResolvedValue(undefined)
 const mockUpdateReleasedDatasetMeta = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
@@ -23,6 +24,7 @@ vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   useUnstageDataset: () => ({ mutateAsync: mockUnstageDataset, isPending: false }),
   useReleaseDataset: () => ({ mutateAsync: mockReleaseDataset, isPending: false }),
   useUnreleaseDataset: () => ({ mutateAsync: mockUnreleaseDataset, isPending: false }),
+  useUpdateReadyDatasetMeta: () => ({ mutateAsync: mockUpdateReadyDatasetMeta, isPending: false }),
   useUpdateReleasedDatasetMeta: () => ({ mutateAsync: mockUpdateReleasedDatasetMeta, isPending: false }),
   useGetDataset: () => ({ data: undefined }),
 }))
@@ -177,6 +179,18 @@ describe('DatasetOverview', () => {
       mockCurrentUserWithDatapoolScope([PERMISSION_NAMES.DATASET_UPDATE], 'pool-1')
       renderComponent({ dataset: makeDraftDataset({ id: 'test-id', datapool: null }) })
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+    })
+
+    it('hides Edit button on an AVAILABLE dataset when user lacks DATASET_RELEASE permission', () => {
+      mockCurrentUser([PERMISSION_NAMES.DATASET_UPDATE])
+      renderComponent({ dataset: makeDraftDataset({ dataSetStatus: 'AVAILABLE' }) })
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+    })
+
+    it('shows Edit button on a READY dataset when user has only DATASET_UPDATE permission', () => {
+      mockCurrentUser([PERMISSION_NAMES.DATASET_UPDATE])
+      renderComponent({ dataset: makeDraftDataset({ dataSetStatus: 'READY' }) })
+      expect(screen.getByTestId('editButton')).toBeInTheDocument()
     })
 
     it('always shows access management completion card', () => {
@@ -502,6 +516,32 @@ describe('DatasetOverview', () => {
         expect(mockUnreleaseDataset).toHaveBeenCalledWith('test-id')
         expect(mockUnstageDataset).toHaveBeenCalledWith('test-id')
       })
+    })
+
+    it('calls updateReadyDatasetMeta when saving form changes on a READY dataset', async () => {
+      renderComponent({
+        dataset: makeDraftDataset({
+          dataSetStatus: 'READY',
+          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
+        }),
+        groupCount: 1,
+        roleCount: 1,
+      })
+      clickEditButton()
+
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
+      })
+
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(mockUpdateReadyDatasetMeta).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'Updated Name', id: 'test-id' }),
+        )
+      })
+      expect(mockUpdateReleasedDatasetMeta).not.toHaveBeenCalled()
+      expect(mockPatchDataset).not.toHaveBeenCalled()
     })
 
     it('calls updateReleasedDatasetMeta when saving form changes on an AVAILABLE dataset', async () => {

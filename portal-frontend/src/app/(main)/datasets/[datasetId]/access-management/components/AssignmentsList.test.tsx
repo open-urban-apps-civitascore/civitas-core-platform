@@ -13,6 +13,7 @@ import { hasAssignmentChanges } from '@/utils/assignments'
 import { AssignmentsList } from './AssignmentsList'
 
 const mockPatchDataset = vi.fn().mockResolvedValue(undefined)
+const mockUpdateReadyMeta = vi.fn().mockResolvedValue(undefined)
 const mockUpdateReleasedMeta = vi.fn().mockResolvedValue(undefined)
 const mockPush = vi.fn()
 const mockRefresh = vi.fn()
@@ -20,6 +21,7 @@ let mockSearchParams = new URLSearchParams()
 
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   usePatchDataset: () => ({ mutateAsync: mockPatchDataset, isPending: false }),
+  useUpdateReadyDatasetMeta: () => ({ mutateAsync: mockUpdateReadyMeta, isPending: false }),
   useUpdateReleasedDatasetMeta: () => ({ mutateAsync: mockUpdateReleasedMeta, isPending: false }),
 }))
 
@@ -97,6 +99,7 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
 
 const allPermissions = [
   PERMISSION_NAMES.DATASET_UPDATE,
+  PERMISSION_NAMES.DATASET_RELEASE,
   PERMISSION_NAMES.DATASTRUCTURE_READ,
   PERMISSION_NAMES.GROUP_READ,
   PERMISSION_NAMES.ROLE_READ,
@@ -261,29 +264,39 @@ describe('AssignmentsList', () => {
         assignments: [{ groupId: '1', roleId: '1' }],
       }),
     )
+    expect(mockUpdateReadyMeta).not.toHaveBeenCalled()
     expect(mockUpdateReleasedMeta).not.toHaveBeenCalled()
   })
 
-  it.each(['READY', 'AVAILABLE'] as const)(
-    'sends the assignments together with the unchanged metadata to released/meta in %s status',
-    async dataSetStatus => {
-      vi.mocked(hasAssignmentChanges).mockReturnValue(true)
-      renderList(mockAssignments, { dataSetStatus })
+  const unchangedMetaPayload = {
+    id: 'ds-1',
+    name: 'Test Dataset',
+    description: 'A test dataset',
+    openDataAccess: false,
+    assignments: [{ groupId: '1', roleId: '1' }],
+  }
 
-      await submitInEditMode()
+  it('sends the assignments together with the unchanged metadata to ready/meta in READY status', async () => {
+    vi.mocked(hasAssignmentChanges).mockReturnValue(true)
+    renderList(mockAssignments, { dataSetStatus: 'READY' })
 
-      await waitFor(() =>
-        expect(mockUpdateReleasedMeta).toHaveBeenCalledWith({
-          id: 'ds-1',
-          name: 'Test Dataset',
-          description: 'A test dataset',
-          openDataAccess: false,
-          assignments: [{ groupId: '1', roleId: '1' }],
-        }),
-      )
-      expect(mockPatchDataset).not.toHaveBeenCalled()
-    },
-  )
+    await submitInEditMode()
+
+    await waitFor(() => expect(mockUpdateReadyMeta).toHaveBeenCalledWith(unchangedMetaPayload))
+    expect(mockPatchDataset).not.toHaveBeenCalled()
+    expect(mockUpdateReleasedMeta).not.toHaveBeenCalled()
+  })
+
+  it('sends the assignments together with the unchanged metadata to released/meta in AVAILABLE status', async () => {
+    vi.mocked(hasAssignmentChanges).mockReturnValue(true)
+    renderList(mockAssignments, { dataSetStatus: 'AVAILABLE' })
+
+    await submitInEditMode()
+
+    await waitFor(() => expect(mockUpdateReleasedMeta).toHaveBeenCalledWith(unchangedMetaPayload))
+    expect(mockPatchDataset).not.toHaveBeenCalled()
+    expect(mockUpdateReadyMeta).not.toHaveBeenCalled()
+  })
 
   it('shows the provisioning hint when released/meta conflicts with an in-flight saga', async () => {
     mockUpdateReleasedMeta.mockRejectedValueOnce({ response: { status: 409 } })
@@ -311,6 +324,30 @@ describe('AssignmentsList', () => {
     renderList()
 
     expect(screen.queryByRole('button', { name: /bearbeiten/i })).not.toBeInTheDocument()
+  })
+
+  it('hides the edit button on an AVAILABLE dataset when the user must not release the dataset', () => {
+    mockCurrentUser([
+      PERMISSION_NAMES.DATASET_UPDATE,
+      PERMISSION_NAMES.DATASTRUCTURE_READ,
+      PERMISSION_NAMES.GROUP_READ,
+      PERMISSION_NAMES.ROLE_READ,
+    ])
+    renderList(mockAssignments, { dataSetStatus: 'AVAILABLE' })
+
+    expect(screen.queryByRole('button', { name: /bearbeiten/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the edit button on a READY dataset without the release permission', () => {
+    mockCurrentUser([
+      PERMISSION_NAMES.DATASET_UPDATE,
+      PERMISSION_NAMES.DATASTRUCTURE_READ,
+      PERMISSION_NAMES.GROUP_READ,
+      PERMISSION_NAMES.ROLE_READ,
+    ])
+    renderList(mockAssignments, { dataSetStatus: 'READY' })
+
+    expect(screen.getByRole('button', { name: /bearbeiten/i })).toBeInTheDocument()
   })
 
   it('stays read-only on a mode=edit deep link when the user must not update the dataset', () => {
