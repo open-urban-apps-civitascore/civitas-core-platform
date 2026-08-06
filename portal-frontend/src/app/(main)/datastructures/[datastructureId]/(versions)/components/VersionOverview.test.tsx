@@ -479,6 +479,31 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(screen.getByTestId('descriptionTextArea')).toHaveAttribute('aria-invalid', 'false')
       expect(screen.queryByText(messages.common.errors.required)).not.toBeInTheDocument()
     })
+
+    it('disables the save button while a required field is empty at status AVAILABLE', async () => {
+      const user = userEvent.setup()
+      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
+      renderComponent({ version: mockVersionWithModel })
+
+      await selectAvailableStatus(user)
+      expect(screen.getAllByTestId('confirmButton')[0]).toBeEnabled()
+
+      await user.clear(screen.getByTestId('descriptionTextArea'))
+
+      await waitFor(() => {
+        expect(screen.getAllByTestId('confirmButton')[0]).toBeDisabled()
+      })
+    })
+
+    it('keeps the save button enabled with an empty description at status DRAFT', async () => {
+      const user = userEvent.setup()
+      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
+      renderComponent({ version: mockVersionWithModel })
+
+      await user.clear(screen.getByTestId('descriptionTextArea'))
+
+      expect(screen.getAllByTestId('confirmButton')[0]).toBeEnabled()
+    })
   })
 
   describe('save button', () => {

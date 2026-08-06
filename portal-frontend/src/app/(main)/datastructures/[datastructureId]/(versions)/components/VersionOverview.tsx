@@ -224,8 +224,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     return undefined
   }, [isInUse, isLastAvailableVersionInAvailableDatastructure, t])
 
-  const isConfirmButtonDisabled =
-    !hasUserChanges || !!form.formState.errors.version || !!versionAlreadyExistsError || isLoading
+  const isConfirmButtonDisabled = !hasUserChanges || !form.formState.isValid || !!versionAlreadyExistsError || isLoading
 
   const renderTabContent = () => {
     switch (subTabValue) {
