@@ -34,7 +34,7 @@ PMD, CPD and SpotBugs are bound per-module at `verify` with `failOnViolation`/`f
 
 - Every module depends on `config-adapter-api` alone; adapters never depend on one another.
 - `config-adapter-application` depends on all of them, discovers plugins via ServiceLoader, and shades the fat JAR.
-- `config-adapter-nifi` is saga-only: it registers a `SagaCommandHandler` and no `ConfigAdapter`, so it is unreachable over the CloudEvent path. Read [`config-adapter-nifi/CONTEXT.md`](config-adapter-nifi/CONTEXT.md) before touching its `flow`, `graph` or `mapping` packages.
+- `config-adapter-nifi` is saga-only: it registers a `SagaCommandHandler` and no `ConfigAdapter`, so it is unreachable over the CloudEvent path.
 - `config-adapter-flowable` embeds the Flowable engine with PostgreSQL state and orchestrates every saga. BPMN process definitions live under its `src/main/resources/processes/`.
 
 ### Core Pattern: Template Method + ServiceLoader
@@ -101,6 +101,5 @@ Runtime config: `config-adapter-application/src/main/resources/application.prope
 
 ## Further reading
 
-- [`config-adapter-nifi/CONTEXT.md`](config-adapter-nifi/CONTEXT.md) — domain vocabulary of the NiFi pipeline-flow subsystem
 - [`DEPLOYMENT.md`](DEPLOYMENT.md) — operator-facing configuration for the whole application
 - [`docs/adr-plain-jdbc-ddl.md`](docs/adr-plain-jdbc-ddl.md) — ADR on plain JDBC for DDL

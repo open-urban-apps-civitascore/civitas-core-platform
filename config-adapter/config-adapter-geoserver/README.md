@@ -1,7 +1,7 @@
 # GeoServer Config Adapter
 
-Drives the [GeoServer](https://geoserver.org/) management REST API — workspaces, datastores, feature types, coverage
-stores, coverages, styles and layers. Two entry points: a config adapter applying one CloudEvent to one REST resource,
+Drives the [GeoServer Cloud](https://geoserver.org/geoserver-cloud/) management REST API — workspaces, datastores,
+feature types, coverage stores, coverages, styles and layers. Two entry points: a config adapter applying one CloudEvent to one REST resource,
 and a saga command handler publishing a dataset's PostGIS tables as WFS/WMS layers. Data-plane access to the WFS/WMS
 endpoints is authorized by the gateway, not here.
 
