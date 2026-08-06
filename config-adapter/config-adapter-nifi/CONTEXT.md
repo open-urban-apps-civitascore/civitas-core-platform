@@ -1,6 +1,6 @@
 # Config Adapter (NiFi) — Context Glossary
 
-A glossary of the domain language used in `config-adapter-nifi`'s pipeline-flow subsystem.
+A glossary of the domain language used in this module's pipeline-flow subsystem.
 Definitions only — no implementation details, no specs. When a term here conflicts with how
 code or conversation uses it, the conflict must be resolved and this file updated.
 
@@ -38,8 +38,8 @@ knowing before extending this: the handover between neighbours is checked on dec
 structure URNs rather than on real shapes, and a node deriving a fan-out from its own source
 paths is blind to a fan-out an earlier node already applied (the array is gone from the
 record, so its `ForkRecord` fails loudly on the `failure` route). Carrying the emitted shape
-along the chain is the change that would fix these at the root; until then, treat a
-multi-node mapping chain as a thin path rather than a supported general case.
+along the chain is the change that would fix these at the root; a multi-node
+mapping chain is a thin path rather than a supported general case.
 
 ## Stage
 
@@ -67,7 +67,7 @@ by the sink's own stage; the deployment request stays sink-agnostic.
 ## Sink Pre-Region
 
 A plan-time handoff from the transform compilation to the sink's build region — data only the
-compilation can produce but only the sink consumes (today: the FROST entity plan for a mapped
+compilation can produce but only the sink consumes (the FROST entity plan for a mapped
 FROST sink). The slot is sink-neutral; each sink validates in its build half that it received a
 variant it can consume and rejects any other.
 

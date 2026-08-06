@@ -1,607 +1,152 @@
 # GeoServer Config Adapter
 
-Production-ready adapter for managing [GeoServer](https://geoserver.org/) OGC geo service configuration through CloudEvents.
+Drives the [GeoServer](https://geoserver.org/) management REST API — workspaces, datastores, feature types, coverage
+stores, coverages, styles and layers. Two entry points: a config adapter applying one CloudEvent to one REST resource,
+and a saga command handler publishing a dataset's PostGIS tables as WFS/WMS layers. Data-plane access to the WFS/WMS
+endpoints is authorized by the gateway, not here.
 
-## Overview
+## Config event operations
 
-The GeoServer adapter integrates with the [GeoServer REST API](https://docs.geoserver.org/stable/en/user/rest/) to manage geo service entities. It consumes CloudEvents from Kafka and translates them into GeoServer REST API calls, enabling automated provisioning of workspaces, datastores, feature types, layers, and styles.
+`targetResource` is the REST path relative to `/rest/`. The resource type is the last collection keyword at an even
+path index; the last segment is the resource name unless it is itself a collection keyword. CREATE, UPDATE and
+DELETE are accepted for every resolved type, with the body taken from `config.value`.
 
-**Key Features:**
-- Full CRUD operations for GeoServer resources (workspaces, datastores, feature types, layers, styles)
-- Typed configuration model per resource type with `toApiMap()` producing the exact GeoServer REST body
-- HTTP Basic Auth for the GeoServer management REST API (data access secured by APISIX + OPA upstream)
-- Automatic `?recurse=true` on deletes of workspaces, datastores, coverage stores, feature types, and coverages
-- Idempotent operations: HTTP 409 on CREATE and HTTP 404 on DELETE are treated as success
-- Asynchronous result publishing via CloudEvents
-- Saga command handler for atomic workspace provisioning (PROVISION_WORKSPACE)
+| Resource type | Collection path | `recurse=true` on DELETE |
+|---|---|:--:|
+| Workspace | `workspaces` | yes |
+| Datastore | `workspaces/{ws}/datastores` | yes |
+| Coverage store | `workspaces/{ws}/coveragestores` | yes |
+| Feature type | `workspaces/{ws}/datastores/{ds}/featuretypes` | yes |
+| Coverage | `workspaces/{ws}/coveragestores/{cs}/coverages` | yes |
+| Style | `styles`, `workspaces/{ws}/styles` | no |
+| Layer | `layers`, `workspaces/{ws}/layers` | no |
 
-## Architecture
+A store delete would otherwise leave orphaned layers, and a feature-type or coverage delete fails while its published
+layer references it; styles and layers stay non-recursive so a shared style is never cascade-deleted.
 
-```text
-┌──────────────────────────┐
-│    Kafka Topics          │
-│  - geo.workspace.*       │
-│  - geo.datastore.*       │
-│  - geo.featuretype.*     │
-│  - geo.layer.*           │
-│  - geo.style.*           │
-└───────────┬──────────────┘
-            │ CloudEvents
-            ↓
-┌───────────────────────────────┐
-│    GeoServerAdapter           │
-│  - JAX-RS Client              │
-│  - Basic Auth                 │
-│  - Typed config models        │
-│  - Error Handling             │
-└───────────┬───────────────────┘
-            │ REST API (/rest)
-            ↓
-┌────────────────────────────────┐
-│   GeoServer (Cloud)            │
-│  - Workspace management        │
-│  - PostGIS Datastore           │
-│  - Feature Types (WFS)         │
-│  - Layers (WMS)                │
-│  - Styles (SLD)                │
-└────────────┬───────────────────┘
-             │
-┌────────────▼───────────────────┐
-│  Data Access (not this adapter)│
-│  - APISIX (routing)            │
-│  - OPA (authorization)         │
-└────────────────────────────────┘
-```
+Rejected: a `/`-delimited path segment outside `A-Za-z0-9_-` (excluding `.`/`..` traversal, empty segments,
+percent-encoding, backslashes); a path resolving to no known collection type, including `layergroups` and
+`namespaces`; UPDATE or DELETE without a resource name; CREATE or UPDATE without a `config.value`; any operation
+other than the three above.
 
-> **Authentication boundary:** This adapter authenticates to the GeoServer **management REST API**
-> using Basic Auth. WFS/WMS data endpoints are protected separately by APISIX and OPA in front
-> of GeoServer — that is outside the scope of this adapter.
+`geoserver.topics` selects from `de.civitascore.geo.<resource>.<action>`, where resource is `workspace`,
+`datastore`, `featuretype` or `style` with actions `created`/`updated`/`deleted`, plus `layer` with `updated` and
+`deleted` only — a layer appears implicitly when its feature type or coverage is published, so there is no
+`layer.created`. Coverage stores and coverages have no topics and are reachable by path only. Results go to the
+`resultTopic` from the request metadata, with type `de.civitascore.geo.processing.result`.
 
-## Supported Operations
+`config.value` carries a typed model whose `resourceType` is the Jackson discriminator, each rendering the
+wrapped REST body: `geoserver-workspace` → `{"workspace": {…}}`, `geoserver-datastore` → `{"dataStore": {…,
+"connectionParameters": {"entry": […]}}}`, `geoserver-featuretype` → `{"featureType": {…}}`, `geoserver-layer` →
+`{"layer": {…}}` with `defaultStyle` wrapped as `{"name": …}`, `geoserver-style` → `{"style": {…}}` with
+`languageVersion` as `{"version": …}` and `workspace` as `{"name": …}`.
 
-### Resource Types
+## Saga operations
 
-| Resource Type | CREATE | UPDATE | DELETE | GeoServer REST path |
-|---------------|:------:|:------:|:------:|---------------------|
-| Workspace     | ✅ | ✅ | ✅ | `/rest/workspaces` |
-| Datastore     | ✅ | ✅ | ✅ | `/rest/workspaces/{ws}/datastores` |
-| Feature Type  | ✅ | ✅ | ✅ | `/rest/workspaces/{ws}/datastores/{ds}/featuretypes` |
-| Layer         | ❌ | ✅ | ✅ | `/rest/layers` or `/rest/workspaces/{ws}/layers` (created implicitly with its feature type) |
-| Style         | ✅ | ✅ | ✅ | `/rest/styles` or `/rest/workspaces/{ws}/styles` |
+Dispatched in-process by the orchestrator; saga steps do not travel over Kafka. `layers` alone drives feature-type
+publication and pruning; `datasinks` only resolves native table names and the native CRS.
 
-The `targetResource` in the config event maps directly to the REST path relative to `/rest/`. Examples:
+| Operation | Effect | Compensation |
+|---|---|---|
+| `CREATE_WORKSPACE` | Isolated workspace; on fresh creation enables and titles the workspace-local WMS service | `DELETE_WORKSPACE` |
+| `CREATE_DATASTORE` | PostGIS datastore inside the workspace | `DELETE_WORKSPACE` |
+| `PROVISION_LAYERS` | Uploads `styles`, publishes a feature type per `layers` entry, assigns styles | `DELETE_WORKSPACE` |
+| `PROVISION_WORKSPACE` | The three create steps in one call; no saga process dispatches it | — |
+| `UPDATE_WORKSPACE` | Ensures workspace and datastore exist, converges feature types from `layers`, snapshots the current ones | `RESTORE_WORKSPACE` |
+| `PRUNE_FEATURE_TYPES` | Deletes feature types no `layers` entry names | — terminal, see Behaviour |
+| `DELETE_WORKSPACE` | Recursive workspace delete | — |
+| `RESTORE_WORKSPACE` | Deletes feature types absent from the snapshot, then restores the snapshot | — |
 
-| Operation | `targetResource` | GeoServer REST call |
-|-----------|-----------------|---------------------|
-| CREATE workspace | `workspaces` | `POST /rest/workspaces` |
-| UPDATE workspace | `workspaces/myws` | `PUT /rest/workspaces/myws` |
-| DELETE workspace | `workspaces/myws` | `DELETE /rest/workspaces/myws?recurse=true` |
-| CREATE datastore | `workspaces/myws/datastores` | `POST /rest/workspaces/myws/datastores` |
-| CREATE featuretype | `workspaces/myws/datastores/myds/featuretypes` | `POST /rest/…/featuretypes` |
-| UPDATE featuretype | `workspaces/myws/datastores/myds/featuretypes/myft` | `PUT /rest/…/featuretypes/myft` |
-| CREATE style | `styles` | `POST /rest/styles` |
+| Payload field | Role |
+|---|---|
+| `datasetId` | Required. Source of the workspace name. |
+| `workspaceName` | Used verbatim when present and matching `a-z0-9_`; otherwise derived from `datasetId`. |
+| `datasetName` | Title of the workspace-local WMS service. Falls back to the workspace name. |
+| `datasinks[]` | `POSTGIS` entries only: `configuration.tableName` is the native-table candidate, `dataStructure` supplies the geometry's native CRS. |
+| `layers[]` | One published feature type each: `layerName` (required), `nativeName`, `crs`, `geometryColumnRef`, `nativeBoundingBox`, `defaultStyle`, `alternativeStyles`. |
+| `styles[]` | `{name, sldContent}`, uploaded before feature types are published. |
 
-### Subscribed Topics (14 Topics)
+## Behaviour
 
-**Workspace Events (3):**
-- `de.civitascore.geo.workspace.created`
-- `de.civitascore.geo.workspace.updated`
-- `de.civitascore.geo.workspace.deleted`
-
-**Datastore Events (3):**
-- `de.civitascore.geo.datastore.created`
-- `de.civitascore.geo.datastore.updated`
-- `de.civitascore.geo.datastore.deleted`
-
-**Feature Type Events (3):**
-- `de.civitascore.geo.featuretype.created`
-- `de.civitascore.geo.featuretype.updated`
-- `de.civitascore.geo.featuretype.deleted`
-
-**Layer Events (2):**
-- `de.civitascore.geo.layer.updated`
-- `de.civitascore.geo.layer.deleted`
-
-> No `layer.created`: GeoServer has no POST on `/layers`; a layer is created implicitly when its feature type (or coverage) is published.
-
-**Style Events (3):**
-- `de.civitascore.geo.style.created`
-- `de.civitascore.geo.style.updated`
-- `de.civitascore.geo.style.deleted`
+- **Naming.** Workspace name = `datasetId` lowercased, characters outside `a-z0-9_` replaced by `_`, prefixed `ds_`
+  when the result would start with a digit (it becomes an XML namespace prefix in OGC capabilities, and an NCName
+  MUST NOT start with a digit). Datastore name appends `_postgis`; its schema *is* the workspace name, so GeoServer
+  reads exactly the schema the PostGIS sink created. The mapping is lossy, so dataset ids MUST be unique under it.
+- **Workspaces are isolated**, each with its own namespace, otherwise the WMS layer-by-name lookup fails and
+  same-named layers across datasets collide. The workspace-local WMS service is enabled and titled with
+  `datasetName`; failure to set it is logged, not fatal. WFS stays global — a workspace-local WFS created over REST
+  has no service level, breaking its `GetCapabilities`.
+- **"Already exists" converges.** GeoServer signals it on POST as HTTP 409, or as HTTP 500 whose body contains
+  `already exists`; both are absorbed. Workspace and feature-type creation treat it as success; datastore creation
+  and `UPDATE_WORKSPACE` feature types fall through to a `PUT`, so stale connection parameters and definitions
+  converge instead of a re-POST reporting an unapplied success.
+- **Styles.** A style POST for an existing name answers HTTP 403, not 409; the upsert branches on 403 and refreshes
+  the SLD by `PUT`, and a genuine authorization 403 surfaces on that same `PUT`. Assignment to a layer is verified
+  by read-back: a `PUT` with an unresolvable style reference answers HTTP 200 while keeping the previous style, so
+  the layer is re-read and the step fails when the expected styles are absent.
+- **The native CRS is set explicitly**, from the sink data structure's geometry — the value the PostGIS adapter
+  turns into the column SRID. GeoServer does not detect it on REST feature-type creation, leaving the layer invalid
+  under `REPROJECT_TO_DECLARED`. A supplied `nativeBoundingBox` is forwarded with only the lat/lon box
+  recalculated; without one GeoServer computes both.
+- **Deletes are recursive and idempotent**: workspace and feature-type deletes send `recurse=true` and treat HTTP
+  404 as success, so a compensation chain is safe whether or not the geo branch ran. On the config-event path, 409
+  on CREATE and 404 on DELETE are likewise successes; a 201 CREATE reads the resource name from the percent-decoded
+  `Location` header, an absorbed 409 — which has none — from the request body.
+- **`PRUNE_FEATURE_TYPES` is terminal and uncompensatable**: the `UPDATE_WORKSPACE` snapshot lists names without
+  definitions, so a deleted feature type cannot be restored and the prune MUST run after the last failable step. An
+  absent `layers` field means no layers remain, not "unknown", so an empty desired set prunes everything. An
+  undeletable feature type is reported as `staleFeatureTypes` and the step still succeeds.
+- **`RESTORE_WORKSPACE` skips rather than guesses**: with no snapshot it does nothing, rather than read the absence
+  as an empty workspace and delete pre-existing feature types. Styles are not snapshotted; only a recursive
+  `DELETE_WORKSPACE` removes them.
+- **Credentials.** Basic Auth; `geoserver.admin.user` and `geoserver.admin.password` MUST both be non-blank or
+  initialization fails. That password, `geoserver.postgis.password` and an incoming datastore model's `passwd`
+  accept an `ENC(<base64>)` value, decrypted in memory at use; plaintext passes through. A missing master key is
+  logged at startup and fails any `ENC(…)` value.
 
 ## Configuration
 
-### Properties
+Property keys carry the `geoserver.` prefix. Env vars, production values and secret handling live in
+[../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-```properties
-# GeoServer REST API base URL (optional, default: http://localhost:8080/geoserver)
-geoserver.url=http://localhost:8080/geoserver
+| Property | Coded default |
+|---|---|
+| `geoserver.topics` | — Required for config events; without it the adapter subscribes to nothing |
+| `geoserver.url` | `http://localhost:8080/geoserver` — trailing slashes stripped |
+| `geoserver.public.url` | value of `geoserver.url` — base of the WFS/WMS URLs in saga results |
+| `geoserver.admin.user` | — **Required** |
+| `geoserver.admin.password` | — **Required**, accepts `ENC(…)` |
+| `geoserver.postgis.host` | `localhost` |
+| `geoserver.postgis.port` | `5432` |
+| `geoserver.postgis.database` | `civitas_geo` |
+| `geoserver.postgis.user` | — Required for saga steps |
+| `geoserver.postgis.password` | — Required for saga steps, accepts `ENC(…)` |
 
-# Public GeoServer URL for saga results (optional, defaults to geoserver.url)
-# Use when GeoServer is reachable at a different URL from downstream consumers.
-geoserver.public.url=https://geo.example.com/geoserver
+No `geoserver.postgis.schema` is read: the datastore schema is the derived workspace name. The `postgis.*` keys
+are read by the saga handler only.
 
-# Topics to subscribe to (comma-separated, required)
-geoserver.topics=de.civitascore.geo.workspace.created,de.civitascore.geo.workspace.updated,...
+## Error codes
 
-# Admin credentials for the GeoServer management REST API (required)
-geoserver.admin.user=admin
-geoserver.admin.password=geoserver
+| Code | Meaning | Retryable |
+|---|---|---|
+| `INVALID_PAYLOAD(1001)` | Missing operation, blank or unsafe `targetResource`, missing resource name, or absent `config.value` | no |
+| `UNSUPPORTED_OPERATION(1004)` | Operation is not CREATE, UPDATE or DELETE | no |
+| `INVALID_RESOURCE_TYPE(1005)` | Path resolves to no known collection type | no |
+| `SERVICE_UNAVAILABLE(2002)` | GeoServer answered 5xx | yes |
+| `NETWORK_ERROR(2003)` | The request did not reach GeoServer | yes |
+| `GEOSERVER_RESOURCE_ERROR(3402)` | GeoServer answered 4xx, or the request failed unexpectedly | no |
 
-# PostGIS connection parameters for the saga handler (required for PROVISION_WORKSPACE)
-geoserver.postgis.host=localhost
-geoserver.postgis.port=5432
-geoserver.postgis.database=civitas_geo
-geoserver.postgis.schema=public
-geoserver.postgis.user=geo_user
-geoserver.postgis.password=secret
-```
-
-### Encrypted credentials
-
-Passwords (`geoserver.admin.password`, `geoserver.postgis.password`, and the `passwd` of an
-incoming `DataStoreConfig`) may be supplied encrypted as `ENC(<base64>)` values, following the same
-project-wide AES-256-GCM credential scheme. They are decrypted in-memory only when needed; plaintext
-values are accepted unchanged for backward compatibility. The master key is read from the
-`CIVITAS_MASTER_KEY` environment variable, and encrypted values must be produced with the
-`portal-backend:datasource-connector` credential context. If `CIVITAS_MASTER_KEY` is not set,
-`ENC(...)` values cannot be decrypted (a warning is logged at startup).
-
-### Environment Variables
-
-All properties can be overridden with environment variables (dots → underscores, uppercase):
-
-```bash
-GEOSERVER_URL=http://geoserver:8080/geoserver
-GEOSERVER_PUBLIC_URL=https://geo.example.com/geoserver
-GEOSERVER_TOPICS=de.civitascore.geo.workspace.created,...
-GEOSERVER_ADMIN_USER=admin
-GEOSERVER_ADMIN_PASSWORD=secret
-GEOSERVER_POSTGIS_HOST=postgres
-GEOSERVER_POSTGIS_PORT=5432
-GEOSERVER_POSTGIS_DATABASE=civitas_geo
-GEOSERVER_POSTGIS_USER=geo_user
-GEOSERVER_POSTGIS_PASSWORD=secret
-```
-
-### Docker Compose Example
-
-```yaml
-services:
-  config-adapter:
-    image: config-adapter:latest
-    environment:
-      ADAPTERS: geoserver
-      EVENTHANDLER_NAME: kafka
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      GEOSERVER_URL: http://geoserver:8080/geoserver
-      GEOSERVER_ADMIN_USER: admin
-      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD}
-      GEOSERVER_TOPICS: de.civitascore.geo.workspace.created,...
-      GEOSERVER_POSTGIS_HOST: postgres
-      GEOSERVER_POSTGIS_DATABASE: civitas_geo
-      GEOSERVER_POSTGIS_USER: geo_user
-      GEOSERVER_POSTGIS_PASSWORD: ${POSTGIS_PASSWORD}
-```
-
-## Configuration Model
-
-Each resource type has a dedicated typed model class in `config-adapter-api`. The `resourceType`
-field in the event payload is used by Jackson as a discriminator to select the correct class.
-
-### WorkspaceConfig (`resourceType: "geoserver-workspace"`)
-
-```json
-{
-  "resourceType": "geoserver-workspace",
-  "name": "civitas_dataset1",
-  "isolated": false
-}
-```
-
-Produces: `{"workspace": {"name": "civitas_dataset1", "isolated": false}}`
-
-### DataStoreConfig (`resourceType: "geoserver-datastore"`)
-
-```json
-{
-  "resourceType": "geoserver-datastore",
-  "name": "civitas_postgis",
-  "description": "PostGIS data source",
-  "type": "PostGIS",
-  "enabled": true,
-  "host": "postgres",
-  "port": "5432",
-  "database": "civitas_geo",
-  "schema": "public",
-  "user": "geo_user",
-  "passwd": "secret",
-  "dbtype": "postgis",
-  "exposePrimaryKeys": true
-}
-```
-
-Connection parameters are serialized as a GeoServer entry-list in `toApiMap()`.
-
-### FeatureTypeConfig (`resourceType: "geoserver-featuretype"`)
-
-```json
-{
-  "resourceType": "geoserver-featuretype",
-  "name": "traffic_counts",
-  "nativeName": "traffic_counts",
-  "title": "Traffic Counts",
-  "abstract": "Traffic counting data per hour",
-  "srs": "EPSG:4326",
-  "projectionPolicy": "REPROJECT_TO_DECLARED",
-  "enabled": true,
-  "nativeBoundingBox": {
-    "minx": -180.0, "maxx": 180.0,
-    "miny":  -90.0, "maxy":  90.0,
-    "crs": "EPSG:4326"
-  }
-}
-```
-
-Valid `projectionPolicy` values: `NONE`, `REPROJECT_TO_DECLARED`, `FORCE_DECLARED`.
-
-### LayerConfig (`resourceType: "geoserver-layer"`)
-
-```json
-{
-  "resourceType": "geoserver-layer",
-  "name": "traffic_counts",
-  "title": "Traffic Counts",
-  "type": "VECTOR",
-  "defaultStyle": "traffic_style",
-  "enabled": true,
-  "queryable": true
-}
-```
-
-The `defaultStyle` string is automatically wrapped in `{"name": "..."}` by `toApiMap()`.
-Valid `type` values: `VECTOR`, `RASTER`, `REMOTE`, `WMS`, `GROUP`.
-
-### StyleConfig (`resourceType: "geoserver-style"`)
-
-```json
-{
-  "resourceType": "geoserver-style",
-  "name": "traffic_style",
-  "filename": "traffic_style.sld",
-  "format": "sld",
-  "languageVersion": "1.0.0",
-  "workspace": "civitas_dataset1"
-}
-```
-
-`languageVersion` is wrapped as `{"version": "..."}` and `workspace` as `{"name": "..."}` in
-`toApiMap()`. Omit `workspace` for global styles.
-
-> **Note:** This model creates the style metadata record. Uploading the SLD document body
-> requires a separate call to the GeoServer REST API — outside the scope of this adapter's
-> current implementation.
-
-## Event Format
-
-### Input Event (CloudEvent)
-
-#### Workspace Create Example
-
-```json
-{
-  "specversion": "1.0",
-  "type": "de.civitascore.geo.workspace.created",
-  "source": "civitas.dataset.provisioning",
-  "id": "event-123",
-  "datacontenttype": "application/json",
-  "data": {
-    "metadata": {
-      "messageId": "msg-456",
-      "timestamp": "2026-01-15T10:00:00Z",
-      "source": "dataset.service",
-      "correlationId": "corr-789",
-      "configVersion": "1.0",
-      "resultTopic": "de.civitascore.geo.processing.result"
-    },
-    "payload": {
-      "targetComponent": "geoserver",
-      "targetResource": "workspaces",
-      "operation": "CREATE",
-      "config": {
-        "value": {
-          "resourceType": "geoserver-workspace",
-          "name": "civitas_dataset1"
-        }
-      }
-    }
-  }
-}
-```
-
-#### Feature Type Create Example
-
-```json
-{
-  "specversion": "1.0",
-  "type": "de.civitascore.geo.featuretype.created",
-  "source": "civitas.dataset.provisioning",
-  "id": "event-456",
-  "data": {
-    "metadata": {
-      "messageId": "msg-789",
-      "correlationId": "corr-012",
-      "resultTopic": "de.civitascore.geo.processing.result"
-    },
-    "payload": {
-      "targetComponent": "geoserver",
-      "targetResource": "workspaces/civitas_dataset1/datastores/civitas_postgis/featuretypes",
-      "operation": "CREATE",
-      "config": {
-        "value": {
-          "resourceType": "geoserver-featuretype",
-          "name": "traffic_counts",
-          "nativeName": "traffic_counts",
-          "title": "Traffic Counts",
-          "srs": "EPSG:4326",
-          "projectionPolicy": "REPROJECT_TO_DECLARED",
-          "enabled": true
-        }
-      }
-    }
-  }
-}
-```
-
-#### Workspace Delete Example
-
-```json
-{
-  "specversion": "1.0",
-  "type": "de.civitascore.geo.workspace.deleted",
-  "source": "civitas.dataset.provisioning",
-  "id": "event-789",
-  "data": {
-    "metadata": {
-      "messageId": "msg-012",
-      "correlationId": "corr-345",
-      "resultTopic": "de.civitascore.geo.processing.result"
-    },
-    "payload": {
-      "targetComponent": "geoserver",
-      "targetResource": "workspaces/civitas_dataset1",
-      "operation": "DELETE",
-      "config": {
-        "value": {
-          "resourceType": "geoserver-workspace"
-        }
-      }
-    }
-  }
-}
-```
-
-The adapter adds `?recurse=true` automatically for workspace and datastore deletes.
-
-### Output Event (Result)
-
-```json
-{
-  "specversion": "1.0",
-  "type": "de.civitascore.geo.processing.result",
-  "source": "de.civitascore.config-adapter.geoserver",
-  "id": "result-123",
-  "datacontenttype": "application/json",
-  "correlationid": "corr-789",
-  "originalmessageid": "msg-456",
-  "status": "SUCCESS",
-  "operation": "CREATE",
-  "targetresource": "workspaces",
-  "resourceid": "civitas_dataset1",
-  "data": {
-    "correlationId": "corr-789",
-    "originalMessageId": "msg-456",
-    "status": "SUCCESS",
-    "message": "GeoServer WORKSPACE created successfully",
-    "resourceId": "civitas_dataset1",
-    "operation": "CREATE",
-    "targetResource": "workspaces",
-    "timestamp": "2026-01-15T10:00:01Z",
-    "source": "de.civitascore.config-adapter.geoserver"
-  }
-}
-```
-
-## Saga Handler
-
-The `GeoServerSagaHandler` provides atomic workspace provisioning for the dataset lifecycle saga.
-
-> **Note:** The saga handler is intentionally minimal. The full saga orchestration will be
-> replaced by Flowable. Only the operations needed by the current dataset lifecycle are implemented.
-
-### Operations
-
-| Operation | Description | Compensation |
-|-----------|-------------|-------------|
-| `PROVISION_WORKSPACE` | Creates workspace + PostGIS datastore + feature types | `DELETE_WORKSPACE` |
-| `UPDATE_WORKSPACE` | Creates/updates feature types; captures state for rollback | `RESTORE_WORKSPACE` |
-| `DELETE_WORKSPACE` | Deletes workspace recursively (`?recurse=true`) | — |
-| `RESTORE_WORKSPACE` | Restores previous feature type state | — |
-
-### Saga Topics
-
-```text
-de.civitascore.dataset.geoserver.execute
-de.civitascore.dataset.geoserver.compensate
-de.civitascore.dataset.geoserver.result
-```
-
-### PROVISION_WORKSPACE Payload
-
-```json
-{
-  "datasetId": "ds-abc-123",
-  "datasetName": "Traffic Counts Dataset",
-  "datasinks": [
-    {
-      "type": "POSTGIS",
-      "configuration": {
-        "tableName": "traffic_counts",
-        "primaryKey": "id",
-        "geometryColumn": "geom",
-        "geometryType": "Point",
-        "crs": "EPSG:4326"
-      }
-    }
-  ]
-}
-```
-
-`PROVISION_WORKSPACE` derives the workspace name from `datasetId` via `toWorkspaceName()`:
-lowercases, replaces all non-alphanumeric/non-underscore characters with `_`, and prefixes the
-result with `ds_` when it would start with a digit (the workspace is emitted as an XML namespace
-prefix in OGC capabilities documents, and an NCName must not start with a digit).
-
-Only datasinks with `"type": "POSTGIS"` are provisioned as feature types; other sink types
-are skipped. From each sink's `configuration`, only `tableName`, `crs`, and `projectionPolicy`
-(default `REPROJECT_TO_DECLARED`) are forwarded — fields such as `primaryKey` and `geometryColumn`
-are derived by GeoServer from the PostGIS table and intentionally not sent. `UPDATE_WORKSPACE`
-upserts (PUT on HTTP 409) so existing feature types are actually updated, and its compensation
-(`RESTORE_WORKSPACE`) deletes feature types created during the update before restoring the previous
-state.
-
-### PROVISION_WORKSPACE Result
-
-```json
-{
-  "workspaceName": "ds_abc_123",
-  "wfsUrl": "https://geo.example.com/geoserver/ds_abc_123/wfs",
-  "wmsUrl": "https://geo.example.com/geoserver/ds_abc_123/wms"
-}
-```
-
-## Error Handling
-
-### HTTP Status Code Mapping
-
-| HTTP Status | Operation | Behavior |
-|-------------|-----------|----------|
-| 2xx | Any | Success |
-| 409 Conflict | CREATE | **Idempotent success** — resource already exists |
-| 404 Not Found | DELETE | **Idempotent success** — resource already deleted |
-| Other 4xx | Any | `FatalAdapterException` → DLQ |
-| 5xx | Any | `RetryableAdapterException` → exponential backoff retry |
-| Network error | Any | `RetryableAdapterException` → exponential backoff retry |
-
-### GeoServer-Specific Error Codes
-
-| Code | Name | Retryable | Description |
-|------|------|-----------|-------------|
-| 3401 | `GEOSERVER_ERROR` | Yes | GeoServer service error (HTTP 5xx) |
-| 3402 | `GEOSERVER_RESOURCE_ERROR` | No | Resource operation failed (HTTP 4xx) |
+A saga step emits no code: it returns a step failure carrying the HTTP status and a bounded excerpt of the response
+body, from which the orchestrator drives compensation.
 
 ## Testing
 
-### Unit Tests
-
 ```bash
-mvn test -pl config-adapter-geoserver
+mvn test -pl config-adapter-geoserver          # unit tests, no Docker
+mvn -pl config-adapter-geoserver -am verify    # adds integration tests, requires Docker
 ```
 
-Tests cover:
-- Initialization (credentials required, missing credentials throws)
-- Resource type detection from path
-- Resource name extraction and collection path detection
-- `?recurse=true` flag for workspace and datastore deletes
-- Successful create/update/delete operations for all entity types
-- HTTP error handling (4xx → fatal, 5xx → retryable)
-- Network error handling
-- Result event publishing
-- All typed model `toApiMap()` outputs (workspace, datastore, feature type, layer, style, bounding box)
-- Saga handler: PROVISION_WORKSPACE, DELETE_WORKSPACE, RESTORE_WORKSPACE, unknown operations
-
-### Integration Tests
-
-`GeoServerAdapterIT` runs the adapter against a real **GeoServer Cloud
-2.28.3.0** stack started with Testcontainers. The setup mirrors
-[`dev-environment/geoserver/docker-compose.yaml`](../../dev-environment/geoserver/docker-compose.yaml)
-and exercises the same provisioning flow as the Bruno collection
-(`dev-environment/geoserver/bruno/`).
-
-**Stack started per JVM (singleton container pattern):**
-
-| Container | Image | Purpose |
-|-----------|-------|---------|
-| `geoserverdb` (alias: `geodatabase`) | `imresamu/postgis:17-3.5` | pgconfig catalog + spatial data, seeded with `dataset_test_uuid_001` schema |
-| `rabbitmq` | `rabbitmq:3.13.3-alpine` | Spring Cloud Bus |
-| `discovery` | `geoservercloud/geoserver-cloud-discovery:2.28.3.0` | Service discovery (Consul/Eureka) |
-| `config` | `geoservercloud/geoserver-cloud-config:2.28.3.0` | Spring Cloud Config server (port 8080) |
-| `restconfig` | `geoservercloud/geoserver-cloud-rest:2.28.3.0` | GeoServer REST API under test |
-
-Total stack startup: ~60–120s.
-
-**Scenarios covered:**
-
-- `provisionWorkspaceDatastoreAndFeatureTypesEndToEnd` — workspace → PostGIS datastore →
-  point + polygon feature types → update feature type title (Bruno steps 01–04)
-- `duplicateWorkspaceCreateIsIdempotent409` — HTTP 409 on duplicate CREATE returns SUCCESS
-- `deleteMissingWorkspaceIsIdempotent404` — HTTP 404 on missing DELETE returns SUCCESS
-- `deleteWorkspaceUsesRecurseTrue` — workspace with child datastore deleted recursively
-
-> **Style creation is not exercised end-to-end:** the adapter sends a JSON metadata body,
-> but GeoServer requires an accompanying SLD XML body uploaded as
-> `application/vnd.ogc.sld+xml` (see Bruno step 05). SLD body upload is out of scope for
-> the adapter's current implementation. Unit tests still verify the JSON body shape.
-
-```bash
-# Run only the integration test (requires Docker); -Dtest=none skips the unit tests
-mvn verify -pl config-adapter-geoserver -Dit.test=GeoServerAdapterIT -Dtest=none -DfailIfNoTests=false
-```
-
-## Troubleshooting
-
-### Connection Refused
-
-```text
-Network error during GeoServer resource creation: Connection refused
-```
-
-Verify GeoServer is running and `geoserver.url` is correct.
-
-### Unauthorized (401)
-
-```text
-GeoServer client error during GeoServer resource creation: HTTP 401
-```
-
-Verify `geoserver.admin.user` and `geoserver.admin.password` match the GeoServer admin credentials.
-
-### Bad Request (400)
-
-```text
-GeoServer client error during GeoServer resource creation: HTTP 400
-```
-
-Validate the configuration model fields against the [GeoServer REST API documentation](https://docs.geoserver.org/stable/en/user/rest/).
-Ensure required fields (e.g., `name` for workspaces, `nativeName` + `srs` for feature types) are present.
-
-### Resource Not Found (404) on UPDATE/DELETE
-
-```text
-GeoServer client error during GeoServer resource update: HTTP 404
-```
-
-For UPDATE/DELETE operations, ensure the resource exists. Check that the `targetResource` path
-and resource name are correct. Note: 404 on DELETE is treated as idempotent success.
-
-## Resources
-
-- [GeoServer REST API Documentation](https://docs.geoserver.org/stable/en/user/rest/)
-- [GeoServer Cloud](https://github.com/geoserver/geoserver-cloud)
-- [OGC WFS Standard](https://www.ogc.org/standards/wfs)
-- [OGC WMS Standard](https://www.ogc.org/standards/wms)
-- [CloudEvents Specification](https://cloudevents.io/)
-
-## License
-
-European Union Public License (EU-PL) 1.2
+Integration tests run against a GeoServer Cloud stack — PostGIS, RabbitMQ, discovery, config and REST
+containers — started once per JVM by Testcontainers; image tags are pinned in the test sources, the shared ones
+in `TestContainerImages`. Failsafe supplies `--add-opens java.base/java.net=ALL-UNNAMED`, which Jersey's PATCH
+support needs.
