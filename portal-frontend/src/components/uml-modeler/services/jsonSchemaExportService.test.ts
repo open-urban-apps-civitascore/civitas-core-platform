@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality } from '../constants/umlTypes'
+import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality, UML_PRIMITIVE_TYPES } from '../constants/umlTypes'
 import type { UMLDiagram } from '../types/diagram'
+import type { UMLPrimitiveType } from '../types/uml'
 import {
   canMultiplicityBePrimaryKey,
   exportToJsonSchema,
@@ -88,6 +89,44 @@ describe('exportToJsonSchema', () => {
 
     expect(properties.stationId).toEqual({ type: 'string', 'x-core-primaryKey': true })
     expect(properties.temperature).toEqual({ type: 'number' })
+  })
+
+  // Keyed off UMLPrimitiveType so a newly added primitive without an expectation fails to
+  // type-check here rather than silently falling back to a bare string property.
+  const primitiveExpectations: Record<UMLPrimitiveType, Record<string, unknown>> = {
+    String: { type: 'string' },
+    Integer: { type: 'integer' },
+    Boolean: { type: 'boolean' },
+    Number: { type: 'number' },
+    Date: { type: 'string', format: 'date' },
+    DateTime: { type: 'string', format: 'date-time' },
+    Uuid: { type: 'string', format: 'uuid' },
+  }
+  const primitiveCases = UML_PRIMITIVE_TYPES.map(type => ({ type, expected: primitiveExpectations[type] }))
+
+  it.each(primitiveCases)('maps the primitive type "$type" to its JSON Schema fragment', ({ type, expected }) => {
+    const diagram = baseDiagram({
+      nodes: [
+        {
+          id: 'node-1',
+          type: 'class',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'elem-1',
+              name: 'TrafficSensor',
+              type: 'class',
+              attributes: [{ id: 'a1', name: 'value', type }],
+              operations: [],
+            },
+            label: 'TrafficSensor',
+          },
+        },
+      ],
+    } as unknown as Partial<UMLDiagram>)
+
+    const def = classDef(exportToJsonSchema(diagram), 'TrafficSensor')
+    expect((def.properties as Record<string, unknown>).value).toEqual(expected)
   })
 
   it('maps "*" multiplicity attributes to arrays', () => {

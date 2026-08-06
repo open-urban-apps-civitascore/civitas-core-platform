@@ -20,7 +20,17 @@ export type GeometryType =
   | 'MultiPolygon'
   | 'GeometryCollection'
 
-export type FieldType = 'str' | 'int' | 'number' | 'bool' | 'date' | 'uuid' | GeometryType | 'array' | 'object'
+export type FieldType =
+  | 'str'
+  | 'int'
+  | 'number'
+  | 'bool'
+  | 'date'
+  | 'datetime'
+  | 'uuid'
+  | GeometryType
+  | 'array'
+  | 'object'
 
 export const GEOMETRY: ReadonlySet<GeometryType> = new Set<GeometryType>([
   'Point',
@@ -50,7 +60,8 @@ export interface FieldNode {
 
 /**
  * Source subtypes a numeric conversion input (toInt/toNumber) accepts. Everything else — uuid, bool,
- * date, geometry — has no meaningful numeric coercion and is rejected. Used as a port's `accepts` set.
+ * date, datetime, geometry — has no meaningful numeric coercion and is rejected. Used as a port's
+ * `accepts` set.
  */
 export const NUMERIC_SUBTYPES: readonly FieldType[] = ['str', 'int', 'number']
 
@@ -97,9 +108,10 @@ export interface SchemaTree {
  *  toInt     → NiFi type coercion to INT        — str/number → int
  *  toFloat   → NiFi type coercion to FLOAT      — str/int → number
  *  toDate    → NiFi toDate(field, format)       — str → date
- *  format    → NiFi format(field, format)       — date → str
+ *  toDateTime→ NiFi toDate(field, format)       — str → datetime
+ *  format    → NiFi format(field, format)       — date / datetime → str
  */
-export type ConversionOp = 'toString' | 'toInt' | 'toFloat' | 'toDate' | 'format'
+export type ConversionOp = 'toString' | 'toInt' | 'toFloat' | 'toDate' | 'toDateTime' | 'format'
 
 export type OpNode =
   | { op: 'copy'; sourcePath: string }

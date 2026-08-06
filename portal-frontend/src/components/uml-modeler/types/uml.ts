@@ -1,6 +1,6 @@
 export type Visibility = 'public' | 'private' | 'protected' | 'package'
 
-export type UMLPrimitiveType = 'String' | 'Integer' | 'Boolean' | 'Number' | 'Date' | 'Uuid'
+export type UMLPrimitiveType = 'String' | 'Integer' | 'Boolean' | 'Number' | 'Date' | 'DateTime' | 'Uuid'
 
 export type UMLGeometryType =
   | 'Point'

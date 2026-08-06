@@ -1425,8 +1425,16 @@
             }
           }
         },
+        "toDateTime": {
+          "description": "str → datetime",
+          "fields": {
+            "pattern": {
+              "label": "Pattern"
+            }
+          }
+        },
         "format": {
-          "description": "date → str",
+          "description": "date / datetime → str",
           "fields": {
             "pattern": {
               "label": "Pattern"

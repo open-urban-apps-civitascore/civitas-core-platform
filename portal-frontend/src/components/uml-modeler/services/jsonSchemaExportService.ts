@@ -53,7 +53,8 @@ const PRIMITIVE_TYPE_MAP: Record<string, JsonSchemaObject> = {
   Integer: { type: 'integer' },
   Number: { type: 'number' },
   Boolean: { type: 'boolean' },
-  Date: { type: 'string', format: 'date-time' },
+  Date: { type: 'string', format: 'date' },
+  DateTime: { type: 'string', format: 'date-time' },
 }
 
 const GEOMETRY_TYPES = new Set([

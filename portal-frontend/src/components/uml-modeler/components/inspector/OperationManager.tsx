@@ -115,7 +115,7 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
     return null
   }
 
-  const typeOptions = Object.keys(UML_PRIMITIVE_TYPES) as UMLPrimitiveType[]
+  const typeOptions = [...UML_PRIMITIVE_TYPES]
   const returnTypeOptions = [...typeOptions]
 
   return (

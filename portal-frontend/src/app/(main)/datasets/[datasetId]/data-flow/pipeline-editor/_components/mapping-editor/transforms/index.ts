@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Binary, Calendar, CalendarClock, Combine, Hash, MapPin, Type } from 'lucide-react'
+import { Binary, Calendar, CalendarClock, Clock, Combine, Hash, MapPin, Type } from 'lucide-react'
 
 import type { ConfigField, PortDef, TransformDef } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
@@ -185,13 +185,32 @@ const conversions: MappingTransformDef[] = [
   conversion('toFloat', 'str / int', undefined, 'number', Binary, [], 'toNumber', NUMERIC_SUBTYPES),
   // toDate: accepts str, produces date
   conversion('toDate', 'str', 'str', 'date', Calendar, [patternField]),
-  // format: accepts date, produces str — reuse patternField but with the format-specific translation key
-  conversion('format', 'date', 'date', 'str', CalendarClock, [
+  // toDateTime: accepts str, produces datetime. Same NiFi toDate() call as toDate; the separate op
+  // token exists because the registry keys nodes by their wire op.
+  conversion('toDateTime', 'str', 'str', 'datetime', Clock, [
     {
       ...patternField,
-      label: 'transforms.format.fields.pattern.label',
+      label: 'transforms.toDateTime.fields.pattern.label',
+      default: "yyyy-MM-dd'T'HH:mm:ssXXX",
     },
   ]),
+  // format: accepts date and datetime, produces str — reuse patternField but with the format-specific
+  // translation key
+  conversion(
+    'format',
+    'date / datetime',
+    undefined,
+    'str',
+    CalendarClock,
+    [
+      {
+        ...patternField,
+        label: 'transforms.format.fields.pattern.label',
+      },
+    ],
+    'format',
+    ['date', 'datetime'],
+  ),
 ]
 
 export const mappingRegistry = buildRegistry<MappingTransformDef>([literal, concat, geoPoint, ...conversions])

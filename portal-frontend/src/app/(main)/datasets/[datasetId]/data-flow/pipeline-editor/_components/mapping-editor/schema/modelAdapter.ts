@@ -221,7 +221,8 @@ const scalarTypeOf = (node: SchemaNode): FieldType => {
   if (type === 'string') {
     const format = asString(node.format)
     if (format === 'uuid') return 'uuid'
-    if (format === 'date-time' || format === 'date') return 'date'
+    if (format === 'date-time') return 'datetime'
+    if (format === 'date') return 'date'
     return 'str'
   }
   // Deliberately permissive: exotic-but-valid schema constructs (type arrays, const/oneOf, "null")

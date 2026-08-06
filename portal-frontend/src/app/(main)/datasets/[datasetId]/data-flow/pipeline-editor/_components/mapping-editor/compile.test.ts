@@ -273,6 +273,55 @@ describe('mapping editor compile', () => {
     expect(findUnconnectedTransformNodes(nodes, edges)).toHaveLength(0)
   })
 
+  it('round-trips a toDateTime node, keeping it distinct from toDate', () => {
+    const toDateTime = mappingRegistry.byType.toDateTime
+    const dtTarget: SchemaTree = {
+      name: 'tgt',
+      fields: [{ path: '$.observedAt', name: 'observedAt', type: 'datetime', portType: 'scalar' }],
+    }
+    const dtNodes: Node[] = [
+      {
+        id: SOURCE_NODE_ID,
+        type: 'mega',
+        position: { x: 0, y: 0 },
+        data: { role: 'source', fields: sourceTree.fields },
+      },
+      {
+        id: TARGET_NODE_ID,
+        type: 'mega',
+        position: { x: 700, y: 0 },
+        data: { role: 'target', fields: dtTarget.fields },
+      },
+      {
+        id: 'dt',
+        type: 'transform',
+        position: { x: 300, y: 40 },
+        data: {
+          defType: 'toDateTime',
+          config: { pattern: "yyyy-MM-dd'T'HH:mm:ssXXX" },
+          inputs: toDateTime.inputs,
+          outputs: toDateTime.outputs,
+        },
+      },
+    ]
+    const dtEdges: Edge[] = [
+      { id: 'd1', source: SOURCE_NODE_ID, sourceHandle: '$.name', target: 'dt', targetHandle: 'in' },
+      { id: 'd2', source: 'dt', sourceHandle: 'out', target: TARGET_NODE_ID, targetHandle: '$.observedAt' },
+    ]
+
+    const compiled = compileCanvas(dtNodes, dtEdges)
+    expect(compiled.fields['$.observedAt']).toEqual({
+      op: 'toDateTime',
+      input: '$.name',
+      pattern: "yyyy-MM-dd'T'HH:mm:ssXXX",
+    })
+
+    const built = decompileConfig({ ...compiled }, sourceTree, dtTarget)
+    const restored = built.nodes.find(n => n.type === 'transform')
+    expect(restored?.data.defType).toBe('toDateTime')
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(compiled.fields)
+  })
+
   it('round-trips: compile → decompile → compile is stable', () => {
     const compiled = compileCanvas(nodes, edges)
 
