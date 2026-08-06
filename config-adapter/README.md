@@ -102,6 +102,16 @@ An environment variable set to the empty string resolves as unset, so the proper
 
 Every adapter reads its topics from `<adapterName>.topics` and its backend settings from keys prefixed with its short name; each adapter's own README documents its properties. Secrets — admin keys, passwords, client secrets, the master key — have no defaults and are supplied per environment. Several are required with no fallback and fail startup when absent, `apisix.admin.key` among them: a default would let a deployment come up reachable but unauthenticated. [DEPLOYMENT.md](DEPLOYMENT.md) is the sole home for all environment variables, ports, health and probe endpoints, secret handling, Kafka tuning, and the Docker Compose and Kubernetes examples.
 
+### Alignment with the deployment repository
+
+Deployed environments are configured from the separate `civitas-core-deployment` repository, whose `config-adapters` component pins the image tag and supplies the environment variables per environment. That repository and this one are versioned independently, so a change to the runtime contract here takes effect only once it is matched there. Three cases break a deployment rather than degrade it:
+
+- **`ADAPTERS` MUST name only adapters the deployed image provides.** A name with no registered `ConfigAdapter` aborts startup, so removing or renaming an adapter here requires the same edit there in the same release.
+- **A new property without a default MUST be supplied there first.** Startup fails on the missing value, so the deployment values have to carry it before the image is rolled out.
+- **A renamed or removed topic MUST be reflected in the per-adapter `*_TOPICS` values.** An unknown topic name is rejected against the topic registry at startup.
+
+Confirm the deployed image tag and environment values in that repository before releasing a change to any of the three.
+
 ## Extending
 
 Depend on `config-adapter-api` and extend `AbstractConfigAdapter`, which owns topic parsing and validation, result publishing and failure wrapping. Subclasses supply the adapter name, the result type and the per-event logic:
