@@ -9,7 +9,7 @@ import {
   SOURCE_NODE_ID,
   TARGET_NODE_ID,
 } from './compile'
-import { concatInputPorts, mappingRegistry } from './transforms'
+import { concatInputPorts, transformDef } from './transforms'
 
 const sourceTree: SchemaTree = {
   name: 'src',
@@ -31,8 +31,8 @@ const targetTree: SchemaTree = {
   ],
 }
 
-const toString = mappingRegistry.byType.toString
-const concat = mappingRegistry.byType.concat
+const toStringDef = transformDef('toString')
+const concat = transformDef('concat')
 
 const nodes: Node[] = [
   { id: SOURCE_NODE_ID, type: 'mega', position: { x: 0, y: 0 }, data: { role: 'source', fields: sourceTree.fields } },
@@ -41,7 +41,7 @@ const nodes: Node[] = [
     id: 'i',
     type: 'transform',
     position: { x: 300, y: 40 },
-    data: { defType: 'toString', config: {}, inputs: toString.inputs, outputs: toString.outputs },
+    data: { defType: 'toString', config: {}, inputs: toStringDef.inputs, outputs: toStringDef.outputs },
   },
   {
     id: 'c',
@@ -72,7 +72,7 @@ describe('mapping editor compile', () => {
   })
 
   it('compiles a geoPoint node from longitude + latitude', () => {
-    const geoPointDef = mappingRegistry.byType.geoPoint
+    const geoPointDef = transformDef('geoPoint')
 
     const geoNodes: Node[] = [
       {
@@ -110,7 +110,7 @@ describe('mapping editor compile', () => {
   })
 
   it('keeps geoPoint inputs positionally aligned when only latitude is wired', () => {
-    const geoPointDef = mappingRegistry.byType.geoPoint
+    const geoPointDef = transformDef('geoPoint')
 
     const geoNodes: Node[] = [
       {
@@ -156,7 +156,7 @@ describe('mapping editor compile', () => {
   })
 
   it('keeps geoPoint inputs positionally aligned when only longitude is wired', () => {
-    const geoPointDef = mappingRegistry.byType.geoPoint
+    const geoPointDef = transformDef('geoPoint')
 
     const geoNodes: Node[] = [
       {
@@ -191,7 +191,7 @@ describe('mapping editor compile', () => {
   it('drops an unconnected interior concat port instead of persisting an empty input', () => {
     // in0 and in2 are wired, in1 is left empty — the compiled inputs must be compacted so the
     // backend never receives a bare '' (which it rejects as a blank copy source path).
-    const concatDef = mappingRegistry.byType.concat
+    const concatDef = transformDef('concat')
 
     const cNodes: Node[] = [
       {

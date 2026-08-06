@@ -38,6 +38,15 @@ export const isDatapoolScopeViolationError = (error: unknown) => {
   return typeof apiError?.type === 'string' && apiError.type.endsWith('DATASOURCE_SCOPE_VIOLATION')
 }
 
+export const isTableNameConflictError = (error: unknown) => {
+  if (!isAxiosError(error)) return false
+  const isConflictError = error.status === 409
+  if (!error?.response) return false
+  const apiError = error.response.data as ApiError
+  const errorDetail = apiError.detail || ''
+  return isConflictError && errorDetail.includes('tableName') && errorDetail.includes('already exists')
+}
+
 export const isLayerNameError = (error: unknown) => {
   if (!isAxiosError(error)) return false
   const isConflictError = error.status === 409
