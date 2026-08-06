@@ -50,8 +50,9 @@ representation for the resource type; unknown fields are ignored. A result event
   created at the top level.
 - **Required actions trigger an email.** When a created user carries `requiredActions`, Keycloak is asked
   to send an actions email so the user can verify the address and set a password. This needs SMTP
-  configured on the realm; without it the user is still created and the missing email is logged as a
-  warning. When both invitation properties are set, the email's link returns the user to the portal.
+  configured on the realm. With both invitation properties set the link returns the user to the portal and
+  a send failure is fatal — the user stays created and the event is dead-lettered as
+  `KEYCLOAK_USER_ERROR`; with neither set a send failure is only logged as a warning.
 - **Failure classification.** Connection failures and 5xx responses are retryable and are retried with
   exponential backoff. Every other 4xx response that is not an idempotent case is fatal and routes the
   event to the dead-letter queue.
@@ -64,9 +65,9 @@ representation for the resource type; unknown fields are ignored. A result event
 Keys carry the `keycloak.` prefix. Env-var names, production values, secret handling and container
 configuration live in [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-| Property | Default |
+| Property | Coded default |
 |---|---|
-| `keycloak.topics` | — **required** |
+| `keycloak.topics` | — required; without it the adapter subscribes to nothing and is skipped |
 | `keycloak.url` | `http://localhost:8080` |
 | `keycloak.realm` | `master` |
 | `keycloak.username` | `admin` |
@@ -94,7 +95,6 @@ uses Keycloak's own default link target.
 | 3005 | `KEYCLOAK_CLIENT_ERROR` | A client operation failed with a 4xx | no |
 | 3006 | `KEYCLOAK_ROLE_ERROR` | A role operation failed with a 4xx | no |
 | 3007 | `KEYCLOAK_GROUP_ERROR` | A group operation failed with a 4xx | no |
-| 9004 | `CONFIGURATION_ERROR` | Startup validation failed: Keycloak unreachable, credentials rejected, or exactly one invitation property set | no |
 
 ## Testing
 

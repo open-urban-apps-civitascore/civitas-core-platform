@@ -32,7 +32,7 @@ PMD, CPD and SpotBugs are bound per-module at `verify` with `failOnViolation`/`f
 
 `pom.xml` `<modules>` is the authority on which modules exist. The dependency rules that are not evident from a pom:
 
-- Every module depends on `config-adapter-api` alone; adapters never depend on one another.
+- Adapter modules depend on `config-adapter-api` at compile scope and never on one another; `config-adapter-examples` additionally depends on `event-handler-kafka`.
 - `config-adapter-application` depends on all of them, discovers plugins via ServiceLoader, and shades the fat JAR.
 - `config-adapter-nifi` is saga-only: it registers a `SagaCommandHandler` and no `ConfigAdapter`, so it is unreachable over the CloudEvent path.
 - `config-adapter-flowable` embeds the Flowable engine with PostgreSQL state and orchestrates every saga. BPMN process definitions live under its `src/main/resources/processes/`.

@@ -51,7 +51,7 @@ Multi-step dataset provisioning runs as a Flowable BPMN saga rather than as inde
 
 The `data` section of an incoming CloudEvent deserializes into a `ConfigEvent` of `metadata` and `payload`. `metadata` carries `messageId` (identifier of this command, echoed into the result), `timestamp` (emission time), `source` (emitting system), `correlationId` (correlates command and result across systems), `configVersion` (version of the payload schema) and `resultTopic` (topic to publish the result to; no result is published when absent). `payload` carries `targetComponent` (resource kind the adapter routes on, for example `user`), `targetResource` (resource the operation applies to), `operation` and `config` (desired state: a `path` and a `value`).
 
-`operation` is a closed enum of `CREATE`, `UPDATE` and `DELETE`. An event carrying any other value is rejected as a deserialization failure and never reaches an adapter.
+`operation` is a closed enum of `CREATE`, `UPDATE` and `DELETE`. An event carrying any other value never reaches an adapter: deserialization fails and the record is dead-lettered as `UNKNOWN_ERROR` (9001).
 
 A `ConfigResultEvent` is published to `resultTopic` as a CloudEvent whose `source` is `de.civitascore.config-adapter.<adapterName>`. Its fields appear both as CloudEvent extension attributes (lowercased, for example `correlationid`) and in the JSON body. Always present: `correlationId` copied from the command, `originalMessageId` holding the command's `messageId`, `status` (`SUCCESS` or `FAILURE`), `operation`, `targetResource`, `message` (symbolic outcome on success, safe description on failure), `timestamp` and `source`. On success only: `resourceId`. On failure only: `errorCode`.
 
@@ -63,34 +63,32 @@ An adapter reads its topics from `<adapterName>.topics`. Every entry is validate
 
 ### Error codes
 
-Codes are banded: `1xxx` validation (fatal), `2xxx` connectivity (retryable), `3xxx` adapter-specific with one band per adapter — `30xx` Keycloak, `31xx` APISIX, `32xx` FROST, `34xx` GeoServer, `35xx` PostGIS, `36xx` NiFi — and `9xxx` unexpected. Retryable codes drive the backoff loop; the rest go straight to the dead-letter queue. Each code also carries an internal log template, which stays in the logs and out of the result event.
+Codes are banded: `1xxx` validation (fatal), `2xxx` connectivity (retryable), `3xxx` adapter-specific with one band per adapter — `30xx` Keycloak, `31xx` APISIX, `32xx` FROST, `34xx` GeoServer, `35xx` PostGIS, `36xx` NiFi — and `9xxx` framework-level: unexpected failures plus `9004` configuration errors. Retryable exception types drive the backoff loop; fatal ones go straight to the dead-letter queue — the `retryable` flag each code carries is metadata, not the dispatch input. Each code also carries an internal log template, which stays in the logs and out of the result event.
 
 Each adapter's README lists the codes that adapter raises. The codes below are framework-wide or have no module README of their own:
 
 | Code | Name | Retryable | External message |
 |---|---|---|---|
-| 1003 | `MISSING_CONFIG` | No | Configuration error |
-| 2001 | `CONNECTION_TIMEOUT` | Yes | Service temporarily unavailable |
-| 2004 | `RATE_LIMITED` | Yes | Service temporarily unavailable |
 | 2005 | `PUBLISH_ERROR` | Yes | Message delivery failed |
 | 2006 | `PUBLISH_TIMEOUT` | Yes | Message delivery timeout |
 | 9001 | `UNKNOWN_ERROR` | No | Internal error |
-| 9002 | `SERIALIZATION_ERROR` | No | Data processing error |
-| 9003 | `DESERIALIZATION_ERROR` | No | Data processing error |
+| 9004 | `CONFIGURATION_ERROR` | No | Configuration error |
 
 ## Guarantees
 
 - **Configuration errors fail startup.** An unknown topic in `<adapterName>.topics`, a missing required property, or `eventhandler.name` set alongside `eventconsumer.name` or `eventpublisher.name` aborts startup rather than degrading at runtime. Either `eventhandler.name` or `eventconsumer.name` **MUST** be set.
-- **Operations are idempotent.** Re-delivering a command converges on the same state; adapters treat "already exists" and "already absent" as success. Redelivery after a crash is therefore safe.
-- **Retryable and fatal are distinct.** A retryable failure is retried with backoff and keeps its partition position; a fatal failure is dead-lettered immediately. Nothing is dropped silently.
-- **One poison record cannot stall a partition.** Offsets are committed per record, and a record that exhausts its retries is diverted and committed.
+- **Idempotency is a convention upheld per adapter, not an SPI guarantee** — see each adapter's README. Adapters treat "already exists" and "already absent" as success, so a redelivered command after a crash is absorbed. How far a duplicate converges differs: GeoServer datastores and feature types converge via `PUT`, while a pre-existing PostGIS table or role is accepted as-is rather than brought into line with the payload.
+- **Retryable and fatal are distinct.** A retryable failure is retried with backoff and keeps its partition position; a fatal failure is dead-lettered immediately. Nothing is dropped silently except a data-less CloudEvent and an unroutable saga trigger, which are logged and committed without a dead-letter record.
+- **One poison record cannot stall a partition.** A record that exhausts its retries is diverted to the dead-letter topic and its offset committed.
 - **Adapters see property access only.** They receive `AdapterConfig`, so no adapter can read or alter application-level configuration.
 - **Result and dead-letter messages are safe to forward.** External messages carry no PII and no stack traces; detail stays in the logs.
 - **Secrets are never baked into the image.** Credentials arrive as environment variables at runtime, and `ENC(...)` values are decrypted in-process with the master key.
 
 ## Error handling
 
-A retryable failure is retried in place with exponential backoff of `initialBackoffMs × 2^(attempt-1)`; once the attempt budget is spent the record is published to the dead-letter topic and its offset committed. A fatal failure skips the retry loop. Publishing to the dead-letter topic is synchronous: if it fails, the offset is not committed and the record is redelivered on the next poll rather than lost. The saga trigger consumer applies the same backoff but has no dead-letter topic — permanent failures such as malformed JSON are skipped immediately, transient failures are retried and then skipped, and the saga timeout mechanism drives compensation. Attempt budget, initial backoff and the dead-letter topic are operator settings; see [DEPLOYMENT.md](DEPLOYMENT.md).
+A retryable failure is retried in place with exponential backoff of `initialBackoffMs × 2^(attempt-1)`, capped at 30 seconds; once the attempt budget is spent the record is published to the dead-letter topic and its offset committed. A fatal failure skips the retry loop. Publishing to the dead-letter topic is synchronous. Attempt budget, initial backoff and the dead-letter topic are operator settings; see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+The saga trigger consumer has no dead-letter topic and no retry budget. A malformed payload is logged and skipped. Any other failure seeks the partition back and is retried on the next poll indefinitely, with no backoff — a permanently failing trigger wedges its partition and emits one error per second. There is no saga timeout; nothing drives compensation for a trigger that never started a process instance.
 
 Dead-lettered records keep their original body and gain extension attributes describing the diversion: `dlqerrorcode` (numeric error code), `dlqerrormsg` (external error message), `dlqoriginaltopic` (topic the record arrived on), `dlqtimestamp` (diversion time, ISO 8601) and `dlqretrycount` (the configured retry budget; a fatal failure is diverted without consuming it).
 
@@ -100,7 +98,7 @@ Each property resolves from the environment variable first, then `application.pr
 
 An environment variable set to the empty string resolves as unset, so the properties file or the code default applies. A property therefore cannot be switched off by blanking its variable, and no property may be documented as "leave empty to disable" — an optional feature needs an explicit sentinel value instead.
 
-Every adapter reads its topics from `<adapterName>.topics` and its backend settings from keys prefixed with its short name; each adapter's own README documents its properties. Secrets — admin keys, passwords, client secrets, the master key — have no defaults and are supplied per environment. Several are required with no fallback and fail startup when absent, `apisix.admin.key` among them: a default would let a deployment come up reachable but unauthenticated. [DEPLOYMENT.md](DEPLOYMENT.md) is the sole home for all environment variables, ports, health and probe endpoints, secret handling, Kafka tuning, and the Docker Compose and Kubernetes examples.
+Every adapter reads its topics from `<adapterName>.topics` and its backend settings from keys prefixed with its short name; each adapter's own README documents its properties. Secrets — admin keys, passwords, client secrets, the master key — are supplied per environment. Several are required with no fallback and fail startup when absent, `apisix.admin.key` among them: a default would let a deployment come up reachable but unauthenticated. Others do carry a default — `keycloak.password` falls back to `admin`, `nifi.oidc.client-secret` and `postgis.jdbc.password` to empty — and **MUST** be set explicitly. [DEPLOYMENT.md](DEPLOYMENT.md) is the sole home for all environment variables, ports, health and probe endpoints, secret handling, Kafka tuning, and the Docker Compose example.
 
 ### Alignment with the deployment repository
 

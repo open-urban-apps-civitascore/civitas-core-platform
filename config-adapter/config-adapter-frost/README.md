@@ -56,7 +56,7 @@ fields.
 `FrostSagaHandler` is invoked in-process by the Flowable orchestrator; saga steps do not travel over
 Kafka. It handles project-level operations only:
 
-| Operation | Request | Compensated by |
+| Operation | Request | Compensation |
 |---|---|---|
 | `CREATE_PROJECT` | Name lookup, then `POST /Projects` if absent | `DELETE_PROJECT` |
 | `UPDATE_PROJECT` | Reads the current name and description, then `PATCH /Projects({projectId})` | `RESTORE_PROJECT` |
@@ -86,13 +86,13 @@ Kafka. It handles project-level operations only:
 Keys carry the `frost.` prefix. Env-var names, production values, secret handling and container
 configuration live in [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-| Property | Default |
+| Property | Coded default |
 |---|---|
-| `frost.topics` | — **required** |
+| `frost.topics` | — required for config events; without it the adapter subscribes to nothing |
 | `frost.url` | `http://localhost:8080/v1.1` |
 | `frost.public.url` | value of `frost.url` |
 | `frost.basic.auth.username` | — |
-| `frost.basic.auth.password` | empty |
+| `frost.basic.auth.password` | — |
 | `frost.api.key` | — |
 | `frost.api.key.header` | `X-API-Key` |
 

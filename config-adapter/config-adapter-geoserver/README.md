@@ -53,7 +53,7 @@ publication and pruning; `datasinks` only resolves native table names and the na
 | `PROVISION_LAYERS` | Uploads `styles`, publishes a feature type per `layers` entry, assigns styles | `DELETE_WORKSPACE` |
 | `PROVISION_WORKSPACE` | The three create steps in one call; no saga process dispatches it | — |
 | `UPDATE_WORKSPACE` | Ensures workspace and datastore exist, converges feature types from `layers`, snapshots the current ones | `RESTORE_WORKSPACE` |
-| `PRUNE_FEATURE_TYPES` | Deletes feature types no `layers` entry names | — terminal, see Behaviour |
+| `PRUNE_FEATURE_TYPES` | Deletes feature types that no `layers` entry names | — terminal, see Behaviour |
 | `DELETE_WORKSPACE` | Recursive workspace delete | — |
 | `RESTORE_WORKSPACE` | Deletes feature types absent from the snapshot, then restores the snapshot | — |
 
@@ -111,16 +111,16 @@ Property keys carry the `geoserver.` prefix. Env vars, production values and sec
 
 | Property | Coded default |
 |---|---|
-| `geoserver.topics` | — Required for config events; without it the adapter subscribes to nothing |
+| `geoserver.topics` | — required for config events; without it the adapter subscribes to nothing |
 | `geoserver.url` | `http://localhost:8080/geoserver` — trailing slashes stripped |
 | `geoserver.public.url` | value of `geoserver.url` — base of the WFS/WMS URLs in saga results |
-| `geoserver.admin.user` | — **Required** |
-| `geoserver.admin.password` | — **Required**, accepts `ENC(…)` |
+| `geoserver.admin.user` | — **required** |
+| `geoserver.admin.password` | — **required**, accepts `ENC(…)` |
 | `geoserver.postgis.host` | `localhost` |
 | `geoserver.postgis.port` | `5432` |
 | `geoserver.postgis.database` | `civitas_geo` |
-| `geoserver.postgis.user` | — Required for saga steps |
-| `geoserver.postgis.password` | — Required for saga steps, accepts `ENC(…)` |
+| `geoserver.postgis.user` | — required for saga steps |
+| `geoserver.postgis.password` | — required for saga steps, accepts `ENC(…)` |
 
 No `geoserver.postgis.schema` is read: the datastore schema is the derived workspace name. The `postgis.*` keys
 are read by the saga handler only.

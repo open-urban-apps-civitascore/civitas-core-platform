@@ -114,7 +114,7 @@ DELETE are absorbed as success.
 Keys carry the `apisix.` prefix. Env-var names, production values and gateway provisioning live in
 [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-| Property | Default | Used by |
+| Property | Coded default | Used by |
 |---|---|---|
 | `apisix.topics` | — | events |
 | `apisix.admin.url` | `http://localhost:9180` | both |

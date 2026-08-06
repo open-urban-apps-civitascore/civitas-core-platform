@@ -24,7 +24,7 @@ payload that is none of the three is rejected.
 `de.civitascore.data.sql.table.updated` MUST NOT be subscribed. Result events go to the `resultTopic` from
 the incoming metadata, with CloudEvent type `de.civitascore.data.sql.processing.result`.
 
-| Forward | Payload field | Teardown | Teardown payload |
+| Forward | Payload field | Compensation | Compensation payload |
 |---|---|---|---|
 | `CREATE_TABLE` | `tableConfig` | `DROP_TABLE` | `{schema?, table}` |
 | `CREATE_SCHEMA` | `schemaConfig` | `DROP_SCHEMA` | `{schema, cascade?}` |
@@ -136,19 +136,23 @@ stays `JSONB` and is never followed as a parent.
 Keys carry the `postgis.` prefix. Env-var names, production values and secret handling live in
 [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-| Property | Default |
+| Property | Coded default |
 |---|---|
 | `postgis.topics` | — |
-| `postgis.jdbc.url` | — **required** |
-| `postgis.jdbc.user` | — **required** |
+| `postgis.jdbc.url` | — |
+| `postgis.jdbc.user` | — |
 | `postgis.jdbc.password` | empty |
 | `postgis.jdbc.maxPoolSize` | `5` |
 | `postgis.jdbc.connectionTimeoutMs` | `5000` |
 | `CIVITAS_MASTER_KEY` (env var only) | — |
 
-A missing required JDBC setting, and a non-numeric `postgis.jdbc.maxPoolSize`, fail initialization with a
-message naming the key. `postgis.jdbc.user` needs the privileges for the DDL it issues. A missing
-`CIVITAS_MASTER_KEY` is logged at startup and fails any event carrying an encrypted password.
+An unresolved `postgis.jdbc.url` or `postgis.jdbc.user` fails initialization with a message naming the key, but the
+packaged `application.properties` supplies both — so an unset `POSTGIS_JDBC_URL` connects to the packaged database
+rather than failing. Only the password has no packaged value. A
+non-numeric `postgis.jdbc.maxPoolSize` or `postgis.jdbc.connectionTimeoutMs` fails initialization with a
+number-format error naming only the offending value, not the key. `postgis.jdbc.user` needs the privileges
+for the DDL it issues. A missing `CIVITAS_MASTER_KEY` is logged at startup and fails any event carrying an
+encrypted password.
 
 ## Error codes
 

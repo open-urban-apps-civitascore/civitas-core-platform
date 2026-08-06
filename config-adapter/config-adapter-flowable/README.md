@@ -41,9 +41,9 @@ GeoServer attempts no teardown.
 
 ## Branch flags
 
-Derived from the trigger payload by the consumer and never read from it, so a producer cannot force a branch. Gating
-the geo branch keeps a deployment without a GeoServer adapter from failing every delete, and avoids a recursive
-workspace delete on a dataset that has no geo data.
+Derived from the trigger payload by the consumer and never read from it. Gating the geo branch keeps a deployment
+without a GeoServer adapter from failing every delete, and avoids a recursive workspace delete on a dataset that has
+no geo data.
 
 | Flag | True when |
 |---|---|
@@ -55,9 +55,10 @@ workspace delete on a dataset that has no geo data.
 
 - **Steps execute in-process.** A step resolves the adapter's `SagaCommandHandler` from the registry by name and calls
   it directly, so no Kafka round trip is paid per step and no step-level topics exist.
-- **`frost` and `apisix` MUST be registered** — every saga path uses them unconditionally, and their absence fails
-  startup. `nifi`, `geoserver` and `postgis` resolve lazily per step, so a deployment without them boots; a forward
-  step reaching an absent handler raises a saga failure routed through the normal path rather than crashing.
+- **`frost` and `apisix` MUST be registered** — the startup check demands both regardless of which sagas the
+  deployment runs, and their absence fails startup. `nifi`, `geoserver` and `postgis` resolve lazily per step, so a
+  deployment without them boots; a forward step reaching an absent handler raises a saga failure routed through the
+  normal path rather than crashing.
 - **Compensation is best-effort.** A teardown that fails or finds no handler is recorded in `compensationErrors` and
   the chain continues; the result then reports `FAILED` rather than `COMPENSATED`. Each step records what it created
   under its own step id and its teardown acts on that record, so a teardown is never gated on configuration.
@@ -98,17 +99,18 @@ Env vars, production values and database provisioning live in [../DEPLOYMENT.md]
 
 | Property | Coded default |
 |---|---|
-| `flowable.jdbc.url` | — **Required** |
-| `flowable.jdbc.username` | — **Required** |
-| `flowable.jdbc.password` | — **Required** |
+| `flowable.jdbc.url` | — |
+| `flowable.jdbc.username` | — |
+| `flowable.jdbc.password` | — **required** |
 | `flowable.kafka.group.id` | `config-adapter-flowable-group` |
 | `kafka.bootstrap.servers` | `localhost:9092` |
 | `pipeline.status-topic` | `de.civitascore.pipeline.status` |
 
-The three JDBC properties have no coded default: all three MUST resolve, or startup fails with an
-incomplete-configuration error rather than connecting somewhere unintended. An empty environment variable
-resolves to the default, not to unset. Flowable requires a database of its own, separate from any other
-component's.
+The three JDBC properties have no coded default, and all three MUST resolve or startup fails with an
+incomplete-configuration error. The packaged `application.properties` supplies a url and a username, so only an
+unresolved password fails startup; an unset `FLOWABLE_JDBC_URL` connects to the packaged database instead. An empty
+environment variable resolves as unset, so the properties file value applies. Flowable requires a database of its
+own, separate from any other component's.
 
 ## Testing
 
