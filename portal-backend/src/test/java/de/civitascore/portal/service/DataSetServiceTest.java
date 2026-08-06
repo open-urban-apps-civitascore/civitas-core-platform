@@ -644,9 +644,11 @@ class DataSetServiceTest {
     @DisplayName("publishes an update for a provisioned dataset that has no FROST project")
     void publishesUpdateForProvisionedDatasetWithoutFrostProject() {
       // A dataset with no FROST sink has no projectId, so keying the publish on one would silently
-      // stop all UPDATE sagas for it — no route auth re-apply, no GeoServer prune.
+      // stop all UPDATE sagas for it — no route auth re-apply, no GeoServer prune. Its named API is
+      // OWS: an STA one could not have been released without a FROST sink in the first place.
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
+      ds.getNamedApis().forEach(api -> api.setStandard(ApiStandard.OWS));
       ds.setDataSetStatus(DataSetStatus.AVAILABLE);
       ds.setProvisioned(true);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
