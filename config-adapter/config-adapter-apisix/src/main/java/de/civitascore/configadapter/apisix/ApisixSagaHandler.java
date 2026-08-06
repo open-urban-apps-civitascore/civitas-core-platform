@@ -225,8 +225,8 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
 
   /**
    * The upstream target per routing kind, holding only the kinds a slug actually routes to. The
-   * same map decides which upstreams get created and which one each route binds to, so a route
-   * bound to an upstream that was never created is not representable.
+   * same map decides which upstreams get created and which one each route binds to, so the two
+   * cannot drift apart.
    *
    * <p>Resolved before any gateway state is touched, so a malformed URL or a missing {@code
    * upstreamUrl} fails the step up front. The FROST target is required only for STA: its URL exists

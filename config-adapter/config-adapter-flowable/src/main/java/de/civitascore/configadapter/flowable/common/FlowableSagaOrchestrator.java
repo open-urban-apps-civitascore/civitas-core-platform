@@ -25,8 +25,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Top-level facade for the Flowable-based saga orchestrator. Manages the lifecycle of the Flowable
- * engine, Kafka trigger consumer, and result publisher. Drop-in replacement for {@code
- * DatasetSagaOrchestrator}.
+ * engine, Kafka trigger consumer, and result publisher.
  *
  * <p>Infrastructure creation (DataSource, Kafka clients) is delegated to {@link
  * FlowableInfrastructureFactory}. Process deployment is delegated to {@link BpmnProcessDeployer}.
@@ -37,9 +36,8 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
 
   // Conditional steps are resolved lazily per step, so a saga that skips them runs fine without
   // their adapter (pipeline/nifi on hasPipelines, geoserver/postgis on hasGeoSink). See
-  // SagaStepDelegate. FROST is conditional per dataset too (hasFrostSink) but stays required here
-  // deliberately: it is the sink type every deployment ships, so a missing handler is a packaging
-  // fault worth failing fast on rather than a supported topology.
+  // SagaStepDelegate. FROST provisioning is conditional too (hasFrostSink), but its teardown step
+  // is unconditional, so every delete saga needs the handler.
   private static final Set<String> REQUIRED_HANDLERS = Set.of("frost", "apisix");
 
   private final AdapterConfig config;

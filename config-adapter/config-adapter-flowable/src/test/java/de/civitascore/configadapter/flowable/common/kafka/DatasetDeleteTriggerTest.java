@@ -24,7 +24,6 @@ import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.flowable.FlowableTestSupport;
 import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
 import de.civitascore.configadapter.flowable.common.SagaHandlerRegistry;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,13 +35,13 @@ import org.mockito.ArgumentCaptor;
 
 /**
  * Exercises the {@code DATASET_DELETE} teardown end-to-end through {@link FlowableTriggerConsumer}
- * against a real (H2) engine, so the flag derivations and the delete saga's conditional teardown
- * branches are tested together from a realistic trigger payload — not from preset process
- * variables.
+ * against a real (H2) engine, so the {@code hasGeoSink} derivation and the delete saga's
+ * conditional GeoServer/PostGIS teardown are tested together from a realistic trigger payload — not
+ * from a preset process variable.
  *
- * <p>Both teardowns are gated on the sink types the trigger carries: {@code hasGeoSink} (a POSTGIS
- * sink) runs workspace removal and sink deprovisioning, {@code hasFrostSink} runs project removal.
- * A trigger without {@code datasinks} touches no sink infrastructure at all.
+ * <p>The teardown is gated on {@code hasGeoSink} (derived from {@code datasinks}): a delete trigger
+ * carrying the POSTGIS sink runs workspace removal and sink deprovisioning, while a trigger without
+ * {@code datasinks} (e.g. from a backend predating the field) skips the geo branch.
  */
 class DatasetDeleteTriggerTest {
 
@@ -84,30 +83,13 @@ class DatasetDeleteTriggerTest {
   }
 
   @Test
-  void deleteWithoutDataSinksSkipsAllSinkTeardown() throws Exception {
-    // No datasinks in the trigger → both sink flags derive false → neither branch runs. The route
-    // teardown is unconditional and still has to happen.
-    TriggerTestSupport.processTrigger(consumer, deleteTrigger(false, false));
+  void deleteWithoutDataSinksSkipsGeoServerTeardown() throws Exception {
+    // No datasinks in the trigger → hasGeoSink derives false → the whole geo branch is skipped.
+    TriggerTestSupport.processTrigger(consumer, deleteTrigger(false));
     FlowableTestSupport.executeAllJobs(engine);
 
     verify(apisix).handle(any());
-    verify(frost, never()).handle(any());
-    verify(geoserver, never()).handle(any());
-    verify(postgis, never()).handle(any());
-  }
-
-  @Test
-  void deleteWithFrostSinkTearsDownTheProject() throws Exception {
-    // A FROST-only dataset tears down its project and nothing geo-related.
-    TriggerTestSupport.processTrigger(consumer, deleteTrigger(false, true));
-    FlowableTestSupport.executeAllJobs(engine);
-
-    ArgumentCaptor<SagaCommandMessage> frostCaptor =
-        ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(frost, times(1)).handle(frostCaptor.capture());
-    assertEquals("DELETE_PROJECT", frostCaptor.getValue().operation());
-    assertEquals("proj-789", frostCaptor.getValue().payload().get("projectId"));
-
+    verify(frost).handle(any());
     verify(geoserver, never()).handle(any());
     verify(postgis, never()).handle(any());
   }
@@ -115,9 +97,8 @@ class DatasetDeleteTriggerTest {
   @Test
   void deleteWithPostgisSinkTearsDownWorkspaceAndSink() throws Exception {
     // The delete trigger carries the POSTGIS sink (symmetric with create/update), so hasGeoSink
-    // derives true: the workspace is removed and the sink deprovisioned — each exactly once. No
-    // FROST sink means no project teardown.
-    TriggerTestSupport.processTrigger(consumer, deleteTrigger(true, false));
+    // derives true: the workspace is removed and the sink deprovisioned — each exactly once.
+    TriggerTestSupport.processTrigger(consumer, deleteTrigger(true));
     FlowableTestSupport.executeAllJobs(engine);
 
     ArgumentCaptor<SagaCommandMessage> geoCaptor =
@@ -139,10 +120,16 @@ class DatasetDeleteTriggerTest {
         ((Map<?, ?>) sink.get("configuration")).get("tableName"),
         "the sink configuration must reach the handler so it knows which table to drop");
 
-    verify(frost, never()).handle(any());
+    // The dataset carries no FROST sink, yet its recorded project is still torn down: teardown
+    // follows what was provisioned, not what is configured now.
+    ArgumentCaptor<SagaCommandMessage> frostCaptor =
+        ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(frost, times(1)).handle(frostCaptor.capture());
+    assertEquals("DELETE_PROJECT", frostCaptor.getValue().operation());
+    assertEquals("proj-789", frostCaptor.getValue().payload().get("projectId"));
   }
 
-  private byte[] deleteTrigger(boolean withGeoSink, boolean withFrostSink) throws Exception {
+  private byte[] deleteTrigger(boolean withGeoSink) throws Exception {
     Map<String, Object> trigger =
         new HashMap<>(
             Map.of(
@@ -151,20 +138,15 @@ class DatasetDeleteTriggerTest {
                 "projectId", "proj-789",
                 "serviceId", "svc-1",
                 "pipelineIds", List.of()));
-    List<Map<String, Object>> datasinks = new ArrayList<>();
     if (withGeoSink) {
-      datasinks.add(
-          Map.of(
-              "type",
-              "POSTGIS",
-              "configuration",
-              Map.of("schema", "ds_456", "tableName", "observations")));
-    }
-    if (withFrostSink) {
-      datasinks.add(Map.of("type", "FROST", "configuration", Map.of()));
-    }
-    if (!datasinks.isEmpty()) {
-      trigger.put("datasinks", datasinks);
+      trigger.put(
+          "datasinks",
+          List.of(
+              Map.of(
+                  "type",
+                  "POSTGIS",
+                  "configuration",
+                  Map.of("schema", "ds_456", "tableName", "observations"))));
     }
     return objectMapper.writeValueAsBytes(trigger);
   }

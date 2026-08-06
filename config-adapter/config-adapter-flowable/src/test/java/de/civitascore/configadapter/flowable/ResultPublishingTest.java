@@ -251,7 +251,6 @@ class ResultPublishingTest {
     vars.put("sagaId", sagaId);
     vars.put("datasetId", "ds-1");
     vars.put("hasPipelines", false);
-    vars.put("hasFrostSink", true);
     vars.put("projectId", "p-1");
     vars.put("routeId", "r-1");
     vars.put("serviceId", "s-1");

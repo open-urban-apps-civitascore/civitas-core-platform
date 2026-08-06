@@ -275,15 +275,15 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     // update saga is gated on the sink rather than on the project. Provision it here instead of
     // failing: the create path is find-or-create on a name carrying the dataset id, so it is
     // idempotent and can only ever bind this dataset to its own project.
-    if (!(command.payload().get(KEY_PROJECT_ID) instanceof String existingId)
-        || existingId.isBlank()) {
+    if (!(command.payload().get(KEY_PROJECT_ID) instanceof String projectId)
+        || projectId.isBlank()) {
       log.info(
-          "UPDATE_PROJECT: dataset has no FROST project yet — provisioning it. saga={}",
+          "UPDATE_PROJECT: dataset {} has no FROST project yet — provisioning it. saga={}",
+          Encode.forJava((String) command.payload().get("datasetId")),
           Encode.forJava(command.sagaId()));
       return handleCreateProject(command);
     }
 
-    String projectId = requireString(command, KEY_PROJECT_ID);
     String datasetName = requireString(command, "datasetName");
     String datasetId = requireString(command, "datasetId");
     String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");

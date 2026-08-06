@@ -354,6 +354,8 @@ class ApisixSagaHandlerTest {
 
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
+        // Upstream targets resolve before any write, so a bad URL touches no gateway state.
+        verify(mockBuilder, never()).put(any(Entity.class));
       }
     }
 

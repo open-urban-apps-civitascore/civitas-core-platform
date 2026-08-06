@@ -115,7 +115,7 @@
       <outgoing>flow-frost-comp-restore</outgoing>
       <outgoing>flow-frost-comp-skip</outgoing>
     </exclusiveGateway>
-    <serviceTask id="compensate-frost" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Restore FROST Project">
+    <serviceTask id="compensate-frost" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Revert FROST Project">
       <extensionElements>
         <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="frost"/>
         <flowable:field xsi:type="xs:anyType" name="operation" stringValue="RESTORE_PROJECT"/>

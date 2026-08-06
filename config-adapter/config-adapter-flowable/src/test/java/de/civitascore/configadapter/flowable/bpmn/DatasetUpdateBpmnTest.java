@@ -185,8 +185,10 @@ class DatasetUpdateBpmnTest {
     executeAllJobs();
 
     assertProcessFinished(instance.getId());
-    // Nothing was updated in FROST, so there is no previous project state to restore.
+    // Nothing was updated in FROST, so there is no previous project state to restore — but the saga
+    // must still report the failure rather than finishing quietly.
     verify(frostHandler, never()).handle(any());
+    assertEquals(List.of("publish-failure"), publishTaskIds(instance.getId()));
   }
 
   @Test
@@ -308,16 +310,7 @@ class DatasetUpdateBpmnTest {
   }
 
   private List<String> publishTaskIds(String processInstanceId) {
-    return historyService
-        .createHistoricActivityInstanceQuery()
-        .processInstanceId(processInstanceId)
-        .activityType("serviceTask")
-        .finished()
-        .list()
-        .stream()
-        .map(org.flowable.engine.history.HistoricActivityInstance::getActivityId)
-        .filter(id -> id.startsWith("publish-"))
-        .toList();
+    return FlowableTestSupport.getPublishedResultTaskIds(historyService, processInstanceId);
   }
 
   private void assertProcessFinished(String processInstanceId) {

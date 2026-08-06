@@ -63,9 +63,10 @@ public class DataSetOutputDTO extends BaseOutputDTO {
 
   @Schema(
       description =
-          "Whether a provisioning saga has run, so the dataset's configured sinks physically exist"
-              + " (a PostGIS table / FROST project). Stays true across an unrelease. Used to warn"
-              + " before a destructive sink change that would rebuild the table.",
+          "Whether a provisioning saga has completed successfully, so whatever sinks the dataset"
+              + " carried at release physically exist (a PostGIS table / FROST project). Stays true"
+              + " across an unrelease. Used to warn before a destructive sink change that would"
+              + " rebuild the table.",
       accessMode = Schema.AccessMode.READ_ONLY)
   private Boolean provisioned;
 }

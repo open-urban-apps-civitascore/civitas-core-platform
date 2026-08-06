@@ -142,8 +142,12 @@ class DatasetCreateBpmnTest {
     assertProcessFinished(instance.getId());
 
     // The route failure routes through the compensation gateway straight to publish-failure: there
-    // is no project to delete, so FROST is never called in either direction.
+    // is no project to delete, so FROST is never called in either direction. The saga must still
+    // report the failure — skipping compensation is not the same as succeeding.
     verify(frostHandler, never()).handle(any());
+    assertEquals(
+        List.of("publish-failure"),
+        FlowableTestSupport.getPublishedResultTaskIds(historyService, instance.getId()));
   }
 
   @Test

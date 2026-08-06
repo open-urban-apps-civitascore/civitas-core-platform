@@ -220,7 +220,8 @@ public class FlowableTriggerConsumer {
     // Always derive — never trust external payload for these control flags
     variables.put("hasPipelines", deriveHasPipelines(trigger));
     // A POSTGIS sink gates the GeoServer branch (GeoServer publishes it via a PostGIS datastore); a
-    // FROST sink gates the FROST-project branch.
+    // FROST sink gates FROST provisioning. FROST teardown is deliberately ungated: it keys on the
+    // recorded project id, so removing the sink first cannot orphan the project.
     variables.put("hasGeoSink", hasDataSinkOfType(trigger, DATASINK_TYPE_POSTGIS));
     variables.put("hasFrostSink", hasDataSinkOfType(trigger, DATASINK_TYPE_FROST));
     variables.put("hasLayers", deriveHasLayers(trigger));
@@ -244,9 +245,8 @@ public class FlowableTriggerConsumer {
   }
 
   /**
-   * Derives the hasPipelines flag from the trigger payload. Matches the behavior of
-   * DatasetSagaOrchestrator's HAS_PIPELINES predicate: true if dataPipelines or pipelineIds is a
-   * non-empty list.
+   * Derives the hasPipelines flag from the trigger payload: true if dataPipelines or pipelineIds is
+   * a non-empty list.
    */
   private static boolean deriveHasPipelines(Map<String, Object> trigger) {
     Object dataPipelines = trigger.get("dataPipelines");
@@ -264,9 +264,7 @@ public class FlowableTriggerConsumer {
   private static boolean hasDataSinkOfType(Map<String, Object> trigger, String sinkType) {
     return trigger.get("datasinks") instanceof List<?> datasinks
         && datasinks.stream()
-            .filter(Map.class::isInstance)
-            .map(Map.class::cast)
-            .anyMatch(sink -> sinkType.equals(sink.get("type")));
+            .anyMatch(sink -> sink instanceof Map<?, ?> map && sinkType.equals(map.get("type")));
   }
 
   /**
