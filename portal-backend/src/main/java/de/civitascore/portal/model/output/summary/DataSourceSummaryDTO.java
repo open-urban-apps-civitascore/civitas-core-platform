@@ -1,5 +1,6 @@
 package de.civitascore.portal.model.output.summary;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -12,4 +13,7 @@ import lombok.EqualsAndHashCode;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
+@Schema(
+    description =
+        "Lightweight data source reference — id and name only, no connector configuration.")
 public class DataSourceSummaryDTO extends BaseSummaryNamedDTO {}

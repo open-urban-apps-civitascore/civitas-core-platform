@@ -13,6 +13,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.util.RestPage;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -306,7 +307,7 @@ class DataSetUsableDataSourcesIntegrationTest
     ds.setDatapoolScopeType(scopeType);
     ds.setScopedDataPools(
         new HashSet<>(
-            java.util.Arrays.stream(scopedPoolIds)
+            Arrays.stream(scopedPoolIds)
                 .map(id -> dataPoolRepository.findById(id).orElseThrow())
                 .toList()));
     return dataSourceRepository.save(ds).getId();

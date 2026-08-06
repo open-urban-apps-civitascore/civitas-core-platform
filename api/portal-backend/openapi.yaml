@@ -7777,9 +7777,10 @@ paths:
       summary: List the data sources this dataset's pipelines may use
       description: "Returns the AVAILABLE data sources released either for every datapool\
         \ or for this dataset's datapool; a dataset in no datapool sees only the former.\
-        \ Requires DATASET_UPDATE on the dataset rather than DATASOURCE_READ, and returns\
-        \ id and name only. Callers lacking that permission are rejected with 403; a dataset\
-        \ outside the caller's X-Allowed-Scope-Ids/X-Allowed-Pool-Ids returns 404."
+        \ Requires DATASET_UPDATE on the dataset rather than DATASOURCE_READ, and\
+        \ returns id and name only. Callers lacking that permission are rejected with\
+        \ 403; a dataset outside the caller's X-Allowed-Scope-Ids/X-Allowed-Pool-Ids\
+        \ returns 404."
       operationId: getUsableDataSources
       parameters:
       - name: id
@@ -7976,8 +7977,8 @@ components:
   schemas:
     DataSourceSummaryDTO:
       type: object
-      description: Lightweight data source reference — id and name only, no connector
-        configuration.
+      description: "Lightweight data source reference — id and name only, no connector\
+        \ configuration."
       properties:
         id:
           type: string
