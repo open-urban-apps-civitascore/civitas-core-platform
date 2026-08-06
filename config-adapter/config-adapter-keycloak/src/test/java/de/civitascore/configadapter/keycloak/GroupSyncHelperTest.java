@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.keycloak;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -20,15 +21,23 @@ import static org.mockito.Mockito.when;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.keycloak.admin.client.resource.GroupResource;
+import org.keycloak.admin.client.resource.GroupsResource;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.admin.client.resource.UsersResource;
 import org.keycloak.representations.idm.GroupRepresentation;
+import org.keycloak.representations.idm.UserRepresentation;
 
 class GroupSyncHelperTest {
 
@@ -55,6 +64,151 @@ class GroupSyncHelperTest {
     g.setId(id);
     g.setName(name);
     return g;
+  }
+
+  @Nested
+  @DisplayName("syncGroupMembers (group side)")
+  class SyncGroupMembers {
+
+    private static final String GROUP_ID = "group-1";
+
+    private GroupResource groupResource;
+
+    @BeforeEach
+    void setUpGroup() {
+      GroupsResource groupsResource = mock(GroupsResource.class);
+      groupResource = mock(GroupResource.class);
+      when(realmResource.groups()).thenReturn(groupsResource);
+      when(groupsResource.group(GROUP_ID)).thenReturn(groupResource);
+    }
+
+    private UserRepresentation user(String id) {
+      UserRepresentation u = new UserRepresentation();
+      u.setId(id);
+      return u;
+    }
+
+    private UserResource userResourceFor(String id) {
+      UserResource r = mock(UserResource.class);
+      when(usersResource.get(id)).thenReturn(r);
+      return r;
+    }
+
+    @Test
+    @DisplayName("null desired set skips reconciliation entirely (never wipes members)")
+    void shouldSkipWhenDesiredNull() {
+      helper.syncGroupMembers(null, GROUP_ID, realmResource);
+
+      verify(groupResource, never()).members(anyInt(), anyInt());
+    }
+
+    @Test
+    @DisplayName("adds missing members and removes stale members (keyed on user externalId)")
+    void shouldAddAndRemoveMembers() {
+      when(groupResource.members(0, 100)).thenReturn(List.of(user("keep-id"), user("stale-id")));
+      UserResource stale = userResourceFor("stale-id");
+      UserResource added = userResourceFor("new-id");
+      UserResource kept = userResourceFor("keep-id");
+
+      helper.syncGroupMembers(Set.of("keep-id", "new-id"), GROUP_ID, realmResource);
+
+      verify(stale).leaveGroup(GROUP_ID);
+      verify(added).joinGroup(GROUP_ID);
+      verify(kept, never()).leaveGroup(GROUP_ID);
+    }
+
+    @Test
+    @DisplayName("NotFoundException on leave (raced removal) is logged and does not abort the loop")
+    void shouldContinueWhenLeaveRaces() {
+      when(groupResource.members(0, 100)).thenReturn(List.of(user("gone-id"), user("other-id")));
+      UserResource gone = userResourceFor("gone-id");
+      UserResource other = userResourceFor("other-id");
+      doThrow(new NotFoundException()).when(gone).leaveGroup(GROUP_ID);
+
+      helper.syncGroupMembers(Collections.emptySet(), GROUP_ID, realmResource);
+
+      verify(gone).leaveGroup(GROUP_ID);
+      verify(other).leaveGroup(GROUP_ID);
+    }
+
+    @Test
+    @DisplayName("WebApplicationException on leave propagates so the event is DLQ'd")
+    void shouldPropagateServerErrorOnLeave() {
+      when(groupResource.members(0, 100)).thenReturn(List.of(user("u")));
+      UserResource failing = userResourceFor("u");
+      doThrow(new WebApplicationException(Response.serverError().build()))
+          .when(failing)
+          .leaveGroup(GROUP_ID);
+
+      assertThrows(
+          WebApplicationException.class,
+          () -> helper.syncGroupMembers(Collections.emptySet(), GROUP_ID, realmResource));
+    }
+
+    @Test
+    @DisplayName("empty desired set removes all current members")
+    void shouldRemoveAllWhenEmpty() {
+      when(groupResource.members(0, 100)).thenReturn(List.of(user("a"), user("b")));
+      UserResource a = userResourceFor("a");
+      UserResource b = userResourceFor("b");
+
+      helper.syncGroupMembers(Collections.emptySet(), GROUP_ID, realmResource);
+
+      verify(a).leaveGroup(GROUP_ID);
+      verify(b).leaveGroup(GROUP_ID);
+    }
+
+    @Test
+    @DisplayName("NotFoundException on join (unsynced user) is logged and does not abort the loop")
+    void shouldSkipUnsyncedUserOnJoin() {
+      when(groupResource.members(0, 100)).thenReturn(Collections.emptyList());
+      UserResource ghost = userResourceFor("ghost-id");
+      UserResource present = userResourceFor("present-id");
+      doThrow(new NotFoundException()).when(ghost).joinGroup(GROUP_ID);
+
+      helper.syncGroupMembers(
+          new LinkedHashSet<>(List.of("ghost-id", "present-id")), GROUP_ID, realmResource);
+
+      verify(ghost).joinGroup(GROUP_ID);
+      verify(present).joinGroup(GROUP_ID);
+    }
+
+    @Test
+    @DisplayName("WebApplicationException on join propagates so the event is DLQ'd")
+    void shouldPropagateServerErrorOnJoin() {
+      when(groupResource.members(0, 100)).thenReturn(Collections.emptyList());
+      UserResource failing = userResourceFor("u");
+      doThrow(new WebApplicationException(Response.serverError().build()))
+          .when(failing)
+          .joinGroup(GROUP_ID);
+
+      assertThrows(
+          WebApplicationException.class,
+          () -> helper.syncGroupMembers(Set.of("u"), GROUP_ID, realmResource));
+    }
+
+    @Test
+    @DisplayName("paginates current members so groups with >100 members don't lose the overflow")
+    void shouldPaginateCurrentMembers() {
+      List<UserRepresentation> firstPage = new ArrayList<>();
+      for (int i = 0; i < 100; i++) {
+        firstPage.add(user("id-" + i));
+      }
+      when(groupResource.members(0, 100)).thenReturn(firstPage);
+      // Second page is short (size 1 < KEYCLOAK_PAGE_SIZE), so fetchAllPaged stops here.
+      when(groupResource.members(100, 100)).thenReturn(List.of(user("id-100")));
+      UserResource overflow = userResourceFor("id-100");
+
+      // desired keeps page 1 entirely; overflow id-100 is not desired and must be removed
+      Set<String> desired = new HashSet<>();
+      for (int i = 0; i < 100; i++) {
+        desired.add("id-" + i);
+      }
+
+      helper.syncGroupMembers(desired, GROUP_ID, realmResource);
+
+      verify(overflow).leaveGroup(GROUP_ID);
+    }
   }
 
   @Test
@@ -191,7 +345,7 @@ class GroupSyncHelperTest {
   @Test
   @DisplayName("paginates current memberships so users with >100 groups don't lose the overflow")
   void shouldPaginateCurrentMemberships() {
-    List<GroupRepresentation> firstPage = new java.util.ArrayList<>();
+    List<GroupRepresentation> firstPage = new ArrayList<>();
     for (int i = 0; i < 100; i++) {
       firstPage.add(group("id-" + i, "group-" + i));
     }
@@ -201,7 +355,7 @@ class GroupSyncHelperTest {
     when(userResource.groups(200, 100)).thenReturn(Collections.emptyList());
 
     // desired keeps page 1 entirely; overflow id-100 is not desired and must be removed
-    List<String> desired = new java.util.ArrayList<>();
+    List<String> desired = new ArrayList<>();
     for (int i = 0; i < 100; i++) {
       desired.add("id-" + i);
     }

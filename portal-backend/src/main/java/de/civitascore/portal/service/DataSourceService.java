@@ -19,6 +19,8 @@ import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.repository.specification.DataSourceDatapoolUsability;
+import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
@@ -33,6 +35,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +61,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final PipelineRepository pipelineRepository;
   private final DataPoolRepository dataPoolRepository;
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
+  private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -95,6 +101,34 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   @Override
   protected ReleasableStatus getAvailableStatus() {
     return DataSourceStatus.AVAILABLE;
+  }
+
+  /**
+   * Restricts the generic CRUD update to DRAFT data sources. A released (AVAILABLE) data source may
+   * only be changed through {@link #updateReleasedMeta(UUID, DataSourceInputDTO)}, which is the
+   * single point that enforces the in-use constraints and re-asserts the DataSource→DataPool scope
+   * rule for the datasets the source already feeds. Without this restriction the generic route
+   * would reach {@link #postConvertToEntity} — which applies a new datapool scope unconditionally —
+   * and silently bypass both guards.
+   *
+   * @param id the data source ID
+   * @param input the update input
+   * @return the updated data source
+   * @throws InvalidInputException if the data source is not in DRAFT status
+   */
+  @Override
+  @Transactional
+  public DataSource update(UUID id, DataSourceInputDTO input) {
+    DataSource existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataSourceStatus() != DataSourceStatus.DRAFT) {
+      throw new InvalidInputException(
+          getEntityName(),
+          id,
+          "DataSource can only be updated in DRAFT status, current status: "
+              + existingEntity.getDataSourceStatus()
+              + ". Use the released metadata endpoint instead.");
+    }
+    return super.update(id, input);
   }
 
   /**
@@ -341,6 +375,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
     if (input.getDatapoolScope() != null) {
       applyDatapoolScope(entity, input.getDatapoolScope());
+      if (inUse) {
+        revalidateLinkedDatasetsAgainstNewScope(entity);
+      }
     }
 
     if (!inUse) {
@@ -348,6 +385,27 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
 
     return save(entity);
+  }
+
+  /**
+   * Re-asserts the DataSource→DataPool scope rule after this DataSource's own scope was narrowed,
+   * for every dataset it already feeds. Narrowing a bound DataSource (e.g. {@code ALL → SPECIFIC}
+   * excluding a pool it is linked into, or {@code → NONE}) would otherwise reach the same persisted
+   * state the pipeline-write validation rejects, without any path re-checking it. Each referencing
+   * pipeline is validated against its own dataset's datapool; the managed DataSource already
+   * carries the new scope.
+   *
+   * @param dataSource the DataSource whose scope has just been changed
+   * @throws de.civitascore.portal.util.DataSourceScopeViolationException if it is now out of scope
+   *     for any dataset it feeds
+   */
+  private void revalidateLinkedDatasetsAgainstNewScope(DataSource dataSource) {
+    List<DataSource> sources = List.of(dataSource);
+    pipelineRepository
+        .findByDataSourcesId(dataSource.getId())
+        .forEach(
+            pipeline ->
+                datapoolScopeValidator.validate(sources, pipeline.getDataSet().getDataPool()));
   }
 
   private void validateInUseConstraints(DataSourceInputDTO input, DataSource entity) {
@@ -483,6 +541,26 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       throw new InvalidInputException(
           getEntityName(), entity.getId(), "Invalid configuration: " + String.join("; ", errors));
     }
+  }
+
+  /**
+   * Returns the AVAILABLE data sources a dataset in the given datapool may build a pipeline from,
+   * ordered by name.
+   *
+   * <p>Restricted to AVAILABLE because {@code PipelineService} rejects anything else on save, so
+   * offering a DRAFT source would only produce a failure one step later.
+   *
+   * @param dataPool the datapool of the dataset, or {@code null} for a pool-less dataset
+   * @return the usable data sources, ordered by name
+   */
+  @Transactional(readOnly = true)
+  public List<DataSource> findUsableIn(DataPool dataPool) {
+    Specification<DataSource> usable =
+        DataSourceDatapoolUsability.usableInPool(dataPool == null ? null : dataPool.getId())
+            .and(
+                (root, query, cb) ->
+                    cb.equal(root.get("dataSourceStatus"), DataSourceStatus.AVAILABLE));
+    return findAll(usable, Pageable.unpaged(Sort.by(Sort.Direction.ASC, "name"))).getContent();
   }
 
   /**

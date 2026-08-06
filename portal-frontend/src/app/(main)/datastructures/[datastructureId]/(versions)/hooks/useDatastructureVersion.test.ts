@@ -81,6 +81,20 @@ const validDiagram = () =>
     isDirty: false,
   }) as unknown as UMLDiagram
 
+/** The same two unconnected classes, but with one designated as root — a savable staged state. */
+const designatedRootDiagram = () => {
+  const alpha = classNode('a', 'Alpha')
+  ;(alpha.data.element as { isRoot?: boolean }).isRoot = true
+  return {
+    id: 'diagram-1',
+    name: 'Struct',
+    nodes: [alpha, classNode('b', 'Beta')],
+    edges: [],
+    lastModified: new Date(0),
+    isDirty: false,
+  } as unknown as UMLDiagram
+}
+
 const version = (over: Partial<DatastructureVersion> = {}): DatastructureVersion =>
   ({
     id: 'v1',
@@ -150,7 +164,7 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     })
 
     expect(saved).toBe(false)
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.releaseInvalidModel'))
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
     expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
     expect(updateStatus.mutateAsync).not.toHaveBeenCalled()
   })
@@ -167,12 +181,12 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     })
 
     expect(saved).toBe(false)
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.releaseInvalidModel'))
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
     expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
     expect(updateReleased.mutateAsync).not.toHaveBeenCalled()
   })
 
-  it('parks a draft diagram-only, silently, sending model null', async () => {
+  it('refuses a draft too, rather than parking it with a null model', async () => {
     const { hook, updateVersion } = setup(version())
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
@@ -181,23 +195,39 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
       saved = await hook.result.current.saveDatastructureVersion(DS_ID)
     })
 
-    expect(saved).toBe(true)
-    expect(toast.warning).not.toHaveBeenCalled()
-    expect(updateVersion.mutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ model: null }) }),
-    )
+    expect(saved).toBe(false)
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
+    expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
   })
 
-  it('parks a draft silently even when a model was previously persisted', async () => {
-    const { hook } = setup(version({ model: { title: 'Struct' } as never }))
+  it('refuses a draft even when a model was previously persisted', async () => {
+    const { hook, updateVersion } = setup(version({ model: { title: 'Struct' } as never }))
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
     await act(async () => {
       await hook.result.current.saveDatastructureVersion(DS_ID)
     })
 
-    expect(toast.warning).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
+    expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
+  })
+
+  it('saves unconnected classes once one of them is designated as root', async () => {
+    const { hook, updateVersion } = setup(version({ styles: designatedRootDiagram() }))
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(true)
     expect(toast.error).not.toHaveBeenCalled()
+
+    // Alpha is the document root; Beta stays in $defs, unreferenced but preserved.
+    const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
+    expect(payload.data.model).toMatchObject({ properties: { alpha: { $ref: '#/$defs/Alpha' } } })
+    expect(payload.data.model.$defs).toHaveProperty('Beta')
   })
 
   it('passes the exported model through for a resolvable diagram', async () => {

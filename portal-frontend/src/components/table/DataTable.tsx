@@ -178,15 +178,15 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
 
   if (tableTitle) {
     return (
-      <ContentCard>
-        <div className="flex items-start justify-between pt-2 pb-6">
+      <ContentCard className="px-0 pb-0">
+        <div className="flex items-start justify-between p-[calc(var(--layout-padding))] pt-0">
           <div className="max-w-2xl">
             <h2 className="text-2xl leading-none font-bold">{tableTitle}</h2>
             {tableSubtitle && <p className="text-sm text-muted-foreground mt-1">{tableSubtitle}</p>}
           </div>
           {tableAction}
         </div>
-        <hr className="border-border mb-4" />
+        <hr className="border-border" />
         {tableContent}
       </ContentCard>
     )

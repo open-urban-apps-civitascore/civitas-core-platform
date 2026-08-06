@@ -63,7 +63,7 @@ import org.owasp.encoder.Encode;
  * {@code /v1/*} catch-all, so APISIX' radix tree dispatches the saga route deterministically
  * without a second host. The {@code hosts} filter on the saga route is kept for deployment
  * determinism and is pinned end-to-end by {@code
- * ApisixSagaHandlerRoutingTest#shouldWinOverV1CatchAllOnSameHost}.
+ * ApisixSagaHandlerRoutingIT#shouldWinOverV1CatchAllOnSameHost}.
  */
 public class ApisixSagaHandler extends AbstractSagaCommandHandler {
 

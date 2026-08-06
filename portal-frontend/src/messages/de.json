@@ -108,14 +108,16 @@
       "updateSuccess": "{item} wurde erfolgreich aktualisiert",
       "updateError": "Beim Aktualisieren des {item}s ist ein Fehler aufgetreten.",
       "createSuccess": "{item} wurde erfolgreich angelegt",
-      "deleteSuccess": "{item} wurde erfolgreich gelöscht"
+      "deleteSuccess": "{item} wurde erfolgreich gelöscht",
+      "releasePermissionRequiredHint": "Die Berechtigung „Freigeben“ ist erforderlich. Ein Data Owner kann die Freigabe durchführen."
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
       "descriptionHint": "max. 150 Zeichen",
-      "creationSubtitle": "Im ersten Schritt ist nur ein Name erforderlich. Weitere Basisinformationen können später ergänzt werden."
+      "creationSubtitle": "Im ersten Schritt ist nur ein Name erforderlich. Weitere Basisinformationen können später ergänzt werden.",
+      "notAvailable": "Nicht verfügbar"
     },
     "success": {
       "statusChangeSuccess": "Der Verfügbarkeitsstatus wurde erfolgreich aktualisiert.",
@@ -187,12 +189,14 @@
     },
     "infoBoxes": {
       "firstBox": "Gruppen, die plattformweite Berechtigungen an allen datenbezogenen Elementen besitzen, haben Zugriff.",
-      "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen."
+      "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen.",
+      "atLeastOne": "Mindestens eine Rolle erforderlich"
     },
     "messages": {
       "updateSuccess": "Berechtigungen wurden erfolgreich aktualisiert.",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert.",
-      "updateErrorNotDraft": "Berechtigungen können nur aktualisiert werden, wenn der Datensatz im Entwurfsstatus ist."
+      "updateErrorNotDraft": "Berechtigungen können nur aktualisiert werden, wenn der Datensatz im Entwurfsstatus ist.",
+      "updateErrorSagaInFlight": "Der Datensatz wird gerade bereitgestellt. Bitte versuchen Sie es in einem Moment erneut."
     }
   },
   "sidebar": {
@@ -491,6 +495,12 @@
               },
               "persistence": {
                 "required": "Persistenz ist erforderlich"
+              },
+              "title": {
+                "tooLong": "Titel darf maximal 80 Zeichen lang sein"
+              },
+              "layerName": {
+                "tooLong": "Technischer Name darf maximal 80 Zeichen lang sein"
               }
             }
           }
@@ -513,7 +523,8 @@
       "unstageSuccess": "Der Datensatz wurde erfolgreich auf Entwurf zurückgesetzt.",
       "releaseSuccess": "Der Datensatz wurde erfolgreich freigegeben.",
       "unreleaseSuccess": "Die Freigabe des Datensatzes wurde erfolgreich aufgehoben.",
-      "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut."
+      "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+      "datasourceScopeViolation": "Der ausgewählte Datenpool ist nicht mit den verwendeten Datenquellen kompatibel. Eine oder mehrere Datenquellen sind für diesen Datenpool nicht freigegeben."
     },
     "warningModal": {
       "title": "Datensatz löschen?",
@@ -945,6 +956,8 @@
     "errors": {
       "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
       "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)",
+      "unsupportedBrokerScheme": "Verwenden Sie für MQTT eine unterstützte URL (tcp://, ws://, mqtt://, ssl://, mqtts:// oder wss://).",
+      "brokerTlsMismatch": "Broker-URL und TLS-Einstellung passen nicht zusammen.",
       "topicInvalidChars": "Das Topic darf keine Kommas, Semikolons oder Leerzeichen enthalten.",
       "topicSingle": "Es ist nur ein Topic erlaubt.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
@@ -978,7 +991,7 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
-      "accessManagement": "Zugriffsberechtigungen",
+      "accessManagement": "Zugriff",
       "datapools": "Datenpools"
     },
     "connectorTab": {
@@ -1070,7 +1083,7 @@
     },
     "tabs": {
       "basicInfo": "Basisinformationen",
-      "accessManagement": "Zugriffsberechtigungen",
+      "accessManagement": "Zugriff",
       "versions": "Versionen"
     },
     "edit": {
@@ -1130,7 +1143,7 @@
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
       "versionAlreadyExists": "Es existiert bereits eine Version mit der gleichen Versionsnummer in dieser Datenstruktur.",
       "versionFormat": "Die Versionsnummer muss dem Format X.Y.Z folgen (z. B. 1.0.0).",
-      "releaseInvalidModel": "Die Version kann nicht veröffentlicht werden: {reason}"
+      "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}"
     }
   },
   "pipelineEditor": {
@@ -1455,7 +1468,7 @@
     "rootValidation": {
       "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",
       "ambiguousRoot": "Das Diagramm hat mehrere mögliche Wurzelklassen ({names}). Markieren Sie die Wurzelklasse in den Klasseneigenschaften oder verbinden Sie die Klassen zu einer Hierarchie.",
-      "unreachable": "Diese Elemente sind von der Wurzelklasse „{root}“ aus nicht erreichbar: {names}. Verbinden Sie sie mit der Hierarchie oder entfernen Sie sie."
+      "misdirected": "Die Beziehung zwischen {name1} und {name2} ist falsch herum gezeichnet."
     }
   },
   "datapools": {

@@ -9,7 +9,13 @@ import lombok.Data;
 @Data
 public class PostgisConfiguration {
 
-  @Schema(description = "Target table name in the PostGIS database", example = "traffic_data")
+  @Schema(
+      description =
+          "Target table name in the PostGIS database. Must be a plain unquoted SQL identifier and"
+              + " unique across the dataset's POSTGIS sinks, which all share one schema.",
+      pattern = "^[A-Za-z_][A-Za-z0-9_]*$",
+      maxLength = 63,
+      example = "traffic_data")
   private String tableName;
 
   @Schema(description = "ID of the DataStructureVersion that defines the table schema")

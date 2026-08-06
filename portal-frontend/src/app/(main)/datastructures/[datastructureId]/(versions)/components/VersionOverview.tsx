@@ -217,6 +217,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         canSetDraft={canSetDraft}
         canRelease={canRelease}
         statusHint={statusHint}
+        availableHint={!canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined}
       />
       <ActionButtons
         confirmButtonType="button"

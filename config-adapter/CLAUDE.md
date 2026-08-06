@@ -100,8 +100,14 @@ PostgisConfigValue (sealed) → TableConfig, SchemaConfig, DbRoleConfig
 
 - Unit tests: JUnit 5 + Mockito. Pattern: mock `AdapterConfig`, create adapter, verify behavior with `ArgumentCaptor`
 - Integration tests: Testcontainers with `confluentinc/cp-kafka:7.5.3`, Awaitility for async assertions
-- FROST tests require JVM arg: `--add-opens java.base/java.net=ALL-UNNAMED` (configured in its pom.xml surefire plugin)
+- Naming decides the runner: `*Test.java` → Surefire (`mvn test`, Docker-free), `*IT.java` → Failsafe (`mvn verify`, Testcontainers). Any container-based test MUST be named `*IT`, otherwise `mvn test` boots containers.
+- Failsafe is bound once in the parent pom; modules only add `<configuration>`, never the goal binding
+- FROST/GeoServer ITs require JVM arg `--add-opens java.base/java.net=ALL-UNNAMED` (Jersey PATCH via reflection); APISIX ITs require `-Djdk.httpclient.allowRestrictedHeaders=host`. Both are set on the failsafe plugin in the respective pom.xml, prefixed with `@{argLine}` so jacoco's agent arg survives.
+- The parent pom defines an empty `argLine` property so `@{argLine}` still resolves when surefire/failsafe goals are invoked directly from the CLI (as CI does), without jacoco's prepare-agent
 - Test config uses `AppConfig(new MapConfiguration(props))` with inline properties
+- Awaitility's `pollDelay` defaults to `pollInterval`, so every `await()` blocks one full interval before the first check. Any test class using Awaitility MUST zero it in a static initializer: `Awaitility.setDefaultPollDelay(Duration.ZERO)`. There is no shared registration point (no Spring, and `junit-platform-launcher` is not on the test classpath), so it goes in each abstract IT base class and in each standalone test class that awaits
+- Container readiness must be awaited once after startup (static block), never in `@BeforeEach` — the containers are `static` and shared per JVM, so a per-method readiness poll is pure dead time
+- `Thread.sleep` is only legitimate for a *negative* assertion (proving something never happens, or state holding across ticks); such dwells carry a comment saying so. Anything waiting for a condition to become true uses Awaitility
 
 ## Local Development
 

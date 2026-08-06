@@ -21,6 +21,7 @@ import { crsOptions } from '@/const/crs'
 import { cn } from '@/lib/utils'
 import { DataSink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
+import { LAYER_TITLE_MAX_LENGTH } from '@/types/layers'
 import { OwsApiFormData } from '@/types/namedApis'
 import { Style } from '@/types/styles'
 import { getEmptyLabelIndex, isNewItem } from '@/utils/common'
@@ -185,6 +186,8 @@ export const LayerConfig = (props: LayerConfigProps) => {
                     required
                     disabled={isReadOnly}
                     formItemProps={wideField}
+                    maxLength={LAYER_TITLE_MAX_LENGTH}
+                    hasCharacterCount
                   />
                 </DetailsFieldContainer>
                 <DetailsFieldContainer className="border-b-0 py-2">
@@ -196,6 +199,8 @@ export const LayerConfig = (props: LayerConfigProps) => {
                     required
                     disabled={isReadOnly}
                     formItemProps={wideField}
+                    maxLength={LAYER_TITLE_MAX_LENGTH}
+                    hasCharacterCount
                   />
                 </DetailsFieldContainer>
                 <DetailsFieldContainer className="border-b-0 py-2 pb-6">

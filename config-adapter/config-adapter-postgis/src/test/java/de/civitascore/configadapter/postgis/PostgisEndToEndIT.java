@@ -31,6 +31,7 @@ import de.civitascore.configadapter.model.postgis.IndexConfig;
 import de.civitascore.configadapter.model.postgis.IndexConfig.IndexMethod;
 import de.civitascore.configadapter.model.postgis.PostgisConfigValue;
 import de.civitascore.configadapter.model.postgis.TableConfig;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import de.civitascore.event.handler.kafka.KafkaEventHandler;
 import de.civitascore.event.handler.kafka.ObjectMapperFactory;
 import io.cloudevents.CloudEvent;
@@ -80,7 +81,7 @@ class PostgisEndToEndIT extends AbstractPostgisIT {
   @SuppressWarnings("resource")
   @Container
   static ConfluentKafkaContainer kafka =
-      new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.3"))
+      new ConfluentKafkaContainer(DockerImageName.parse(TestContainerImages.KAFKA))
           .withReuse(false);
 
   private PostgisAdapter adapter;

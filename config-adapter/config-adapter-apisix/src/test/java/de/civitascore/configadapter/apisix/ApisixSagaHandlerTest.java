@@ -1117,6 +1117,115 @@ class ApisixSagaHandlerTest {
     }
 
     @Test
+    @DisplayName(
+        "retries the upstream delete while APISIX still reports a stale route reference, then"
+            + " completes")
+    void shouldRetryUpstreamDeleteOnStaleRouteReference() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        Response staleReference = mock(Response.class);
+        when(staleReference.getStatus()).thenReturn(400);
+        when(staleReference.readEntity(String.class))
+            .thenReturn(
+                "{\"error_msg\":\"can not delete this upstream, route [rid-things] is still using"
+                    + " it now\"}");
+        // Route delete succeeds; the immediately following upstream delete still sees the route in
+        // APISIX's worker-local route cache, then succeeds once the cache has caught up.
+        when(mockBuilder.delete()).thenReturn(ok, staleReference, ok, ok);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("routeIds", Map.of("things", "rid-things"));
+        payload.put("serviceId", "ds-001");
+
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "EXECUTE_STEP",
+                    "m",
+                    "saga-001",
+                    "delete-route",
+                    "apisix",
+                    "DELETE_ROUTE",
+                    payload));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // 1 route + 2 upstream attempts for ds-001 (one rejected, one accepted) + 1 for ds-001-ows.
+        verify(mockBuilder, times(4)).delete();
+      }
+    }
+
+    @Test
+    @DisplayName("fails the step when the stale route reference does not clear within the retries")
+    void shouldFailWhenStaleRouteReferencePersists() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        Response staleReference = mock(Response.class);
+        when(staleReference.getStatus()).thenReturn(400);
+        when(staleReference.readEntity(String.class))
+            .thenReturn(
+                "{\"error_msg\":\"can not delete this upstream, route [rid-things] is still using"
+                    + " it now\"}");
+        when(mockBuilder.delete()).thenReturn(ok, staleReference, staleReference, staleReference);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("routeIds", Map.of("things", "rid-things"));
+        payload.put("serviceId", "ds-001");
+
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "EXECUTE_STEP",
+                    "m",
+                    "saga-001",
+                    "delete-route",
+                    "apisix",
+                    "DELETE_ROUTE",
+                    payload));
+
+        // A reference that outlives the retry budget is surfaced, not waited out.
+        assertEquals("STEP_FAILED", result.type());
+        // 1 route + exactly 3 upstream attempts: pins the budget, which STEP_FAILED alone does not.
+        verify(mockBuilder, times(4)).delete();
+      }
+    }
+
+    @Test
+    @DisplayName("does not retry an upstream delete rejected for an unrelated reason")
+    void shouldNotRetryUnrelatedUpstreamDeleteFailure() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        Response badRequest = mock(Response.class);
+        when(badRequest.getStatus()).thenReturn(400);
+        when(badRequest.readEntity(String.class))
+            .thenReturn("{\"error_msg\":\"invalid configuration\"}");
+        when(mockBuilder.delete()).thenReturn(ok, badRequest, ok, ok);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("routeIds", Map.of("things", "rid-things"));
+        payload.put("serviceId", "ds-001");
+
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "EXECUTE_STEP",
+                    "m",
+                    "saga-001",
+                    "delete-route",
+                    "apisix",
+                    "DELETE_ROUTE",
+                    payload));
+
+        assertEquals("STEP_FAILED", result.type());
+        // 1 route + a single (non-retried) upstream attempt — the step aborts on the first
+        // unrelated rejection.
+        verify(mockBuilder, times(2)).delete();
+      }
+    }
+
+    @Test
     @DisplayName("drops a routeIds entry with a null value and still deletes the valid route(s)")
     void shouldDropNullValuedRouteIdEntry() {
       try (ApisixSagaHandler handler = createHandler()) {
@@ -2152,9 +2261,8 @@ class ApisixSagaHandlerTest {
      * Documents/pins the SHAPE of the path-rewrite regex the handler is expected to emit — it
      * re-implements the pattern locally and is NOT wired to {@code buildRouteBody}'s actual output.
      * Treat it as executable documentation of the rewrite contract; the genuine end-to-end coverage
-     * that the produced route really rewrites correctly lives in {@code
-     * ApisixSagaHandlerRoutingTest} (real APISIX via Testcontainers). If the production regex
-     * changes, update both.
+     * that the produced route really rewrites correctly lives in {@code ApisixSagaHandlerRoutingIT}
+     * (real APISIX via Testcontainers). If the production regex changes, update both.
      */
     private String applyRewrite(String datasetId, String upstreamPath, String requestPath) {
       String regex = "^/v1/datasets/" + datasetId + "(/.*)?$";

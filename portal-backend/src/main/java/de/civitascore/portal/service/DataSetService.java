@@ -3,11 +3,14 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
@@ -15,7 +18,9 @@ import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -23,9 +28,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.encoder.Encode;
@@ -53,6 +60,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final DataSetRepository dataSetRepository;
   private final DataSinkRepository dataSinkRepository;
+  private final LayerRepository layerRepository;
   private final DataSetMapper dataSetMapper;
   private final DataPoolRepository dataPoolRepository;
 
@@ -60,23 +68,33 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final DataSetSagaPublisher sagaPublisher;
 
+  private final PipelineRuntimeStatusService pipelineRuntimeStatusService;
+
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;
+
+  private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
   public DataSetService(
       DataSetRepository dataSetRepository,
       DataSinkRepository dataSinkRepository,
+      LayerRepository layerRepository,
       DataSetMapper dataSetMapper,
       DataPoolRepository dataPoolRepository,
       AssignmentFactory assignmentFactory,
       DataSetSagaPublisher sagaPublisher,
-      ObjectProvider<AllowedScopes> allowedScopesProvider) {
+      PipelineRuntimeStatusService pipelineRuntimeStatusService,
+      ObjectProvider<AllowedScopes> allowedScopesProvider,
+      DataSourceDatapoolScopeValidator datapoolScopeValidator) {
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
+    this.layerRepository = layerRepository;
     this.dataSetMapper = dataSetMapper;
     this.dataPoolRepository = dataPoolRepository;
     this.assignmentFactory = assignmentFactory;
     this.sagaPublisher = sagaPublisher;
+    this.pipelineRuntimeStatusService = pipelineRuntimeStatusService;
     this.allowedScopesProvider = allowedScopesProvider;
+    this.datapoolScopeValidator = datapoolScopeValidator;
   }
 
   /**
@@ -96,6 +114,28 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
     throw new AccessDeniedException(
         "Not authorized to place a dataset into datapool " + datapoolId);
+  }
+
+  /**
+   * Re-asserts the DataSource→DataPool scope rule for every DataSource across the dataset's
+   * existing pipelines against the dataset's current datapool. The rule is enforced at
+   * pipeline-write time against the pool the dataset had then; moving the dataset into a different
+   * pool afterwards would otherwise leave a pipeline holding a DataSource that is out of scope for
+   * the new pool. Rejecting here (and as a backstop before staging/release) keeps a dataset from
+   * ever being released while carrying an out-of-scope DataSource.
+   *
+   * @param dataSet the dataset whose pipelines' DataSources are checked against {@code
+   *     dataSet.getDataPool()}
+   * @throws de.civitascore.portal.util.DataSourceScopeViolationException if any is out of scope
+   */
+  private void revalidatePipelineDataSourcesAgainstPool(DataSet dataSet) {
+    Set<DataSource> dataSources =
+        dataSet.getPipelines().stream()
+            .flatMap(p -> p.getDataSources() == null ? Stream.empty() : p.getDataSources().stream())
+            .collect(Collectors.toSet());
+    if (!dataSources.isEmpty()) {
+      datapoolScopeValidator.validate(dataSources, dataSet.getDataPool());
+    }
   }
 
   @Override
@@ -167,9 +207,16 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
         authorizeTargetPool(input.getDatapoolId());
       }
       entity.setDataPool(dataPool);
-    } else {
+    } else if (input.isDatapoolIdPresent()) {
+      // Only an explicit null clears the pool. An omitted field leaves it untouched, so a partial
+      // write (a rename via PUT) cannot drop the dataset out of its pool as a side effect.
       entity.setDataPool(null);
     }
+
+    // Re-assert scope against the resolved pool unconditionally: decoupling it from the pool-change
+    // decision keeps the guard from silently lapsing if any future mutation path is added here. The
+    // pool-change condition gates only authorization above.
+    revalidatePipelineDataSourcesAgainstPool(entity);
 
     List<NamedApiInputDTO> incoming = input.getNamedApis();
     if (incoming != null) {
@@ -187,6 +234,17 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
                   + dto.getSlug()
                   + "' — named-API slugs must be unique within a dataset");
         }
+      }
+      long owsCount = incoming.stream().filter(dto -> dto.getStandard() == ApiStandard.OWS).count();
+      if (owsCount > 1) {
+        throw new InvalidInputException(
+            "namedApis",
+            entity.getId(),
+            "A dataset can expose at most one OWS named API; got "
+                + owsCount
+                + ". Workspace and route target both derive from the dataset id, so they would all"
+                + " serve the same layers from the same workspace, leaving no way to tell which"
+                + " API a layer belongs to.");
       }
       Map<String, NamedApi> existingBySlug = new HashMap<>();
       for (NamedApi api : entity.getNamedApis()) {
@@ -206,8 +264,33 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
         }
       }
       entity.getNamedApis().removeIf(api -> !incomingSlugs.contains(api.getSlug()));
+      cleanUpOrphanedOwsLayers(entity);
     }
     return super.postConvertToEntity(entity, input);
+  }
+
+  /**
+   * Layers are published only through the dataset's OWS {@link NamedApi}, so once none remains
+   * nothing serves them. Keyed on the post-reconcile state rather than on the removed entry, so
+   * replacing an OWS API with a differently-slugged one keeps the layers.
+   */
+  private void cleanUpOrphanedOwsLayers(DataSet entity) {
+    if (entity.getId() == null) {
+      return;
+    }
+    boolean hasOwsApi =
+        entity.getNamedApis().stream().anyMatch(api -> api.getStandard() == ApiStandard.OWS);
+    if (!hasOwsApi) {
+      int removed = layerRepository.deleteByDataSetId(entity.getId());
+      if (removed > 0) {
+        // The response is an ordinary 200 on the dataset, so without this the layer rows are gone
+        // with no record of it anywhere.
+        log.info(
+            "Removed {} layer(s) of dataset {}: no OWS named API left to serve them",
+            removed,
+            entity.getId());
+      }
+    }
   }
 
   /**
@@ -255,7 +338,28 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           id,
           "This endpoint requires a released dataset (READY or AVAILABLE), current status: DRAFT");
     }
+    return updateMetaOf(existingEntity, input);
+  }
 
+  /**
+   * Restricted to READY so it can be granted with DATASET_UPDATE alone, without DATASET_RELEASE:
+   * editing a staged dataset is an update, not a release.
+   */
+  @Transactional
+  public DataSet updateReadyMeta(UUID id, DataSetInputDTO input) {
+    DataSet existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataSetStatus() != DataSetStatus.READY) {
+      throw new InvalidInputException(
+          "dataSetStatus",
+          id,
+          "This endpoint requires a READY dataset, current status: "
+              + existingEntity.getDataSetStatus());
+    }
+    return updateMetaOf(existingEntity, input);
+  }
+
+  private DataSet updateMetaOf(DataSet existingEntity, DataSetInputDTO input) {
+    UUID id = existingEntity.getId();
     if (existingEntity.getPendingSagaType() != null) {
       throw new ResourceInUseException(
           "DataSet",
@@ -297,7 +401,10 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    */
   @Transactional
   public DataSet stage(UUID id) {
-    DataSet dataSet = findByIdOrThrow(id);
+    DataSet dataSet =
+        dataSetRepository
+            .findByIdWithPipelineDataSources(id)
+            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
 
     if (dataSet.getDataSetStatus() != DataSetStatus.DRAFT) {
       throw new InvalidInputException("dataSetStatus", id, "Only DRAFT datasets can be staged");
@@ -319,6 +426,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       throw new InvalidInputException(
           "pipelines", id, "DataSet must have at least one Pipeline with DataSources");
     }
+
+    revalidatePipelineDataSourcesAgainstPool(dataSet);
 
     dataSet.setDataSetStatus(DataSetStatus.READY);
     return dataSetRepository.save(dataSet);
@@ -365,7 +474,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    *
    * @param id the dataset ID
    * @return the released dataset
-   * @throws InvalidInputException if dataset is not in READY status
+   * @throws InvalidInputException if dataset is not in READY status, or if its map surface is only
+   *     half configured
    * @throws ResourceInUseException if a saga is already in-flight
    */
   @Override
@@ -388,6 +498,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "Cannot release while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
 
+    revalidatePipelineDataSourcesAgainstPool(dataSet);
+    verifyMapSurfaceIsServable(dataSet);
+
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
     dataSet.setPendingSagaType(PendingSagaType.CREATE);
     DataSet saved = dataSetRepository.save(dataSet);
@@ -395,6 +508,40 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     sagaPublisher.publishCreateRequested(saved);
 
     return saved;
+  }
+
+  /**
+   * Rejects a release whose map surface would be provisioned but unreachable, or routed but empty.
+   * Layers and the OWS route are gated independently downstream, so each without its counterpart
+   * provisions half a surface and reports success.
+   *
+   * <p>A workspace without an OWS named API is deliberately NOT rejected: that is the state an
+   * unrelease leaves behind, and the data is meant to survive it.
+   */
+  private void verifyMapSurfaceIsServable(DataSet dataSet) {
+    boolean hasOwsApi =
+        dataSet.getNamedApis().stream().anyMatch(api -> api.getStandard() == ApiStandard.OWS);
+
+    if (layerRepository.existsByDataSetId(dataSet.getId()) && !hasOwsApi) {
+      throw new InvalidInputException(
+          "namedApis",
+          dataSet.getId(),
+          "DataSet has layers but no OWS named API to serve them. Add an OWS named API or remove"
+              + " the layers.");
+    }
+
+    if (hasOwsApi && !hasPostgisSink(dataSet)) {
+      throw new InvalidInputException(
+          "dataSinks",
+          dataSet.getId(),
+          "DataSet has an OWS named API but no POSTGIS data sink to back its map service. The"
+              + " route would resolve to a workspace that is never provisioned.");
+    }
+  }
+
+  private boolean hasPostgisSink(DataSet dataSet) {
+    return dataSinkRepository.existsByDataSetIdAndDataSinkType(
+        dataSet.getId(), DataSinkType.POSTGIS);
   }
 
   /**
@@ -454,15 +601,19 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       return;
     }
 
+    warnAboutStaleFeatureTypes(datasetId, result);
+
     switch (pendingType) {
       case CREATE -> {
         applyInfrastructureResult(dataSet, result);
         markProvisionedIfSinkExists(dataSet);
+        pipelineRuntimeStatusService.markDeploymentSucceeded(deployedPipelineIds(dataSet, result));
         log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
       }
       case UPDATE -> {
         applyInfrastructureResult(dataSet, result);
         markProvisionedIfSinkExists(dataSet);
+        pipelineRuntimeStatusService.markDeploymentSucceeded(deployedPipelineIds(dataSet, result));
         log.info("Saga UPDATE completed for dataset {}", datasetId);
       }
       case UNRELEASE -> {
@@ -564,6 +715,21 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
+   * A saga reports feature types it could not unpublish. They keep being served for layers the
+   * dataset no longer has, and no portal query can find them — the layer table is already correct.
+   */
+  private void warnAboutStaleFeatureTypes(UUID datasetId, SagaResultPayload result) {
+    if (result.staleFeatureTypes() == null || result.staleFeatureTypes().isEmpty()) {
+      return;
+    }
+    log.warn(
+        "Dataset {} still serves {} feature type(s) for removed layers: {}",
+        datasetId,
+        result.staleFeatureTypes().size(),
+        Encode.forJava(String.join(", ", result.staleFeatureTypes())));
+  }
+
+  /**
    * Logs a teardown-saga failure. An uncompensated failure is confirmed leaked infrastructure, not
    * a transient — signal it at ERROR so it is not lost among ordinary warnings.
    */
@@ -579,10 +745,12 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   /**
    * Deletes a dataset. An AVAILABLE dataset must be unreleased first — its ingest and consumer
    * access are still live, so it cannot be deleted directly. Otherwise: a dataset that was never
-   * provisioned (no PostGIS table / FROST project) is removed immediately, and a dataset that still
-   * holds a provisioned sink from a prior release goes through a DATASET_DELETE saga that tears
-   * down the full infrastructure including the data-holding sink; the entity is removed once the
-   * saga completes (see {@link #handleSagaCompleted}).
+   * released is removed immediately, and one that still holds provisioned infrastructure from a
+   * prior release goes through a DATASET_DELETE saga that tears it down; the entity is removed once
+   * the saga completes (see {@link #handleSagaCompleted}).
+   *
+   * <p>{@code provisioned} is the discriminator: a release always runs the unconditional {@code
+   * create-project} step and thereby sets it.
    */
   @Override
   @Transactional
@@ -621,6 +789,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * Deleting the sinks first — after detaching them from their pipeline — clears both FKs before
    * the dataset delete cascades into the pipelines, avoiding the FK violation that would otherwise
    * roll the transaction back.
+   *
+   * <p>Going through the repository deliberately bypasses the layer guard that rejects a standalone
+   * {@code DELETE /datasinks/{id}}: that guard protects a sink whose dataset lives on, whereas here
+   * the whole aggregate goes away.
+   *
+   * <p>Flushing here keeps a constraint violation inside this call instead of surfacing it at
+   * commit, after a caller has already logged the removal as done.
    */
   private void deleteWithSinks(DataSet dataSet) {
     dataSinkRepository
@@ -631,6 +806,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
               dataSinkRepository.delete(sink);
             });
     dataSetRepository.delete(dataSet);
+    dataSetRepository.flush();
   }
 
   /**
@@ -656,6 +832,24 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     if (dataSet.getProjectId() != null) {
       dataSet.setProvisioned(true);
     }
+  }
+
+  /**
+   * The pipeline ids a completed saga reports, narrowed to those still attached to the dataset. An
+   * UPDATE result also carries the ids the same saga tore down, and marking a removed pipeline as
+   * successfully deployed would leave a permanently healthy status on a flow that no longer exists.
+   */
+  private List<String> deployedPipelineIds(DataSet dataSet, SagaResultPayload result) {
+    if (result.pipelineIds() == null) {
+      return List.of();
+    }
+    Set<String> attached =
+        dataSet.getPipelines().stream()
+            .map(Pipeline::getId)
+            .filter(Objects::nonNull)
+            .map(UUID::toString)
+            .collect(Collectors.toSet());
+    return result.pipelineIds().stream().filter(attached::contains).toList();
   }
 
   private void applyInfrastructureResult(DataSet dataSet, SagaResultPayload result) {

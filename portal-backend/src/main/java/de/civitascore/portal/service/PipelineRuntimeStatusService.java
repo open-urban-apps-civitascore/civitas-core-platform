@@ -7,10 +7,12 @@ import de.civitascore.portal.model.entity.PipelineRuntimeStatus;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.PipelineRuntimeStatusRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,6 +72,40 @@ public class PipelineRuntimeStatusService {
     status.setCorrelationId(correlationId);
     status.setLastEventId(eventId);
     statusRepository.save(status);
+  }
+
+  /**
+   * Records a successful deployment for the pipelines a saga reports as deployed. This is the
+   * success counterpart to the {@code ERROR}/{@code DEPLOYMENT} status written when a saga fails —
+   * without it the status of a failed publication would outlive the fix that resolved it.
+   *
+   * @param pipelineIds the pipeline ids reported by the completed saga; unknown or malformed ids
+   *     are skipped
+   */
+  @Transactional
+  public void markDeploymentSucceeded(List<String> pipelineIds) {
+    if (pipelineIds == null) {
+      return;
+    }
+    for (String pipelineId : pipelineIds) {
+      UUID id;
+      try {
+        id = UUID.fromString(pipelineId);
+      } catch (IllegalArgumentException e) {
+        log.warn("Ignoring malformed pipeline id in saga result: {}", Encode.forJava(pipelineId));
+        continue;
+      }
+      applyPlainStatus(id, PipelineRuntimeState.OK, PipelineRuntimeSource.DEPLOYMENT);
+    }
+  }
+
+  /**
+   * Replaces any existing status with a fresh state/source record carrying no error detail, so a
+   * message, stacktrace or correlation left by an earlier status does not survive the new one.
+   */
+  private void applyPlainStatus(
+      UUID pipelineId, PipelineRuntimeState state, PipelineRuntimeSource source) {
+    apply(pipelineId, state, source, null, null, null, null, null);
   }
 
   private static String sanitize(String value) {

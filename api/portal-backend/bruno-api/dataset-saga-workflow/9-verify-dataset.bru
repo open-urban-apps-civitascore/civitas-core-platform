@@ -36,22 +36,26 @@ script:pre-request {
   const tokenResp = await axios.post(
     `${keycloakUrl}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`,
     form,
-    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 10000 }
   );
   const token = tokenResp.data.access_token;
 
+  // Guard each attempt separately: the QuickJS sandbox does not honour validateStatus across the
+  // VM boundary, so a transient non-2xx rejects the promise and would otherwise end the poll.
   for (let i = 0; i < 15; i++) {
-    const resp = await axios.get(
-      `${baseUrl}/datasets/${datasetId}`,
-      {
-        headers: { 'Authorization': `Bearer ${token}` },
-        validateStatus: () => true,
+    try {
+      const resp = await axios.get(
+        `${baseUrl}/datasets/${datasetId}`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` },
+          timeout: 10000,
+        }
+      );
+      if (resp.status === 200 && resp.data && resp.data.publicUrl) {
+        bru.setVar('sagaPublicUrl', resp.data.publicUrl);
+        break;
       }
-    );
-    if (resp.status === 200 && resp.data && resp.data.publicUrl) {
-      bru.setVar('sagaPublicUrl', resp.data.publicUrl);
-      break;
-    }
+    } catch (e) { /* transient; retry */ }
     await new Promise(r => setTimeout(r, 2000));
   }
 }

@@ -45,20 +45,24 @@ class DatasetUpdateBpmnTest {
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
   private SagaCommandHandler pipelineHandler;
+  private SagaCommandHandler geoserverHandler;
 
   @BeforeEach
   void setUp() {
     frostHandler = mock(SagaCommandHandler.class);
     apisixHandler = mock(SagaCommandHandler.class);
     pipelineHandler = mock(SagaCommandHandler.class);
+    geoserverHandler = mock(SagaCommandHandler.class);
     when(frostHandler.adapter()).thenReturn("frost");
     when(apisixHandler.adapter()).thenReturn("apisix");
     when(pipelineHandler.adapter()).thenReturn("nifi");
+    when(geoserverHandler.adapter()).thenReturn("geoserver");
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
     registry.register(pipelineHandler);
+    registry.register(geoserverHandler);
 
     processEngine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     runtimeService = processEngine.getRuntimeService();
@@ -93,6 +97,72 @@ class DatasetUpdateBpmnTest {
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
     inOrder.verify(pipelineHandler).handle(any());
+  }
+
+  @Test
+  void shouldPruneFeatureTypesAfterTheLastFailableStep() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubPipelineSuccess();
+    stubGeoserverSuccess();
+
+    ProcessInstance instance = startProcess(true, true);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+
+    ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(geoserverHandler, times(2)).handle(captor.capture());
+    assertEquals(
+        List.of("UPDATE_WORKSPACE", "PRUNE_FEATURE_TYPES"),
+        captor.getAllValues().stream().map(SagaCommandMessage::operation).toList());
+
+    // The prune must run after the pipeline step, whose failure is what would otherwise compensate
+    // the workspace — a delete inside that window cannot be undone.
+    var inOrder = inOrder(pipelineHandler, geoserverHandler);
+    inOrder.verify(pipelineHandler).handle(any());
+    inOrder
+        .verify(geoserverHandler)
+        .handle(argThat(cmd -> cmd != null && "PRUNE_FEATURE_TYPES".equals(cmd.operation())));
+  }
+
+  @Test
+  void shouldReportSuccessWhenOnlyTheFeatureTypePruneFails() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubPipelineSuccess();
+    when(geoserverHandler.handle(
+            argThat(cmd -> cmd != null && "UPDATE_WORKSPACE".equals(cmd.operation()))))
+        .thenReturn(
+            SagaCommandResult.success("saga-test-123", "update-workspace", Map.of(), Map.of()));
+    when(geoserverHandler.handle(
+            argThat(cmd -> cmd != null && "PRUNE_FEATURE_TYPES".equals(cmd.operation()))))
+        .thenReturn(
+            SagaCommandResult.failure("saga-test-123", "prune-featuretypes", "GeoServer 503"));
+
+    ProcessInstance instance = startProcess(true, true);
+    executeAllJobs();
+
+    // Cleanup is not part of the update's success criteria: the update itself applied, so a failed
+    // prune must not compensate it away or report the edit as failed. Asserting the publish task
+    // rather than mere completion — both ends finish the process regularly.
+    assertProcessCompleted(instance.getId());
+    assertEquals(List.of("publish-success"), publishTaskIds(instance.getId()));
+    verify(frostHandler, never())
+        .handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type())));
+  }
+
+  @Test
+  void shouldSkipPruneWhenDatasetHasNoGeoSink() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubPipelineSuccess();
+
+    ProcessInstance instance = startProcess(true, false);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+    verify(geoserverHandler, never()).handle(any());
   }
 
   @Test
@@ -177,6 +247,10 @@ class DatasetUpdateBpmnTest {
   }
 
   private ProcessInstance startProcess(boolean hasPipelines) {
+    return startProcess(hasPipelines, false);
+  }
+
+  private ProcessInstance startProcess(boolean hasPipelines, boolean hasGeoSink) {
     Map<String, Object> variables = new HashMap<>();
     variables.put("sagaId", "saga-test-123");
     variables.put("datasetId", "ds-456");
@@ -186,6 +260,7 @@ class DatasetUpdateBpmnTest {
     variables.put("routeId", "r-1");
     variables.put("serviceId", "s-1");
     variables.put("hasPipelines", hasPipelines);
+    variables.put("hasGeoSink", hasGeoSink);
     if (hasPipelines) {
       variables.put("dataPipelines", List.of(Map.of("id", "p-1", "action", "UPDATE")));
       variables.put("datasources", List.of(Map.of("id", "src-1")));
@@ -200,6 +275,19 @@ class DatasetUpdateBpmnTest {
 
   private void assertProcessCompleted(String processInstanceId) {
     FlowableTestSupport.assertProcessCompleted(historyService, processInstanceId);
+  }
+
+  private List<String> publishTaskIds(String processInstanceId) {
+    return historyService
+        .createHistoricActivityInstanceQuery()
+        .processInstanceId(processInstanceId)
+        .activityType("serviceTask")
+        .finished()
+        .list()
+        .stream()
+        .map(org.flowable.engine.history.HistoricActivityInstance::getActivityId)
+        .filter(id -> id.startsWith("publish-"))
+        .toList();
   }
 
   private void assertProcessFinished(String processInstanceId) {
@@ -234,6 +322,19 @@ class DatasetUpdateBpmnTest {
                 "update-pipelines",
                 Map.of("pipelineIds", List.of("p-1")),
                 Map.of("pipelineIds", List.of("p-1"))));
+  }
+
+  private void stubGeoserverSuccess() {
+    when(geoserverHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenAnswer(
+            invocation -> {
+              SagaCommandMessage cmd = invocation.getArgument(0);
+              return SagaCommandResult.success(
+                  "saga-test-123",
+                  cmd.stepId(),
+                  Map.of("workspaceName", "ds_456"),
+                  Map.of("workspaceName", "ds_456"));
+            });
   }
 
   private void stubApisixFailure(String error) {

@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { Dataset } from '@/types/datasets'
+import { Dataset, DATASET_STATUS_TYPES } from '@/types/datasets'
 
 export type ApiConfigTab = 'basicInfo' | 'layer' | 'styles'
 
@@ -65,6 +65,7 @@ export const ApiConfigWrapper = (props: ApiConfigWrapperProps) => {
 
   const tCommon = useTranslations('common')
   const t = useTranslations('datasets.overview.completion.apis.config')
+  const isDraftMode = dataset.dataSetStatus === DATASET_STATUS_TYPES.DRAFT
 
   const { hasScopedPermission, hasPermission } = usePermissions()
   const canUpdateDataset = hasScopedPermission(
@@ -76,7 +77,7 @@ export const ApiConfigWrapper = (props: ApiConfigWrapperProps) => {
 
   const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
 
-  const canEdit = canUpdateDataset && canReadDatastructures
+  const canEdit = canUpdateDataset && canReadDatastructures && isDraftMode
 
   const buttonGroup = isReadOnly ? (
     <div className="flex items-center gap-2 px-[var(--layout-padding)]">

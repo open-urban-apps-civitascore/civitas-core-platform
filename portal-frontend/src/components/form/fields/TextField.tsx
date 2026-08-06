@@ -1,4 +1,4 @@
-import { DetailedHTMLProps, HTMLAttributes } from 'react'
+import { DetailedHTMLProps, HTMLAttributes, useMemo } from 'react'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -17,6 +17,8 @@ interface TextFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
   formItemProps?: DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>
   shouldShowErrors?: boolean
   manualError?: string
+  maxLength?: number
+  hasCharacterCount?: boolean
 }
 
 export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
@@ -31,8 +33,12 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
     shouldShowErrors = true,
     manualError,
     type,
+    maxLength,
+    hasCharacterCount,
   } = props
   const isMobile = useIsMobile()
+  const fieldValue = form.watch(name)
+  const characterCount = useMemo(() => (fieldValue as string)?.length || 0, [fieldValue])
   return (
     <FormField
       control={form.control}
@@ -57,17 +63,27 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
                 autoComplete={type === 'password' ? 'new-password' : undefined}
                 className="disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
                 placeholder={disabled ? undefined : placeholder}
+                maxLength={maxLength}
                 {...field}
                 disabled={disabled}
                 aria-invalid={!!manualError || !!form.formState.errors[name]}
               />
             </FormControl>
-            {shouldShowErrors && <FormMessage data-testid={`${name}FormMessage`} className="mt-2" />}
-            {manualError && (
-              <FormMessage data-testid={`${name}ManualFormMessage`} className="mt-2">
-                {manualError}
-              </FormMessage>
-            )}
+            <div className="flex justify-between">
+              <div>
+                {shouldShowErrors && <FormMessage data-testid={`${name}FormMessage`} className="mt-2" />}
+                {manualError && (
+                  <FormMessage data-testid={`${name}ManualFormMessage`} className="mt-2">
+                    {manualError}
+                  </FormMessage>
+                )}
+              </div>
+              {hasCharacterCount && maxLength && !disabled && (
+                <span className="text-sm text-muted-foreground ml-auto mt-2">
+                  {characterCount}/{maxLength}
+                </span>
+              )}
+            </div>
           </div>
         </FormItem>
       )}

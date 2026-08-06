@@ -11,35 +11,32 @@ import { StatusDropdown } from '../status-dropdown/StatusDropdown'
 import { Button } from '../ui/button'
 
 type PageEditControlsProps<T extends StatusTypes> = ActionButtonsProps & {
-  status: T
-  onStatusChange: (status: T) => void
-  canStage: boolean
-  canSetDraft?: boolean
-  canRelease?: boolean
   onEditClick: () => void
   isReadOnly: boolean
   formId?: string
-  statusOptions: T[]
   canEdit?: boolean
-  statusHint?: string
+  statusProps?: {
+    status: T
+    onStatusChange: (status: T) => void
+    canStage: boolean
+    canSetDraft?: boolean
+    canRelease?: boolean
+    statusOptions: T[]
+    statusHint?: string
+    availableHint?: string
+  }
 }
 
 const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>): JSX.Element => {
   const {
-    status,
-    onStatusChange,
-    canStage,
-    canSetDraft,
-    canRelease,
     hasCard = true,
     wrapperClassname,
     className,
     onEditClick,
     isReadOnly = true,
     formId,
-    statusOptions,
     canEdit = true,
-    statusHint,
+    statusProps,
     ...actionButtonsProps
   } = props
 
@@ -52,16 +49,7 @@ const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>
         wrapperClassname,
       )}
     >
-      <StatusDropdown
-        status={status}
-        statusOptions={statusOptions}
-        onStatusChange={onStatusChange}
-        canStage={canStage}
-        canSetDraft={canSetDraft}
-        canRelease={canRelease}
-        isReadOnly={isReadOnly}
-        statusHint={statusHint}
-      />
+      {statusProps && <StatusDropdown {...statusProps} isReadOnly={isReadOnly} />}
 
       <div>
         {!isReadOnly ? (

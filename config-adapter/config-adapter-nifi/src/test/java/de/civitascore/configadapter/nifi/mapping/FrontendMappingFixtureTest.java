@@ -38,7 +38,7 @@ class FrontendMappingFixtureTest {
         "urn:core:platform:civitas:datastructure:common:Source:ggb6odzea5:1.0.0", mapping.source());
 
     List<UpdateRecordProperty> props =
-        new RecordPathCompiler().compile(mapping, GeometryEncoding.WKT);
+        new RecordPathCompiler().compile(mapping, GeometryEncoding.WKT).properties();
     Map<String, UpdateRecordProperty> byPath =
         props.stream().collect(Collectors.toMap(UpdateRecordProperty::recordPath, p -> p));
 
@@ -72,7 +72,7 @@ class FrontendMappingFixtureTest {
 
     MappingConfig mapping = new MappingConfigParser().parse(root);
     List<UpdateRecordProperty> props =
-        new RecordPathCompiler().compile(mapping, GeometryEncoding.WKT);
+        new RecordPathCompiler().compile(mapping, GeometryEncoding.WKT).properties();
     Map<String, UpdateRecordProperty> byPath =
         props.stream().collect(Collectors.toMap(UpdateRecordProperty::recordPath, p -> p));
 

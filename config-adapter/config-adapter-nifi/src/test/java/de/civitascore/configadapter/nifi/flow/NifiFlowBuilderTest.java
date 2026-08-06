@@ -24,12 +24,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
+import de.civitascore.configadapter.nifi.mapping.ForkPlan;
 import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan;
 import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan.FilterTerm;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.Test;
 
 class NifiFlowBuilderTest {
@@ -106,6 +114,69 @@ class NifiFlowBuilderTest {
       }
     }
     assertTrue(found, "DBCP reference must point to a real controller service");
+  }
+
+  @Test
+  void mqttTlsAddsOneJvmTruststoreSslContextServiceAndReferencesIt() throws Exception {
+    FlowBuildSpec plain = mqttToPostgis(mapping());
+    Map<String, String> tlsProperties = new LinkedHashMap<>(plain.sourceProperties());
+    tlsProperties.put("Broker URI", "ssl://mqtt:8883");
+    tlsProperties.put(
+        "SSL Context Service", "${CS:" + MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE + "}");
+    FlowBuildSpec tls =
+        new FlowBuildSpec(
+            plain.processGroupName(),
+            plain.sourceType(),
+            tlsProperties,
+            plain.sinkType(),
+            plain.sinkProperties(),
+            plain.transforms(),
+            plain.controllerServiceProperties(),
+            plain.sourceCron(),
+            plain.sinkPreRegion());
+
+    JsonNode flow = build(tls);
+    JsonNode services = flow.path("flowContents").path("controllerServices");
+    assertEquals(4, services.size());
+    JsonNode sslContext = component(flow, "controllerServices", "StandardSSLContextService");
+    assertEquals("TLS", sslContext.path("properties").path("TLS Protocol").asText());
+    assertEquals(
+        "${TRUSTSTORE_PATH}", sslContext.path("properties").path("Truststore Filename").asText());
+    assertEquals(
+        "#{TRUSTSTORE_PASSWORD}",
+        sslContext.path("properties").path("Truststore Password").asText());
+    assertEquals("PKCS12", sslContext.path("properties").path("Truststore Type").asText());
+    assertEquals(
+        MqttSourceStage.NODE_TRUSTSTORE_PARAMETER_CONTEXT,
+        flow.path("flowContents").path("parameterContextName").asText());
+    JsonNode truststorePassword =
+        flow.path("parameterContexts")
+            .path(MqttSourceStage.NODE_TRUSTSTORE_PARAMETER_CONTEXT)
+            .path("parameters")
+            .path(0);
+    assertEquals(
+        MqttSourceStage.TRUSTSTORE_PASSWORD_PARAMETER, truststorePassword.path("name").asText());
+    assertTrue(truststorePassword.path("sensitive").asBoolean());
+    assertTrue(truststorePassword.path("value").isMissingNode());
+    assertTrue(sslContext.path("properties").path("Keystore Filename").isNull());
+    assertEquals(
+        sslContext.path("identifier").asText(),
+        component(flow, "processors", "ConsumeMQTT")
+            .path("properties")
+            .path("SSL Context Service")
+            .asText());
+    assertEquals(builder.build(tls), builder.build(tls), "TLS snapshot must remain deterministic");
+  }
+
+  @Test
+  void mqttWithoutTlsDoesNotAddOrReferenceSslContextService() throws Exception {
+    JsonNode flow = build(mqttToPostgis(mapping()));
+    assertEquals(3, flow.path("flowContents").path("controllerServices").size());
+    assertTrue(
+        component(flow, "processors", "ConsumeMQTT")
+            .path("properties")
+            .path("SSL Context Service")
+            .isNull());
   }
 
   @Test
@@ -187,6 +258,106 @@ class NifiFlowBuilderTest {
         hasConnection(flow, sinkId, logId, "failure"), "sink failure must route to the log sink");
     assertTrue(
         hasConnection(flow, sinkId, logId, "retry"), "sink retry must route to the log sink");
+  }
+
+  @Test
+  void frostFanoutPutsTheForkAheadOfTheMappingAndFeedsTheRecordSplit() throws Exception {
+    // The fan-out has to happen before the entity bodies are rendered: those are static EL
+    // templates over sta_* attributes and cannot multiply themselves. So ForkRecord must sit at the
+    // head of the mapping unit, leave on its own 'fork' relationship, and the N records it writes
+    // must reach the pre-region's SplitJson — that is what turns N records into N FlowFiles and
+    // therefore N observations.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithFanoutMapping());
+
+    JsonNode fork = component(flow, "processors", "ForkRecord");
+    assertEquals("/measurements[*]/measuredValues", fork.get("properties").get("fan-out").asText());
+    assertEquals("extract", fork.get("properties").get("Mode").asText());
+    assertEquals("true", fork.get("properties").get("Include Parent Fields").asText());
+
+    // 'original' must be auto-terminated, otherwise the unforked input queues up forever
+    assertTrue(
+        StreamSupport.stream(fork.get("autoTerminatedRelationships").spliterator(), false)
+            .anyMatch(r -> "original".equals(r.asText())),
+        "the unforked original must be auto-terminated");
+
+    // ForkRecord's third relationship. Left neither connected nor auto-terminated, the processor is
+    // INVALID and NiFi silently never runs it, so every deploy of a fan-out flow fails.
+    assertFalse(autoTerminates(fork, "failure"), "the fork must not auto-terminate failure");
+    assertEquals(
+        component(flow, "processors", "LogMessage").get("identifier").asText(),
+        destinationOf(flow, fork.get("identifier").asText(), "failure"),
+        "an unreadable FlowFile must reach the error sink");
+
+    // Selected by strategy, not by first-match: the fixture mixes a const rule with copies, so the
+    // flow holds a literal-value AND a record-path-value UpdateRecord and the fork feeds the
+    // latter.
+    JsonNode update =
+        componentByProperty(
+            flow, "UpdateRecord", "Replacement Value Strategy", "record-path-value");
+    String forkId = fork.get("identifier").asText();
+
+    // The guard sits between the two: a fan-out that extracted nothing must not travel the chain as
+    // an empty, successful FlowFile.
+    JsonNode guard =
+        componentByProperty(flow, "RouteOnAttribute", "failure", "${record.count:equals('0')}");
+    String guardId = guard.get("identifier").asText();
+    assertEquals(
+        guardId,
+        destinationOf(flow, forkId, "fork"),
+        "the fork must feed the guard over its 'fork' relationship");
+    assertEquals(
+        update.get("identifier").asText(),
+        destinationOf(flow, guardId, "unmatched"),
+        "records that survived the guard must feed the mapping");
+    assertEquals(
+        component(flow, "processors", "LogMessage").get("identifier").asText(),
+        destinationOf(flow, guardId, "failure"),
+        "an empty fan-out must reach the error sink");
+
+    // The forked records must reach the pre-region's SplitJson — that is what turns N records into
+    // N FlowFiles and therefore N observations. Without it the fan-out would produce one FlowFile
+    // carrying N records, and the static entity bodies would render only the first.
+    String splitId =
+        componentByProperty(flow, "SplitJson", "JsonPath Expression", "$[*]")
+            .get("identifier")
+            .asText();
+    assertTrue(
+        reaches(flow, forkId, splitId), "the forked records must reach the pre-region's SplitJson");
+  }
+
+  /** Whether any chain of connections leads from {@code sourceId} to {@code targetId}. */
+  private boolean reaches(JsonNode flow, String sourceId, String targetId) {
+    Set<String> seen = new HashSet<>();
+    Deque<String> pending = new ArrayDeque<>(List.of(sourceId));
+    while (!pending.isEmpty()) {
+      String current = pending.pop();
+      if (!seen.add(current)) {
+        continue;
+      }
+      if (current.equals(targetId)) {
+        return true;
+      }
+      for (JsonNode connection : flow.get("flowContents").get("connections")) {
+        if (current.equals(connection.path("source").path("id").asText())) {
+          pending.push(connection.path("destination").path("id").asText());
+        }
+      }
+    }
+    return false;
+  }
+
+  /** The destination component id of the connection leaving {@code sourceId} on {@code rel}. */
+  private String destinationOf(JsonNode flow, String sourceId, String rel) {
+    for (JsonNode connection : flow.get("flowContents").get("connections")) {
+      boolean matches =
+          sourceId.equals(connection.path("source").path("id").asText())
+              && StreamSupport.stream(connection.get("selectedRelationships").spliterator(), false)
+                  .anyMatch(r -> rel.equals(r.asText()));
+      if (matches) {
+        return connection.path("destination").path("id").asText();
+      }
+    }
+    return null;
   }
 
   @Test
@@ -395,7 +566,9 @@ class NifiFlowBuilderTest {
             single.sourceProperties(),
             single.sinkType(),
             single.sinkProperties(),
-            List.of(new CompiledMapping(mapping()), new CompiledMapping(mapping())),
+            List.of(
+                new CompiledMapping(mapping(), ForkPlan.NONE),
+                new CompiledMapping(mapping(), ForkPlan.NONE)),
             single.controllerServiceProperties(),
             null,
             null);
@@ -409,6 +582,29 @@ class NifiFlowBuilderTest {
     // live NiFi map back to the same component on redeploy (redeploy idempotency).
     assertEquals(singleIds.get(0), chainedIds.get(0));
     assertFalse(chainedIds.get(0).equals(chainedIds.get(1)));
+  }
+
+  @Test
+  void addingAFanOutLeavesTheUpdateRecordIdsUntouched() throws Exception {
+    // The fork's id seed is deliberately independent of the strategy discriminators, so a mapping
+    // that gains a fan-out keeps its UpdateRecord ids and a redeploy still matches them to the live
+    // NiFi components. If the fork joined that seed instead, every existing UpdateRecord would get
+    // a
+    // new id and the redeploy would orphan the deployed ones — invisible in every other assertion.
+    FlowBuildSpec withoutFork = mqttToPostgis(mapping());
+    FlowBuildSpec withFork =
+        new FlowBuildSpec(
+            withoutFork.processGroupName(),
+            withoutFork.sourceType(),
+            withoutFork.sourceProperties(),
+            withoutFork.sinkType(),
+            withoutFork.sinkProperties(),
+            List.of(new CompiledMapping(mapping(), new ForkPlan("/items"))),
+            withoutFork.controllerServiceProperties(),
+            null,
+            null);
+
+    assertEquals(updateRecordIds(build(withoutFork)), updateRecordIds(build(withFork)));
   }
 
   private List<String> updateRecordIds(JsonNode flow) {
@@ -872,6 +1068,31 @@ class NifiFlowBuilderTest {
     assertTrue(
         hasConnection(flow, patchId, dsGetId, "Original"),
         "the PATCHed existing Thing must feed the Datastream GET");
+  }
+
+  @Test
+  void aCreatedEntityContinuesOnOriginalBecauseTheResponseIsCapturedIntoAnAttribute()
+      throws Exception {
+    // Chained onto 'Response', a first delivery would write no observation at all while a
+    // redelivery
+    // hid it by taking the lookup-hit path — no error, no failure route, no bulletin.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithThingOnlyMapping());
+
+    JsonNode post = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "POST");
+    assertFalse(
+        post.path("properties").path("Response Body Attribute Name").asText().isEmpty(),
+        "the entity POST must capture the response body, so a 4xx can be logged with its cause");
+    assertFalse(
+        autoTerminates(post, "Original"),
+        "the created entity leaves on 'Original' and must not be discarded there");
+    assertTrue(
+        autoTerminates(post, "Response"),
+        "'Response' never fires while the body is captured, so it must stay terminated");
+
+    String postId = post.get("identifier").asText();
+    assertTrue(
+        destinationOf(flow, postId, "Original") != null,
+        "the created entity must be chained onwards from 'Original'");
   }
 
   @Test

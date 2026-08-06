@@ -3,6 +3,7 @@ package de.civitascore.portal.config;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import de.civitascore.portal.PortalBackendApplication;
 import de.civitascore.portal.util.KeycloakTokenHelper;
+import de.civitascore.portal.util.TestContainerImages;
 import lombok.AccessLevel;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
@@ -38,14 +39,14 @@ public abstract class BaseKeycloakIntegrationTest {
 
   static {
     POSTGRES =
-        new PostgreSQLContainer("postgres:15")
+        new PostgreSQLContainer(TestContainerImages.POSTGRES)
             .withDatabaseName("iot_schema")
             .withUsername("iot")
             .withPassword("iot")
             .withReuse(true);
 
     KEYCLOAK =
-        new KeycloakContainer("quay.io/keycloak/keycloak:26.3.4")
+        new KeycloakContainer(TestContainerImages.KEYCLOAK)
             .withRealmImportFile("keycloak/iot-realm.json")
             .withReuse(true);
 
