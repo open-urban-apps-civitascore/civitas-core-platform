@@ -50,7 +50,6 @@ vi.mock('@/components/uml-modeler/hooks/use-multi-session-manager', () => ({
 }))
 
 const mockUpdateMutateAsync = vi.fn()
-const mockUpdateReleasedMutateAsync = vi.fn()
 const mockCreateMutateAsync = vi.fn()
 const mockStatusUpdateMutateAsync = vi.fn()
 
@@ -61,10 +60,6 @@ vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
   }),
   useUpdateDatastructureVersion: () => ({
     mutateAsync: mockUpdateMutateAsync,
-    isPending: false,
-  }),
-  useUpdateDatastructureVersionReleased: () => ({
-    mutateAsync: mockUpdateReleasedMutateAsync,
     isPending: false,
   }),
   useStatusUpdateDatastructureVersion: () => ({
@@ -179,7 +174,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     mockPush.mockReset()
     mockRefresh.mockReset()
     mockUpdateMutateAsync.mockResolvedValue({ data: mockVersion })
-    mockUpdateReleasedMutateAsync.mockResolvedValue({ data: mockVersion })
     mockCreateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockStatusUpdateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockSearchParams = new URLSearchParams('mode=edit')
@@ -552,7 +546,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
           }),
         )
       })
-      expect(mockUpdateReleasedMutateAsync).not.toHaveBeenCalled()
       expect(mockUpdateMutateAsync).not.toHaveBeenCalled()
     })
 

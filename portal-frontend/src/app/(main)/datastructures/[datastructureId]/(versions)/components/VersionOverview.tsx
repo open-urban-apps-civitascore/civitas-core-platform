@@ -1,14 +1,16 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useWatch } from 'react-hook-form'
+import { toast } from 'sonner'
 
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
+import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { QUERY_PARAMS } from '@/const/searchParams'
@@ -27,8 +29,6 @@ import {
   DatastructureVersionTab,
 } from '@/types/datastructures'
 
-import PageEditControls from '@/components/page-edit-controls/PageEditControls'
-import { toast } from 'sonner'
 import { useDatastructureVersion } from '../hooks/useDatastructureVersion'
 import { StructureDefinitionTab } from './structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
@@ -84,7 +84,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit' || !canEdit)
-  const [canStage, setCanSetAvailable] = useState(true)
 
   const isInUse = version?.inUse || false
 
@@ -141,9 +140,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const canSetDraft = !isInUse && !isLastAvailableVersionInAvailableDatastructure
 
-  useEffect(() => {
-    setCanSetAvailable(DatastructureVersionFormAvailableSchema.safeParse(formValues).success)
-  }, [formValues])
+  const canStage = useMemo(() => DatastructureVersionFormAvailableSchema.safeParse(formValues).success, [formValues])
 
   useEffect(() => {
     if (isVersionAvailable && !isReadOnly) toast.info(t('messages.isAvailableModelHint'))

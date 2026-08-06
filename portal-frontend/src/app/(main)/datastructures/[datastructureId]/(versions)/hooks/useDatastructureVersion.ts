@@ -11,7 +11,6 @@ import {
   useCreateDatastructureVersion,
   useStatusUpdateDatastructureVersion,
   useUpdateDatastructureVersion,
-  useUpdateDatastructureVersionReleased,
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import { SchemaExportError } from '@/components/uml-modeler/services/jsonSchemaExportService'
@@ -43,6 +42,8 @@ import { buildDataStructureUrn } from '@/utils/urn'
 const draftResolver: Resolver<DatastructureVersionFormData> = zodResolver(DatastructureVersionFormDraftSchema)
 // The available schema narrows modelName to a non-null string, the form values stay the draft shape.
 const availableResolver = zodResolver(DatastructureVersionFormAvailableSchema) as Resolver<DatastructureVersionFormData>
+
+class ReleasedVersionUpdateError extends Error {}
 
 const versionFormResolver: Resolver<DatastructureVersionFormData> = (values, context, options) =>
   (values.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.DRAFT ? draftResolver : availableResolver)(
@@ -84,12 +85,10 @@ export const useDatastructureVersion = ({
   const [initialSession, setInitialSession] = useState(() => buildSessionFromVersion(version))
 
   const updateVersion = useUpdateDatastructureVersion()
-  const updateReleasedVersion = useUpdateDatastructureVersionReleased()
   const createVersion = useCreateDatastructureVersion()
   const updateStatus = useStatusUpdateDatastructureVersion()
 
-  const isLoading =
-    updateVersion.isPending || createVersion.isPending || updateStatus.isPending || updateReleasedVersion.isPending
+  const isLoading = updateVersion.isPending || createVersion.isPending || updateStatus.isPending
 
   const modelSessionManager = useMultiSessionManager({ initialSession })
   const nodes = modelSessionManager.activeSession?.diagram.nodes
@@ -202,20 +201,18 @@ export const useDatastructureVersion = ({
     values: DatastructureVersionPutData,
     datastructureId: string,
   ): Promise<DatastructureVersion> => {
+    // An available version accepts nothing but a status change, so no field can reach an update.
+    if (initialFormValues.dataStructureVersionStatus === STATUS_TYPES.AVAILABLE) {
+      toast.error(t('messages.isAvailableModelHint'))
+      throw new ReleasedVersionUpdateError()
+    }
+
     try {
-      let response: { data: DatastructureVersion }
-      if (initialFormValues.dataStructureVersionStatus === STATUS_TYPES.AVAILABLE) {
-        response = await updateReleasedVersion.mutateAsync({
-          data: values,
-          endpoint: `/datastructures/${datastructureId}/versions/${values.id}/released/meta`,
-        })
-      } else {
-        response = await updateVersion.mutateAsync({
-          data: values,
-          endpoint: `/datastructures/${datastructureId}/versions/${values.id}`,
-        })
-        toast.success(t('messages.updateSuccess'))
-      }
+      const response = await updateVersion.mutateAsync({
+        data: values,
+        endpoint: `/datastructures/${datastructureId}/versions/${values.id}`,
+      })
+      toast.success(t('messages.updateSuccess'))
       return response.data
     } catch (error) {
       toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructureVersion') }))
@@ -309,6 +306,7 @@ export const useDatastructureVersion = ({
       }
       return true
     } catch (error: unknown) {
+      if (error instanceof ReleasedVersionUpdateError) return false
       console.error('An error occurred while submitting datastructure version data.', error)
       toast.error(tCommon('errors.unexpectedError'))
       return false
