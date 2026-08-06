@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -188,6 +188,33 @@ describe('ConnectorTab (integration)', () => {
     renderConnectorTab()
 
     expect(screen.getByLabelText(/URLs/)).toBeInTheDocument()
+  })
+
+  describe('MQTT TLS/broker validation refresh', () => {
+    it('refreshes broker URL error when TLS is toggled', async () => {
+      // Start with a TLS scheme URL but TLS disabled — a mismatch that should produce an error
+      renderConnectorTab({
+        configuration: {
+          ...defaultValues.configuration,
+          urls: 'mqtts://broker.local:8883',
+          tls: false,
+        },
+      })
+
+      const tlsCheckbox = screen.getByRole('checkbox')
+
+      // Toggle TLS on — scheme now matches, error should disappear
+      fireEvent.click(tlsCheckbox)
+      await waitFor(() => {
+        expect(screen.queryByText('datasources.errors.brokerTlsMismatch')).not.toBeInTheDocument()
+      })
+
+      // Toggle TLS off again — mismatch returns, error should reappear
+      fireEvent.click(tlsCheckbox)
+      await waitFor(() => {
+        expect(screen.getByText('datasources.errors.brokerTlsMismatch')).toBeInTheDocument()
+      })
+    })
   })
 
   describe('Read-only mode', () => {

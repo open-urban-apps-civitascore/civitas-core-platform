@@ -1,12 +1,13 @@
 import { useTranslations } from 'next-intl'
-import { useMemo } from 'react'
-import { Path, UseFormReturn } from 'react-hook-form'
+import { useEffect, useMemo, useRef } from 'react'
+import { Path, UseFormReturn, useWatch } from 'react-hook-form'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FormSelect } from '@/components/form/fields/FormSelect'
 import { FooterElement } from '@/components/form/FooterElement'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { cn } from '@/lib/utils'
+import { CONNECTOR_TYPES } from '@/const/connectors'
 import { SelectOption } from '@/types/common'
 import { ConnectorType } from '@/types/connectors'
 import { DatasourceFormDraft } from '@/types/datasources'
@@ -29,6 +30,20 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
   }))
 
   const connectorConfig = useMemo(() => (connectorType ? CONNECTOR_INPUTS[connectorType] : []), [connectorType])
+
+  const tlsWatch = useWatch({ control: form.control, name: 'configuration.tls' as Path<DatasourceFormDraft> })
+  const isFirstTlsRender = useRef(true)
+
+  useEffect(() => {
+    if (isFirstTlsRender.current) {
+      isFirstTlsRender.current = false
+      return
+    }
+    if (connectorType === CONNECTOR_TYPES.MQTT) {
+      void form.trigger('configuration.urls' as Path<DatasourceFormDraft>)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tlsWatch])
 
   const getLabel = (label: { label: string; labelHint: string | null }) => {
     const labelHint = label.labelHint ? `(${tCommon(`info.${label.labelHint}`)})` : ''
