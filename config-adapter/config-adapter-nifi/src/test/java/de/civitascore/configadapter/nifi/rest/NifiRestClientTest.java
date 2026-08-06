@@ -33,6 +33,7 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import java.util.Map;
@@ -53,7 +54,9 @@ class NifiRestClientTest {
     server.start();
     httpClient = ClientBuilder.newClient();
     tokenProvider = new FakeTokenProvider();
-    client = new NifiRestClient(server.baseUrl(), tokenProvider, httpClient);
+    client =
+        new NifiRestClient(
+            server.baseUrl(), tokenProvider, httpClient, MqttTruststoreConfig.nodeTruststore());
   }
 
   @AfterEach

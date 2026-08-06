@@ -228,10 +228,13 @@ The PostGIS extension must already be installed in the target database; the adap
 | `nifi.frost.basic.auth.username` / `.password` | `NIFI_FROST_BASIC_AUTH_USERNAME` / `_PASSWORD` |
 | `nifi.postgis.url` / `.user` / `.password` | `NIFI_POSTGIS_URL` / `_USER` / `_PASSWORD` |
 | `nifi.master-key` | `NIFI_MASTER_KEY` |
+| `nifi.mqtt.truststore.path` / `.type` | `NIFI_MQTT_TRUSTSTORE_PATH` / `_TYPE` |
+| `nifi.mqtt.truststore.password-parameter` | `NIFI_MQTT_TRUSTSTORE_PASSWORD_PARAMETER` |
+| `nifi.mqtt.truststore.parameter-context` | `NIFI_MQTT_TRUSTSTORE_PARAMETER_CONTEXT` |
 
 Most NiFi misconfiguration fails the first affected pipeline deployment rather than startup.
 
-> **A TLS MQTT source needs a deployment-provisioned Parameter Context.** When a datasource sets `tls.enabled`, the generated flow adds an SSL context service that validates the broker against the NiFi node truststore and references a Parameter Context named `NiFi Node Truststore` holding a sensitive parameter `TRUSTSTORE_PASSWORD`; the flow declares that context but carries no value for it. Provision the context on the NiFi node with the truststore password, resolve the truststore file from `TRUSTSTORE_PATH` in the node's environment, and ensure that truststore contains the broker's CA. Otherwise the pipeline deploys clean and then fails at runtime when the processor connects.
+> **A TLS MQTT source needs a truststore the deployment provides.** When a datasource sets `tls.enabled`, the generated flow adds an SSL context service that validates the broker against the truststore named by `nifi.mqtt.truststore.*`; the file and its password belong to the deployment, the adapter writes only names. The defaults describe NiFi's node truststore — the file resolved from `TRUSTSTORE_PATH` in the node's environment, unlocked by a sensitive parameter `TRUSTSTORE_PASSWORD` in a Parameter Context named `NiFi Node Truststore` that the deployment must provision, because a sensitive value never travels in a flow. That truststore also backs cluster-internal TLS and the OIDC back-channel, so a dedicated store keeps external-broker trust out of it. Setting the password parameter to `none` drops the Parameter Context, for a truststore that opens without one. Whichever store is used must carry the broker's CA, otherwise the pipeline deploys clean and fails at runtime when the processor connects. TLS without a configured path and type fails the deployment; there is no fallback to plaintext.
 
 **Flowable** — see [§1.3](#13-flowable-state-database).
 
@@ -246,7 +249,7 @@ Four settings ship with development-friendly defaults that are wrong for product
 | 3 | Kafka transport | PLAINTEXT only | *(not configurable)* | No TLS or SASL support exists. Isolate the broker at the network level. |
 | 4 | Every `localhost` default | `localhost` | real hostnames | `kafka.bootstrap.servers`, `keycloak.url`, `apisix.admin.url`, `frost.url`, `geoserver.url`, `nifi.url`, `nifi.oidc.token-uri`, `postgis.jdbc.url` and `flowable.jdbc.url` all default to a local address. |
 
-Custom certificate authorities: only NiFi has a verification flag. The APISIX, FROST, GeoServer and Keycloak clients use the JVM default trust store, so a private CA needs either `-Djavax.net.ssl.trustStore…` in `JAVA_OPTS` or a trust store baked into the image. MQTT-over-TLS trust belongs to NiFi rather than the adapter: the generated flow validates the broker against the NiFi node truststore, which must therefore carry the broker's CA and be unlocked by the `NiFi Node Truststore` Parameter Context — see [§2.4](#24-per-adapter-connection-settings).
+Custom certificate authorities: only NiFi has a verification flag. The APISIX, FROST, GeoServer and Keycloak clients use the JVM default trust store, so a private CA needs either `-Djavax.net.ssl.trustStore…` in `JAVA_OPTS` or a trust store baked into the image. MQTT-over-TLS trust is evaluated inside NiFi, against a truststore the deployment provides and the adapter only names via `nifi.mqtt.truststore.*`. The default is NiFi's node truststore, which also backs cluster-internal TLS and the OIDC back-channel; a dedicated store keeps external-broker trust separate — see [§2.4](#24-per-adapter-connection-settings).
 
 Secrets to inject rather than bake in: `CIVITAS_MASTER_KEY`, `APISIX_ADMIN_KEY`, `KEYCLOAK_PASSWORD`, `FLOWABLE_JDBC_PASSWORD`, `POSTGIS_JDBC_PASSWORD`, `GEOSERVER_ADMIN_PASSWORD`, `GEOSERVER_POSTGIS_PASSWORD`, `NIFI_OIDC_CLIENT_SECRET`, `NIFI_POSTGIS_PASSWORD`, and the FROST credentials.
 
