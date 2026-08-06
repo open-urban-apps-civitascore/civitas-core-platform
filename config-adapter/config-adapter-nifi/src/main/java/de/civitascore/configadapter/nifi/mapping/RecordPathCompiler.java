@@ -40,6 +40,9 @@ public class RecordPathCompiler {
    */
   private static final String TO_STRING_CHARSET = "UTF-8";
 
+  /** Renders a {@code toDate} result date-only, dropping the time the parse always produces. */
+  private static final String ISO_DATE_PATTERN = "yyyy-MM-dd";
+
   /**
    * The NiFi {@code UpdateRecord} "Replacement Value Strategy" for a property. A {@code const} uses
    * {@code literal-value} (a bare RecordPath literal is not evaluated as a value by UpdateRecord);
@@ -210,7 +213,19 @@ public class RecordPathCompiler {
       throws FatalAdapterException {
     String inner = render(convert.input(), geometryEncoding, target);
     return switch (convert.op()) {
-      case TO_DATE -> "toDate(" + inner + ", " + quote(convert.pattern()) + ")";
+      case TO_DATE_TIME -> "toDate(" + inner + ", " + quote(convert.pattern()) + ")";
+      // A parsed date carries a time component the reader infers as epoch millis, which a DATE
+      // column rejects outright ('date/time field value out of range') while the row vanishes
+      // without a deployment error. Re-formatting to an ISO date hands the sink a plain string
+      // that stringtype=unspecified lets the server parse into the column's own type.
+      case TO_DATE ->
+          "format(toDate("
+              + inner
+              + ", "
+              + quote(convert.pattern())
+              + "), "
+              + quote(ISO_DATE_PATTERN)
+              + ")";
       case FORMAT -> "format(" + inner + ", " + quote(convert.pattern()) + ")";
       case TO_STRING -> "toString(" + inner + ", " + quote(TO_STRING_CHARSET) + ")";
       case TO_INT, TO_FLOAT -> inner;

@@ -49,8 +49,12 @@ class FrontendMappingFixtureTest {
     // toString over a nested path
     assertEquals("toString(/klasse/offen, 'UTF-8')", byPath.get("/groups/boolean").value());
 
-    // toDate with pattern
-    assertEquals("toDate(/klasse/Stufe, 'yyyy-MM-dd')", byPath.get("/groups/datum").value());
+    // toDate with pattern. The fixture predates the Date/DateTime split, where toDate still meant
+    // a timestamp — it now compiles to a date-only value, which is what makes a stored mapping
+    // carrying the op a migration concern rather than a rename.
+    assertEquals(
+        "format(toDate(/klasse/Stufe, 'yyyy-MM-dd'), 'yyyy-MM-dd')",
+        byPath.get("/groups/datum").value());
 
     // concat of two source paths
     assertEquals("concat(/adresse, /klasse/Bezeichnung)", byPath.get("/adresse").value());

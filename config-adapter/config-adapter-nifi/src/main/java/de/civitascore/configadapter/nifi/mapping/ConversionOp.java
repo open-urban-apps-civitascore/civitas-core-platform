@@ -20,6 +20,7 @@ public enum ConversionOp {
   TO_STRING("toString", false),
   TO_INT("toInt", false),
   TO_FLOAT("toFloat", false),
+  TO_DATE_TIME("toDateTime", true),
   TO_DATE("toDate", true),
   FORMAT("format", true);
 
@@ -41,7 +42,8 @@ public enum ConversionOp {
   }
 
   /**
-   * Whether this op needs a non-blank {@code pattern} operand ({@code toDate}/{@code format}).
+   * Whether this op needs a non-blank {@code pattern} operand ({@code toDateTime}/{@code
+   * toDate}/{@code format}).
    *
    * @return true if a pattern is mandatory
    */
