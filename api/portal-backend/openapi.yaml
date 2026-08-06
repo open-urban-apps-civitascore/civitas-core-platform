@@ -2454,10 +2454,11 @@ paths:
       tags:
       - DataSets
       summary: Delete a dataset
-      description: "Deletes a DRAFT dataset immediately (204 No Content). READY datasets\
-        \ cannot be deleted — unstage first (POST /{id}/unstage). AVAILABLE datasets\
-        \ cannot be deleted directly — unrelease first (POST /{id}/unrelease) to tear\
-        \ down infrastructure, then delete."
+      description: "Deletes a dataset (204 No Content). A never-provisioned dataset\
+        \ is removed immediately. A dataset that still holds a provisioned sink is\
+        \ torn down asynchronously via a DELETE saga and removed once the saga completes.\
+        \ An AVAILABLE dataset cannot be deleted directly — unrelease it first (POST\
+        \ /{id}/unrelease)."
       operationId: deleteDataSet
       parameters:
       - name: id
@@ -7678,6 +7679,55 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /datasets/{id}/usable-datasources:
+    get:
+      tags:
+      - DataSets
+      summary: List the data sources this dataset's pipelines may use
+      description: "Returns the AVAILABLE data sources released either for every datapool\
+        \ or for this dataset's datapool; a dataset in no datapool sees only the former.\
+        \ Requires DATASET_UPDATE on the dataset rather than DATASOURCE_READ, and\
+        \ returns id and name only. Callers lacking that permission are rejected with\
+        \ 403; a dataset outside the caller's X-Allowed-Scope-Ids/X-Allowed-Pool-Ids\
+        \ returns 404."
+      operationId: getUsableDataSources
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Usable data sources returned successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DataSourceSummaryDTO"
+        "404":
+          description: Dataset not found or out of scope
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{id}/usable-datasources"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /datasets/{id}/assignments:
     get:
       tags:
@@ -8446,6 +8496,7 @@ components:
         version:
           type: string
           minLength: 1
+          pattern: \d+\.\d+\.\d+
         description:
           type: string
         modelName:
@@ -8594,7 +8645,8 @@ components:
             type: string
         topics:
           type: array
-          description: MQTT topic filters.
+          description: "MQTT topic filter. Exactly one filter, which may use wildcards\
+            \ (+ one level, # multiple) to match several topics."
           example:
           - sensor/#
           items:
@@ -8823,8 +8875,8 @@ components:
           type: string
           description: "URL slug used as the path segment in the public route /v1/datasets/{datasetId}/{slug}.\
             \ Lowercase alphanumeric with internal hyphens, max 32 characters, unique\
-            \ within a dataset, not one of the reserved platform names (apis, api,\
-            \ v1, admin), immutable while AVAILABLE."
+            \ within a dataset, not one of the reserved platform names (apis, usable-datasources,\
+            \ api, v1, admin), immutable while AVAILABLE."
           example: traffic
           maxLength: 32
           minLength: 0
@@ -8923,12 +8975,20 @@ components:
           readOnly: true
         pendingSagaType:
           type: string
-          description: "Type of saga currently in progress (CREATE, UPDATE, DELETE),\
-            \ or null when idle"
+          description: "Type of saga currently in progress (CREATE, UPDATE, UNRELEASE,\
+            \ DELETE), or null when idle"
           enum:
           - CREATE
           - UPDATE
+          - UNRELEASE
           - DELETE
+          readOnly: true
+        provisioned:
+          type: boolean
+          description: Whether the data-holding sink has been physically provisioned
+            at least once (a PostGIS table / FROST project exists). Stays true across
+            an unrelease. Used to warn before a destructive sink change that would
+            rebuild the table.
           readOnly: true
     NamedApiOutputDTO:
       type: object
@@ -8966,6 +9026,30 @@ components:
             \ absent before the dataset is persisted."
           example: https://api.core.civitasconnect.digital/v1/datasets/b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a/traffic
           readOnly: true
+    PipelineRuntimeStatusDTO:
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - OK
+          - ERROR
+          - UNKNOWN
+        message:
+          type: string
+        sanitizedStacktrace:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        source:
+          type: string
+          enum:
+          - DEPLOYMENT
+          - RUNTIME
+        lastEventId:
+          type: string
+          format: uuid
     PipelineSummaryDTO:
       type: object
       properties:
@@ -8976,6 +9060,8 @@ components:
           type: string
         description:
           type: string
+        runtimeStatus:
+          $ref: "#/components/schemas/PipelineRuntimeStatusDTO"
     StyleInputDTO:
       type: object
       properties:
@@ -9090,6 +9176,11 @@ components:
           items:
             type: string
             format: uuid
+        dataSourceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
         model:
           type: object
           additionalProperties: {}
@@ -9102,6 +9193,7 @@ components:
         layerName:
           type: string
           minLength: 1
+          pattern: "^[A-Za-z_-][A-Za-z0-9_-]*$"
         title:
           type: string
         description:
@@ -9243,6 +9335,11 @@ components:
           oneOf:
           - $ref: "#/components/schemas/PostgisConfiguration"
           - $ref: "#/components/schemas/FrostConfiguration"
+        confirmDataLoss:
+          type: boolean
+          description: Acknowledges that this update rebuilds the sink's table and
+            discards all stored data. Required (true) when tableName or dataStructureVersionId
+            changes on a provisioned dataset; ignored otherwise.
       required:
       - configuration
       - dataSinkType
@@ -9413,13 +9510,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageableObject:
@@ -9533,13 +9630,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     Sort:
@@ -9613,13 +9710,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageDataStructureOutputDTO:
@@ -9645,13 +9742,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageDataSourceOutputDTO:
@@ -9677,13 +9774,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageDataSetOutputDTO:
@@ -9709,15 +9806,28 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
+    DataSourceSummaryDTO:
+      type: object
+      description: "Lightweight data source reference — id and name only, no connector\
+        \ configuration."
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier (UUID)
+          example: 550e8400-e29b-41d4-a716-446655440000
+          readOnly: true
+        name:
+          type: string
     PageStyleOutputDTO:
       type: object
       properties:
@@ -9741,13 +9851,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PagePipelineOutputDTO:
@@ -9773,13 +9883,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageLayerOutputDTO:
@@ -9805,13 +9915,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageDataSinkOutputDTO:
@@ -9837,13 +9947,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageDataPoolOutputDTO:
@@ -9869,13 +9979,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageAssignmentOutputDTO:
@@ -9901,13 +10011,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PatchUserInputDTO:
@@ -10019,6 +10129,7 @@ components:
         version:
           type: string
           minLength: 1
+          pattern: \d+\.\d+\.\d+
         description:
           type: string
         modelName:
@@ -10138,6 +10249,7 @@ components:
         layerName:
           type: string
           minLength: 1
+          pattern: "^[A-Za-z_-][A-Za-z0-9_-]*$"
         title:
           type: string
         description:
@@ -10189,6 +10301,11 @@ components:
           oneOf:
           - $ref: "#/components/schemas/PostgisConfiguration"
           - $ref: "#/components/schemas/FrostConfiguration"
+        confirmDataLoss:
+          type: boolean
+          description: Acknowledges that this update rebuilds the sink's table and
+            discards all stored data. Required (true) when tableName or dataStructureVersionId
+            changes on a provisioned dataset; ignored otherwise.
     PatchDataPoolInputDTO:
       description: Partial update — only provided fields are modified.
       properties:

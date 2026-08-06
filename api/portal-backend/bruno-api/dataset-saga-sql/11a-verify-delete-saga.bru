@@ -40,15 +40,20 @@ script:pre-request {
   const token = tokenResp.data.access_token;
 
   for (let i = 0; i < 30; i++) {
-    const resp = await axios.get(
-      `${baseUrl}/datasets/${datasetId}`,
-      {
-        headers: { 'Authorization': `Bearer ${token}` },
-        validateStatus: () => true,
-      }
-    );
-    if (resp.status === 404) break; // already deleted by a previous run
-    if (resp.status === 200 && resp.data && resp.data.pendingSagaType === null
+    // The QuickJS sandbox does not honour validateStatus across the VM boundary, so any non-2xx
+    // rejects the promise. Guard each attempt and keep the response off the error, so a 404
+    // (dataset already gone) is still seen while a transient 401/403 just retries.
+    let resp;
+    try {
+      resp = await axios.get(
+        `${baseUrl}/datasets/${datasetId}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+    } catch (e) {
+      resp = e.response;
+    }
+    if (resp && resp.status === 404) break; // already deleted by a previous run
+    if (resp && resp.status === 200 && resp.data && resp.data.pendingSagaType === null
         && resp.data.dataSetStatus === 'READY') {
       break;
     }

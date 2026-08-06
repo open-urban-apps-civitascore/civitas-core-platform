@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -22,8 +23,8 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
-import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashSet;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -39,6 +41,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 class PipelineServiceTest {
@@ -49,11 +53,20 @@ class PipelineServiceTest {
   @Mock private DataSourceRepository dataSourceRepository;
   @Mock private DataSinkService dataSinkService;
   @Mock private DataSinkRepository dataSinkRepository;
-  @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
+
+  @Mock private ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   @Spy private DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
   @InjectMocks private PipelineService pipelineService;
+
+  /** A request that came through OPA. Lenient: only the datasource-reference path consults it. */
+  @BeforeEach
+  void scopeHeaderPresent() {
+    AllowedScopes scopes = new AllowedScopes();
+    scopes.setWildcard();
+    lenient().when(allowedScopesProvider.getObject()).thenReturn(scopes);
+  }
 
   private DataSet draftDataSet(UUID id) {
     DataSet ds = new DataSet();
@@ -100,9 +113,58 @@ class PipelineServiceTest {
       when(dataSourceRepository.findAllById(Set.of(dataSourceId)))
           .thenReturn(List.of(draftDataSource));
 
+      // A DRAFT source is rejected with the same answer as a nonexistent or out-of-pool one:
+      // naming the lifecycle status would leak it to a caller who may not read the data source.
       assertThatThrownBy(() -> pipelineService.create(input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("AVAILABLE status");
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(dataSourceId))
+          .hasMessageNotContaining("AVAILABLE status");
+    }
+
+    @Test
+    @DisplayName("Should reject a nonexistent datasource indistinguishably from an unusable one")
+    void shouldRejectNonexistentDataSourceLikeAnUnusableOne() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID missingId = UUID.randomUUID();
+
+      PipelineInputDTO input = new PipelineInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSourceIds(Set.of(missingId));
+
+      when(pipelineMapper.toEntity(any())).thenReturn(new Pipeline());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(draftDataSet(dataSetId)));
+      when(dataSourceRepository.findAllById(Set.of(missingId))).thenReturn(List.of());
+
+      assertThatThrownBy(() -> pipelineService.create(input))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(missingId))
+          .hasMessageNotContaining("not found");
+    }
+
+    @Test
+    @DisplayName("Should deny referencing a datasource when no scope header is present")
+    void shouldDenyWhenScopeHeaderAbsent() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dataSourceId = UUID.randomUUID();
+
+      PipelineInputDTO input = new PipelineInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSourceIds(Set.of(dataSourceId));
+
+      // A request that never passed APISIX/OPA carries no scope header at all.
+      when(allowedScopesProvider.getObject()).thenReturn(new AllowedScopes());
+      when(pipelineMapper.toEntity(any())).thenReturn(new Pipeline());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(draftDataSet(dataSetId)));
+
+      assertThatThrownBy(() -> pipelineService.create(input))
+          .isInstanceOf(AccessDeniedException.class);
+      verify(dataSourceRepository, never()).findAllById(any());
     }
 
     @Test
