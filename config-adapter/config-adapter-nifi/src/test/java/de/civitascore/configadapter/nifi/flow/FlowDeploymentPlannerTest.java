@@ -674,9 +674,11 @@ class FlowDeploymentPlannerTest {
       assertTrue(snapshot.contains("tcp://mosquitto:1883"));
       assertTrue(snapshot.contains("sensors/+/temp"));
       assertTrue(snapshot.contains("sensor_observations"));
-      // compiled RecordPath mapping is present (copied field + a toDate conversion)
+      // compiled RecordPath mapping is present (copied field + a toDateTime conversion). The
+      // date-only op renders the same call wrapped in format(), so a substring match would accept
+      // either — the full property value is what tells the two apart.
       assertTrue(snapshot.contains("station_id"));
-      assertTrue(snapshot.contains("toDate(/ts, 'yyyy-MM-dd')"));
+      assertTrue(snapshot.contains("\"toDate(/ts, 'yyyy-MM-dd')\""));
 
       // SECURITY INVARIANT: the plaintext secret never appears in the uploaded snapshot
       assertFalse(snapshot.contains(SECRET));

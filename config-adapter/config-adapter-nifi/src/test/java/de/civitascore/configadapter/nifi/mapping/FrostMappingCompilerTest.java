@@ -658,6 +658,21 @@ class FrostMappingCompilerTest {
   }
 
   @Test
+  void anyResultFromATemporalConvertRendersQuoted() throws Exception {
+    // Both temporal ops yield text; unquoted they would emit bare ISO characters into the entity
+    // body, which is invalid JSON and only surfaces when FROST rejects the ingest.
+    String quoted = "\"${sta_2_result:escapeJson()}\"";
+    assertEquals(
+        quoted,
+        observationResult(
+            new ConvertNode(ConversionOp.TO_DATE_TIME, new CopyNode("$.ts"), "yyyy-MM-dd")));
+    assertEquals(
+        quoted,
+        observationResult(
+            new ConvertNode(ConversionOp.TO_DATE, new CopyNode("$.ts"), "yyyy-MM-dd")));
+  }
+
+  @Test
   void anyResultFromACopyRendersQuotedString() throws Exception {
     // A copy is a string source: the ANY placeholder must quote+escape it (unquoted would be
     // invalid JSON for a text result).

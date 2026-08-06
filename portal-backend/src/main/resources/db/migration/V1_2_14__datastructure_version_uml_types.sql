@@ -122,8 +122,9 @@ SELECT COALESCE(
                nodes);
 $$ LANGUAGE SQL IMMUTABLE;
 
--- Reaches the same three type locations as the rewrite, so the verification below cannot pass on a
--- location the rewrite skipped.
+-- Reaches the same three type locations as the rewrite. That keeps the two in step, but it also
+-- bounds the verification: a type stored anywhere else is missed by both and still reports success.
+-- Only nodes carry attributes and operations, so no such location exists today.
 CREATE OR REPLACE FUNCTION pg_temp.uml_type_values(styles JSONB) RETURNS SETOF JSONB AS
 $$
 SELECT member -> 'type'

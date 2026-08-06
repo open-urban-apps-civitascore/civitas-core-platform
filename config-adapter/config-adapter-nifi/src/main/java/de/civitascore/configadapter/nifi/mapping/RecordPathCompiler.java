@@ -40,7 +40,6 @@ public class RecordPathCompiler {
    */
   private static final String TO_STRING_CHARSET = "UTF-8";
 
-  /** Renders a {@code toDate} result date-only, dropping the time the parse always produces. */
   private static final String ISO_DATE_PATTERN = "yyyy-MM-dd";
 
   /**
@@ -213,11 +212,12 @@ public class RecordPathCompiler {
       throws FatalAdapterException {
     String inner = render(convert.input(), geometryEncoding, target);
     return switch (convert.op()) {
+      // RecordPath has one parse function and it always yields a time component, so the timestamp
+      // op is the bare call and the date-only op is the one that needs extra work.
       case TO_DATE_TIME -> "toDate(" + inner + ", " + quote(convert.pattern()) + ")";
-      // A parsed date carries a time component the reader infers as epoch millis, which a DATE
-      // column rejects outright ('date/time field value out of range') while the row vanishes
-      // without a deployment error. Re-formatting to an ISO date hands the sink a plain string
-      // that stringtype=unspecified lets the server parse into the column's own type.
+      // That time component reaches a DATE column as epoch millis and is rejected there, while the
+      // row vanishes without a deployment error. Re-formatting yields a plain string the server
+      // parses into the column's own type (see PostgisSinkStage#withStringtypeUnspecified).
       case TO_DATE ->
           "format(toDate("
               + inner

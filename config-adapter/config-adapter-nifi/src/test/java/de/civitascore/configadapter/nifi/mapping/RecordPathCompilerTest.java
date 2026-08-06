@@ -215,8 +215,7 @@ class RecordPathCompilerTest {
 
   @Test
   void toDateDropsTheTimeTheParseProduces() throws Exception {
-    // Without the re-format the value reaches a DATE column as epoch millis and is rejected there
-    // silently — the pattern describes the input, never the result.
+    // The pattern describes the input, never the result.
     var props =
         byPath(
             compile(
