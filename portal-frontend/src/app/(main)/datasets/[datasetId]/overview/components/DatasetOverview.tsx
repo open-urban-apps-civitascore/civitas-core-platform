@@ -13,6 +13,7 @@ import {
   useStageDataset,
   useUnreleaseDataset,
   useUnstageDataset,
+  useUpdateReadyDatasetMeta,
   useUpdateReleasedDatasetMeta,
 } from '@/app/services/api/datasets/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
@@ -50,7 +51,6 @@ import { pickDirtyValues } from '@/utils/form'
 import { mapDatasetToFormData } from '../../../utils/mappers'
 import { BaseInfoForm } from '../../components/BaseInfoForm'
 import { CompletionStep } from '../../components/CompletionStep'
-import { usePipelinePermissions } from '../../data-flow/pipeline-editor/_hooks/use-pipeline-permissions'
 import { ApiList } from './ApiList'
 import { PipelineList } from './PipelineList'
 
@@ -66,17 +66,21 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
 
+  const router = useRouter()
+  const { handleFormValidationError } = useError()
+
+  const serverStatus = dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT
+  const [dataSetStatus, setDataSetStatus] = useState<DatasetStatusTypes>(serverStatus)
+  const isDraftMode = dataSetStatus === DATASET_STATUS_TYPES.DRAFT
+  const isServerDraftState = serverStatus === DATASET_STATUS_TYPES.DRAFT
+  const isServerReadyState = serverStatus === DATASET_STATUS_TYPES.READY
+  const isServerAvailableState = serverStatus === DATASET_STATUS_TYPES.AVAILABLE
+  const hasStatusChanged = dataSetStatus !== serverStatus
+
   const { hasPermission, hasScopedPermission } = usePermissions()
 
   const canRead = hasScopedPermission(
     PERMISSION_NAMES.DATASET_READ,
-    ASSIGNMENT_SCOPE_TYPES.DATASET,
-    dataset.id,
-    dataset.datapool?.id,
-  )
-
-  const canUpdate = hasScopedPermission(
-    PERMISSION_NAMES.DATASET_UPDATE,
     ASSIGNMENT_SCOPE_TYPES.DATASET,
     dataset.id,
     dataset.datapool?.id,
@@ -89,9 +93,24 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     dataset.datapool?.id,
   )
 
-  const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
+  const canUpdateDatasets = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
 
-  const { canCreatePipeline } = usePipelinePermissions(dataset.id, dataset.datapool?.id)
+  const canUpdate = isServerAvailableState ? canUpdateDatasets && canRelease : canUpdateDatasets
+
+  const canCreate = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_CREATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
+
+  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
+  const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
@@ -100,16 +119,11 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const pipelineList = pipelines ?? []
   const namedApiList = namedApis ?? []
 
-  const router = useRouter()
-  const { handleFormValidationError } = useError()
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit' || !canUpdate)
-  const [dataSetStatus, setDataSetStatus] = useState<DatasetStatusTypes>(
-    dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT,
-  )
-
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const updateDataset = usePatchDataset()
+  const updateReadyMeta = useUpdateReadyDatasetMeta()
   const updateReleasedMeta = useUpdateReleasedDatasetMeta()
   const stageDataset = useStageDataset()
   const unstageDataset = useUnstageDataset()
@@ -118,6 +132,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const isLoading =
     updateDataset.isPending ||
+    updateReadyMeta.isPending ||
     updateReleasedMeta.isPending ||
     stageDataset.isPending ||
     unstageDataset.isPending ||
@@ -134,12 +149,18 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   useEffect(() => {
     const formData = mapDatasetToFormData(dataset)
     form.reset(formData)
-    setDataSetStatus(dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT)
+    setDataSetStatus(serverStatus)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset])
 
-  const isDraftMode = dataSetStatus === DATASET_STATUS_TYPES.DRAFT || !dataSetStatus
-  const hasStatusChanged = dataSetStatus !== dataset.dataSetStatus
+  const canCreatePipeline =
+    canRead &&
+    canCreate &&
+    canUpdate &&
+    canReadDatasources &&
+    canReadDatastructures &&
+    isDraftMode &&
+    isServerDraftState
 
   const hasUnsavedChanges = form.formState.isDirty || hasStatusChanged
   const hasOnlyStatusChanges = !form.formState.isDirty && hasStatusChanged
@@ -147,9 +168,9 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const formValues = useWatch({ control: form.control })
 
   const canStage = useMemo(() => {
-    const hasDistribution = !!dataset.pipelines?.length || !!dataset.namedApis?.length
+    const hasDistribution = !!dataset.pipelines?.length
     return DatasetFormAvailableSchema.safeParse(formValues).success && hasDistribution
-  }, [formValues, dataset.pipelines, dataset.namedApis])
+  }, [formValues, dataset.pipelines])
 
   // Auto-revert status to draft when required fields become invalid
   const revalidateDraftMode = () => {
@@ -194,17 +215,14 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   }
 
   const handleSaveAndTransition = async (formData: DatasetFormDraft) => {
-    const serverStatus = dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT
-
     try {
       // Step 1: Save form data if dirty
       if (form.formState.isDirty) {
         const { dirtyFields } = form.formState
         const valuesForValidation = { ...formData, id: dataset.id }
-        const parsed =
-          serverStatus === DATASET_STATUS_TYPES.DRAFT
-            ? DatasetUpdateApiSchema.safeParse(valuesForValidation)
-            : DatasetFormAvailableSchema.safeParse(valuesForValidation)
+        const parsed = isServerDraftState
+          ? DatasetUpdateApiSchema.safeParse(valuesForValidation)
+          : DatasetFormAvailableSchema.safeParse(valuesForValidation)
 
         if (!parsed.success) {
           handleFormValidationError(parsed.error)
@@ -218,8 +236,10 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
           ...fieldsToUpdate,
         }
 
-        if (serverStatus === DATASET_STATUS_TYPES.DRAFT) {
+        if (isServerDraftState) {
           await updateDataset.mutateAsync(updateData)
+        } else if (isServerReadyState) {
+          await updateReadyMeta.mutateAsync({ ...parsed.data, id: dataset.id })
         } else {
           await updateReleasedMeta.mutateAsync({ ...parsed.data, id: dataset.id })
         }
@@ -287,14 +307,14 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       setIsExitModalOpen(true)
     } else {
       setIsReadOnly(true)
-      setDataSetStatus(dataset.dataSetStatus)
+      setDataSetStatus(serverStatus)
     }
   }
 
   const handleDiscardAndExit = () => {
     setIsExitModalOpen(false)
     form.reset(mapDatasetToFormData(dataset))
-    setDataSetStatus(dataset.dataSetStatus)
+    setDataSetStatus(serverStatus)
     setIsReadOnly(true)
   }
 
@@ -344,7 +364,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
           <ApiList
             datasetId={dataset.id}
             apis={namedApiList}
-            canEdit={canRead && canUpdate && canReadDatastructures}
+            canEdit={canRead && canUpdate && canReadDatastructures && isDraftMode && isServerDraftState}
             canView={canRead && canReadDatastructures}
             isOpenDataAccess={dataset.openDataAccess}
           />

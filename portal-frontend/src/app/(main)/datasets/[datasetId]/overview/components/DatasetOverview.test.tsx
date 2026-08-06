@@ -15,6 +15,7 @@ const mockStageDataset = vi.fn().mockResolvedValue(undefined)
 const mockUnstageDataset = vi.fn().mockResolvedValue(undefined)
 const mockReleaseDataset = vi.fn().mockResolvedValue(undefined)
 const mockUnreleaseDataset = vi.fn().mockResolvedValue(undefined)
+const mockUpdateReadyDatasetMeta = vi.fn().mockResolvedValue(undefined)
 const mockUpdateReleasedDatasetMeta = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
@@ -23,6 +24,7 @@ vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   useUnstageDataset: () => ({ mutateAsync: mockUnstageDataset, isPending: false }),
   useReleaseDataset: () => ({ mutateAsync: mockReleaseDataset, isPending: false }),
   useUnreleaseDataset: () => ({ mutateAsync: mockUnreleaseDataset, isPending: false }),
+  useUpdateReadyDatasetMeta: () => ({ mutateAsync: mockUpdateReadyDatasetMeta, isPending: false }),
   useUpdateReleasedDatasetMeta: () => ({ mutateAsync: mockUpdateReleasedDatasetMeta, isPending: false }),
   useGetDataset: () => ({ data: undefined }),
 }))
@@ -179,6 +181,18 @@ describe('DatasetOverview', () => {
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
     })
 
+    it('hides Edit button on an AVAILABLE dataset when user lacks DATASET_RELEASE permission', () => {
+      mockCurrentUser([PERMISSION_NAMES.DATASET_UPDATE])
+      renderComponent({ dataset: makeDraftDataset({ dataSetStatus: 'AVAILABLE' }) })
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+    })
+
+    it('shows Edit button on a READY dataset when user has only DATASET_UPDATE permission', () => {
+      mockCurrentUser([PERMISSION_NAMES.DATASET_UPDATE])
+      renderComponent({ dataset: makeDraftDataset({ dataSetStatus: 'READY' }) })
+      expect(screen.getByTestId('editButton')).toBeInTheDocument()
+    })
+
     it('always shows access management completion card', () => {
       mockCurrentUser([])
       renderComponent()
@@ -256,6 +270,21 @@ describe('DatasetOverview', () => {
         renderComponent({
           dataset: makeDraftDataset({
             description: '',
+            pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
+          }),
+          groupCount: 1,
+          roleCount: 1,
+        })
+        clickEditButton()
+        await openStatusDropdown()
+        expect(getStatusOption('READY')).toHaveAttribute('aria-disabled', 'true')
+        expect(getStatusOption('AVAILABLE')).toHaveAttribute('aria-disabled', 'true')
+      })
+
+      it('when only a named API is present (a named API is no distribution)', async () => {
+        renderComponent({
+          dataset: makeDraftDataset({
+            pipelines: [],
             namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
           }),
           groupCount: 1,
@@ -269,7 +298,7 @@ describe('DatasetOverview', () => {
     })
 
     describe('READY and AVAILABLE are enabled when canStage is true', () => {
-      it('when pipelines present, assignments set, and form passes strict schema', async () => {
+      it('when pipelines present and form passes strict schema', async () => {
         renderComponent({
           dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
           groupCount: 1,
@@ -281,21 +310,9 @@ describe('DatasetOverview', () => {
         expect(getStatusOption('AVAILABLE')).not.toHaveAttribute('aria-disabled', 'true')
       })
 
-      it('when namedApis present, assignments set, and form passes strict schema', async () => {
-        renderComponent({
-          dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
-          groupCount: 1,
-          roleCount: 1,
-        })
-        clickEditButton()
-        await openStatusDropdown()
-        expect(getStatusOption('READY')).not.toHaveAttribute('aria-disabled', 'true')
-        expect(getStatusOption('AVAILABLE')).not.toHaveAttribute('aria-disabled', 'true')
-      })
-
       it('when distribution present and form valid but no assignments (assignments not required)', async () => {
         renderComponent({
-          dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
+          dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
           groupCount: 0,
           roleCount: 0,
         })
@@ -309,7 +326,7 @@ describe('DatasetOverview', () => {
         renderComponent({
           dataset: makeDraftDataset({
             description: '',
-            namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+            pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
           }),
           groupCount: 1,
           roleCount: 1,
@@ -336,7 +353,7 @@ describe('DatasetOverview', () => {
           const { rerender } = renderComponent({
             dataset: makeDraftDataset({
               dataSetStatus,
-              namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+              pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
             }),
             groupCount: 1,
             roleCount: 1,
@@ -349,7 +366,7 @@ describe('DatasetOverview', () => {
               <DatasetOverview
                 dataset={makeDraftDataset({
                   dataSetStatus,
-                  namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+                  pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
                 })}
                 groupCount={0}
                 roleCount={0}
@@ -368,7 +385,7 @@ describe('DatasetOverview', () => {
           dataset: makeDraftDataset({
             dataSetStatus: 'READY',
             description: 'A meaningful description',
-            namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+            pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
           }),
           groupCount: 1,
           roleCount: 1,
@@ -381,7 +398,7 @@ describe('DatasetOverview', () => {
             dataset={makeDraftDataset({
               dataSetStatus: 'READY',
               description: '',
-              namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+              pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
             })}
             groupCount={1}
             roleCount={1}
@@ -425,7 +442,7 @@ describe('DatasetOverview', () => {
 
     it('calls stageDataset when status changes from DRAFT to READY', async () => {
       renderComponent({
-        dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
+        dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
         groupCount: 1,
         roleCount: 1,
       })
@@ -444,7 +461,7 @@ describe('DatasetOverview', () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'READY',
-          namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
         }),
         groupCount: 1,
         roleCount: 1,
@@ -464,7 +481,7 @@ describe('DatasetOverview', () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'AVAILABLE',
-          namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
         }),
         groupCount: 1,
         roleCount: 1,
@@ -484,7 +501,7 @@ describe('DatasetOverview', () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'AVAILABLE',
-          namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
         }),
         groupCount: 1,
         roleCount: 1,
@@ -501,11 +518,37 @@ describe('DatasetOverview', () => {
       })
     })
 
+    it('calls updateReadyDatasetMeta when saving form changes on a READY dataset', async () => {
+      renderComponent({
+        dataset: makeDraftDataset({
+          dataSetStatus: 'READY',
+          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
+        }),
+        groupCount: 1,
+        roleCount: 1,
+      })
+      clickEditButton()
+
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
+      })
+
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(mockUpdateReadyDatasetMeta).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'Updated Name', id: 'test-id' }),
+        )
+      })
+      expect(mockUpdateReleasedDatasetMeta).not.toHaveBeenCalled()
+      expect(mockPatchDataset).not.toHaveBeenCalled()
+    })
+
     it('calls updateReleasedDatasetMeta when saving form changes on an AVAILABLE dataset', async () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'AVAILABLE',
-          namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
         }),
         groupCount: 1,
         roleCount: 1,
@@ -595,7 +638,7 @@ describe('DatasetOverview', () => {
 
     it('discarding resets form values and status to original dataset values and clears exit modal', async () => {
       renderComponent({
-        dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
+        dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
       })
       clickEditButton()
 
@@ -614,7 +657,7 @@ describe('DatasetOverview', () => {
 
     it('save-and-exit from modal calls mockStageDataset and closes modal on success', async () => {
       renderComponent({
-        dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
+        dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
       })
 
       clickEditButton()

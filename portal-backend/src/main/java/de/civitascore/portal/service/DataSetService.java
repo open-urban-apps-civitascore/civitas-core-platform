@@ -338,7 +338,28 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           id,
           "This endpoint requires a released dataset (READY or AVAILABLE), current status: DRAFT");
     }
+    return updateMetaOf(existingEntity, input);
+  }
 
+  /**
+   * Restricted to READY so it can be granted with DATASET_UPDATE alone, without DATASET_RELEASE:
+   * editing a staged dataset is an update, not a release.
+   */
+  @Transactional
+  public DataSet updateReadyMeta(UUID id, DataSetInputDTO input) {
+    DataSet existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataSetStatus() != DataSetStatus.READY) {
+      throw new InvalidInputException(
+          "dataSetStatus",
+          id,
+          "This endpoint requires a READY dataset, current status: "
+              + existingEntity.getDataSetStatus());
+    }
+    return updateMetaOf(existingEntity, input);
+  }
+
+  private DataSet updateMetaOf(DataSet existingEntity, DataSetInputDTO input) {
+    UUID id = existingEntity.getId();
     if (existingEntity.getPendingSagaType() != null) {
       throw new ResourceInUseException(
           "DataSet",

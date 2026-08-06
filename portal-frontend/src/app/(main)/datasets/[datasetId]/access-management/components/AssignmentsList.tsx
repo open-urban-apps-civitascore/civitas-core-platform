@@ -6,7 +6,11 @@ import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
-import { usePatchDataset, useUpdateReleasedDatasetMeta } from '@/app/services/api/datasets/clientRequests'
+import {
+  usePatchDataset,
+  useUpdateReadyDatasetMeta,
+  useUpdateReleasedDatasetMeta,
+} from '@/app/services/api/datasets/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { GenericAssignmentsList } from '@/components/access-management/GenericAssignmentsList'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
@@ -34,6 +38,10 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
   const router = useRouter()
   const searchParams = useSearchParams()
 
+  const isDraft = dataset.dataSetStatus === DATASET_STATUS_TYPES.DRAFT
+  const isReady = dataset.dataSetStatus === DATASET_STATUS_TYPES.READY
+  const isAvailable = dataset.dataSetStatus === DATASET_STATUS_TYPES.AVAILABLE
+
   const { hasScopedPermission, hasPermission } = usePermissions()
   const canUpdateDataset = hasScopedPermission(
     PERMISSION_NAMES.DATASET_UPDATE,
@@ -41,8 +49,16 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
     dataset.id,
     dataset.datapool?.id,
   )
+  const canReleaseDataset = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_RELEASE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
   const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
-  const canEdit = canUpdateDataset && canReadDatastructures
+  const canEdit = isAvailable
+    ? canUpdateDataset && canReadDatastructures && canReleaseDataset
+    : canUpdateDataset && canReadDatastructures
 
   const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
   const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit' || !canEdit)
@@ -50,9 +66,8 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
   const [isLoading, setIsLoading] = useState(false)
 
   const { mutateAsync: patchDataset } = usePatchDataset()
+  const { mutateAsync: updateReadyMeta } = useUpdateReadyDatasetMeta()
   const { mutateAsync: updateReleasedMeta } = useUpdateReleasedDatasetMeta()
-
-  const isDraft = dataset.dataSetStatus === DATASET_STATUS_TYPES.DRAFT
 
   const hasChanges = hasAssignmentChanges(assignedGroups, initialAssignments)
 
@@ -63,17 +78,21 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
     const areAssignmentsInvalid = assignedGroups.some(group => group.assignedRoles.length === 0)
     try {
       const assignments = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
+      const realeasedPayload = {
+        id: dataset.id,
+        name: dataset.name,
+        description: dataset.description,
+        openDataAccess: dataset.openDataAccess,
+        assignments,
+      }
       if (isDraft) {
         await patchDataset({ id: dataset.id, assignments })
+      } else if (isReady) {
+        // Ready datasets go through the ready/meta PUT endpoint
+        await updateReadyMeta(realeasedPayload)
       } else {
         // Released datasets go through the released/meta PUT endpoint
-        await updateReleasedMeta({
-          id: dataset.id,
-          name: dataset.name,
-          description: dataset.description,
-          openDataAccess: dataset.openDataAccess,
-          assignments,
-        })
+        await updateReleasedMeta(realeasedPayload)
       }
       toast.success(t('messages.updateSuccess'))
       if (areAssignmentsInvalid) {

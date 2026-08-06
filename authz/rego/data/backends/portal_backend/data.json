@@ -88,6 +88,9 @@
     "/v1/datasets/{id}/released/meta": {
       "PUT": ["DATASET_UPDATE", "DATASET_RELEASE"]
     },
+    "/v1/datasets/{id}/ready/meta": {
+      "PUT": "DATASET_UPDATE"
+    },
     "/v1/datasets/{id}/assignments": {
       "GET": "DATASET_READ"
     },
