@@ -215,3 +215,58 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(payload.data.model).toMatchObject({ properties: { alpha: { $ref: '#/$defs/Alpha' } } })
   })
 })
+
+describe('useDatastructureVersion — status-dependent field validation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('flags an emptied description as required while the status is AVAILABLE', async () => {
+    const { hook } = setup(version({ dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE }))
+
+    await act(async () => {
+      hook.result.current.form.setValue('description', '', { shouldValidate: true })
+    })
+
+    expect(hook.result.current.form.getFieldState('description').error?.message).toBe('common.errors.required')
+  })
+
+  it('leaves an emptied description unflagged while the status is DRAFT', async () => {
+    const { hook } = setup(version())
+
+    await act(async () => {
+      hook.result.current.form.setValue('description', '', { shouldValidate: true })
+    })
+
+    expect(hook.result.current.form.getFieldState('description').error).toBeUndefined()
+  })
+
+  it('flags the empty description as soon as the status switches to AVAILABLE', async () => {
+    const { hook } = setup(version({ description: '' }))
+
+    expect(hook.result.current.form.getFieldState('description').error).toBeUndefined()
+
+    await act(async () => {
+      hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.AVAILABLE)
+    })
+
+    expect(hook.result.current.form.getFieldState('description').error?.message).toBe('common.errors.required')
+  })
+
+  it('clears the required error when the status switches back to DRAFT', async () => {
+    const { hook } = setup(
+      version({ description: '', dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE }),
+    )
+
+    await act(async () => {
+      hook.result.current.form.setValue('description', '', { shouldValidate: true })
+    })
+    expect(hook.result.current.form.getFieldState('description').error?.message).toBe('common.errors.required')
+
+    await act(async () => {
+      hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.DRAFT)
+    })
+
+    expect(hook.result.current.form.getFieldState('description').error).toBeUndefined()
+  })
+})

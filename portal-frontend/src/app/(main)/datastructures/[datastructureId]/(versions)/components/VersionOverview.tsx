@@ -1,19 +1,16 @@
 'use client'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useWatch } from 'react-hook-form'
 
-import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
-import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
-import { Button } from '@/components/ui/button'
 import { QUERY_PARAMS } from '@/const/searchParams'
 import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
@@ -29,13 +26,12 @@ import {
   DatastructureVersionFormAvailableSchema,
   DatastructureVersionTab,
 } from '@/types/datastructures'
-import { getHeaderAction } from '@/utils/headerAction'
 
+import PageEditControls from '@/components/page-edit-controls/PageEditControls'
+import { toast } from 'sonner'
 import { useDatastructureVersion } from '../hooks/useDatastructureVersion'
 import { StructureDefinitionTab } from './structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
-import PageEditControls from '@/components/page-edit-controls/PageEditControls'
-import { toast } from 'sonner'
 
 const tabs: Tab<DatastructureVersionTab>[] = [
   {
@@ -124,7 +120,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     datastructureId: datastructure.id,
     dataStructureName: datastructure.name,
     onCreateVersion: redirectAfterVersionCreation,
-    canStage,
   })
 
   const formValues = useWatch({ control: form.control })

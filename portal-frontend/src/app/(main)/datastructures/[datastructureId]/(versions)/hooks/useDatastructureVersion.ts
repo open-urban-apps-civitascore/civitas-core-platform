@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Resolver, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
@@ -25,6 +25,7 @@ import {
   DatastructureStatusType,
   DatastructureVersion,
   DatastructureVersionCreateData,
+  DatastructureVersionFormAvailableSchema,
   DatastructureVersionFormData,
   DatastructureVersionFormDraftSchema,
   DatastructureVersionPutData,
@@ -38,6 +39,17 @@ import {
 } from '@/utils/datastructures'
 import { pickDirtyValues } from '@/utils/form'
 import { buildDataStructureUrn } from '@/utils/urn'
+
+const draftResolver: Resolver<DatastructureVersionFormData> = zodResolver(DatastructureVersionFormDraftSchema)
+// The available schema narrows modelName to a non-null string, the form values stay the draft shape.
+const availableResolver = zodResolver(DatastructureVersionFormAvailableSchema) as Resolver<DatastructureVersionFormData>
+
+const versionFormResolver: Resolver<DatastructureVersionFormData> = (values, context, options) =>
+  (values.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.DRAFT ? draftResolver : availableResolver)(
+    values,
+    context,
+    options,
+  )
 
 export const defaultDatastructureVersionFormData: DatastructureVersionFormData = {
   id: '',
@@ -56,7 +68,6 @@ interface UseDatastructureVersionProps {
   version: DatastructureVersion | null
   isCreateMode: boolean
   onCreateVersion?: (data: DatastructureVersion) => void
-  canStage?: boolean
 }
 
 export const useDatastructureVersion = ({
@@ -64,7 +75,6 @@ export const useDatastructureVersion = ({
   version,
   isCreateMode,
   onCreateVersion,
-  canStage = true,
 }: UseDatastructureVersionProps) => {
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
@@ -95,7 +105,7 @@ export const useDatastructureVersion = ({
   )
 
   const form = useForm<DatastructureVersionFormData>({
-    resolver: zodResolver(DatastructureVersionFormDraftSchema),
+    resolver: versionFormResolver,
     mode: 'onChange',
     defaultValues: initialFormValues,
   })
@@ -134,32 +144,13 @@ export const useDatastructureVersion = ({
     }
   }, [activeSession, initialSession, form, activeSessionId])
 
-  const revalidateForm = () => {
-    if (!isDraftMode) {
-      void form.trigger()
-    }
-  }
-
-  const revalidateDraftMode = () => {
-    if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canStage) {
-      form.setValue('dataStructureVersionStatus', DATASTRUCTURE_STATUS_TYPES.DRAFT, { shouldDirty: true })
-      toast.info(tCommon('info.switchMode'))
-    }
-  }
-
   useEffect(() => {
     if (isDraftMode) {
       form.clearErrors()
-    } else {
-      revalidateForm()
+      return
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDraftMode])
-
-  useEffect(() => {
-    revalidateDraftMode()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canStage, statusWatch])
+    void form.trigger()
+  }, [form, isDraftMode])
 
   const handleStatusChange = (newStatus: DatastructureStatusType) => {
     form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })
