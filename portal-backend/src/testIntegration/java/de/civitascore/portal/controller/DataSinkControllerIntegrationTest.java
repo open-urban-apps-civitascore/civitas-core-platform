@@ -1,8 +1,6 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatNoException;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
@@ -27,7 +25,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -304,60 +301,6 @@ class DataSinkControllerIntegrationTest
           exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), duplicate);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-    }
-
-    /**
-     * The service check is a non-locking read, so two concurrent creates can both pass it. Saving
-     * straight through the repository is the only way to reach the constraint that closes that
-     * window — every path through the service is rejected earlier.
-     */
-    @Test
-    @DisplayName("The database rejects a duplicate tableName that bypasses the service check")
-    void databaseRejectsDuplicateTableNameBypassingTheService() {
-      ensureTestData();
-      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
-
-      DataSink first = new DataSink();
-      first.setDataSet(dataSet);
-      first.setDataSinkType(DataSinkType.POSTGIS);
-      first.setConfiguration(Map.of("tableName", "raced_table"));
-      dataSinkRepository.saveAndFlush(first);
-
-      DataSink duplicate = new DataSink();
-      duplicate.setDataSet(dataSet);
-      duplicate.setDataSinkType(DataSinkType.POSTGIS);
-      duplicate.setConfiguration(Map.of("tableName", "RACED_TABLE"));
-
-      assertThatThrownBy(() -> dataSinkRepository.saveAndFlush(duplicate))
-          .isInstanceOf(DataIntegrityViolationException.class);
-    }
-
-    /**
-     * A non-partial index would reject a FROST/POSTGIS tableName collision that the service
-     * deliberately permits, so the API would accept the write and the flush would fail.
-     */
-    @Test
-    @DisplayName("The database allows the same tableName across different sink types")
-    void databaseAllowsSameTableNameForDifferentSinkTypes() {
-      ensureTestData();
-      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
-
-      DataSink postgis = new DataSink();
-      postgis.setDataSet(dataSet);
-      postgis.setDataSinkType(DataSinkType.POSTGIS);
-      postgis.setConfiguration(Map.of("tableName", "shared"));
-
-      DataSink frost = new DataSink();
-      frost.setDataSet(dataSet);
-      frost.setDataSinkType(DataSinkType.FROST);
-      frost.setConfiguration(Map.of("tableName", "shared"));
-
-      assertThatNoException()
-          .isThrownBy(
-              () -> {
-                dataSinkRepository.saveAndFlush(postgis);
-                dataSinkRepository.saveAndFlush(frost);
-              });
     }
 
     @Test

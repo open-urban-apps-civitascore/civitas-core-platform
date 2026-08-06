@@ -38,8 +38,8 @@ import org.springframework.stereotype.Service;
 public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
 
   /**
-   * ASCII-only keeps Postgres' {@code LOWER()} in the unique index and Java's {@code
-   * equalsIgnoreCase} in the uniqueness check from disagreeing about what counts as a duplicate.
+   * ASCII-only keeps Java's {@code equalsIgnoreCase} in the uniqueness check from disagreeing with
+   * Postgres' own case folding about which two names denote one table.
    */
   private static final Pattern TABLE_NAME_PATTERN = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
