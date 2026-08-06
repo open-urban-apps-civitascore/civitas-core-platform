@@ -211,12 +211,24 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
         .ifPresent(
             _ -> {
               throw new UniqueConstraintViolationException(
-                  getEntityName(),
-                  "configuration.tableName",
-                  tableName,
-                  "dataSetId",
-                  entity.getDataSet().getId().toString());
+                  duplicateTableNameMessage(entity, tableName));
             });
+  }
+
+  /**
+   * An update carries the stored {@code tableName} forward when the request does not mention it, so
+   * a sink that already collides is rejected by a request that changed nothing about its name. That
+   * reads as a bug in the request unless the message points at the stored value.
+   */
+  private static String duplicateTableNameMessage(DataSink entity, String tableName) {
+    if (entity.getId() == null) {
+      return "Another POSTGIS DataSink of this dataset already uses tableName '%s';"
+              .formatted(tableName)
+          + " they would share one physical table";
+    }
+    return "This DataSink's tableName '%s' is already used by another POSTGIS DataSink of this"
+            .formatted(tableName)
+        + " dataset; rename it to change this sink";
   }
 
   private static String siblingTableName(DataSink sink) {

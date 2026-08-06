@@ -619,9 +619,8 @@ class DataSinkControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDetail())
-          .contains("configuration.tableName")
+          .contains("tableName")
           .contains("T_ONE")
-          .contains(testDataSetId.toString())
           .doesNotContain("confirmDataLoss");
       assertThat(dataSinkRepository.findById(existing.getBody().getId()))
           .isPresent()

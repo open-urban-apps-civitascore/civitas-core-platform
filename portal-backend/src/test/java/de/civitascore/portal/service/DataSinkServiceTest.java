@@ -403,7 +403,8 @@ class DataSinkServiceTest {
 
       assertThatThrownBy(() -> dataSinkService.create(input))
           .isInstanceOf(UniqueConstraintViolationException.class)
-          .hasMessageContaining("messwerte");
+          .hasMessageContaining("messwerte")
+          .hasMessageContaining("Another POSTGIS DataSink");
     }
 
     @Test
@@ -566,8 +567,40 @@ class DataSinkServiceTest {
 
       assertThatThrownBy(() -> dataSinkService.update(sinkId, input))
           .isInstanceOf(UniqueConstraintViolationException.class)
-          .hasMessageContaining("messwerte")
-          .hasMessageContaining(dataSetId.toString());
+          .hasMessageContaining("messwerte");
+    }
+
+    /**
+     * An update carries the stored tableName forward, so a sink that already collides is rejected
+     * by a request that never mentioned the name. A create-shaped message would send the caller
+     * looking for the fault in their request body.
+     */
+    @Test
+    @DisplayName("Should name the stored tableName as the conflict when an update changed nothing")
+    void shouldAttributeTheConflictToTheStoredNameOnUpdate() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID sinkId = UUID.randomUUID();
+      UUID siblingId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSink existing = postgisSink(sinkId, dataSetId, "messwerte");
+      existing.getConfiguration().put("dataStructureVersionId", dsvId.toString());
+
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
+
+      when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(existing));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      when(dataStructureVersionRepository.findById(dsvId))
+          .thenReturn(Optional.of(dataStructureVersion(dsvId)));
+      when(dataSinkRepository.findByDataSetId(dataSetId))
+          .thenReturn(
+              List.of(
+                  postgisSink(sinkId, dataSetId, "messwerte"),
+                  postgisSink(siblingId, dataSetId, "messwerte")));
+
+      assertThatThrownBy(() -> dataSinkService.update(sinkId, input))
+          .isInstanceOf(UniqueConstraintViolationException.class)
+          .hasMessageContaining("rename it");
     }
   }
 
