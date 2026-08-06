@@ -203,7 +203,7 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
     }
     String tableName = (String) entity.getConfiguration().get("tableName");
 
-    dataSinkRepository.findByDataSetIdWithoutFlush(entity.getDataSet().getId()).stream()
+    dataSinkRepository.findByDataSetId(entity.getDataSet().getId()).stream()
         .filter(sibling -> !Objects.equals(sibling.getId(), entity.getId()))
         .filter(sibling -> sibling.getDataSinkType() == DataSinkType.POSTGIS)
         .filter(sibling -> tableName.equalsIgnoreCase(siblingTableName(sibling)))

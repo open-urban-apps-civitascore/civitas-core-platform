@@ -398,7 +398,7 @@ class DataSinkServiceTest {
 
       DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
       stubCreate(dataSetId, dsvId, input);
-      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
+      when(dataSinkRepository.findByDataSetId(dataSetId))
           .thenReturn(List.of(postgisSink(UUID.randomUUID(), dataSetId, "messwerte")));
 
       assertThatThrownBy(() -> dataSinkService.create(input))
@@ -414,7 +414,7 @@ class DataSinkServiceTest {
 
       DataSinkInputDTO input = postgisInput(dataSetId, "MESSWERTE", dsvId);
       stubCreate(dataSetId, dsvId, input);
-      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
+      when(dataSinkRepository.findByDataSetId(dataSetId))
           .thenReturn(List.of(postgisSink(UUID.randomUUID(), dataSetId, "messwerte")));
 
       assertThatThrownBy(() -> dataSinkService.create(input))
@@ -435,8 +435,7 @@ class DataSinkServiceTest {
 
       DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
       stubCreate(dataSetId, dsvId, input);
-      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
-          .thenReturn(List.of(frostSibling));
+      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of(frostSibling));
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       assertThat(dataSinkService.create(input)).isNotNull();
@@ -450,7 +449,7 @@ class DataSinkServiceTest {
 
       DataSinkInputDTO input = postgisInput(dataSetId, "andere_tabelle", dsvId);
       stubCreate(dataSetId, dsvId, input);
-      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
+      when(dataSinkRepository.findByDataSetId(dataSetId))
           .thenReturn(List.of(postgisSink(UUID.randomUUID(), dataSetId, "messwerte")));
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -493,7 +492,7 @@ class DataSinkServiceTest {
 
       DataSinkInputDTO input = postgisInput(dataSetId, "t".repeat(63), dsvId);
       stubCreate(dataSetId, dsvId, input);
-      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId)).thenReturn(List.of());
+      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of());
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       assertThat(dataSinkService.create(input)).isNotNull();
@@ -524,7 +523,7 @@ class DataSinkServiceTest {
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
       when(dataStructureVersionRepository.findById(dsvId))
           .thenReturn(Optional.of(dataStructureVersion(dsvId)));
-      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
+      when(dataSinkRepository.findByDataSetId(dataSetId))
           .thenReturn(List.of(postgisSink(sinkId, dataSetId, "messwerte")));
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -559,7 +558,7 @@ class DataSinkServiceTest {
               })
           .when(dataSinkMapper)
           .updateEntity(any(), any());
-      when(dataSinkRepository.findByDataSetIdWithoutFlush(dataSetId))
+      when(dataSinkRepository.findByDataSetId(dataSetId))
           .thenReturn(
               List.of(
                   postgisSink(sinkId, dataSetId, "andere_tabelle"),
