@@ -1142,7 +1142,7 @@
     "messages": {
       "createSuccess": "The version of the Data structure has been successfully created.",
       "updateSuccess": "The version of the data has been successfully updated.",
-      "isInUseModelHint": "The data model can not be edited since it is already in use.",
+      "isAvailableModelHint": "The version information and the structure definition can not be edited since this version already has the status 'Available'.",
       "isInUseStatusHint": "Can not be set to draft since this version is already in use.",
       "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available Data structure. Set the Data structure to draft first."
     },

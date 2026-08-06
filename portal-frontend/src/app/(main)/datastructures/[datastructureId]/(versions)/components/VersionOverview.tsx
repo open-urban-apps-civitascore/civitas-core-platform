@@ -1,8 +1,8 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useWatch } from 'react-hook-form'
 
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
@@ -24,6 +24,7 @@ import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   Datastructure,
   DATASTRUCTURE_STATUS_TYPES,
+  DatastructureStatusType,
   DatastructureVersion,
   DatastructureVersionFormAvailableSchema,
   DatastructureVersionTab,
@@ -33,6 +34,8 @@ import { getHeaderAction } from '@/utils/headerAction'
 import { useDatastructureVersion } from '../hooks/useDatastructureVersion'
 import { StructureDefinitionTab } from './structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
+import PageEditControls from '@/components/page-edit-controls/PageEditControls'
+import { toast } from 'sonner'
 
 const tabs: Tab<DatastructureVersionTab>[] = [
   {
@@ -63,6 +66,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
   const router = useRouter()
+  const pathname = usePathname()
+
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const { handleFormValidationError } = useError()
   const { hasScopedPermission } = usePermissions()
@@ -77,8 +82,12 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     datastructureId,
   )
 
+  const isVersionAvailable = version?.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+
+  const canEdit = isVersionAvailable ? canUpdate && canRelease : canUpdate
+
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
-  const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
+  const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit' || !canEdit)
   const [canStage, setCanSetAvailable] = useState(true)
 
   const isInUse = version?.inUse || false
@@ -141,6 +150,10 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     setCanSetAvailable(DatastructureVersionFormAvailableSchema.safeParse(formValues).success)
   }, [formValues])
 
+  useEffect(() => {
+    if (isVersionAvailable && !isReadOnly) toast.info(t('messages.isAvailableModelHint'))
+  }, [isVersionAvailable, isReadOnly, t])
+
   const handleSubmit = async () => {
     let isSaved = false
 
@@ -190,6 +203,21 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     else handleExit()
   }
 
+  const updateMode = useCallback(
+    (isEditing: boolean) => {
+      setIsReadOnly(!isEditing)
+      const searchParams = new URLSearchParams(params.toString())
+      if (isEditing) {
+        searchParams.set('mode', 'edit')
+      } else {
+        searchParams.delete('mode')
+      }
+      const query = searchParams.toString()
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    },
+    [pathname, params, router],
+  )
+
   const versionAlreadyExistsError = useMemo(() => {
     const versionExists = otherVersions.find(otherVersion => otherVersion.version === versionWatch.trim())
     if (versionExists) {
@@ -207,50 +235,54 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const isConfirmButtonDisabled =
     !hasUserChanges || !!form.formState.errors.version || !!versionAlreadyExistsError || isLoading
 
-  const ActionButtonsAndStatusSwitch = (
-    <div className="flex gap-6">
-      <StatusDropdown
-        statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
-        status={statusWatch}
-        onStatusChange={handleStatusChange}
-        canStage={canStage}
-        canSetDraft={canSetDraft}
-        canRelease={canRelease}
-        statusHint={statusHint}
-        availableHint={!canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined}
-      />
-      <ActionButtons
-        confirmButtonType="button"
-        onCancelClick={handleExitButtonClick}
-        onConfirmClick={handleSave}
-        isConfirmButtonDisabled={isConfirmButtonDisabled}
-        isCancelButtonDisabled={isLoading}
-        cancelButtonTitle={tCommon('actions.exit')}
-        hasCard={false}
-        wrapperClassname="w-auto"
-      />
-    </div>
-  )
-
-  const EditButton = (
-    <Button data-testid="editButton" type="button" onClick={() => setIsReadOnly(false)}>
-      {tCommon('actions.edit')}
-    </Button>
-  )
-
   const renderTabContent = () => {
     switch (subTabValue) {
       case 'structure':
         return (
-          <StructureDefinitionTab isReadOnly={isReadOnly} modelSessionManager={modelSessionManager} isInUse={isInUse} />
+          <StructureDefinitionTab
+            isReadOnly={isReadOnly}
+            modelSessionManager={modelSessionManager}
+            isAvailable={isVersionAvailable}
+          />
         )
       case 'versionInfo':
       default:
         return (
-          <VersionInfoTab form={form} isReadOnly={isReadOnly} versionAlreadyExistsError={versionAlreadyExistsError} />
+          <VersionInfoTab
+            form={form}
+            isReadOnly={isReadOnly}
+            versionAlreadyExistsError={versionAlreadyExistsError}
+            isAvailable={isVersionAvailable}
+          />
         )
     }
   }
+
+  const PageEditButtons = (
+    <PageEditControls<DatastructureStatusType>
+      statusProps={{
+        status: statusWatch,
+        onStatusChange: handleStatusChange,
+        statusOptions: Object.values(DATASTRUCTURE_STATUS_TYPES),
+        canStage,
+        canRelease,
+        canSetDraft,
+        statusHint,
+        availableHint: !canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined,
+      }}
+      confirmButtonType="button"
+      onConfirmClick={handleSave}
+      isConfirmButtonDisabled={isConfirmButtonDisabled}
+      isCancelButtonDisabled={isLoading}
+      onCancelClick={handleExitButtonClick}
+      hasCard={false}
+      canEdit={canEdit}
+      isReadOnly={isReadOnly}
+      onEditClick={() => updateMode(true)}
+      cancelButtonTitle={tCommon('actions.exit')}
+      wrapperClassname="w-auto"
+    />
+  )
 
   return (
     <PageContainer testId={testId} headerType="withSubTabsOrSubtitle" className="overflow-hidden">
@@ -263,15 +295,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
           completedTabs,
           hasCompletionStatus: true,
         }}
-        customElement={getHeaderAction({
-          isReadOnly,
-          canUpdate:
-            version?.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
-              ? canUpdate && canRelease
-              : canUpdate,
-          editButton: EditButton,
-          saveExitButtons: ActionButtonsAndStatusSwitch,
-        })}
+        customElement={PageEditButtons}
       />
       <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
         {isLoading ? <LoadingSpinner className="h-full" /> : renderTabContent()}
