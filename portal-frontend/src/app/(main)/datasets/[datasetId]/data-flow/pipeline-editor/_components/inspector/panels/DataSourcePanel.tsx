@@ -66,7 +66,10 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
         <>
           <EntityMetadata
             title={t('dataSourcePanel.details')}
-            items={[{ label: t('dataSourcePanel.connector'), value: selectedEntity.connectorType ?? undefined }]}
+            items={[
+              { label: t('dataSourcePanel.connector'), value: selectedEntity.connectorType ?? undefined },
+              { label: t('dataSourcePanel.description'), value: selectedEntity.description ?? undefined },
+            ]}
           />
           {canReadDatasources && (
             <button

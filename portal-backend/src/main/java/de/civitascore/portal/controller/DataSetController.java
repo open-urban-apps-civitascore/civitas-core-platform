@@ -187,8 +187,8 @@ public class DataSetController
    *
    * <p>Authorized on the <em>dataset</em>, not on the data sources: the caller needs {@code
    * DATASET_UPDATE} on this dataset, which a DATAPOOL-scoped grant conveys. Reading the data source
-   * administration surface still requires {@code DATASOURCE_READ}, so the response carries id, name
-   * and connector type only — no connector configuration.
+   * administration surface still requires {@code DATASOURCE_READ}, so the response carries id,
+   * name, description and connector type only — no connector configuration.
    *
    * <p>A caller without {@code DATASET_UPDATE} on this dataset is rejected upstream with 403. Past
    * that, the caller's scope headers still apply: a dataset they do not cover — unknown or merely
@@ -204,9 +204,10 @@ public class DataSetController
       description =
           "Returns the AVAILABLE data sources released either for every datapool or for this"
               + " dataset's datapool; a dataset in no datapool sees only the former. Requires"
-              + " DATASET_UPDATE on the dataset rather than DATASOURCE_READ, and returns id, name"
-              + " and connector type only. Callers lacking that permission are rejected with 403; a"
-              + " dataset outside the caller's X-Allowed-Scope-Ids/X-Allowed-Pool-Ids returns 404.")
+              + " DATASET_UPDATE on the dataset rather than DATASOURCE_READ, and returns id, name,"
+              + " description and connector type only. Callers lacking that permission are rejected"
+              + " with 403; a dataset outside the caller's X-Allowed-Scope-Ids/X-Allowed-Pool-Ids"
+              + " returns 404.")
   @ApiResponse(responseCode = "200", description = "Usable data sources returned successfully")
   @ApiResponse(
       responseCode = "404",

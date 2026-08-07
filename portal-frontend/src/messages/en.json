@@ -1233,6 +1233,7 @@
       "details": "Data source details",
       "connector": "Connector",
       "connection": "Connection",
+      "description": "Description",
       "tags": "Tags",
       "showDataStructure": "Show Data Structure",
       "anonymousName": "Anonymous Data Source"

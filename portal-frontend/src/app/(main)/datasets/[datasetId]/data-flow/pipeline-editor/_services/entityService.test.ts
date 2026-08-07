@@ -15,6 +15,7 @@ const DATASET_ID = 'dataset-1'
 const mockDatasource = (overrides?: Partial<DatasourceSummary>): DatasourceSummary => ({
   id: 'ds-1',
   name: 'Test Datasource',
+  description: 'A test datasource',
   connectorType: 'SQL',
   ...overrides,
 })
@@ -120,6 +121,12 @@ describe('datasourceToSelectable', () => {
     const ds = mockDatasource({ connectorType: 'MQTT' })
     const result = datasourceToSelectable(ds)
     expect(result.metadata?.connectorType).toBe('MQTT')
+  })
+
+  it('carries the description into metadata', () => {
+    const ds = mockDatasource({ description: 'Traffic sensors, north ring' })
+    const result = datasourceToSelectable(ds)
+    expect(result.metadata?.description).toBe('Traffic sensors, north ring')
   })
 
   it('keeps connectorType null when the source has none', () => {

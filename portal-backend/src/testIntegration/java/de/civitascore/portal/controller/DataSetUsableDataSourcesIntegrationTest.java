@@ -48,6 +48,8 @@ class DataSetUsableDataSourcesIntegrationTest
   private static final String SCOPE_HEADER = "X-Allowed-Scope-Ids";
   private static final String POOL_HEADER = "X-Allowed-Pool-Ids";
   private static final String DATASETS_ENDPOINT = "/datasets";
+  private static final String DATA_SOURCE_DESCRIPTION =
+      "Traffic sensor readings from the north ring";
 
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataPoolRepository dataPoolRepository;
@@ -154,15 +156,16 @@ class DataSetUsableDataSourcesIntegrationTest
     }
 
     @Test
-    @DisplayName("Entries carry id, name and connector type, never connector configuration")
-    void entriesCarryIdNameAndConnectorType() {
+    @DisplayName("Entries carry id, name, description and connector type, never the configuration")
+    void entriesCarryPickerFieldsOnly() {
       createDataSource("aaa-unrestricted", DatapoolScopeType.ALL);
 
       List<Map<String, Object>> body = getUsable(createDataSetInPool("ds", null), "*", null);
 
       assertThat(body).hasSize(1);
-      assertThat(body.get(0)).containsOnlyKeys("id", "name", "connectorType");
+      assertThat(body.get(0)).containsOnlyKeys("id", "name", "description", "connectorType");
       assertThat(body.get(0)).containsEntry("connectorType", ConnectorType.SQL.name());
+      assertThat(body.get(0)).containsEntry("description", DATA_SOURCE_DESCRIPTION);
     }
 
     @Test
@@ -305,6 +308,7 @@ class DataSetUsableDataSourcesIntegrationTest
   private UUID createDataSource(String name, DatapoolScopeType scopeType, UUID... scopedPoolIds) {
     DataSource ds = new DataSource();
     ds.setName(name);
+    ds.setDescription(DATA_SOURCE_DESCRIPTION);
     ds.setDataSourceStatus(DataSourceStatus.AVAILABLE);
     ds.setConnectorType(ConnectorType.SQL);
     // Populated so the projection assertion proves the configuration is withheld rather than merely

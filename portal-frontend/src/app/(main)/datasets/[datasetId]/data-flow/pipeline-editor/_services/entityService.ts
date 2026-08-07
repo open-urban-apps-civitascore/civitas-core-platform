@@ -90,5 +90,6 @@ export const datasourceToSelectable = (ds: DatasourceSummary): SelectableEntity 
   name: ds.name,
   metadata: {
     connectorType: ds.connectorType,
+    description: ds.description,
   },
 })

@@ -80,6 +80,7 @@ export type Datasource = z.infer<typeof DatasourceApiResponseSchema>
 export const DatasourceSummaryApiResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
+  description: z.string().nullable(),
   connectorType: ConnectorTypeSchema.nullable(),
 })
 

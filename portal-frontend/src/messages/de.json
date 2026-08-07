@@ -1220,6 +1220,7 @@
       "details": "Datenquellen-Details",
       "connector": "Konnektor",
       "connection": "Verbindung",
+      "description": "Beschreibung",
       "tags": "Tags",
       "showDataStructure": "Datenstruktur anzeigen",
       "anonymousName": "Anonyme Datenquelle"
