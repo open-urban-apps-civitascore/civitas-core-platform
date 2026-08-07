@@ -81,11 +81,12 @@ export const LITERAL_DEFAULT_TYPE = 'String'
  * Geometries are first-class typed ports: their `dataType` is the concrete
  * geometry name (e.g. 'Point') so Point vs Polygon is matched by exact type;
  * other primitives → scalar port with the matching subtype.
+ * The port label shows that same subtype, matching the conversion nodes.
  */
 export const literalOutputPort = (umlType: string): PortDef => {
   const isGeom = (GEOMETRY as Set<string>).has(umlType)
   const dataType = isGeom ? umlType : (PRIMITIVE[umlType] ?? 'str')
-  return { id: 'out', label: 'value', type: isGeom ? 'geometry' : 'scalar', dataType }
+  return { id: 'out', label: dataType, type: isGeom ? 'geometry' : 'scalar', dataType }
 }
 
 const literal: MappingTransformDef = {
