@@ -47,6 +47,7 @@ class DatasetCreateBpmnTest {
   private SagaCommandHandler pipelineHandler;
   private SagaCommandHandler geoserverHandler;
   private SagaCommandHandler postgisHandler;
+  private SagaCommandHandler supersetHandler;
 
   @BeforeEach
   void setUp() {
@@ -55,8 +56,10 @@ class DatasetCreateBpmnTest {
     pipelineHandler = FlowableTestSupport.mockHandler("nifi");
     geoserverHandler = FlowableTestSupport.mockHandler("geoserver");
     postgisHandler = FlowableTestSupport.mockHandler("postgis");
+    supersetHandler = FlowableTestSupport.mockHandler("superset");
     stubGeoserverSuccess();
     stubPostgisSuccess();
+    stubSupersetSuccess();
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
@@ -64,6 +67,7 @@ class DatasetCreateBpmnTest {
     registry.register(pipelineHandler);
     registry.register(geoserverHandler);
     registry.register(postgisHandler);
+    registry.register(supersetHandler);
 
     processEngine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     runtimeService = processEngine.getRuntimeService();
@@ -232,12 +236,15 @@ class DatasetCreateBpmnTest {
     // Assert execution order via the handlers' actual invocation order (deterministic). Sorting
     // HistoricActivityInstances by start time is flaky: sequential synchronous tasks can share a
     // millisecond timestamp, so workspace/datastore can appear swapped.
-    // PostGIS sink is provisioned first (so the table exists), then the GeoServer steps run.
-    var inOrder = inOrder(frostHandler, apisixHandler, postgisHandler, geoserverHandler);
+    // PostGIS sink is provisioned first (so the table exists), then the GeoServer steps run,
+    // then Superset registers the table last in the branch.
+    var inOrder =
+        inOrder(frostHandler, apisixHandler, postgisHandler, geoserverHandler, supersetHandler);
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
     inOrder.verify(postgisHandler).handle(any());
     inOrder.verify(geoserverHandler, times(3)).handle(any());
+    inOrder.verify(supersetHandler).handle(any());
 
     ArgumentCaptor<SagaCommandMessage> sink = ArgumentCaptor.forClass(SagaCommandMessage.class);
     verify(postgisHandler).handle(sink.capture());
@@ -248,6 +255,10 @@ class DatasetCreateBpmnTest {
     assertEquals(
         List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PROVISION_LAYERS"),
         geo.getAllValues().stream().map(SagaCommandMessage::operation).toList());
+
+    ArgumentCaptor<SagaCommandMessage> superset = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(supersetHandler).handle(superset.capture());
+    assertEquals("REGISTER_DATASET", superset.getValue().operation());
   }
 
   @Test
@@ -295,6 +306,15 @@ class DatasetCreateBpmnTest {
     SagaCommandMessage compensation = captor.getAllValues().get(3);
     assertEquals("COMPENSATE_STEP", compensation.type());
     assertEquals("DELETE_WORKSPACE", compensation.operation());
+
+    // Superset registered (it ran before the pipeline step), so the pipeline failure must
+    // deregister it too.
+    ArgumentCaptor<SagaCommandMessage> supersetCaptor =
+        ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(supersetHandler, times(2)).handle(supersetCaptor.capture());
+    assertEquals(
+        List.of("REGISTER_DATASET", "DEREGISTER_DATASET"),
+        supersetCaptor.getAllValues().stream().map(SagaCommandMessage::operation).toList());
   }
 
   @Test
@@ -463,6 +483,16 @@ class DatasetCreateBpmnTest {
     when(geoserverHandler.handle(
             argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "create-workspace"));
+  }
+
+  private void stubSupersetSuccess() {
+    when(supersetHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(
+            SagaCommandResult.success(
+                "saga-test-123", "register-superset", Map.of(), Map.of("dashboardId", 1)));
+    when(supersetHandler.handle(
+            argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "register-superset"));
   }
 
   private void stubGeoserverDatastoreFailure() {

@@ -41,19 +41,22 @@ class ResultPublishingTest {
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
   private SagaCommandHandler pipelineHandler;
+  private SagaCommandHandler supersetHandler;
 
   @BeforeEach
   void setUp() {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
     pipelineHandler = FlowableTestSupport.mockHandler("nifi");
+    supersetHandler = FlowableTestSupport.mockHandler("superset");
     resultPublisher = mock(FlowableResultPublisher.class);
 
     processEngine =
         FlowableTestSupport.createTestEngine(
             Map.of(
                 "sagaHandlerRegistry",
-                FlowableTestSupport.registry(frostHandler, apisixHandler, pipelineHandler),
+                FlowableTestSupport.registry(
+                    frostHandler, apisixHandler, pipelineHandler, supersetHandler),
                 "resultPublisher",
                 resultPublisher));
 
@@ -149,6 +152,7 @@ class ResultPublishingTest {
     void success_publishesCompleted() {
       stubSuccess(frostHandler, "update-project", Map.of());
       stubSuccess(apisixHandler, "update-route", Map.of());
+      stubSuccess(supersetHandler, "sync-superset", Map.of());
 
       start("dataset-update", updateVars("saga-u1"));
 

@@ -45,6 +45,7 @@ public class FlowableTriggerConsumer {
   static final String TRIGGER_TOPIC = "de.civitascore.dataset.saga.trigger";
   private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
   private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
+  private static final String DATASINK_TYPE_FROST = "FROST";
 
   private final RuntimeService runtimeService;
   private final HistoryService historyService;
@@ -219,6 +220,7 @@ public class FlowableTriggerConsumer {
     // Always derive — never trust external payload for these control flags
     variables.put("hasPipelines", deriveHasPipelines(trigger));
     variables.put("hasGeoSink", deriveHasGeoSink(trigger));
+    variables.put("hasFrostSink", deriveHasFrostSink(trigger));
     variables.put("hasLayers", deriveHasLayers(trigger));
 
     ProcessInstance instance =
@@ -264,6 +266,20 @@ public class FlowableTriggerConsumer {
             .filter(Map.class::isInstance)
             .map(Map.class::cast)
             .anyMatch(sink -> DATASINK_TYPE_POSTGIS.equals(sink.get("type")));
+  }
+
+  /**
+   * Derives the hasFrostSink flag from the trigger payload: true if {@code datasinks} contains a
+   * sink of type {@code FROST}. Gates the Superset sync step for datasets whose only sink is FROST
+   * (no PostGIS sink, so no per-dataset schema — Superset datasets are registered against the
+   * shared {@code frost_scoped} views instead).
+   */
+  private static boolean deriveHasFrostSink(Map<String, Object> trigger) {
+    return trigger.get("datasinks") instanceof List<?> datasinks
+        && datasinks.stream()
+            .filter(Map.class::isInstance)
+            .map(Map.class::cast)
+            .anyMatch(sink -> DATASINK_TYPE_FROST.equals(sink.get("type")));
   }
 
   /**

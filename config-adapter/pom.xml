@@ -33,6 +33,7 @@
 		<module>config-adapter-nifi</module>
 		<module>config-adapter-flowable</module>
 		<module>config-adapter-postgis</module>
+		<module>config-adapter-superset</module>
 	</modules>
 
 	<properties>

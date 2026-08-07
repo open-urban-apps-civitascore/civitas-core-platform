@@ -29,6 +29,14 @@
             <scope>test</scope>
         </dependency>
 
+<!-- DEVELOPMENT -->
+<dependency>
+    <groupId>de.civitas-core</groupId>
+    <artifactId>config-adapter-superset</artifactId>
+    <version>${project.version}</version>
+    <scope>runtime</scope>
+</dependency>
+
         <dependency>
             <groupId>de.civitas-core</groupId>
             <artifactId>event-handler-kafka</artifactId>
@@ -263,6 +271,12 @@
                 <dependency>
                     <groupId>de.civitas-core</groupId>
                     <artifactId>config-adapter-postgis</artifactId>
+                    <version>${project.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>de.civitas-core</groupId>
+                    <artifactId>config-adapter-superset</artifactId>
                     <version>${project.version}</version>
                     <scope>runtime</scope>
                 </dependency>

@@ -1205,8 +1205,12 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
             step + "/read-featuretypes failed: HTTP " + status + " — " + body, status);
       }
       Map<String, Object> result = response.readEntity(Map.class);
-      Map<String, Object> featureTypes =
-          (Map<String, Object>) result.getOrDefault("featureTypes", Map.of());
+      // GeoServer serializes an empty featureTypes collection as "" (a bare string), not {} or
+      // null — same empty-collection quirk it has elsewhere in the REST API. Only cast when it's
+      // actually the expected object shape.
+      if (!(result.get("featureTypes") instanceof Map<?, ?> featureTypes)) {
+        return List.of();
+      }
       Object ftList = featureTypes.get("featureType");
       if (ftList instanceof List) {
         return (List<Map<String, Object>>) ftList;
