@@ -1,8 +1,10 @@
 package de.civitascore.authz.repository.service;
 
 import de.civitascore.authz.repository.data.DataSetRepository;
+import de.civitascore.authz.repository.model.dto.DatapoolDatasetsResponse;
 import de.civitascore.authz.repository.model.dto.DatasetPoolResponse;
 import de.civitascore.portal.model.entity.DataPool;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -28,12 +30,14 @@ public class DatasetPoolService {
 
   /**
    * Returns the authorization attributes of a dataset: its datapool membership (Epic 1 union
-   * inheritance) and its open-data flag (ABAC). Both are resolved from the single {@code DataSet}
-   * row, so the lookup stays one query.
+   * inheritance), its open-data flag (ABAC), and its FROST project id (row-level scoping for
+   * FROST-backed sensor data, see the Trino row-filter policy). All resolved from the single
+   * {@code DataSet} row, so the lookup stays one query.
    *
    * @param datasetId the dataset id
-   * @return present with the pool id (possibly {@code null} when the dataset has no pool) and the
-   *     open-data flag if the dataset exists; empty if the dataset does not exist
+   * @return present with the pool id (possibly {@code null} when the dataset has no pool), the
+   *     open-data flag, and the FROST project id (possibly {@code null} when the dataset has no
+   *     FROST sink) if the dataset exists; empty if the dataset does not exist
    */
   @Transactional(readOnly = true)
   public Optional<DatasetPoolResponse> getDatasetPool(UUID datasetId) {
@@ -44,7 +48,22 @@ public class DatasetPoolService {
               DataPool pool = dataSet.getDataPool();
               return new DatasetPoolResponse(
                   pool != null ? pool.getId() : null,
-                  Boolean.TRUE.equals(dataSet.getOpenDataAccess()));
+                  Boolean.TRUE.equals(dataSet.getOpenDataAccess()),
+                  dataSet.getProjectId());
             });
+  }
+
+  /**
+   * Reverse of {@link #getDatasetPool(UUID)}: resolves every dataset belonging to any of the given
+   * pools, deduplicated. Consumed by OPA to enumerate the datasets a DATAPOOL-scoped grant covers
+   * for listing purposes (e.g. Superset's schema list), where per-dataset {@code pool_of()} lookups
+   * don't help since the caller doesn't yet know which dataset ids exist in the pool.
+   *
+   * @param poolIds the datapool ids to resolve
+   * @return the deduplicated union of dataset ids across all given pools
+   */
+  @Transactional(readOnly = true)
+  public DatapoolDatasetsResponse getDatasetsInPools(List<UUID> poolIds) {
+    return new DatapoolDatasetsResponse(dataSetRepository.findIdsByDataPoolIdIn(poolIds));
   }
 }

@@ -11,7 +11,7 @@ gl-dependency-scanning.json
 **/maven.graph.json
 .DS_Store
 
-/.idea/
+.idea/
 /test-results/
 **/.DS_Store
 errorlogs.txt
@@ -25,6 +25,9 @@ api/**/node_modules/
 
 # NiFi JDBC drivers (downloaded at dev startup)
 dev-environment/nifi/drivers/*.jar
+
+# bpmn-diff.py vendored viewer assets (downloaded on first run)
+config-adapter/config-adapter-flowable/scripts/.cache/
 
 # Claude Code state (symlinked to private archive repo)
 **/CLAUDE.md

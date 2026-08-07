@@ -1,0 +1,10 @@
+{
+  "_comment": "Trino authorization marker. The real per-operation/per-dataset model isn't implemented yet (see policy/trino.rego) — data_permissions is a bare allow-all/deny-all switch, nulled by generate-allowall.sh.",
+  "_version": "0.3.0",
+  "_backend_id": "trino",
+
+  "data_permissions": [
+    "DATASET_READ",
+    "DATASET_PAYLOAD_READ"
+  ]
+}

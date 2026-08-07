@@ -23,6 +23,11 @@
 #
 # The module keeps its historical name (dataset_pool_fetcher) to avoid churn in
 # its many importers; it now answers both questions from the same response.
+#
+# A third question, the reverse of pool_of() — "which datasets are in this set of pools" — is
+# answered by datasets_in_pools() against a separate batch endpoint on the same authz/repository
+# resource, for callers that need to enumerate a DATAPOOL grant's coverage rather than check one
+# dataset id they already have (see that function's own comment).
 
 package civitas.authz.dataset_pool_fetcher
 
@@ -101,4 +106,36 @@ pool_of(dataset_id) := pool_id if {
 # Undefined (fail-secure) when the lookup failed or the flag is absent/false.
 is_open_data(dataset_id) if {
 	attributes(dataset_id).openDataAccess == true
+}
+
+# frost_project_of(dataset_id) → the FROST-Server project id backing this dataset's sensor data.
+# Undefined when the lookup failed or the dataset has no FROST sink (frostProjectId null).
+# Consumed by the Trino row-filter policy to map a readable dataset id to the project id it needs
+# to filter frost_scoped.* views by.
+frost_project_of(dataset_id) := project_id if {
+	project_id := attributes(dataset_id).frostProjectId
+	project_id != null
+}
+
+# datasets_in_pools(pool_ids) → the deduplicated union of dataset ids across every given pool.
+# The reverse of pool_of(): a caller enumerating "which datasets does this DATAPOOL grant cover"
+# (e.g. Superset's schema-listing rule) doesn't yet know the dataset ids to ask pool_of() about
+# one at a time — this resolves the whole set in one round-trip instead.
+#
+# No caching (mirrors dashboard_dataset_fetcher's batch lookup): the requested pool-id set differs
+# per call, so per-call caching would rarely hit. raise_error=false: a fetch outage yields
+# undefined, not an empty set, so a caller must treat "undefined" as "unknown," not "no datasets."
+datasets_in_pools(pool_ids) := ids if {
+	dataset_pool_url
+	count(pool_ids) > 0
+	response := http.send({
+		"method": "POST",
+		"url": concat("", [dataset_pool_url, "/datasets"]),
+		"timeout": request_timeout,
+		"headers": {"Accept": "application/json", "Content-Type": "application/json"},
+		"body": {"poolIds": pool_ids},
+		"raise_error": false,
+	})
+	response.status_code == 200
+	ids := response.body.datasetIds
 }

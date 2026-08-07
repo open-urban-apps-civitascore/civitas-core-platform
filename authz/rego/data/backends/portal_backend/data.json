@@ -124,12 +124,12 @@
     },
     "/v1/datasets/{id}/visualizations": {
       "GET": "DATASET_READ",
-      "POST": "DATASET_DASHBOARD_UPDATE"
+      "POST": "DATASET_UPDATE"
     },
     "/v1/datasets/{id}/visualizations/{id}": {
       "GET": "DATASET_READ",
-      "PUT": "DATASET_DASHBOARD_UPDATE",
-      "DELETE": "DATASET_DASHBOARD_UPDATE"
+      "PUT": "DATASET_UPDATE",
+      "DELETE": "DATASET_UPDATE"
     },
     "/v1/datasets/{id}/pipelines": {
       "GET": "DATASET_READ",

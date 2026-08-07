@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.authz.repository.data.DataSetRepository;
+import de.civitascore.authz.repository.model.dto.DatapoolDatasetsResponse;
 import de.civitascore.authz.repository.model.dto.DatasetPoolResponse;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -105,6 +107,61 @@ class DatasetPoolServiceTest {
 
       assertThat(result).isPresent();
       assertThat(result.get().isOpenDataAccess()).isFalse();
+    }
+
+    @Test
+    @DisplayName("returns the FROST project id when the dataset has a FROST sink")
+    void datasetWithFrostProject_returnsFrostProjectId() {
+      DataSet dataSet = new DataSet();
+      dataSet.setProjectId("42");
+      when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
+
+      Optional<DatasetPoolResponse> result = datasetPoolService.getDatasetPool(DATASET_ID);
+
+      assertThat(result).isPresent();
+      assertThat(result.get().getFrostProjectId()).isEqualTo("42");
+    }
+
+    @Test
+    @DisplayName("returns null FROST project id when the dataset has no FROST sink")
+    void datasetWithoutFrostProject_returnsNullFrostProjectId() {
+      DataSet dataSet = new DataSet();
+      when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
+
+      Optional<DatasetPoolResponse> result = datasetPoolService.getDatasetPool(DATASET_ID);
+
+      assertThat(result).isPresent();
+      assertThat(result.get().getFrostProjectId()).isNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("getDatasetsInPools")
+  class GetDatasetsInPools {
+
+    @Test
+    @DisplayName("returns every dataset id the repository resolves for the given pools")
+    void returnsResolvedDatasetIds() {
+      UUID datasetId1 = UUID.randomUUID();
+      UUID datasetId2 = UUID.randomUUID();
+      UUID otherPoolId = UUID.randomUUID();
+      when(dataSetRepository.findIdsByDataPoolIdIn(List.of(POOL_ID, otherPoolId)))
+          .thenReturn(List.of(datasetId1, datasetId2));
+
+      DatapoolDatasetsResponse result =
+          datasetPoolService.getDatasetsInPools(List.of(POOL_ID, otherPoolId));
+
+      assertThat(result.getDatasetIds()).containsExactlyInAnyOrder(datasetId1, datasetId2);
+    }
+
+    @Test
+    @DisplayName("returns an empty list when no dataset belongs to any of the given pools")
+    void noMatches_returnsEmptyList() {
+      when(dataSetRepository.findIdsByDataPoolIdIn(List.of(POOL_ID))).thenReturn(List.of());
+
+      DatapoolDatasetsResponse result = datasetPoolService.getDatasetsInPools(List.of(POOL_ID));
+
+      assertThat(result.getDatasetIds()).isEmpty();
     }
   }
 }
