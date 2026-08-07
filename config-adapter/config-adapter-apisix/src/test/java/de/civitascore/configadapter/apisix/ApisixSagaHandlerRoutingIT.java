@@ -430,9 +430,8 @@ class ApisixSagaHandlerRoutingIT extends AbstractApisixIT {
                   Map.of(
                       "datasetId",
                       datasetId,
-                      // FROST upstreamUrl is always carried by the saga even for a map-only
-                      // dataset;
-                      // here it is unused because the only named API is OWS.
+                      // A map-only dataset may still carry the upstream URL (it has a FROST sink
+                      // too); it goes unused here because the only named API is OWS.
                       "upstreamUrl",
                       "http://" + STUB_ALIAS + ":" + STUB_PORT + "/FROST-Server/v1.1/Projects(1)",
                       "openDataAccess",

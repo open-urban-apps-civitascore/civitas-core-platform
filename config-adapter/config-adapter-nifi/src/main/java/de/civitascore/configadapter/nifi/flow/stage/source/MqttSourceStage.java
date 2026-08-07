@@ -48,12 +48,6 @@ public final class MqttSourceStage implements SourceStage {
   /** Stable friendly name used for the deterministic controller-service id and processor token. */
   public static final String MQTT_SSL_CONTEXT_SERVICE = "MQTT SSL Context Service";
 
-  /** Parameter Context provisioned by the NiFi deployment for the node truststore password. */
-  public static final String NODE_TRUSTSTORE_PARAMETER_CONTEXT = "NiFi Node Truststore";
-
-  /** Sensitive parameter supplied by the deployment, never serialized with a value here. */
-  public static final String TRUSTSTORE_PASSWORD_PARAMETER = "TRUSTSTORE_PASSWORD";
-
   private static final String MQTT_SSL_CONTEXT_REFERENCE = "${CS:" + MQTT_SSL_CONTEXT_SERVICE + "}";
 
   private static final Set<String> PLAINTEXT_SCHEMES = Set.of("tcp", "ws", "mqtt");
@@ -87,9 +81,11 @@ public final class MqttSourceStage implements SourceStage {
       Pattern.compile("(\\d+)\\s*(?:s|sec|secs|second|seconds)?", Pattern.CASE_INSENSITIVE);
 
   private final CredentialResolver credentials;
+  private final MqttTruststoreConfig truststore;
 
-  public MqttSourceStage(CredentialResolver credentials) {
+  public MqttSourceStage(CredentialResolver credentials, MqttTruststoreConfig truststore) {
     this.credentials = credentials;
+    this.truststore = truststore;
   }
 
   @Override
@@ -140,6 +136,7 @@ public final class MqttSourceStage implements SourceStage {
     out.putSourceProperty("Broker URI", String.join(",", brokers));
     out.putSourceProperty("Topic Filter", topics.get(0));
     if (tlsEnabled) {
+      bindTruststore(out);
       out.putSourceProperty("SSL Context Service", MQTT_SSL_CONTEXT_REFERENCE);
     }
     putIfPresent(out::putSourceProperty, "Username", decrypted.get("user"));
@@ -161,26 +158,59 @@ public final class MqttSourceStage implements SourceStage {
     }
   }
 
+  /**
+   * Only the password <em>parameter name</em> reaches the SSL Context Service; the value lives in
+   * NiFi, supplied by the deployment, so no truststore secret passes through the adapter. A missing
+   * anchor fails the deploy instead of falling back to plaintext or to NiFi's node truststore.
+   */
+  private void bindTruststore(PlanContext out) throws FatalAdapterException {
+    if (truststore.path().isEmpty() || truststore.type().isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "MQTT TLS needs a truststore: set nifi.mqtt.truststore.path and"
+              + " nifi.mqtt.truststore.type");
+    }
+    if (truststore.hasPasswordParameter() && truststore.parameterContext().isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "MQTT truststore password parameter '"
+              + truststore.passwordParameter()
+              + "' needs nifi.mqtt.truststore.parameter-context");
+    }
+    truststore
+        .sslContextProperties()
+        .forEach(
+            (key, value) -> out.putControllerServiceProperty(MQTT_SSL_CONTEXT_SERVICE, key, value));
+  }
+
   @Override
   public void registerControllerServices(BuildContext ctx) throws FatalAdapterException {
-    if (MQTT_SSL_CONTEXT_REFERENCE.equals(
-        ctx.spec().sourceProperties().get("SSL Context Service"))) {
+    if (tlsRequested(ctx)) {
       ctx.addControllerService(Fragment.MQTT_SSL_CONTEXT_SERVICE, MQTT_SSL_CONTEXT_SERVICE);
     }
   }
 
+  /**
+   * Binds the flow to the Parameter Context holding the truststore password; a store that opens
+   * without one needs no context at all. The declaration carries no value — the deployment
+   * populates the sensitive parameter in NiFi.
+   */
   @Override
   public Optional<ParameterContextSpec> parameterContext(BuildContext ctx) {
-    if (!MQTT_SSL_CONTEXT_REFERENCE.equals(
-        ctx.spec().sourceProperties().get("SSL Context Service"))) {
+    if (!tlsRequested(ctx) || !truststore.hasPasswordParameter()) {
       return Optional.empty();
     }
     return Optional.of(
         new ParameterContextSpec(
-            NODE_TRUSTSTORE_PARAMETER_CONTEXT,
+            truststore.parameterContext(),
             List.of(
                 new ParameterSpec(
-                    TRUSTSTORE_PASSWORD_PARAMETER, "Password of the NiFi node truststore", true))));
+                    truststore.passwordParameter(), "Password of the MQTT truststore", true))));
+  }
+
+  private static boolean tlsRequested(BuildContext ctx) {
+    return MQTT_SSL_CONTEXT_REFERENCE.equals(
+        ctx.spec().sourceProperties().get("SSL Context Service"));
   }
 
   @Override

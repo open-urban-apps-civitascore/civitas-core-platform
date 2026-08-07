@@ -25,10 +25,11 @@ import java.util.Map;
  * RecordPath only, never Jolt or scripting. Each target field becomes one property whose name is
  * the destination RecordPath and whose value is either a RecordPath value expression or a literal.
  *
- * <p>Numeric conversions ({@code toInt}/{@code toFloat}) are intentionally transparent here: the
- * value is copied unchanged and the actual coercion happens at the sink — PutDatabaseRecord coerces
- * to the target column types (the PostGIS adapter owns the typed table DDL). This keeps every
- * transform expressible in pure RecordPath, with no schema knowledge in this adapter.
+ * <p>Numeric and UUID conversions ({@code toInt}/{@code toFloat}/{@code toUuid}) are intentionally
+ * transparent here: the value is copied unchanged and the actual coercion happens at the sink —
+ * PutDatabaseRecord coerces to the target column types (the PostGIS adapter owns the typed table
+ * DDL). This keeps every transform expressible in pure RecordPath, with no schema knowledge in this
+ * adapter.
  */
 public class RecordPathCompiler {
 
@@ -39,6 +40,8 @@ public class RecordPathCompiler {
    * a fixed charset is always passed.
    */
   private static final String TO_STRING_CHARSET = "UTF-8";
+
+  private static final String ISO_DATE_PATTERN = "yyyy-MM-dd";
 
   /**
    * The NiFi {@code UpdateRecord} "Replacement Value Strategy" for a property. A {@code const} uses
@@ -239,10 +242,25 @@ public class RecordPathCompiler {
       throws FatalAdapterException {
     String inner = render(convert.input(), geometryEncoding, target, fork);
     return switch (convert.op()) {
-      case TO_DATE -> "toDate(" + inner + ", " + quote(convert.pattern()) + ")";
+      // RecordPath has one parse function and it always yields a time component, so the timestamp
+      // op is the bare call and the date-only op is the one that needs extra work.
+      case TO_DATE_TIME -> "toDate(" + inner + ", " + quote(convert.pattern()) + ")";
+      // That time component reaches a DATE column as epoch millis and is rejected there, while the
+      // row vanishes without a deployment error. Re-formatting yields a plain string the server
+      // parses into the column's own type (see PostgisSinkStage#withStringtypeUnspecified).
+      case TO_DATE ->
+          "format(toDate("
+              + inner
+              + ", "
+              + quote(convert.pattern())
+              + "), "
+              + quote(ISO_DATE_PATTERN)
+              + ")";
       case FORMAT -> "format(" + inner + ", " + quote(convert.pattern()) + ")";
       case TO_STRING -> "toString(" + inner + ", " + quote(TO_STRING_CHARSET) + ")";
-      case TO_INT, TO_FLOAT -> inner;
+      // RecordPath's only UUID function, uuid5(), mints a new identifier rather than converting
+      // one.
+      case TO_INT, TO_FLOAT, TO_UUID -> inner;
     };
   }
 

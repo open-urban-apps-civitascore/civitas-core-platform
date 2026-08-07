@@ -49,7 +49,8 @@ Publication is per named API, not per dataset.
 - **Up to two upstreams per dataset**, only the kinds a slug uses: the FROST-project upstream keyed by the
   bare `datasetId` (`STA` slugs) and the map-server upstream keyed by `{datasetId}-ows` (`OWS` slugs). Both
   single-node `roundrobin`; node, scheme and path come from the command's `upstreamUrl` for FROST and from
-  `apisix.geoserver.url` for the map server.
+  `apisix.geoserver.url` for the map server. `upstreamUrl` is required only when a slug is `STA`, since a DataSet
+  without a FROST sink has no project for it to name.
 - **One route per slug** at `/v1/datasets/{datasetId}/{slug}` and `…/{slug}/*`, with a deterministic id — a
   name-based UUID over `datasetId + "/" + slug`. The portal-backend persists the returned `routeIds` map
   onto each named API and builds each API's URL as `publicUrl` + `/{slug}`.

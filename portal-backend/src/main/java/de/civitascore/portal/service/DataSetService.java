@@ -381,7 +381,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     DataSet updated = super.update(id, input);
 
     if (updated.getDataSetStatus() == DataSetStatus.AVAILABLE
-        && updated.getProjectId() != null
+        && updated.isProvisioned()
         && updated.getPendingSagaType() == null) {
       updated.setPendingSagaType(PendingSagaType.UPDATE);
       updated = dataSetRepository.save(updated);
@@ -499,7 +499,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     revalidatePipelineDataSourcesAgainstPool(dataSet);
-    verifyMapSurfaceIsServable(dataSet);
+    verifyPublishedSurfacesAreServable(dataSet);
 
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
     dataSet.setPendingSagaType(PendingSagaType.CREATE);
@@ -511,14 +511,14 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Rejects a release whose map surface would be provisioned but unreachable, or routed but empty.
-   * Layers and the OWS route are gated independently downstream, so each without its counterpart
-   * provisions half a surface and reports success.
+   * Rejects a release whose published surfaces would be provisioned but unreachable, or routed but
+   * empty. Layers, the OWS route and the FROST project are each gated independently downstream, so
+   * one without its counterpart provisions half a surface and reports success.
    *
-   * <p>A workspace without an OWS named API is deliberately NOT rejected: that is the state an
-   * unrelease leaves behind, and the data is meant to survive it.
+   * <p>A sink without its named API is deliberately NOT rejected: that is the state an unrelease
+   * leaves behind, and the data is meant to survive it.
    */
-  private void verifyMapSurfaceIsServable(DataSet dataSet) {
+  private void verifyPublishedSurfacesAreServable(DataSet dataSet) {
     boolean hasOwsApi =
         dataSet.getNamedApis().stream().anyMatch(api -> api.getStandard() == ApiStandard.OWS);
 
@@ -530,18 +530,28 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
               + " the layers.");
     }
 
-    if (hasOwsApi && !hasPostgisSink(dataSet)) {
+    if (hasOwsApi && !hasSink(dataSet, DataSinkType.POSTGIS)) {
       throw new InvalidInputException(
           "dataSinks",
           dataSet.getId(),
           "DataSet has an OWS named API but no POSTGIS data sink to back its map service. The"
               + " route would resolve to a workspace that is never provisioned.");
     }
+
+    boolean hasStaApi =
+        dataSet.getNamedApis().stream().anyMatch(api -> api.getStandard() == ApiStandard.STA);
+
+    if (hasStaApi && !hasSink(dataSet, DataSinkType.FROST)) {
+      throw new InvalidInputException(
+          "dataSinks",
+          dataSet.getId(),
+          "DataSet has an STA named API but no FROST data sink to back it. The route would resolve"
+              + " to a FROST project that is never provisioned.");
+    }
   }
 
-  private boolean hasPostgisSink(DataSet dataSet) {
-    return dataSinkRepository.existsByDataSetIdAndDataSinkType(
-        dataSet.getId(), DataSinkType.POSTGIS);
+  private boolean hasSink(DataSet dataSet, DataSinkType type) {
+    return dataSinkRepository.existsByDataSetIdAndDataSinkType(dataSet.getId(), type);
   }
 
   /**
@@ -606,13 +616,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     switch (pendingType) {
       case CREATE -> {
         applyInfrastructureResult(dataSet, result);
-        markProvisionedIfSinkExists(dataSet);
+        markProvisioned(dataSet);
         pipelineRuntimeStatusService.markDeploymentSucceeded(deployedPipelineIds(dataSet, result));
         log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
       }
       case UPDATE -> {
         applyInfrastructureResult(dataSet, result);
-        markProvisionedIfSinkExists(dataSet);
+        markProvisioned(dataSet);
         pipelineRuntimeStatusService.markDeploymentSucceeded(deployedPipelineIds(dataSet, result));
         log.info("Saga UPDATE completed for dataset {}", datasetId);
       }
@@ -749,8 +759,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * prior release goes through a DATASET_DELETE saga that tears it down; the entity is removed once
    * the saga completes (see {@link #handleSagaCompleted}).
    *
-   * <p>{@code provisioned} is the discriminator: a release always runs the unconditional {@code
-   * create-project} step and thereby sets it.
+   * <p>{@code provisioned} is the discriminator: a completed CREATE saga sets it, whichever sinks
+   * the dataset has.
    */
   @Override
   @Transactional
@@ -822,16 +832,14 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * compensation (fail-saga + cleanup) is not yet implemented.
    */
   /**
-   * Marks the dataset provisioned once a data-holding sink physically exists. Bound to the presence
-   * of a FROST {@code projectId} (the sink identifier {@link #applyInfrastructureResult} writes)
-   * rather than to the saga type, so any provisioning path — not just the first CREATE — sets the
-   * flag. Never resets it: the flag survives an unrelease and is only dropped when the row is
-   * removed on DELETE.
+   * Marks the dataset provisioned once a provisioning saga has completed, so a later delete knows
+   * it must tear infrastructure down. Deliberately independent of which sinks the dataset has:
+   * FROST is provisioned only for datasets carrying a FROST sink, so a project id is no longer a
+   * reliable proxy. Never resets it: the flag survives an unrelease and is only dropped when the
+   * row is removed on DELETE.
    */
-  private void markProvisionedIfSinkExists(DataSet dataSet) {
-    if (dataSet.getProjectId() != null) {
-      dataSet.setProvisioned(true);
-    }
+  private void markProvisioned(DataSet dataSet) {
+    dataSet.setProvisioned(true);
   }
 
   /**

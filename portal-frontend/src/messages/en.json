@@ -1148,7 +1148,7 @@
     "messages": {
       "createSuccess": "The version of the Data structure has been successfully created.",
       "updateSuccess": "The version of the data has been successfully updated.",
-      "isInUseModelHint": "The data model can not be edited since it is already in use.",
+      "isAvailableModelHint": "The version information and the structure definition can not be edited since this version already has the status 'Available'.",
       "isInUseStatusHint": "Can not be set to draft since this version is already in use.",
       "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available Data structure. Set the Data structure to draft first."
     },
@@ -1427,21 +1427,32 @@
           "description": "any scalar → str"
         },
         "toInt": {
-          "description": "str / float → int"
+          "description": "str / number → int"
         },
         "toFloat": {
-          "description": "str / int → float"
+          "description": "str / int → number"
+        },
+        "toUuid": {
+          "description": "str → uuid"
         },
         "toDate": {
           "description": "str → date",
           "fields": {
             "pattern": {
-              "label": "Pattern"
+              "label": "Input format"
+            }
+          }
+        },
+        "toDateTime": {
+          "description": "str → datetime",
+          "fields": {
+            "pattern": {
+              "label": "Input format"
             }
           }
         },
         "format": {
-          "description": "date → str",
+          "description": "date / datetime → str",
           "fields": {
             "pattern": {
               "label": "Pattern"

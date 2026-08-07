@@ -216,11 +216,14 @@ const resolveRecordRoot = (root: SchemaNode, defs: Record<string, SchemaNode>): 
 const scalarTypeOf = (node: SchemaNode): FieldType => {
   const type = asString(node.type)
   if (type === 'integer') return 'int'
-  if (type === 'number') return 'float'
+  if (type === 'number') return 'number'
   if (type === 'boolean') return 'bool'
   if (type === 'string') {
     const format = asString(node.format)
-    return format === 'date-time' || format === 'date' ? 'date' : 'str'
+    if (format === 'uuid') return 'uuid'
+    if (format === 'date-time') return 'datetime'
+    if (format === 'date') return 'date'
+    return 'str'
   }
   // Deliberately permissive: exotic-but-valid schema constructs (type arrays, const/oneOf, "null")
   // must not block the editor, so anything unrecognized degrades to a plain string port.

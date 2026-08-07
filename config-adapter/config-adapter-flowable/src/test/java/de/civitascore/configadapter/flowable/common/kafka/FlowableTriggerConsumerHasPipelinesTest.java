@@ -167,6 +167,37 @@ class FlowableTriggerConsumerHasPipelinesTest {
         Arguments.of(null, false));
   }
 
+  @ParameterizedTest(name = "hasFrostSink={1} when datasinks={0}")
+  @MethodSource("frostSinkCases")
+  void deriveHasFrostSink(Object datasinks, boolean expected) throws Exception {
+    TriggerTestSupport.processTrigger(consumer, triggerWith("datasinks", datasinks));
+
+    assertEquals(expected, capturedVariables().get("hasFrostSink"));
+  }
+
+  static Stream<Arguments> frostSinkCases() {
+    return Stream.of(
+        Arguments.of(List.of(Map.of("type", "FROST"), Map.of("type", "POSTGIS")), true),
+        Arguments.of(List.of(Map.of("type", "FROST")), true),
+        Arguments.of(List.of(Map.of("type", "POSTGIS")), false),
+        Arguments.of(List.of(), false),
+        Arguments.of(null, false));
+  }
+
+  @Test
+  void deriveHasFrostSink_explicitValueInPayloadIsOverriddenByDerivation() throws Exception {
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("sagaType", "DATASET_CREATE");
+    payload.put("datasetId", "ds-1");
+    payload.put("datasinks", List.of(Map.of("type", "POSTGIS")));
+    // A trigger claiming the flag must not be able to force the FROST branch: the flag is derived.
+    payload.put("hasFrostSink", true);
+
+    TriggerTestSupport.processTrigger(consumer, objectMapper.writeValueAsBytes(payload));
+
+    assertEquals(Boolean.FALSE, capturedVariables().get("hasFrostSink"));
+  }
+
   @ParameterizedTest(name = "hasLayers={1} when layers={0}")
   @MethodSource("layersCases")
   void deriveHasLayers(Object layers, boolean expected) throws Exception {

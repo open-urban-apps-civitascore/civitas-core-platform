@@ -120,6 +120,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String DS_NEVER = "DS-NEVER-1";
   private static final String REF_BADTS = "REF-BADTS-1";
   private static final String DS_BADTS = "DS-BADTS-1";
+  private static final String REF_DATEONLY = "REF-DATEONLY-1";
+  private static final String DS_DATEONLY = "DS-DATEONLY-1";
   private static final String REF_FOI = "REF-FOI-1";
   private static final String DS_FOI = "DS-FOI-1";
   private static final String REF_SQL = "REF-SQL-1";
@@ -138,6 +140,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static long dsMapId;
   private static long dsNullId;
   private static long dsBadTsId;
+  private static long dsDateOnlyId;
   private static long dsSqlId;
   private static long dsFoiId;
   private static long dsFanoutId;
@@ -218,6 +221,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     dsMapId = createDatastream(DS_MAP, REF_MAP, "HOLDER-MAP");
     dsNullId = createDatastream(DS_NULL, REF_NULL, "HOLDER-NULL");
     dsBadTsId = createDatastream(DS_BADTS, REF_BADTS, "HOLDER-BADTS");
+    dsDateOnlyId = createDatastream(DS_DATEONLY, REF_DATEONLY, "HOLDER-DATEONLY");
     dsSqlId = createDatastream(DS_SQL, REF_SQL, "HOLDER-SQL");
     dsFoiId = createDatastream(DS_FOI, REF_FOI, "HOLDER-FOI");
     dsFanoutId = createDatastream(DS_FANOUT, REF_FANOUT, "HOLDER-FANOUT");
@@ -585,6 +589,35 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         0,
         observations(dsBadTsId).size(),
         "a FROST-rejected observation must go to the error sink, not into the Datastream");
+  }
+
+  @Test
+  void dateOnlyPhenomenonTimeIsRejectedByFrost() throws Exception {
+    // A Date-typed (format:date) modeller attribute yields '2026-07-29' — no time, no zone. The
+    // adapter passes STA time targets through as plain strings (StaJsonType.STRING), so whether
+    // such
+    // a value is usable is FROST's call alone: it rejects it, exactly as it rejects 'not-a-date'.
+    // Consequence for the modeller: a Date attribute must never be mapped onto an STA time target.
+    String payload =
+        payload("DateOnly Station", REF_DATEONLY, DS_DATEONLY, "12.3", "\"2026-07-29\"");
+
+    try (MqttPublisher publisher = publisher("civitas-it-dateonly")) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(TOPIC, payload);
+                return countThings(REF_DATEONLY) >= 1;
+              });
+      // the Thing leg proves the message was processed; give the observation leg time to post
+      Thread.sleep(Duration.ofSeconds(10).toMillis());
+    }
+    assertEquals(
+        0,
+        observations(dsDateOnlyId).size(),
+        "a date-only phenomenonTime must not silently become an observation");
   }
 
   // ─── SQL → mapping → FROST ──────────────────────────────────────────────────

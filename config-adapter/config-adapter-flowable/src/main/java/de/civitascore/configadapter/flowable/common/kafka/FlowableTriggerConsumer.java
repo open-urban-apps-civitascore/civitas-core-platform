@@ -45,6 +45,7 @@ public class FlowableTriggerConsumer {
   static final String TRIGGER_TOPIC = "de.civitascore.dataset.saga.trigger";
   private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
   private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
+  private static final String DATASINK_TYPE_FROST = "FROST";
 
   private final RuntimeService runtimeService;
   private final HistoryService historyService;
@@ -218,7 +219,11 @@ public class FlowableTriggerConsumer {
     variables.computeIfAbsent("sagaId", k -> UUID.randomUUID().toString());
     // Always derive — never trust external payload for these control flags
     variables.put("hasPipelines", deriveHasPipelines(trigger));
-    variables.put("hasGeoSink", deriveHasGeoSink(trigger));
+    // A POSTGIS sink gates the GeoServer branch (GeoServer publishes it via a PostGIS datastore); a
+    // FROST sink gates FROST provisioning. FROST teardown is deliberately ungated: it keys on the
+    // recorded project id, so removing the sink first cannot orphan the project.
+    variables.put("hasGeoSink", hasDataSinkOfType(trigger, DATASINK_TYPE_POSTGIS));
+    variables.put("hasFrostSink", hasDataSinkOfType(trigger, DATASINK_TYPE_FROST));
     variables.put("hasLayers", deriveHasLayers(trigger));
 
     ProcessInstance instance =
@@ -240,9 +245,8 @@ public class FlowableTriggerConsumer {
   }
 
   /**
-   * Derives the hasPipelines flag from the trigger payload. Matches the behavior of
-   * DatasetSagaOrchestrator's HAS_PIPELINES predicate: true if dataPipelines or pipelineIds is a
-   * non-empty list.
+   * Derives the hasPipelines flag from the trigger payload: true if dataPipelines or pipelineIds is
+   * a non-empty list.
    */
   private static boolean deriveHasPipelines(Map<String, Object> trigger) {
     Object dataPipelines = trigger.get("dataPipelines");
@@ -254,16 +258,13 @@ public class FlowableTriggerConsumer {
   }
 
   /**
-   * Derives the hasGeoSink flag from the trigger payload: true if {@code datasinks} contains a sink
-   * of type {@code POSTGIS} (the sink type that GeoServer publishes via a PostGIS datastore). Gates
-   * the conditional GeoServer branch of the dataset sagas.
+   * True if the trigger carries a data sink of the given type. Absent, non-list and empty {@code
+   * datasinks} all collapse to false, so the derived flags are total over any payload shape.
    */
-  private static boolean deriveHasGeoSink(Map<String, Object> trigger) {
+  private static boolean hasDataSinkOfType(Map<String, Object> trigger, String sinkType) {
     return trigger.get("datasinks") instanceof List<?> datasinks
         && datasinks.stream()
-            .filter(Map.class::isInstance)
-            .map(Map.class::cast)
-            .anyMatch(sink -> DATASINK_TYPE_POSTGIS.equals(sink.get("type")));
+            .anyMatch(sink -> sink instanceof Map<?, ?> map && sinkType.equals(map.get("type")));
   }
 
   /**

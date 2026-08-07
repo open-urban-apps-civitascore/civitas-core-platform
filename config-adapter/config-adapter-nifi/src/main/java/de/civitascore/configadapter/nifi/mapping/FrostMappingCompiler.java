@@ -800,13 +800,13 @@ public class FrostMappingCompiler {
   /**
    * Whether an {@code any}-typed value serializes unquoted (JSON number/boolean): {@code
    * toInt}/{@code toFloat} coerce to a number, a constant carries its literal's JSON type;
-   * everything else (copy/concat/toString/format/toDate) renders as a string.
+   * everything else (copy/concat/toString/format/toDateTime/toDate/toUuid) renders as a string.
    */
   private boolean inferredUnquoted(ValueNode node) {
     if (node instanceof ConvertNode convert) {
       return switch (convert.op()) {
         case TO_INT, TO_FLOAT -> true;
-        case TO_DATE, FORMAT, TO_STRING -> false;
+        case TO_DATE_TIME, TO_DATE, FORMAT, TO_STRING, TO_UUID -> false;
       };
     }
     return node instanceof ConstNode constant

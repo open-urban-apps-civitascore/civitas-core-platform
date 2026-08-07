@@ -59,25 +59,31 @@ Kafka. It handles project-level operations only:
 | Operation | Request | Compensation |
 |---|---|---|
 | `CREATE_PROJECT` | Name lookup, then `POST /Projects` if absent | `DELETE_PROJECT` |
-| `UPDATE_PROJECT` | Reads the current name and description, then `PATCH /Projects({projectId})` | `RESTORE_PROJECT` |
+| `UPDATE_PROJECT` | Reads the current name and description, then `PATCH /Projects({projectId})`, or creates the project when the DataSet has none | `RESTORE_PROJECT` |
 | `DELETE_PROJECT` | Deletes the project's Things, then `DELETE /Projects({projectId})` | — |
-| `RESTORE_PROJECT` | `PATCH /Projects({projectId})` with the captured previous state | — |
+| `RESTORE_PROJECT` | `PATCH /Projects({projectId})` with the captured previous state, or the delete when the update provisioned the project | — |
 
 - **The project name is unique per DataSet:** `"{datasetName} ({datasetId})"`. The portal permits
   duplicate display names while FROST enforces project-name uniqueness, so the id is part of the name
   and a name match only ever resolves to that DataSet's own project.
+- **A project exists only for a DataSet with a FROST data sink.** The orchestrator gates `CREATE_PROJECT`
+  and `UPDATE_PROJECT` on it and leaves `DELETE_PROJECT` ungated — see
+  [../config-adapter-flowable/README.md](../config-adapter-flowable/README.md).
 - **`CREATE_PROJECT` finds or creates.** An existing project under the derived name is reused, keeping
   its Things, Datastreams and Observations intact. A 409 or a duplicate-signalling 500 from the POST
   re-runs the lookup as a race guard.
+- **`UPDATE_PROJECT` provisions what it cannot patch.** A DataSet released without a FROST sink has no
+  project, so a later update creates one rather than failing, and its compensation deletes it rather than
+  restoring a state never captured.
 - **A reused project is never deleted by compensation.** `CREATE_PROJECT` records whether it created the
   project, so compensating a reused project is a no-op and a later step's failure cannot destroy the data
   a re-release is meant to reuse.
 - **Projects are always private.** Create, update and restore all force the project non-public. Open
   data access is an authorization decision made per request at the gateway, never granted through FROST
   project visibility.
-- **`DELETE_PROJECT` is idempotent.** An absent project (HTTP 404) is the goal state and succeeds both
-  forward and compensating. Deleting a Thing cascades to its Datastreams and Observations, while deleting
-  a project cascades to nothing — which is why the Things are removed first.
+- **`DELETE_PROJECT` is idempotent.** An absent `projectId`, and an absent project (HTTP 404), are both the
+  goal state and succeed forward and compensating. Deleting a Thing cascades to its Datastreams and
+  Observations, while deleting a project cascades to nothing — which is why the Things are removed first.
 - **Results carry the public service root.** `baseUrl` derives from `frost.public.url`, so consumers
   receive a reachable URL even when the adapter itself reaches FROST over an internal address.
 

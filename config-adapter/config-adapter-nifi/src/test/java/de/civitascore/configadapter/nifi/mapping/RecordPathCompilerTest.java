@@ -398,16 +398,28 @@ class RecordPathCompilerTest {
   }
 
   @Test
-  void toDateBecomesRecordPathFunction() throws Exception {
+  void toDateTimeBecomesRecordPathFunction() throws Exception {
     var props =
         byPath(
             compile(
-                "{ \"$.observed_at\": { \"op\": \"toDate\", \"input\": \"$.ts\","
+                "{ \"$.observed_at\": { \"op\": \"toDateTime\", \"input\": \"$.ts\","
                     + " \"pattern\": \"yyyy-MM-dd\" } }"));
 
     UpdateRecordProperty p = props.get("/observed_at");
     assertEquals("toDate(/ts, 'yyyy-MM-dd')", p.value());
     assertEquals(ReplacementStrategy.RECORD_PATH_VALUE, p.strategy());
+  }
+
+  @Test
+  void toDateDropsTheTimeTheParseProduces() throws Exception {
+    // The pattern describes the input, never the result.
+    var props =
+        byPath(
+            compile(
+                "{ \"$.day\": { \"op\": \"toDate\", \"input\": \"$.ts\","
+                    + " \"pattern\": \"dd.MM.yyyy\" } }"));
+
+    assertEquals("format(toDate(/ts, 'dd.MM.yyyy'), 'yyyy-MM-dd')", props.get("/day").value());
   }
 
   @Test
@@ -445,6 +457,15 @@ class RecordPathCompilerTest {
     var props = byPath(compile("{ \"$.v\": { \"op\": \"toFloat\", \"input\": \"$.raw\" } }"));
 
     assertEquals("/raw", props.get("/v").value());
+  }
+
+  @Test
+  void toUuidIsTransparent() throws Exception {
+    // Emitting uuid5() here would deploy without error and silently replace every source value
+    // with a freshly minted identifier.
+    var props = byPath(compile("{ \"$.id\": { \"op\": \"toUuid\", \"input\": \"$.raw\" } }"));
+
+    assertEquals("/raw", props.get("/id").value());
   }
 
   @Test
@@ -533,6 +554,8 @@ class RecordPathCompilerTest {
         "{ \"$.items[].name\": \"$.items[].sourceName\" }",
         "{ \"$.s\": { \"op\": \"toString\", \"input\": \"$.n\" } }",
         "{ \"$.d\": { \"op\": \"toDate\", \"input\": \"$.ts\", \"pattern\": \"yyyy-MM-dd\" } }",
+        "{ \"$.dt\": { \"op\": \"toDateTime\", \"input\": \"$.ts\","
+            + " \"pattern\": \"yyyy-MM-dd HH:mm:ss\" } }",
         "{ \"$.f\": { \"op\": \"format\", \"input\": \"$.d\", \"pattern\": \"yyyy\" } }",
         "{ \"$.i\": { \"op\": \"toInt\", \"input\": \"$.n\" } }",
         "{ \"$.label\": { \"op\": \"concat\", \"separator\": \"-\","

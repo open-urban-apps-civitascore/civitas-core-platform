@@ -1,92 +1,33 @@
 import type { UMLGeometryType, UMLPrimitiveType, UMLTypeReference } from '../types/uml'
 
-// UML 2.5 Primitive Types with their official URIs
-export const UML_PRIMITIVE_TYPES: Record<UMLPrimitiveType, { name: string; uri: string }> = {
-  String: {
-    name: 'String',
-    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
-  },
-  Integer: {
-    name: 'Integer',
-    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
-  },
-  Boolean: {
-    name: 'Boolean',
-    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Boolean',
-  },
-  Float: {
-    name: 'Float',
-    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
-  },
-  Double: {
-    name: 'Double',
-    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
-  },
-  Long: {
-    name: 'Long',
-    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
-  },
-  Short: {
-    name: 'Short',
-    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
-  },
-  Byte: {
-    name: 'Byte',
-    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
-  },
-  Character: {
-    name: 'Character',
-    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
-  },
-  Date: {
-    name: 'Date',
-    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
-  },
-  Uuid: {
-    name: 'Uuid',
-    uri: 'http://models.civitasconnect.org/Types/1.0#//Uuid',
-  },
-  void: {
-    name: 'void',
-    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
-  },
-}
-export const UML_GEOMETRY_TYPES: Record<UMLGeometryType, { name: string; uri: string }> = {
-  Point: {
-    name: 'Point',
-    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//Point',
-  },
-  LineString: {
-    name: 'LineString',
-    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//LineString',
-  },
-  Polygon: {
-    name: 'Polygon',
-    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//Polygon',
-  },
-  MultiPoint: {
-    name: 'MultiPoint',
-    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//MultiPoint',
-  },
-  MultiLineString: {
-    name: 'MultiLineString',
-    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//MultiLineString',
-  },
-  MultiPolygon: {
-    name: 'MultiPolygon',
-    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//MultiPolygon',
-  },
-  GeometryCollection: {
-    name: 'GeometryCollection',
-    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//GeometryCollection',
-  },
-}
+// Selectable UML primitive and geometry types. The `UMLPrimitiveType` /
+// `UMLGeometryType` unions are the source of truth; these lists drive the
+// type dropdowns and are checked against those unions at compile time.
+export const UML_PRIMITIVE_TYPES: readonly UMLPrimitiveType[] = [
+  'String',
+  'Integer',
+  'Boolean',
+  'Number',
+  'Date',
+  'DateTime',
+  'Uuid',
+]
+
+export const UML_GEOMETRY_TYPES: readonly UMLGeometryType[] = [
+  'Point',
+  'LineString',
+  'Polygon',
+  'MultiPoint',
+  'MultiLineString',
+  'MultiPolygon',
+  'GeometryCollection',
+]
 
 // Categorized primitive types for UI dropdowns
 export const PRIMITIVE_TYPE_CATEGORIES = {
-  Text: ['String', 'Character', 'Uuid'] as UMLPrimitiveType[],
-  Numbers: ['Integer', 'Long', 'Short', 'Byte', 'Float', 'Double'] as UMLPrimitiveType[],
-  Other: ['Boolean', 'Date', 'void'] as UMLPrimitiveType[],
+  Text: ['String', 'Uuid'] as UMLPrimitiveType[],
+  Numbers: ['Integer', 'Number'] as UMLPrimitiveType[],
+  Other: ['Boolean', 'Date', 'DateTime'] as UMLPrimitiveType[],
 }
 
 // Common external type references (Java, C#, etc.)

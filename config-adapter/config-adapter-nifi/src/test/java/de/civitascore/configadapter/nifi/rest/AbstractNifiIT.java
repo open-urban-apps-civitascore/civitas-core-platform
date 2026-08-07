@@ -14,6 +14,7 @@ import static org.awaitility.Awaitility.await;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.nifi.auth.OidcClientCredentialsTokenProvider;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
@@ -324,7 +325,8 @@ abstract class AbstractNifiIT {
             "https://" + dockerHost + ":" + hostPort,
             new OidcClientCredentialsTokenProvider(
                 tokenUri, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, null, httpClient),
-            httpClient);
+            httpClient,
+            MqttTruststoreConfig.nodeTruststore());
 
     // NiFi keeps initialising after the port opens; poll the REST API (with a real, token-backed
     // request) until it both accepts the OIDC token and has materialised the root process group.

@@ -88,12 +88,9 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     return options
   }
 
-  const primitiveTypeOptions = Object.keys(UML_PRIMITIVE_TYPES) as UMLPrimitiveType[]
-  const geometryTypeOptions = Object.keys(UML_GEOMETRY_TYPES) as UMLGeometryType[]
-
   const typeOptions: GroupedOption[] = [
-    { label: 'Primitive Types', options: primitiveTypeOptions.map(type => ({ label: type, value: type })) },
-    { label: 'Geometry Types', options: geometryTypeOptions.map(type => ({ label: type, value: type })) },
+    { label: 'Primitive Types', options: UML_PRIMITIVE_TYPES.map(type => ({ label: type, value: type })) },
+    { label: 'Geometry Types', options: UML_GEOMETRY_TYPES.map(type => ({ label: type, value: type })) },
   ]
 
   const crsOptions = [
@@ -119,7 +116,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     },
   ]
 
-  const isGeometryType = (type: string) => !!UML_GEOMETRY_TYPES[type as UMLGeometryType]
+  const isGeometryType = (type: string) => UML_GEOMETRY_TYPES.includes(type as UMLGeometryType)
 
   const allGeomAttributes = element.attributes.filter(attr => isGeometryType(attr.type as string))
 

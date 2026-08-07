@@ -36,6 +36,7 @@ import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.nifi.flow.stage.source.SqlSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.transform.MappingNodeType;
 import de.civitascore.configadapter.nifi.graph.FlowPath;
@@ -153,10 +154,11 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
             getProperty("postgis.user", null),
             getProperty("postgis.password", null));
 
+    MqttTruststoreConfig mqttTruststore = mqttTruststore();
     this.stages =
         new StageRegistry(
             List.of(
-                new MqttSourceStage(credentialResolver),
+                new MqttSourceStage(credentialResolver, mqttTruststore),
                 new SqlSourceStage(credentialResolver, new JdbcSqlSourceProbe())),
             List.of(
                 new PostgisSinkStage(platformSink),
@@ -168,12 +170,26 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     if (this.nifiClient == null) {
       Client jaxrs = client() != null ? client() : createClient();
       setClient(jaxrs);
-      this.nifiClient = new NifiRestClient(url, oidcTokenProvider(), jaxrs);
+      this.nifiClient = new NifiRestClient(url, oidcTokenProvider(), jaxrs, mqttTruststore);
     }
     this.runtimeMonitor =
         new NifiRuntimeMonitor(
             nifiClient, Long.parseLong(getProperty("runtime-monitor.interval-ms", "5000")));
     log.info("NifiSagaHandler initialized for: {}", Encode.forJava(url));
+  }
+
+  /**
+   * Trust anchor for MQTT broker certificates. Defaults to NiFi's node truststore behind the
+   * deployment-owned parameter context; an environment that provisions a dedicated MQTT truststore
+   * points these at it instead, which keeps external-broker trust out of NiFi's node trust.
+   */
+  private MqttTruststoreConfig mqttTruststore() {
+    MqttTruststoreConfig defaults = MqttTruststoreConfig.nodeTruststore();
+    return new MqttTruststoreConfig(
+        getProperty("mqtt.truststore.path", defaults.path()),
+        getProperty("mqtt.truststore.type", defaults.type()),
+        getProperty("mqtt.truststore.password-parameter", defaults.passwordParameter()),
+        getProperty("mqtt.truststore.parameter-context", defaults.parameterContext()));
   }
 
   private FrostSinkAuth resolveFrostSinkAuth(AdapterConfig config) {

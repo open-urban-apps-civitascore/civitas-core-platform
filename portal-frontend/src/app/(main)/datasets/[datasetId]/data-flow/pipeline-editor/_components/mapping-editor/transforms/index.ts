@@ -1,11 +1,12 @@
 import type { LucideIcon } from 'lucide-react'
-import { Binary, Calendar, CalendarClock, Combine, Hash, MapPin, Type } from 'lucide-react'
+import { Binary, Calendar, CalendarClock, Clock, Combine, Fingerprint, Hash, MapPin, Type } from 'lucide-react'
 
 import type { ConfigField, PortDef, TransformDef } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
 import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '@/components/uml-modeler/constants/umlTypes'
 
 import type { ConversionOp, OpNode, TransformOp, ValueNode } from '../_types'
+import { NUMERIC_SUBTYPES } from '../_types'
 import { GEOMETRY, PRIMITIVE } from '../schema/adapter'
 
 /** A registry entry: the single source of truth for a node's ports, config and compiled op. */
@@ -33,9 +34,13 @@ const patternField: ConfigField = {
 
 /**
  * Build a conversion node definition.
- * @param inLabel  Human-readable label for the input port (e.g. "str/float")
+ * @param inLabel  Human-readable label for the input port (e.g. "str/int")
  * @param inSubtype  The actual primitive subtype for type-matching (undefined = accepts any scalar)
  * @param outSubtype The actual primitive subtype produced
+ * @param label  Display label for the node; defaults to the op name. Decoupled from `op` so the
+ *   UI can show a different name (e.g. "toNumber") while the wire op stays the backend contract token.
+ * @param accepts  When set, the input port accepts exactly these source subtypes (membership test)
+ *   instead of the exact-match on `inSubtype` — e.g. numeric conversions accept str/int/number only.
  */
 const conversion = (
   type: ConversionOp,
@@ -44,13 +49,15 @@ const conversion = (
   outSubtype: string,
   icon: LucideIcon,
   config: ConfigField[] = [],
+  label: string = type,
+  accepts?: readonly string[],
 ): MappingTransformDef => ({
   type,
   category: 'categories.conversionFunctions',
-  label: type,
+  label,
   description: `transforms.${type}.description`,
   icon,
-  inputs: [scalar('in', inLabel, inSubtype)],
+  inputs: [{ ...scalar('in', inLabel, inSubtype), ...(accepts ? { accepts } : {}) }],
   outputs: [scalar('out', outSubtype, outSubtype)],
   config,
   op: type,
@@ -68,9 +75,10 @@ const conversion = (
  * type constants so the two stay in sync automatically.
  * Each option uses the UML type name as its unique value.
  */
-export const LITERAL_TYPE_OPTIONS = [...Object.keys(UML_PRIMITIVE_TYPES), ...Object.keys(UML_GEOMETRY_TYPES)].map(
-  name => ({ label: name, value: name }),
-)
+export const LITERAL_TYPE_OPTIONS = [...UML_PRIMITIVE_TYPES, ...UML_GEOMETRY_TYPES].map(name => ({
+  label: name,
+  value: name,
+}))
 
 /** Default UML type name for a freshly-dropped Literal node. */
 export const LITERAL_DEFAULT_TYPE = 'String'
@@ -152,7 +160,7 @@ const geoPoint: MappingTransformDef = {
   label: 'geoPoint',
   description: 'transforms.geoPoint.description',
   icon: MapPin,
-  inputs: [scalar('lon', 'longitude', 'float'), scalar('lat', 'latitude', 'float')],
+  inputs: [scalar('lon', 'longitude', 'number'), scalar('lat', 'latitude', 'number')],
   outputs: [geometry('out', 'Point', 'Point')],
   config: [],
   op: 'geoPoint',
@@ -171,19 +179,51 @@ const geoPoint: MappingTransformDef = {
 const conversions: MappingTransformDef[] = [
   // toString: accepts any scalar (no subtype restriction on input), produces str
   conversion('toString', 'any scalar', undefined, 'str', Type),
-  // toInt: accepts str or float (no subtype restriction — conversion node wires freely), produces int
-  conversion('toInt', 'str / float', undefined, 'int', Binary),
-  // toFloat: accepts str or int, produces float
-  conversion('toFloat', 'str / int', undefined, 'float', Binary),
-  // toDate: accepts str, produces date
-  conversion('toDate', 'str', 'str', 'date', Calendar, [patternField]),
-  // format: accepts date, produces str — reuse patternField but with the format-specific translation key
-  conversion('format', 'date', 'date', 'str', CalendarClock, [
-    {
-      ...patternField,
-      label: 'transforms.format.fields.pattern.label',
-    },
-  ]),
+  // toInt: accepts only numerically-parseable scalars (str/int/number), produces int
+  conversion('toInt', 'str / number', undefined, 'int', Binary, [], 'toInt', NUMERIC_SUBTYPES),
+  // toFloat: accepts only numerically-parseable scalars (str/int/number), produces number. Wire op
+  // stays 'toFloat' (backend contract); only the display label is 'toNumber'.
+  conversion('toFloat', 'str / int', undefined, 'number', Binary, [], 'toNumber', NUMERIC_SUBTYPES),
+  // toUuid: accepts str, produces uuid. No RecordPath function backs it — the value is passed
+  // through and the sink parses it. A uuid source needs no transform; it matches a uuid target
+  // directly.
+  conversion('toUuid', 'str', 'str', 'uuid', Fingerprint),
+  // toDate: accepts str and date, produces date
+  conversion('toDate', 'str / date', undefined, 'date', Calendar, [patternField], 'toDate', ['str', 'date']),
+  // toDateTime: accepts str and datetime, produces datetime
+  conversion(
+    'toDateTime',
+    'str / datetime',
+    undefined,
+    'datetime',
+    Clock,
+    [
+      {
+        ...patternField,
+        label: 'transforms.toDateTime.fields.pattern.label',
+        default: "yyyy-MM-dd'T'HH:mm:ssXXX",
+      },
+    ],
+    'toDateTime',
+    ['str', 'datetime'],
+  ),
+  // format: accepts date and datetime, produces str — reuse patternField but with the format-specific
+  // translation key
+  conversion(
+    'format',
+    'date / datetime',
+    undefined,
+    'str',
+    CalendarClock,
+    [
+      {
+        ...patternField,
+        label: 'transforms.format.fields.pattern.label',
+      },
+    ],
+    'format',
+    ['date', 'datetime'],
+  ),
 ]
 
 export const mappingRegistry = buildRegistry<MappingTransformDef>([literal, concat, geoPoint, ...conversions])

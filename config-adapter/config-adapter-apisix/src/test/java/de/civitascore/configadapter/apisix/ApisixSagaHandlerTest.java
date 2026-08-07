@@ -347,16 +347,51 @@ class ApisixSagaHandlerTest {
     @DisplayName("returns failure for invalid upstream URL")
     void shouldReturnFailureForInvalidUpstreamUrl() {
       try (ApisixSagaHandler handler = createHandler()) {
+        // Goes through the helper so the command carries an STA slug: the upstream URL is only
+        // required — and therefore only parsed — when a slug actually routes to FROST.
+        SagaCommandResult result =
+            handler.handle(createRouteCommand(Map.of("upstreamUrl", "://not a valid uri")));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        // Upstream targets resolve before any write, so a bad URL touches no gateway state.
+        verify(mockBuilder, never()).put(any(Entity.class));
+      }
+    }
+
+    @Test
+    @DisplayName("fails when an STA route has no upstream URL")
+    void shouldFailWhenStaRouteHasNoUpstreamUrl() {
+      try (ApisixSagaHandler handler = createHandler()) {
         SagaCommandMessage command =
             createCommand(
                 "EXECUTE_STEP",
                 "CREATE_ROUTE",
-                Map.of("datasetId", "ds-001", "upstreamUrl", "://not a valid uri"));
+                Map.of(
+                    "datasetId",
+                    "ds-001",
+                    "namedApis",
+                    List.of(Map.of("slug", "data", "standard", "STA"))));
 
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
+        verify(mockBuilder, never()).put(any(Entity.class));
+      }
+    }
+
+    @Test
+    @DisplayName("no-ops without named APIs even when the upstream URL is absent")
+    void shouldNoOpWithoutNamedApisWhenUpstreamUrlIsAbsent() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "CREATE_ROUTE", Map.of("datasetId", "ds-001")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(Map.of(), result.resultData().get("routeIds"));
+        verify(mockBuilder, never()).put(any(Entity.class));
       }
     }
 
@@ -669,6 +704,44 @@ class ApisixSagaHandlerTest {
         assertEquals(
             "https?://[^/]+/geoserver/ds_001/(wfs|wms|wcs|wps|wmts|ows|gwc)", filter.get("regex"));
         assertEquals("https://api.example.test/v1/datasets/ds-001/map", filter.get("replace"));
+      }
+    }
+
+    @Test
+    @DisplayName("provisions an OWS-only dataset that carries no FROST upstream URL at all")
+    void shouldCreateOwsOnlyRouteWithoutUpstreamUrl() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(201);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+
+        // A dataset with no FROST data sink gets no FROST project, so the saga carries no
+        // upstreamUrl. Its OWS surface must still be published.
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("datasetId", "ds-001");
+        payload.put("openDataAccess", false);
+        payload.put("namedApis", List.of(Map.of("slug", "map", "standard", "OWS")));
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "EXECUTE_STEP",
+                    "msg-001",
+                    "saga-001",
+                    "create-route",
+                    "apisix",
+                    "CREATE_ROUTE",
+                    payload));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(
+            Map.of("map", NamedApiHelper.derive("ds-001", "map")),
+            result.resultData().get("routeIds"));
+
+        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
+        List<String> paths = pathCaptor.getAllValues();
+        assertTrue(paths.contains("/apisix/admin/upstreams/ds-001-ows"), "map-server upstream");
+        assertFalse(paths.contains("/apisix/admin/upstreams/ds-001"), "no FROST upstream");
       }
     }
 

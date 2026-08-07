@@ -1,0 +1,60 @@
+meta {
+  name: 10. Reject duplicate slug within one dataset
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "Named API Contract Duplicate Slug",
+    "description": "Negative fixture — the repeated slug must be the only reason this create fails.",
+    "openDataAccess": false,
+    "namedApis": [
+      { "name": "Things One", "slug": "things", "standard": "STA", "version": "1.1" },
+      { "name": "Things Two", "slug": "things", "standard": "STA", "version": "1.1" }
+    ]
+  }
+}
+
+tests {
+  const body = res.body || {};
+  const fieldMessages = (body.fieldErrors || []).map(function(fe) { return fe.message; }).join(' ');
+  const problemText = [body.detail, body.title, fieldMessages].join(' ').toLowerCase();
+
+  test("Status code is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Response is a problem document", function() {
+    expect(body.detail !== undefined || body.title !== undefined).to.be.true;
+  });
+  test("Rejection names the duplicated slug", function() {
+    expect(problemText).to.contain('duplicate');
+    expect(problemText).to.contain('things');
+  });
+}
+
+docs {
+  **Contract step 10** — Reject two named APIs sharing a slug.
+
+  Both entries are individually valid; only their collision is wrong. The slug is the per-named-API
+  route key, so two rows sharing it are ambiguous downstream — the saga could not tell which API a
+  request to `/v1/datasets/{id}/things` belongs to, and the pair would otherwise surface as an
+  opaque database unique-constraint failure. The service rejects it up front as a business 400 with
+  a `detail` naming the offending slug.
+
+  Everything else in the body is valid, so a 400 here can only come from the repeated slug.
+
+  **Precondition:** none.
+
+  **Expected Response:** 400 Bad Request, `application/problem+json` whose `detail` names the
+  duplicated slug and states that slugs must be unique within a dataset.
+
+  **Post-condition:** none — no dataset is created, so nothing to clean up.
+}
