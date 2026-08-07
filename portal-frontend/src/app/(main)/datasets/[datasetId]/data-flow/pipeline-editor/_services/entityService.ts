@@ -14,7 +14,6 @@ import type { DatasourceSummary } from '@/types/datasources'
 export interface SelectableEntity {
   id: string
   name: string
-  metadata?: Record<string, unknown>
 }
 
 /**
@@ -74,8 +73,4 @@ export const useDataSourceEntities = (opts: {
 export const datasourceToSelectable = (ds: DatasourceSummary): SelectableEntity => ({
   id: ds.id,
   name: ds.name,
-  metadata: {
-    connectorType: ds.connectorType,
-    description: ds.description,
-  },
 })

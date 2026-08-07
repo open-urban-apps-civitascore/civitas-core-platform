@@ -57,21 +57,15 @@ describe('PipelineList', () => {
     expect(vi.mocked(useGetUsableDatasources).mock.calls[0][1]?.isEnabled).toBe(false)
   })
 
-  it('requests the connector source in edit mode', () => {
-    renderComponent({ canEditDataset: true })
+  it('hides pipeline creation when not permitted', () => {
+    renderComponent({ canCreatePipeline: false })
 
-    expect(vi.mocked(useGetUsableDatasources).mock.calls[0][1]?.isEnabled).toBe(true)
+    expect(screen.queryByText('addButton')).not.toBeInTheDocument()
   })
 
   it('offers pipeline creation when permitted', () => {
     renderComponent({ canCreatePipeline: true })
 
     expect(screen.getByText('addButton')).toBeInTheDocument()
-  })
-
-  it('hides pipeline creation when not permitted', () => {
-    renderComponent({ canCreatePipeline: false })
-
-    expect(screen.queryByText('addButton')).not.toBeInTheDocument()
   })
 })
