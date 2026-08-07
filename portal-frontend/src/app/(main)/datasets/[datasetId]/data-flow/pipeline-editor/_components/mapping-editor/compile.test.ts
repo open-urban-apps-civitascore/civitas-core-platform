@@ -274,7 +274,7 @@ describe('mapping editor compile', () => {
   })
 
   it('round-trips a toDateTime node, keeping it distinct from toDate', () => {
-    const toDateTime = mappingRegistry.byType.toDateTime
+    const toDateTime = transformDef('toDateTime')
     const dtTarget: SchemaTree = {
       name: 'tgt',
       fields: [{ path: '$.observedAt', name: 'observedAt', type: 'datetime', portType: 'scalar' }],
