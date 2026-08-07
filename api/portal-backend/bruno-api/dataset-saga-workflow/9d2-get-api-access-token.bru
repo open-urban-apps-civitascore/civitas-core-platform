@@ -1,0 +1,61 @@
+meta {
+  name: 9d2. Get api-access Token (public client, no secret)
+  type: http
+  seq: 26
+}
+
+post {
+  url: {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  grant_type: password
+  client_id: {{apiAccessClientId}}
+  username: {{username}}
+  password: {{password}}
+}
+
+script:post-response {
+  // Hand the bearer to the protected named-API reads in this folder.
+  if (res.getStatus() === 200 && res.getBody() && res.getBody().access_token) {
+    bru.setVar('sagaApiAccessToken', res.getBody().access_token);
+  }
+}
+
+tests {
+  test("api-access issues a token without a client secret", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response carries an access_token", function() {
+    expect(res.body).to.have.property('access_token');
+  });
+}
+
+docs {
+  **Saga step 9d2 of 18** — Mint the external-consumer bearer.
+
+  Protected named-API routes (`/v1/datasets/{id}/{slug}` while the dataset is not open data) require a
+  bearer token. Per concept #1293 an external API consumer obtains that token from the static **public**
+  Keycloak client `api-access` — no client secret, Resource Owner Password Credentials (direct access
+  grants) — not from the confidential `portal-frontend` client whose secret belongs to the portal UI and
+  the management API. The request body therefore carries no `client_secret`.
+
+  **Why this folder mints its own token:** the collection's `payload-api` folder already performs the same
+  exchange and stores `apiAccessToken`, but folders run in alphabetical order and `dataset-saga-workflow`
+  sorts **before** `payload-api`. `apiAccessToken` is still unset while this folder runs, so the protected
+  reads below would send an empty bearer. This request stores its own `sagaApiAccessToken` instead.
+
+  A valid token only clears the authentication gate — which datasets it may read is still an OPA decision
+  on the gateway.
+
+  **Precondition:** Keycloak reachable at `keycloakUrl`; realm `realm` has the public `api-access` client
+  with direct access grants enabled; `username` / `password` identify a user with read access to the
+  suite's dataset.
+
+  **Expected Response:** 200 OK with an `access_token`.
+
+  **Post-condition:** `sagaApiAccessToken` is set for the protected reads in steps 4 and 5.
+}
