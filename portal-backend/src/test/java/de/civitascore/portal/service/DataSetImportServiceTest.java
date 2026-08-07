@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -115,7 +116,10 @@ class DataSetImportServiceTest {
         importService.importDataSet(
             bundle(List.of(structureInput()), List.of(sourceInput(STRUCTURE_URN))));
 
-    verify(dataSourceService).create(sourceInputCaptor.capture());
+    // The bundled structure must be AVAILABLE before the source links to it.
+    var order = inOrder(dataStructureImportService, dataSourceService);
+    order.verify(dataStructureImportService).ensureAvailable(version);
+    order.verify(dataSourceService).create(sourceInputCaptor.capture());
     assertThat(sourceInputCaptor.getValue().getDataStructureVersionId()).isEqualTo(version.getId());
     verify(dataSetService).create(dataSetInputCaptor.capture());
     assertThat(dataSetInputCaptor.getValue().getName()).isEqualTo("Air Quality");
@@ -140,6 +144,8 @@ class DataSetImportServiceTest {
 
     importService.importDataSet(bundle(List.of(), List.of(sourceInput(STRUCTURE_URN))));
 
+    // Installed-but-never-released structures (single import leaves DRAFT) are released too.
+    verify(dataStructureImportService).ensureAvailable(installed);
     verify(dataSourceService).create(sourceInputCaptor.capture());
     assertThat(sourceInputCaptor.getValue().getDataStructureVersionId())
         .isEqualTo(installed.getId());

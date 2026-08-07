@@ -1,0 +1,42 @@
+meta {
+  name: Bundle with unresolvable source → 400
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/imports/datasets
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Bruno Flow kaputtes Bundle",
+    "description": "Source references a structure that exists nowhere",
+    "dataStructures": [],
+    "dataSources": [
+      {
+        "name": "Verwaiste Quelle",
+        "dataStructureUrn": "urn:core:city:openurbanapps:datastructure:test:doesnotexist:r{{runId}}"
+      }
+    ]
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("rejects before creating anything", function() {
+    expect(res.status).to.equal(400);
+    expect(res.body.detail).to.include('neither part of this bundle nor');
+  });
+}
+
+docs {
+  A dataStructureUrn must resolve against the bundle first, then against the
+  installed structures — if both fail the whole import is rejected up front
+  (single transaction: nothing is left behind).
+}

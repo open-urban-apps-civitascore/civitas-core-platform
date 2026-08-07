@@ -28,9 +28,11 @@ import org.springframework.transaction.annotation.Transactional;
  * resolving their structure reference by URN, then the dataset shell — all in one transaction, so a
  * rejected artifact rolls back the whole install.
  *
- * <p>Like the single-structure import, everything is created in DRAFT and release stays a separate,
- * permission-gated step; no saga is touched here ({@link DataSetService} publishes infrastructure
- * sagas only on release).
+ * <p>Contained structures are released to AVAILABLE right away (a catalogue artifact is finished
+ * content, and sources can only link to AVAILABLE versions — see {@link
+ * DataStructureImportService#ensureAvailable}); the dataset shell and its sources stay DRAFT, so
+ * release remains a separate, permission-gated step and no saga is touched here ({@link
+ * DataSetService} publishes infrastructure sagas only on dataset release).
  *
  * <p>Increment 1: dataset shell + data structures + data sources. Mappings, pipelines and data
  * sinks are rejected with an explicit message until their increments land.
@@ -65,6 +67,7 @@ public class DataSetImportService {
     List<ImportedArtifactDTO> structureResults = new ArrayList<>();
     for (DataStructureImportInputDTO structure : input.getDataStructures()) {
       ImportResolution resolution = dataStructureImportService.importOrReuse(structure);
+      dataStructureImportService.ensureAvailable(resolution.version());
       String logicalUrn = modelRegistryGateway.logicalUrn(resolution.version().getModelUrn());
       structuresByLogicalUrn.put(logicalUrn, resolution);
       structureResults.add(
@@ -120,10 +123,18 @@ public class DataSetImportService {
 
     ImportResolution bundled = structuresByLogicalUrn.get(logicalUrn);
     if (bundled != null) {
+      // Already ensured AVAILABLE by the structure step.
       return bundled.version();
     }
     return dataStructureVersionRepository
         .findFirstByModelUrnStartingWith(logicalUrn + ":")
+        // Installed-but-never-released structures (e.g. from the single-structure import, which
+        // deliberately leaves everything DRAFT) must be released before a source can link.
+        .map(
+            installed -> {
+              dataStructureImportService.ensureAvailable(installed);
+              return installed;
+            })
         .orElseThrow(
             () ->
                 new InvalidInputException(

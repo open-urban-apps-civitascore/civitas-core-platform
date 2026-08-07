@@ -1,6 +1,8 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureImportInputDTO;
@@ -102,6 +104,28 @@ public class DataStructureImportService {
     // version pin (e.g. a half-built UI draft) must conflict rather than gain a twin.
     rejectAlreadyInstalled(modelId);
     return new ImportResolution(create(input), false);
+  }
+
+  /**
+   * Releases the version and its parent structure when still in DRAFT (version first — the
+   * structure's release validation requires a released version). No-op for anything already
+   * AVAILABLE.
+   *
+   * <p>The bundle import calls this for every structure it touches: an imported catalogue artifact
+   * is finished content, and {@link DataSourceService} only links sources to AVAILABLE versions —
+   * DRAFT would make every bundled source fail. Note that this releases implicitly under the
+   * dataset-import permission rather than {@code DATASTRUCTURE_RELEASE}; flagged as an upstream
+   * design question (structure releases trigger no sagas, so this is a pure status flip).
+   */
+  @Transactional
+  public void ensureAvailable(DataStructureVersion version) {
+    if (version.getDataStructureVersionStatus() == DataStructureVersionStatus.DRAFT) {
+      dataStructureVersionService.release(version.getId());
+    }
+    DataStructure structure = version.getDataStructure();
+    if (structure.getDataStructureStatus() == DataStructureStatus.DRAFT) {
+      dataStructureService.release(structure.getId());
+    }
   }
 
   private DataStructureVersion create(DataStructureImportInputDTO input) {

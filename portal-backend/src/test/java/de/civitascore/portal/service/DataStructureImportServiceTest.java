@@ -3,11 +3,14 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureImportInputDTO;
@@ -219,5 +222,52 @@ class DataStructureImportServiceTest {
 
     assertThat(resolution.reused()).isFalse();
     assertThat(resolution.version()).isSameAs(created);
+  }
+
+  private static DataStructureVersion versionWithStatuses(
+      DataStructureVersionStatus versionStatus, DataStructureStatus structureStatus) {
+    DataStructure structure = new DataStructure();
+    structure.setId(UUID.randomUUID());
+    structure.setDataStructureStatus(structureStatus);
+    DataStructureVersion version = new DataStructureVersion();
+    version.setId(UUID.randomUUID());
+    version.setDataStructureVersionStatus(versionStatus);
+    version.setDataStructure(structure);
+    return version;
+  }
+
+  @Test
+  void ensureAvailable_releasesDraftVersionBeforeDraftStructure() {
+    DataStructureVersion version =
+        versionWithStatuses(DataStructureVersionStatus.DRAFT, DataStructureStatus.DRAFT);
+
+    importService.ensureAvailable(version);
+
+    // Version first: the structure's release validation requires a released version.
+    var order = inOrder(dataStructureVersionService, dataStructureService);
+    order.verify(dataStructureVersionService).release(version.getId());
+    order.verify(dataStructureService).release(version.getDataStructure().getId());
+  }
+
+  @Test
+  void ensureAvailable_isNoOpWhenBothAreAvailable() {
+    DataStructureVersion version =
+        versionWithStatuses(DataStructureVersionStatus.AVAILABLE, DataStructureStatus.AVAILABLE);
+
+    importService.ensureAvailable(version);
+
+    verify(dataStructureVersionService, never()).release(any(UUID.class));
+    verify(dataStructureService, never()).release(any(UUID.class));
+  }
+
+  @Test
+  void ensureAvailable_releasesOnlyTheDraftHalf() {
+    DataStructureVersion version =
+        versionWithStatuses(DataStructureVersionStatus.AVAILABLE, DataStructureStatus.DRAFT);
+
+    importService.ensureAvailable(version);
+
+    verify(dataStructureVersionService, never()).release(any(UUID.class));
+    verify(dataStructureService).release(version.getDataStructure().getId());
   }
 }

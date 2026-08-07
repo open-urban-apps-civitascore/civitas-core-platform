@@ -1,0 +1,44 @@
+meta {
+  name: Re-Import same URN → 409
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/imports/datastructures
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Bruno Flow Struktur",
+    "description": "Created by the import test flow",
+    "model": {
+      "$id": "urn:core:city:openurbanapps:datastructure:test:brunoflow:r{{runId}}",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "value": { "type": "number" },
+        "measuredAt": { "type": "string" }
+      }
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("shell turnstile rejects the second import", function() {
+    expect(res.status).to.equal(409);
+    expect(res.body.detail).to.include('already installed');
+  });
+}
+
+docs {
+  The registry itself is idempotent, but the shell layer is not — the
+  turnstile (existsByModelLogicalUrn) must 409 instead of adding a second
+  data_structures row for the same artifact. Depends on 01 (same runId URN).
+}
