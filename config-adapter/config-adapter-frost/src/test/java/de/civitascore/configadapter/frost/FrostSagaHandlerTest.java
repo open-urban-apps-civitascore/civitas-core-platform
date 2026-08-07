@@ -429,6 +429,35 @@ class FrostSagaHandlerTest {
   class UpdateProject {
 
     @Test
+    @DisplayName("provisions the project when the dataset has none yet")
+    void shouldCreateProjectWhenNoneWasProvisionedYet() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(created.getHeaderString("Location")).thenReturn("http://frost:8080/v1.1/Projects(42)");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        // A FROST sink added after a release that provisioned no project: the update carries no
+        // projectId, so the step must provision instead of failing the whole saga.
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_PROJECT",
+                Map.of("datasetName", "Updated Dataset", "description", "Updated"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("42", result.resultData().get("projectId"));
+        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
+        // created=true marks this as a provisioning step, so its compensation deletes rather than
+        // restores.
+        assertEquals(true, result.compensationData().get("created"));
+        verify(mockBuilder, never()).method(eq("PATCH"), any(Entity.class));
+      }
+    }
+
+    @Test
     @DisplayName("returns success with projectId, baseUrl and previous state in compensationData")
     void shouldUpdateProjectSuccessfully() {
       try (FrostSagaHandler handler = createHandler()) {
@@ -1117,6 +1146,50 @@ class FrostSagaHandlerTest {
   @Nested
   @DisplayName("RESTORE_PROJECT")
   class RestoreProject {
+
+    @Test
+    @DisplayName("deletes instead of restoring when the update provisioned the project")
+    void shouldDeleteProjectWhenTheUpdateCreatedIt() {
+      try (FrostSagaHandler handler = createHandler()) {
+        // The project has no Things, so the teardown enumeration returns a single empty page.
+        Response emptyThingsPage = mock(Response.class);
+        when(emptyThingsPage.getStatus()).thenReturn(200);
+        when(emptyThingsPage.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
+        when(mockBuilder.get()).thenReturn(emptyThingsPage);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(ok);
+
+        // There is no previous state to restore: the forward step created the project, so the exact
+        // inverse is the delete. Patching would blank the description of a project meant to go
+        // away.
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP", "RESTORE_PROJECT", Map.of("projectId", "42", "created", true));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        verify(mockBuilder).delete();
+        verify(mockBuilder, never()).method(eq("PATCH"), any(Entity.class));
+      }
+    }
+
+    @Test
+    @DisplayName("preserves a project the update merely adopted (created=false)")
+    void shouldPreserveProjectWhenTheUpdateReusedIt() {
+      try (FrostSagaHandler handler = createHandler()) {
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP", "RESTORE_PROJECT", Map.of("projectId", "42", "created", false));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        verify(mockBuilder, never()).delete();
+        verify(mockBuilder, never()).method(eq("PATCH"), any(Entity.class));
+      }
+    }
 
     @Test
     @DisplayName("returns COMPENSATION_COMPLETED on successful restore")
