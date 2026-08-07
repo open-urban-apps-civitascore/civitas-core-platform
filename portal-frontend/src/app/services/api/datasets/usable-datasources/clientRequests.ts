@@ -8,10 +8,8 @@ const key = 'usable-datasources'
 
 /**
  * Fetches the data sources this dataset's pipelines may be built from.
- * GET /datasets/{datasetId}/usable-datasources
  *
- * Authorized on the dataset (DATASET_UPDATE), not on the data sources, so a datapool-scoped caller
- * reaches it without DATASOURCE_READ. The datapool and status filtering happens server-side.
+ * Requires DATASET_UPDATE on the dataset, not DATASOURCE_READ — enable it accordingly.
  */
 export const useGetUsableDatasources = (datasetId: string, { params, isEnabled = true }: GetListInput = {}) =>
   useQuery<ApiServiceResponse<DatasourceSummary[]>>({
@@ -24,7 +22,5 @@ export const useGetUsableDatasources = (datasetId: string, { params, isEnabled =
         params,
         errorMessage: 'An error occurred while loading usable data sources.',
       }),
-    // The route param is empty on the first render; without this the request would go to
-    // /datasets//usable-datasources.
     enabled: isEnabled && !!datasetId,
   })

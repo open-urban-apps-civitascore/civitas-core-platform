@@ -71,12 +71,7 @@ export const DatasourceApiResponseSchema = z.object({
 
 export type Datasource = z.infer<typeof DatasourceApiResponseSchema>
 
-/**
- * Projection of `GET /datasets/{id}/usable-datasources` — the sources a dataset's pipelines may be
- * built from. Authorized on the dataset rather than on the data source, so it withholds the
- * connector configuration; the connector type is included because the pipeline editor derives a
- * node's payload form from it.
- */
+/** Mirrors `GET /datasets/{id}/usable-datasources`. */
 export const DatasourceSummaryApiResponseSchema = z.object({
   id: z.string(),
   name: z.string(),

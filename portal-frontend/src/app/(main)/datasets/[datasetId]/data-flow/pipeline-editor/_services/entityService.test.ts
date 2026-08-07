@@ -116,8 +116,6 @@ describe('datasourceToSelectable', () => {
   })
 
   it('carries the connector type into metadata', () => {
-    // The connector drives the node's payload form and the schedule rules, so losing it here
-    // silently disables pipeline validation.
     const ds = mockDatasource({ connectorType: 'MQTT' })
     const result = datasourceToSelectable(ds)
     expect(result.metadata?.connectorType).toBe('MQTT')

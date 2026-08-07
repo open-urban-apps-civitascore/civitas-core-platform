@@ -38,8 +38,6 @@ export const usePipelinePermissions = (datasetId: string, datapoolId?: string): 
   const canDeletePipeline = scoped(PERMISSION_NAMES.DATASET_DELETE) && isDraftMode
   const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
 
-  // Building a pipeline needs no DATASOURCE_READ: the picker is served through the dataset, and
-  // referencing a source is authorized by that Use relationship rather than by reading the source.
   return {
     canDeletePipeline,
     canReadDatastructures,

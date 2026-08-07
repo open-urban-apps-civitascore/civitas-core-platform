@@ -177,22 +177,13 @@ public class DataSetController
   }
 
   /**
-   * Lists the data sources this dataset's pipelines may be built from — the input behind the data
-   * source picker in the pipeline editor.
+   * Lists the data sources this dataset's pipelines may be built from.
    *
-   * <p>A data source is usable when it is released for every datapool, or for the datapool this
-   * dataset sits in; a dataset in no datapool therefore sees only the former. The same rule {@code
-   * DataSourceDatapoolScopeValidator} enforces when a pipeline establishes the relationship, so the
-   * picker cannot offer a source that saving would reject.
+   * <p>Usability is the rule {@code DataSourceDatapoolScopeValidator} applies when a pipeline
+   * establishes the relationship, so the picker cannot offer a source that saving would reject.
    *
-   * <p>Authorized on the <em>dataset</em>, not on the data sources: the caller needs {@code
-   * DATASET_UPDATE} on this dataset, which a DATAPOOL-scoped grant conveys. Reading the data source
-   * administration surface still requires {@code DATASOURCE_READ}, so the response carries id,
-   * name, description and connector type only — no connector configuration.
-   *
-   * <p>A caller without {@code DATASET_UPDATE} on this dataset is rejected upstream with 403. Past
-   * that, the caller's scope headers still apply: a dataset they do not cover — unknown or merely
-   * out of scope — yields 404, so route existence is not leaked.
+   * <p>The 404 for a dataset outside the caller's scope headers is deliberate: a 403 would confirm
+   * that the dataset exists.
    *
    * @param id the dataset UUID
    * @return HTTP 200 with the usable data sources, ordered by name
@@ -204,10 +195,9 @@ public class DataSetController
       description =
           "Returns the AVAILABLE data sources released either for every datapool or for this"
               + " dataset's datapool; a dataset in no datapool sees only the former. Requires"
-              + " DATASET_UPDATE on the dataset rather than DATASOURCE_READ, and returns id, name,"
-              + " description and connector type only. Callers lacking that permission are rejected"
-              + " with 403; a dataset outside the caller's X-Allowed-Scope-Ids/X-Allowed-Pool-Ids"
-              + " returns 404.")
+              + " DATASET_UPDATE on the dataset rather than DATASOURCE_READ, and omits the connector"
+              + " configuration. Callers lacking that permission are rejected with 403; a dataset"
+              + " outside the caller's X-Allowed-Scope-Ids/X-Allowed-Pool-Ids returns 404.")
   @ApiResponse(responseCode = "200", description = "Usable data sources returned successfully")
   @ApiResponse(
       responseCode = "404",

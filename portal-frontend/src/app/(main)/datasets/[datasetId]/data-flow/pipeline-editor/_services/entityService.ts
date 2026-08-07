@@ -1,11 +1,3 @@
-/**
- * Entity Service for Pipeline Editor
- *
- * Provides hooks for fetching entities used in pipeline nodes.
- * - DataSources: Uses real API via useGetUsableDatasources()
- *
- */
-
 import { useCallback, useMemo } from 'react'
 
 import { useGetUsableDatasources } from '@/app/services/api/datasets/usable-datasources/clientRequests'
@@ -38,15 +30,9 @@ export interface UseEntityResult<T extends SelectableEntity> {
 }
 
 // ============================================================================
-// DataSource Hook (Real API)
+// DataSource Hook
 // ============================================================================
 
-/**
- * Hook to fetch the datasources usable in this dataset's pipelines.
- *
- * Status and datapool filtering happen server-side, on the same rule that rejects a pipeline
- * referencing an unusable source — so the picker cannot offer one that saving would reject.
- */
 export const useDataSourceEntities = (opts: {
   isEnabled?: boolean
   datasetId: string
