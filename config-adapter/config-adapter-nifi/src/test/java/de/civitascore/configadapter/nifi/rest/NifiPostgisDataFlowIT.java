@@ -25,15 +25,19 @@ import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.io.File;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.awaitility.core.ConditionTimeoutException;
@@ -76,6 +80,9 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
   private static final String CHAINED_FANOUT_TOPIC = "civitas/it/postgis-fanout-chained";
   private static final String GEO_TOPIC = "civitas/it/postgis-geo";
   private static final String GEO_25832_TOPIC = "civitas/it/postgis-geo-25832";
+  private static final String NUMERIC_TOPIC = "civitas/it/postgis-numeric";
+  private static final String TEMPORAL_TOPIC = "civitas/it/postgis-temporal";
+  private static final String CONVERTED_TOPIC = "civitas/it/postgis-converted";
   private static final String DB = "nifi_demo";
   private static final String DB_USER = "nifi";
   private static final String DB_PASSWORD = "nifi-db-secret";
@@ -243,6 +250,193 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                         + "{\"sourceName\":\"A\",\"name\":null},"
                         + "{\"sourceName\":\"B\",\"name\":null}]}");
                 return arrayRowLanded();
+              });
+    }
+  }
+
+  @Test
+  void deployedFlowCoercesNumericConversionsIntoTypedColumns() throws Exception {
+    // NiFi RecordPath has no toFloat/toInt function — those CORE ops render as a bare value copy
+    // and
+    // delegate coercion to PutDatabaseRecord. Without this test a silent regression to an emitted
+    // toFloat(...) call would fail RecordPath compile at deploy time and no row would ever land,
+    // while every unit test still passes.
+    Map<String, Object> graph =
+        map(
+            """
+            { "nodes": [
+                { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
+                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
+                    "fields": { "$.stationid": "$.stationid",
+                                "$.temperature": { "op": "toFloat", "input": "$.temp" },
+                                "$.pressure": { "op": "toFloat", "input": "$.press" },
+                                "$.samples": { "op": "toInt", "input": "$.n" } } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
+                { "id": "e", "type": "end", "data": {} } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+
+    Datasource source = new Datasource();
+    source.setId("ds-pg-numeric-it");
+    source.setType("MQTT");
+    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
+    source.handleUnknownProperty("topics", List.of(NUMERIC_TOPIC));
+
+    FlowDeploymentPlanner planner =
+        NifiTestFixtures.planner(
+            new CredentialResolver(new byte[0]),
+            SqlSourceProbe.NO_OP,
+            new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
+            null);
+    DeploymentPlan plan =
+        planner.plan(
+            new PipelineDeploymentRequest(
+                "pg-numeric-it", graph, source, new PostgisSinkSpec("numeric_observation")));
+
+    client.deployFlow(plan);
+
+    String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
+    try (MqttPublisher publisher = new MqttPublisher(brokerUrl)) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(
+                    NUMERIC_TOPIC,
+                    "{\"stationid\":\"S5\",\"temp\":\"21.5\",\"press\":\"1013.25\",\"n\":\"7\"}");
+                return numericRowLanded();
+              });
+    }
+  }
+
+  @Test
+  void toDateTimeAndToDateBindIntoTheirOwnColumnTypes() throws Exception {
+    // Without this, nothing would catch a conversion whose value the column silently rejects:
+    // PutDatabaseRecord reports no deployment error, the row just never lands. The two conversions
+    // differ in target — toDateTime feeds TIMESTAMPTZ, toDate feeds DATE — and only an assertion
+    // against the real columns shows whether both survive the parse-then-bind path.
+    Map<String, Object> graph =
+        map(
+            """
+            { "nodes": [
+                { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
+                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
+                    "fields": { "$.stationid": "$.stationid",
+                                "$.day": { "op": "toDate", "input": "$.day",
+                                           "pattern": "dd.MM.yyyy" },
+                                "$.observed": { "op": "toDateTime", "input": "$.observed",
+                                                "pattern": "dd.MM.yyyy HH:mm:ss" } } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
+                { "id": "e", "type": "end", "data": {} } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+
+    Datasource source = new Datasource();
+    source.setId("ds-pg-converted-it");
+    source.setType("MQTT");
+    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
+    source.handleUnknownProperty("topics", List.of(CONVERTED_TOPIC));
+
+    FlowDeploymentPlanner planner =
+        NifiTestFixtures.planner(
+            new CredentialResolver(new byte[0]),
+            SqlSourceProbe.NO_OP,
+            new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
+            null);
+    DeploymentPlan plan =
+        planner.plan(
+            new PipelineDeploymentRequest(
+                "pg-converted-it", graph, source, new PostgisSinkSpec("converted_observation")));
+
+    client.deployFlow(plan);
+
+    String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
+    try (MqttPublisher publisher = new MqttPublisher(brokerUrl)) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(
+                    CONVERTED_TOPIC,
+                    "{\"stationid\":\"S7\",\"day\":\"29.07.2026\","
+                        + "\"observed\":\"29.07.2026 14:30:00\"}");
+                return convertedRowLanded();
+              });
+    }
+  }
+
+  @Test
+  void deployedFlowWritesDateAndTimestampIntoTheirOwnColumnTypes() throws Exception {
+    // DataStructureTableMapper derives DATE for format:date and TIMESTAMPTZ for format:date-time,
+    // but nothing proves a mapped value actually binds into those columns at runtime — a date-only
+    // string reaching a DATE column is the case the modeller can only produce once Date and
+    // Timestamp are distinct types. Same for the UUID column behind format:uuid.
+    Map<String, Object> graph =
+        map(
+            """
+            { "nodes": [
+                { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
+                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
+                    "fields": { "$.stationid": "$.stationid", "$.id": "$.uid",
+                                "$.day": "$.day", "$.observed": "$.observed" } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
+                { "id": "e", "type": "end", "data": {} } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+
+    Datasource source = new Datasource();
+    source.setId("ds-pg-temporal-it");
+    source.setType("MQTT");
+    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
+    source.handleUnknownProperty("topics", List.of(TEMPORAL_TOPIC));
+
+    FlowDeploymentPlanner planner =
+        NifiTestFixtures.planner(
+            new CredentialResolver(new byte[0]),
+            SqlSourceProbe.NO_OP,
+            new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
+            null);
+    DeploymentPlan plan =
+        planner.plan(
+            new PipelineDeploymentRequest(
+                "pg-temporal-it", graph, source, new PostgisSinkSpec("temporal_observation")));
+
+    client.deployFlow(plan);
+
+    String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
+    try (MqttPublisher publisher = new MqttPublisher(brokerUrl)) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(
+                    TEMPORAL_TOPIC,
+                    "{\"stationid\":\"S6\","
+                        + "\"uid\":\"3f2504e0-4f89-11d3-9a0c-0305e82c3301\","
+                        + "\"day\":\"2026-07-29\","
+                        + "\"observed\":\"2026-07-29T14:30:00Z\"}");
+                return temporalRowLanded();
               });
     }
   }
@@ -776,6 +970,62 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     }
   }
 
+  /** Asserts the string-typed source values arrived as real numbers in the typed columns. */
+  private boolean numericRowLanded() throws Exception {
+    try (Connection c = dbConnection();
+        Statement st = c.createStatement();
+        ResultSet rs =
+            st.executeQuery(
+                "SELECT temperature, pressure, samples FROM numeric_observation"
+                    + " WHERE stationid = 'S5'")) {
+      if (!rs.next()) {
+        return false;
+      }
+      assertEquals(21.5, rs.getDouble("temperature"), 1e-9);
+      assertEquals(new BigDecimal("1013.25"), rs.getBigDecimal("pressure").stripTrailingZeros());
+      assertEquals(7L, rs.getLong("samples"));
+      return true;
+    }
+  }
+
+  /** Asserts the uuid/date/timestamptz columns hold real typed values, not text. */
+  private boolean temporalRowLanded() throws Exception {
+    try (Connection c = dbConnection();
+        Statement st = c.createStatement();
+        ResultSet rs =
+            st.executeQuery(
+                "SELECT id, day, observed FROM temporal_observation WHERE stationid = 'S6'")) {
+      if (!rs.next()) {
+        return false;
+      }
+      assertEquals(
+          UUID.fromString("3f2504e0-4f89-11d3-9a0c-0305e82c3301"), rs.getObject("id", UUID.class));
+      assertEquals(LocalDate.of(2026, 7, 29), rs.getObject("day", LocalDate.class));
+      assertEquals(
+          OffsetDateTime.parse("2026-07-29T14:30:00Z").toInstant(),
+          rs.getObject("observed", OffsetDateTime.class).toInstant());
+      return true;
+    }
+  }
+
+  /** Asserts both conversions produced values the DATE and TIMESTAMPTZ columns accept. */
+  private boolean convertedRowLanded() throws Exception {
+    try (Connection c = dbConnection();
+        Statement st = c.createStatement();
+        ResultSet rs =
+            st.executeQuery(
+                "SELECT day, observed FROM converted_observation WHERE stationid = 'S7'")) {
+      if (!rs.next()) {
+        return false;
+      }
+      assertEquals(LocalDate.of(2026, 7, 29), rs.getObject("day", LocalDate.class));
+      assertEquals(
+          OffsetDateTime.parse("2026-07-29T14:30:00Z").toInstant(),
+          rs.getObject("observed", OffsetDateTime.class).toInstant());
+      return true;
+    }
+  }
+
   /** Asserts that UpdateRecord evaluated the source relative to each selected array element. */
   private boolean arrayRowLanded() throws Exception {
     try (Connection c = dbConnection();
@@ -834,6 +1084,16 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
           "CREATE TABLE geo_fanout_observation ("
               + "stationid text, geom geometry(Point,4326), measured_at text)");
       st.execute("CREATE TABLE chained_fanout_observation (stationid text, measured_at text)");
+      st.execute(
+          "CREATE TABLE numeric_observation (stationid text, temperature double precision,"
+              + " pressure numeric, samples bigint)");
+      // the column types DataStructureTableMapper derives for format uuid / date / date-time
+      st.execute(
+          "CREATE TABLE temporal_observation (stationid text, id uuid, day date,"
+              + " observed timestamptz)");
+      st.execute(
+          "CREATE TABLE converted_observation (stationid text, day date,"
+              + " observed timestamptz)");
       st.execute("CREATE TABLE geo_observation (stationid text, geom geometry(Point,4326))");
       st.execute("CREATE TABLE geo_observation_25832 (stationid text, geom geometry(Point,25832))");
     }
