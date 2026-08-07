@@ -120,6 +120,7 @@ class DataSetServiceTest {
   private DataSet availableDataSet(UUID id) {
     DataSet ds = readyDataSet(id);
     ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+    ds.setProvisioned(true);
     ds.setProjectId("proj-1");
     ds.setFrostBaseUrl("https://frost.example.com/Projects(1)");
     ds.getNamedApis().forEach(api -> api.setRouteId("route-1"));
@@ -871,6 +872,7 @@ class DataSetServiceTest {
     void publishesNoSagaWithoutProjectId() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
+      ds.setProvisioned(false);
       ds.setProjectId(null);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
