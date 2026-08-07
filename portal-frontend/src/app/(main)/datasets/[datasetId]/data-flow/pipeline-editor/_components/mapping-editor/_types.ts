@@ -107,9 +107,9 @@ export interface SchemaTree {
  *  toString  → NiFi toString(field, charset)   — any scalar → string
  *  toInt     → NiFi type coercion to INT        — str/number → int
  *  toFloat   → NiFi type coercion to FLOAT      — str/int → number
- *  toDate    → NiFi toDate(field, format)       — str → date
- *  toDateTime→ NiFi toDate(field, format)       — str → datetime
- *  format    → NiFi format(field, format)       — date / datetime → str
+ *  toDate    → NiFi format(toDate(field, format), 'yyyy-MM-dd')  — str / date → date
+ *  toDateTime→ NiFi toDate(field, format)                        — str / datetime → datetime
+ *  format    → NiFi format(field, format)                        — date / datetime → str
  */
 export type ConversionOp = 'toString' | 'toInt' | 'toFloat' | 'toDate' | 'toDateTime' | 'format'
 

@@ -1434,7 +1434,7 @@
           "description": "str → date",
           "fields": {
             "pattern": {
-              "label": "Pattern"
+              "label": "Input format"
             }
           }
         },
@@ -1442,7 +1442,7 @@
           "description": "str → datetime",
           "fields": {
             "pattern": {
-              "label": "Pattern"
+              "label": "Input format"
             }
           }
         },

@@ -23,11 +23,14 @@ describe('numeric conversion inputs', () => {
 })
 
 describe('date conversion inputs', () => {
-  it('toDate and toDateTime produce distinct output subtypes from a str input', () => {
-    expect(mappingRegistry.byType['toDate'].inputs[0].dataType).toBe('str')
+  it('toDate and toDateTime produce distinct output subtypes', () => {
     expect(mappingRegistry.byType['toDate'].outputs[0].dataType).toBe('date')
-    expect(mappingRegistry.byType['toDateTime'].inputs[0].dataType).toBe('str')
     expect(mappingRegistry.byType['toDateTime'].outputs[0].dataType).toBe('datetime')
+  })
+
+  it('toDate accepts str and date sources; toDateTime accepts str and datetime', () => {
+    expect(mappingRegistry.byType['toDate'].inputs[0].accepts).toEqual(['str', 'date'])
+    expect(mappingRegistry.byType['toDateTime'].inputs[0].accepts).toEqual(['str', 'datetime'])
   })
 
   it('format accepts both date and datetime sources', () => {
