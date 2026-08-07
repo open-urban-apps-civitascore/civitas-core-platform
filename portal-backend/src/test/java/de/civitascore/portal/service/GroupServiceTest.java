@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.Topics;
@@ -20,6 +21,7 @@ import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentGroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.HashSet;
@@ -202,6 +204,43 @@ class GroupServiceTest {
       assertThatThrownBy(() -> service.deleteById(groupId))
           .isInstanceOf(ResourceInUseException.class)
           .hasMessageContaining("child groups");
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // preValidateWithExternalSystem
+  // ---------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("preValidateWithExternalSystem()")
+  class PreValidateWithExternalSystemTests {
+
+    @Test
+    @DisplayName("Should reject update when group has not been synced to Keycloak")
+    void shouldRejectUpdateWhenExternalIdMissing() {
+      GroupService service = createService();
+      Group group = new Group();
+      group.setId(UUID.randomUUID());
+      group.setName("Local Data Consumers");
+
+      assertThatThrownBy(() -> service.preValidateWithExternalSystem(group, null, "update", null))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("not been synced to Keycloak");
+      verifyNoInteractions(configEventPublisher);
+    }
+
+    @Test
+    @DisplayName("Should reject delete when group has not been synced to Keycloak")
+    void shouldRejectDeleteWhenExternalIdMissing() {
+      GroupService service = createService();
+      Group group = new Group();
+      group.setId(UUID.randomUUID());
+      group.setName("Local Data Consumers");
+
+      assertThatThrownBy(() -> service.preValidateWithExternalSystem(group, null, "delete", null))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("not been synced to Keycloak");
+      verifyNoInteractions(configEventPublisher);
     }
   }
 

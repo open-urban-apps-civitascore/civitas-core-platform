@@ -173,6 +173,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       logger.warn("Unknown resource type: {}", type);
       throw new FatalAdapterException(AdapterErrorCode.INVALID_RESOURCE_TYPE, type);
     }
+    requireResourceIdForExistingResourceOperation(operation, type, resourceId);
 
     switch (operation) {
       case CREATE -> handler.create(targetResource, event);
@@ -182,6 +183,16 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         logger.warn("Unknown operation: {}", operation);
         throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);
       }
+    }
+  }
+
+  private void requireResourceIdForExistingResourceOperation(
+      Operation operation, ResourceType type, String resourceId) throws FatalAdapterException {
+    if ((operation == Operation.UPDATE || operation == Operation.DELETE)
+        && (resourceId == null || resourceId.isBlank())) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD,
+          "Missing resource id for " + operation + " " + type + " event");
     }
   }
 

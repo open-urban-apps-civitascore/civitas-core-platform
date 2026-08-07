@@ -1,6 +1,7 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.configadapter.Topics;
+import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.idm.GroupConfig;
 import de.civitascore.portal.configuration.EventProperties;
@@ -12,6 +13,7 @@ import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentGroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashSet;
 import java.util.Objects;
@@ -101,6 +103,17 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
     return buildGroupConfig(entity);
   }
 
+  @Override
+  protected ConfigResultEvent preValidateWithExternalSystem(
+      Group entity, GroupInputDTO input, String operation, ConfigValue preSaveConfigValue) {
+    if (requiresExistingKeycloakGroup(operation)
+        && (entity.getExternalId() == null || entity.getExternalId().isBlank())) {
+      throw new InvalidInputException(
+          "Group", entity.getId(), "Group has not been synced to Keycloak yet; retry shortly.");
+    }
+    return super.preValidateWithExternalSystem(entity, input, operation, preSaveConfigValue);
+  }
+
   /**
    * Builds a {@link GroupConfig} from a Group entity. Used by both CRUD events and catch-up sync.
    *
@@ -141,6 +154,10 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
     }
 
     return groupConfig;
+  }
+
+  private boolean requiresExistingKeycloakGroup(String operation) {
+    return "update".equalsIgnoreCase(operation) || "delete".equalsIgnoreCase(operation);
   }
 
   @Override
