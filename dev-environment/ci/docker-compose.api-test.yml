@@ -76,6 +76,20 @@ services:
       timeout: 2s
       retries: 10
 
+  # Superset's own metadata DB (dashboards/datasets/users) — separate from postgres-sink, the
+  # data DB Superset's registered connection actually queries.
+  superset-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: superset
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superset -d superset"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   # ── Identity ───────────────────────────────────────────────
 
   keycloak:
@@ -470,6 +484,49 @@ services:
       geoserverdb:
         condition: service_healthy
 
+  # ── Superset (dataset/dashboard registration for POSTGIS sinks) ──────────
+  # config-adapter's "superset" saga handler runs REGISTER_DATASET/DEREGISTER_DATASET as part of
+  # the dataset-create/-delete sagas whenever a POSTGIS sink is present. No Trino/Keycloak SSO
+  # here (unlike dev-environment/trino-superset) — the bootstrap script registers a Superset
+  # database connection straight against postgres-sink instead.
+  superset:
+    build:
+      context: ./superset
+      dockerfile_inline: |
+        FROM apache/superset:6.0.0
+        USER root
+        ENV PATH="/app/.venv/bin:${PATH}"
+        RUN uv pip install --python /app/.venv/bin/python psycopg2-binary==2.9.12
+        COPY superset_config.py /app/pythonpath/superset_config.py
+        COPY bootstrap-superset-ci.py start-superset-ci.sh /app/civitas/
+        RUN chmod 755 /app/civitas/start-superset-ci.sh \
+          && chown -R superset:superset /app/civitas /app/pythonpath
+        USER superset
+    entrypoint: ["/bin/bash", "/app/civitas/start-superset-ci.sh"]
+    environment:
+      PYTHONPATH: /app/pythonpath
+      SUPERSET_SECRET_KEY: dev-only-ci-superset-secret-key
+      SUPERSET_DB_HOST: superset-db
+      SUPERSET_DB_PORT: "5432"
+      SUPERSET_DB_NAME: superset
+      SUPERSET_DB_USER: superset
+      SUPERSET_DB_PASSWORD: superset
+      SUPERSET_ADMIN_USERNAME: admin
+      SUPERSET_ADMIN_PASSWORD: admin
+      SUPERSET_SINK_DATABASE_NAME: geosink
+      SUPERSET_SINK_SQLALCHEMY_URI: postgresql://geosink:geosink@postgres-sink:5432/geosink
+    depends_on:
+      superset-db:
+        condition: service_healthy
+      postgres-sink:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8088/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+
   # ── Application ──────────────────────────────────────────
 
   portal-backend:
@@ -586,6 +643,11 @@ services:
       GEOSERVER_POSTGIS_DATABASE: geosink
       GEOSERVER_POSTGIS_USER: geosink
       GEOSERVER_POSTGIS_PASSWORD: geosink
+      # Superset saga step (register-superset): registers a dataset/dashboard per POSTGIS sink.
+      SUPERSET_URL: http://superset:8088
+      SUPERSET_ADMIN_USERNAME: admin
+      SUPERSET_ADMIN_PASSWORD: admin
+      SUPERSET_TRINO_DATABASE_ID: "1"
     depends_on:
       # Flowable's JDBC URL targets postgres-portal — wait until it is healthy before boot.
       postgres-portal:
@@ -601,6 +663,9 @@ services:
       gateway:
         condition: service_healthy
       restconfig:
+        condition: service_healthy
+      # The saga's register-superset step (POSTGIS sinks) authenticates against Superset.
+      superset:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/health/ready"]

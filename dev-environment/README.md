@@ -16,6 +16,7 @@ dev-environment/
 ├── keycloak/   # Keycloak only
 ├── apisix/     # API Gateway + Authorization (OPA, AuthZ Repository)
 ├── frost/      # FROST IoT Server
+├── trino-superset/ # Dashboard stack (Trino + Superset)
 ├── geoserver/  # GeoServer OGC Services (OWS)
 ├── nifi/       # Apache NiFi (data integration / pipeline engine)
 └── modelatlas/ # Model Atlas
@@ -206,6 +207,7 @@ cd kafka     && docker compose up -d
 cd postgres  && docker compose up -d
 cd keycloak  && docker compose up -d
 cd apisix    && docker compose up -d
+cd trino-superset && docker compose up -d --build
 ```
 
 ---
@@ -217,6 +219,8 @@ cd apisix    && docker compose up -d
 | Keycloak         | http://localhost:8080                           | admin / admin |
 | Portal Backend   | http://localhost:8089                           | Swagger: /v1/swagger-ui.html |
 | Config Adapter   | http://localhost:8088                           | |
+| Trino UI         | https://localhost:8446/ui/                      | OIDC via Keycloak, self-signed dev certificate |
+| Superset         | http://localhost:8092                           | OIDC via Keycloak |
 | APISIX Gateway   | http://localhost:9080                           | Routes to backend via OPA authz |
 | OPA              | http://localhost:8181                           | Policy decision point |
 | AuthZ Repository | http://localhost:8091                           | User authorization context |
@@ -227,6 +231,14 @@ cd apisix    && docker compose up -d
 | Apache NiFi      | https://localhost:8443/nifi                     | OIDC via Keycloak (no single-user login) |
 
 ---
+
+## Dashboard Login
+
+For Trino Web UI and Superset OIDC login, use the central dev user of the
+`civitas-core` realm:
+
+- Username: `dev@civitas.local`
+- Password: `dev123`
 
 ## Stopping
 
@@ -242,6 +254,7 @@ cd kafka     && docker compose down
 cd keycloak  && docker compose down
 cd postgres  && docker compose down
 cd frost     && docker compose down
+cd trino-superset && docker compose down
 cd geoserver && docker compose down
 ```
 

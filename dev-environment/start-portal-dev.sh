@@ -465,6 +465,7 @@ echo "  - Keycloak"
 echo "  - APISIX + etcd"
 echo "  - OPA + AuthZ Repository"
 echo "  - FROST Server"
+echo "  - Trino + Superset (after backend health)"
 echo "  - Apache NiFi"
 echo
 
@@ -712,7 +713,7 @@ wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 60
 
 # macOS: disable Keycloak https requirement on master realm on macos
 if [ "$OS_TYPE" = "Darwin" ]; then
-    docker exec -it civitas-keycloak /opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password admin
+    docker exec civitas-keycloak /opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password admin
     docker exec civitas-keycloak /opt/keycloak/bin/kcadm.sh update realms/master -s sslRequired=NONE
 fi
 
@@ -761,8 +762,10 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
     fi
     echo "  Portal Model built"
 
-    # Config Adapter JAR (needed by config-adapter Dockerfile)
-    if [ "$config_adapter_option" = "1" ]; then
+    # Config Adapter JAR — needed by the config-adapter Dockerfile (config_adapter_option=1),
+    # and also by portal-backend's build (backend_option=1), which depends on the
+    # config-adapter-* modules at $DEV_VERSION regardless of how config-adapter itself runs.
+    if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
         if ! mvn_in_container "$SCRIPT_DIR/../config-adapter" clean install -DskipTests -Drevision=$DEV_VERSION -Pdist -q; then
             echo "ERROR: Config Adapter build failed"
             exit 1
@@ -888,6 +891,11 @@ export FROST_PUBLIC_URL=http://civitas-frost:8080/FROST-Server/v1.1
 export FROST_API_KEY=dev-frost-api-key
 export FROST_API_KEY_HEADER=X-API-Key
 export FROST_TOPICS=de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
+export SUPERSET_URL=http://localhost:8092
+export SUPERSET_ADMIN_USERNAME=civitas-config-adapter
+export SUPERSET_ADMIN_PASSWORD=dev-only-civitas-superset-service-password
+export SUPERSET_TRINO_DATABASE_ID=1
+export SUPERSET_TOPICS=de.civitascore.data.dataset.released,de.civitascore.data.dataset.unreleased,de.civitascore.data.dataset.deleted
 export NIFI_URL=https://localhost:8443
 # config-adapter authenticates to NiFi via the OIDC client-credentials grant (Keycloak).
 export NIFI_OIDC_TOKEN_URI=http://localhost:8080/realms/civitas-core/protocol/openid-connect/token
@@ -996,6 +1004,10 @@ if [ "$config_adapter_option" = "3" ]; then
     echo "  FROST_URL=http://localhost:8085/FROST-Server/v1.1"
     echo "  FROST_PUBLIC_URL=http://civitas-frost:8080/FROST-Server/v1.1"
     echo "  FROST_API_KEY=dev-frost-api-key"
+    echo "  SUPERSET_URL=http://localhost:8092"
+    echo "  SUPERSET_ADMIN_USERNAME=civitas-config-adapter"
+    echo "  SUPERSET_ADMIN_PASSWORD=dev-only-civitas-superset-service-password"
+    echo "  SUPERSET_TRINO_DATABASE_ID=1"
     echo "  NIFI_URL=https://localhost:8443"
     echo "  NIFI_OIDC_TOKEN_URI=http://localhost:8080/realms/civitas-core/protocol/openid-connect/token"
     echo "  NIFI_OIDC_CLIENT_ID=nifi"
@@ -1083,6 +1095,54 @@ if [ "$config_adapter_option" = "1" ]; then
     fi
     echo
 fi
+
+# ---- Start Dashboard Stack ------------------------------------------
+
+echo "Starting dashboard stack (Trino + Superset)..."
+cd "$SCRIPT_DIR/trino-superset"
+if [ ! -f .env ] && [ -f .env.example ]; then
+    cp .env.example .env
+    echo "  Created trino-superset/.env from .env.example"
+fi
+if $DOCKER_COMPOSE up -d --build 2>&1; then
+    echo "  Trino + Superset started"
+else
+    echo "ERROR: Trino + Superset failed to start"
+    exit 1
+fi
+
+echo "Waiting for Trino to be ready..."
+TRINO_READY=false
+for i in $(seq 1 60); do
+    if curl -sk -o /dev/null "https://localhost:8446/ui/" 2>/dev/null; then
+        echo "  Trino is ready"
+        TRINO_READY=true
+        break
+    fi
+    sleep 2
+done
+if [ "$TRINO_READY" = false ]; then
+    echo "ERROR: Trino did not become ready in time"
+    exit 1
+fi
+
+echo "Waiting for Superset to be ready..."
+SUPERSET_READY=false
+for i in $(seq 1 90); do
+    if curl -s -f "http://localhost:8092/health" >/dev/null 2>&1; then
+        echo "  Superset is ready"
+        SUPERSET_READY=true
+        break
+    fi
+    sleep 2
+done
+if [ "$SUPERSET_READY" = false ]; then
+    echo "ERROR: Superset did not become ready in time"
+    exit 1
+fi
+
+cd "$SCRIPT_DIR"
+echo
 
 # Check if Keycloak client secret needs to be configured
 if [ -f "$FRONTEND_DIR/.env.local" ]; then
@@ -1184,10 +1244,10 @@ if [ "$backend_option" = "1" ] && [ "$BACKEND_READY" = true ]; then
     }
 
     # Get a token from Keycloak using resource owner password grant.
-    # MUST use civitas-keycloak:8080 (not localhost:8080) so the JWT issuer claim
-    # matches what APISIX expects from its OIDC discovery URL.
-    # Requires /etc/hosts: 127.0.0.1 civitas-keycloak
-    TOKEN_RESPONSE=$(curl -s -X POST "http://civitas-keycloak:8080/realms/civitas-core/protocol/openid-connect/token" \
+    # Use the local Keycloak port with an internal Host header so the smoke test
+    # works without /etc/hosts changes while still matching APISIX expectations.
+    TOKEN_RESPONSE=$(curl -s -X POST "http://localhost:8080/realms/civitas-core/protocol/openid-connect/token" \
+        -H "Host: civitas-keycloak:8080" \
         -H "Content-Type: application/x-www-form-urlencoded" \
         -d "grant_type=password" \
         -d "client_id=portal-frontend" \
@@ -1239,8 +1299,10 @@ echo "======================================================"
 echo
 echo "  Portal Frontend:  http://localhost:3000"
 echo "  Portal Backend:   http://localhost:8089"
-echo "  Config Adapter:   http://localhost:8088"
+echo "  Config Adapter:   http://localhost:8280"
 echo "  Keycloak Admin:   http://localhost:8080 (admin/admin)"
+echo "  Trino UI:         https://localhost:8446/ui/"
+echo "  Superset:         http://localhost:8092 (OIDC via Keycloak)"
 echo "  Kafka UI:         http://localhost:8090"
 echo "  FROST Server:     http://localhost:8085/FROST-Server/v1.1 (HTTP)"
 echo "  FROST MQTT:       mqtt://localhost:1883"
@@ -1261,6 +1323,7 @@ echo "======================================================"
 echo
 echo "  Email:    dev@civitas.local"
 echo "  Password: dev123"
+echo "  Note: This central dev user is also intended for Trino and Superset OIDC."
 echo
 if [ "$backend_option" = "1" ] || [ "$config_adapter_option" = "1" ] || [ "$frontend_option" = "1" ]; then
     echo "======================================================"
@@ -1287,6 +1350,7 @@ echo "  cd dev-environment/kafka && docker compose down"
 echo "  cd dev-environment/keycloak && docker compose down"
 echo "  cd dev-environment/apisix && docker compose down"
 echo "  cd dev-environment/frost && docker compose down"
+echo "  cd dev-environment/trino-superset && docker compose down"
 echo "  cd dev-environment/geoserver && docker compose down"
 echo "  cd dev-environment/nifi && docker compose down"
 echo

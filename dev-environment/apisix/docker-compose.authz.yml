@@ -16,7 +16,7 @@ services:
       context: ../../authz/repository
       dockerfile: Dockerfile
     container_name: civitas-authz-repository
-    restart: always
+    restart: unless-stopped
     environment:
       DATABASE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
       DATABASE_USERNAME: ${POSTGRES_USER:-admin}

@@ -35,11 +35,62 @@ services:
     networks:
       - frost-network
       - civitas-network
+    healthcheck:
+      # The DB's own healthcheck only proves Postgres is reachable, not that FROST has finished
+      # applying its own schema migrations (persistence_autoUpdateDatabase=true, run lazily on
+      # FROST's own startup) — THINGS/PROJECTS/etc. don't exist until this passes. The
+      # frost-migrations service (below) depends on this, not on `database`, for that reason.
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/FROST-Server/v1.1/ >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  # One-shot: creates the frost_scoped.* row-scoping views and the least-privilege
+  # frost_trino_reader role Trino's "frost" catalog connects as (see
+  # dev-environment/trino-superset/trino/start-trino.sh). Runs after FROST-Server itself (not just
+  # its DB) is healthy, since FROST creates THINGS/PROJECTS/etc. lazily on its own startup —
+  # depends_on: database wouldn't be enough. Safe to re-run (idempotent DDL); the retry loop is
+  # belt-and-suspenders for environments without an equivalent health-gate (e.g. a deploy pipeline
+  # stage), not a substitute for the depends_on above.
+  frost-migrations:
+    image: postgres:18.1-alpine
+    container_name: civitas-frost-migrations
+    restart: "no"
+    environment:
+      - FROST_DB_PASSWORD=${FROST_DB_PASSWORD}
+      - FROST_TRINO_READER_PASSWORD=${FROST_TRINO_READER_PASSWORD:-dev-only-frost-trino-reader-password}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        attempt=0
+        until PGPASSWORD="$$FROST_DB_PASSWORD" psql -v ON_ERROR_STOP=1 \
+            -h database -U sensorthings -d sensorthings \
+            -v frost_trino_reader_password="$$FROST_TRINO_READER_PASSWORD" \
+            -f /migrations/01-create-scoped-views.sql; do
+          attempt=$$((attempt + 1))
+          if [ "$$attempt" -ge 10 ]; then
+            echo "frost-migrations: giving up after $$attempt attempts" >&2
+            exit 1
+          fi
+          echo "frost-migrations: attempt $$attempt failed, retrying in 3s..." >&2
+          sleep 3
+        done
+    volumes:
+      - ./migrations:/migrations:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - frost-network
 
   database:
     image: postgis/postgis:16-3.5-alpine
     platform: linux/amd64
     container_name: civitas-frost-db
+    hostname: civitas-frost-db
     environment:
       - POSTGRES_DB=sensorthings
       - POSTGRES_USER=sensorthings
@@ -52,7 +103,10 @@ services:
       timeout: 2s
       retries: 10
     networks:
-      - frost-network
+      frost-network:
+      civitas-network:
+        aliases:
+          - civitas-frost-db
 
 volumes:
     postgis_volume:

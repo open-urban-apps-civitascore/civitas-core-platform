@@ -1,0 +1,135 @@
+import os
+
+from flask_appbuilder.security.manager import AUTH_OAUTH
+from superset.config import THEME_DARK, THEME_DEFAULT
+
+from civitas_security import (
+    CivitasSupersetSecurityManager,
+    resolve_extra_chart_ids,
+    resolve_extra_dashboard_ids,
+    resolve_extra_editor_subject_ids,
+)
+
+
+def env(name: str, default: str | None = None) -> str:
+    value = os.getenv(name, default)
+    if value is None:
+        raise RuntimeError(f"Missing environment variable: {name}")
+    return value
+
+
+SECRET_KEY = env("SUPERSET_SECRET_KEY")
+SQLALCHEMY_DATABASE_URI = (
+    f"postgresql+psycopg2://{env('SUPERSET_DB_USER')}:{env('SUPERSET_DB_PASSWORD')}"
+    f"@{env('SUPERSET_DB_HOST')}:{env('SUPERSET_DB_PORT')}/{env('SUPERSET_DB_NAME')}"
+)
+
+TALISMAN_ENABLED = False
+WTF_CSRF_ENABLED = True
+ENABLE_PROXY_FIX = True
+AUTH_TYPE = AUTH_OAUTH
+# Flask-AppBuilder's POST /api/v1/security/login rejects any provider other than the one
+# AUTH_TYPE maps to (db/ldap) once api_login_allow_multiple_providers is off — and AUTH_OAUTH
+# maps to no provider at all, so that check now also rejects provider="db" outright (closed by
+# FAB's validate_provider fix, landing in flask-appbuilder 5.2.2). SupersetSession.java's service
+# account (civitas-config-adapter) logs in with provider="db" precisely because it can't do an
+# interactive Keycloak redirect — this flag is FAB's own documented opt-in to allow that
+# alongside real users' OAuth logins, not a workaround for something else.
+AUTH_API_LOGIN_ALLOW_MULTIPLE_PROVIDERS = True
+AUTH_USER_REGISTRATION = False
+PUBLIC_ROLE_LIKE = "Public"
+# Lets genuinely unauthenticated requests through Flask-AppBuilder's @protect() as the "Public"
+# role (distinct from PUBLIC_ROLE_LIKE above, which only seeds that role's permission set). Only
+# open-data dashboards/datasets are actually reachable anonymously — civitas_security.py and the
+# civitas.superset/civitas.trino OPA policies independently re-check every object.
+AUTH_ROLE_PUBLIC = "Public"
+AUTH_ROLES_SYNC_AT_LOGIN = True
+AUTH_ROLES_MAPPING = {
+    "superset-admins": ["Admin"],
+    env("KEYCLOAK_SUPERSET_GROUP"): ["Gamma"],
+}
+CUSTOM_SECURITY_MANAGER = CivitasSupersetSecurityManager
+# First-party replacement for the old (never-actually-invoked) get_extra_dashboard_ids override —
+# OR'd into DashboardAccessFilter/ChartFilter's native list criteria for the current user.
+EXTRA_ACCESS_QUERY_FILTERS = {
+    "dashboards": resolve_extra_dashboard_ids,
+    "charts": resolve_extra_chart_ids,
+}
+# Feeds both get_extra_editor_subject_ids() (server-side, consulted by is_editor()/
+# raise_for_editorship()) and the chart/dashboard API schemas' extra_editors field (frontend) —
+# without this, a user with a real OPA-granted write permission passes every actual write check
+# but Explore's "Overwrite" option never shows, since that's computed client-side from the
+# resource's native editors list alone (see civitas_security.py's resolve_extra_editor_subject_ids
+# docstring).
+EXTRA_EDITORS_RESOLVER = resolve_extra_editor_subject_ids
+OAUTH_PROVIDERS = [
+    {
+        "name": "keycloak",
+        "icon": "fa-key",
+        "token_key": "access_token",
+        "remote_app": {
+            "client_id": env("KEYCLOAK_SUPERSET_CLIENT_ID"),
+            "client_secret": env("KEYCLOAK_SUPERSET_CLIENT_SECRET"),
+            "api_base_url": f"{env('KEYCLOAK_INTERNAL_URL')}/realms/{env('KEYCLOAK_REALM')}/protocol/openid-connect/",
+            "access_token_url": f"{env('KEYCLOAK_INTERNAL_URL')}/realms/{env('KEYCLOAK_REALM')}/protocol/openid-connect/token",
+            "authorize_url": f"{env('KEYCLOAK_PUBLIC_URL')}/realms/{env('KEYCLOAK_REALM')}/protocol/openid-connect/auth",
+            "userinfo_endpoint": f"{env('KEYCLOAK_INTERNAL_URL')}/realms/{env('KEYCLOAK_REALM')}/protocol/openid-connect/userinfo",
+            "jwks_uri": f"{env('KEYCLOAK_INTERNAL_URL')}/realms/{env('KEYCLOAK_REALM')}/protocol/openid-connect/certs",
+            "request_token_url": None,
+            "client_kwargs": {"scope": "openid email profile"},
+        },
+    }
+]
+FEATURE_FLAGS = {
+    "ENABLE_TEMPLATE_PROCESSING": True,
+    # DASHBOARD_RBAC was removed upstream (replaced by the Subject/editors/viewers model) —
+    # dropped here rather than left as a dead key.
+    #
+    # ENABLE_VIEWERS / VIEWER_PROMISCUOUS_MODE are deliberately NOT set. Both let a
+    # dashboard/chart accumulate its own native Superset viewer list (a Subject: user/role/group)
+    # assigned through Superset's own UI/API, independent of Civitas's OPA/group model —
+    # VIEWER_PROMISCUOUS_MODE additionally bypasses the underlying dataset's own access check for
+    # a native viewer. Civitas's model is "read/write for datasets, charts, and dashboards is
+    # determined entirely by the external system" — turning these on would open a second,
+    # OPA-invisible grant path. Enable only for a deliberate, scoped reason, not as a byproduct of
+    # this upgrade.
+}
+
+# Superset ships with i18n off (LANGUAGES = {}) since most locales are incomplete; German is
+# maintained well enough to use. Keeping "en" too so the flag-icon switcher can still fall back.
+LANGUAGES = {
+    "en": {"flag": "us", "name": "English"},
+    "de": {"flag": "de", "name": "German"},
+}
+BABEL_DEFAULT_LOCALE = "de"
+
+LOGOUT_REDIRECT_URL = (
+    f"{env('KEYCLOAK_PUBLIC_URL')}/realms/{env('KEYCLOAK_REALM')}"
+    f"/protocol/openid-connect/logout"
+    f"?post_logout_redirect_uri={env('SUPERSET_PUBLIC_URL')}/login"
+    f"&client_id={env('KEYCLOAK_SUPERSET_CLIENT_ID')}"
+)
+
+ROW_LIMIT = 5000
+SQLLAB_CTAS_NO_LIMIT = True
+
+# Civitas branding. APP_NAME/APP_ICON alone wouldn't take effect here since THEME_DEFAULT
+# already captured their old values at import time (see the note on APP_NAME in
+# superset/config.py) — mutate the theme tokens directly instead, matching portal-frontend's
+# brand mark (public/images/only_logo_civitas.svg) and primary color (--primary in globals.css,
+# oklch(49.999% 0.11934 242.772) == #0369a1).
+APP_NAME = "Civitas Core"
+CIVITAS_BRAND_LOGO_URL = "/static/assets/images/civitas-logo.svg"
+CIVITAS_BRAND_COLOR = "#0369a1"
+# menu_data() (superset/views/base.py) reads APP_ICON directly for the brand icon shown in the
+# navbar's bootstrap payload, independent of the theme tokens set below.
+APP_ICON = CIVITAS_BRAND_LOGO_URL
+for _theme in (THEME_DEFAULT, THEME_DARK):
+    if _theme is None:
+        continue
+    _theme["token"]["brandAppName"] = APP_NAME
+    _theme["token"]["brandLogoAlt"] = APP_NAME
+    _theme["token"]["brandLogoUrl"] = CIVITAS_BRAND_LOGO_URL
+    _theme["token"]["colorPrimary"] = CIVITAS_BRAND_COLOR
+    _theme["token"]["colorLink"] = CIVITAS_BRAND_COLOR
+FAVICONS = [{"href": CIVITAS_BRAND_LOGO_URL, "type": "image/svg+xml"}]

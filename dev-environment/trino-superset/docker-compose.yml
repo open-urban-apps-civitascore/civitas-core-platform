@@ -1,0 +1,160 @@
+services:
+  keycloak-reconcile:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: civitas-keycloak-reconcile
+    restart: "no"
+    entrypoint:
+      - /usr/bin/bash
+      - /opt/civitas/keycloak/reconcile-trino-superset.sh
+    environment:
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://civitas-keycloak:8080}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-civitas-core}
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KEYCLOAK_DEFAULT_REALM_USER: ${KEYCLOAK_DEFAULT_REALM_USER:-dev@civitas.local}
+      KEYCLOAK_TRINO_CLIENT_ID: ${KEYCLOAK_TRINO_CLIENT_ID:-civitas-trino}
+      KEYCLOAK_TRINO_CLIENT_SECRET: ${KEYCLOAK_TRINO_CLIENT_SECRET:-dev-only-civitas-trino-secret}
+      KEYCLOAK_TRINO_GROUP: ${KEYCLOAK_TRINO_GROUP:-trino-users}
+      KEYCLOAK_SUPERSET_CLIENT_ID: ${KEYCLOAK_SUPERSET_CLIENT_ID:-civitas-superset}
+      KEYCLOAK_SUPERSET_CLIENT_SECRET: ${KEYCLOAK_SUPERSET_CLIENT_SECRET:-dev-only-civitas-superset-secret}
+      KEYCLOAK_SUPERSET_GROUP: ${KEYCLOAK_SUPERSET_GROUP:-superset-users}
+      TRINO_PUBLIC_URL: ${TRINO_PUBLIC_URL:-https://localhost:8446}
+      SUPERSET_PUBLIC_URL: ${SUPERSET_PUBLIC_URL:-http://localhost:8092}
+    volumes:
+      - ./keycloak:/opt/civitas/keycloak:ro
+    networks:
+      - civitas-network
+
+  trino:
+    image: ${TRINO_IMAGE:-trinodb/trino:481}
+    container_name: civitas-trino
+    restart: unless-stopped
+    entrypoint:
+      - /bin/bash
+      - /opt/civitas/trino/start-trino.sh
+    environment:
+      TRINO_PUBLIC_URL: ${TRINO_PUBLIC_URL:-https://localhost:8446}
+      TRINO_INTERNAL_SHARED_SECRET: ${TRINO_INTERNAL_SHARED_SECRET:-dev-only-civitas-trino-internal-secret}
+      TRINO_TLS_KEYSTORE_PASSWORD: ${TRINO_TLS_KEYSTORE_PASSWORD:-dev-only-civitas-trino-keystore-secret}
+      TRINO_SUPERSET_SERVICE_USER: ${TRINO_SUPERSET_SERVICE_USER:-superset_trino}
+      TRINO_SUPERSET_SERVICE_PASSWORD: ${TRINO_SUPERSET_SERVICE_PASSWORD:-dev-only-civitas-trino-superset-password}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://civitas-keycloak:8080}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-civitas-core}
+      KEYCLOAK_TRINO_CLIENT_ID: ${KEYCLOAK_TRINO_CLIENT_ID:-civitas-trino}
+      KEYCLOAK_TRINO_CLIENT_SECRET: ${KEYCLOAK_TRINO_CLIENT_SECRET:-dev-only-civitas-trino-secret}
+      FROST_DB_HOST: ${FROST_DB_HOST:-civitas-frost-db}
+      FROST_DB_PORT: ${FROST_DB_PORT:-5432}
+      FROST_DB_NAME: ${FROST_DB_NAME:-sensorthings}
+      # Password for frost_trino_reader, the least-privilege role the frost_scoped.* views'
+      # migration creates (dev-environment/frost/migrations/01-create-scoped-views.sql) — must
+      # match FROST_TRINO_READER_PASSWORD there. Not FROST-Server's own app user/password, which
+      # has full read-write access to every project's raw tables.
+      FROST_TRINO_READER_PASSWORD: ${FROST_TRINO_READER_PASSWORD:-dev-only-frost-trino-reader-password}
+      CIVITAS_DB_HOST: ${CIVITAS_DB_HOST:-civitas-geoserver-db}
+      CIVITAS_DB_PORT: ${CIVITAS_DB_PORT:-5432}
+      CIVITAS_DB_NAME: ${CIVITAS_DB_NAME:-geoserver}
+      CIVITAS_DB_USER: ${CIVITAS_DB_USER:-geoserver}
+      CIVITAS_DB_PASSWORD: ${CIVITAS_DB_PASSWORD:-geoserver}
+    ports:
+      - "${TRINO_PORT:-8446}:8446"
+    volumes:
+      - trino_data:/data/trino
+      - ./trino:/opt/civitas/trino:ro
+    depends_on:
+      keycloak-reconcile:
+        condition: service_completed_successfully
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8446'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  superset-db:
+    image: postgres:18.1-alpine
+    container_name: civitas-superset-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${SUPERSET_DB_NAME:-superset}
+      POSTGRES_USER: ${SUPERSET_DB_USER:-superset}
+      POSTGRES_PASSWORD: ${SUPERSET_DB_PASSWORD:-dev-only-civitas-superset-db-password}
+    volumes:
+      - superset_db_data:/var/lib/postgresql/data
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SUPERSET_DB_USER:-superset} -d ${SUPERSET_DB_NAME:-superset}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  superset:
+    build:
+      context: .
+      dockerfile: superset/Dockerfile
+      args:
+        # SUPERSET_BASE_IMAGE: registry.gitlab.com/civitas-connect/civitas-core/civitas-core-v2/superset:feat-dashboard-write-permissions
+        # SUPERSET_BASE_IMAGE: registry.gitlab.com/birke-kb/superset-src:feat-dashboard-write-permissions
+        SUPERSET_BASE_IMAGE: registry.gitlab.com/birke-kb/superset-src:feat-superset-7-build
+    container_name: civitas-superset
+    restart: unless-stopped
+    entrypoint:
+      - /bin/bash
+      - /app/civitas/start-superset.sh
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-dev-only-civitas-superset-secret-key}
+      SUPERSET_PUBLIC_URL: ${SUPERSET_PUBLIC_URL:-http://localhost:8092}
+      SUPERSET_DB_HOST: superset-db
+      SUPERSET_DB_PORT: 5432
+      SUPERSET_DB_NAME: ${SUPERSET_DB_NAME:-superset}
+      SUPERSET_DB_USER: ${SUPERSET_DB_USER:-superset}
+      SUPERSET_DB_PASSWORD: ${SUPERSET_DB_PASSWORD:-dev-only-civitas-superset-db-password}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://civitas-keycloak:8080}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-civitas-core}
+      KEYCLOAK_SUPERSET_CLIENT_ID: ${KEYCLOAK_SUPERSET_CLIENT_ID:-civitas-superset}
+      KEYCLOAK_SUPERSET_CLIENT_SECRET: ${KEYCLOAK_SUPERSET_CLIENT_SECRET:-dev-only-civitas-superset-secret}
+      KEYCLOAK_SUPERSET_GROUP: ${KEYCLOAK_SUPERSET_GROUP:-superset-users}
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-civitas-config-adapter}
+      SUPERSET_ADMIN_FIRSTNAME: ${SUPERSET_ADMIN_FIRSTNAME:-CIVITAS}
+      SUPERSET_ADMIN_LASTNAME: ${SUPERSET_ADMIN_LASTNAME:-Admin}
+      SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@civitas.local}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+      SUPERSET_SERVICE_USERNAME: ${SUPERSET_SERVICE_USERNAME:-civitas-config-adapter}
+      SUPERSET_SERVICE_PASSWORD: ${SUPERSET_SERVICE_PASSWORD:-dev-only-civitas-superset-service-password}
+      SUPERSET_LOCAL_ADMIN_USER: ${SUPERSET_SERVICE_USERNAME:-civitas-config-adapter}
+      SUPERSET_TRINO_DATABASE_NAME: ${SUPERSET_TRINO_DATABASE_NAME:-Trino}
+      TRINO_SUPERSET_SERVICE_USER: ${TRINO_SUPERSET_SERVICE_USER:-superset_trino}
+      TRINO_SUPERSET_SERVICE_PASSWORD: ${TRINO_SUPERSET_SERVICE_PASSWORD:-dev-only-civitas-trino-superset-password}
+      OPA_URL: ${OPA_URL:-http://civitas-opa:8181}
+      PYTHONPATH: /app/pythonpath
+    ports:
+      - "${SUPERSET_PORT:-8092}:8088"
+    volumes:
+      - superset_home:/app/superset_home
+    depends_on:
+      superset-db:
+        condition: service_healthy
+      trino:
+        condition: service_healthy
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8088/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+
+volumes:
+  trino_data:
+  superset_db_data:
+  superset_home:
+
+networks:
+  civitas-network:
+    name: civitas-network
+    external: true
