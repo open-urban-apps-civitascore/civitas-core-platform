@@ -43,7 +43,7 @@
     </serviceTask>
     <boundaryEvent id="superset-error" name="Step Failed" attachedToRef="sync-superset">
       <outgoing>flow-superset-error</outgoing>
-      <errorEventDefinition id="ErrorEventDefinition_5" errorRef="stepFailedError"/>
+      <errorEventDefinition id="ErrorEventDefinition_6" errorRef="stepFailedError"/>
     </boundaryEvent>
     <exclusiveGateway id="geo-gateway" name="Has Geo Sink?" default="flow-geo-skip">
       <incoming>flow-superset-geo</incoming>
@@ -353,7 +353,7 @@
           <dc:Bounds height="14.0" width="62.0" x="672.0" y="218.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_5" bpmnElement="superset-error">
+      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_6" bpmnElement="superset-error">
         <dc:Bounds height="36.0" width="36.0" x="433.0" y="72.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_SupersetErrorShape" labelStyle="BPMNLabelStyle_1">
           <dc:Bounds height="14.0" width="62.0" x="420.0" y="18.0"/>
@@ -389,7 +389,7 @@
         <di:waypoint xsi:type="dc:Point" x="491.0" y="150.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_SyncSupersetGeo"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_SupersetError" bpmnElement="flow-superset-error" sourceElement="BPMNShape_BoundaryEvent_5" targetElement="BPMNShape_ServiceTask_6">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_SupersetError" bpmnElement="flow-superset-error" sourceElement="BPMNShape_BoundaryEvent_6" targetElement="BPMNShape_ServiceTask_6">
         <di:waypoint xsi:type="dc:Point" x="451.0" y="108.0"/>
         <di:waypoint xsi:type="dc:Point" x="451.0" y="250.0"/>
         <di:waypoint xsi:type="dc:Point" x="518.0" y="250.0"/>

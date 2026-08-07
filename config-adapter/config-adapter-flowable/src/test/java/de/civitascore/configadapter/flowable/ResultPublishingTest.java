@@ -76,6 +76,7 @@ class ResultPublishingTest {
     void success_publishesCompleted() {
       stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
       stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
+      stubSuccess(supersetHandler, "register-superset", Map.of());
 
       start("dataset-create", createVars("saga-c1"));
 
@@ -99,6 +100,7 @@ class ResultPublishingTest {
     void success_doesNotPublishFailed() {
       stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
       stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
+      stubSuccess(supersetHandler, "register-superset", Map.of());
 
       start("dataset-create", createVars("saga-c3"));
 
@@ -110,6 +112,7 @@ class ResultPublishingTest {
       stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
       stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
       stubSuccess(pipelineHandler, "deploy-pipelines", Map.of("pipelineIds", List.of("pl1")));
+      stubSuccess(supersetHandler, "register-superset", Map.of());
 
       Map<String, Object> vars = new HashMap<>();
       vars.put("sagaId", "saga-3step");
@@ -133,6 +136,7 @@ class ResultPublishingTest {
       // survives storage as a Flowable process variable and the result aggregation untouched.
       Map<String, Object> routeIds = Map.of("traffic", "rid-traffic", "weather", "rid-weather");
       stubSuccess(apisixHandler, "create-route", Map.of("routeIds", routeIds, "serviceId", "ds-1"));
+      stubSuccess(supersetHandler, "register-superset", Map.of());
 
       start("dataset-create", createVars("saga-cmap"));
 

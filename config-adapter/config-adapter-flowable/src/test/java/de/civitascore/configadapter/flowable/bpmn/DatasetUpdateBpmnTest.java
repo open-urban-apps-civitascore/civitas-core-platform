@@ -108,6 +108,7 @@ class DatasetUpdateBpmnTest {
   void shouldPruneFeatureTypesAfterTheLastFailableStep() {
     stubFrostSuccess();
     stubApisixSuccess();
+    stubSupersetSuccess();
     stubPipelineSuccess();
     stubGeoserverSuccess();
 
@@ -135,6 +136,7 @@ class DatasetUpdateBpmnTest {
   void shouldReportSuccessWhenOnlyTheFeatureTypePruneFails() {
     stubFrostSuccess();
     stubApisixSuccess();
+    stubSupersetSuccess();
     stubPipelineSuccess();
     when(geoserverHandler.handle(
             argThat(cmd -> cmd != null && "UPDATE_WORKSPACE".equals(cmd.operation()))))
@@ -161,6 +163,7 @@ class DatasetUpdateBpmnTest {
   void shouldSkipPruneWhenDatasetHasNoGeoSink() {
     stubFrostSuccess();
     stubApisixSuccess();
+    stubSupersetSuccess();
     stubPipelineSuccess();
 
     ProcessInstance instance = startProcess(true, false);

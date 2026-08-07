@@ -36,15 +36,17 @@ class PublishFailureDoesNotReplayStepsTest {
   private FlowableResultPublisher resultPublisher;
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
+  private SagaCommandHandler supersetHandler;
 
   @BeforeEach
   void setUp() {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
     SagaCommandHandler pipelineHandler = FlowableTestSupport.mockHandler("nifi");
+    supersetHandler = FlowableTestSupport.mockHandler("superset");
 
     SagaHandlerRegistry registry =
-        FlowableTestSupport.registry(frostHandler, apisixHandler, pipelineHandler);
+        FlowableTestSupport.registry(frostHandler, apisixHandler, pipelineHandler, supersetHandler);
     resultPublisher = mock(FlowableResultPublisher.class);
 
     processEngine =
@@ -78,6 +80,8 @@ class PublishFailureDoesNotReplayStepsTest {
         .thenReturn(
             SagaCommandResult.success(
                 "s", "create-route", Map.of("routeId", "r1"), Map.of("routeId", "r1")));
+    when(supersetHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.success("s", "register-superset", Map.of(), Map.of()));
 
     doThrow(new RuntimeException("Kafka timeout"))
         .doNothing()
