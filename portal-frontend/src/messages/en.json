@@ -920,6 +920,7 @@
       "dataPermissions": {
         "dataset": "Dataset",
         "datasetPayload": "Dataset Payload",
+        "datasetDashboard": "Dataset Dashboard",
         "datasource": "Data source",
         "datastructure": "Data structure",
         "datapool": "Data pool",

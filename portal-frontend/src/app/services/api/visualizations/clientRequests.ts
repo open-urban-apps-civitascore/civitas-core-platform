@@ -6,6 +6,7 @@ import { useDataQuery } from '@/hooks/use-data-query'
 import {
   CreateVisualizationInput,
   DeleteVisualizationInput,
+  toVisualizationPayload,
   UpdateVisualizationInput,
   VisualizationApiResponse,
 } from '@/types/visualizations'
@@ -29,7 +30,7 @@ export const useCreateVisualization = () => {
         method: 'POST',
         endpoint: `/datasets/${datasetId}/visualizations`,
         headers: { 'x-api-request': 'true' },
-        data: visualization,
+        data: toVisualizationPayload(visualization),
         errorMessage: 'An error occurred while creating the visualization.',
       }),
     onSuccess: (_data, { datasetId }) => {
@@ -49,7 +50,7 @@ export const useUpdateVisualization = () => {
         method: 'PUT',
         endpoint: `/datasets/${datasetId}/visualizations/${visualizationId}`,
         headers: { 'x-api-request': 'true' },
-        data: visualization,
+        data: toVisualizationPayload(visualization),
         errorMessage: 'An error occurred while updating the visualization.',
       }),
     onSuccess: (_data, { datasetId }) => {

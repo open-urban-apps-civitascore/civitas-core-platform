@@ -912,6 +912,7 @@
       "dataPermissions": {
         "dataset": "Datensatz",
         "datasetPayload": "Datensatz-Payload",
+        "datasetDashboard": "Datensatz-Dashboard",
         "datasource": "Datenquelle",
         "datastructure": "Datenstruktur",
         "datapool": "Datenpool",

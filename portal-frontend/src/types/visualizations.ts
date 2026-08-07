@@ -67,3 +67,12 @@ export type UpdateVisualizationInput = {
   visualizationId: string
   visualization: VisualizationFormData
 }
+
+// VisualizationInputDTO's @JsonTypeInfo discriminator lives on the abstract base class, so Jackson
+// requires it on the wire even though the controller binds directly to the concrete
+// DashboardInputDTO — the form itself never lets the user pick a type, so it's added here rather
+// than carried around in VisualizationFormData.
+export const toVisualizationPayload = (data: VisualizationFormData) => ({
+  ...data,
+  visualizationType: 'DASHBOARD',
+})
