@@ -96,9 +96,7 @@ services:
       context: .
       dockerfile: superset/Dockerfile
       args:
-        # SUPERSET_BASE_IMAGE: registry.gitlab.com/civitas-connect/civitas-core/civitas-core-v2/superset:feat-dashboard-write-permissions
-        # SUPERSET_BASE_IMAGE: registry.gitlab.com/birke-kb/superset-src:feat-dashboard-write-permissions
-        SUPERSET_BASE_IMAGE: registry.gitlab.com/birke-kb/superset-src:feat-superset-7-build
+        SUPERSET_BASE_IMAGE: registry.gitlab.com/civitas-connect/civitas-core/civitas-core-v2/superset:feat-superset-7-build
     container_name: civitas-superset
     restart: unless-stopped
     entrypoint:
