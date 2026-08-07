@@ -431,7 +431,6 @@ deploy-config-adapter:
   image: docker:27-dind
   stage: deploy
   needs:
-    - job: setup-version-config-adapter
     - job: setup-version
       artifacts: true
     - job: container-scan-config-adapter
@@ -446,16 +445,16 @@ deploy-config-adapter:
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
   script:
     - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/config-adapter:${CI_COMMIT_REF_SLUG}-scan
-    - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/config-adapter:$CONFIG_ADAPTER_VERSION
+    - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/config-adapter:$REVISION
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
     - |
       if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
-        docker buildx imagetools create $CI_REGISTRY_IMAGE/config-adapter:$CONFIG_ADAPTER_VERSION --tag $CI_REGISTRY_IMAGE/config-adapter:$CI_COMMIT_BRANCH
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/config-adapter:$REVISION --tag $CI_REGISTRY_IMAGE/config-adapter:$CI_COMMIT_BRANCH
       fi
     # Nightly build: additionally tag with <branch>-nightly-<YYYYMMDD>
     - |
       if [ "$IS_NIGHTLY" = "true" ] && [ -n "$NIGHTLY_IMAGE_TAG" ]; then
-        docker buildx imagetools create $CI_REGISTRY_IMAGE/config-adapter:$CONFIG_ADAPTER_VERSION --tag $CI_REGISTRY_IMAGE/config-adapter:$NIGHTLY_IMAGE_TAG
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/config-adapter:$REVISION --tag $CI_REGISTRY_IMAGE/config-adapter:$NIGHTLY_IMAGE_TAG
       fi
 
 
@@ -464,7 +463,8 @@ sbom-config-adapter-image:
   image: docker:27-dind
   stage: report
   needs:
-    - job: setup-version-config-adapter
+    - job: setup-version
+      artifacts: true
     - job: deploy-config-adapter
   services:
     - docker:27-dind
@@ -479,7 +479,7 @@ sbom-config-adapter-image:
   script:
     - cd config-adapter
     - mkdir -p target
-    - syft registry:$CI_REGISTRY_IMAGE/config-adapter:$CONFIG_ADAPTER_VERSION -o cyclonedx-json > target/config-adapter-image.cdx.json
+    - syft registry:$CI_REGISTRY_IMAGE/config-adapter:$REVISION -o cyclonedx-json > target/config-adapter-image.cdx.json
   artifacts:
     when: always
     expire_in: 1 month
