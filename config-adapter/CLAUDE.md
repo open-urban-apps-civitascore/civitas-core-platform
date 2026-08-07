@@ -30,42 +30,10 @@ PMD, CPD and SpotBugs are bound per-module at `verify` with `failOnViolation`/`f
 
 ## Architecture
 
-### Modules
+[`README.md`](README.md) owns the module map, the two `ServiceLoader` SPIs, the event flow and the error-code bands; `pom.xml` `<modules>` is the authority on which modules exist. Two conventions neither states:
 
-`pom.xml` `<modules>` is the authority on which modules exist. The dependency rules that are not evident from a pom:
-
-- Adapter modules depend on `config-adapter-api` at compile scope and never on one another; `config-adapter-examples` additionally depends on `event-handler-kafka`.
-- `config-adapter-application` depends on all of them, discovers plugins via ServiceLoader, and shades the fat JAR.
-- `config-adapter-nifi` is saga-only: it registers a `SagaCommandHandler` and no `ConfigAdapter`, so it is unreachable over the CloudEvent path.
-- `config-adapter-flowable` embeds the Flowable engine with PostgreSQL state and orchestrates every saga. BPMN process definitions live under its `src/main/resources/processes/`.
-
-### Core Pattern: Template Method + ServiceLoader
-
-Adapters extend `AbstractConfigAdapter` and implement `doProcessConfigEvent()`. The base class handles error wrapping and failure result publishing.
-
-Two SPIs are discovered at runtime via `java.util.ServiceLoader`, registered independently under `META-INF/services/`. A module may register either or both:
-
-| SPI | Purpose |
-|---|---|
-| `ConfigAdapter` | Applies a single config event over the CloudEvent path |
-| `SagaCommandHandler` | Executes a saga step and its teardown (`SagaCommandMessage` → `SagaCommandResult`) |
-
-Key interfaces: `ConfigAdapter`, `SagaCommandHandler`, `EventConsumer`, `EventPublisher`, `AdapterConfig` (property access), `ApplicationConfig` (extends AdapterConfig with app-level config).
-
-### Event Flow
-
-1. `KafkaEventHandler` consumes CloudEvents on a virtual thread → `CloudEventProcessor` deserializes to `ConfigEvent`
-2. `AbstractConfigAdapter.processConfigEvent()` delegates to `doProcessConfigEvent()`
-3. Adapter publishes `ConfigResultEvent` (SUCCESS/FAILURE) to the `resultTopic` from metadata
-4. Retry: `RetryableAdapterException` → exponential backoff; `FatalAdapterException` → DLQ immediately
-
-### Config Values
-
-Config value types live in `config-adapter-api` under `model/<service>/`. `IdmConfigValue` and `PostgisConfigValue` are `sealed`; their `permits` clauses are the authority on the variants. Two shapes deviate from the sealed pattern: `FrostConfigValue` extends `AbstractApiModel` and serialises through `toApiMap()`, and `GeoServerConfigValue` is a passthrough container whose `toApiMap()` returns `additionalProperties` unchanged.
-
-### Error Codes
-
-`AdapterErrorCode` enum: 1xxx = fatal/validation, 2xxx = retryable/connectivity, 3xxx = adapter-specific (30xx Keycloak, 31xx APISIX, 32xx FROST, 34xx GeoServer, 35xx PostGIS, 36xx NiFi), 9xxx = unknown. Each code carries retryable flag, internal log template, and safe external message.
+- Adapters extend `AbstractConfigAdapter` and implement `doProcessConfigEvent()`. `processConfigEvent` is `final` and owns error wrapping and failure-result publishing, so throwing the right exception type is the whole error contract.
+- Config value types live in `config-adapter-api` under `model/<service>/`. `IdmConfigValue` and `PostgisConfigValue` are `sealed`, so their `permits` clauses are the authority on the variants. `FrostConfigValue` and `GeoServerConfigValue` deviate from that pattern and serialise through `toApiMap()`, the GeoServer one returning `additionalProperties` unchanged.
 
 ## Conventions
 
@@ -73,8 +41,7 @@ Config value types live in `config-adapter-api` under `model/<service>/`. `IdmCo
 - **License**: EUPL-1.2 header auto-inserted on all Java files by Spotless
 - **Logging**: All user-controlled strings in log statements use `Encode.forJava(...)` (OWASP Encoder)
 - **Imports**: Always use Java imports, never fully qualified class names
-- **Adapters depend only on `AdapterConfig` interface**, never on `AppConfig` directly
-- **config-adapter-application** is the only module with compile dependency on config-adapter-configuration
+- **Dependency direction**: adapters take `AdapterConfig`, never `AppConfig`; keep `config-adapter-configuration` a compile dependency of `config-adapter-application` alone
 
 ## Gotchas
 
@@ -93,15 +60,18 @@ Config value types live in `config-adapter-api` under `model/<service>/`. `IdmCo
 - Container readiness must be awaited once after startup (static block), never in `@BeforeEach` — the containers are `static` and shared per JVM, so a per-method readiness poll is pure dead time
 - `Thread.sleep` is only legitimate for a *negative* assertion (proving something never happens, or state holding across ticks); such dwells carry a comment saying so. Anything waiting for a condition to become true uses Awaitility
 
+## Configuration
+
+Runtime config is `config-adapter-application/src/main/resources/application.properties`, layered under env vars; [`DEPLOYMENT.md`](DEPLOYMENT.md) owns the resolution order. Env-var names uppercase the key and replace dots **and** dashes with underscores, so `nifi.runtime-monitor.interval-ms` → `NIFI_RUNTIME_MONITOR_INTERVAL_MS`. Two consequences when writing code or docs:
+
+- The properties file overrides the code default, so a constant in an adapter is the effective default only for a key that file omits.
+- An empty env var is indistinguishable from an unset one. A property MUST NOT be documented as "leave empty to disable" — use an explicit sentinel value.
+
 ## Local Development
 
 `docker compose up -d` at the module root starts Zookeeper, Kafka, Keycloak and PostgreSQL; `docker-compose.yml` is the authority on ports and image versions. This stack is independent of `dev-environment/`.
 
 `config-adapter-flowable` needs its own `flowable` database and user, created by `docker/postgres/init-flowable.sql` mounted into `/docker-entrypoint-initdb.d/`. PostgreSQL runs init scripts **only when initializing an empty data volume**, so a volume carrying data from any earlier start has no `flowable` database and the adapter crash-loops on startup. `docker compose down -v && docker compose up -d` recreates the volume and re-runs the script.
-
-Runtime config resolves in three layers: env var, then `config-adapter-application/src/main/resources/application.properties`, then a default in the reading code. Every property is overridable via env var — dots **and** dashes become underscores and the key is uppercased, so `kafka.bootstrap.servers` → `KAFKA_BOOTSTRAP_SERVERS`.
-
-Which layer supplies a value matters when documenting one. The packaged properties file overrides the code default, so a constant in an adapter is the effective default only for a key that file omits — `DEPLOYMENT.md` reports what actually ships, and that is the value to state. An empty env var is indistinguishable from an unset one, falling through to both lower layers; a property MUST NOT be documented as "leave empty to disable", an explicit sentinel value is required instead.
 
 ## Documentation
 
@@ -114,6 +84,11 @@ Each fact has one home. Read the document that owns an area before changing code
 | `config-adapter-<name>/README.md` | That adapter's operations, invariants, properties and error codes |
 | [`docs/adr-plain-jdbc-ddl.md`](docs/adr-plain-jdbc-ddl.md) | Why DDL is applied over plain JDBC |
 
-What obliges a documentation edit: a new or renamed property, or a changed startup requirement → `DEPLOYMENT.md`. A new `AdapterErrorCode` → the error-code table of the module that raises it. A changed saga step or branch condition → `config-adapter-flowable/README.md` and the module owning the step. A renamed adapter, a new property without a default, or a renamed topic → the alignment rules in `README.md`, because each of those breaks a deployment rather than degrading it.
+What obliges a documentation edit in the same change:
 
-The adapter READMEs record behaviour that is expensive to re-derive from the source — idempotency handling, HTTP status quirks, rejection rules. Consult them rather than re-reading the adapter.
+- A new or renamed property, or a changed startup requirement → `DEPLOYMENT.md`
+- A new `AdapterErrorCode` → the error-code table of the module that raises it
+- A changed saga step or branch condition → `config-adapter-flowable/README.md` and the module owning the step
+- A renamed adapter, a new property without a default, or a renamed topic → the alignment rules in `README.md`, since each breaks a deployment rather than degrading it
+
+State the value that ships, not the constant in the code. The adapter READMEs record behaviour that is expensive to re-derive — idempotency handling, HTTP status quirks, rejection rules — so consult them rather than re-reading the adapter.
