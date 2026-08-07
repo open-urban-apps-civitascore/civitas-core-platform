@@ -1,1445 +1,164 @@
 # APISIX Config Adapter
 
-Production-ready adapter for managing [Apache APISIX](https://apisix.apache.org/) API Gateway configuration through CloudEvents.
+Adapter for [Apache APISIX](https://apisix.apache.org/) gateway configuration, reaching APISIX only
+through the Admin API. An event-driven `ConfigAdapter` applies CRUD on **upstreams** and **routes** from
+CloudEvents on Kafka; an `ApisixSagaHandler` provisions a dataset's **published-data routes** from saga
+commands. Services, plugin configs, SSL certificates, consumers and global rules are provisioned outside
+the adapter and referenced by id.
 
-## ⚠️ Breaking change — issue #1368 (gateway routing)
+## Operations
 
-The saga-provisioned published-data API is now pinned to the configured API virtual host and
-carries the `/v1` prefix, so APISIX can dispatch incoming requests deterministically and the
-portal-backend catch-all `/v1/*` route cannot shadow it.
+### Config events
 
-| Aspect                  | Before                                         | After (this release)                                            |
-|-------------------------|------------------------------------------------|------------------------------------------------------------------|
-| Published-data URL      | `https://<host>/datasets/{id}[/...]`           | `https://<api-host>/v1/datasets/{id}[/...]`                      |
-| APISIX route `hosts`    | unset (wildcard)                               | set to `apisix.api.host` on saga routes                          |
-| OPA FROST provider path | `/datasets/{id}`                               | `/v1/datasets/{id}` + `Host` header guard                        |
-| Config properties       | `apisix.admin.*`, `apisix.gateway.url`, …      | `apisix.gateway.url` removed; **additionally required**: `apisix.api.host`, `apisix.api.public.url` |
+`targetResource` has the form `upstreams[/{id}]` or `routes[/{id}]` (either segment pair may sit inside a
+longer path) and selects the resource kind and optional id; naming neither kind is fatal.
 
-**Operator migration steps**
+| Resource | CREATE | UPDATE | DELETE |
+|---|---|---|---|
+| Upstream | `POST /apisix/admin/upstreams` (APISIX assigns the id) | `PUT …/upstreams/{id}` | `DELETE …/upstreams/{id}` |
+| Route | `POST /apisix/admin/routes` (APISIX assigns the id) | `PUT …/routes/{id}` | `DELETE …/routes/{id}` |
 
-1. Provision a DNS record (or ingress hostname) for the APISIX gateway — e.g.
-   `api.core.example.org`. For local dev use `api.localhost` (add to `/etc/hosts`; see
-   `dev-environment/README.md`).
-2. Set `APISIX_API_HOST` and `APISIX_API_PUBLIC_URL` on the `config-adapter` deployment. The
-   adapter fails fast at startup when either is missing — no silent fallback. The previous
-   `APISIX_GATEWAY_URL` is no longer read and can be removed.
-3. Overlay `data.backends.frost_server.api_host` in the OPA data bundle (Helm/Kustomize) to the
-   same value as `APISIX_API_HOST`. The Dev default (`api.localhost`) in
-   `authz/rego/data/backends/frost_server/data.json` is explicitly flagged as dev-only.
-4. Update clients of the published-data API: prepend `/v1` to dataset paths. Existing routes
-   under `/datasets/{id}` are no longer served (404).
+`config.value` is forwarded to APISIX verbatim. The adapter validates no upstream field and no plugin
+configuration; APISIX does, and rejects an invalid body with HTTP 400. Body schema:
+[Admin API reference](https://apisix.apache.org/docs/apisix/admin-api/).
 
-**Compatibility note:** this is a bugfix for a production-blocking route shadow — there is
-intentionally no backwards-compatible shim. Any consumer of the legacy `/datasets/{id}` path
-(e.g. cached dashboards, STA clients) must be repointed before rollout. If a rolling migration
-is needed, operators can temporarily mirror the old path behind a proxy-rewrite route while
-consumers are updated; this is out of scope for the adapter itself.
+`apisix.topics` selects from `de.civitascore.api.backend.{created,updated,deleted}` (upstreams) and
+`de.civitascore.api.route.{created,updated,deleted}` (routes); each value is validated against the
+framework's topic registry. Results go to the `resultTopic` from the incoming metadata, with type
+`de.civitascore.api.processing.result` and source `de.civitascore.config-adapter.apisix`; a failure
+carries `status: FAILURE`, an `errorCode` of the form `NAME(code)` and a safe `message`.
 
-**Migrating from an interim two-host iteration.** An earlier iteration of #1368 briefly
-introduced a separate `data.<host>` virtual host (`APISIX_DATA_HOST` / `APISIX_DATA_PUBLIC_URL`)
-alongside `api.<host>`. That split has been rolled back — `/v1/datasets/{id}` is now strictly
-more specific than any `/v1/*` catch-all, so APISIX' radix tree dispatches it deterministically
-without a second host. If a deployment pipeline was already configured against the interim
-variant, drop `APISIX_DATA_HOST` / `APISIX_DATA_PUBLIC_URL` and the `data.<host>` DNS record —
-they are no longer read. Only `APISIX_API_HOST` / `APISIX_API_PUBLIC_URL` remain required.
+### Saga commands
 
-**Per-named-API routes (#1311/#1379).** The `CREATE_ROUTE` saga step does not create a single
-dataset-level route. It creates **one shared upstream per dataset** plus **one route per named API**
-at `/v1/datasets/{datasetId}/{slug}`, each with a deterministic id `NamedApiHelper.derive(datasetId,
-slug)`, and returns a **slug-keyed `routeIds` map** that the portal-backend persists onto each
-`NamedApi`. `UPDATE_ROUTE`/`DELETE_ROUTE`/`RESTORE_ROUTE` iterate that map (DELETE/RESTORE are
-404-idempotent). A command without `namedApis` falls back to a single dataset-level route
-(legacy/edge). The reserved slug `apis` keeps the discovery endpoint `/v1/datasets/{id}/apis` from
-being shadowed.
+Dataset routes are **not** driven by the topics above.
 
-## Overview
+| Operation | Effect | Compensation |
+|---|---|---|
+| `CREATE_ROUTE` | Creates the dataset upstream(s) and one route per named-API slug; returns the slug-keyed `routeIds` map, `serviceId` and `publicUrl` | `DELETE_ROUTE` |
+| `UPDATE_ROUTE` | Reads each slug route and re-applies the protected shape | `RESTORE_ROUTE` |
+| `DELETE_ROUTE` | Deletes each slug route, then the dataset upstream(s) | — |
+| `RESTORE_ROUTE` | Re-applies the protected shape to each slug route | — |
 
-The APISIX adapter integrates with Apache APISIX API Gateway's Admin API to manage upstream backend services. It consumes CloudEvents from Kafka and translates them into APISIX Admin API calls, enabling automated configuration management for your API Gateway infrastructure.
+A named API whose `standard` is neither `STA` (FROST SensorThings) nor `OWS` (GeoServer WFS/WMS) is not
+routable: `CREATE_ROUTE` fails on it before any gateway state is created. A blank standard means `STA`.
 
-**Key Features:**
-- ✅ JAX-RS Client for clean, fluent REST API calls
-- ✅ Full CRUD operations for APISIX upstreams
-- ✅ Asynchronous result publishing via CloudEvents
-- ✅ Comprehensive error handling and reporting
-- ✅ Production-ready with integration tests
-- ✅ Testcontainers-based testing with real APISIX instances
+## Behaviour
 
-## Architecture
+Publication is per named API, not per dataset.
 
-```
-┌─────────────────┐
-│  Kafka Topics   │
-│  - backend.*    │
-│  - route.*      │
-└────────┬────────┘
-         │ CloudEvents
-         ↓
-┌────────────────────────┐
-│   ApisixAdapter        │
-│  - JAX-RS Client       │
-│  - Event Processing    │
-│  - Error Handling      │
-└────────┬───────────────┘
-         │ REST API (9180)
-         ↓
-┌────────────────────────┐
-│   APISIX Admin API     │
-│  - Upstream Management │
-│  - Route Management    │
-│  - Plugin Config       │
-└────────────────────────┘
-```
+- **Up to two upstreams per dataset**, only the kinds a slug uses: the FROST-project upstream keyed by the
+  bare `datasetId` (`STA` slugs) and the map-server upstream keyed by `{datasetId}-ows` (`OWS` slugs). Both
+  single-node `roundrobin`; node, scheme and path come from the command's `upstreamUrl` for FROST and from
+  `apisix.geoserver.url` for the map server.
+- **One route per slug** at `/v1/datasets/{datasetId}/{slug}` and `…/{slug}/*`, with a deterministic id — a
+  name-based UUID over `datasetId + "/" + slug`. The portal-backend persists the returned `routeIds` map
+  onto each named API and builds each API's URL as `publicUrl` + `/{slug}`.
+- No named APIs means no route and no upstream; `UPDATE_ROUTE`, `DELETE_ROUTE` and `RESTORE_ROUTE` are then
+  no-ops.
+- Every dataset route pins `hosts` to `apisix.api.host` and carries `service_id` from `apisix.service.id`
+  plus `status: 1`. Host pinning and the `/v1/datasets/{id}` prefix — strictly more specific than a `/v1/*`
+  catch-all — make dispatch deterministic without a second virtual host.
+- `proxy-rewrite` maps gateway path to upstream path via
+  `regex_uri: ["^{routePath}(/.*)?$", "{upstreamPath}$1"]`, and APISIX preserves the query string. The
+  upstream path is the FROST project path for `STA` and `{geoserver path}/{workspace}/ows` for `OWS`, the
+  workspace name deriving from the dataset id by the same rule the GeoServer adapter applies.
+- `OWS` routes carry a `response-rewrite` filter rewriting GeoServer's self-referential capabilities URLs
+  onto the route's external endpoint, and strip the request `Accept-Encoding`, because that filter matches
+  raw response bytes and would otherwise pass a gzipped capabilities document through unchanged.
+- `UPDATE_ROUTE` and `RESTORE_ROUTE` read the route back without the dataset's named-API metadata, so two
+  labels carry that state: `civitas-frost-upstream-auth-header` names the credential header the adapter
+  injected, so a re-apply removes a stale entry after a scheme or header-name change, and
+  `civitas-named-api-standard` is `OWS` on map-service routes (absent means `STA`).
 
-## Technology Stack
+**Authorization.** Every published-data route is protected; there is no unprotected variant. Each carries
+`plugin_config_id` from `apisix.plugin.config.id` and no `methods` filter — an existing one is removed,
+because the per-request OPA decision is the gate. Open-data access is that decision, not a route shape:
+OPA grants or denies the anonymous read from the dataset's open-data flag and denies writes and protected
+datasets. The referenced plugin config MUST enforce OIDC with `unauth_action: pass` (an anonymous request
+continues to OPA rather than being rejected at the gateway; a present bearer token is validated and its
+claims forwarded) and OPA with `with_service: true` (OPA resolves the backend policy from the route's
+`service_id`). A `service_id` matching no provisioned APISIX service makes OPA reject every dataset route
+as `unknown_backend`, which is why `apisix.service.id` is required. The FROST project itself is private and
+is reached with the upstream credential.
 
-- **JAX-RS Client API** (Jakarta 3.1.0) - REST client interface
-- **Jersey Client** (3.1.5) - JAX-RS implementation
-- **Jackson** - JSON processing (integrated with Jersey)
-- **SLF4J** - Logging
-- **CloudEvents** - Event format specification
+**Upstream credentials and stripped headers.** `STA` routes inject the FROST credential into
+`proxy-rewrite.headers.set` — `Authorization: Basic <base64>` from `apisix.frost.basic.auth.*`, or the
+configured API-key header from `apisix.frost.api.key[.header]`; Basic Auth wins when both are configured.
+`OWS` routes carry no upstream credential, since GeoServer serves the workspace OWS endpoint anonymously,
+and one left there by a different configuration is removed. `X-Allowed-Scope-Ids` and `X-Allowed-Pool-Ids`
+are always in `proxy-rewrite.headers.remove` and cannot be disabled: OPA sets them and downstream services
+trust them, so a client-supplied value MUST NOT reach the backend.
+`apisix.proxy.rewrite.headers.remove` adds names on top of that baseline. APISIX resolves plugins by
+route-over-plugin-config precedence, so the route-level `proxy-rewrite` overrides any strip list in the
+shared plugin config — every header the gateway strips there MUST be mirrored in this property. Merging
+preserves foreign `headers.set`, `headers.add` and `headers.remove` entries.
 
-## Supported Operations
+**Idempotency, drift and cleanup.** Deterministic ids make every saga write a `PUT` and therefore
+retry-safe, and deletes tolerate a 404. In the config-event path, HTTP 409 on a CREATE and HTTP 404 on a
+DELETE are absorbed as success.
 
-### Upstream Management
-
-| Operation | HTTP Method | Endpoint | Description |
-|-----------|-------------|----------|-------------|
-| CREATE | POST | `/apisix/admin/upstreams` | Create new upstream |
-| UPDATE | PUT | `/apisix/admin/upstreams/{id}` | Update existing upstream |
-| DELETE | DELETE | `/apisix/admin/upstreams/{id}` | Delete upstream |
-
-### Route Management
-
-| Operation | HTTP Method | Endpoint | Description |
-|-----------|-------------|----------|-------------|
-| CREATE | POST | `/apisix/admin/routes` | Create new route |
-| UPDATE | PUT | `/apisix/admin/routes/{id}` | Update existing route |
-| DELETE | DELETE | `/apisix/admin/routes/{id}` | Delete route |
-
-> **Two provisioning paths.** The tables above describe the **event-driven `ApisixAdapter`**
-> (`AbstractConfigAdapter`), which consumes the CloudEvent topics below and creates routes with a
-> server-assigned id via `POST`. **Dataset routes are provisioned separately** by the
-> **`ApisixSagaHandler`**, which is driven by saga commands (`CREATE_ROUTE`, `UPDATE_ROUTE`,
-> `DELETE_ROUTE`, `RESTORE_ROUTE`) — not by Kafka topics — and uses `PUT /apisix/admin/routes/{id}`
-> with a deterministic id (`NamedApiHelper.derive(datasetId, slug)`), one route per named API at
-> `/v1/datasets/{datasetId}/{slug}`. The deterministic id is what makes CREATE/UPDATE/DELETE
-> idempotent (issue #1368). See `config-adapter/docs/SAGA-DATASET-USE-CASES.md`.
-
-### Subscribed Topics
-
-The **event-driven `ApisixAdapter`** subscribes to backend and route lifecycle events. (Dataset
-route provisioning does **not** use these topics — it is saga-command-driven; see the note above.)
-
-**Backend Topics:**
-- `de.civitascore.api.backend.created` - New backend services
-- `de.civitascore.api.backend.updated` - Backend updates
-- `de.civitascore.api.backend.deleted` - Backend removal
-
-**Route Topics:**
-- `de.civitascore.api.route.created` - New routes
-- `de.civitascore.api.route.updated` - Route updates
-- `de.civitascore.api.route.deleted` - Route removal
+- `CREATE_ROUTE` failing mid-provisioning removes the routes and upstreams it already created before
+  propagating, so a failed step leaves no orphaned gateway state.
+- `UPDATE_ROUTE` is all-or-nothing: a named API without a persisted route id, or a target route absent from
+  the gateway, fails the step before the first write, since a partial change would leave a mixed
+  authorization state. A compensation re-run skips an absent route.
+- `DELETE_ROUTE` heals a drifted route map by deriving the deterministic id for any named API whose id is
+  missing, and attempts both possible upstreams. A forward delete removing none of its target routes is
+  logged as a warning: the gateway may hold routes under other ids.
+- An upstream delete rejected with HTTP 400 and `route [...] is still using it now` reflects a worker's
+  route-cache lag, not a client error: the saga path retries it three times with backoff, the config-event
+  path classifies it retryable.
 
 ## Configuration
 
-### Required Properties
+Keys carry the `apisix.` prefix. The values that ship, env-var names and gateway provisioning live in
+[../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-```properties
-# APISIX Admin API URL
-apisix.admin.url=http://localhost:9180
+| Property | Required | Used by |
+|---|:--:|---|
+| `apisix.topics` | for config events | events |
+| `apisix.admin.url` | | both |
+| `apisix.admin.key` | yes | both |
+| `apisix.api.host` | yes | saga |
+| `apisix.api.public.url` | yes | saga |
+| `apisix.plugin.config.id` | yes | saga |
+| `apisix.service.id` | yes | saga |
+| `apisix.frost.basic.auth.username` / `.password` | one FROST credential | saga |
+| `apisix.frost.api.key` | one FROST credential | saga |
+| `apisix.frost.api.key.header` | | saga |
+| `apisix.geoserver.url` | | saga |
+| `apisix.proxy.rewrite.headers.remove` | | saga |
 
-# APISIX Admin API Key (for authentication)
-apisix.admin.key=edd1c9f034335f136f87ad84b625c8f1
+Either `apisix.frost.basic.auth.username` (with its password) or `apisix.frost.api.key` MUST be set, and
+`apisix.frost.api.key.header` MUST NOT be blank while an API key is set. A blank `apisix.admin.key` and
+each missing required saga setting fail initialization with a message naming the key, so the adapter never
+starts with a partial gateway configuration. `apisix.geoserver.url` is validated when an `OWS` slug is
+routed, not at startup. Trailing slashes are stripped from `apisix.api.public.url` and
+`apisix.geoserver.url`.
 
-# Topics to subscribe to (backend and route events)
-apisix.topics=de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted,de.civitascore.api.route.created,de.civitascore.api.route.updated,de.civitascore.api.route.deleted
+## Error codes
 
-# Public API host (issue #1368) — required by the ApisixSagaHandler when provisioning dataset
-# routes. Saga-created FROST routes are pinned to this virtual host so APISIX can match
-# them deterministically against incoming requests.
-apisix.api.host=api.localhost
-apisix.api.public.url=http://api.localhost:9080
+Config-event failures publish a `FAILURE` result with one of these codes; retryable ones go through the
+framework's exponential backoff, fatal ones straight to the DLQ. Saga commands do not use these codes: a
+failed step returns a command failure carrying the Admin API status and message, and the orchestrator
+drives compensation.
 
-# Gateway-side auth plugin_config_id — required. EVERY dataset route attaches this plugin_config so
-# APISIX enforces OIDC/OPA in front of the upstream — routes are always protected, and open-data
-# access is an OPA per-request decision (not a route variant). The referenced plugin_config must be
-# provisioned in APISIX before any dataset is created. The dev/CI stack provisions it as
-# plugin_config id `1` (see dev-environment apisix seeding).
-apisix.plugin.config.id=1
-
-# Headers the saga route's proxy-rewrite must strip — optional but typically required in
-# production. Applied to EVERY saga route (all routes are protected), because APISIX merges
-# plugins by Route-over-PluginConfig precedence: the saga always defines its own proxy-rewrite,
-# so any proxy-rewrite.headers.remove in the shared plugin_config is silently overridden.
-# Mirror the strip list from plugin_config here so e.g. client-supplied X-Allowed-Scope-Ids
-# (used by OPA for collection filtering) cannot bypass authorization. Comma-separated.
-apisix.proxy.rewrite.headers.remove=X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
-
-# FROST upstream auth — required. APISIX injects credentials into proxy-rewrite when forwarding
-# to private FROST projects. Configure ONE of the two schemes (mirroring the FROST adapter):
-#   1) Basic Auth (takes precedence when both are configured)
-apisix.frost.basic.auth.username=frost-admin
-apisix.frost.basic.auth.password=changeme
-#   2) API key (used when no basic.auth.username is set)
-#apisix.frost.api.key=frost-api-key
-#apisix.frost.api.key.header=X-API-Key
-```
-
-### Migration: pre-label routes with custom API-key headers
-
-The adapter tracks the FROST upstream auth header it sets via the APISIX route label
-`civitas-frost-upstream-auth-header`. New routes carry the label automatically. Routes that
-predate the label (created by an earlier version of this adapter) are cleaned on public flips
-via a fallback list of historical adapter-managed header names (`Authorization`,
-`X-API-Key`).
-
-**Limitation:** if you previously ran the adapter with a custom `apisix.frost.api.key.header`
-(e.g. `X-Frost-Key`), routes provisioned at that time without the label may keep the stale
-custom header on a public flip when you've since reconfigured the adapter. To migrate cleanly:
-
-1. Trigger an UPDATE through the saga while the adapter is still configured with the
-   historical header name — the cleanup picks up the currently-configured name regardless of
-   label state.
-2. Optionally rotate the configuration afterwards.
-
-Alternatively clean up via the APISIX admin API directly.
-
-### Environment Variables
-
-All properties can be overridden with environment variables:
-
-```bash
-APISIX_ADMIN_URL=http://apisix:9180
-APISIX_ADMIN_KEY=your-api-key
-APISIX_API_HOST=api.core.example.org
-APISIX_API_PUBLIC_URL=https://api.core.example.org
-APISIX_PLUGIN_CONFIG_ID=1
-APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
-# Pick ONE FROST upstream auth scheme:
-APISIX_FROST_BASIC_AUTH_USERNAME=frost-admin
-APISIX_FROST_BASIC_AUTH_PASSWORD=changeme
-# or
-#APISIX_FROST_API_KEY=frost-api-key
-#APISIX_FROST_API_KEY_HEADER=X-API-Key
-APISIX_TOPICS=de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted,de.civitascore.api.route.created,de.civitascore.api.route.updated,de.civitascore.api.route.deleted
-```
-
-### Docker Compose Example
-
-```yaml
-version: '3.8'
-services:
-  config-adapter:
-    image: config-adapter:latest
-    environment:
-      ADAPTERS: apisix
-      EVENTHANDLER_NAME: kafka
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      APISIX_ADMIN_URL: http://apisix:9180
-      APISIX_ADMIN_KEY: ${APISIX_API_KEY}
-      APISIX_TOPICS: de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted,de.civitascore.api.route.created,de.civitascore.api.route.updated,de.civitascore.api.route.deleted
-    depends_on:
-      - kafka
-      - apisix
-```
-
-## Event Format
-
-### Input Event (CloudEvent)
-
-```json
-{
-  "specversion": "1.0",
-  "type": "de.civitascore.api.backend.created",
-  "source": "civitas.api.provisioning",
-  "id": "event-123",
-  "datacontenttype": "application/json",
-  "data": {
-    "metadata": {
-      "messageId": "msg-456",
-      "timestamp": "2025-01-15T10:00:00Z",
-      "source": "api.service",
-      "correlationId": "corr-789",
-      "configVersion": "1.0",
-      "resultTopic": "api.results"
-    },
-    "payload": {
-      "targetComponent": "apisix",
-      "targetResource": "upstreams/my-backend",
-      "operation": "CREATE",
-      "config": {
-        "path": "upstreams/my-backend",
-        "value": {
-          "type": "roundrobin",
-          "nodes": {
-            "backend1.example.com:8080": 1,
-            "backend2.example.com:8080": 1,
-            "backend3.example.com:8080": 1
-          },
-          "timeout": {
-            "connect": 6,
-            "send": 6,
-            "read": 6
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-### Output Event (Result)
-
-```json
-{
-  "specversion": "1.0",
-  "type": "config.result",
-  "source": "civitas.config-adapter.apisix",
-  "id": "result-123",
-  "datacontenttype": "application/json",
-  "data": {
-    "correlationId": "corr-789",
-    "originalMessageId": "msg-456",
-    "status": "SUCCESS",
-    "message": "APISIX upstream updated successfully",
-    "resourceId": "my-backend",
-    "operation": "UPDATE",
-    "targetResource": "upstreams/my-backend",
-    "timestamp": "2025-01-15T10:00:01Z"
-  }
-}
-```
-
-## APISIX Admin API Integration
-
-### Authentication
-
-All requests include the `X-API-KEY` header for authentication:
-
-```java
-client.target(adminApiUrl)
-    .path("/apisix/admin/upstreams")
-    .request(MediaType.APPLICATION_JSON)
-    .header("X-API-KEY", adminApiKey)
-    .post(Entity.json(upstreamConfig));
-```
-
-### Upstream Configuration
-
-APISIX upstreams support various load balancing algorithms and health check configurations:
-
-#### Load Balancing Algorithms
-
-| Algorithm | Description | Use Case |
-|-----------|-------------|----------|
-| `roundrobin` | Distributes requests sequentially to each backend in turn (default) | General purpose, evenly distributed backends |
-| `chash` | Consistent hashing based on specified key (e.g., client IP, header) | Session affinity, cache optimization |
-| `ewma` | Exponentially Weighted Moving Average - routes to lowest latency backend | Latency-sensitive applications |
-| `least_conn` | Routes to backend with fewest active connections | Long-lived connections, varying request durations |
-
-**Algorithm Configuration Examples:**
-
-```json
-// Round-robin with weights
-{
-  "type": "roundrobin",
-  "nodes": {
-    "backend1:8080": 3,
-    "backend2:8080": 2,
-    "backend3:8080": 1
-  }
-}
-
-// Consistent hashing by client IP
-{
-  "type": "chash",
-  "hash_on": "vars",
-  "key": "remote_addr",
-  "nodes": {
-    "backend1:8080": 1,
-    "backend2:8080": 1
-  }
-}
-
-// EWMA for latency optimization
-{
-  "type": "ewma",
-  "nodes": {
-    "backend1:8080": 1,
-    "backend2:8080": 1
-  }
-}
-
-// Least connections
-{
-  "type": "least_conn",
-  "nodes": {
-    "backend1:8080": 1,
-    "backend2:8080": 1
-  }
-}
-```
-
-#### Example: Weighted Round-Robin
-
-```json
-{
-  "type": "roundrobin",
-  "nodes": {
-    "backend1:8080": 1,
-    "backend2:8080": 2,
-    "backend3:8080": 1
-  }
-}
-```
-
-#### Example: With Health Checks
-
-```json
-{
-  "type": "roundrobin",
-  "nodes": {
-    "backend1:8080": 1,
-    "backend2:8080": 1
-  },
-  "checks": {
-    "active": {
-      "type": "http",
-      "http_path": "/health",
-      "healthy": {
-        "interval": 5,
-        "successes": 2
-      },
-      "unhealthy": {
-        "interval": 5,
-        "http_failures": 3
-      }
-    }
-  }
-}
-```
-
-#### Example: With TLS
-
-```json
-{
-  "type": "roundrobin",
-  "scheme": "https",
-  "nodes": {
-    "secure-backend:8443": 1
-  },
-  "tls": {
-    "client_cert": "...",
-    "client_key": "..."
-  }
-}
-```
-
-## Error Handling
-
-### Error Codes
-
-| Error Code | Description | Action |
-|------------|-------------|--------|
-| `UPSTREAM_CREATE_FAILED` | Failed to create upstream | Check configuration and APISIX logs |
-| `UPSTREAM_UPDATE_FAILED` | Failed to update upstream | Verify upstream exists and config is valid |
-| `UPSTREAM_DELETE_FAILED` | Failed to delete upstream | Check if upstream is in use by routes |
-| `ROUTE_CREATE_FAILED` | Failed to create route | Verify uri and upstream_id are valid |
-| `ROUTE_UPDATE_FAILED` | Failed to update route | Verify route exists and config is valid |
-| `ROUTE_DELETE_FAILED` | Failed to delete route | Check route ID exists |
-| `UNKNOWN_RESOURCE_TYPE` | Unsupported resource type | Only `upstreams` and `routes` are supported |
-| `PROCESSING_ERROR` | General processing error | Check event format and APISIX availability |
-
-### Error Response Example
-
-```json
-{
-  "status": "FAILURE",
-  "errorCode": "UPSTREAM_CREATE_FAILED",
-  "errorMessage": "Failed to create APISIX upstream. Status: 400, Body: {\"error_msg\":\"invalid configuration\"}"
-}
-```
-
-### Common Issues
-
-#### 1. Connection Refused
-
-```
-Failed to create APISIX upstream
-jakarta.ws.rs.ProcessingException: Connection refused
-```
-
-**Solution:** Verify APISIX is running and `apisix.admin.url` is correct.
-
-#### 2. Unauthorized (401)
-
-```
-Failed to create APISIX upstream. Status: 401
-```
-
-**Solution:** Check `apisix.admin.key` matches APISIX configuration.
-
-#### 3. Invalid Configuration (400)
-
-```
-Status: 400, Body: {"error_msg":"invalid configuration: value should match only one schema"}
-```
-
-**Solution:** Validate upstream configuration against APISIX schema. Ensure required fields are present.
-
-#### 4. Resource Not Found (404)
-
-```
-Status: 404, Body: {"error_msg":"not found"}
-```
-
-**Solution:** For UPDATE/DELETE operations, ensure the upstream exists first.
+| Code | Meaning | Retryable |
+|---|---|---|
+| `INVALID_RESOURCE_TYPE(1005)` | `targetResource` names neither `upstreams` nor `routes` | no |
+| `APISIX_ROUTE_ERROR(3102)` | Admin API rejected a route call with HTTP 4xx other than the absorbed 409/404, or the call failed unexpectedly | no |
+| `APISIX_UPSTREAM_ERROR(3103)` | Admin API rejected an upstream call with HTTP 4xx other than the absorbed 409/404, or the call failed unexpectedly | no |
+| `SERVICE_UNAVAILABLE(2002)` | Admin API returned HTTP 5xx, or refused an upstream delete for a route that references it | yes |
+| `NETWORK_ERROR(2003)` | Admin API unreachable | yes |
 
 ## Testing
 
-### Unit Tests
-
-Run unit tests with mocked dependencies:
-
 ```bash
-mvn test -Dtest=ApisixAdapterTest
+mvn test -pl config-adapter-apisix                           # unit tests, no Docker
+mvn verify -pl config-adapter-apisix                         # adds APISIX + etcd integration tests
+mvn verify -pl config-adapter-apisix -Dit.test=ApisixRouteIT # a single integration test class
 ```
 
-Tests cover:
-- Successful create/update/delete operations
-- HTTP error handling (4xx, 5xx)
-- Network exceptions
-- Result event publishing
-- Null safety
-
-### Integration Tests
-
-Run integration tests with real APISIX and etcd containers:
-
-```bash
-# All integration tests in this module
-mvn verify -pl config-adapter-apisix
-# A single one
-mvn verify -pl config-adapter-apisix -Dit.test=ApisixRouteIT
-```
-
-Integration tests use:
-- **Testcontainers** for Docker management
-- **etcd v3.6.6** as APISIX configuration store
-- **APISIX 3.14.0-debian** for API Gateway
-- **Awaitility** for async assertion
-
-Test scenarios:
-- ✅ Create upstream successfully
-- ✅ Update upstream with new nodes
-- ✅ Delete upstream
-- ✅ Handle invalid configuration gracefully
-- ✅ Create route with plugins
-- ✅ Update route configuration
-- ✅ Delete route
-- ✅ Create route with serverless-post-function (log phase)
-- ✅ Create route with serverless-post-function (header_filter phase)
-- ✅ Update route to add serverless-post-function plugin
-- ✅ Create route with multiple Lua functions
-- ✅ Combine serverless-post-function with other plugins
-- ✅ Create route with serverless-pre-function (rewrite phase)
-- ✅ Create route with serverless-pre-function (access phase)
-- ✅ Update route to add serverless-pre-function plugin
-- ✅ Create route with multiple serverless-pre-function Lua functions
-- ✅ Combine serverless-pre-function with serverless-post-function
-- ✅ Create route with response-rewrite (set headers)
-- ✅ Create route with response-rewrite (add headers)
-- ✅ Create route with response-rewrite (remove headers)
-- ✅ Create route with response-rewrite (status code override)
-- ✅ Create route with response-rewrite (body replacement)
-- ✅ Create route with response-rewrite (base64 encoded body)
-- ✅ Create route with response-rewrite (Lua body filters)
-- ✅ Create route with response-rewrite (APISIX variables)
-- ✅ Update route to add response-rewrite plugin
-- ✅ Create route with response-rewrite (full configuration)
-- ✅ Handle invalid response-rewrite configuration
-- ✅ Create route with proxy-rewrite (static URI replacement)
-- ✅ Create route with proxy-rewrite (regex URI path transformation)
-- ✅ Create route with proxy-rewrite (path stripping - critical use case)
-- ✅ Create route with proxy-rewrite (request header manipulation)
-- ✅ Update route to add proxy-rewrite plugin
-- ✅ Create route with proxy-rewrite (host modification)
-- ✅ Create route with proxy-rewrite (full configuration)
-- ✅ Combine proxy-rewrite with other plugins
-- ✅ Handle invalid proxy-rewrite configuration
-
-### Test Coverage
-
-```bash
-mvn verify
-```
-
-Coverage reports are generated in `target/site/jacoco/index.html`.
-
-## Implementation Details
-
-### JAX-RS Client Benefits
-
-The adapter uses JAX-RS Client API for clean, maintainable code:
-
-**Before (java.net.http.HttpClient):**
-```java
-HttpRequest request = HttpRequest.newBuilder()
-        .uri(URI.create(url))
-        .header("Content-Type", "application/json")
-        .header("X-API-KEY", adminApiKey)
-        .PUT(HttpRequest.BodyPublishers.ofString(json))
-        .timeout(Duration.ofSeconds(30))
-        .build();
-HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-```
-
-**After (JAX-RS Client):**
-```java
-Response response = client.target(adminApiUrl)
-        .path("/apisix/admin/upstreams/{id}")
-        .resolveTemplate("id", upstreamId)
-        .request(MediaType.APPLICATION_JSON)
-        .header("X-API-KEY", adminApiKey)
-        .put(Entity.json(configValue));
-```
-
-**Benefits:**
-- Fluent, readable API
-- Built-in JSON marshalling with Jackson
-- Path template support
-- Type-safe responses
-- Better for complex operations (routes API coming soon)
-
-### Resource Parsing
-
-The adapter parses `targetResource` to extract resource type and ID:
-
-- `upstreams` → CREATE (APISIX generates ID)
-- `upstreams/my-backend` → UPDATE or DELETE on specific upstream
-
-```java
-private record ResourceInfo(String type, String id) {}
-
-private ResourceInfo parseTargetResource(String targetResource) {
-    // Parses: "upstreams/my-backend-id"
-    //      → ResourceInfo("upstream", "my-backend-id")
-}
-```
-
-### Lifecycle Management
-
-```java
-public class ApisixAdapter extends AbstractConfigAdapter {
-
-    @Override
-    public void initialize(AdapterConfig config) {
-        this.adminApiUrl = getAdapterProperty("admin.url", "http://localhost:9180");
-        this.adminApiKey = getAdapterProperty("admin.key", "...");
-        this.client = createClient();
-    }
-
-    @Override
-    public void close() {
-        if (client != null) {
-            client.close();  // Release connection resources
-        }
-    }
-}
-```
-
-## Route Configuration
-
-Routes define how requests are matched and forwarded to upstreams. The adapter supports full CRUD operations for routes with plugin configuration.
-
-### Route Event Format
-
-```json
-{
-  "specversion": "1.0",
-  "type": "de.civitascore.api.route.created",
-  "source": "civitas.api.provisioning",
-  "id": "event-route-123",
-  "datacontenttype": "application/json",
-  "data": {
-    "metadata": {
-      "messageId": "msg-route-456",
-      "timestamp": "2025-01-22T10:00:00Z",
-      "source": "api.service",
-      "correlationId": "corr-route-789",
-      "configVersion": "1.0",
-      "resultTopic": "api.results"
-    },
-    "payload": {
-      "targetComponent": "apisix",
-      "targetResource": "routes/my-api-route",
-      "operation": "CREATE",
-      "config": {
-        "path": "routes/my-api-route",
-        "value": {
-          "uri": "/api/v1/*",
-          "methods": ["GET", "POST", "PUT", "DELETE"],
-          "upstream_id": "my-backend",
-          "plugins": {
-            "prometheus": {},
-            "proxy-rewrite": {
-              "uri": "/rewritten"
-            }
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-### Route Configuration Fields
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `uri` | string | Yes | URI path pattern (supports wildcards with `*`) |
-| `methods` | array | No | HTTP methods to match (e.g., `["GET", "POST"]`) |
-| `upstream_id` | string | Yes* | Reference to existing upstream |
-| `upstream` | object | Yes* | Inline upstream definition |
-| `plugins` | object | No | Plugin configurations |
-| `host` | string | No | Match specific host header |
-| `hosts` | array | No | Match multiple hosts |
-| `priority` | integer | No | Route priority (higher = more priority) |
-
-*Either `upstream_id` or `upstream` must be provided.
-
-## serverless-post-function Plugin
-
-The `serverless-post-function` plugin allows executing custom Lua code **after** the request has been processed. This is useful for:
-
-- **Response manipulation** - Add/modify headers after upstream response
-- **Custom logging** - Log metrics or data after request completion
-- **Post-processing logic** - Execute cleanup or notification tasks
-
-### Available Phases
-
-| Phase | Description | Use Case |
-|-------|-------------|----------|
-| `rewrite` | During request rewriting | Modify request before proxy |
-| `access` | After access phase | Post-authentication logic |
-| `header_filter` | After receiving response headers | Modify response headers |
-| `body_filter` | After receiving response body | Modify response body |
-| `log` | At the end of request processing | Logging, metrics, cleanup |
-
-### Plugin Configuration
-
-```json
-{
-  "serverless-post-function": {
-    "phase": "log",
-    "functions": [
-      "return function(conf, ctx) ngx.log(ngx.INFO, 'Request completed for: ' .. ngx.var.uri) end"
-    ]
-  }
-}
-```
-
-### Configuration Fields
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `phase` | string | No | Execution phase (default: `access`) |
-| `functions` | array | Yes | Array of Lua function strings |
-
-### Example: Add Custom Response Header
-
-```json
-{
-  "plugins": {
-    "serverless-post-function": {
-      "phase": "header_filter",
-      "functions": [
-        "return function(conf, ctx) ngx.header['X-Processed-By'] = 'civitas-gateway' end"
-      ]
-    }
-  }
-}
-```
-
-### Example: Custom Logging
-
-```json
-{
-  "plugins": {
-    "serverless-post-function": {
-      "phase": "log",
-      "functions": [
-        "return function(conf, ctx) ngx.log(ngx.INFO, 'Method: ' .. ngx.var.request_method .. ', URI: ' .. ngx.var.uri .. ', Status: ' .. ngx.var.status) end"
-      ]
-    }
-  }
-}
-```
-
-### Example: Multiple Functions
-
-```json
-{
-  "plugins": {
-    "serverless-post-function": {
-      "phase": "log",
-      "functions": [
-        "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 1: Request logged') end",
-        "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 2: Metrics sent') end"
-      ]
-    }
-  }
-}
-```
-
-### Combined with Other Plugins
-
-The `serverless-post-function` plugin can be combined with other plugins:
-
-```json
-{
-  "plugins": {
-    "prometheus": {},
-    "response-rewrite": {
-      "headers": {
-        "set": {
-          "X-Upstream-Response-Time": "$upstream_response_time"
-        }
-      }
-    },
-    "serverless-post-function": {
-      "phase": "log",
-      "functions": [
-        "return function(conf, ctx) ngx.log(ngx.INFO, 'Request processed: ' .. ngx.var.uri) end"
-      ]
-    }
-  }
-}
-```
-
-### Lua Function Syntax
-
-Lua functions must follow this format:
-```lua
-return function(conf, ctx)
-    -- Your code here
-    -- conf: plugin configuration
-    -- ctx: request context
-end
-```
-
-**Available ngx variables:**
-- `ngx.var.uri` - Request URI
-- `ngx.var.request_method` - HTTP method
-- `ngx.var.status` - Response status code
-- `ngx.var.remote_addr` - Client IP
-- `ngx.header['Header-Name']` - Response headers (in header_filter phase)
-
-**Important Notes:**
-- APISIX validates Lua syntax - invalid code returns HTTP 400
-- Functions execute in order when multiple are provided
-- Use `ngx.log(ngx.INFO, ...)` for logging (visible in APISIX error.log)
-
-## serverless-pre-function Plugin
-
-The `serverless-pre-function` plugin allows executing custom Lua code **before** the request is proxied to the upstream. This is useful for:
-
-- **Request modification** - Add/modify headers before proxying
-- **Early validation** - Check request properties before processing
-- **Request enrichment** - Inject correlation IDs, timestamps, etc.
-
-### Available Phases
-
-| Phase | Description | Use Case |
-|-------|-------------|----------|
-| `rewrite` | During request rewriting (default) | Modify request before proxy |
-| `access` | After access phase | Post-authentication logic |
-
-### Plugin Configuration
-
-```json
-{
-  "serverless-pre-function": {
-    "phase": "rewrite",
-    "functions": [
-      "return function(conf, ctx) ngx.req.set_header('X-Request-ID', ngx.var.request_id) end"
-    ]
-  }
-}
-```
-
-### Configuration Fields
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `phase` | string | No | Execution phase (default: `rewrite`) |
-| `functions` | array | Yes | Array of Lua function strings |
-
-### Example: Add Request Headers
-
-```json
-{
-  "plugins": {
-    "serverless-pre-function": {
-      "phase": "rewrite",
-      "functions": [
-        "return function(conf, ctx) ngx.req.set_header('X-Request-ID', ngx.var.request_id) end"
-      ]
-    }
-  }
-}
-```
-
-### Example: Request Timestamp Injection
-
-```json
-{
-  "plugins": {
-    "serverless-pre-function": {
-      "phase": "rewrite",
-      "functions": [
-        "return function(conf, ctx) ngx.req.set_header('X-Request-Start', tostring(ngx.now())) end"
-      ]
-    }
-  }
-}
-```
-
-### Example: Combining Pre and Post Functions
-
-Use `serverless-pre-function` to modify requests before proxy and `serverless-post-function` to process responses:
-
-```json
-{
-  "plugins": {
-    "serverless-pre-function": {
-      "phase": "rewrite",
-      "functions": [
-        "return function(conf, ctx) ngx.req.set_header('X-Request-Start', tostring(ngx.now())) end"
-      ]
-    },
-    "serverless-post-function": {
-      "phase": "log",
-      "functions": [
-        "return function(conf, ctx) ngx.log(ngx.INFO, 'Request completed: ' .. ngx.var.uri) end"
-      ]
-    }
-  }
-}
-```
-
-### Difference from serverless-post-function
-
-| Aspect | serverless-pre-function | serverless-post-function |
-|--------|------------------------|-------------------------|
-| **Execution Time** | Before proxy to upstream | After upstream response |
-| **Primary Use** | Request modification | Response processing |
-| **Common Phases** | `rewrite`, `access` | `header_filter`, `body_filter`, `log` |
-| **Can Modify** | Request headers, URI | Response headers, body |
-
-## response-rewrite Plugin
-
-The `response-rewrite` plugin modifies the response returned by the upstream before sending it to the client. This is useful for:
-
-- **Header manipulation** - Set, add, or remove response headers
-- **Status code override** - Change the HTTP status code returned to clients
-- **Body replacement** - Replace the entire response body
-- **Content transformation** - Use Lua-based filters to transform response content
-
-### Plugin Configuration
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `status_code` | integer | No | Override HTTP status code (200-598) |
-| `body` | string | No | Replacement response body |
-| `body_base64` | boolean | No | Whether body is base64 encoded (default: false) |
-| `headers.set` | object | No | Headers to set (overwrite existing or add new) |
-| `headers.add` | object | No | Headers to add (append to existing) |
-| `headers.remove` | array | No | Header names to remove from response |
-| `filters` | array | No | Lua-based body filter configurations |
-
-### Example: Set Response Headers
-
-```json
-{
-  "plugins": {
-    "response-rewrite": {
-      "headers": {
-        "set": {
-          "X-Server-Id": "server-1",
-          "X-Environment": "production"
-        }
-      }
-    }
-  }
-}
-```
-
-### Example: Add and Remove Headers
-
-```json
-{
-  "plugins": {
-    "response-rewrite": {
-      "headers": {
-        "add": {
-          "X-Custom-Header": "custom-value"
-        },
-        "remove": ["X-Internal-Header", "X-Debug-Info"]
-      }
-    }
-  }
-}
-```
-
-### Example: Override Status Code
-
-```json
-{
-  "plugins": {
-    "response-rewrite": {
-      "status_code": 201
-    }
-  }
-}
-```
-
-### Example: Replace Response Body
-
-```json
-{
-  "plugins": {
-    "response-rewrite": {
-      "body": "{\"status\":\"ok\",\"processed\":true}"
-    }
-  }
-}
-```
-
-### Example: Base64 Encoded Body
-
-```json
-{
-  "plugins": {
-    "response-rewrite": {
-      "body": "eyJyZXN1bHQiOiJlbmNvZGVkIn0=",
-      "body_base64": true
-    }
-  }
-}
-```
-
-### Example: Lua Body Filters
-
-Body filters use regex patterns to transform response content:
-
-```json
-{
-  "plugins": {
-    "response-rewrite": {
-      "filters": [
-        {
-          "regex": "old_text",
-          "replace": "new_text"
-        },
-        {
-          "regex": "internal_value",
-          "replace": "public_value"
-        }
-      ]
-    }
-  }
-}
-```
-
-### Example: Full Configuration (Combined)
-
-```json
-{
-  "plugins": {
-    "response-rewrite": {
-      "status_code": 200,
-      "headers": {
-        "set": {
-          "X-Processed": "true",
-          "Content-Type": "application/json"
-        },
-        "remove": ["X-Internal", "X-Debug"]
-      },
-      "body": "{\"result\":\"success\",\"processed\":true}"
-    }
-  }
-}
-```
-
-### Available Variables
-
-APISIX variables can be used in header values:
-
-| Variable | Description |
-|----------|-------------|
-| `$upstream_status` | Upstream response status code |
-| `$upstream_response_time` | Upstream response time |
-| `$request_id` | Unique request identifier |
-| `$remote_addr` | Client IP address |
-| `$host` | Request host header |
-
-**Example with Variables:**
-```json
-{
-  "plugins": {
-    "response-rewrite": {
-      "headers": {
-        "set": {
-          "X-Upstream-Status": "$upstream_status",
-          "X-Request-Id": "$request_id"
-        }
-      }
-    }
-  }
-}
-```
-
-### Combining with Other Plugins
-
-The `response-rewrite` plugin can be combined with other plugins:
-
-```json
-{
-  "plugins": {
-    "prometheus": {},
-    "serverless-post-function": {
-      "phase": "log",
-      "functions": [
-        "return function(conf, ctx) ngx.log(ngx.INFO, 'Request processed') end"
-      ]
-    },
-    "response-rewrite": {
-      "headers": {
-        "set": {
-          "X-Processed-By": "civitas-gateway"
-        }
-      }
-    }
-  }
-}
-```
-
-### Difference from proxy-rewrite
-
-| Aspect | response-rewrite | proxy-rewrite |
-|--------|-----------------|---------------|
-| **Target** | Modifies response from upstream | Modifies request to upstream |
-| **Headers** | Response headers | Request headers |
-| **Body** | Can replace response body | Cannot modify request body |
-| **Timing** | After upstream responds | Before proxying to upstream |
-
-## proxy-rewrite Plugin
-
-The `proxy-rewrite` plugin modifies the request sent to the upstream before it is proxied. This is useful for:
-
-- **Path transformation** - Rewrite the request URI before forwarding
-- **Path stripping** - Remove API prefixes (e.g., `/api/v1/users` → `/users`)
-- **Host modification** - Change the Host header sent to upstream
-- **Request header manipulation** - Set, add, or remove request headers
-
-### Plugin Configuration
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `uri` | string | No | New static URI to replace the original request path |
-| `regex_uri` | array | No | Regex pattern and replacement: `["pattern", "replacement"]` |
-| `host` | string | No | New Host header value to send to upstream |
-| `headers.set` | object | No | Headers to set (overwrite existing or add new) |
-| `headers.add` | object | No | Headers to add (append to existing) |
-| `headers.remove` | array | No | Header names to remove from request |
-| `method` | string | No | Override HTTP method (e.g., change GET to POST) |
-
-### Example: Static URI Replacement
-
-Replace the entire request path with a fixed URI:
-
-```json
-{
-  "plugins": {
-    "proxy-rewrite": {
-      "uri": "/users"
-    }
-  }
-}
-```
-
-**Result:** `/api/v1/users/123` → `/users` (backend receives `/users`)
-
-### Example: Path Stripping (Critical Use Case)
-
-Strip the API version prefix from requests:
-
-```json
-{
-  "plugins": {
-    "proxy-rewrite": {
-      "regex_uri": ["^/api/v1/(.*)", "/$1"]
-    }
-  }
-}
-```
-
-**Result:** `/api/v1/users/123` → `/users/123` (backend receives `/users/123`)
-
-### Example: Host Header Modification
-
-Change the Host header sent to the upstream (useful for virtual hosting):
-
-```json
-{
-  "plugins": {
-    "proxy-rewrite": {
-      "host": "internal-backend.local"
-    }
-  }
-}
-```
-
-### Example: Request Header Manipulation
-
-Set, add, and remove request headers before proxying:
-
-```json
-{
-  "plugins": {
-    "proxy-rewrite": {
-      "headers": {
-        "set": {
-          "X-Forwarded-Prefix": "/api/v1/data",
-          "X-Real-IP": "$remote_addr"
-        },
-        "add": {
-          "X-Request-ID": "$request_id",
-          "X-Request-Source": "gateway"
-        },
-        "remove": ["X-Internal-Token", "X-Debug-Mode"]
-      }
-    }
-  }
-}
-```
-
-### Example: Full Configuration (Combined)
-
-Combining path stripping, host modification, and header manipulation:
-
-```json
-{
-  "plugins": {
-    "proxy-rewrite": {
-      "regex_uri": ["^/api/v1/data/(.*)", "/$1"],
-      "host": "internal-backend.local",
-      "headers": {
-        "set": {
-          "X-Forwarded-Prefix": "/api/v1/data",
-          "X-Real-IP": "$remote_addr",
-          "Host": "internal-backend.local"
-        },
-        "add": {
-          "X-Request-ID": "$request_id"
-        },
-        "remove": ["X-Internal-Token", "X-Debug-Mode"]
-      }
-    }
-  }
-}
-```
-
-### Available Variables
-
-APISIX variables can be used in header values:
-
-| Variable | Description |
-|----------|-------------|
-| `$remote_addr` | Client IP address |
-| `$request_id` | Unique request identifier |
-| `$host` | Original Host header |
-| `$uri` | Original request URI |
-| `$args` | Query string arguments |
-| `$http_HEADER` | Any request header (e.g., `$http_authorization`) |
-
-### Combining with Other Plugins
-
-The `proxy-rewrite` plugin can be combined with other plugins:
-
-```json
-{
-  "plugins": {
-    "prometheus": {},
-    "proxy-rewrite": {
-      "regex_uri": ["^/api/v1/data/(.*)", "/$1"],
-      "headers": {
-        "set": {
-          "X-Forwarded-Prefix": "/api/v1/data"
-        }
-      }
-    },
-    "response-rewrite": {
-      "headers": {
-        "set": {
-          "X-Processed-By": "civitas-gateway"
-        }
-      }
-    }
-  }
-}
-```
-
-### CloudEvent Example
-
-Complete CloudEvent for creating a route with `proxy-rewrite`:
-
-```json
-{
-  "specversion": "1.0",
-  "type": "de.civitascore.api.route.created",
-  "source": "civitas.api.provisioning",
-  "id": "event-proxy-rewrite-001",
-  "datacontenttype": "application/json",
-  "data": {
-    "metadata": {
-      "messageId": "msg-proxy-rewrite-001",
-      "timestamp": "2025-01-23T10:00:00Z",
-      "source": "api.service",
-      "correlationId": "corr-proxy-rewrite-001",
-      "configVersion": "1.0",
-      "resultTopic": "api.results"
-    },
-    "payload": {
-      "targetComponent": "apisix",
-      "targetResource": "routes/my-api-route",
-      "operation": "CREATE",
-      "config": {
-        "path": "routes/my-api-route",
-        "value": {
-          "uri": "/api/v1/*",
-          "methods": ["GET", "POST", "PUT", "DELETE"],
-          "upstream_id": "backend-service",
-          "plugins": {
-            "proxy-rewrite": {
-              "regex_uri": ["^/api/v1/(.*)", "/$1"]
-            }
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-### Common Use Cases
-
-| Use Case | Configuration |
-|----------|---------------|
-| Strip `/api/v1` prefix | `"regex_uri": ["^/api/v1/(.*)", "/$1"]` |
-| Strip `/v1` prefix | `"regex_uri": ["^/v1/(.*)", "/$1"]` |
-| Add prefix to path | `"regex_uri": ["^/(.*)", "/backend/$1"]` |
-| Replace entire path | `"uri": "/fixed-path"` |
-| Change host header | `"host": "internal.example.com"` |
-| Forward client IP | `"headers": {"set": {"X-Real-IP": "$remote_addr"}}` |
-
-### Error Handling
-
-Common errors when configuring `proxy-rewrite`:
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| HTTP 400 - Invalid regex | `regex_uri` has invalid regex pattern | Verify regex syntax is valid |
-| HTTP 400 - Invalid config | `regex_uri` array has wrong length | Must have exactly 2 elements: `["pattern", "replacement"]` |
-| HTTP 400 - Unknown field | Unsupported configuration field | Check APISIX documentation for valid fields |
-
-## Future Enhancements
-
-### SSL/TLS Certificates (Planned)
-
-Manage SSL certificates and SNI configuration.
-
-### Services API (Planned)
-
-Support for APISIX services for shared route configurations.
-
-## Performance Considerations
-
-### Connection Pooling
-
-JAX-RS Client automatically manages connection pooling:
-
-```java
-Client client = ClientBuilder.newBuilder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build();
-```
-
-### Timeouts
-
-- **Connect timeout:** 10 seconds
-- **Read timeout:** 30 seconds
-
-Adjust in `createClient()` if needed for your environment.
-
-### Concurrency
-
-The adapter is thread-safe and can process multiple events concurrently. Each event is processed independently.
-
-## Troubleshooting
-
-### Enable Debug Logging
-
-```properties
-# application.properties
-logging.level.de.civitascore.configadapter.apisix=DEBUG
-```
-
-Or via environment:
-```bash
-LOGGING_LEVEL_COM_CIVITAS_CONFIGADAPTER_APISIX=DEBUG
-```
-
-### Verify APISIX Connectivity
-
-```bash
-curl -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
-     http://localhost:9180/apisix/admin/upstreams
-```
-
-### Check Event Format
-
-Ensure CloudEvents match the expected schema (see Event Format section).
-
-### Monitor Result Topic
-
-Subscribe to the result topic to see success/failure responses:
-
-```bash
-kafka-console-consumer --bootstrap-server localhost:9092 \
-    --topic api.results --from-beginning
-```
-
-## Resources
-
-- [Apache APISIX Documentation](https://apisix.apache.org/docs/)
-- [APISIX Admin API Reference](https://apisix.apache.org/docs/apisix/admin-api/)
-- [JAX-RS Client API](https://jakarta.ee/specifications/restful-ws/3.1/)
-- [CloudEvents Specification](https://cloudevents.io/)
-
-## Contributing
-
-When adding new features:
-
-1. **Add unit tests** in `ApisixAdapterTest`
-2. **Add integration tests** in a `*IT` class extending `AbstractApisixIT` — the `*IT` suffix is what
-   routes them to Failsafe instead of Surefire, keeping `mvn test` Docker-free
-3. **Update this README** with new configuration options
-4. **Follow existing patterns** for consistency
-5. **Test with real APISIX** using integration tests
-
-## License
-
-Eclipse Public License 2.0 (EPL-2.0)
+Integration tests start APISIX and etcd through Testcontainers, with image versions in the shared
+`TestContainerImages` constants. They require the JVM argument
+`-Djdk.httpclient.allowRestrictedHeaders=host`, which the module's failsafe configuration sets.
