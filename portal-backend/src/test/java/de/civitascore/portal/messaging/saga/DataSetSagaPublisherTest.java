@@ -393,6 +393,7 @@ class DataSetSagaPublisherTest {
       UUID layerId = UUID.randomUUID();
       DataSink sink = postgisSink(sinkId, "my_table");
       Layer l = layer(layerId, "layer1", "EPSG:4326", sink);
+      l.setGeometryColumnRef("geom");
 
       DataSet dataSet = new DataSet();
       dataSet.setId(UUID.randomUUID());
@@ -412,6 +413,9 @@ class DataSetSagaPublisherTest {
       assertThat(entry.get("layerName").asString()).isEqualTo("layer1");
       assertThat(entry.get("nativeName").asString()).isEqualTo("my_table");
       assertThat(entry.get("crs").asString()).isEqualTo("EPSG:4326");
+      assertThat(entry.get("geometryColumnRef").asString())
+          .as("the geometry-column selection is forwarded so the adapter can pick the native CRS")
+          .isEqualTo("geom");
     }
 
     @Test
@@ -974,6 +978,32 @@ class DataSetSagaPublisherTest {
       assertThat(routeIds.size()).isEqualTo(2);
       assertThat(routeIds.get("traffic").asString()).isEqualTo("route-1");
       assertThat(routeIds.get("weather").asString()).isEqualTo("route-2");
+    }
+
+    @Test
+    @DisplayName("DatasetUnrelease trigger carries route/pipeline fields but omits the sink")
+    void unreleaseTriggerOmitsSinkFields() {
+      DataSet dataSet = datasetWithNamedApis("route-1", "route-2");
+      dataSet.setProjectId("proj-1");
+      dataSet.setFrostBaseUrl("https://frost/Projects(1)");
+      dataSet.setServiceId("svc-1");
+      dataSet.setPipelineIds(java.util.List.of("pipe-1"));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUnreleaseRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.get("sagaType").asString()).isEqualTo("DATASET_UNRELEASE");
+      // Route/pipeline teardown fields are present.
+      assertThat(payload.get("serviceId").asString()).isEqualTo("svc-1");
+      assertThat(payload.get("routeIds").size()).isEqualTo(2);
+      assertThat(payload.get("pipelineIds")).isNotNull();
+      assertNamedApisInPayload(jsonCaptor.getValue());
+      // The sink-holding fields must NOT leak into an unrelease trigger — otherwise the adapter
+      // could tear down the PostGIS table / FROST project (the bug #1923 fixes).
+      assertThat(payload.has("projectId")).as("projectId must be omitted").isFalse();
+      assertThat(payload.has("frostBaseUrl")).as("frostBaseUrl must be omitted").isFalse();
+      assertThat(payload.has("datasinks")).as("datasinks must be omitted").isFalse();
     }
 
     @Test

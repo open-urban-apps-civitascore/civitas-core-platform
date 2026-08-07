@@ -20,6 +20,9 @@
         <wiremock.version>3.9.2</wiremock.version>
         <archunit.version>1.4.2</archunit.version>
         <paho.version>1.2.5</paho.version>
+        <!-- Must track the NiFi version the flows are deployed to (apache/nifi:2.9.0), so the
+             compiler's emitted RecordPath is parse-checked against the same grammar that runs it. -->
+        <nifi-record-path.version>2.9.0</nifi-record-path.version>
     </properties>
 
     <dependencies>
@@ -27,6 +30,13 @@
             <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-api</artifactId>
             <version>${revision}</version>
+        </dependency>
+        <dependency>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-api</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
         </dependency>
 
         <dependency>
@@ -161,30 +171,19 @@
             <version>${archunit.version}</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- NiFi's own RecordPath parser: lets the compiler tests assert the emitted expression
+             actually parses, catching arity/signature errors at unit time instead of flow deploy. -->
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-record-path</artifactId>
+            <version>${nifi-record-path.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <!-- JDK 21+ requires add-opens for Jersey HTTP client reflection -->
-                    <argLine>@{argLine} --add-opens java.base/java.net=ALL-UNNAMED</argLine>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-failsafe-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>integration-test</goal>
-                            <goal>verify</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>

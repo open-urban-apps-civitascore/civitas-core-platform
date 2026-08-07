@@ -21,14 +21,14 @@ export const useDatastructureCreation = () => {
 
   const form = useForm<DatastructureCreateFormData>({
     resolver: zodResolver(DatastructureCreateFormSchema),
-    defaultValues: { name: '' },
+    defaultValues: { name: '', description: '' },
   })
 
   const saveDatastructure = async () => {
     const formData = form.getValues()
     const createDatastructureData = {
       name: formData.name,
-      description: '',
+      description: formData.description,
       createdFromDataSource: false,
       dataStructureVersionIds: [],
       assignments: [],

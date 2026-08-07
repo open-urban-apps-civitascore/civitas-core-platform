@@ -82,7 +82,8 @@
       "emailExists": "Diese E-Mail ist bereits vergeben.",
       "emailExistsToast": "Die E-mail {email} ist bereits vergeben. Bitte wählen Sie eine andere E-Mail-Adresse.",
       "insufficientPermissions": "Sie verfügen nicht über die notwendigen Berechtigungen für diese Aktion.",
-      "invalidCharacters": "Es sind nur Buchstaben, Zahlen, Binde- und Unterstriche erlaubt."
+      "invalidCharacters": "Es sind nur Buchstaben, Zahlen, Binde- und Unterstriche erlaubt.",
+      "mustNotStartWithNumber": "Darf nicht mit einer Nummer beginnen."
     },
     "items": {
       "data": "Daten",
@@ -107,13 +108,16 @@
       "updateSuccess": "{item} wurde erfolgreich aktualisiert",
       "updateError": "Beim Aktualisieren des {item}s ist ein Fehler aufgetreten.",
       "createSuccess": "{item} wurde erfolgreich angelegt",
-      "deleteSuccess": "{item} wurde erfolgreich gelöscht"
+      "deleteSuccess": "{item} wurde erfolgreich gelöscht",
+      "releasePermissionRequiredHint": "Die Berechtigung „Freigeben“ ist erforderlich. Ein Data Owner kann die Freigabe durchführen."
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
-      "descriptionHint": "max. 150 Zeichen"
+      "descriptionHint": "max. 150 Zeichen",
+      "creationSubtitle": "Im ersten Schritt ist nur ein Name erforderlich. Weitere Basisinformationen können später ergänzt werden.",
+      "notAvailable": "Nicht verfügbar"
     },
     "success": {
       "statusChangeSuccess": "Der Verfügbarkeitsstatus wurde erfolgreich aktualisiert.",
@@ -185,12 +189,14 @@
     },
     "infoBoxes": {
       "firstBox": "Gruppen, die plattformweite Berechtigungen an allen datenbezogenen Elementen besitzen, haben Zugriff.",
-      "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen."
+      "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen.",
+      "atLeastOne": "Mindestens eine Rolle erforderlich"
     },
     "messages": {
       "updateSuccess": "Berechtigungen wurden erfolgreich aktualisiert.",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert.",
-      "updateErrorNotDraft": "Berechtigungen können nur aktualisiert werden, wenn der Datensatz im Entwurfsstatus ist."
+      "updateErrorNotDraft": "Berechtigungen können nur aktualisiert werden, wenn der Datensatz im Entwurfsstatus ist.",
+      "updateErrorSagaInFlight": "Der Datensatz wird gerade bereitgestellt. Bitte versuchen Sie es in einem Moment erneut."
     }
   },
   "sidebar": {
@@ -270,7 +276,10 @@
     },
     "create": {
       "title": "Neuer Datensatz",
-      "subtitle": "Neue Datensätze sind nur intern sichtbar."
+      "subtitle": "Neue Datensätze sind nur intern sichtbar.",
+      "basicInfo": {
+        "title": "Basisinformation"
+      }
     },
     "overview": {
       "info": {
@@ -297,7 +306,12 @@
           "pipelines": {
             "title": "Pipeline(s)",
             "empty": "Noch keine Pipeline vorhanden",
-            "addButton": "Pipeline hinzufügen"
+            "addButton": "Pipeline hinzufügen",
+            "unknownError": "Unbekannter Fehler.",
+            "pipelineError": "Pipelinefehler",
+            "errorLabel": "Fehler",
+            "errorDetails": "Fehlerdetails für {name}",
+            "errorToast": "Pipeline „{name}“: {message}"
           },
           "apis": {
             "title": "APIs",
@@ -429,7 +443,7 @@
               },
               "style": {
                 "sectionTitle": "Layer-Stil",
-                "sectionSubtitle": "Stile werden im Tab \u201EStile\u201C erstellt und hier Layern zugewiesen",
+                "sectionSubtitle": "Stile werden im Tab „Stile“ erstellt und hier Layern zugewiesen",
                 "standardStyle": "Standardanzeige",
                 "default": "Standard (Geoserver default)",
                 "alternativeStyles": "Alternative Stile",
@@ -481,6 +495,12 @@
               },
               "persistence": {
                 "required": "Persistenz ist erforderlich"
+              },
+              "title": {
+                "tooLong": "Titel darf maximal 80 Zeichen lang sein"
+              },
+              "layerName": {
+                "tooLong": "Technischer Name darf maximal 80 Zeichen lang sein"
               }
             }
           }
@@ -503,7 +523,8 @@
       "unstageSuccess": "Der Datensatz wurde erfolgreich auf Entwurf zurückgesetzt.",
       "releaseSuccess": "Der Datensatz wurde erfolgreich freigegeben.",
       "unreleaseSuccess": "Die Freigabe des Datensatzes wurde erfolgreich aufgehoben.",
-      "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut."
+      "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+      "datasourceScopeViolation": "Der ausgewählte Datenpool ist nicht mit den verwendeten Datenquellen kompatibel. Eine oder mehrere Datenquellen sind für diesen Datenpool nicht freigegeben."
     },
     "warningModal": {
       "title": "Datensatz löschen?",
@@ -762,8 +783,7 @@
       "GROUP": "Gruppe",
       "PERMISSION": "Berechtigung",
       "ROLE": "Rolle",
-      "USER": "Benutzer",
-      "DATASET_DASHBOARD": "Datensatz-Dashboard"
+      "USER": "Benutzer"
     }
   },
   "roles": {
@@ -936,6 +956,8 @@
     "errors": {
       "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
       "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)",
+      "unsupportedBrokerScheme": "Verwenden Sie für MQTT eine unterstützte URL (tcp://, ws://, mqtt://, ssl://, mqtts:// oder wss://).",
+      "brokerTlsMismatch": "Broker-URL und TLS-Einstellung passen nicht zusammen.",
       "topicInvalidChars": "Das Topic darf keine Kommas, Semikolons oder Leerzeichen enthalten.",
       "topicSingle": "Es ist nur ein Topic erlaubt.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
@@ -951,8 +973,7 @@
       "title": "Neue Datenquelle",
       "subtitle": "Neue Datenquellen sind nur intern sichtbar.",
       "basicInfo": {
-        "title": "Basisinformation",
-        "subtitle": "Der Name kann später angepasst werden."
+        "title": "Basisinformation"
       }
     },
     "edit": {
@@ -970,7 +991,7 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
-      "accessManagement": "Zugriffsberechtigungen",
+      "accessManagement": "Zugriff",
       "datapools": "Datenpools"
     },
     "connectorTab": {
@@ -1052,8 +1073,7 @@
       "title": "Neue Datenstruktur",
       "subtitle": "Neue Datenstrukturen sind nur intern sichtbar.",
       "basicInfo": {
-        "title": "Basisinformation",
-        "subtitle": "Der Name kann später angepasst werden."
+        "title": "Basisinformation"
       }
     },
     "form": {
@@ -1063,7 +1083,7 @@
     },
     "tabs": {
       "basicInfo": "Basisinformationen",
-      "accessManagement": "Zugriffsberechtigungen",
+      "accessManagement": "Zugriff",
       "versions": "Versionen"
     },
     "edit": {
@@ -1115,7 +1135,7 @@
     "messages": {
       "createSuccess": "Die Version der Datenstruktur wurde erfolgreich angelegt.",
       "updateSuccess": "Die Version der Datenstruktur wurde erfolgreich aktualisiert.",
-      "isInUseModelHint": "Das Datenmodell kann nicht bearbeitet werden, da es bereits verwendet wird.",
+      "isAvailableModelHint": "Die Versionsinformationen und die Strukturdefinition können nicht bearbeitet werden, da diese Version bereits den Status 'Verfügbar' hat.",
       "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Version bereits verwendet wird.",
       "isLastAvailableVersion": "Kann nicht auf Entwurf gesetzt werden, da dies die letzte verfügbare Version einer verfügbaren Datenstruktur ist. Setzen Sie zuerst die Datenstruktur auf Entwurf."
     },
@@ -1123,7 +1143,7 @@
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
       "versionAlreadyExists": "Es existiert bereits eine Version mit der gleichen Versionsnummer in dieser Datenstruktur.",
       "versionFormat": "Die Versionsnummer muss dem Format X.Y.Z folgen (z. B. 1.0.0).",
-      "releaseInvalidModel": "Die Version kann nicht veröffentlicht werden: {reason}"
+      "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}"
     }
   },
   "pipelineEditor": {
@@ -1204,7 +1224,8 @@
       "description": "Beschreibung",
       "tags": "Tags",
       "showDataStructure": "Datenstruktur anzeigen",
-      "noPermission": "Keine Berechtigung zum Lesen von Datenquellen"
+      "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
+      "anonymousName": "Anonyme Datenquelle"
     },
     "frostPanel": {
       "details": "Sensordaten-Speicher Details",
@@ -1217,12 +1238,14 @@
       "title": "Geodaten-Speicher",
       "tableName": "Tabellenname",
       "tableNamePlaceholder": "Tabellennamen eingeben...",
+      "tableNameInvalid": "Erlaubt sind nur Buchstaben (a–z, A–Z), Ziffern und Unterstriche. Das erste Zeichen muss ein Buchstabe oder ein Unterstrich sein.",
       "dataStructureVersion": "Datenstruktur-Version",
       "importDataStructure": "Datenstruktur importieren",
       "changeDataStructure": "Datenstruktur ändern",
       "details": "Datenstruktur-Details",
       "dataStructureName": "Datenstruktur",
-      "versionNumber": "Version"
+      "versionNumber": "Version",
+      "anonymousDataStructure": "Anonyme Datenstruktur"
     },
     "mappingPanel": {
       "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
@@ -1259,7 +1282,7 @@
         "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld NiFi-Syntax sein.",
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
         "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben",
-        "duplicateTableName": "Zwei Geo-Persistenz-Speicher dürfen nicht den gleichen Namen haben",
+        "duplicateTableName": "Der Tabellenname \"{tableName}\" wird bereits in der Pipeline \"{pipeline}\" verwendet",
         "cronMqttIncompatible": "Ein CRON-Trigger kann nicht mit einer MQTT-Datenquelle verwendet werden. Bitte eine SQL-Quelle (Pull) verwenden.",
         "cronSourceConnectorUnknown": "Der Quell-Konnektor konnte nicht ermittelt werden; ein CRON-Trigger funktioniert nur mit einer SQL-Quelle (Pull), nicht mit MQTT.",
         "sqlSourceNoScheduleDefaultPoll": "Diese SQL-Quelle hat keinen CRON-Knoten und pollt im Standardintervall (alle 5 Minuten). Für einen expliziten Zeitplan bitte einen CRON-Knoten hinzufügen.",
@@ -1280,18 +1303,18 @@
         "mappingDataCorrupt": "{label} trägt keine gültigen Mapping-Daten — bitte den Knoten löschen und neu anlegen",
         "edgeEndpointMissing": "Eine Kante verweist auf einen nicht vorhandenen Knoten — bitte die Kante entfernen",
         "sourceNodeRequired": "Pipeline hat keinen Datenquellen-Knoten; genau eine verdrahtete Datenquelle ist erforderlich",
-        "sinkNodeRequired": "Pipeline hat keinen Datensenken-Knoten (Sensor- oder Geodaten-Speicher); genau eine verdrahtete Datensenke ist erforderlich",
+        "sinkNodeRequired": "Pipeline hat keinen Datenspeicher-Knoten (Sensor- oder Geodaten-Speicher); genau ein Datenspeicher ist erforderlich",
         "multipleSourceNodes": "{label} ist ein zusätzlicher Datenquellen-Knoten; eine Pipeline unterstützt genau einen",
-        "multipleSinkNodes": "{label} ist ein zusätzlicher Datensenken-Knoten; eine Pipeline unterstützt genau einen",
+        "multipleSinkNodes": "{label} ist ein zusätzlicher Datenspeicher-Knoten; eine Pipeline unterstützt genau einen",
         "nodeUnsupportedPosition": "{label} ist an einer nicht unterstützten Position verdrahtet",
         "unknownNodeInFlow": "{label} hat einen nicht unterstützten Knotentyp und kann nicht in den Datenfluss verdrahtet werden",
         "flowBranches": "Der Datenfluss verzweigt bei {label}; ein linearer Fluss von Quelle zu Senke ist erforderlich",
         "flowCycle": "Der Datenfluss enthält einen Zyklus bei {label}",
-        "noDataPath": "Es gibt keinen Datenfluss-Pfad von der Datenquelle zur Datensenke",
-        "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datensenke",
+        "noDataPath": "Es gibt keinen Datenfluss-Pfad von der Datenquelle zum Datenspeicher",
+        "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datenspeicher",
         "cronTriggerCapacity": "{label} ist ein zusätzlicher Zeitplan-Trigger an der Datenquelle; der Trigger-Port fasst höchstens einen",
         "edgeFormIncompatible": "{label} kann {form} von {upstreamLabel} nicht verarbeiten; akzeptiert wird: {accepted}",
-        "mappingChainStructureMismatch": "{label} setzt die Mapping-Kette nicht fort: {upstreamLabel} gibt {expected} aus, aber {label} liest {actual}"
+        "mappingChainStructureMismatch": "Die Output-Datenstruktur in Mapping-Node {upstreamLabel} und die Input-Datenstruktur in Mapping-Node {label} sind inkompatibel"
       }
     },
     "toolbar": {
@@ -1306,6 +1329,11 @@
       "deleteConfirmTitle": "Pipeline löschen?",
       "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
     },
+    "dataLoss": {
+      "title": "Gespeicherte Daten verwerfen und neu erzeugen?",
+      "description": "Diese Änderung verwirft alle gespeicherten Daten dieses Datensatzes. Die Daten werden beim nächsten Ausführen der Pipeline neu erzeugt. Alle bisher gespeicherten Daten gehen dauerhaft verloren.",
+      "confirm": "Gespeicherte Daten verwerfen"
+    },
     "header": {
       "saveAll": "Alle speichern",
       "savingAll": "Speichert...",
@@ -1314,7 +1342,8 @@
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
       "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
-      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt."
+      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt.",
+      "tableNameConflict": "{names} kann nicht gespeichert werden: Ein Geo-Persistenz-Tabellenname wird bereits von einem anderen Datenspeicher dieses Datensatzes verwendet."
     },
     "tabs": {
       "closeTab": "Tab schließen",
@@ -1346,14 +1375,15 @@
       },
       "errors": {
         "typeMismatchWithType": "Typen stimmen nicht überein ({type}). Konvertierungsfunktion hinzufügen.",
-        "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen."
+        "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen.",
+        "outputToOutput": "Zwei Ausgänge können nicht verbunden werden.",
+        "inputToInput": "Zwei Eingänge können nicht verbunden werden."
       },
       "unconnectedWarning": {
         "title": "Nicht verbundene Transformationen entfernen?",
         "description": "{count, plural, one {# Transformation ist} other {# Transformationen sind}} nicht mit dem Ausgang verbunden und {count, plural, one {wird} other {werden}} beim Verlassen des Editors entfernt.",
         "confirm": "Verlassen und entfernen"
       },
-
       "categories": {
         "literal": "Literal",
         "recordPathFunctions": "RecordPath-Funktionen",
@@ -1384,21 +1414,32 @@
           "description": "beliebiger Skalar → str"
         },
         "toInt": {
-          "description": "str / float → int"
+          "description": "str / number → int"
         },
         "toFloat": {
-          "description": "str / int → float"
+          "description": "str / int → number"
+        },
+        "toUuid": {
+          "description": "str → uuid"
         },
         "toDate": {
           "description": "str → date",
           "fields": {
             "pattern": {
-              "label": "Muster"
+              "label": "Eingabeformat"
+            }
+          }
+        },
+        "toDateTime": {
+          "description": "str → datetime",
+          "fields": {
+            "pattern": {
+              "label": "Eingabeformat"
             }
           }
         },
         "format": {
-          "description": "date → str",
+          "description": "date / datetime → str",
           "fields": {
             "pattern": {
               "label": "Muster"
@@ -1432,7 +1473,7 @@
     "rootValidation": {
       "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",
       "ambiguousRoot": "Das Diagramm hat mehrere mögliche Wurzelklassen ({names}). Markieren Sie die Wurzelklasse in den Klasseneigenschaften oder verbinden Sie die Klassen zu einer Hierarchie.",
-      "unreachable": "Diese Elemente sind von der Wurzelklasse „{root}“ aus nicht erreichbar: {names}. Verbinden Sie sie mit der Hierarchie oder entfernen Sie sie."
+      "misdirected": "Die Beziehung zwischen {name1} und {name2} ist falsch herum gezeichnet."
     }
   },
   "datapools": {

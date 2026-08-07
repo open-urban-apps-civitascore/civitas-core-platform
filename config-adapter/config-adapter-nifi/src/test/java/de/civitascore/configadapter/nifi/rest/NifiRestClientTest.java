@@ -33,6 +33,7 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import java.util.Map;
@@ -53,7 +54,9 @@ class NifiRestClientTest {
     server.start();
     httpClient = ClientBuilder.newClient();
     tokenProvider = new FakeTokenProvider();
-    client = new NifiRestClient(server.baseUrl(), tokenProvider, httpClient);
+    client =
+        new NifiRestClient(
+            server.baseUrl(), tokenProvider, httpClient, MqttTruststoreConfig.nodeTruststore());
   }
 
   @AfterEach
@@ -584,7 +587,35 @@ class NifiRestClientTest {
   }
 
   @Test
-  void unmatchedSensitivePropertyFailsLoudlyInsteadOfDroppingTheSecret() throws Exception {
+  void patchesSharedFrostCredentialOntoEveryInvokeHttpProcessor() throws Exception {
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{ \"controllerServices\": [] }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1/processors"))
+            .willReturn(
+                json(
+                    "{ \"processors\": ["
+                        + " { \"id\": \"get-1\", \"component\": { \"name\":"
+                        + " \"FrostPublish\" }, \"revision\": { \"version\": 2 } },"
+                        + " { \"id\": \"post-1\", \"component\": { \"name\":"
+                        + " \"FrostPublish\" }, \"revision\": { \"version\": 5 } } ] }")));
+    server.stubFor(put(urlEqualTo("/nifi-api/processors/get-1")).willReturn(json("{}")));
+    server.stubFor(put(urlEqualTo("/nifi-api/processors/post-1")).willReturn(json("{}")));
+
+    client.patchSensitiveProperties(
+        "pg-1", Map.of("FrostPublish", Map.of("X-API-Key", "frost-secret")));
+
+    server.verify(
+        putRequestedFor(urlEqualTo("/nifi-api/processors/get-1"))
+            .withRequestBody(containing("frost-secret")));
+    server.verify(
+        putRequestedFor(urlEqualTo("/nifi-api/processors/post-1"))
+            .withRequestBody(containing("frost-secret")));
+  }
+
+  @Test
+  void unmatchedSensitivePropertyFailsLoudlyInsteadOfDroppingTheSecret() {
     // A secret whose target component exists in neither the controller services nor the processors
     // must fail the deploy, not silently vanish.
     server.stubFor(
@@ -613,7 +644,7 @@ class NifiRestClientTest {
   }
 
   @Test
-  void invalidProcessorAfterStartFailsTheDeploy() throws Exception {
+  void invalidProcessorAfterStartFailsTheDeploy() {
     // starting the group returns only an HTTP status; a processor left INVALID (e.g. a bad cron)
     // would otherwise make the saga report success while the flow never runs. The post-start check
     // must fail the deploy with the processor's validation state.

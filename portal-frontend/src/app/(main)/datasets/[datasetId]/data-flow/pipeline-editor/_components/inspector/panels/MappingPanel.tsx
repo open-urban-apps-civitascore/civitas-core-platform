@@ -9,30 +9,23 @@
 
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 
 import { DataModelImportModal } from '@/app/(main)/datasources/[datasourceId]/components/datastructure-tab/DataModelImportModal'
-import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 import type { StaTargetVocabulary } from '../../../_constants/staTargetCatalog'
+import { parseCompositeKey, useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
 import { usePipelinePermissions } from '../../../_hooks/use-pipeline-permissions'
 import type { MappingNodeData } from '../../../_types/nodes'
 import { emptyMappingConfig, type MappingConfig } from '../../mapping-editor/_types'
 import { MappingEditorModal } from '../../mapping-editor/MappingEditorModal'
 
-const parseCompositeKey = (key: string): { datastructureId: string; versionId: string } | null => {
-  const [datastructureId, versionId, ...rest] = key.split('/')
-  if (!datastructureId || !versionId || rest.length > 0) return null
-  return { datastructureId, versionId }
-}
-
 interface SchemaSelection {
   datastructureId: string
   versionId: string
-  name: string
 }
 
 interface DatastructureFieldProps {
@@ -43,31 +36,16 @@ interface DatastructureFieldProps {
   onSelect: (selection: SchemaSelection) => void
 }
 
-/** Datastructure-version picker reusing DataModelImportModal, resolving the schema name. */
+/** Datastructure-version picker reusing DataModelImportModal. */
 const DatastructureField = ({ label, placeholder, selectedKey, name, onSelect }: DatastructureFieldProps) => {
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canReadDatastructures } = usePipelinePermissions(datasetId)
-
   const [isOpen, setIsOpen] = useState(false)
-  const [pendingKey, setPendingKey] = useState<string | null>(null)
-  const parsed = useMemo(() => (pendingKey ? parseCompositeKey(pendingKey) : null), [pendingKey])
-
-  const { data: versionResponse } = useGetDatastructureVersion({
-    datastructureId: parsed?.datastructureId ?? '',
-    versionId: parsed?.versionId ?? '',
-    isEnabled: !!parsed,
-  })
-
-  useEffect(() => {
-    if (!versionResponse?.data || !pendingKey) return
-    const p = parseCompositeKey(pendingKey)
-    if (p) onSelect({ ...p, name: versionResponse.data.dataStructure?.name ?? '' })
-    setPendingKey(null)
-  }, [versionResponse?.data, pendingKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelect = (selection: Record<string, boolean>) => {
     const key = Object.keys(selection).find(k => selection[k])
-    if (key && parseCompositeKey(key)) setPendingKey(key)
+    const parsed = key ? parseCompositeKey(key) : null
+    if (parsed) onSelect(parsed)
     setIsOpen(false)
   }
 
@@ -84,6 +62,7 @@ const DatastructureField = ({ label, placeholder, selectedKey, name, onSelect }:
           selectedVersion={selectedKey}
           datasourceTitle={name || label}
           onSelectVersion={handleSelect}
+          canRemoveSelection={false}
         />
       )}
     </div>
@@ -105,6 +84,10 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
     data.targetDatastructureId && data.targetVersionId ? `${data.targetDatastructureId}/${data.targetVersionId}` : null
   const canOpen = Boolean(data.label.trim() && sourceKey && targetKey)
 
+  // Names are not stored on the node — resolve them from the version references at render time.
+  const { name: sourceName } = useDatastructureVersionInfo(sourceKey ?? undefined)
+  const { name: targetName } = useDatastructureVersionInfo(targetKey ?? undefined)
+
   // The node is "configured" (deployable) ONLY after the field mapping has been saved (handleSave).
   // The name and the source/target selection alone never mark it configured — otherwise a node with
   // source+target but no actual mapping would pass validation and deploy an empty transformation.
@@ -124,7 +107,6 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
     onUpdate({
       sourceDatastructureId: sel.datastructureId,
       sourceVersionId: sel.versionId,
-      sourceName: sel.name,
       ...invalidateMapping,
     })
 
@@ -132,7 +114,6 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
     onUpdate({
       targetDatastructureId: sel.datastructureId,
       targetVersionId: sel.versionId,
-      targetName: sel.name,
       ...invalidateMapping,
     })
 
@@ -150,14 +131,14 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
         label={t('inputDatastructure')}
         placeholder={t('selectDatastructure')}
         selectedKey={sourceKey}
-        name={data.sourceName}
+        name={sourceName}
         onSelect={handleSource}
       />
       <DatastructureField
         label={t('outputDatastructure')}
         placeholder={t('selectDatastructure')}
         selectedKey={targetKey}
-        name={data.targetName}
+        name={targetName}
         onSelect={handleTarget}
       />
 
@@ -173,12 +154,12 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
           source={{
             datastructureId: data.sourceDatastructureId!,
             versionId: data.sourceVersionId!,
-            name: data.sourceName,
+            name: sourceName,
           }}
           target={{
             datastructureId: data.targetDatastructureId!,
             versionId: data.targetVersionId!,
-            name: data.targetName,
+            name: targetName,
           }}
           config={data.mappingConfig}
           onSave={handleSave}

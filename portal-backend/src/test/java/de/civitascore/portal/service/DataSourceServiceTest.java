@@ -3,6 +3,10 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataSourceMapper;
@@ -11,22 +15,30 @@ import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataPool;
+import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
+import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,9 +48,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataSourceService Tests")
@@ -54,6 +69,9 @@ class DataSourceServiceTest {
   @Mock private DataSetRepository dataSetRepository;
   @Mock private PipelineRepository pipelineRepository;
   @Mock private DataPoolRepository dataPoolRepository;
+  @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
+
+  @Spy private DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
   @InjectMocks private DataSourceService dataSourceService;
 
@@ -358,6 +376,62 @@ class DataSourceServiceTest {
     }
 
     @Test
+    @DisplayName(
+        "Should deny updateReleasedMeta binding a DataPool the caller is not authorized for")
+    void shouldDenyUnauthorizedDatapoolOnUpdateReleasedMeta() {
+      UUID id = UUID.randomUUID();
+      UUID poolId = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(poolId));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setDatapoolScope(scope);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      stubNotInUse(id);
+      doThrow(new AccessDeniedException("denied"))
+          .when(scopeAccessAuthorizer)
+          .authorizeReferences(eq(ScopeType.DATAPOOL), any());
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    @DisplayName("Should deny updateReleasedMeta binding a DataStructure the caller cannot access")
+    void shouldDenyUnauthorizedDataStructureOnUpdateReleasedMeta() {
+      UUID id = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+
+      DataStructureVersion dsv = createDataStructureVersion();
+      dsv.setId(dsvId);
+      dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setDataStructureVersionId(dsvId);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      stubNotInUse(id);
+      when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
+      doThrow(new AccessDeniedException("denied"))
+          .when(scopeAccessAuthorizer)
+          .authorizeReferences(eq(ScopeType.DATASTRUCTURE), any());
+
+      // An unauthorized version must surface as the same not-found failure as a missing one, so
+      // the caller cannot distinguish an existing-but-forbidden version from a non-existent one.
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
     @DisplayName("Should fail to update metadata of DRAFT data source")
     void shouldFailToUpdateMetaOfDraftDataSource() {
       UUID id = UUID.randomUUID();
@@ -647,6 +721,124 @@ class DataSourceServiceTest {
 
       assertThat(result.getAssignments()).isEmpty();
     }
+
+    @Test
+    @DisplayName(
+        "Should reject narrowing an in-use datasource's scope to exclude a pool it already feeds")
+    void shouldRejectNarrowingScopeExcludingLinkedPool() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setDatapoolScopeType(DatapoolScopeType.ALL);
+
+      // The datasource already feeds a dataset sitting in poolA.
+      DataPool poolA = new DataPool();
+      poolA.setId(UUID.randomUUID());
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setDataPool(poolA);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSet(dataSet);
+      pipeline.setDataSources(new HashSet<>(Set.of(entity)));
+
+      // Narrow the scope to a DIFFERENT pool (poolB), excluding poolA.
+      DataPool poolB = new DataPool();
+      poolB.setId(UUID.randomUUID());
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(poolB.getId()));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setDatapoolScope(scope);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      stubInUse(id);
+      when(dataPoolRepository.findAllById(List.of(poolB.getId()))).thenReturn(List.of(poolB));
+      when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(id));
+    }
+
+    @Test
+    @DisplayName("Should accept narrowing an in-use datasource's scope to a pool it already feeds")
+    void shouldAcceptNarrowingScopeIncludingLinkedPool() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setDatapoolScopeType(DatapoolScopeType.ALL);
+
+      DataPool poolA = new DataPool();
+      poolA.setId(UUID.randomUUID());
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setDataPool(poolA);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSet(dataSet);
+      pipeline.setDataSources(new HashSet<>(Set.of(entity)));
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(poolA.getId()));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setDatapoolScope(scope);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      stubInUse(id);
+      when(dataPoolRepository.findAllById(List.of(poolA.getId()))).thenReturn(List.of(poolA));
+      when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
+      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
+
+      assertThat(result.getDatapoolScopeType()).isEqualTo(DatapoolScopeType.SPECIFIC);
+    }
+
+    @Test
+    @DisplayName("Should reject narrowing an in-use datasource's scope to NONE")
+    void shouldRejectNarrowingScopeToNone() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setDatapoolScopeType(DatapoolScopeType.ALL);
+
+      DataPool poolA = new DataPool();
+      poolA.setId(UUID.randomUUID());
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setDataPool(poolA);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSet(dataSet);
+      pipeline.setDataSources(new HashSet<>(Set.of(entity)));
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.NONE);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setDatapoolScope(scope);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      stubInUse(id);
+      when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(id));
+    }
   }
 
   @Nested
@@ -692,6 +884,7 @@ class DataSourceServiceTest {
       dsv.setId(dsvId);
       dsv.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       DataStructure ds = new DataStructure();
+      ds.setId(UUID.randomUUID());
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       dsv.setDataStructure(ds);
 
@@ -718,6 +911,7 @@ class DataSourceServiceTest {
       dsv.setId(dsvId);
       dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       DataStructure ds = new DataStructure();
+      ds.setId(UUID.randomUUID());
       ds.setDataStructureStatus(DataStructureStatus.DRAFT);
       dsv.setDataStructure(ds);
 
@@ -737,8 +931,92 @@ class DataSourceServiceTest {
     }
 
     @Test
-    @DisplayName("Should reject changing DSV on AVAILABLE data source")
-    void shouldRejectChangingDsvWhenAvailable() {
+    @DisplayName("Should authorize the parent structure id, not the version id, when linking")
+    void shouldAuthorizeParentStructureNotVersion() {
+      UUID dsvId = UUID.randomUUID();
+      DataStructureVersion dsv = createDataStructureVersion();
+      dsv.setId(dsvId);
+      dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dsv.getDataStructure().setDataStructureStatus(DataStructureStatus.AVAILABLE);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("test");
+      input.setDataStructureVersionId(dsvId);
+
+      DataSource entity = new DataSource();
+      entity.setId(UUID.randomUUID());
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+      when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
+      when(dataSourceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      dataSourceService.create(input);
+
+      // Assignments scope on the parent DataStructure; authorizing the version id would deny every
+      // legitimate caller. This assertion fails if the guard is inverted to the version id.
+      ArgumentCaptor<Collection<UUID>> captor = ArgumentCaptor.forClass(Collection.class);
+      verify(scopeAccessAuthorizer)
+          .authorizeReferences(eq(ScopeType.DATASTRUCTURE), captor.capture());
+      assertThat(captor.getValue())
+          .containsExactly(dsv.getDataStructure().getId())
+          .doesNotContain(dsvId);
+    }
+
+    @Test
+    @DisplayName("Should deny an unauthorized structure indistinguishably from a missing version")
+    void shouldDenyWhenNotAuthorizedForDataStructure() {
+      UUID dsvId = UUID.randomUUID();
+      DataStructureVersion dsv = createDataStructureVersion();
+      dsv.setId(dsvId);
+      dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("test");
+      input.setDataStructureVersionId(dsvId);
+
+      DataSource entity = new DataSource();
+      entity.setId(UUID.randomUUID());
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+      when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
+      doThrow(new AccessDeniedException("denied"))
+          .when(scopeAccessAuthorizer)
+          .authorizeReferences(eq(ScopeType.DATASTRUCTURE), any());
+
+      // An unauthorized version must surface as the same not-found failure as a missing one, so
+      // the caller cannot distinguish an existing-but-forbidden version from a non-existent one.
+      assertThatThrownBy(() -> dataSourceService.create(input))
+          .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("Should reject changing DSV on an in-use AVAILABLE data source")
+    void shouldRejectChangingDsvWhenAvailableAndInUse() {
+      UUID id = UUID.randomUUID();
+      DataStructureVersion existingDsv = createDataStructureVersion();
+
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setConnectorType(ConnectorType.MQTT);
+      entity.setDataStructureVersion(existingDsv);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("updated");
+      input.setConnectorType(ConnectorType.MQTT);
+      input.setDataStructureVersionId(UUID.randomUUID());
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(true);
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("data structure version");
+    }
+
+    @Test
+    @DisplayName("Should reject changing DSV on an AVAILABLE data source via the generic route")
+    void shouldRejectChangingDsvWhenAvailableViaGenericUpdate() {
       UUID id = UUID.randomUUID();
       DataStructureVersion existingDsv = createDataStructureVersion();
 
@@ -757,31 +1035,7 @@ class DataSourceServiceTest {
 
       assertThatThrownBy(() -> dataSourceService.update(id, input))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("Cannot change data structure version");
-    }
-
-    @Test
-    @DisplayName("Should reject removing DSV from AVAILABLE data source")
-    void shouldRejectRemovingDsvWhenAvailable() {
-      UUID id = UUID.randomUUID();
-      DataStructureVersion existingDsv = createDataStructureVersion();
-
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      entity.setConnectorType(ConnectorType.MQTT);
-      entity.setDataStructureVersion(existingDsv);
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("updated");
-      input.setConnectorType(ConnectorType.MQTT);
-      input.setDataStructureVersionId(null);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-
-      assertThatThrownBy(() -> dataSourceService.update(id, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("Cannot remove data structure version");
+          .hasMessageContaining("can only be updated in DRAFT status");
     }
 
     @Test
@@ -823,8 +1077,8 @@ class DataSourceServiceTest {
   class UpdateTests {
 
     @Test
-    @DisplayName("Should prevent changing connector type of AVAILABLE data source")
-    void shouldPreventChangingConnectorTypeWhenAvailable() {
+    @DisplayName("Should prevent changing connector type of an in-use AVAILABLE data source")
+    void shouldPreventChangingConnectorTypeWhenAvailableAndInUse() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -836,10 +1090,58 @@ class DataSourceServiceTest {
       input.setConnectorType(ConnectorType.SQL);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(true);
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("connector type");
+    }
+
+    @Test
+    @DisplayName("Should reject the generic update route for an AVAILABLE data source")
+    void shouldRejectGenericUpdateWhenAvailable() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("updated");
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
       assertThatThrownBy(() -> dataSourceService.update(id, input))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("connector type");
+          .hasMessageContaining("can only be updated in DRAFT status");
+
+      verify(dataSourceRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should reject narrowing the datapool scope of an AVAILABLE source via update")
+    void shouldRejectScopeNarrowingViaGenericUpdate() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setDatapoolScopeType(DatapoolScopeType.ALL);
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.NONE);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("updated");
+      input.setDatapoolScope(scope);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+
+      assertThatThrownBy(() -> dataSourceService.update(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("can only be updated in DRAFT status");
+
+      // The scope must not have been applied before the guard rejected the call.
+      assertThat(entity.getDatapoolScopeType()).isEqualTo(DatapoolScopeType.ALL);
+      verify(dataSourceRepository, never()).save(any());
     }
 
     @Test
@@ -1050,6 +1352,29 @@ class DataSourceServiceTest {
     }
 
     @Test
+    @DisplayName("Should deny SPECIFIC scope when the caller is not authorized for a DataPool")
+    void shouldDenyWhenNotAuthorizedForDatapool() {
+      UUID poolId = UUID.randomUUID();
+      DataSource entity = DataSource.builder().build();
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(poolId));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("source");
+      input.setDatapoolScope(scope);
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+      doThrow(new AccessDeniedException("denied"))
+          .when(scopeAccessAuthorizer)
+          .authorizeReferences(eq(ScopeType.DATAPOOL), any());
+
+      assertThatThrownBy(() -> dataSourceService.create(input))
+          .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
     @DisplayName("Should reject SPECIFIC scope with null datapoolIds")
     void shouldRejectSpecificScopeWithNullIds() {
       DataSource entity = DataSource.builder().build();
@@ -1176,6 +1501,9 @@ class DataSourceServiceTest {
   private DataStructureVersion createDataStructureVersion() {
     DataStructureVersion dsv = new DataStructureVersion();
     dsv.setId(UUID.randomUUID());
+    DataStructure parent = new DataStructure();
+    parent.setId(UUID.randomUUID());
+    dsv.setDataStructure(parent);
     return dsv;
   }
 }

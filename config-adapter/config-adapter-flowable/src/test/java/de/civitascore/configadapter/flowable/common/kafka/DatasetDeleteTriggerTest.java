@@ -120,7 +120,13 @@ class DatasetDeleteTriggerTest {
         ((Map<?, ?>) sink.get("configuration")).get("tableName"),
         "the sink configuration must reach the handler so it knows which table to drop");
 
-    verify(frost, times(1)).handle(any());
+    // The dataset carries no FROST sink, yet its recorded project is still torn down: teardown
+    // follows what was provisioned, not what is configured now.
+    ArgumentCaptor<SagaCommandMessage> frostCaptor =
+        ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(frost, times(1)).handle(frostCaptor.capture());
+    assertEquals("DELETE_PROJECT", frostCaptor.getValue().operation());
+    assertEquals("proj-789", frostCaptor.getValue().payload().get("projectId"));
   }
 
   private byte[] deleteTrigger(boolean withGeoSink) throws Exception {

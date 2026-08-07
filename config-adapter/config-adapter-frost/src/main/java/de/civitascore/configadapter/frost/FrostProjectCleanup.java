@@ -58,11 +58,12 @@ final class FrostProjectCleanup {
   /**
    * Deletes the project's Things (cascading to their Datastreams and Observations).
    *
-   * <p>Re-run safe: already-deleted Things (404) are skipped; a 404 on the enumeration skips the
-   * cleanup on compensation only — a forward delete must fail instead of silently stranding the
-   * Things at server root.
+   * <p>Re-run safe: already-deleted Things (404) are skipped, and a 404 on the enumeration means
+   * the whole project is already gone — nothing to clean up, in either direction. A forward delete
+   * of a dataset whose project a prior run (or a failed saga's compensation) already removed
+   * therefore succeeds rather than stranding on the 404.
    */
-  void deleteProjectThings(String projectId, boolean compensating) {
+  void deleteProjectThings(String projectId) {
     // Collect all ids before deleting (deleting while paging shifts pages). Explicit $skip paging
     // instead of @iot.nextLink: FROST renders that link from its serviceRootUrl, which is not
     // necessarily reachable from this adapter. Stable because nothing writes during this step.
@@ -81,10 +82,14 @@ final class FrostProjectCleanup {
                       .queryParam("$skip", String.valueOf(skip))
                       .request(MediaType.APPLICATION_JSON))
               .get()) {
-        if (compensating && response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
+        if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
+          // A missing project means there is nothing left to delete — idempotent in both
+          // directions. This also covers a re-release/re-delete after an earlier run already
+          // removed the project (e.g. a prior failed saga's compensation), so the forward delete
+          // must not fail on the 404 either.
           log.info(
-              "DELETE_PROJECT compensation: project {} not found while listing its Things —"
-                  + " skipping Thing cleanup. saga={}",
+              "DELETE_PROJECT: project {} not found while listing its Things — skipping Thing"
+                  + " cleanup (already gone). saga={}",
               Encode.forJava(projectId),
               Encode.forJava(sagaId));
           return;

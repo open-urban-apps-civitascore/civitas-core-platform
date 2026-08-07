@@ -167,6 +167,18 @@ public class DataSet extends BaseDataEntity {
   @Column(name = "pending_saga_type", length = 30)
   private PendingSagaType pendingSagaType;
 
+  /**
+   * Whether a provisioning saga has completed for this dataset, so whatever sinks it carried at
+   * release physically exist (PostGIS table / FROST project). Set on any provisioning saga's
+   * completion regardless of which sinks the dataset has, and left untouched by unrelease — the
+   * sinks survive it. (There is no reset path: the row is removed on DELETE-saga completion.)
+   * Distinguishes "never released, nothing provisioned yet" from "infrastructure exists, holds
+   * data" so a destructive sink edit only warns once data is actually at risk, and so a delete
+   * knows a teardown saga is required.
+   */
+  @Column(name = "provisioned", nullable = false)
+  private boolean provisioned = false;
+
   @OneToMany(
       mappedBy = "dataset",
       fetch = FetchType.LAZY,
@@ -250,16 +262,18 @@ public class DataSet extends BaseDataEntity {
   }
 
   /**
-   * Resets all infrastructure-related fields and clears the per-named-API {@code routeId} on each
-   * entry. The named-API entries themselves are preserved (they are user-authored). The {@code
-   * namedApis} collection must be initialized before this is called.
+   * Clears the ingest and consumer-access infrastructure torn down by an unrelease: the pipeline
+   * ids, the per-named-API {@code routeId}, and the APISIX access fields {@code serviceId} (the
+   * per-dataset upstream, deleted by {@code DELETE_ROUTE}) and {@code publicUrl} (the gateway
+   * endpoint, unreachable once the route is gone). The two data-holding sink references {@code
+   * projectId} and {@code frostBaseUrl} are deliberately left intact — the FROST project survives
+   * an unrelease and is reused on re-release. The named-API entries themselves are preserved (they
+   * are user-authored). The {@code namedApis} collection must be initialized before this is called.
    */
-  public void clearInfrastructureFields() {
-    this.projectId = null;
-    this.frostBaseUrl = null;
+  public void clearRouteAndPipelineInfrastructure() {
+    this.pipelineIds = null;
     this.serviceId = null;
     this.publicUrl = null;
-    this.pipelineIds = null;
     this.namedApis.forEach(api -> api.setRouteId(null));
   }
 }

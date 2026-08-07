@@ -34,12 +34,13 @@ class FrostSinkStageTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  private final FrostSinkStage stage = new FrostSinkStage("http://frost:8080/v1.1");
+  private final FrostSinkStage stage =
+      new FrostSinkStage("http://frost:8080/v1.1", FrostSinkAuth.basicAuth("frost", "secret"));
   private final SinkResolutionContext ctx = new SinkResolutionContext("7", null);
 
   private static Map<String, Object> json(String json) {
     try {
-      return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {});
+      return MAPPER.readValue(json, new TypeReference<>() {});
     } catch (Exception e) {
       throw new IllegalStateException(e);
     }
@@ -64,6 +65,26 @@ class FrostSinkStageTest {
                   "name": { "type": "string" } } } } } }
         """
             .formatted(thingProps, datastreamProps));
+  }
+
+  @Test
+  void resolvesDatastreamBagThroughLowercaseRelationshipName() throws Exception {
+    Map<String, Object> datasink =
+        datasinkWith(
+            "\"reference\": { \"type\": \"string\" }", "\"reference\": { \"type\": \"string\" }");
+    @SuppressWarnings("unchecked")
+    Map<String, Object> schema = (Map<String, Object>) datasink.get("dataStructure");
+    @SuppressWarnings("unchecked")
+    Map<String, Object> defs = (Map<String, Object>) schema.get("$defs");
+    @SuppressWarnings("unchecked")
+    Map<String, Object> thing = (Map<String, Object>) defs.get("Thing");
+    @SuppressWarnings("unchecked")
+    Map<String, Object> properties = (Map<String, Object>) thing.get("properties");
+    properties.put("datastream", properties.remove("Datastreams"));
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertEquals(List.of("reference"), spec.staProperties().datastreamKeys());
   }
 
   @Test
@@ -141,6 +162,42 @@ class FrostSinkStageTest {
 
     assertEquals(List.of("reference"), spec.staProperties().thingKeys());
     assertEquals(List.of("reference"), spec.staProperties().datastreamKeys());
+  }
+
+  @Test
+  void resolvesReferenceFromALittleThingModel() throws Exception {
+    Map<String, Object> datasink =
+        json(
+            """
+            { "dataStructure": {
+                "$id": "urn:core:platform:civitas:datastructure:common:ALittleThing:91zjftfn1i:1.0.0",
+                "type": "object",
+                "$defs": {
+                  "Thing": {
+                    "type": "object",
+                    "required": ["name", "description", "definition", "properties"],
+                    "properties": {
+                      "name": { "type": "string" },
+                      "definition": { "type": "string" },
+                      "properties": { "$ref": "#/$defs/properties" },
+                      "description": { "type": "string" }
+                    }
+                  },
+                  "properties": {
+                    "type": "object",
+                    "required": ["reference"],
+                    "properties": { "reference": { "type": "string" } }
+                  }
+                },
+                "properties": { "thing": { "$ref": "#/$defs/Thing" } }
+              }
+            }
+            """);
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertEquals(List.of("reference"), spec.staProperties().thingKeys());
+    assertTrue(spec.staProperties().datastreamKeys().isEmpty());
   }
 
   @Test

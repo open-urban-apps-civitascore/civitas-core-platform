@@ -22,7 +22,15 @@ public enum SagaType {
    * Dataset deletion: NiFi (conditional) → APISIX → FROST (reverse order). Best-effort execution,
    * no compensation.
    */
-  DATASET_DELETE("dataset-delete");
+  DATASET_DELETE("dataset-delete"),
+
+  /**
+   * Dataset unrelease: NiFi (conditional) → APISIX (reverse order). Tears down only the ingest and
+   * consumer access (pipeline + route/upstream); the data-holding sink (PostGIS table, FROST
+   * project) is deliberately kept so a later re-release reuses it. Best-effort execution, no
+   * compensation.
+   */
+  DATASET_UNRELEASE("dataset-unrelease");
 
   private final String key;
 

@@ -1,68 +1,30 @@
 'use client'
 
-import { AxiosError } from 'axios'
 import { InfoIcon, List, Plus, TriangleAlert } from 'lucide-react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
-import { toast } from 'sonner'
 
-import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
-import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { NoDataCard } from '@/components/no-data/no-data-card/NoDataCard'
-import { PageBackground } from '@/components/page-background/PageBackground'
-import { PageContainer } from '@/components/page-container/PageContainer'
-import { PageHeader } from '@/components/page-header/PageHeader'
 import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
-import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
-import { AssignmentScopedInput } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
-import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 
 import { AccessManagementTable, GroupRoleAssignmentTable } from './AccessManagementTable'
 import { AddGroupModal } from './AddGroupModal'
 import { AddRoleModal } from './AddRoleModal'
 
 /**
- * Uncontrolled mode: component manages its own state.
- * Used for standalone pages (e.g. datasets).
- * Renders with page-level title, subtitle and save/cancel action buttons.
+ * Renders the group/role assignments of an entity. The parent owns the assignments state,
+ * the read-only mode and — where applicable — saving; this component only edits the list.
  */
-type UncontrolledProps = {
-  entityId: string
-  initialAssignments: GroupRoleAssignmentTable[]
-  onPatchEntity: (id: string, assignments: AssignmentScopedInput[]) => Promise<void>
-  title: string
-  subtitle: string
-  onExit?: () => void
-  // controlled props must not be passed
-  assignedGroups?: never
-  onAssignedGroupsChange?: never
-  isReadOnly?: never
-}
-
-/**
- * Controlled mode: parent manages the assignments state.
- * Used for embedded contexts (e.g. datasources tab).
- * No action buttons – the parent handles saving.
- */
-type ControlledProps = {
+type GenericAssignmentsListProps = {
   assignedGroups: GroupRoleAssignmentTable[]
   onAssignedGroupsChange: (groups: GroupRoleAssignmentTable[]) => void
   isReadOnly?: boolean
-  // uncontrolled props must not be passed
-  entityId?: never
-  initialAssignments?: never
-  onPatchEntity?: never
-  title?: never
-  subtitle?: never
-}
-
-type GenericAssignmentsListProps = {
+  isLoading?: boolean
   testId?: string
   firstBoxText?: string
   secondBoxText?: string
@@ -70,10 +32,14 @@ type GenericAssignmentsListProps = {
   tableTitle?: string
   tableSubtitle?: string
   noDataSubtitle?: string
-} & (UncontrolledProps | ControlledProps)
+}
 
 export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
   const {
+    assignedGroups,
+    onAssignedGroupsChange,
+    isReadOnly = false,
+    isLoading = false,
     testId = 'accessManagement',
     hasSecondBox = false,
     firstBoxText,
@@ -83,47 +49,18 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
     noDataSubtitle,
   } = props
 
-  const isControlled = props.assignedGroups !== undefined
   const { hasPermission } = usePermissions()
   const canAddGroups = hasPermission(PERMISSION_NAMES.GROUP_READ) && hasPermission(PERMISSION_NAMES.ROLE_READ)
   const canAddRoles = hasPermission(PERMISSION_NAMES.ROLE_READ)
 
-  const params = useSearchParams()
-  const mode = params.get('mode')
-
   const t = useTranslations('accessManagement')
-  const tCommon = useTranslations('common')
-  const router = useRouter()
 
-  // Internal state — only used in uncontrolled mode
-  const [assignedGroupsInternal, setAssignedGroupsInternal] = useState<GroupRoleAssignmentTable[]>(
-    props.initialAssignments ?? [],
-  )
-  const [isReadOnlyInternal, setIsReadOnlyInternal] = useState(mode !== 'edit')
   const [isAddGroupModalOpen, setIsAddGroupModalOpen] = useState(false)
   const [isAddRoleModalOpen, setIsAddRoleModalOpen] = useState(false)
   const [selectedGroupForRole, setSelectedGroupForRole] = useState<string | null>(null)
-  const [isExitModalOpen, setIsExitModalOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-
-  // Resolved values based on mode
-  const assignedGroups = isControlled ? (props.assignedGroups as GroupRoleAssignmentTable[]) : assignedGroupsInternal
-  const isReadOnly = isControlled ? (props.isReadOnly ?? false) : isReadOnlyInternal
-  const initialAssignments = props.initialAssignments ?? []
-
-  // Change detection only used in uncontrolled mode
-  const hasChanges = hasAssignmentChanges(assignedGroups, initialAssignments)
-
-  const updateAssignedGroups = (updated: GroupRoleAssignmentTable[]) => {
-    if (isControlled) {
-      props.onAssignedGroupsChange!(updated)
-    } else {
-      setAssignedGroupsInternal(updated)
-    }
-  }
 
   const handleDeleteGroup = (groupId: string) => {
-    updateAssignedGroups(assignedGroups.filter(a => a.groupId !== groupId))
+    onAssignedGroupsChange(assignedGroups.filter(a => a.groupId !== groupId))
   }
 
   const handleAddAssignmentClick = () => setIsAddGroupModalOpen(true)
@@ -136,7 +73,7 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
       groupDescription: g.description,
       assignedRoles: [],
     }))
-    updateAssignedGroups([...assignedGroups, ...newAssignments])
+    onAssignedGroupsChange([...assignedGroups, ...newAssignments])
   }
 
   const handleAddRoleClick = (groupId: string) => {
@@ -147,7 +84,7 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
   const handleAddRoles = (roles: Role[]) => {
     if (!selectedGroupForRole) return
     if (roles.length === 0) return
-    updateAssignedGroups(
+    onAssignedGroupsChange(
       assignedGroups.map(group =>
         group.groupId === selectedGroupForRole
           ? {
@@ -160,7 +97,7 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
   }
 
   const handleDeleteRole = (groupId: string, roleId: string) => {
-    updateAssignedGroups(
+    onAssignedGroupsChange(
       assignedGroups.map(group =>
         group.groupId === groupId
           ? { ...group, assignedRoles: group.assignedRoles.filter(r => r.roleId !== roleId) }
@@ -170,67 +107,6 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
   }
 
   const assignedGroupIds = assignedGroups.map(a => a.groupId)
-
-  // Submit / Cancel / Exit handlers only relevant in uncontrolled mode
-  const onSubmit = async (): Promise<boolean> => {
-    setIsLoading(true)
-    const areAssignmentsInvalid = assignedGroups.some(group => group.assignedRoles.length === 0)
-    try {
-      if (props.onPatchEntity && props.entityId) {
-        await props.onPatchEntity(props.entityId, mapGroupRoleAssignmentsToApiPayload(assignedGroups))
-      }
-      toast.success(t('messages.updateSuccess'))
-      if (areAssignmentsInvalid) {
-        toast.warning(t('messages.groupsWithoutRoles'))
-      }
-      setIsExitModalOpen(false)
-      setIsReadOnlyInternal(true)
-      setAssignedGroupsInternal(prev => prev.filter(g => g.assignedRoles.length > 0))
-      router.refresh()
-      return true
-    } catch (error) {
-      console.error('Error updating entity:', error)
-      const axiosError = error as AxiosError
-      if (axiosError?.response?.status === 400) {
-        toast.error(t('messages.updateErrorNotDraft'))
-      } else {
-        toast.error(tCommon('errors.unexpectedError'))
-      }
-      setAssignedGroupsInternal(initialAssignments)
-      setIsReadOnlyInternal(true)
-      return false
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useRegisterUnsavedChanges(!isControlled && hasChanges, !isControlled ? onSubmit : undefined)
-
-  const handleCancel = () => {
-    if (hasChanges) {
-      setIsExitModalOpen(true)
-    } else if (!isControlled && props.onExit) {
-      props.onExit()
-    } else {
-      setIsReadOnlyInternal(true)
-      setAssignedGroupsInternal(initialAssignments)
-    }
-  }
-
-  const handleDiscardAndExit = () => {
-    setIsExitModalOpen(false)
-    if (!isControlled && props.onExit) {
-      props.onExit()
-    } else {
-      setAssignedGroupsInternal(initialAssignments)
-      setIsReadOnlyInternal(true)
-    }
-  }
-
-  const handleSaveAndExit = async () => {
-    const isSuccess = await onSubmit()
-    if (!isControlled && isSuccess) props.onExit?.()
-  }
 
   const shouldShowAddButton = !isReadOnly && canAddGroups
 
@@ -282,21 +158,18 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
     </div>
   )
 
-  const mainContent = (
-    <div className="min-h-0">
-      {assignedGroups.length === 0 ? (
-        renderNoData()
-      ) : (
-        <>
-          {renderTable()}
-          {renderInfoBoxes()}
-        </>
-      )}
-    </div>
-  )
-
-  const modals = (
-    <>
+  return (
+    <div data-testid={testId}>
+      <div className="min-h-0">
+        {assignedGroups.length === 0 ? (
+          renderNoData()
+        ) : (
+          <>
+            {renderTable()}
+            {renderInfoBoxes()}
+          </>
+        )}
+      </div>
       <AddGroupModal
         open={isAddGroupModalOpen}
         onOpenChange={setIsAddGroupModalOpen}
@@ -316,57 +189,6 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
           selectedGroupForRole ? (assignedGroups.find(g => g.groupId === selectedGroupForRole)?.groupName ?? '') : ''
         }
       />
-    </>
-  )
-
-  // Controlled mode: optional title/subtitle, no action buttons
-  if (isControlled) {
-    return (
-      <div data-testid={testId}>
-        {mainContent}
-        {modals}
-      </div>
-    )
-  }
-
-  // Uncontrolled mode: full standalone UI
-  const EditButton = (
-    <Button type="button" onClick={() => setIsReadOnlyInternal(false)}>
-      {tCommon('actions.edit')}
-    </Button>
-  )
-
-  const EditModeButtons = (
-    <ActionButtons
-      onCancelClick={handleCancel}
-      onConfirmClick={onSubmit}
-      confirmButtonType="button"
-      confirmButtonTitle={tCommon('actions.submit')}
-      cancelButtonTitle={tCommon('actions.exit')}
-      isCancelButtonDisabled={false}
-      isConfirmButtonDisabled={!hasChanges}
-      hasCard={false}
-    />
-  )
-
-  return (
-    <PageContainer testId={testId} headerType="withSubTabsOrSubtitle" className="overflow-auto">
-      <PageHeader
-        title={props.title as string}
-        subtitle={props.subtitle as string}
-        customElement={isReadOnly ? EditButton : EditModeButtons}
-      />
-      <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
-        {mainContent}
-      </PageBackground>
-      {modals}
-      <ExitWarningModal
-        open={isExitModalOpen}
-        onOpenChange={setIsExitModalOpen}
-        onDiscard={handleDiscardAndExit}
-        onConfirm={handleSaveAndExit}
-        isLoading={isLoading}
-      />
-    </PageContainer>
+    </div>
   )
 }

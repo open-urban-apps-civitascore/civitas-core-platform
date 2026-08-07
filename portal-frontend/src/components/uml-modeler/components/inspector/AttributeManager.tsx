@@ -23,10 +23,14 @@ import { type UMLAttribute, type UMLElement, type UMLGeometryType, type UMLPrimi
 interface AttributeManagerProps {
   nodeId: string
   element: UMLElement
+  /** Off until the static modifier is supported end to end. */
+  isStaticVisible?: boolean
+  /** Off until attribute default values are supported end to end. */
+  isDefaultValueVisible?: boolean
 }
 
 export const AttributeManager: React.FC<AttributeManagerProps> = props => {
-  const { nodeId, element } = props
+  const { nodeId, element, isStaticVisible = false, isDefaultValueVisible = false } = props
   const { isReadOnly } = useReadOnly()
 
   const { updateNode } = useActiveDiagram()
@@ -84,12 +88,9 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     return options
   }
 
-  const primitiveTypeOptions = Object.keys(UML_PRIMITIVE_TYPES) as UMLPrimitiveType[]
-  const geometryTypeOptions = Object.keys(UML_GEOMETRY_TYPES) as UMLGeometryType[]
-
   const typeOptions: GroupedOption[] = [
-    { label: 'Primitive Types', options: primitiveTypeOptions.map(type => ({ label: type, value: type })) },
-    { label: 'Geometry Types', options: geometryTypeOptions.map(type => ({ label: type, value: type })) },
+    { label: 'Primitive Types', options: UML_PRIMITIVE_TYPES.map(type => ({ label: type, value: type })) },
+    { label: 'Geometry Types', options: UML_GEOMETRY_TYPES.map(type => ({ label: type, value: type })) },
   ]
 
   const crsOptions = [
@@ -115,7 +116,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     },
   ]
 
-  const isGeometryType = (type: string) => !!UML_GEOMETRY_TYPES[type as UMLGeometryType]
+  const isGeometryType = (type: string) => UML_GEOMETRY_TYPES.includes(type as UMLGeometryType)
 
   const allGeomAttributes = element.attributes.filter(attr => isGeometryType(attr.type as string))
 
@@ -239,32 +240,36 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
             </div>
 
             {/* Default Value */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Default Value</label>
-              <input
-                type="text"
-                value={attribute.defaultValue || ''}
-                onChange={e => updateAttribute(attribute.id, { defaultValue: e.target.value || undefined })}
-                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="Optional default value"
-                disabled={isReadOnly}
-              />
-            </div>
+            {isDefaultValueVisible && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Default Value</label>
+                <input
+                  type="text"
+                  value={attribute.defaultValue || ''}
+                  onChange={e => updateAttribute(attribute.id, { defaultValue: e.target.value || undefined })}
+                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="Optional default value"
+                  disabled={isReadOnly}
+                />
+              </div>
+            )}
 
             {/* Static checkbox */}
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id={`static-${attribute.id}`}
-                checked={attribute.isStatic || false}
-                onChange={e => updateAttribute(attribute.id, { isStatic: e.target.checked })}
-                className="mr-2"
-                disabled={isReadOnly}
-              />
-              <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
-                Static (underlined)
-              </label>
-            </div>
+            {isStaticVisible && (
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={`static-${attribute.id}`}
+                  checked={attribute.isStatic || false}
+                  onChange={e => updateAttribute(attribute.id, { isStatic: e.target.checked })}
+                  className="mr-2"
+                  disabled={isReadOnly}
+                />
+                <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
+                  Static (underlined)
+                </label>
+              </div>
+            )}
 
             {canMultiplicityBePrimaryKey(attribute.multiplicity) && (
               <div className="flex items-center">

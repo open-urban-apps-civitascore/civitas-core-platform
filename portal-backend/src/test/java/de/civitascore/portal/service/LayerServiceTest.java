@@ -118,7 +118,7 @@ class LayerServiceTest {
       when(layerMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
       when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));
-      when(layerRepository.findByDataSinkIdAndLayerName(dataSinkId, "test-layer"))
+      when(layerRepository.findByDataSetIdAndLayerName(dataSetId, "test-layer"))
           .thenReturn(Optional.empty());
       when(layerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -242,7 +242,7 @@ class LayerServiceTest {
 
     @Test
     @DisplayName(
-        "Should throw UniqueConstraintViolationException when layerName already exists in dataSink")
+        "Should throw UniqueConstraintViolationException when layerName already exists in dataset")
     void shouldThrowOnDuplicateLayerName() {
       UUID dataSetId = UUID.randomUUID();
       UUID dataSinkId = UUID.randomUUID();
@@ -264,8 +264,45 @@ class LayerServiceTest {
       when(layerMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
       when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));
-      when(layerRepository.findByDataSinkIdAndLayerName(dataSinkId, "test-layer"))
+      when(layerRepository.findByDataSetIdAndLayerName(dataSetId, "test-layer"))
           .thenReturn(Optional.of(existing));
+
+      assertThatThrownBy(() -> layerService.create(input))
+          .isInstanceOf(UniqueConstraintViolationException.class);
+    }
+
+    @Test
+    @DisplayName("Should throw when a sibling sink of the same dataset already uses the layerName")
+    void shouldThrowOnDuplicateLayerNameAcrossSinks() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dataSinkId = UUID.randomUUID();
+      DataSet ds = dataSet(dataSetId);
+
+      DataSink dataSink = new DataSink();
+      dataSink.setId(dataSinkId);
+      dataSink.setDataSet(ds);
+
+      DataSink siblingSink = new DataSink();
+      siblingSink.setId(UUID.randomUUID());
+      siblingSink.setDataSet(ds);
+
+      Layer onSiblingSink = new Layer();
+      onSiblingSink.setId(UUID.randomUUID());
+      onSiblingSink.setDataSet(ds);
+      onSiblingSink.setDataSink(siblingSink);
+      onSiblingSink.setLayerName("test-layer");
+
+      LayerInputDTO input = baseInput(dataSetId, dataSinkId);
+      Layer entity = new Layer();
+      entity.setDataSet(ds);
+      entity.setDataSink(dataSink);
+      entity.setLayerName("test-layer");
+
+      when(layerMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));
+      when(layerRepository.findByDataSetIdAndLayerName(dataSetId, "test-layer"))
+          .thenReturn(Optional.of(onSiblingSink));
 
       assertThatThrownBy(() -> layerService.create(input))
           .isInstanceOf(UniqueConstraintViolationException.class);
@@ -294,7 +331,7 @@ class LayerServiceTest {
       when(layerRepository.findById(layerId)).thenReturn(Optional.of(existingLayer));
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
       when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));
-      when(layerRepository.findByDataSinkIdAndLayerName(dataSinkId, "test-layer"))
+      when(layerRepository.findByDataSetIdAndLayerName(dataSetId, "test-layer"))
           .thenReturn(Optional.of(existingLayer));
       when(layerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

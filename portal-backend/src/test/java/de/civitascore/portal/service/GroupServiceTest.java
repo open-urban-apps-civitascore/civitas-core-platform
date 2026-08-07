@@ -16,6 +16,7 @@ import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentGroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
@@ -288,6 +289,58 @@ class GroupServiceTest {
           (GroupConfig) service.toConfigValuePostSave(group, new GroupInputDTO(), null);
 
       assertThat(config.getParentId()).isNull();
+    }
+
+    @Test
+    @DisplayName("Should emit member externalIds")
+    void shouldEmitMemberExternalIds() {
+      GroupService service = createService();
+      Group group = new Group();
+      group.setId(UUID.randomUUID());
+      group.setName("Editors");
+      group.setMembers(new HashSet<>(List.of(member("kc-user-1"), member("kc-user-2"))));
+
+      GroupConfig config =
+          (GroupConfig) service.toConfigValuePostSave(group, new GroupInputDTO(), null);
+
+      assertThat(config.getMembers()).containsExactlyInAnyOrder("kc-user-1", "kc-user-2");
+    }
+
+    @Test
+    @DisplayName("Should skip members without an externalId (not yet synced)")
+    void shouldSkipMembersWithoutExternalId() {
+      GroupService service = createService();
+      Group group = new Group();
+      group.setId(UUID.randomUUID());
+      group.setName("Editors");
+      group.setMembers(new HashSet<>(List.of(member("kc-user-1"), member(null), member("  "))));
+
+      GroupConfig config =
+          (GroupConfig) service.toConfigValuePostSave(group, new GroupInputDTO(), null);
+
+      assertThat(config.getMembers()).containsExactly("kc-user-1");
+    }
+
+    @Test
+    @DisplayName("Should leave members null when the group has no members collection")
+    void shouldLeaveMembersNullWhenNoMembers() {
+      GroupService service = createService();
+      Group group = new Group();
+      group.setId(UUID.randomUUID());
+      group.setName("Editors");
+      group.setMembers(null);
+
+      GroupConfig config =
+          (GroupConfig) service.toConfigValuePostSave(group, new GroupInputDTO(), null);
+
+      assertThat(config.getMembers()).isNull();
+    }
+
+    private User member(String externalId) {
+      User user = new User();
+      user.setId(UUID.randomUUID());
+      user.setExternalId(externalId);
+      return user;
     }
   }
 

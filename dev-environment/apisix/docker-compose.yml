@@ -30,7 +30,7 @@ services:
 
   # APISIX - API Gateway with Admin API + JWT validation + OPA authorization
   apisix:
-    image: apache/apisix:3.14.0-debian
+    image: apache/apisix:3.17.0-debian
     container_name: civitas-apisix
     restart: always
     volumes:

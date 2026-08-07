@@ -6,6 +6,7 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.model.output.PipelineOutputDTO;
 import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.repository.DataSourceRepository;
 import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
@@ -22,6 +23,7 @@ public class PipelineAssembler implements BaseAssembler<Pipeline, PipelineOutput
 
   private final PipelineMapper pipelineMapper;
   private final DataSinkRepository dataSinkRepository;
+  private final DataSourceRepository dataSourceRepository;
 
   /** {@inheritDoc} Delegates to the {@link PipelineMapper} for basic field mapping. */
   @Override
@@ -29,10 +31,11 @@ public class PipelineAssembler implements BaseAssembler<Pipeline, PipelineOutput
     return pipelineMapper.toOutput(entity);
   }
 
-  /** {@inheritDoc} Loads DataSink IDs linked to this pipeline. */
+  /** {@inheritDoc} Loads DataSink and DataSource IDs linked to this pipeline. */
   @Override
   public PipelineOutputDTO enrichDto(PipelineOutputDTO dto, Pipeline entity) {
     dto.setDataSinkIds(findDataSinkIds(entity));
+    dto.setDataSourceIds(findDataSourceIds(entity));
     return dto;
   }
 
@@ -42,6 +45,7 @@ public class PipelineAssembler implements BaseAssembler<Pipeline, PipelineOutput
   public <I> I toInput(Pipeline entity) {
     PipelineInputDTO input = pipelineMapper.toInput(entity);
     input.setDataSinkIds(new HashSet<>(findDataSinkIds(entity)));
+    input.setDataSourceIds(new HashSet<>(findDataSourceIds(entity)));
     return (I) input;
   }
 
@@ -49,5 +53,9 @@ public class PipelineAssembler implements BaseAssembler<Pipeline, PipelineOutput
     return dataSinkRepository.findByPipelineId(entity.getId()).stream()
         .map(DataSink::getId)
         .toList();
+  }
+
+  private List<UUID> findDataSourceIds(Pipeline entity) {
+    return dataSourceRepository.findIdsByPipelineId(entity.getId());
   }
 }

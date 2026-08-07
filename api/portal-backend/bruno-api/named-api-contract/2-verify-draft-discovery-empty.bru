@@ -1,0 +1,49 @@
+meta {
+  name: 2. Verify DRAFT discovery returns an empty list
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id/apis
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{napiContractDataSetId}}
+}
+
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Body is a named API list", function() {
+    expect(res.body).to.be.an('array');
+  });
+  test("A DRAFT dataset advertises no named APIs", function() {
+    expect(res.body).to.have.lengthOf(0);
+  });
+}
+
+docs {
+  **Contract step 2** — Assert the AVAILABLE-gate on the discovery endpoint.
+
+  `GET /v1/datasets/{id}/apis` is a consumer-facing surface for **active, published** APIs
+  (concept #1379). It returns the dataset's named APIs only once the dataset reaches `AVAILABLE`.
+  The fixture from step 1 is `DRAFT`, so the correct answer is **200 with an empty array** — not
+  404, and not the two draft entries.
+
+  A non-empty array here would mean unreleased routes are being advertised: consumers would see
+  paths that no APISIX route backs yet, and draft edits (slug renames, added or removed APIs) would
+  leak into the public API surface before release. The 200-with-`[]` shape also keeps the response
+  indistinguishable in *kind* from a published dataset with no APIs, so nothing about the dataset's
+  internal draft state is disclosed.
+
+  **Precondition:** `napiContractDataSetId` is set (step 1) and the dataset is still `DRAFT`.
+
+  **Expected Response:** 200 OK, body is `[]`.
+
+  **Post-condition:** none.
+}

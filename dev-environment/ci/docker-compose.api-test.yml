@@ -20,7 +20,7 @@ services:
     build:
       context: .
       dockerfile_inline: |
-        FROM postgres:18.1-alpine
+        FROM postgres:16-alpine
         RUN echo "CREATE DATABASE flowable OWNER admin;" > /docker-entrypoint-initdb.d/20-flowable.sql
     environment:
       POSTGRES_DB: portal_backend
@@ -35,7 +35,7 @@ services:
       retries: 10
 
   postgres-keycloak:
-    image: postgres:18.1-alpine
+    image: postgres:16-alpine
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
@@ -47,7 +47,7 @@ services:
       retries: 10
 
   postgres-frost:
-    image: postgis/postgis:16-3.4-alpine
+    image: postgis/postgis:16-3.5-alpine
     platform: linux/amd64
     environment:
       POSTGRES_DB: sensorthings
@@ -64,7 +64,7 @@ services:
   # PutDatabaseRecord writes rows into it. The postgis image auto-creates the PostGIS extension in
   # the default database, so geometry columns work out of the box.
   postgres-sink:
-    image: postgis/postgis:16-3.4-alpine
+    image: postgis/postgis:16-3.5-alpine
     platform: linux/amd64
     environment:
       POSTGRES_DB: geosink
@@ -82,7 +82,7 @@ services:
     build:
       context: ../keycloak
       dockerfile_inline: |
-        FROM quay.io/keycloak/keycloak:latest
+        FROM quay.io/keycloak/keycloak:26.6.4
         COPY realm-export.json /opt/keycloak/data/import/realm-export.json
     command: start-dev --import-realm
     environment:
@@ -166,7 +166,7 @@ services:
     build:
       context: ../apisix/apisix_conf
       dockerfile_inline: |
-        FROM apache/apisix:3.14.0-debian
+        FROM apache/apisix:3.17.0-debian
         COPY config.yaml /usr/local/apisix/conf/config.yaml
         USER root
         RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
@@ -219,9 +219,6 @@ services:
         COPY lib /staging/helpers
         COPY providers /staging/providers
         COPY data/backends /staging/data/backends
-        # Null out all permission values for allow-all mode (CI only)
-        RUN find /staging/data/backends -name '*.json' \
-            -exec sed -i 's/: *"[A-Z][A-Z_]*"/: null/g; s/: *\[.*\]/: null/g' {} +
         RUN mkdir -p /staging/data/config && \
             printf '{"authz_repository_url":"http://authz-repository:8091/api/v1/user-context","dataset_pool_membership_url":"http://authz-repository:8091/api/v1/dataset-pool","authz_cache_duration_seconds":0}\n'\
             > /staging/data/config/config.json
@@ -260,11 +257,13 @@ services:
   # ── FROST SensorThings API ──────────────────────────────
 
   frost:
-    image: hylkevds/frost-http-projects:latest
+    image: fraunhoferiosb/frost-server-http:2.7.3
     platform: linux/amd64
     hostname: civitas-frost
     environment:
       - serviceRootUrl=http://apisix:9080/FROST-Server/
+      - plugins_projects_enable=true
+      - plugins_projects_enableDefaultRules=false
       - plugins_modelLoader_enable=true
       - plugins_multiDatastream_enable=false
       - plugins_actuation_enable=false
@@ -275,7 +274,6 @@ services:
       - persistence_db_username=sensorthings
       - persistence_db_password=frost-ci-password
       - persistence_autoUpdateDatabase=true
-      - plugins_modelLoader_securityPath=
     depends_on:
       postgres-frost:
         condition: service_healthy
@@ -393,7 +391,7 @@ services:
   # pgconfig catalog DB for GeoServer Cloud — separate from postgres-sink (the DATA db the
   # datastore reads). The postgis image auto-creates the PostGIS extension.
   geoserverdb:
-    image: postgis/postgis:16-3.4-alpine
+    image: postgis/postgis:16-3.5-alpine
     platform: linux/amd64
     environment:
       POSTGRES_DB: geoserver
@@ -406,7 +404,7 @@ services:
       retries: 10
 
   rabbitmq:
-    image: rabbitmq:3.13.3-alpine
+    image: rabbitmq:4.1.3-alpine
     tmpfs:
       - /var/lib/rabbitmq:size=256m,mode=1777
     healthcheck:
@@ -417,10 +415,10 @@ services:
       retries: 3
 
   config:
-    image: geoservercloud/geoserver-cloud-config:2.28.3.0
+    image: geoservercloud/geoserver-cloud-config:2.28.4.0
     environment:
       SPRING_PROFILES_ACTIVE: native
-      SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL: v2.28.3.0
+      SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL: v2.28.4.0
       SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_HOST: geoserverdb
       SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_PORT: 5432
       SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_DATABASE: geoserver
@@ -430,12 +428,12 @@ services:
       SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_INITIALIZE: "true"
 
   discovery:
-    image: geoservercloud/geoserver-cloud-discovery:2.28.3.0
+    image: geoservercloud/geoserver-cloud-discovery:2.28.4.0
     depends_on:
       - config
 
   gateway:
-    image: geoservercloud/geoserver-cloud-gateway:2.28.3.0
+    image: geoservercloud/geoserver-cloud-gateway:2.28.4.0
     environment:
       GEOSERVER_BASE_PATH: /geoserver
     depends_on:
@@ -447,7 +445,7 @@ services:
           - civitas-geoserver
 
   restconfig:
-    image: geoservercloud/geoserver-cloud-rest:2.28.3.0
+    image: geoservercloud/geoserver-cloud-rest:2.28.4.0
     environment:
       SPRING_PROFILES_ACTIVE: pgconfig
       GEOWEBCACHE_CACHE_DIR: /data/geowebcache
@@ -493,7 +491,6 @@ services:
       APP_URL: http://portal-backend:8089
       SERVER_PORT: 8089
       SPRING_PROFILES_ACTIVE: local,postgres,init
-      SPRING_KAFKA_PRODUCER_PROPERTIES_COMPRESSION_TYPE: lz4
     depends_on:
       postgres-portal:
         condition: service_healthy
@@ -514,7 +511,9 @@ services:
     image: ${CI_REGISTRY_IMAGE}/config-adapter:${IMAGE_TAG:-develop}
     environment:
       HEALTHCHECK_PORT: 8088
-      ADAPTERS: keycloak,apisix,frost
+      # ConfigAdapter names only — SagaCommandHandlers (nifi among them) are discovered from the
+      # classpath independently, so listing a handler-only module here aborts the boot.
+      ADAPTERS: keycloak,apisix,frost,postgis,geoserver
       EVENTHANDLER_NAME: kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_GROUP_ID: config-adapter-group
@@ -635,10 +634,26 @@ services:
         RUN apk add --no-cache curl bash
         COPY seed-routes.sh /seed-routes.sh
         RUN chmod +x /seed-routes.sh
-    entrypoint: ["bash", "/seed-routes.sh", "--allowall"]
+    entrypoint: ["bash", "/seed-routes.sh"]
     environment:
       APISIX_ADMIN_URL: http://apisix:9180
       APISIX_ADMIN_KEY: edd1c9f034335f136f87ad84b625c8f1
+
+  # ── NiFi Parameter Contexts (one-shot, run via: docker compose run --rm nifi-parameter-contexts)
+  # The sensitive truststore password reaches the SSL context service through a parameter context,
+  # never through the deployed flow, so without this every MQTT-TLS pipeline deploy fails validation.
+  nifi-parameter-contexts:
+    profiles: [seed]
+    image: curlimages/curl:8.11.1
+    entrypoint: ["sh", "/provision-parameter-contexts.sh"]
+    environment:
+      NIFI_SECURITY_USER_OIDC_CLIENT_SECRET: "${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}"
+      TRUSTSTORE_PASSWORD: "changeit"
+      NIFI_HOST: "nifi"
+      NIFI_HOST_HEADER: "nifi:8443"
+      KEYCLOAK_HOST: "keycloak"
+    volumes:
+      - ../nifi/provision-parameter-contexts.sh:/provision-parameter-contexts.sh:ro
 
 networks:
   default:

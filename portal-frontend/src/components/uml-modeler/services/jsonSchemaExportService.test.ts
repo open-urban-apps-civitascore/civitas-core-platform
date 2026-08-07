@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality } from '../constants/umlTypes'
-import type { UMLDiagram } from '../types/diagram'
+import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality, UML_PRIMITIVE_TYPES } from '../constants/umlTypes'
+import type { UMLDiagram, UMLNode } from '../types/diagram'
+import type { UMLPrimitiveType } from '../types/uml'
+import { hasAttributes } from '../types/uml'
 import {
   canMultiplicityBePrimaryKey,
   exportToJsonSchema,
@@ -33,7 +35,7 @@ const baseDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
             {
               id: 'a2',
               name: 'temperature',
-              type: 'Double',
+              type: 'Number',
               multiplicity: '0..1',
             },
             {
@@ -54,6 +56,25 @@ const baseDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
   isDirty: false,
   ...overrides,
 })
+
+/**
+ * The base diagram's root class node with `extraAttributes` appended. Spreading `data.element`
+ * directly would widen to the `UMLElement` union, whose interface member carries no `attributes`;
+ * the guard narrows it back to the class the fixture actually is.
+ */
+const rootNodeWithAttributes = (extraAttributes: Record<string, unknown>[]): UMLNode => {
+  const rootNode = baseDiagram().nodes[0]
+  const element = rootNode.data.element
+  if (!hasAttributes(element)) throw new Error('base diagram root is expected to be a class with attributes')
+
+  return {
+    ...rootNode,
+    data: {
+      ...rootNode.data,
+      element: { ...element, attributes: [...element.attributes, ...extraAttributes] },
+    },
+  } as unknown as UMLNode
+}
 
 describe('sanitizeName', () => {
   it('lowercases and dashes non-alphanumerics', () => {
@@ -88,6 +109,44 @@ describe('exportToJsonSchema', () => {
 
     expect(properties.stationId).toEqual({ type: 'string', 'x-core-primaryKey': true })
     expect(properties.temperature).toEqual({ type: 'number' })
+  })
+
+  // Keyed off UMLPrimitiveType so a newly added primitive without an expectation fails to
+  // type-check here rather than silently falling back to a bare string property.
+  const primitiveExpectations: Record<UMLPrimitiveType, Record<string, unknown>> = {
+    String: { type: 'string' },
+    Integer: { type: 'integer' },
+    Boolean: { type: 'boolean' },
+    Number: { type: 'number' },
+    Date: { type: 'string', format: 'date' },
+    DateTime: { type: 'string', format: 'date-time' },
+    Uuid: { type: 'string', format: 'uuid' },
+  }
+  const primitiveCases = UML_PRIMITIVE_TYPES.map(type => ({ type, expected: primitiveExpectations[type] }))
+
+  it.each(primitiveCases)('maps the primitive type "$type" to its JSON Schema fragment', ({ type, expected }) => {
+    const diagram = baseDiagram({
+      nodes: [
+        {
+          id: 'node-1',
+          type: 'class',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'elem-1',
+              name: 'TrafficSensor',
+              type: 'class',
+              attributes: [{ id: 'a1', name: 'value', type }],
+              operations: [],
+            },
+            label: 'TrafficSensor',
+          },
+        },
+      ],
+    } as unknown as Partial<UMLDiagram>)
+
+    const def = classDef(exportToJsonSchema(diagram), 'TrafficSensor')
+    expect((def.properties as Record<string, unknown>).value).toEqual(expected)
   })
 
   it('maps "*" multiplicity attributes to arrays', () => {
@@ -294,22 +353,9 @@ describe('exportToJsonSchema', () => {
   it('emits enumerations using the enum keyword', () => {
     // The root reaches the enum through an attribute typed by it; association edges are out of scope
     // and would leave the enum unreachable.
-    const rootNode = baseDiagram().nodes[0]
     const diagram = baseDiagram({
       nodes: [
-        {
-          ...rootNode,
-          data: {
-            ...rootNode.data,
-            element: {
-              ...rootNode.data.element,
-              attributes: [
-                ...rootNode.data.element.attributes,
-                { id: 'a4', name: 'status', type: { id: 'elem-2' }, visibility: 'public' },
-              ],
-            },
-          },
-        },
+        rootNodeWithAttributes([{ id: 'a4', name: 'status', type: { id: 'elem-2' }, visibility: 'public' }]),
         {
           id: 'node-2',
           type: 'enumeration',
@@ -493,22 +539,9 @@ describe('exportToJsonSchema', () => {
   it('enumerations alone do not count as roots — single class stays the root class', () => {
     // The class reaches the enum through an attribute typed by it, keeping it reachable without an
     // out-of-scope association edge.
-    const rootNode = baseDiagram().nodes[0]
     const diagram = baseDiagram({
       nodes: [
-        {
-          ...rootNode,
-          data: {
-            ...rootNode.data,
-            element: {
-              ...rootNode.data.element,
-              attributes: [
-                ...rootNode.data.element.attributes,
-                { id: 'a4', name: 'sensorType', type: { id: 'elem-enum' }, visibility: 'public' },
-              ],
-            },
-          },
-        },
+        rootNodeWithAttributes([{ id: 'a4', name: 'sensorType', type: { id: 'elem-enum' }, visibility: 'public' }]),
         {
           id: 'node-enum',
           type: 'enumeration',
@@ -541,6 +574,90 @@ describe('exportToJsonSchema', () => {
     expect(defs.SensorType.enum).toEqual(['TRAFFIC', 'WEATHER'])
   })
 
+  it('links an enumeration via $ref through composition', () => {
+    const diagram = baseDiagram({
+      nodes: [
+        ...baseDiagram().nodes,
+        {
+          id: 'node-enum',
+          type: 'enumeration',
+          position: { x: 300, y: 0 },
+          data: {
+            element: {
+              id: 'elem-enum',
+              name: 'Quality',
+              type: 'enumeration',
+              literals: [
+                { id: 'l1', name: 'GOOD' },
+                { id: 'l2', name: 'POOR' },
+              ],
+            },
+            label: 'Quality',
+          },
+        },
+      ],
+      // Diamond at the target (TrafficSensor = container), the enumeration is the part.
+      edges: [
+        {
+          id: 'edge-enum',
+          type: 'composition',
+          source: 'node-enum',
+          target: 'node-1',
+          data: {
+            relationship: {
+              id: 'rel-enum',
+              type: 'composition',
+              source: 'elem-enum',
+              target: 'elem-1',
+              sourceRole: 'level',
+            },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+      ],
+    })
+
+    const schema = exportToJsonSchema(diagram)
+    const properties = classDef(schema, 'TrafficSensor').properties as Record<string, Record<string, unknown>>
+    expect(properties.level).toEqual({ $ref: '#/$defs/Quality' })
+
+    const defs = schema.$defs as Record<string, Record<string, unknown>>
+    expect(defs.Quality).toEqual({ title: 'Quality', enum: ['GOOD', 'POOR'] })
+  })
+
+  it('names a role-less composition property after the part, ignoring the relationship name', () => {
+    const diagram = baseDiagram({
+      nodes: [...baseDiagram().nodes, readingNode],
+      edges: [
+        {
+          id: 'edge-1',
+          type: 'composition',
+          source: 'node-2',
+          target: 'node-1',
+          data: {
+            // The edge label a user typed in the inspector; it must not become the JSON key.
+            relationship: {
+              id: 'rel-1',
+              name: 'Composition Edge',
+              type: 'composition',
+              source: 'elem-2',
+              target: 'elem-1',
+            },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+      ],
+    })
+
+    const properties = classDef(exportToJsonSchema(diagram), 'TrafficSensor').properties as Record<string, unknown>
+    expect(properties).toHaveProperty('reading')
+    expect(properties).not.toHaveProperty('Composition Edge')
+  })
+
   it('links contained classes via $ref through composition', () => {
     const diagram = baseDiagram({
       nodes: [
@@ -554,7 +671,7 @@ describe('exportToJsonSchema', () => {
               id: 'elem-2',
               name: 'Reading',
               type: 'class',
-              attributes: [{ id: 'a1', name: 'value', type: 'Double' }],
+              attributes: [{ id: 'a1', name: 'value', type: 'Number' }],
               operations: [],
             },
             label: 'Reading',
@@ -604,7 +721,7 @@ describe('exportToJsonSchema', () => {
         id: 'elem-2',
         name: 'Reading',
         type: 'class' as const,
-        attributes: [{ id: 'a1', name: 'value', type: 'Double' as const }],
+        attributes: [{ id: 'a1', name: 'value', type: 'Number' as const }],
         operations: [],
       },
       label: 'Reading',
@@ -944,7 +1061,7 @@ describe('exportToJsonSchema', () => {
     })
   })
 
-  it('rejects an isolated enumeration as unreachable from the root class', () => {
+  it('emits an isolated enumeration into $defs, unreferenced, instead of refusing the export', () => {
     const diagram = baseDiagram({
       name: 'S',
       nodes: [
@@ -967,18 +1084,14 @@ describe('exportToJsonSchema', () => {
       edges: [],
     } as Partial<UMLDiagram>)
 
-    let thrown: unknown
-    try {
-      exportToJsonSchema(diagram)
-    } catch (error) {
-      thrown = error
-    }
-    expect(thrown).toBeInstanceOf(SchemaExportError)
-    expect((thrown as SchemaExportError).failure).toEqual({
-      code: 'unreachable',
-      rootName: 'Root',
-      unreachableNames: ['Status'],
-    })
+    const schema = exportToJsonSchema(diagram)
+    const defs = schema.$defs as Record<string, Record<string, unknown>>
+
+    // Root is the single class; the enumeration is kept but nothing points at it, so it carries no
+    // data until the modeller wires it up.
+    expect(schema.properties).toEqual({ root: { $ref: '#/$defs/Root' } })
+    expect(defs.Status.enum).toEqual(['ON'])
+    expect(defs.Root.properties).not.toHaveProperty('Status')
   })
 
   it('rejects several enumerations without any class as ambiguous', () => {

@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.geoserver;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,6 +33,7 @@ import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Nested;
@@ -99,7 +101,62 @@ class GeoServerSagaHandlerTest {
         assertEquals("ds_abc", result.resultData().get("workspaceName"));
         assertNotNull(result.resultData().get("wfsUrl"));
         assertEquals("ds_abc", result.compensationData().get("workspaceName"));
-        verify(mockBuilder, times(1)).post(any(Entity.class));
+
+        // The workspace is created isolated: reachable only via its virtual OWS services (matching
+        // globalServices=false) with its own namespace, so the WMS service resolves its layers for
+        // anonymous (APISIX-gated) requests and same-named layers across datasets don't collide.
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(1)).post(captor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> workspace =
+            (Map<String, Object>)
+                ((Map<String, Object>) captor.getValue().getEntity()).get("workspace");
+        assertEquals("ds_abc", workspace.get("name"));
+        assertEquals(Boolean.TRUE, workspace.get("isolated"));
+
+        // Only the per-workspace WMS service is enabled (and titled with the workspace name), so
+        // the
+        // workspace shows up as a named service in map clients. WFS is deliberately not enabled per
+        // workspace (flat feature-type list, and a REST-created WFSInfo has a null serviceLevel
+        // that
+        // breaks WFS GetCapabilities).
+        assertTrue(capturedPaths().contains("/rest/services/wms/workspaces/ds_abc/settings"));
+        assertFalse(capturedPaths().contains("/rest/services/wfs/workspaces/ds_abc/settings"));
+        ArgumentCaptor<Entity> putCaptor = ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(1)).put(putCaptor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> svc =
+            (Map<String, Object>)
+                ((Map<String, Object>) putCaptor.getValue().getEntity()).get("wms");
+        assertEquals(Boolean.TRUE, svc.get("enabled"));
+        assertEquals("ds_abc", svc.get("title"));
+      }
+    }
+
+    @Test
+    void titlesWorkspaceServicesWithDatasetName() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        // With a datasetName in the trigger, the workspace WMS/WFS services are titled with the
+        // human-facing dataset name (not the technical workspace name).
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "CREATE_WORKSPACE",
+                    Map.of("datasetId", "ds-abc", "datasetName", "Bewohnerparkzonen Bielefeld")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        ArgumentCaptor<Entity> putCaptor = ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(1)).put(putCaptor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> svc =
+            (Map<String, Object>)
+                ((Map<String, Object>) putCaptor.getValue().getEntity()).get("wms");
+        assertEquals("Bewohnerparkzonen Bielefeld", svc.get("title"));
       }
     }
 
@@ -189,6 +246,62 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void provisionLayersNeverPrunesWhatItWasNotAskedAbout() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // Pruning on the provisioning path would drop live layers of a workspace that a re-release
+        // is only topping up.
+        Response snapshot = snapshotResponse("already_published");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "layers",
+                        List.of(Map.of("layerName", "traffic_counts", "crs", "EPSG:4326")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, times(0)).delete();
+      }
+    }
+
+    @Test
+    void provisionLayersAcceptsAnAlreadyPublishedFeatureTypeReportedAsHttp500() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // A re-release republishes the feature types the unrelease left behind. Failing on them
+        // makes provision-layers compensate, which drops the workspace and the PostGIS schema the
+        // sink-preserving unrelease kept the data in.
+        Response snapshot = snapshotResponse("traffic_counts");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response duplicate = mock(Response.class);
+        when(duplicate.getStatus()).thenReturn(500);
+        when(duplicate.readEntity(String.class))
+            .thenReturn("Resource named 'traffic_counts' already exists in store: 'ds'");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(duplicate);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "layers",
+                        List.of(Map.of("layerName", "traffic_counts", "crs", "EPSG:4326")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+      }
+    }
+
+    @Test
     void failsWhenLayerMissingLayerName() {
       try (GeoServerSagaHandler handler = createHandler()) {
         // A requested layer without a layerName can't be published — the step must fail rather than
@@ -241,6 +354,231 @@ class GeoServerSagaHandlerTest {
                 ((Map<String, Object>) captor.getValue().getEntity()).get("featureType");
         assertEquals("roads", featureType.get("name"));
         assertEquals("traffic", featureType.get("nativeName"));
+      }
+    }
+
+    @Test
+    void derivesNativeCrsFromDataStructureGeometry() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", Map.of("geom", "EPSG:25832"))),
+                        "layers",
+                        List.of(Map.of("layerName", "roads", "crs", "EPSG:4326")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // Declared SRS from the layer, native CRS read from the geometry in the data structure —
+        // the same source PostGIS uses for the column SRID.
+        Map<String, Object> featureType = postedFeatureType();
+        assertEquals("EPSG:4326", featureType.get("srs"));
+        assertEquals("EPSG:25832", featureType.get("nativeCRS"));
+      }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void forwardsNativeBoundingBoxTaggedWithNativeCrsAndReprojectsLatLon() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", Map.of("geom", "EPSG:25832"))),
+                        "layers",
+                        List.of(
+                            Map.of(
+                                "layerName",
+                                "roads",
+                                "crs",
+                                "EPSG:4326",
+                                "nativeBoundingBox",
+                                Map.of(
+                                    "minX", 239323.44,
+                                    "minY", 4290145.58,
+                                    "maxX", 761545.65,
+                                    "maxY", 9365801.91,
+                                    "crs", ""))))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // Native box is mapped to GeoServer field names and tagged with the resolved native CRS
+        // (the portal box's own crs is ignored — it may be blank).
+        Map<String, Object> bbox =
+            (Map<String, Object>) postedFeatureType().get("nativeBoundingBox");
+        assertEquals(239323.44, bbox.get("minx"));
+        assertEquals(4290145.58, bbox.get("miny"));
+        assertEquals(761545.65, bbox.get("maxx"));
+        assertEquals(9365801.91, bbox.get("maxy"));
+        assertEquals("EPSG:25832", bbox.get("crs"));
+        // With a native box supplied, only the lat/lon box is reprojected — no data-driven
+        // recompute.
+        verify(mockPathTarget).queryParam("recalculate", "latlonbbox");
+      }
+    }
+
+    @Test
+    void computesBothBoxesFromDataWhenNoNativeBoundingBoxGiven() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", Map.of("geom", "EPSG:25832"))),
+                        "layers",
+                        List.of(Map.of("layerName", "roads", "crs", "EPSG:4326")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertNull(postedFeatureType().get("nativeBoundingBox"));
+        verify(mockPathTarget).queryParam("recalculate", "nativebbox,latlonbbox");
+      }
+    }
+
+    @Test
+    void selectsGeometryByGeometryColumnRefWhenMultiple() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        // Two geometry columns with different CRS; geometryColumnRef picks which one is published.
+        LinkedHashMap<String, String> geometries = new LinkedHashMap<>();
+        geometries.put("geom_a", "EPSG:25832");
+        geometries.put("geom_b", "EPSG:3857");
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", geometries)),
+                        "layers",
+                        List.of(
+                            Map.of(
+                                "layerName", "roads",
+                                "crs", "EPSG:4326",
+                                "geometryColumnRef", "geom_b")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("EPSG:3857", postedFeatureType().get("nativeCRS"));
+      }
+    }
+
+    @Test
+    void failsWhenMultipleGeometriesAndNoGeometryColumnRef() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // Ambiguous: two geometry columns and no geometryColumnRef → fail rather than guess,
+        // mirroring the nativeName handling across multiple sinks.
+        LinkedHashMap<String, String> geometries = new LinkedHashMap<>();
+        geometries.put("geom_a", "EPSG:25832");
+        geometries.put("geom_b", "EPSG:3857");
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", geometries)),
+                        "layers",
+                        List.of(Map.of("layerName", "roads", "crs", "EPSG:4326")))));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertTrue(result.error().contains("geometryColumnRef"), result.error());
+        verify(mockBuilder, times(0)).post(any(Entity.class));
+      }
+    }
+
+    @Test
+    void fallsBackToDeclaredCrsWhenGeometryHasNoCrs() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        // Geometry present but without an explicit crs — PostGIS defaults such a column to
+        // EPSG:4326, so the native CRS falls back to the declared CRS (which is EPSG:4326 here).
+        LinkedHashMap<String, String> geometries = new LinkedHashMap<>();
+        geometries.put("geom", null);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(postgisSinkWithGeometry("roads", geometries)),
+                        "layers",
+                        List.of(Map.of("layerName", "roads", "crs", "EPSG:4326")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("EPSG:4326", postedFeatureType().get("nativeCRS"));
+      }
+    }
+
+    @Test
+    void fallsBackToDeclaredCrsWhenNoDataStructure() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        // A POSTGIS sink without a data structure (nothing to derive from) → the native CRS mirrors
+        // the declared CRS so the layer stays valid under REPROJECT_TO_DECLARED.
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "datasinks",
+                        List.of(
+                            Map.of(
+                                "type", "POSTGIS", "configuration", Map.of("tableName", "roads"))),
+                        "layers",
+                        List.of(Map.of("layerName", "roads", "crs", "EPSG:25832")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("EPSG:25832", postedFeatureType().get("nativeCRS"));
       }
     }
 
@@ -752,6 +1090,58 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void treatsDuplicateWorkspaceReportedAsHttp500Idempotent() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response duplicate = mock(Response.class);
+        when(duplicate.getStatus()).thenReturn(500);
+        when(duplicate.readEntity(String.class))
+            .thenReturn("Workspace 'ds_existing' already exists");
+
+        Response createdResponse = mock(Response.class);
+        when(createdResponse.getStatus()).thenReturn(201);
+
+        when(mockBuilder.post(any(Entity.class)))
+            .thenReturn(duplicate) // workspace already exists, reported as 500
+            .thenReturn(createdResponse); // datastore
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "PROVISION_WORKSPACE",
+                Map.of("datasetId", "ds-existing", "layers", List.of()));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // Only a fresh 201 may configure the WMS service — doing it here would overwrite the
+        // service title of a workspace that already serves data.
+        assertTrue(
+            capturedPaths().stream().noneMatch(path -> path.contains("/services/wms/")),
+            "an existing workspace must keep its WMS service settings");
+      }
+    }
+
+    @Test
+    void failsWhenWorkspaceCreationReturnsAnUnrelatedHttp500() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response serverError = mock(Response.class);
+        when(serverError.getStatus()).thenReturn(500);
+        when(serverError.readEntity(String.class)).thenReturn("java.lang.NullPointerException");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(serverError);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "PROVISION_WORKSPACE",
+                Map.of("datasetId", "ds-broken", "layers", List.of()));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+      }
+    }
+
+    @Test
     void createsWorkspaceAndDatastoreButNoFeatureTypesWhenNoLayers() {
       try (GeoServerSagaHandler handler = createHandler()) {
         Response created = mock(Response.class);
@@ -928,6 +1318,187 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
+      }
+    }
+
+    @Test
+    void updateWorkspaceLeavesStaleFeatureTypesToThePruneStep() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // A delete here would sit in the compensable window, where RESTORE_WORKSPACE cannot undo
+        // it.
+        Response snapshot = snapshotResponse("t1", "removed_layer");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response conflict = mock(Response.class);
+        when(conflict.getStatus()).thenReturn(409);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, times(0)).delete();
+      }
+    }
+
+    @Test
+    void keepsPublishedFeatureTypesTheUpdateStillAsksFor() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response snapshot = snapshotResponse("t1");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response conflict = mock(Response.class);
+        when(conflict.getStatus()).thenReturn(409);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, times(0)).delete();
+      }
+    }
+
+    @Test
+    void updatesFeatureTypeWhenGeoServerReportsTheConflictAsHttp500() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // Otherwise every metadata edit on a released dataset with layers fails, since an update
+        // re-publishes all of them.
+        Response snapshot = snapshotResponse("t1");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response conflict = mock(Response.class);
+        when(conflict.getStatus()).thenReturn(409);
+        Response duplicate = mock(Response.class);
+        when(duplicate.getStatus()).thenReturn(500);
+        when(duplicate.readEntity(String.class))
+            .thenReturn("Resource named 't1' already exists in store: 'ds'");
+        // The workspace and datastore POSTs precede the feature type's and share this mock.
+        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict, conflict, duplicate);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertTrue(
+            capturedPaths().stream().anyMatch(path -> path.endsWith("/featuretypes/t1")),
+            "the conflict must fall through to the PUT that converges the definition");
+      }
+    }
+
+    @Test
+    void failsWhenAFeatureTypePostReturnsAnUnrelatedHttp500() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response snapshot = snapshotResponse("t1");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response conflict = mock(Response.class);
+        when(conflict.getStatus()).thenReturn(409);
+        Response serverError = mock(Response.class);
+        when(serverError.getStatus()).thenReturn(500);
+        when(serverError.readEntity(String.class)).thenReturn("java.lang.NullPointerException");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict, conflict, serverError);
+
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+      }
+    }
+  }
+
+  @Nested
+  class PruneFeatureTypes {
+
+    @Test
+    void deletesPublishedFeatureTypesTheDatasetNoLongerHasALayerFor() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response snapshot = snapshotResponse("t1", "removed_layer");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(ok);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "PRUNE_FEATURE_TYPES", updatePayload("t1")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, times(1)).delete();
+        assertTrue(
+            capturedPaths().stream().anyMatch(path -> path.endsWith("/featuretypes/removed_layer")),
+            "the stale feature type must be the one deleted");
+      }
+    }
+
+    @Test
+    void keepsFeatureTypesTheDatasetStillHasALayerFor() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response snapshot = snapshotResponse("t1");
+        when(mockBuilder.get()).thenReturn(snapshot);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "PRUNE_FEATURE_TYPES", updatePayload("t1")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, times(0)).delete();
+      }
+    }
+
+    @Test
+    void reportsFeatureTypesItCouldNotUnpublishAndPrunesTheRest() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // Failing the step would report an applied update as failed; staying silent would leave the
+        // layer served with nothing in the portal able to see it.
+        Response snapshot = snapshotResponse("t1", "stuck", "removable");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response locked = mock(Response.class);
+        when(locked.getStatus()).thenReturn(500);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(locked, ok);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "PRUNE_FEATURE_TYPES", updatePayload("t1")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(List.of("stuck"), result.resultData().get("staleFeatureTypes"));
+        verify(mockBuilder, times(2)).delete();
+      }
+    }
+
+    @Test
+    void prunesEveryFeatureTypeWhenTheDatasetHasNoLayersLeft() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // An empty desired set must prune, not be treated as "unknown" and skipped.
+        Response snapshot = snapshotResponse("t1", "t2");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(ok);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP", "PRUNE_FEATURE_TYPES", Map.of("datasetId", "ds-abc")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, times(2)).delete();
       }
     }
   }
@@ -1175,6 +1746,13 @@ class GeoServerSagaHandlerTest {
     when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
     when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
     when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
+    // Lenient default so the best-effort per-workspace WMS/WFS service-settings PUTs (issued after
+    // a
+    // fresh workspace CREATE) don't NPE in tests that don't stub put themselves; tests that assert
+    // specific put behaviour override this.
+    Response okPut = mock(Response.class);
+    when(okPut.getStatus()).thenReturn(200);
+    when(mockBuilder.put(any(Entity.class))).thenReturn(okPut);
 
     handler.setTestClient(mockClient);
     return handler;
@@ -1195,6 +1773,43 @@ class GeoServerSagaHandlerTest {
         List.of(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", layerName))),
         "layers",
         List.of(Map.of("layerName", layerName, "crs", "EPSG:4326")));
+  }
+
+  /**
+   * A POSTGIS data sink for {@code tableName} whose {@code dataStructure} defines the given
+   * geometry columns (column name → CRS; a {@code null} CRS means the geometry declares none), plus
+   * a scalar {@code id} column so the schema resolves as a normal table.
+   */
+  private static Map<String, Object> postgisSinkWithGeometry(
+      String tableName, Map<String, String> geometryCrs) {
+    LinkedHashMap<String, Object> properties = new LinkedHashMap<>();
+    properties.put("id", Map.of("type", "integer"));
+    geometryCrs.forEach(
+        (column, crs) -> {
+          LinkedHashMap<String, Object> spec = new LinkedHashMap<>();
+          spec.put("$ref", "https://geojson.org/schema/Point.json");
+          if (crs != null) {
+            spec.put("crs", crs);
+          }
+          properties.put(column, spec);
+        });
+    return Map.of(
+        "type", "POSTGIS",
+        "configuration", Map.of("tableName", tableName),
+        "dataStructure", Map.of("properties", properties));
+  }
+
+  /** The {@code featureType} object from the captured feature-type POST body. */
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private Map<String, Object> postedFeatureType() {
+    ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+    verify(mockBuilder, atLeastOnce()).post(captor.capture());
+    for (Entity entity : captor.getAllValues()) {
+      if (entity.getEntity() instanceof Map<?, ?> body && body.get("featureType") instanceof Map) {
+        return (Map<String, Object>) ((Map<String, Object>) body).get("featureType");
+      }
+    }
+    throw new AssertionError("no featureType POST captured");
   }
 
   /** Mocks a 200 {@code featuretypes.json} response listing the given feature type names. */

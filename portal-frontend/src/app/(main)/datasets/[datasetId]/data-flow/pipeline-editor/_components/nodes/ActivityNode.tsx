@@ -30,13 +30,23 @@ export const createActivityNode = (type: PipelineNodeType) => {
       return <ControlNode variant={def.shape === 'controlStart' ? 'start' : 'end'} isSelected={isSelected} />
     }
 
+    // Configured nodes may resolve their sublabel via a component (async / permission-gated)
+    // or a pure function. Unconfigured nodes show no sublabel so the "not configured" hint wins.
+    const SublabelComponent = def?.SublabelComponent
+    let sublabel: React.ReactNode
+    if (SublabelComponent) {
+      sublabel = isConfigured ? <SublabelComponent data={nodeData} /> : undefined
+    } else {
+      sublabel = def?.getSublabel?.(nodeData)
+    }
+
     return (
       <BasePipelineNode
         category={def?.category ?? 'general'}
         isConfigured={isConfigured}
         isSelected={isSelected}
         label={nodeData.label || (def?.type ?? '')}
-        sublabel={def?.getSublabel?.(nodeData)}
+        sublabel={sublabel}
         icon={def?.icon}
         hasLeftHandle={def?.handles.left ?? true}
         hasRightHandle={def?.handles.right ?? true}

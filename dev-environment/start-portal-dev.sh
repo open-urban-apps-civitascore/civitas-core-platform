@@ -492,18 +492,41 @@ fi
 
 # Ensure the Flowable saga database exists (config-adapter's embedded engine).
 # PostgreSQL has no "CREATE DATABASE IF NOT EXISTS", so guard with a catalog check.
-# Unlike init scripts (docker-entrypoint-initdb.d, which only run on a fresh volume),
-# this runs on every start — so it also provisions the database on existing volumes
-# created before Flowable was introduced. Idempotent, same spirit as Flyway below.
+# On a fresh volume the database is created race-free by postgres/initdb/; this block
+# covers PRE-EXISTING volumes (created before Flowable was introduced) where the init
+# scripts no longer run. It also retries: pg_isready can report "ready" while the
+# entrypoint is still finishing its bootstrap, so a single CREATE DATABASE may transiently
+# fail — we retry instead of silently warning. Idempotent, same spirit as Flyway below.
 echo "  Ensuring Flowable database exists..."
-if docker exec civitas-postgres-portal psql -U admin -d portal_backend -tAc \
-    "SELECT 1 FROM pg_database WHERE datname='flowable'" 2>/dev/null | grep -q 1; then
-    echo "  Flowable database already present"
-elif docker exec civitas-postgres-portal psql -U admin -d portal_backend -c \
-    "CREATE DATABASE flowable OWNER admin" >/dev/null 2>&1; then
-    echo "  Flowable database created"
-else
-    echo "  WARNING: Could not create Flowable database (config-adapter may fail to start)"
+FLOWABLE_DB_READY=false
+for i in $(seq 1 10); do
+    if docker exec civitas-postgres-portal psql -U admin -d portal_backend -tAc \
+        "SELECT 1 FROM pg_database WHERE datname='flowable'" 2>/dev/null | grep -q 1; then
+        echo "  Flowable database already present"
+        FLOWABLE_DB_READY=true
+        break
+    fi
+    CREATE_OUTPUT=$(docker exec civitas-postgres-portal psql -U admin -d portal_backend -c \
+        "CREATE DATABASE flowable OWNER admin" 2>&1)
+    if echo "$CREATE_OUTPUT" | grep -q "CREATE DATABASE"; then
+        echo "  Flowable database created"
+        FLOWABLE_DB_READY=true
+        break
+    fi
+    # A concurrent creator (init script / another start) may have won the race meanwhile.
+    if echo "$CREATE_OUTPUT" | grep -q "already exists"; then
+        echo "  Flowable database already present"
+        FLOWABLE_DB_READY=true
+        break
+    fi
+    sleep 1
+done
+if [ "$FLOWABLE_DB_READY" = false ]; then
+    echo "  ERROR: Could not create Flowable database after 10 attempts; last psql output:"
+    echo "    $CREATE_OUTPUT"
+    echo "  config-adapter will fail to start — create it manually with:"
+    echo "    docker exec civitas-postgres-portal psql -U admin -d portal_backend -c 'CREATE DATABASE flowable OWNER admin'"
+    exit 1
 fi
 
 echo "  Running database migrations..."
@@ -616,6 +639,23 @@ fi
 
 if $DOCKER_COMPOSE up -d 2>&1; then
     echo "  Apache NiFi started"
+    # The MQTT-TLS flows resolve their truststore password from a parameter context that the
+    # snapshot deliberately carries no value for, so it has to exist before the first deploy.
+    echo "  Waiting for NiFi to become healthy to provision parameter contexts..."
+    nifi_healthy=false
+    for _ in $(seq 1 60); do
+        if [ "$(docker inspect --format='{{.State.Health.Status}}' civitas-nifi 2>/dev/null)" = "healthy" ]; then
+            nifi_healthy=true
+            break
+        fi
+        sleep 5
+    done
+    if [ "$nifi_healthy" = true ] && $DOCKER_COMPOSE run --rm nifi-parameter-contexts 2>&1; then
+        echo "  NiFi parameter contexts provisioned"
+    else
+        echo "  WARNING: could not provision NiFi parameter contexts"
+        echo "           MQTT sources with TLS enabled will fail to deploy."
+    fi
 else
     echo "  WARNING: Apache NiFi failed to start"
     echo "           Dataset pipeline deployment will not work."
@@ -804,6 +844,11 @@ if [ "$config_adapter_option" = "2" ]; then
 #!/bin/bash
 # Config Adapter environment variables (from application.properties)
 export HEALTHCHECK_PORT=8088
+# Master key for decrypting ENC(...) credentials (e.g. a datasource DB password) at deploy time.
+# MUST match portal-backend's civitas.master-key — the local profile (application-local.yaml) and
+# apps/docker-compose.yml both use this dev value. Without it the NiFi/GeoServer saga fails with
+# "encrypted credentials present but CIVITAS_MASTER_KEY is not configured".
+export CIVITAS_MASTER_KEY=${CIVITAS_MASTER_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
 export ADAPTERS=keycloak,apisix,frost
 export EVENTHANDLER_NAME=kafka
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
@@ -852,15 +897,27 @@ export NIFI_OIDC_CLIENT_SECRET=${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}
 # not the host-mapped localhost:8085.
 export NIFI_FROST_URL=http://civitas-frost:8080/FROST-Server/v1.1
 export NIFI_TOPICS=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+# PostGIS sink connection for the DEPLOYED NiFi flow (PutDatabaseRecord). The flow runs INSIDE the
+# NiFi container, so this must be the docker name + internal port (like apps/docker-compose.yml) —
+# not localhost/5434. Without it the POSTGIS sink stage fails: "no platform database connection URL".
+export NIFI_POSTGIS_URL=${NIFI_POSTGIS_URL:-jdbc:postgresql://civitas-geoserver-db:5432/geoserver}
+export NIFI_POSTGIS_USER=${NIFI_POSTGIS_USER:-geoserver}
+export NIFI_POSTGIS_PASSWORD=${NIFI_POSTGIS_PASSWORD:-geoserver}
 export GEOSERVER_URL=http://localhost:8082/geoserver
 export GEOSERVER_ADMIN_USER=admin
 export GEOSERVER_ADMIN_PASSWORD=geoserver
-export GEOSERVER_POSTGIS_HOST=localhost
-export GEOSERVER_POSTGIS_PORT=5434
-export GEOSERVER_POSTGIS_DB=geoserver
+# GeoServer datastore connection: the adapter only relays these to GeoServer via REST; the
+# GeoServer CONTAINER opens the actual DB connection over the docker network, so this must be
+# the container name + internal port (NOT localhost / the host-published 5434, which from inside
+# the GeoServer container would point at GeoServer itself). Var name is GEOSERVER_POSTGIS_DATABASE
+# (dots->underscores of geoserver.postgis.database), matching apps/docker-compose.yml.
+export GEOSERVER_POSTGIS_HOST=civitas-geoserver-db
+export GEOSERVER_POSTGIS_PORT=5432
+export GEOSERVER_POSTGIS_DATABASE=geoserver
 export GEOSERVER_POSTGIS_USER=geoserver
 export GEOSERVER_POSTGIS_PASSWORD=geoserver
-# PostGIS adapter DDL connection — must point at the same database the GeoServer datastore reads
+# PostGIS adapter DDL connection — opened by the config-adapter ITSELF (runs on the host in cmd
+# mode), so it uses the host-published port 5434. Same physical DB as the datastore above.
 export POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5434/geoserver
 export POSTGIS_JDBC_USER=geoserver
 export POSTGIS_JDBC_PASSWORD=geoserver
@@ -914,6 +971,8 @@ if [ "$config_adapter_option" = "3" ]; then
     echo
     echo "Environment variables to set in IDE:"
     echo "  HEALTHCHECK_PORT=8088"
+    echo "  # must match portal-backend's civitas.master-key (local profile / apps compose)"
+    echo "  CIVITAS_MASTER_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     echo "  KAFKA_BOOTSTRAP_SERVERS=localhost:9092"
     echo "  FLOWABLE_JDBC_URL=jdbc:postgresql://localhost:5432/flowable"
     echo "  FLOWABLE_JDBC_USERNAME=admin"
@@ -941,14 +1000,20 @@ if [ "$config_adapter_option" = "3" ]; then
     echo "  NIFI_OIDC_TOKEN_URI=http://localhost:8080/realms/civitas-core/protocol/openid-connect/token"
     echo "  NIFI_OIDC_CLIENT_ID=nifi"
     echo "  NIFI_OIDC_CLIENT_SECRET=<set; see dev-environment/nifi/.env.example>"
+    echo "  # PostGIS sink conn for the deployed NiFi flow (runs in the NiFi container) -> docker name + 5432"
+    echo "  NIFI_POSTGIS_URL=jdbc:postgresql://civitas-geoserver-db:5432/geoserver"
+    echo "  NIFI_POSTGIS_USER=geoserver"
+    echo "  NIFI_POSTGIS_PASSWORD=geoserver"
     echo "  GEOSERVER_URL=http://localhost:8082/geoserver"
     echo "  GEOSERVER_ADMIN_USER=admin"
     echo "  GEOSERVER_ADMIN_PASSWORD=geoserver"
-    echo "  GEOSERVER_POSTGIS_HOST=localhost"
-    echo "  GEOSERVER_POSTGIS_PORT=5434"
-    echo "  GEOSERVER_POSTGIS_DB=geoserver"
+    echo "  # datastore conn is relayed to the GeoServer container -> use the docker name + internal port"
+    echo "  GEOSERVER_POSTGIS_HOST=civitas-geoserver-db"
+    echo "  GEOSERVER_POSTGIS_PORT=5432"
+    echo "  GEOSERVER_POSTGIS_DATABASE=geoserver"
     echo "  GEOSERVER_POSTGIS_USER=geoserver"
     echo "  GEOSERVER_POSTGIS_PASSWORD=geoserver"
+    echo "  # DDL conn is opened by the adapter itself (host) -> host-published port 5434"
     echo "  POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5434/geoserver"
     echo "  POSTGIS_JDBC_USER=geoserver"
     echo "  POSTGIS_JDBC_PASSWORD=geoserver"

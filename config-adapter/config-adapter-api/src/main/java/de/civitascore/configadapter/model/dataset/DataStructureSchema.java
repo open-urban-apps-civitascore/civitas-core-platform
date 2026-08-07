@@ -39,6 +39,13 @@ public final class DataStructureSchema {
   /** JSON Schema extension keyword carrying the conceptual primary key (UML {@code {id}}). */
   public static final String PRIMARY_KEY_MARKER = "x-core-primaryKey";
 
+  /**
+   * GeoJSON geometry properties reference a schema under this host ({@code
+   * https://geojson.org/schema/<Type>.json}); the same marker the PostGIS adapter uses to detect a
+   * geometry column.
+   */
+  private static final String GEOJSON_SCHEMA_MARKER = "geojson.org/schema/";
+
   /** Local definition reference prefixes ({@code #/$defs/Name} / {@code #/definitions/Name}). */
   private static final String[] LOCAL_DEF_PREFIXES = {"#/$defs/", "#/definitions/"};
 
@@ -145,7 +152,7 @@ public final class DataStructureSchema {
       // marker intended — no dedup, no constraint — with no diagnostic trail.
       LOG.warn(
           "Could not resolve data structure schema to derive its primary key: {}",
-          Encode.forJava(String.valueOf(unresolvable.getMessage())));
+          Encode.forJava(unresolvable.getMessage()));
       return List.of();
     }
     return markerColumns(properties);
@@ -197,6 +204,43 @@ public final class DataStructureSchema {
   public static List<String> primaryKeyColumnsAt(
       Map<String, Object> schema, List<String> propertyPath) {
     return markerColumns(resolveDefinitionAt(schema, propertyPath).properties());
+  }
+
+  /**
+   * The GeoJSON geometry properties of the resolved table definition, mapped to their declared CRS
+   * identifier (e.g. {@code EPSG:25832}) in declaration order. A geometry property is one whose
+   * {@code $ref} points at a GeoJSON geometry schema ({@code
+   * https://geojson.org/schema/<Type>.json}); its CRS rides on an optional {@code crs} sibling of
+   * that {@code $ref}, and the map value is {@code null} when the property declares none.
+   *
+   * <p>This is the same geometry-and-CRS source the PostGIS adapter reads to set a geometry
+   * column's SRID (see the {@code crs}/{@code EPSG:...} handling in the PostGIS table mapper), so a
+   * GeoServer layer's native CRS derived from here is guaranteed to match the stored geometry.
+   * Returns an empty map when the schema is null or cannot be resolved (best-effort, like {@link
+   * #primaryKeyColumns(Map)}).
+   */
+  public static Map<String, String> geometryCrsByColumn(Map<String, Object> schema) {
+    if (schema == null) {
+      return Map.of();
+    }
+    Map<String, Object> properties;
+    try {
+      properties = resolveDefinition(schema).properties();
+    } catch (IllegalArgumentException unresolvable) {
+      LOG.warn(
+          "Could not resolve data structure schema to read geometry CRS: {}",
+          Encode.forJava(unresolvable.getMessage()));
+      return Map.of();
+    }
+    LinkedHashMap<String, String> geometryCrs = new LinkedHashMap<>();
+    for (Map.Entry<String, Object> entry : properties.entrySet()) {
+      Map<String, Object> spec = mapValue(entry.getValue());
+      String ref = stringValue(spec.get("$ref"));
+      if (ref != null && ref.contains(GEOJSON_SCHEMA_MARKER)) {
+        geometryCrs.put(entry.getKey(), stringValue(spec.get("crs")));
+      }
+    }
+    return Collections.unmodifiableMap(geometryCrs);
   }
 
   @SuppressWarnings("unchecked")

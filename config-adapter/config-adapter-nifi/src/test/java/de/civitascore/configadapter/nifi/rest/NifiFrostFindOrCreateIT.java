@@ -20,6 +20,7 @@ import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import jakarta.ws.rs.core.Response;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -46,11 +47,10 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * DATA-CORRECTNESS integration test for the FROST find-or-create sub-flow against a <b>real
- * FROST-Server</b>: deploys the MQTT→find-or-create flow built by {@link NifiFlowBuilder} onto an
- * actual NiFi 2.9.0, publishes an STA-envelope message repeatedly, and asserts that FROST ends up
- * with exactly ONE Thing for the reference — i.e. the lookup-by-reference really dedups
- * (idempotency) end to end, not just against a mock.
+ * DATA-CORRECTNESS integration test for the FROST upsert sub-flow against a <b>real
+ * FROST-Server</b>: deploys the MQTT→upsert flow built by {@link NifiFlowBuilder} onto an actual
+ * NiFi 2.9.0, publishes STA-envelope messages repeatedly, and asserts that FROST ends up with
+ * exactly ONE updated Thing for the reference.
  *
  * <p>Topology (one Docker network): Mosquitto (alias {@code mqtt}) ← NiFi → FROST (alias {@code
  * frost}) → PostGIS (alias {@code database}). Skipped when Docker is unavailable.
@@ -62,6 +62,11 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
   private static final String REFERENCE = "STATION-IT-1";
   private static final String ENVELOPE =
       "{\"things\":[{\"name\":\"Station IT 1\",\"description\":\"find-or-create IT\","
+          + "\"properties\":{\"reference\":\""
+          + REFERENCE
+          + "\"}}]}";
+  private static final String UPDATED_ENVELOPE =
+      "{\"things\":[{\"name\":\"Station IT 1 updated\",\"description\":\"upsert IT\","
           + "\"properties\":{\"reference\":\""
           + REFERENCE
           + "\"}}]}";
@@ -109,7 +114,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     network = Network.newNetwork();
 
     mosquitto =
-        new GenericContainer<>(DockerImageName.parse("eclipse-mosquitto:2.0"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.MOSQUITTO))
             .withNetwork(network)
             .withNetworkAliases("mqtt")
             .withExposedPorts(1883)
@@ -118,7 +123,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     mosquitto.start();
 
     postgis =
-        new GenericContainer<>(DockerImageName.parse("postgis/postgis:16-3.4-alpine"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.POSTGIS))
             .withNetwork(network)
             .withNetworkAliases("database")
             .withEnv("POSTGRES_DB", "sensorthings")
@@ -129,11 +134,13 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     postgis.start();
 
     frost =
-        new GenericContainer<>(DockerImageName.parse("hylkevds/frost-http-projects:latest"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.FROST))
             .withNetwork(network)
             .withNetworkAliases("frost")
             .withExposedPorts(8080)
             .withEnv("serviceRootUrl", "http://frost:8080" + FROST_PATH + "/")
+            .withEnv("plugins_projects_enable", "true")
+            .withEnv("plugins_projects_enableDefaultRules", "false")
             .withEnv("plugins_modelLoader_enable", "true")
             .withEnv("plugins_multiDatastream_enable", "false")
             .withEnv("plugins_actuation_enable", "false")
@@ -142,8 +149,6 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
             .withEnv("persistence_db_username", "sensorthings")
             .withEnv("persistence_db_password", "ChangeMe")
             .withEnv("persistence_autoUpdateDatabase", "true")
-            .withEnv("plugins_modelLoader_securityPath", "")
-            .withEnv("plugins_modelLoader_securityFiles", "")
             .waitingFor(
                 Wait.forHttp(FROST_PATH + "/Things")
                     .forStatusCode(200)
@@ -195,7 +200,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
   }
 
   @Test
-  void findOrCreateCreatesThingExactlyOnceAcrossRepeatedMessages() throws Exception {
+  void upsertCreatesOnceAndUpdatesOnRepeatedReference() throws Exception {
     String snapshot =
         NifiTestFixtures.flowBuilder()
             .build(
@@ -217,7 +222,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
 
     String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
     try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-frost")) {
-      // The Thing must appear in FROST (created via the find-or-create POST).
+      // The first delivery creates the Thing via POST.
       await()
           .atMost(Duration.ofSeconds(120))
           .pollInterval(Duration.ofSeconds(3))
@@ -228,16 +233,25 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                 return countThings(REFERENCE) >= 1;
               });
 
-      // Keep delivering the same message; find-or-create must reuse the existing Thing, never
-      // creating a duplicate.
+      // A changed record with the same reference must PATCH the existing Thing, never create a
+      // duplicate. Deliberate pacing dwell: the no-duplicate assertion is negative, so it only
+      // means something once every delivery has been processed. The sleep spaces the five
+      // deliveries out to guarantee that; an await here would return on the first success.
       for (int i = 0; i < 5; i++) {
-        publisher.publish(TOPIC, ENVELOPE);
+        publisher.publish(TOPIC, UPDATED_ENVELOPE);
         Thread.sleep(Duration.ofSeconds(2).toMillis());
       }
-      assertEquals(
-          1,
-          countThings(REFERENCE),
-          "find-or-create must keep exactly one Thing for the reference (idempotency)");
+      await()
+          .atMost(Duration.ofSeconds(60))
+          .pollInterval(Duration.ofSeconds(2))
+          .untilAsserted(
+              () -> {
+                assertEquals(1, countThings(REFERENCE), "upsert must not duplicate the Thing");
+                assertEquals(
+                    "Station IT 1 updated",
+                    thingName(REFERENCE),
+                    "the existing Thing must be updated by reference");
+              });
     }
   }
 
@@ -329,6 +343,8 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     // create one, so an unmatched reference is dropped to the error sink, not written.
     String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
     try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-frost-nods")) {
+      // Deliberate dwell: this proves an absence, so there is no condition that can complete early
+      // and shortening the window would only narrow the chance to observe the Datastream appearing.
       for (int i = 0; i < 10; i++) {
         publisher.publish(NO_DS_TOPIC, OBS_ENVELOPE_UNKNOWN_DS);
         Thread.sleep(3000);
@@ -373,6 +389,21 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                 .build(),
             HttpResponse.BodyHandlers.ofString());
     return mapper.readTree(response.body()).path("value").size();
+  }
+
+  /** Returns the name of the single Thing identified by reference inside the IT project. */
+  private String thingName(String reference) throws Exception {
+    String filter =
+        URLEncoder.encode("properties/reference eq '" + reference + "'", StandardCharsets.UTF_8)
+            .replace("+", "%20");
+    HttpResponse<String> response =
+        http.send(
+            HttpRequest.newBuilder()
+                .uri(URI.create(frostUrl("/Projects(" + projectId + ")/Things?$filter=" + filter)))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    return mapper.readTree(response.body()).path("value").path(0).path("name").asText();
   }
 
   /** Counts FROST Datastreams matching the flow's lookup filter (properties/reference + name). */

@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi.mapping;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConcatNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConstNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
@@ -24,12 +25,23 @@ import java.util.Map;
  * RecordPath only, never Jolt or scripting. Each target field becomes one property whose name is
  * the destination RecordPath and whose value is either a RecordPath value expression or a literal.
  *
- * <p>Numeric conversions ({@code toInt}/{@code toFloat}) are intentionally transparent here: the
- * value is copied unchanged and the actual coercion happens at the sink — PutDatabaseRecord coerces
- * to the target column types (the PostGIS adapter owns the typed table DDL). This keeps every
- * transform expressible in pure RecordPath, with no schema knowledge in this adapter.
+ * <p>Numeric and UUID conversions ({@code toInt}/{@code toFloat}/{@code toUuid}) are intentionally
+ * transparent here: the value is copied unchanged and the actual coercion happens at the sink —
+ * PutDatabaseRecord coerces to the target column types (the PostGIS adapter owns the typed table
+ * DDL). This keeps every transform expressible in pure RecordPath, with no schema knowledge in this
+ * adapter.
  */
 public class RecordPathCompiler {
+
+  /**
+   * NiFi's RecordPath {@code toString(subject, charset)} requires the charset argument even though
+   * it only affects {@code bytes} subjects; for any other subject the argument is inert. The
+   * RecordPath parser rejects a single-argument call at compile time regardless of subject type, so
+   * a fixed charset is always passed.
+   */
+  private static final String TO_STRING_CHARSET = "UTF-8";
+
+  private static final String ISO_DATE_PATTERN = "yyyy-MM-dd";
 
   /**
    * The NiFi {@code UpdateRecord} "Replacement Value Strategy" for a property. A {@code const} uses
@@ -74,26 +86,42 @@ public class RecordPathCompiler {
    * @param mapping the parsed mapping
    * @param geometryEncoding how a geometry op ({@code geoPoint}) must be rendered for the target
    *     sink (WKT for PostGIS, GeoJSON for FROST)
-   * @return the properties, one per target field, in mapping order
-   * @throws FatalAdapterException if an op cannot be rendered for the requested encoding
+   * @return the properties, one per target field, in mapping order, plus the fan-out they were
+   *     compiled against
+   * @throws FatalAdapterException if an op cannot be rendered for the requested encoding, or the
+   *     mapping reads from independent source arrays
    */
-  public List<UpdateRecordProperty> compile(
-      MappingConfig mapping, GeometryEncoding geometryEncoding) throws FatalAdapterException {
+  public CompiledMapping compile(MappingConfig mapping, GeometryEncoding geometryEncoding)
+      throws FatalAdapterException {
+    ForkPlan fork = ForkPlan.forMapping(mapping);
     List<UpdateRecordProperty> properties = new ArrayList<>();
     for (Map.Entry<String, ValueNode> field : mapping.fields().entrySet()) {
-      String destination = JsonPaths.toRecordPath(field.getKey());
-      properties.add(compileField(destination, field.getValue(), geometryEncoding));
+      JsonPaths.ParsedPath target = parsePath(field.getKey(), "target");
+      properties.add(
+          compileField(target.recordPath(), field.getValue(), geometryEncoding, target, fork));
     }
-    return List.copyOf(properties);
+    return new CompiledMapping(properties, fork);
   }
 
   /**
-   * Compiles a single field rule against an explicit destination — the flat-compilation entry point
-   * for {@link FrostMappingCompiler}, which redirects each rule into an intermediate root-level
-   * field instead of the mapping's own target path.
+   * Compiles a single field rule against an explicit destination. This flat-compilation entry point
+   * redirects each rule into an intermediate root-level field instead of the mapping's own target
+   * path.
    */
-  UpdateRecordProperty compileField(
-      String destination, ValueNode node, GeometryEncoding geometryEncoding)
+  UpdateRecordProperty compileField(String destination, ValueNode node, ForkPlan fork)
+      throws FatalAdapterException {
+    // The flat representation has no target array context, but source paths still pass through the
+    // same ambiguity checks.
+    return compileField(
+        destination, node, GeometryEncoding.GEOJSON, new JsonPaths.ParsedPath(List.of(), -1), fork);
+  }
+
+  private UpdateRecordProperty compileField(
+      String destination,
+      ValueNode node,
+      GeometryEncoding geometryEncoding,
+      JsonPaths.ParsedPath target,
+      ForkPlan fork)
       throws FatalAdapterException {
     if (node instanceof ConstNode constant) {
       // A bare RecordPath literal is not evaluated as a value by UpdateRecord, so a const must use
@@ -106,22 +134,90 @@ public class RecordPathCompiler {
     }
     return new UpdateRecordProperty(
         destination,
-        NifiExpressionLanguage.escape(render(node, geometryEncoding)),
+        NifiExpressionLanguage.escape(render(node, geometryEncoding, target, fork)),
         ReplacementStrategy.RECORD_PATH_VALUE);
   }
 
-  private String render(ValueNode node, GeometryEncoding geometryEncoding)
+  private String render(
+      ValueNode node, GeometryEncoding geometryEncoding, JsonPaths.ParsedPath target, ForkPlan fork)
       throws FatalAdapterException {
     return switch (node) {
-      case CopyNode copy -> JsonPaths.toRecordPath(copy.sourcePath());
+      case CopyNode copy -> renderCopy(copy, target, fork);
       case ConstNode constant -> literal(constant.value());
-      case ConcatNode concat -> renderConcat(concat, geometryEncoding);
-      case ConvertNode convert -> renderConvert(convert, geometryEncoding);
-      case GeoPointNode geoPoint -> renderGeoPoint(geoPoint, geometryEncoding);
+      case ConcatNode concat -> renderConcat(concat, geometryEncoding, target, fork);
+      case ConvertNode convert -> renderConvert(convert, geometryEncoding, target, fork);
+      case GeoPointNode geoPoint -> renderGeoPoint(geoPoint, geometryEncoding, target, fork);
     };
   }
 
-  private String renderConcat(ConcatNode concat, GeometryEncoding geometryEncoding)
+  /**
+   * Renders a source path relative to the selected target field when both live below the same
+   * innermost array. NiFi evaluates an absolute wildcard source as a multi-value selection; using
+   * it as the replacement for every wildcard target can assign the entire selection to each
+   * element. A relative path (for example {@code ../sourceName}) keeps evaluation anchored at the
+   * current array record and therefore preserves element-wise semantics.
+   *
+   * <p>When the mapping fans out, this relative form is not needed and not wanted: the upstream
+   * {@code ForkRecord} has already flattened one element per record, so every path — element field
+   * or ancestor field — is a plain root-level selection.
+   */
+  private String renderCopy(CopyNode copy, JsonPaths.ParsedPath target, ForkPlan fork)
+      throws FatalAdapterException {
+    JsonPaths.ParsedPath source = parsePath(copy.sourcePath(), "source");
+    if (fork.required()) {
+      if (target.hasArrayContext()) {
+        // ForkPlan rejects this pairing before compilation: an in-place array target cannot share a
+        // mapping with a fan-out. Falling through would emit a relative '../field' against an
+        // already-flattened record — wrong output, no error.
+        throw reject(
+            "target '"
+                + target.recordPath()
+                + "' keeps an array level while the mapping fans out over '"
+                + fork.recordPath()
+                + "'");
+      }
+      return fork.rewriteSource(source);
+    }
+    if (!source.hasArrayContext()) {
+      return source.recordPath(); // root scalar/object; valid as an absolute value or broadcast
+    }
+    if (!target.hasArrayContext()) {
+      throw incompatibleArrayContexts(copy.sourcePath(), target);
+    }
+    if (!source.arrayContext().equals(target.arrayContext())) {
+      throw incompatibleArrayContexts(copy.sourcePath(), target);
+    }
+
+    List<String> sourceSuffix = source.suffixWithinArray();
+    List<String> targetSuffix = target.suffixWithinArray();
+    if (sourceSuffix.isEmpty() || targetSuffix.isEmpty()) {
+      throw reject(
+          "array element paths must select a field below the array; source="
+              + copy.sourcePath()
+              + ", target="
+              + target.recordPath());
+    }
+
+    return "../".repeat(targetSuffix.size())
+        + String.join(
+            "/", sourceSuffix.stream().map(segment -> segment.replace("[]", "[*]")).toList());
+  }
+
+  private FatalAdapterException incompatibleArrayContexts(
+      String sourcePath, JsonPaths.ParsedPath target) {
+    return reject(
+        "cannot map array source '"
+            + sourcePath
+            + "' to target '"
+            + target.recordPath()
+            + "': element-wise mapping requires the same array context");
+  }
+
+  private String renderConcat(
+      ConcatNode concat,
+      GeometryEncoding geometryEncoding,
+      JsonPaths.ParsedPath target,
+      ForkPlan fork)
       throws FatalAdapterException {
     String separator = concat.separator();
     StringBuilder builder = new StringBuilder("concat(");
@@ -133,19 +229,38 @@ public class RecordPathCompiler {
           builder.append(quote(separator)).append(", ");
         }
       }
-      builder.append(render(inputs.get(i), geometryEncoding));
+      builder.append(render(inputs.get(i), geometryEncoding, target, fork));
     }
     return builder.append(')').toString();
   }
 
-  private String renderConvert(ConvertNode convert, GeometryEncoding geometryEncoding)
+  private String renderConvert(
+      ConvertNode convert,
+      GeometryEncoding geometryEncoding,
+      JsonPaths.ParsedPath target,
+      ForkPlan fork)
       throws FatalAdapterException {
-    String inner = render(convert.input(), geometryEncoding);
+    String inner = render(convert.input(), geometryEncoding, target, fork);
     return switch (convert.op()) {
-      case TO_DATE -> "toDate(" + inner + ", " + quote(convert.pattern()) + ")";
+      // RecordPath has one parse function and it always yields a time component, so the timestamp
+      // op is the bare call and the date-only op is the one that needs extra work.
+      case TO_DATE_TIME -> "toDate(" + inner + ", " + quote(convert.pattern()) + ")";
+      // That time component reaches a DATE column as epoch millis and is rejected there, while the
+      // row vanishes without a deployment error. Re-formatting yields a plain string the server
+      // parses into the column's own type (see PostgisSinkStage#withStringtypeUnspecified).
+      case TO_DATE ->
+          "format(toDate("
+              + inner
+              + ", "
+              + quote(convert.pattern())
+              + "), "
+              + quote(ISO_DATE_PATTERN)
+              + ")";
       case FORMAT -> "format(" + inner + ", " + quote(convert.pattern()) + ")";
-      case TO_STRING -> "toString(" + inner + ")";
-      case TO_INT, TO_FLOAT -> inner;
+      case TO_STRING -> "toString(" + inner + ", " + quote(TO_STRING_CHARSET) + ")";
+      // RecordPath's only UUID function, uuid5(), mints a new identifier rather than converting
+      // one.
+      case TO_INT, TO_FLOAT, TO_UUID -> inner;
     };
   }
 
@@ -155,10 +270,14 @@ public class RecordPathCompiler {
    * one would clash with a non-4326 column). {@code GEOJSON} (FROST): a GeoJSON Point built as a
    * string via {@code concat} — the FROST entity template embeds it verbatim.
    */
-  private String renderGeoPoint(GeoPointNode geoPoint, GeometryEncoding geometryEncoding)
+  private String renderGeoPoint(
+      GeoPointNode geoPoint,
+      GeometryEncoding geometryEncoding,
+      JsonPaths.ParsedPath target,
+      ForkPlan fork)
       throws FatalAdapterException {
-    String lon = render(geoPoint.lon(), geometryEncoding);
-    String lat = render(geoPoint.lat(), geometryEncoding);
+    String lon = render(geoPoint.lon(), geometryEncoding, target, fork);
+    String lat = render(geoPoint.lat(), geometryEncoding, target, fork);
     return switch (geometryEncoding) {
       case WKT ->
           "concat("
@@ -207,5 +326,21 @@ public class RecordPathCompiler {
    */
   private static String quote(String text) {
     return "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'";
+  }
+
+  private static JsonPaths.ParsedPath parsePath(String path, String role)
+      throws FatalAdapterException {
+    try {
+      return JsonPaths.parse(path);
+    } catch (IllegalArgumentException e) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_MAPPING_ERROR,
+          e,
+          "invalid " + role + " CORE path '" + path + "': " + e.getMessage());
+    }
+  }
+
+  private static FatalAdapterException reject(String detail) {
+    return new FatalAdapterException(AdapterErrorCode.NIFI_MAPPING_ERROR, detail);
   }
 }

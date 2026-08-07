@@ -34,12 +34,12 @@ class DataSetEntityTest {
   }
 
   @Nested
-  @DisplayName("clearInfrastructureFields()")
-  class ClearInfrastructureFieldsTests {
+  @DisplayName("clearRouteAndPipelineInfrastructure()")
+  class ClearRouteAndPipelineInfrastructureTests {
 
     @Test
-    @DisplayName("Should clear all infrastructure fields and per-API route IDs")
-    void shouldClearAllInfrastructureFields() {
+    @DisplayName("Should clear route/pipeline fields and per-API route IDs, keep the sink")
+    void shouldClearRouteAndPipelineKeepSink() {
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
       dataSet.setProjectId("project-1");
       dataSet.setFrostBaseUrl("http://frost.example.com");
@@ -59,17 +59,19 @@ class DataSetEntityTest {
       weather.setRouteId("route-2");
       dataSet.setNamedApis(Set.of(traffic, weather));
 
-      dataSet.clearInfrastructureFields();
+      dataSet.clearRouteAndPipelineInfrastructure();
 
-      assertThat(dataSet.getProjectId()).isNull();
-      assertThat(dataSet.getFrostBaseUrl()).isNull();
+      // Route/consumer-access layer is torn down.
       assertThat(dataSet.getServiceId()).isNull();
       assertThat(dataSet.getPublicUrl()).isNull();
       assertThat(dataSet.getPipelineIds()).isNull();
+      assertThat(dataSet.getNamedApis()).allSatisfy(api -> assertThat(api.getRouteId()).isNull());
+      // Data-holding sink references survive an unrelease.
+      assertThat(dataSet.getProjectId()).isEqualTo("project-1");
+      assertThat(dataSet.getFrostBaseUrl()).isEqualTo("http://frost.example.com");
       assertThat(dataSet.getNamedApis())
           .as("named-API entries are preserved on unrelease")
           .hasSize(2);
-      assertThat(dataSet.getNamedApis()).allSatisfy(api -> assertThat(api.getRouteId()).isNull());
     }
 
     @Test
@@ -77,10 +79,8 @@ class DataSetEntityTest {
     void shouldHandleAlreadyNullFields() {
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
 
-      dataSet.clearInfrastructureFields();
+      dataSet.clearRouteAndPipelineInfrastructure();
 
-      assertThat(dataSet.getProjectId()).isNull();
-      assertThat(dataSet.getFrostBaseUrl()).isNull();
       assertThat(dataSet.getServiceId()).isNull();
       assertThat(dataSet.getPublicUrl()).isNull();
       assertThat(dataSet.getPipelineIds()).isNull();

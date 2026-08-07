@@ -17,12 +17,14 @@ import java.util.Objects;
  * as an explicit field so Jackson serializes it into the flat JSON that the saga orchestrator (the
  * config-adapter service) consumes and resolves via {@code SagaType.valueOf(sagaTypeStr)}.
  *
- * <p>The three permitted subtypes map 1:1 to {@link SagaType} variants. Construct via the static
- * {@code of(...)} factories; the canonical constructors enforce that the supplied {@code sagaType}
- * matches the variant and that {@code datasetId} is non-null.
+ * <p>The permitted subtypes map 1:1 to {@link SagaType} variants. Construct via the static {@code
+ * of(...)} factories; the canonical constructors enforce that the supplied {@code sagaType} matches
+ * the variant and that {@code datasetId} is non-null.
  *
  * <p>The orchestrator provisions FROST project → APISIX routes (one per named API) → Redpanda
- * pipelines on CREATE, runs targeted updates on UPDATE, and tears down in reverse order on DELETE.
+ * pipelines on CREATE, runs targeted updates on UPDATE, tears down in reverse order on DELETE, and
+ * tears down only the ingest/consumer-access layer (pipeline + route) on UNRELEASE while leaving
+ * the data-holding sink intact.
  *
  * <p>{@code routeIds} is keyed by named-API slug so per-route infrastructure state is addressable
  * independently.
@@ -32,7 +34,10 @@ import java.util.Objects;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public sealed interface SagaTrigger
-    permits SagaTrigger.DatasetCreate, SagaTrigger.DatasetUpdate, SagaTrigger.DatasetDelete {
+    permits SagaTrigger.DatasetCreate,
+        SagaTrigger.DatasetUpdate,
+        SagaTrigger.DatasetUnrelease,
+        SagaTrigger.DatasetDelete {
 
   /** Dataset UUID used as the Kafka message key and for duplicate detection. */
   String datasetId();
@@ -141,6 +146,35 @@ public sealed interface SagaTrigger
           styles,
           dataPipelines,
           namedApis);
+    }
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  record DatasetUnrelease(
+      SagaType sagaType,
+      String datasetId,
+      Map<String, String> routeIds,
+      String serviceId,
+      List<String> pipelineIds,
+      List<NamedApi> namedApis)
+      implements SagaTrigger {
+
+    public DatasetUnrelease {
+      if (sagaType != SagaType.DATASET_UNRELEASE) {
+        throw new IllegalArgumentException(
+            "DatasetUnrelease requires sagaType=DATASET_UNRELEASE, got " + sagaType);
+      }
+      Objects.requireNonNull(datasetId, "datasetId");
+    }
+
+    public static DatasetUnrelease of(
+        String datasetId,
+        Map<String, String> routeIds,
+        String serviceId,
+        List<String> pipelineIds,
+        List<NamedApi> namedApis) {
+      return new DatasetUnrelease(
+          SagaType.DATASET_UNRELEASE, datasetId, routeIds, serviceId, pipelineIds, namedApis);
     }
   }
 

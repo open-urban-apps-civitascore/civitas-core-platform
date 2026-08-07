@@ -3,6 +3,7 @@ import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios
 import React from 'react'
 import { toast } from 'sonner'
 
+import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
@@ -21,6 +22,7 @@ import {
   buildDataSinkPayloads,
   getRemovedDataSinkIds,
   hasDataSinkChanged,
+  isDestructiveDataSinkChange,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
 import { createEmptyPipeline } from '../../_services/pipelineService'
@@ -55,10 +57,26 @@ vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useDeletePipeline: vi.fn(),
 }))
 
+vi.mock('@/app/services/api/datasets/clientRequests', () => ({
+  useGetDataset: vi.fn(),
+}))
+
 vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useCreateDataSink: vi.fn(),
   useDeleteDataSink: vi.fn(),
   useUpdateDataSink: vi.fn(),
+}))
+
+// Capture the latest WarningModal props so tests can drive the data-loss dialog (confirm/discard).
+const warningModalRef = vi.hoisted(() => ({
+  current: null as { open?: boolean; onConfirm?: () => void; onDiscard?: () => void } | null,
+}))
+
+vi.mock('@/components/modals/warning-modal/WarningModal', () => ({
+  WarningModal: (props: { open?: boolean; onConfirm?: () => void; onDiscard?: () => void }) => {
+    warningModalRef.current = props
+    return null
+  },
 }))
 
 vi.mock('../../_services/validationService', () => ({
@@ -80,6 +98,7 @@ vi.mock('../../_services/payloadBuilderService', () => ({
   createDataSinkSnapshot: vi.fn().mockReturnValue({}),
   getRemovedDataSinkIds: vi.fn().mockReturnValue([]),
   hasDataSinkChanged: vi.fn().mockReturnValue(false),
+  isDestructiveDataSinkChange: vi.fn().mockReturnValue(false),
   updateNodeEntityId: vi.fn().mockImplementation((pipeline: unknown) => pipeline),
 }))
 
@@ -112,7 +131,7 @@ const makeNode = (id: string, type: PipelineNodeType = PIPELINE_NODE_TYPES.Start
   } as ControlNodeData,
 })
 
-const makeGeoPersistenceNode = (id: string, entityId?: string): PipelineNode => ({
+const makeGeoPersistenceNode = (id: string, entityId?: string, tableName = `table_${id}`): PipelineNode => ({
   id,
   type: PIPELINE_NODE_TYPES.GeoPersistence,
   position: { x: 0, y: 0 },
@@ -121,7 +140,7 @@ const makeGeoPersistenceNode = (id: string, entityId?: string): PipelineNode => 
     configured: true,
     entityType: 'persistence',
     entityId,
-    tableName: `table_${id}`,
+    tableName,
   } as unknown as ControlNodeData,
 })
 
@@ -174,6 +193,11 @@ beforeEach(() => {
     data: undefined,
     isLoading: false,
   } as unknown as ReturnType<typeof useGetPipelines>)
+
+  vi.mocked(useGetDataset).mockReturnValue({
+    data: { data: { provisioned: false } },
+    isLoading: false,
+  } as unknown as ReturnType<typeof useGetDataset>)
 
   vi.mocked(useCreatePipeline).mockReturnValue({
     mutate: vi.fn(),
@@ -385,6 +409,27 @@ describe('PipelineEditorProviderComponent', () => {
         contextRef.current?.deleteNodes(['node-1'])
       })
 
+      expect(contextRef.current?.pipeline?.edges).toHaveLength(0)
+    })
+
+    it('removes connected edges when React Flow emits edge + node removals in the same event', () => {
+      const pipeline = {
+        ...createEmptyPipeline('Test'),
+        nodes: [makeNode('node-1'), makeNode('node-2', PIPELINE_NODE_TYPES.End)],
+        edges: [{ id: 'edge-1', source: 'node-1', target: 'node-2', type: 'smoothstep', data: { label: '' } }],
+      }
+
+      renderProvider(makeSession({ pipeline }))
+
+      // React Flow's native delete synchronously dispatches the connected-edge removal
+      // first, then the node removal. Both must compose so no orphaned edge remains.
+      act(() => {
+        contextRef.current?.dispatch({ type: 'EDGE_CHANGES', payload: [{ type: 'remove', id: 'edge-1' }] })
+        contextRef.current?.dispatch({ type: 'NODE_CHANGES', payload: [{ type: 'remove', id: 'node-1' }] })
+      })
+
+      expect(contextRef.current?.pipeline?.nodes).toHaveLength(1)
+      expect(contextRef.current?.pipeline?.nodes[0].id).toBe('node-2')
       expect(contextRef.current?.pipeline?.edges).toHaveLength(0)
     })
   })
@@ -697,6 +742,55 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       expect(contextRef.current?.getNodeValidationSeverity('node-1')).toBe('error')
+    })
+  })
+
+  describe('pipelineUsingTableName', () => {
+    const sessionWithGeoNode = (sessionId: string, nodeId: string, tableName: string) =>
+      makeSession({
+        id: sessionId,
+        name: sessionId,
+        pipeline: {
+          ...createEmptyPipeline(sessionId),
+          id: `pipeline-${sessionId}`,
+          nodes: [makeGeoPersistenceNode(nodeId, undefined, tableName)],
+        },
+      })
+
+    it('is null for the name the node itself uses', () => {
+      renderProvider(sessionWithGeoNode('session-1', 'persist-1', 'roads'))
+
+      expect(contextRef.current?.pipelineUsingTableName('persist-1', 'roads')).toBeNull()
+    })
+
+    it('names the other pipeline of the dataset using the name, ignoring case', () => {
+      renderProviderWithSessions([
+        sessionWithGeoNode('session-1', 'persist-1', 'roads'),
+        sessionWithGeoNode('session-2', 'persist-2', 'Roads'),
+      ])
+
+      expect(contextRef.current?.pipelineUsingTableName('persist-1', 'ROADS')).toBe('session-2')
+    })
+
+    it('is null for an empty name', () => {
+      renderProvider(sessionWithGeoNode('session-1', 'persist-1', 'roads'))
+
+      expect(contextRef.current?.pipelineUsingTableName('persist-2', '  ')).toBeNull()
+    })
+
+    it('passes the names used outside the validated pipeline to the validation service', () => {
+      renderProviderWithSessions([
+        sessionWithGeoNode('session-1', 'persist-1', 'roads'),
+        sessionWithGeoNode('session-2', 'persist-2', 'Rivers'),
+      ])
+
+      act(() => {
+        contextRef.current?.runValidation()
+      })
+
+      expect(vi.mocked(validatePipelineWithNodeStatus)).toHaveBeenLastCalledWith(expect.anything(), {
+        tableNameOwners: { rivers: 'session-2' },
+      })
     })
   })
 
@@ -1305,7 +1399,10 @@ describe('PipelineEditorProviderComponent', () => {
           statusText: 'Unprocessable Entity',
           headers: new AxiosHeaders(),
           config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
-          data: { detail: 'DataSource "My DS" is not permitted for this datapool' },
+          data: {
+            detail: 'DataSource "My DS" is not permitted for this datapool',
+            type: 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
+          },
         },
       )
       mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
@@ -1320,18 +1417,21 @@ describe('PipelineEditorProviderComponent', () => {
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
     })
 
-    it('returns false on a 422 error', async () => {
+    it('reports a duplicate table name instead of a generic save failure on a 409 error', async () => {
       const axiosError = new AxiosError(
-        'Unprocessable Entity',
+        'Conflict',
         undefined,
-        { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
+        { headers: new AxiosHeaders(), method: 'POST', url: '/datasinks' } as InternalAxiosRequestConfig,
         undefined,
         {
-          status: 422,
-          statusText: 'Unprocessable Entity',
+          status: 409,
+          statusText: 'Conflict',
           headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
-          data: { detail: 'DataSource "My DS" is not permitted for this datapool' },
+          config: { headers: new AxiosHeaders(), method: 'POST', url: '/datasinks' } as InternalAxiosRequestConfig,
+          data: {
+            detail: "DataSink with configuration.tableName 'roads' and dataSetId 'dataset-1' already exists",
+            type: 'urn:civitas:error:CONFLICT',
+          },
         },
       )
       mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
@@ -1344,6 +1444,172 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       expect(result).toBe(false)
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.tableNameConflict')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('header.saveFailed')
+    })
+
+    it('returns false on a 422 error', async () => {
+      const axiosError = new AxiosError(
+        'Unprocessable Entity',
+        undefined,
+        { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
+        undefined,
+        {
+          status: 422,
+          statusText: 'Unprocessable Entity',
+          headers: new AxiosHeaders(),
+          config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
+          data: {
+            detail: 'DataSource "My DS" is not permitted for this datapool',
+            type: 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
+          },
+        },
+      )
+      mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+    })
+
+    describe('data-loss confirmation', () => {
+      const destructiveUpdateSession = () =>
+        makeSession({
+          isDirty: true,
+          pipeline: {
+            ...createEmptyPipeline('Test'),
+            id: 'pipeline-1',
+            nodes: [makeGeoPersistenceNode('persist-existing', 'existing-sink-id')],
+          },
+        })
+
+      const armDestructiveUpdate = (mockUpdateDataSinkAsync: ReturnType<typeof vi.fn>) => {
+        vi.mocked(useUpdateDataSink).mockReturnValue({
+          mutate: vi.fn(),
+          mutateAsync: mockUpdateDataSinkAsync,
+          isPending: false,
+        } as unknown as ReturnType<typeof useUpdateDataSink>)
+        vi.mocked(useGetDataset).mockReturnValue({
+          data: { data: { provisioned: true } },
+          isLoading: false,
+        } as unknown as ReturnType<typeof useGetDataset>)
+        vi.mocked(buildDataSinkPayloads).mockReturnValue([
+          { nodeId: 'persist-existing', entityId: 'existing-sink-id', payload: { name: 'sink' } as never },
+        ])
+        vi.mocked(hasDataSinkChanged).mockReturnValue(true)
+        vi.mocked(isDestructiveDataSinkChange).mockReturnValue(true)
+      }
+
+      it('confirms the dialog and sends confirmDataLoss on a destructive change', async () => {
+        const mockUpdateDataSinkAsync = vi.fn().mockResolvedValue({})
+        armDestructiveUpdate(mockUpdateDataSinkAsync)
+
+        renderProvider(destructiveUpdateSession())
+
+        let savePromise: Promise<boolean | undefined> | undefined
+        await act(async () => {
+          savePromise = contextRef.current?.saveAllPipelines()
+        })
+        // Dialog is now open, awaiting the user's decision.
+        expect(warningModalRef.current?.open).toBe(true)
+
+        await act(async () => {
+          warningModalRef.current?.onConfirm?.()
+          await savePromise
+        })
+
+        expect(mockUpdateDataSinkAsync).toHaveBeenCalledWith({
+          datasetId: 'dataset-1',
+          dataSinkId: 'existing-sink-id',
+          data: { name: 'sink', confirmDataLoss: true },
+        })
+      })
+
+      it('cancels the dialog and saves nothing on a destructive change', async () => {
+        const mockUpdateDataSinkAsync = vi.fn().mockResolvedValue({})
+        armDestructiveUpdate(mockUpdateDataSinkAsync)
+
+        renderProvider(destructiveUpdateSession())
+
+        let savePromise: Promise<boolean | undefined> | undefined
+        await act(async () => {
+          savePromise = contextRef.current?.saveAllPipelines()
+        })
+        expect(warningModalRef.current?.open).toBe(true)
+
+        let result: boolean | undefined
+        await act(async () => {
+          warningModalRef.current?.onDiscard?.()
+          result = await savePromise
+        })
+
+        expect(result).toBe(false)
+        expect(mockUpdateDataSinkAsync).not.toHaveBeenCalled()
+      })
+
+      it('rejects a second save-all while the data-loss dialog is open, then completes the first', async () => {
+        const mockUpdateDataSinkAsync = vi.fn().mockResolvedValue({})
+        armDestructiveUpdate(mockUpdateDataSinkAsync)
+
+        renderProvider(destructiveUpdateSession())
+
+        let firstSave: Promise<boolean | undefined> | undefined
+        await act(async () => {
+          firstSave = contextRef.current?.saveAllPipelines()
+        })
+        expect(warningModalRef.current?.open).toBe(true)
+
+        // A second trigger while the dialog awaits confirmation must be rejected by the guard,
+        // not reopen the dialog or overwrite the first save's pending resolve.
+        let secondResult: boolean | undefined
+        await act(async () => {
+          secondResult = await contextRef.current?.saveAllPipelines()
+        })
+        expect(secondResult).toBe(false)
+        expect(mockUpdateDataSinkAsync).not.toHaveBeenCalled()
+
+        // The first save's promise is still live and resolves normally once confirmed.
+        let firstResult: boolean | undefined
+        await act(async () => {
+          warningModalRef.current?.onConfirm?.()
+          firstResult = await firstSave
+        })
+        expect(firstResult).toBe(true)
+        expect(mockUpdateDataSinkAsync).toHaveBeenCalledTimes(1)
+        expect(mockUpdateDataSinkAsync).toHaveBeenCalledWith({
+          datasetId: 'dataset-1',
+          dataSinkId: 'existing-sink-id',
+          data: { name: 'sink', confirmDataLoss: true },
+        })
+      })
+
+      it('does not open the dialog when the dataset is not provisioned', async () => {
+        const mockUpdateDataSinkAsync = vi.fn().mockResolvedValue({})
+        armDestructiveUpdate(mockUpdateDataSinkAsync)
+        // Override: never provisioned → no table at risk → no dialog, no confirmDataLoss flag.
+        vi.mocked(useGetDataset).mockReturnValue({
+          data: { data: { provisioned: false } },
+          isLoading: false,
+        } as unknown as ReturnType<typeof useGetDataset>)
+
+        renderProvider(destructiveUpdateSession())
+
+        await act(async () => {
+          await contextRef.current?.saveAllPipelines()
+        })
+
+        expect(warningModalRef.current?.open).toBeFalsy()
+        expect(mockUpdateDataSinkAsync).toHaveBeenCalledWith({
+          datasetId: 'dataset-1',
+          dataSinkId: 'existing-sink-id',
+          data: { name: 'sink' },
+        })
+      })
     })
   })
 

@@ -1,0 +1,50 @@
+meta {
+  name: 8. Reject slug with an underscore
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "Named API Contract Underscore Slug",
+    "description": "Negative fixture — the slug shape must be the only reason this create fails.",
+    "openDataAccess": false,
+    "namedApis": [
+      { "name": "Underscore Slug", "slug": "a_b", "standard": "STA", "version": "1.1" }
+    ]
+  }
+}
+
+tests {
+  const body = res.body || {};
+
+  test("Status code is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Response is a problem document", function() {
+    expect(body.detail !== undefined || body.title !== undefined).to.be.true;
+  });
+}
+
+docs {
+  **Contract step 8** — Reject an underscore in the slug.
+
+  The hyphen is the only permitted separator. Underscores are excluded to keep the public path
+  segment to the conventional URL-safe alphabet, so a slug never needs escaping or normalising on
+  the way into a route definition.
+
+  Everything else in the body is valid, so a 400 here can only come from the slug.
+
+  **Precondition:** none.
+
+  **Expected Response:** 400 Bad Request, `application/problem+json`.
+
+  **Post-condition:** none — no dataset is created, so nothing to clean up.
+}

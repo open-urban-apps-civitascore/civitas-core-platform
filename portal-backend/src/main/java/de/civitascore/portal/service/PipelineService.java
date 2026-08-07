@@ -3,8 +3,6 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.PipelineMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DatapoolScopeType;
-import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
@@ -14,18 +12,28 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 /**
@@ -43,6 +51,8 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
   private final DataSourceRepository dataSourceRepository;
   private final DataSinkService dataSinkService;
   private final DataSinkRepository dataSinkRepository;
+  private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
+  private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   public PipelineService(
       PipelineRepository pipelineRepository,
@@ -50,13 +60,17 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
       DataSetRepository dataSetRepository,
       DataSourceRepository dataSourceRepository,
       DataSinkService dataSinkService,
-      DataSinkRepository dataSinkRepository) {
+      DataSinkRepository dataSinkRepository,
+      DataSourceDatapoolScopeValidator datapoolScopeValidator,
+      ObjectProvider<AllowedScopes> allowedScopesProvider) {
     this.pipelineRepository = pipelineRepository;
     this.pipelineMapper = pipelineMapper;
     this.dataSetRepository = dataSetRepository;
     this.dataSourceRepository = dataSourceRepository;
     this.dataSinkService = dataSinkService;
     this.dataSinkRepository = dataSinkRepository;
+    this.datapoolScopeValidator = datapoolScopeValidator;
+    this.allowedScopesProvider = allowedScopesProvider;
   }
 
   @Override
@@ -112,13 +126,15 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
 
   /**
    * Resolves the parent dataset and data source references after DTO-to-entity conversion.
-   * Validates that the dataset and all referenced data sources exist.
    *
    * @param entity the pipeline entity
    * @param input the pipeline input DTO
    * @return the entity with resolved dataset and data source relationships
    * @throws ResourceNotFoundException if the dataset is not found
-   * @throws InvalidInputException if any data source ID is not found
+   * @throws org.springframework.security.access.AccessDeniedException if no scope header is present
+   * @throws DataSourceScopeViolationException if a referenced data source is not usable by this
+   *     dataset's pipelines — it does not exist, is not AVAILABLE, or is not released for the
+   *     dataset's datapool. The three cases are deliberately indistinguishable.
    */
   @Override
   protected Pipeline postConvertToEntity(Pipeline entity, PipelineInputDTO input) {
@@ -132,13 +148,13 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
             });
 
     if (input.getDataSourceIds() != null && !input.getDataSourceIds().isEmpty()) {
+      // Referencing a DataSource is authorized by the Use relationship, not by DATASOURCE_READ: the
+      // dataset's datapool decides, and OPA has already enforced the caller's permission on the
+      // dataset. The scope header must still be present — its absence means the request reached the
+      // backend without passing OPA at all.
+      requireScopeHeader();
       List<DataSource> dataSources = dataSourceRepository.findAllById(input.getDataSourceIds());
-      if (dataSources.size() != input.getDataSourceIds().size()) {
-        throw new InvalidInputException(
-            "Pipeline", "dataSourceIds", "One or more DataSource IDs not found");
-      }
-      dataSources.forEach(this::validateDataSourceLinkable);
-      validateDataSourcesInScope(dataSources, entity.getDataSet());
+      resolveUsableReferences(entity.getDataSet(), input.getDataSourceIds(), dataSources);
       entity.setDataSources(new HashSet<>(dataSources));
     } else {
       entity.setDataSources(null);
@@ -217,49 +233,77 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
     return saved;
   }
 
-  private void validateDataSourcesInScope(List<DataSource> dataSources, DataSet dataSet) {
-    List<DataSource> offendingDataSources =
-        new ArrayList<>(
-            dataSources.stream()
-                .filter(ds -> ds.getDatapoolScopeType() == DatapoolScopeType.NONE)
-                .toList());
+  /**
+   * Runs the datapool-confinement check and records who established the relationship.
+   *
+   * <p>Establishing a Use relationship no longer passes through {@code ScopeAccessAuthorizer},
+   * which used to log every grant and denial with the acting user. This is now the only place the
+   * decision is attributable, so both outcomes are logged here rather than left to the exception
+   * handler.
+   */
+  private void resolveUsableReferences(
+      DataSet dataSet, Collection<UUID> requestedIds, List<DataSource> found) {
+    Map<UUID, DataSource> byId =
+        found.stream().collect(Collectors.toMap(DataSource::getId, Function.identity()));
+    List<UUID> notUsable =
+        requestedIds.stream().distinct().filter(id -> !isUsable(byId.get(id), dataSet)).toList();
 
-    DataPool dataPool = dataSet.getDataPool();
-    if (dataPool != null) {
-      offendingDataSources.addAll(
-          dataSources.stream().filter(ds -> !isPermittedForDataPool(ds, dataPool)).toList());
-    } else {
-      // A pool-less dataset belongs to no datapool, so a SPECIFIC-scoped datasource (confined to
-      // its
-      // scopedDataPools) must NOT be usable here — otherwise its pool-confined data could be routed
-      // into a pool-less (and possibly openDataAccess=public) dataset, defeating the restriction.
-      offendingDataSources.addAll(
-          dataSources.stream()
-              .filter(ds -> ds.getDatapoolScopeType() == DatapoolScopeType.SPECIFIC)
-              .toList());
+    UUID dataPoolId = dataSet.getDataPool() == null ? null : dataSet.getDataPool().getId();
+    if (!notUsable.isEmpty()) {
+      log.warn(
+          "DataSource reference denied for user {} on dataset {} (datapool {}): requested={} notUsable={}",
+          Encode.forJava(actingUserId()),
+          dataSet.getId(),
+          dataPoolId,
+          requestedIds,
+          notUsable);
+      throw DataSourceScopeViolationException.notUsableInPipeline(notUsable);
     }
+    log.info(
+        "DataSource reference granted for user {} on dataset {} (datapool {}): {}",
+        Encode.forJava(actingUserId()),
+        dataSet.getId(),
+        dataPoolId,
+        requestedIds);
+  }
 
-    if (!offendingDataSources.isEmpty()) {
-      throw new DataSourceScopeViolationException(
-          offendingDataSources.stream().map(DataSource::getId).collect(Collectors.toList()));
+  /**
+   * Whether a referenced DataSource may feed this dataset's pipelines: it must exist, be AVAILABLE,
+   * and be released for the dataset's datapool. A nonexistent id ({@code null} here) is treated the
+   * same as an unusable one so the three cases stay indistinguishable to the caller.
+   */
+  private boolean isUsable(DataSource dataSource, DataSet dataSet) {
+    return dataSource != null
+        && dataSource.getDataSourceStatus() == DataSourceStatus.AVAILABLE
+        && datapoolScopeValidator.isPermitted(dataSource, dataSet.getDataPool());
+  }
+
+  /**
+   * Denies when no scope header is present, i.e. the request reached the backend without passing
+   * APISIX/OPA. Defence in depth: the datapool rule below is not an authorization check on the
+   * caller, so this is the only caller-facing guard left on this path.
+   */
+  private void requireScopeHeader() {
+    if (!allowedScopesProvider.getObject().isHeaderPresent()) {
+      log.warn(
+          "DataSource reference denied for user {}: no scope header present (direct backend access)",
+          Encode.forJava(actingUserId()));
+      throw new AccessDeniedException("Missing scope information for DataSource reference");
     }
   }
 
-  private boolean isPermittedForDataPool(DataSource dataSource, DataPool dataPool) {
-    if (dataSource.getDatapoolScopeType() != DatapoolScopeType.SPECIFIC) {
-      return true;
+  /**
+   * The acting user's id for the audit lines, or {@code unknown} when no principal is resolvable.
+   */
+  private String actingUserId() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication != null
+        && authentication.isAuthenticated()
+        && authentication.getPrincipal() instanceof PrincipalUserDetails principal
+        && principal.getUserId() != null) {
+      return principal.getUserId().toString();
     }
-    return dataSource.getScopedDataPools().stream()
-        .anyMatch(scopedPool -> scopedPool.getId().equals(dataPool.getId()));
-  }
-
-  private void validateDataSourceLinkable(DataSource dataSource) {
-    if (dataSource.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
-      throw new InvalidInputException(
-          getEntityName(),
-          dataSource.getId(),
-          "DataSource must be in AVAILABLE status to be linked to a Pipeline");
-    }
+    return "unknown";
   }
 
   private void validateUniqueName(Pipeline entity) {

@@ -19,6 +19,8 @@ import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
@@ -29,11 +31,15 @@ import jakarta.ws.rs.core.Response;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Supplier;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
@@ -72,21 +78,187 @@ public class NifiRestClient implements AutoCloseable {
    */
   private volatile String token;
 
+  /** Only its names are used, to point a validation failure at the right parameter context. */
+  private final MqttTruststoreConfig mqttTruststore;
+
   /**
    * Creates a client.
    *
    * @param baseUrl the NiFi base URL (e.g. {@code https://nifi:8443})
    * @param tokenProvider supplies (and refreshes) the OIDC bearer token sent to NiFi
    * @param client the JAX-RS client to use
+   * @param mqttTruststore the configured MQTT trust anchor, named in truststore-password
+   *     diagnostics
    */
-  public NifiRestClient(String baseUrl, NifiTokenProvider tokenProvider, Client client) {
+  public NifiRestClient(
+      String baseUrl,
+      NifiTokenProvider tokenProvider,
+      Client client,
+      MqttTruststoreConfig mqttTruststore) {
     this.baseUrl = baseUrl;
     this.tokenProvider = tokenProvider;
     this.client = client;
+    this.mqttTruststore = mqttTruststore;
   }
 
   /** A reference to a NiFi process group with its optimistic-locking revision. */
   public record ProcessGroupRef(String id, long version) {}
+
+  public record ManagedProcessGroup(String pipelineId, String processGroupId) {}
+
+  public List<ManagedProcessGroup> listManagedProcessGroups()
+      throws FatalAdapterException, RetryableAdapterException {
+    if (token == null) {
+      authenticate();
+    }
+    String rootId = getRootProcessGroupId();
+    JsonNode groups =
+        getJson(API + "/flow/process-groups/" + rootId, "list process groups")
+            .path("processGroupFlow")
+            .path("flow")
+            .path("processGroups");
+    List<ManagedProcessGroup> result = new ArrayList<>();
+    for (JsonNode group : groups) {
+      String name = group.path("component").path("name").asText();
+      if (!name.startsWith("pipeline-")) {
+        continue;
+      }
+      String pipelineId = name.substring("pipeline-".length());
+      try {
+        UUID.fromString(pipelineId);
+        result.add(new ManagedProcessGroup(pipelineId, group.path("id").asText()));
+      } catch (IllegalArgumentException ignored) {
+        // Integration/test flows may use readable names; only managed UUID pipelines are tracked.
+      }
+    }
+    return result;
+  }
+
+  /** Runtime information collected from processors and the NiFi bulletin board. */
+  public record RuntimeStatus(
+      boolean healthy, String message, String stacktrace, Instant occurredAt) {}
+
+  private record ProcessorInspection(RuntimeStatus status, Set<String> processorIds) {}
+
+  public RuntimeStatus readRuntimeStatus(String processGroupId)
+      throws FatalAdapterException, RetryableAdapterException {
+    return readRuntimeStatus(processGroupId, readBulletins());
+  }
+
+  public RuntimeStatus readRuntimeStatus(String processGroupId, JsonNode bulletins)
+      throws FatalAdapterException, RetryableAdapterException {
+    if (token == null) {
+      authenticate();
+    }
+    ProcessorInspection inspection = readProcessorStatus(processGroupId);
+    if (inspection.status() != null) {
+      return inspection.status();
+    }
+    RuntimeStatus bulletinStatus =
+        readBulletinStatus(processGroupId, inspection.processorIds(), bulletins);
+    return bulletinStatus == null
+        ? new RuntimeStatus(true, null, null, Instant.now())
+        : bulletinStatus;
+  }
+
+  public JsonNode readBulletins() throws FatalAdapterException, RetryableAdapterException {
+    if (token == null) {
+      authenticate();
+    }
+    return getJson(API + "/flow/bulletin-board", "list bulletins")
+        .path("bulletinBoard")
+        .path("bulletins");
+  }
+
+  private ProcessorInspection readProcessorStatus(String processGroupId)
+      throws FatalAdapterException, RetryableAdapterException {
+    JsonNode processors = processorNodes(processGroupId);
+    Set<String> processorIds = new HashSet<>();
+    for (JsonNode processor : processors) {
+      processorIds.add(processor.path("id").asText());
+      JsonNode component = processor.path("component");
+      String name = component.path("name").asText("processor");
+      String validation = component.path("validationStatus").asText();
+      String runStatus = processor.path("status").path("runStatus").asText();
+      if ("INVALID".equals(validation)) {
+        return new ProcessorInspection(
+            new RuntimeStatus(
+                false,
+                "Processor '" + name + "' is invalid",
+                validationErrors(component),
+                Instant.now()),
+            processorIds);
+      }
+      if ("Stopped".equals(runStatus) || "Disabled".equals(runStatus)) {
+        return new ProcessorInspection(
+            new RuntimeStatus(
+                false,
+                "Processor '" + name + "' is " + runStatus,
+                name + " runStatus=" + runStatus,
+                Instant.now()),
+            processorIds);
+      }
+    }
+
+    return new ProcessorInspection(null, processorIds);
+  }
+
+  private JsonNode processorNodes(String processGroupId)
+      throws FatalAdapterException, RetryableAdapterException {
+    try {
+      return getJson(
+              API + "/flow/process-groups/" + processGroupId + "/processors", "list processors")
+          .path("processors");
+    } catch (FatalAdapterException e) {
+      if (!e.getInternalMessage().contains("HTTP 404")) {
+        throw e;
+      }
+      return getJson(API + "/flow/process-groups/" + processGroupId, "read process group")
+          .path("processGroupFlow")
+          .path("flow")
+          .path("processors");
+    }
+  }
+
+  private RuntimeStatus readBulletinStatus(
+      String processGroupId, Set<String> processorIds, JsonNode bulletins) {
+    for (JsonNode entry : bulletins) {
+      JsonNode bulletin = entry.path("bulletin");
+      if (!matchesPipeline(bulletin, processGroupId, processorIds)) {
+        continue;
+      }
+      String level = bulletin.path("level").asText();
+      String message = bulletin.path("message").asText();
+      if (isRuntimeFailure(level, message)) {
+        String timestamp = bulletin.path("timestamp").asText();
+        Instant occurredAt;
+        try {
+          occurredAt = timestamp.isBlank() ? Instant.now() : Instant.parse(timestamp);
+        } catch (DateTimeParseException ignored) {
+          occurredAt = Instant.now();
+        }
+        return new RuntimeStatus(
+            false,
+            message.isBlank() ? "NiFi reported a pipeline error" : message,
+            message,
+            occurredAt);
+      }
+    }
+    return null;
+  }
+
+  private static boolean matchesPipeline(
+      JsonNode bulletin, String processGroupId, Set<String> processorIds) {
+    return processGroupId.equals(bulletin.path("groupId").asText())
+        || processorIds.contains(bulletin.path("sourceId").asText());
+  }
+
+  private static boolean isRuntimeFailure(String level, String message) {
+    return "ERROR".equalsIgnoreCase(level)
+        || ("WARN".equalsIgnoreCase(level)
+            && message.matches(
+                "(?is).*\\b(error|failed|exception|connection refused|unable to connect|yielding)\\b.*"));
+  }
 
   /** A reference to a controller service with its type and revision. */
   public record ControllerServiceRef(String id, String type, long version) {}
@@ -518,12 +690,14 @@ public class NifiRestClient implements AutoCloseable {
       // A service whose configuration is INVALID will never reach ENABLED, so polling for it is
       // pointless: fail fast and FATALLY (a retryable timeout would loop forever under redelivery).
       if (awaitingEnabled && "INVALID".equals(component.path("validationStatus").asText())) {
+        String name = component.path("name").asText();
         throw new FatalAdapterException(
             AdapterErrorCode.NIFI_FLOW_ERROR,
             "controller service '"
-                + component.path("name").asText()
+                + name
                 + "' is INVALID and will never enable: "
-                + validationErrors(component));
+                + validationErrors(component)
+                + provisioningHint(name));
       }
       if (!state.equals(component.path("state").asText())) {
         allInState = false;
@@ -548,6 +722,23 @@ public class NifiRestClient implements AutoCloseable {
       joined.append(error.asText());
     }
     return joined.toString();
+  }
+
+  /**
+   * Points at the deployment-owned parameter context behind the MQTT SSL Context Service. Where the
+   * deployment has not populated it, the context exists but holds no password and NiFi reports an
+   * unrelated-looking truststore-password error.
+   */
+  private String provisioningHint(String serviceName) {
+    if (!MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE.equals(serviceName)
+        || !mqttTruststore.hasPasswordParameter()) {
+      return "";
+    }
+    return " — check that parameter context '"
+        + mqttTruststore.parameterContext()
+        + "' provides a value for the sensitive parameter '"
+        + mqttTruststore.passwordParameter()
+        + "'";
   }
 
   /**

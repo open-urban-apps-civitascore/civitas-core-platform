@@ -90,6 +90,8 @@ export interface ActivePipelineContextValue {
   clearValidation: () => void
   /** Get validation severity for a specific node */
   getNodeValidationSeverity: (nodeId: string) => 'error' | 'warning' | 'none'
+  /** Name of the pipeline that already uses this table name in another node, or null */
+  pipelineUsingTableName: (nodeId: string, tableName: string) => string | null
   /** Whether validation is required before save (true when pipeline changed since last validation) */
   isValidationRequired: boolean
   /** Whether the pipeline can be saved (isDirty && !hasErrors && !isValidationRequired) */

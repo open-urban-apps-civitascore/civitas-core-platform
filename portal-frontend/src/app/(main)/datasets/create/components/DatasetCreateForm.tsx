@@ -9,6 +9,7 @@ import { useCreateDataset } from '@/app/services/api/datasets/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormSelect } from '@/components/form/fields/FormSelect'
+import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -18,9 +19,11 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { useError } from '@/hooks/use-error'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatasetCreateFormData, DatasetCreateFormSchema } from '@/types/datasets'
 
 type DatasetCreateFormProps = {
@@ -31,10 +34,12 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
   const { datapoolOptions } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
+  const { hasPermission } = usePermissions()
 
   const router = useRouter()
   const searchParams = useSearchParams()
 
+  const canReadDatapools = hasPermission(PERMISSION_NAMES.DATAPOOL_READ)
   const datapoolId = searchParams.get('datapoolId') ?? null
   const sourceParam = searchParams.get('source')
 
@@ -46,6 +51,7 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
     defaultValues: {
       name: '',
       datapoolId: datapoolId,
+      description: '',
     },
   })
 
@@ -55,6 +61,7 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
     try {
       const { data } = await createDataset.mutateAsync({
         name: formData.name,
+        description: formData.description,
         ...(formData.datapoolId && { datapoolId: formData.datapoolId }),
       })
       toast.success(t('messages.createSuccess'))
@@ -108,7 +115,7 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
     <PageContainer testId="createDatasetPage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <PageHeader title={t('create.title')} subtitle={t('create.subtitle')} customElement={customElementCreateMode} />
       <PageBackground className="overflow-y-auto" hasBackground>
-        <ContentCard className={cn('h-full overflow-auto')}>
+        <ContentCard className={cn('overflow-auto')}>
           <Form {...form}>
             <form
               id="dataset-create-form"
@@ -122,9 +129,9 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
             >
               <DetailsFieldContainer className="pt-0 border-b-0">
                 <SubHeader
-                  title={t('create.title')}
+                  title={t('create.basicInfo.title')}
                   titleClassName="text-2xl leading-none font-bold"
-                  subtitle={t('create.subtitle')}
+                  subtitle={tCommon('info.creationSubtitle')}
                 />
               </DetailsFieldContainer>
               {isLoading ? (
@@ -141,19 +148,34 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
                       required
                     />
                   </DetailsFieldContainer>
-                  {datapoolId ? (
-                    <DetailsFieldContainer className="max-w-300">
-                      <FormSelect
-                        id="datasetDatapool"
-                        placeholder={t('form.datapoolSelectPlaceholder')}
-                        label={t('form.datapoolSelect')}
-                        options={datapoolOptions ?? []}
-                        form={form}
-                        name="datapoolId"
-                        data-testid="datapoolSelect"
-                      />
-                    </DetailsFieldContainer>
-                  ) : null}
+                  <DetailsFieldContainer className="max-w-300">
+                    <FormSelect
+                      id="datasetDatapool"
+                      placeholder={
+                        canReadDatapools ? t('form.datapoolSelectPlaceholder') : tCommon('info.notAvailable')
+                      }
+                      label={t('form.datapoolSelect')}
+                      options={datapoolOptions ?? []}
+                      form={form}
+                      name="datapoolId"
+                      data-testid="datapoolSelect"
+                      disabled={!canReadDatapools}
+                      hasPlaceholderWhenDisabled
+                    />
+                  </DetailsFieldContainer>
+                  <DetailsFieldContainer className="max-w-300" hasBorder={false}>
+                    <FormTextArea
+                      id="datasetDescription"
+                      form={form}
+                      label={t('form.description')}
+                      name="description"
+                      placeholder={t('form.description')}
+                      hint={t('form.descriptionHint')}
+                      maxLength={150}
+                      hasCharacterCount
+                      className="min-h-[100px] resize-none"
+                    />
+                  </DetailsFieldContainer>
                 </>
               )}
             </form>

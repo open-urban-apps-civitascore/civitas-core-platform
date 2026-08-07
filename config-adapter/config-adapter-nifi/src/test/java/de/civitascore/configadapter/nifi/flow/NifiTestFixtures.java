@@ -16,17 +16,20 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkAuth;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.nifi.flow.stage.source.SqlSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.transform.MappingNodeType;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
 import de.civitascore.configadapter.nifi.mapping.ConversionOp;
+import de.civitascore.configadapter.nifi.mapping.ForkPlan;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
@@ -46,6 +49,11 @@ public final class NifiTestFixtures {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
+  private static final PlatformSinkConfig DEFAULT_PLATFORM_SINK =
+      new PlatformSinkConfig("jdbc:postgresql://db:5432/civitas", "nifi", "db-secret");
+
+  private static final String DEFAULT_FROST_BASE_URL = "http://frost:8080/FROST-Server/v1.1";
+
   private NifiTestFixtures() {}
 
   static byte[] stretchedKey() throws Exception {
@@ -57,15 +65,32 @@ public final class NifiTestFixtures {
       SqlSourceProbe probe,
       PlatformSinkConfig platformSink,
       String frostBaseUrl) {
+    return stageRegistry(
+        resolver, probe, platformSink, frostBaseUrl, MqttTruststoreConfig.nodeTruststore());
+  }
+
+  public static StageRegistry stageRegistry(
+      CredentialResolver resolver,
+      SqlSourceProbe probe,
+      PlatformSinkConfig platformSink,
+      String frostBaseUrl,
+      MqttTruststoreConfig mqttTruststore) {
     return new StageRegistry(
-        List.of(new MqttSourceStage(resolver), new SqlSourceStage(resolver, probe)),
-        List.of(new PostgisSinkStage(platformSink), new FrostSinkStage(frostBaseUrl)),
+        List.of(new MqttSourceStage(resolver, mqttTruststore), new SqlSourceStage(resolver, probe)),
+        List.of(
+            new PostgisSinkStage(platformSink),
+            new FrostSinkStage(frostBaseUrl, FrostSinkAuth.basicAuth("frost", "secret"))),
         List.of(new MappingNodeType(new MappingConfigParser(), new RecordPathCompiler())));
   }
 
   /** A builder over stages whose bind halves are never exercised (build-level tests). */
   public static NifiFlowBuilder flowBuilder() {
-    return new NifiFlowBuilder(stageRegistry(null, SqlSourceProbe.NO_OP, null, null));
+    return flowBuilder(MqttTruststoreConfig.nodeTruststore());
+  }
+
+  public static NifiFlowBuilder flowBuilder(MqttTruststoreConfig mqttTruststore) {
+    return new NifiFlowBuilder(
+        stageRegistry(null, SqlSourceProbe.NO_OP, null, null, mqttTruststore));
   }
 
   static FlowDeploymentPlanner planner(CredentialResolver resolver) {
@@ -73,11 +98,17 @@ public final class NifiTestFixtures {
   }
 
   static FlowDeploymentPlanner planner(CredentialResolver resolver, SqlSourceProbe probe) {
+    return planner(resolver, probe, DEFAULT_PLATFORM_SINK, DEFAULT_FROST_BASE_URL);
+  }
+
+  static FlowDeploymentPlanner planner(
+      CredentialResolver resolver, MqttTruststoreConfig mqttTruststore) {
     return planner(
         resolver,
-        probe,
-        new PlatformSinkConfig("jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
-        "http://frost:8080/FROST-Server/v1.1");
+        SqlSourceProbe.NO_OP,
+        DEFAULT_PLATFORM_SINK,
+        DEFAULT_FROST_BASE_URL,
+        mqttTruststore);
   }
 
   public static FlowDeploymentPlanner planner(
@@ -85,12 +116,23 @@ public final class NifiTestFixtures {
       SqlSourceProbe probe,
       PlatformSinkConfig platformSink,
       String frostBaseUrl) {
-    StageRegistry registry = stageRegistry(resolver, probe, platformSink, frostBaseUrl);
+    return planner(
+        resolver, probe, platformSink, frostBaseUrl, MqttTruststoreConfig.nodeTruststore());
+  }
+
+  public static FlowDeploymentPlanner planner(
+      CredentialResolver resolver,
+      SqlSourceProbe probe,
+      PlatformSinkConfig platformSink,
+      String frostBaseUrl,
+      MqttTruststoreConfig mqttTruststore) {
+    StageRegistry registry =
+        stageRegistry(resolver, probe, platformSink, frostBaseUrl, mqttTruststore);
     return new FlowDeploymentPlanner(new GraphParser(), new NifiFlowBuilder(registry), registry);
   }
 
   static Map<String, Object> map(String json) throws Exception {
-    return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {});
+    return MAPPER.readValue(json, new TypeReference<>() {});
   }
 
   static Map<String, Object> graphWithMapping() throws Exception {
@@ -108,7 +150,7 @@ public final class NifiTestFixtures {
                 "fields": {
                   "$.station_id": "$.station_id",
                   "$.temperature": "$.temperature",
-                  "$.observed_at": { "op": "toDate", "input": "$.ts", "pattern": "yyyy-MM-dd" }
+                  "$.observed_at": { "op": "toDateTime", "input": "$.ts", "pattern": "yyyy-MM-dd" }
                 } } } },
             { "id": "n-sink", "type": "%s", "data": { "entityId": "sink-1" } },
             { "id": "n-end", "type": "end", "data": {} }
@@ -351,7 +393,18 @@ public final class NifiTestFixtures {
 
   /** Wraps one node's compiled properties as the spec's mapping-unit list (empty stays empty). */
   static List<CompiledTransform> compiled(List<UpdateRecordProperty> properties) {
-    return properties.isEmpty() ? List.of() : List.of(new CompiledMapping(properties));
+    return properties.isEmpty()
+        ? List.of()
+        : List.of(new CompiledMapping(properties, ForkPlan.NONE));
+  }
+
+  /**
+   * Wraps a FROST compilation, keeping its fan-out. Taking the compilation rather than its
+   * properties is what keeps a fixture from silently losing the fork and asserting on a flow that
+   * does not fan out.
+   */
+  static List<CompiledTransform> compiled(FrostMappingCompiler.FrostCompilation compilation) {
+    return List.of(compilation.mapping());
   }
 
   static List<UpdateRecordProperty> mapping() {
@@ -448,7 +501,7 @@ public final class NifiTestFixtures {
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
             "7"),
-        compiled(compilation.flatProperties()),
+        compiled(compilation),
         Map.of(),
         null,
         compilation.plan());
@@ -483,7 +536,98 @@ public final class NifiTestFixtures {
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
             "7"),
-        compiled(compilation.flatProperties()),
+        compiled(compilation),
+        Map.of(),
+        null,
+        compilation.plan());
+  }
+
+  /**
+   * A mapped MQTT→FROST flow whose sources read a nested array, so the compiler derives a fan-out.
+   * Mirrors the reported structure: readings two array levels deep under a gateway.
+   */
+  static FlowBuildSpec frostSinkWithFanoutMapping() throws Exception {
+    Map<String, ValueNode> fields = new LinkedHashMap<>();
+    fields.put("$.name", new ValueNode.CopyNode("$.station"));
+    fields.put("$.description", new ValueNode.ConstNode("gateway", null));
+    fields.put("$.properties.reference", new ValueNode.CopyNode("$.ref"));
+    fields.put("$.Datastreams[].properties.reference", new ValueNode.CopyNode("$.ref"));
+    fields.put(
+        "$.Datastreams[].Observations[].result",
+        new ValueNode.ConvertNode(
+            ConversionOp.TO_FLOAT,
+            new ValueNode.CopyNode("$.measurements[].measuredValues[].value"),
+            null));
+    fields.put(
+        "$.Datastreams[].Observations[].phenomenonTime",
+        new ValueNode.CopyNode("$.measurements[].measuredValues[].ts"));
+    FrostMappingCompiler.FrostCompilation compilation =
+        new FrostMappingCompiler(new RecordPathCompiler())
+            .compile(new MappingConfig(null, null, fields), STA_KEYS);
+    return new FlowBuildSpec(
+        "pipeline-frost-fanout",
+        SourceType.MQTT,
+        Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/temp"),
+        SinkType.FROST,
+        Map.of(
+            FrostSinkStage.FROST_BASE_URL,
+            "http://frost:8080/FROST-Server/v1.1",
+            FrostSinkStage.FROST_PROJECT_ID,
+            "7"),
+        compiled(compilation),
+        Map.of(),
+        null,
+        compilation.plan());
+  }
+
+  /** A fully creatable mapped chain including every related entity update stage. */
+  static FlowBuildSpec frostSinkWithRelatedEntityMapping() throws Exception {
+    Map<String, ValueNode> fields = new LinkedHashMap<>();
+    fields.put("$.name", new ValueNode.CopyNode("$.station"));
+    fields.put("$.description", new ValueNode.ConstNode("station", null));
+    fields.put("$.properties.reference", new ValueNode.CopyNode("$.ref"));
+    fields.put("$.Locations[].name", new ValueNode.ConstNode("location", null));
+    fields.put("$.Locations[].description", new ValueNode.ConstNode("location", null));
+    fields.put("$.Locations[].encodingType", new ValueNode.ConstNode("application/geo+json", null));
+    fields.put(
+        "$.Locations[].location",
+        new ValueNode.GeoPointNode(
+            new ValueNode.CopyNode("$.lon"), new ValueNode.CopyNode("$.lat")));
+    fields.put("$.Datastreams[].name", new ValueNode.CopyNode("$.stream"));
+    fields.put("$.Datastreams[].description", new ValueNode.ConstNode("stream", null));
+    fields.put("$.Datastreams[].observationType", new ValueNode.ConstNode("measurement", null));
+    fields.put("$.Datastreams[].unitOfMeasurement.name", new ValueNode.ConstNode("Celsius", null));
+    fields.put("$.Datastreams[].unitOfMeasurement.symbol", new ValueNode.ConstNode("C", null));
+    fields.put(
+        "$.Datastreams[].unitOfMeasurement.definition", new ValueNode.ConstNode("ucum:Cel", null));
+    fields.put("$.Datastreams[].Sensor.name", new ValueNode.ConstNode("sensor", null));
+    fields.put("$.Datastreams[].Sensor.description", new ValueNode.ConstNode("sensor", null));
+    fields.put(
+        "$.Datastreams[].Sensor.encodingType", new ValueNode.ConstNode("application/pdf", null));
+    fields.put("$.Datastreams[].Sensor.metadata", new ValueNode.ConstNode("metadata", null));
+    fields.put(
+        "$.Datastreams[].ObservedProperty.name", new ValueNode.ConstNode("temperature", null));
+    fields.put(
+        "$.Datastreams[].ObservedProperty.definition",
+        new ValueNode.ConstNode("https://example.org/temperature", null));
+    fields.put(
+        "$.Datastreams[].ObservedProperty.description",
+        new ValueNode.ConstNode("temperature", null));
+    fields.put("$.Datastreams[].properties.reference", new ValueNode.CopyNode("$.ref"));
+    FrostMappingCompiler.FrostCompilation compilation =
+        new FrostMappingCompiler(new RecordPathCompiler())
+            .compile(new MappingConfig(null, null, fields), STA_KEYS);
+    return new FlowBuildSpec(
+        "pipeline-frost-related-updates",
+        SourceType.MQTT,
+        Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/meta"),
+        SinkType.FROST,
+        Map.of(
+            FrostSinkStage.FROST_BASE_URL,
+            "http://frost:8080/FROST-Server/v1.1",
+            FrostSinkStage.FROST_PROJECT_ID,
+            "7"),
+        compiled(compilation),
         Map.of(),
         null,
         compilation.plan());

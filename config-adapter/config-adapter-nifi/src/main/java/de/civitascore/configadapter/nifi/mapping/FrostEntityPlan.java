@@ -29,9 +29,19 @@ import java.util.regex.Pattern;
  *     byte-deterministic, so no map iteration may decide it)
  * @param thingFilter the Thing lookup terms (never empty — a FROST mapping always maps the Thing)
  * @param thingBody the Thing create body (with Locations deep-inserted), or null when lookup-only
+ * @param thingUpdateBody the Thing update body without navigation entities, or null when
+ *     lookup-only
+ * @param locationBody the mapped Location body for the Thing's navigation collection, or null when
+ *     no Location is mapped
  * @param datastreamFilter the Datastream lookup terms, empty when the mapping maps no datastream
  * @param datastreamBody the Datastream create body (Sensor/ObservedProperty/unitOfMeasurement
  *     deep-inserted, Thing linked via {@link #THING_ID_ATTRIBUTE}), or null when lookup-only
+ * @param datastreamUpdateBody the Datastream update body without navigation entities, or null when
+ *     lookup-only
+ * @param sensorBody the Sensor body resolved through the Datastream navigation and patched by id,
+ *     or null when absent
+ * @param observedPropertyBody the ObservedProperty body resolved through the Datastream navigation
+ *     and patched by id, or null when absent
  * @param observationBody the Observation body (Datastream linked via {@link #DS_ID_ATTRIBUTE}), or
  *     null when the mapping maps no observation
  */
@@ -39,8 +49,13 @@ public record FrostEntityPlan(
     List<String> flatKeys,
     List<FilterTerm> thingFilter,
     String thingBody,
+    String thingUpdateBody,
+    String locationBody,
     List<FilterTerm> datastreamFilter,
     String datastreamBody,
+    String datastreamUpdateBody,
+    String sensorBody,
+    String observedPropertyBody,
     String observationBody)
     implements SinkPreRegionPlan {
 
@@ -83,6 +98,18 @@ public record FrostEntityPlan(
       // The sink gates the whole datastream stage on the filter — a body without one would be
       // silently dropped instead of deployed.
       throw new IllegalArgumentException("a datastream body requires a datastream lookup filter");
+    }
+    if ((thingBody == null) != (thingUpdateBody == null)) {
+      throw new IllegalArgumentException(
+          "Thing create and update bodies must either both exist or both be null");
+    }
+    if ((datastreamBody == null) != (datastreamUpdateBody == null)) {
+      throw new IllegalArgumentException(
+          "Datastream create and update bodies must either both exist or both be null");
+    }
+    if ((sensorBody != null || observedPropertyBody != null) && datastreamFilter.isEmpty()) {
+      throw new IllegalArgumentException(
+          "Sensor/ObservedProperty bodies require a datastream lookup filter");
     }
     for (FilterTerm term : concat(thingFilter, datastreamFilter)) {
       if (!flatKeys.contains(term.flatKey())) {

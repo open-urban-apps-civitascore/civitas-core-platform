@@ -6,8 +6,9 @@
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
-    # Always run on main and develop branch
+    # Always run on main, staging and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     # Run on MR only when backend files change
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -31,8 +32,9 @@ generate-graph-backend:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
-    # Always run on main and develop branch
+    # Always run on main, staging and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     # Always run on MR pipelines
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -201,6 +203,7 @@ saga-e2e-test-backend:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -258,6 +261,7 @@ api-test-backend:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -318,12 +322,15 @@ api-test-backend:
       }
     # Seed APISIX routes (services, plugin config, portal-backend route)
     - docker compose -p api-test $COMPOSE_FILES run --rm apisix-seed
+    # Provision the NiFi parameter context the MQTT-TLS flows resolve their truststore password from
+    - docker compose -p api-test $COMPOSE_FILES run --rm nifi-parameter-contexts
     # Run Bruno API tests from a container on the same Compose network
     - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
     - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/
     # The NiFi + GeoServer adapters are wired into the CI stack, so the dataset-saga Bruno
     # lifecycles run as the end-to-end acceptance gate.
     - |
+      set +e
       docker exec bruno-runner sh -c '
         npm install -g @usebruno/cli 2>/dev/null
         cd /tests
@@ -332,7 +339,17 @@ api-test-backend:
         cat /tests/bruno-output.txt
         exit $RESULT
       '
-    - docker cp bruno-runner:/tests/bruno-output.txt bruno-results.txt || true
+      BRUNO_EXIT=$?
+      set -e
+      docker cp bruno-runner:/tests/bruno-output.txt bruno-results.txt || true
+      # On bruno failure, dump service logs so we can diagnose 500s etc.
+      if [ "$BRUNO_EXIT" != "0" ]; then
+        for svc in portal-backend config-adapter kafka apisix frost; do
+          echo "=== $svc logs (last 300 lines) ==="
+          docker compose -p api-test $COMPOSE_FILES logs --tail=300 --no-color "$svc" 2>&1 | tee "${svc}-logs.txt" || true
+        done
+      fi
+      exit ${BRUNO_EXIT:-0}
   after_script:
     - docker rm -f bruno-runner 2>/dev/null || true
     - docker compose -p api-test -f dev-environment/ci/docker-compose.api-test.yml down -v 2>/dev/null || true
@@ -340,6 +357,11 @@ api-test-backend:
     when: always
     paths:
       - bruno-results.txt
+      - portal-backend-logs.txt
+      - config-adapter-logs.txt
+      - kafka-logs.txt
+      - apisix-logs.txt
+      - frost-logs.txt
     expire_in: 30 days
 
 report-test-backend:

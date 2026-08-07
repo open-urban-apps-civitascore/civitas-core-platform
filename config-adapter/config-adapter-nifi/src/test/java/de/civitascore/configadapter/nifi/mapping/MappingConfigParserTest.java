@@ -162,6 +162,21 @@ class MappingConfigParserTest {
   }
 
   @Test
+  void toDateTimeWithPattern() throws Exception {
+    // 'toDate' is a prefix of 'toDateTime': a lookup that stopped being an exact match would
+    // resolve the longer token to the date-only op and invert what the mapping writes.
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.observed_at": { "op": "toDateTime", "input": "$.ts", "pattern": "yyyy-MM-dd HH:mm:ss" } } }
+        """);
+
+    ConvertNode conv = assertInstanceOf(ConvertNode.class, mc.fields().get("$.observed_at"));
+    assertEquals(ConversionOp.TO_DATE_TIME, conv.op());
+    assertEquals("yyyy-MM-dd HH:mm:ss", conv.pattern());
+  }
+
+  @Test
   void toStringWrapsNestedNode() throws Exception {
     MappingConfig mc =
         parse(
@@ -310,6 +325,21 @@ class MappingConfigParserTest {
                 parse(
                     """
             { "fields": { "$.ts": { "op": "toDate", "input": "$.raw" } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void toDateTimeWithoutPatternIsRejected() {
+    // requiresPattern is a plain constructor flag with nothing enforcing it per op; without this,
+    // clearing it for toDateTime would compile and emit toDate(/raw, null) at deployment time.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.ts": { "op": "toDateTime", "input": "$.raw" } } }
             """));
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
   }

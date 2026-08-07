@@ -5,7 +5,6 @@ import {
   useCreateDatastructureVersion,
   useStatusUpdateDatastructureVersion,
   useUpdateDatastructureVersion,
-  useUpdateDatastructureVersionReleased,
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
@@ -34,7 +33,6 @@ vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
   useCreateDatastructureVersion: vi.fn(),
   useStatusUpdateDatastructureVersion: vi.fn(),
   useUpdateDatastructureVersion: vi.fn(),
-  useUpdateDatastructureVersionReleased: vi.fn(),
 }))
 
 vi.mock('@/components/uml-modeler/hooks/use-multi-session-manager', () => ({
@@ -81,6 +79,20 @@ const validDiagram = () =>
     isDirty: false,
   }) as unknown as UMLDiagram
 
+/** The same two unconnected classes, but with one designated as root — a savable staged state. */
+const designatedRootDiagram = () => {
+  const alpha = classNode('a', 'Alpha')
+  ;(alpha.data.element as { isRoot?: boolean }).isRoot = true
+  return {
+    id: 'diagram-1',
+    name: 'Struct',
+    nodes: [alpha, classNode('b', 'Beta')],
+    edges: [],
+    lastModified: new Date(0),
+    isDirty: false,
+  } as unknown as UMLDiagram
+}
+
 const version = (over: Partial<DatastructureVersion> = {}): DatastructureVersion =>
   ({
     id: 'v1',
@@ -98,11 +110,9 @@ const mutation = () => ({ mutateAsync: vi.fn().mockResolvedValue({ data: version
 
 const setup = (versionData: DatastructureVersion) => {
   const updateVersion = mutation()
-  const updateReleased = mutation()
   const createVersion = mutation()
   const updateStatus = mutation()
   vi.mocked(useUpdateDatastructureVersion).mockReturnValue(updateVersion as never)
-  vi.mocked(useUpdateDatastructureVersionReleased).mockReturnValue(updateReleased as never)
   vi.mocked(useCreateDatastructureVersion).mockReturnValue(createVersion as never)
   vi.mocked(useStatusUpdateDatastructureVersion).mockReturnValue(updateStatus as never)
   // The session id must match buildSessionFromVersion(version).id (= styles.id) — otherwise the
@@ -132,7 +142,7 @@ const setup = (versionData: DatastructureVersion) => {
       isCreateMode: false,
     }),
   )
-  return { hook, updateVersion, updateReleased, updateStatus }
+  return { hook, updateVersion, updateStatus }
 }
 
 describe('useDatastructureVersion — save-flow gating for unexportable diagrams', () => {
@@ -150,15 +160,13 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     })
 
     expect(saved).toBe(false)
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.releaseInvalidModel'))
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
     expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
     expect(updateStatus.mutateAsync).not.toHaveBeenCalled()
   })
 
   it('refuses the save even when the version is already released (status not dirty)', async () => {
-    const { hook, updateVersion, updateReleased } = setup(
-      version({ dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE }),
-    )
+    const { hook, updateVersion } = setup(version({ dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE }))
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
     let saved: boolean | undefined
@@ -167,12 +175,11 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     })
 
     expect(saved).toBe(false)
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.releaseInvalidModel'))
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
     expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
-    expect(updateReleased.mutateAsync).not.toHaveBeenCalled()
   })
 
-  it('parks a draft diagram-only, silently, sending model null', async () => {
+  it('refuses a draft too, rather than parking it with a null model', async () => {
     const { hook, updateVersion } = setup(version())
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
@@ -181,23 +188,39 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
       saved = await hook.result.current.saveDatastructureVersion(DS_ID)
     })
 
-    expect(saved).toBe(true)
-    expect(toast.warning).not.toHaveBeenCalled()
-    expect(updateVersion.mutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ model: null }) }),
-    )
+    expect(saved).toBe(false)
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
+    expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
   })
 
-  it('parks a draft silently even when a model was previously persisted', async () => {
-    const { hook } = setup(version({ model: { title: 'Struct' } as never }))
+  it('refuses a draft even when a model was previously persisted', async () => {
+    const { hook, updateVersion } = setup(version({ model: { title: 'Struct' } as never }))
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
     await act(async () => {
       await hook.result.current.saveDatastructureVersion(DS_ID)
     })
 
-    expect(toast.warning).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
+    expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
+  })
+
+  it('saves unconnected classes once one of them is designated as root', async () => {
+    const { hook, updateVersion } = setup(version({ styles: designatedRootDiagram() }))
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(true)
     expect(toast.error).not.toHaveBeenCalled()
+
+    // Alpha is the document root; Beta stays in $defs, unreferenced but preserved.
+    const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
+    expect(payload.data.model).toMatchObject({ properties: { alpha: { $ref: '#/$defs/Alpha' } } })
+    expect(payload.data.model.$defs).toHaveProperty('Beta')
   })
 
   it('passes the exported model through for a resolvable diagram', async () => {
@@ -213,5 +236,83 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(toast.warning).not.toHaveBeenCalled()
     const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
     expect(payload.data.model).toMatchObject({ properties: { alpha: { $ref: '#/$defs/Alpha' } } })
+  })
+})
+
+describe('useDatastructureVersion — released versions take no field update', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('refuses a field update on a released version instead of sending a request', async () => {
+    const { hook, updateVersion, updateStatus } = setup(
+      version({ dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE, styles: validDiagram() }),
+    )
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(false)
+    expect(toast.error).toHaveBeenCalledExactlyOnceWith('datastructureVersions.messages.isAvailableModelHint')
+    expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
+    expect(updateStatus.mutateAsync).not.toHaveBeenCalled()
+  })
+})
+
+describe('useDatastructureVersion — status-dependent field validation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('flags an emptied description as required while the status is AVAILABLE', async () => {
+    const { hook } = setup(version({ dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE }))
+
+    await act(async () => {
+      hook.result.current.form.setValue('description', '', { shouldValidate: true })
+    })
+
+    expect(hook.result.current.form.getFieldState('description').error?.message).toBe('common.errors.required')
+  })
+
+  it('leaves an emptied description unflagged while the status is DRAFT', async () => {
+    const { hook } = setup(version())
+
+    await act(async () => {
+      hook.result.current.form.setValue('description', '', { shouldValidate: true })
+    })
+
+    expect(hook.result.current.form.getFieldState('description').error).toBeUndefined()
+  })
+
+  it('flags the empty description as soon as the status switches to AVAILABLE', async () => {
+    const { hook } = setup(version({ description: '' }))
+
+    expect(hook.result.current.form.getFieldState('description').error).toBeUndefined()
+
+    await act(async () => {
+      hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.AVAILABLE)
+    })
+
+    expect(hook.result.current.form.getFieldState('description').error?.message).toBe('common.errors.required')
+  })
+
+  it('clears the required error when the status switches back to DRAFT', async () => {
+    const { hook } = setup(
+      version({ description: '', dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE }),
+    )
+
+    await act(async () => {
+      hook.result.current.form.setValue('description', '', { shouldValidate: true })
+    })
+    expect(hook.result.current.form.getFieldState('description').error?.message).toBe('common.errors.required')
+
+    await act(async () => {
+      hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.DRAFT)
+    })
+
+    expect(hook.result.current.form.getFieldState('description').error).toBeUndefined()
   })
 })

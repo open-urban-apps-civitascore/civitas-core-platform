@@ -1,7 +1,7 @@
 meta {
-  name: 15. Cleanup - Delete DataSet
+  name: 15. Cleanup - Delete DataSet (safety net)
   type: http
-  seq: 23
+  seq: 24
 }
 
 delete {
@@ -15,25 +15,18 @@ params:path {
 }
 
 tests {
-  test("DataSet deleted or already gone", function() {
+  test("DataSet already gone or deleted", function() {
     const status = res.getStatus();
-    // 204=deleted, 404=already gone
+    // After the DELETE saga (steps 12/13) the dataset entity is already removed → 404.
+    // 204 only occurs as a safety net for a never-provisioned run deleted synchronously.
     expect(status === 204 || status === 404).to.be.true;
   });
 }
 
 docs {
-  **PostGIS saga step 15** — Delete the dataset (final cleanup).
+  **PostGIS saga step 15** — Delete the dataset (safety net).
 
-  Removes the dataset record. Must be in `DRAFT` state (step 12). The DataSink (step 13) must already be gone — `data_sinks.dataset_id` is `NOT NULL` with no DB cascade, so a lingering sink would block this delete. The pipeline (step 14) is also deleted first; if any remains it is cascade-removed.
+  With the new delete contract this step is normally a no-op: the DATASET_DELETE saga (steps 12/13) already removed the DataSet entity after its teardown completed, so this usually returns `404`. It remains only as a safety net for a never-provisioned dataset, which is deleted synchronously (`204`) without a saga.
 
-  **Expected Response:** 204 No Content. 400 if not in `DRAFT` state (wait for pending saga). 404 if already deleted.
-
-  **System Impact:**
-
-  | Layer | Effect |
-  |---|---|
-  | Backend | DataSet record removed from `portal_backend` DB |
-  | Config Adapter | — |
-  | External System | — |
+  **Expected Response:** 404 Not Found (already removed by the DELETE saga). 204 only for a never-provisioned run.
 }

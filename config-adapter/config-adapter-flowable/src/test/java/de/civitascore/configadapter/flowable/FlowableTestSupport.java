@@ -33,10 +33,7 @@ import org.flowable.job.api.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Shared test utilities for Flowable process tests. Eliminates duplication across BPMN and coded
- * test classes.
- */
+/** Shared test utilities for Flowable process tests. */
 public final class FlowableTestSupport {
 
   private static final Logger LOG = LoggerFactory.getLogger(FlowableTestSupport.class);
@@ -134,6 +131,25 @@ public final class FlowableTestSupport {
         .stream()
         .map(HistoricActivityInstance::getActivityId)
         .filter(id -> !id.startsWith("compensate-") && !id.startsWith("publish-"))
+        .toList();
+  }
+
+  /**
+   * Returns the IDs of the result-publishing tasks the instance reached ({@code publish-success} /
+   * {@code publish-failure}). Distinguishes a saga that reported failure from one that silently
+   * finished or reported success — {@link #assertProcessFinished} cannot.
+   */
+  public static List<String> getPublishedResultTaskIds(
+      HistoryService historyService, String processInstanceId) {
+    return historyService
+        .createHistoricActivityInstanceQuery()
+        .processInstanceId(processInstanceId)
+        .activityType("serviceTask")
+        .finished()
+        .list()
+        .stream()
+        .map(HistoricActivityInstance::getActivityId)
+        .filter(id -> id.startsWith("publish-"))
         .toList();
   }
 

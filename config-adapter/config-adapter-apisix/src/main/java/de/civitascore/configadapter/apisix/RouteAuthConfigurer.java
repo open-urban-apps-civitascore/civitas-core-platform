@@ -125,7 +125,8 @@ final class RouteAuthConfigurer {
    * variant.
    */
   void applyAuthState(Map<String, Object> route) {
-    boolean sta = readUpstreamKind(route) == RouteUpstreamKind.STA;
+    RouteUpstreamKind kind = readUpstreamKind(route);
+    boolean sta = kind == RouteUpstreamKind.STA;
 
     // FROST upstream credential is tracked via a route label so a re-apply can clean a stale entry
     // left behind by a different auth scheme, a renamed API key header, or a route that no longer
@@ -156,6 +157,12 @@ final class RouteAuthConfigurer {
     }
     // STA routes inject the FROST upstream credential; OWS map-service routes carry none.
     mergeProxyRewriteHeaders(proxyRewrite, managedHeader, sta);
+
+    // OWS routes additionally rewrite GeoServer's self-referential capabilities URLs to this
+    // route's external endpoint so map clients can follow them back through the gateway.
+    if (kind == RouteUpstreamKind.OWS) {
+      OwsCapabilitiesRewrite.apply(route, plugins, proxyRewrite, settings.apiHost());
+    }
   }
 
   /** A route's upstream kind, read from {@link #MANAGED_STANDARD_LABEL}; absent marker ⇒ STA. */
@@ -252,7 +259,7 @@ final class RouteAuthConfigurer {
     return map instanceof HashMap ? map : new HashMap<>(map);
   }
 
-  private static List<String> readStringList(Object value) {
+  static List<String> readStringList(Object value) {
     if (value instanceof String[] arr) {
       return new ArrayList<>(Arrays.asList(arr));
     }

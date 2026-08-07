@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -22,8 +23,17 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
       example = "[\"tcp://broker:1883\"]")
   @NotEmpty(groups = OnRelease.class, message = "'urls' is required and must be a non-empty list") private List<String> urls;
 
-  @Schema(description = "MQTT topic filters.", example = "[\"sensor/#\"]")
-  @NotEmpty(groups = OnRelease.class, message = "'topics' is required and must be a non-empty list") private List<String> topics;
+  @Schema(
+      description =
+          "MQTT topic filter. Exactly one filter, which may use wildcards (+ one level, # multiple)"
+              + " to match several topics.",
+      example = "[\"sensor/#\"]")
+  @NotEmpty(groups = OnRelease.class, message = "'topics' is required and must be a non-empty list") @Size(
+      max = 1,
+      groups = OnRelease.class,
+      message =
+          "'topics' must contain exactly one topic filter; use wildcards (+, #) for multiple topics")
+  private List<String> topics;
 
   @JsonProperty("client_id")
   @Schema(description = "MQTT client identifier.", example = "civitas-client-1")

@@ -16,7 +16,18 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> {
 
-  @EntityGraph(attributePaths = {"owner", "pipelines", "distributions", "namedApis"})
+  // pipelines.dataSources is fetched because every dataset write re-asserts the DataSource→DataPool
+  // scope rule across the existing pipelines; without it that check costs one lazy select per
+  // pipeline.
+  @EntityGraph(
+      attributePaths = {
+        "owner",
+        "pipelines",
+        "pipelines.runtimeStatus",
+        "pipelines.dataSources",
+        "distributions",
+        "namedApis"
+      })
   @Override
   @NonNull Optional<DataSet> findById(@NonNull UUID id);
 

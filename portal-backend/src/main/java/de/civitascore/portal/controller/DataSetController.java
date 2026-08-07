@@ -1,5 +1,6 @@
 package de.civitascore.portal.controller;
 
+import de.civitascore.portal.mapper.DataSourceMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -7,10 +8,12 @@ import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
+import de.civitascore.portal.model.output.summary.DataSourceSummaryDTO;
 import de.civitascore.portal.repository.specification.DataSetSpec;
 import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.service.DataSetService;
+import de.civitascore.portal.service.DataSourceService;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -52,6 +55,8 @@ public class DataSetController
 
   private final DataSetService dataSetService;
   private final DataSetAssembler dataSetAssembler;
+  private final DataSourceService dataSourceService;
+  private final DataSourceMapper dataSourceMapper;
 
   @Parameters({
     @Parameter(
@@ -172,6 +177,55 @@ public class DataSetController
   }
 
   /**
+   * Lists the data sources this dataset's pipelines may be built from — the input behind the data
+   * source picker in the pipeline editor.
+   *
+   * <p>A data source is usable when it is released for every datapool, or for the datapool this
+   * dataset sits in; a dataset in no datapool therefore sees only the former. The same rule {@code
+   * DataSourceDatapoolScopeValidator} enforces when a pipeline establishes the relationship, so the
+   * picker cannot offer a source that saving would reject.
+   *
+   * <p>Authorized on the <em>dataset</em>, not on the data sources: the caller needs {@code
+   * DATASET_UPDATE} on this dataset, which a DATAPOOL-scoped grant conveys. Reading the data source
+   * administration surface still requires {@code DATASOURCE_READ}, so the response carries id and
+   * name only — no connector configuration.
+   *
+   * <p>A caller without {@code DATASET_UPDATE} on this dataset is rejected upstream with 403. Past
+   * that, the caller's scope headers still apply: a dataset they do not cover — unknown or merely
+   * out of scope — yields 404, so route existence is not leaked.
+   *
+   * @param id the dataset UUID
+   * @return HTTP 200 with the usable data sources, ordered by name
+   */
+  @GetMapping("/{id}/usable-datasources")
+  @Operation(
+      operationId = "getUsableDataSources",
+      summary = "List the data sources this dataset's pipelines may use",
+      description =
+          "Returns the AVAILABLE data sources released either for every datapool or for this"
+              + " dataset's datapool; a dataset in no datapool sees only the former. Requires"
+              + " DATASET_UPDATE on the dataset rather than DATASOURCE_READ, and returns id and name"
+              + " only. Callers lacking that permission are rejected with 403; a dataset outside the"
+              + " caller's X-Allowed-Scope-Ids/X-Allowed-Pool-Ids returns 404.")
+  @ApiResponse(responseCode = "200", description = "Usable data sources returned successfully")
+  @ApiResponse(
+      responseCode = "404",
+      description = "Dataset not found or out of scope",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<List<DataSourceSummaryDTO>> getUsableDataSources(@PathVariable UUID id) {
+    Specification<DataSet> scopedById =
+        applyScopeFilter(ScopeFilteringSpecification.baseEntityById(Set.of(id)));
+    DataSet dataSet =
+        dataSetService
+            .findOne(scopedById)
+            .orElseThrow(() -> new ResourceNotFoundException("DataSet", id));
+    return ResponseEntity.ok(
+        dataSourceService.findUsableIn(dataSet.getDataPool()).stream()
+            .map(dataSourceMapper::toSummary)
+            .toList());
+  }
+
+  /**
    * Updates a dataset in DRAFT status by fully replacing its content.
    *
    * @param id the UUID of the dataset to update
@@ -249,8 +303,40 @@ public class DataSetController
     return ResponseEntity.ok(output);
   }
 
+  @PutMapping("/{id}/ready/meta")
+  @Operation(
+      operationId = "updateReadyDataSetMeta",
+      summary = "Update READY dataset metadata",
+      description =
+          "Updates the metadata of a dataset in READY status, requiring only DATASET_UPDATE — unlike"
+              + " PUT /datasets/{id}/released/meta, which also requires DATASET_RELEASE. Rejects"
+              + " DRAFT and AVAILABLE datasets. namedApis are immutable — unrelease the dataset and"
+              + " edit it in DRAFT.")
+  @ApiResponse(responseCode = "200", description = "Dataset metadata updated successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description = "Dataset is not READY, or the input carries namedApis",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "422",
+      description = "A datapool switch leaves a pipeline DataSource out of scope",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<DataSetOutputDTO> updateReadyMeta(
+      @PathVariable UUID id, @Valid @RequestBody DataSetInputDTO input) {
+    DataSetInputDTO preProcessedInput = preProcessInput(input);
+    DataSet updated = dataSetService.updateReadyMeta(id, preProcessedInput);
+    DataSetOutputDTO output = dataSetAssembler.toOutput(updated);
+    return ResponseEntity.ok(output);
+  }
+
   /**
-   * Deletes a DRAFT dataset. READY or released datasets must be unstaged/unreleased first.
+   * Deletes a dataset. An AVAILABLE dataset must be unreleased first. A never-provisioned dataset
+   * is removed immediately; a dataset that still holds a provisioned sink is torn down
+   * asynchronously via a DELETE saga and removed once the saga completes.
    *
    * @param id the UUID of the dataset to delete
    */
@@ -259,9 +345,10 @@ public class DataSetController
   @Operation(
       summary = "Delete a dataset",
       description =
-          "Deletes a DRAFT dataset immediately (204 No Content). "
-              + "READY datasets cannot be deleted — unstage first (POST /{id}/unstage). "
-              + "AVAILABLE datasets cannot be deleted directly — unrelease first (POST /{id}/unrelease) to tear down infrastructure, then delete.")
+          "Deletes a dataset (204 No Content). A never-provisioned dataset is removed immediately. "
+              + "A dataset that still holds a provisioned sink is torn down asynchronously via a "
+              + "DELETE saga and removed once the saga completes. An AVAILABLE dataset cannot be "
+              + "deleted directly — unrelease it first (POST /{id}/unrelease).")
   public void delete(@PathVariable UUID id) {
     dataSetService.deleteById(id);
   }

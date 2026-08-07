@@ -58,6 +58,8 @@ class NifiSagaHandlerTest {
     // platform sink connections the planner requires (FROST base URL / PostGIS DB URL)
     when(config.getProperty("nifi.frost.url", null))
         .thenReturn("http://frost:8080/FROST-Server/v1.1");
+    when(config.getProperty("frost.basic.auth.username")).thenReturn("frost");
+    when(config.getProperty("frost.basic.auth.password")).thenReturn("secret");
     when(config.getProperty("nifi.postgis.url", null))
         .thenReturn("jdbc:postgresql://db:5432/civitas");
 
@@ -68,7 +70,7 @@ class NifiSagaHandlerTest {
   }
 
   private Map<String, Object> map(String json) throws Exception {
-    return mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+    return mapper.readValue(json, new TypeReference<>() {});
   }
 
   private SagaCommandMessage deployCommand() throws Exception {
@@ -147,6 +149,8 @@ class NifiSagaHandlerTest {
       when(config.getProperty("nifi.master-key", null)).thenReturn(MASTER_KEY_HEX);
       when(config.getProperty("nifi.frost.url", null))
           .thenReturn("http://frost:8080/FROST-Server/v1.1");
+      when(config.getProperty("frost.basic.auth.username")).thenReturn("frost");
+      when(config.getProperty("frost.basic.auth.password")).thenReturn("secret");
       when(config.getProperty("nifi.postgis.url", null))
           .thenReturn("jdbc:postgresql://db:5432/civitas");
       when(config.getProperty(eq("nifi.url"), any())).thenReturn(server.baseUrl());
@@ -155,8 +159,7 @@ class NifiSagaHandlerTest {
       when(config.getProperty(eq("nifi.oidc.client-id"), any())).thenReturn("nifi-test-id");
       when(config.getProperty(eq("nifi.oidc.client-secret"), any())).thenReturn("nifi-test-secret");
 
-      NifiSagaHandler realHandler = new NifiSagaHandler();
-      try {
+      try (NifiSagaHandler realHandler = new NifiSagaHandler()) {
         realHandler.initialize(config); // no setTestNifiClient → real client + token provider
         realHandler.handle(deployCommand()); // deploy → authenticate() → token fetch, then NiFi 400
 
@@ -165,8 +168,6 @@ class NifiSagaHandlerTest {
                 .withRequestBody(containing("grant_type=client_credentials"))
                 .withRequestBody(containing("client_id=nifi-test-id"))
                 .withRequestBody(containing("client_secret=nifi-test-secret")));
-      } finally {
-        realHandler.close();
       }
     } finally {
       server.stop();
@@ -289,6 +290,26 @@ class NifiSagaHandlerTest {
     assertEquals("STEP_COMPLETED", result.type());
     verify(restClient).deleteFlowByName(eq("pipeline-p-1"));
     verify(restClient).deleteFlowByName(eq("pipeline-p-2"));
+  }
+
+  @Test
+  void compensationTearsDownEveryDeployedPipeline() throws Exception {
+    // The saga replays the deploy step's compensationData (its pipelineIds) as a COMPENSATE_STEP;
+    // the sibling pipelines a failed deploy already deployed must all be removed (issue #1842).
+    Map<String, Object> payload =
+        map(
+            """
+            { "type": "COMPENSATE_STEP", "sagaId": "s", "stepId": "deploy-pipelines",
+              "adapter": "nifi", "operation": "DELETE_PIPELINES",
+              "pipelineIds": ["p-1", "p-2", "p-3"] }
+            """);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("COMPENSATION_COMPLETED", result.type());
+    verify(restClient).deleteFlowByName(eq("pipeline-p-1"));
+    verify(restClient).deleteFlowByName(eq("pipeline-p-2"));
+    verify(restClient).deleteFlowByName(eq("pipeline-p-3"));
   }
 
   /**

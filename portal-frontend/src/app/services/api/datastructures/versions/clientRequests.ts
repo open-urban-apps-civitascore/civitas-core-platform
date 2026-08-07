@@ -8,7 +8,6 @@ import {
   DatastructureVersion,
   DatastructureVersionCreateData,
   DatastructureVersionPatchData,
-  DatastructureVersionPutData,
 } from '@/types/datastructures'
 
 import { apiRequest, ApiServiceResponse } from '../../request/apiRequest'
@@ -67,12 +66,6 @@ export const useCreateDatastructureVersion = () =>
 export const useUpdateDatastructureVersion = () =>
   useDatastructureVersionMutation<DatastructureVersion, DatastructureVersionPatchData>({
     method: 'PATCH',
-    errorMessage: 'An error occurred while updating datastructure version',
-  })
-
-export const useUpdateDatastructureVersionReleased = () =>
-  useDatastructureVersionMutation<DatastructureVersion, DatastructureVersionPutData>({
-    method: 'PUT',
     errorMessage: 'An error occurred while updating datastructure version',
   })
 

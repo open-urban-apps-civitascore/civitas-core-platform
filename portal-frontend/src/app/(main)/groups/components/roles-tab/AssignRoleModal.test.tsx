@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { type Role, ROLE_TYPES, type RoleType } from '@/types/roles'
 
+import { AssignRoleModal } from './AssignRoleModal'
+
 const mockRoles: Role[] = [
   {
     id: 'r1',
@@ -114,11 +116,10 @@ describe('AssignRoleModal', () => {
   })
 
   const renderModal = async (overrides?: Partial<typeof defaultProps>) => {
-    const { AssignRoleModal } = await import('./AssignRoleModal')
     return renderWithProvider(<AssignRoleModal {...defaultProps} {...overrides} />)
   }
 
-  it('renders system role modal title and description', { timeout: 10000, retry: 2 }, async () => {
+  it('renders system role modal title and description', async () => {
     await renderModal({ roleType: ROLE_TYPES.SYSTEM })
 
     expect(await screen.findByText('roles.assignSystemRole')).toBeInTheDocument()

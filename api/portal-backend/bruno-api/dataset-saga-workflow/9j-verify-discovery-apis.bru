@@ -10,6 +10,63 @@ get {
   auth: inherit
 }
 
+script:pre-request {
+  // OPA authorization data for a freshly provisioned dataset propagates asynchronously, so an
+  // immediate call can transiently 401/403. Poll the discovery endpoint until it returns 200
+  // (max 30s) so the assertions below don't race OPA propagation.
+  const axios = require('axios');
+  const apiUrl = bru.getEnvVar('apisixApiUrl');
+  const datasetId = bru.getVar('sagaDataSetId');
+
+  // Build the form body by hand: the Bruno CLI runs scripts in a QuickJS sandbox that has no
+  // URLSearchParams. encodeURIComponent is standard ECMAScript and is available.
+  const tokenUrl = `${bru.getEnvVar('keycloakUrl')}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`;
+  const form = [
+    'grant_type=password',
+    `username=${encodeURIComponent(bru.getEnvVar('username'))}`,
+    `password=${encodeURIComponent(bru.getEnvVar('password'))}`,
+    `client_id=${encodeURIComponent(bru.getEnvVar('clientId'))}`,
+    `client_secret=${encodeURIComponent(bru.getEnvVar('clientSecret') || '')}`,
+  ].join('&');
+
+  // Fail loudly if no token can be obtained — otherwise the poll below is skipped entirely and
+  // the assertions run straight into the OPA propagation race this guard exists to absorb.
+  let accessToken = '';
+  for (let i = 0; i < 3 && !accessToken; i++) {
+    try {
+      const tokenResp = await axios.post(tokenUrl, form, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: 10000,
+      });
+      accessToken = tokenResp.data && tokenResp.data.access_token;
+    } catch (e) {
+      await new Promise(res => setTimeout(res, 1000));
+    }
+  }
+  if (!accessToken) {
+    throw new Error('Discovery readiness token fetch failed — refusing to assert without a proven-ready endpoint');
+  }
+
+  // Guard each attempt separately: the QuickJS sandbox does not honour validateStatus across the
+  // VM boundary, so a 401/403 rejects the promise and would otherwise abort the whole loop.
+  let authorized = false;
+  for (let i = 0; i < 15 && !authorized; i++) {
+    try {
+      const resp = await axios.get(`${apiUrl}/v1/datasets/${datasetId}/apis`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: 10000,
+      });
+      authorized = resp.status === 200;
+    } catch (e) { /* transient 401/403 while OPA data propagates; retry */ }
+    if (!authorized) {
+      await new Promise(res => setTimeout(res, 2000));
+    }
+  }
+  if (!authorized) {
+    throw new Error('Discovery endpoint never became authorized within 30s — OPA authorization did not propagate');
+  }
+}
+
 tests {
   // Discovery endpoint GET /v1/datasets/{id}/apis (#1596, concept #1379) — a portal-backend
   // management endpoint, reached through the gateway's /v1/* management catch-all. No dedicated
@@ -66,6 +123,7 @@ docs {
   `NamedApiAllowedSlugValidator`) so no named API can shadow this path.
 
   **Precondition:** released dataset with named API `things` (steps 4-9); bearer token has DATASET_READ.
+  The pre-request polls up to 30s to absorb asynchronous OPA authorization propagation.
 
   **Expected:** 200 OK, JSON array of named APIs including slug `things`.
 }

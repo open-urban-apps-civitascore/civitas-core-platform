@@ -347,16 +347,51 @@ class ApisixSagaHandlerTest {
     @DisplayName("returns failure for invalid upstream URL")
     void shouldReturnFailureForInvalidUpstreamUrl() {
       try (ApisixSagaHandler handler = createHandler()) {
+        // Goes through the helper so the command carries an STA slug: the upstream URL is only
+        // required — and therefore only parsed — when a slug actually routes to FROST.
+        SagaCommandResult result =
+            handler.handle(createRouteCommand(Map.of("upstreamUrl", "://not a valid uri")));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        // Upstream targets resolve before any write, so a bad URL touches no gateway state.
+        verify(mockBuilder, never()).put(any(Entity.class));
+      }
+    }
+
+    @Test
+    @DisplayName("fails when an STA route has no upstream URL")
+    void shouldFailWhenStaRouteHasNoUpstreamUrl() {
+      try (ApisixSagaHandler handler = createHandler()) {
         SagaCommandMessage command =
             createCommand(
                 "EXECUTE_STEP",
                 "CREATE_ROUTE",
-                Map.of("datasetId", "ds-001", "upstreamUrl", "://not a valid uri"));
+                Map.of(
+                    "datasetId",
+                    "ds-001",
+                    "namedApis",
+                    List.of(Map.of("slug", "data", "standard", "STA"))));
 
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
+        verify(mockBuilder, never()).put(any(Entity.class));
+      }
+    }
+
+    @Test
+    @DisplayName("no-ops without named APIs even when the upstream URL is absent")
+    void shouldNoOpWithoutNamedApisWhenUpstreamUrlIsAbsent() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "CREATE_ROUTE", Map.of("datasetId", "ds-001")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(Map.of(), result.resultData().get("routeIds"));
+        verify(mockBuilder, never()).put(any(Entity.class));
       }
     }
 
@@ -648,6 +683,65 @@ class ApisixSagaHandlerTest {
         @SuppressWarnings("unchecked")
         List<String> remove = (List<String>) headers.get("remove");
         assertTrue(remove.contains("X-Allowed-Scope-Ids"));
+        // Accept-Encoding is stripped so GeoServer returns an uncompressed capabilities body the
+        // response-rewrite filter below can match.
+        assertTrue(
+            remove.contains("Accept-Encoding"),
+            "OWS route strips Accept-Encoding so the response-rewrite filter sees a plain body");
+
+        // GeoServer advertises the internal /geoserver/{ws}/{service} path in its capabilities; a
+        // response-rewrite filter maps it back to this route's external endpoint so map clients can
+        // follow the advertised GetMap/GetFeature URLs through the gateway.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> responseRewrite =
+            (Map<String, Object>) pluginsOf(routeBody).get("response-rewrite");
+        assertNotNull(responseRewrite, "OWS route rewrites GeoServer's self-referential URLs");
+        Object[] filters = (Object[]) responseRewrite.get("filters");
+        assertEquals(1, filters.length);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> filter = (Map<String, Object>) filters[0];
+        assertEquals("global", filter.get("scope"));
+        assertEquals(
+            "https?://[^/]+/geoserver/ds_001/(wfs|wms|wcs|wps|wmts|ows|gwc)", filter.get("regex"));
+        assertEquals("https://api.example.test/v1/datasets/ds-001/map", filter.get("replace"));
+      }
+    }
+
+    @Test
+    @DisplayName("provisions an OWS-only dataset that carries no FROST upstream URL at all")
+    void shouldCreateOwsOnlyRouteWithoutUpstreamUrl() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(201);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+
+        // A dataset with no FROST data sink gets no FROST project, so the saga carries no
+        // upstreamUrl. Its OWS surface must still be published.
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("datasetId", "ds-001");
+        payload.put("openDataAccess", false);
+        payload.put("namedApis", List.of(Map.of("slug", "map", "standard", "OWS")));
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "EXECUTE_STEP",
+                    "msg-001",
+                    "saga-001",
+                    "create-route",
+                    "apisix",
+                    "CREATE_ROUTE",
+                    payload));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(
+            Map.of("map", NamedApiHelper.derive("ds-001", "map")),
+            result.resultData().get("routeIds"));
+
+        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
+        List<String> paths = pathCaptor.getAllValues();
+        assertTrue(paths.contains("/apisix/admin/upstreams/ds-001-ows"), "map-server upstream");
+        assertFalse(paths.contains("/apisix/admin/upstreams/ds-001"), "no FROST upstream");
       }
     }
 
@@ -972,6 +1066,19 @@ class ApisixSagaHandlerTest {
         Map<String, Object> labels = (Map<String, Object>) routeBody.get("labels");
         assertFalse(labels.containsKey("civitas-frost-upstream-auth-header"));
         assertEquals("OWS", labels.get("civitas-named-api-standard"));
+        // Re-applying the state also (re-)installs the capabilities URL rewrite, so a route created
+        // before this feature is healed on the next UPDATE/RESTORE.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> responseRewrite =
+            (Map<String, Object>) pluginsOf(routeBody).get("response-rewrite");
+        assertNotNull(
+            responseRewrite, "toggling an OWS route (re-)installs the capabilities rewrite");
+        Object[] filters = (Object[]) responseRewrite.get("filters");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> filter = (Map<String, Object>) filters[0];
+        assertEquals(
+            "https?://[^/]+/geoserver/ds_001/(wfs|wms|wcs|wps|wmts|ows|gwc)", filter.get("regex"));
+        assertEquals("https://api.example.test/v1/datasets/ds-001/map", filter.get("replace"));
       }
     }
   }
@@ -1079,6 +1186,115 @@ class ApisixSagaHandlerTest {
         // Two slug routes + both per-dataset upstreams (FROST + map server) — all 404, all
         // tolerated.
         verify(mockBuilder, times(4)).delete();
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "retries the upstream delete while APISIX still reports a stale route reference, then"
+            + " completes")
+    void shouldRetryUpstreamDeleteOnStaleRouteReference() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        Response staleReference = mock(Response.class);
+        when(staleReference.getStatus()).thenReturn(400);
+        when(staleReference.readEntity(String.class))
+            .thenReturn(
+                "{\"error_msg\":\"can not delete this upstream, route [rid-things] is still using"
+                    + " it now\"}");
+        // Route delete succeeds; the immediately following upstream delete still sees the route in
+        // APISIX's worker-local route cache, then succeeds once the cache has caught up.
+        when(mockBuilder.delete()).thenReturn(ok, staleReference, ok, ok);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("routeIds", Map.of("things", "rid-things"));
+        payload.put("serviceId", "ds-001");
+
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "EXECUTE_STEP",
+                    "m",
+                    "saga-001",
+                    "delete-route",
+                    "apisix",
+                    "DELETE_ROUTE",
+                    payload));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // 1 route + 2 upstream attempts for ds-001 (one rejected, one accepted) + 1 for ds-001-ows.
+        verify(mockBuilder, times(4)).delete();
+      }
+    }
+
+    @Test
+    @DisplayName("fails the step when the stale route reference does not clear within the retries")
+    void shouldFailWhenStaleRouteReferencePersists() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        Response staleReference = mock(Response.class);
+        when(staleReference.getStatus()).thenReturn(400);
+        when(staleReference.readEntity(String.class))
+            .thenReturn(
+                "{\"error_msg\":\"can not delete this upstream, route [rid-things] is still using"
+                    + " it now\"}");
+        when(mockBuilder.delete()).thenReturn(ok, staleReference, staleReference, staleReference);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("routeIds", Map.of("things", "rid-things"));
+        payload.put("serviceId", "ds-001");
+
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "EXECUTE_STEP",
+                    "m",
+                    "saga-001",
+                    "delete-route",
+                    "apisix",
+                    "DELETE_ROUTE",
+                    payload));
+
+        // A reference that outlives the retry budget is surfaced, not waited out.
+        assertEquals("STEP_FAILED", result.type());
+        // 1 route + exactly 3 upstream attempts: pins the budget, which STEP_FAILED alone does not.
+        verify(mockBuilder, times(4)).delete();
+      }
+    }
+
+    @Test
+    @DisplayName("does not retry an upstream delete rejected for an unrelated reason")
+    void shouldNotRetryUnrelatedUpstreamDeleteFailure() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        Response badRequest = mock(Response.class);
+        when(badRequest.getStatus()).thenReturn(400);
+        when(badRequest.readEntity(String.class))
+            .thenReturn("{\"error_msg\":\"invalid configuration\"}");
+        when(mockBuilder.delete()).thenReturn(ok, badRequest, ok, ok);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("routeIds", Map.of("things", "rid-things"));
+        payload.put("serviceId", "ds-001");
+
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "EXECUTE_STEP",
+                    "m",
+                    "saga-001",
+                    "delete-route",
+                    "apisix",
+                    "DELETE_ROUTE",
+                    payload));
+
+        assertEquals("STEP_FAILED", result.type());
+        // 1 route + a single (non-retried) upstream attempt — the step aborts on the first
+        // unrelated rejection.
+        verify(mockBuilder, times(2)).delete();
       }
     }
 
@@ -2118,9 +2334,8 @@ class ApisixSagaHandlerTest {
      * Documents/pins the SHAPE of the path-rewrite regex the handler is expected to emit — it
      * re-implements the pattern locally and is NOT wired to {@code buildRouteBody}'s actual output.
      * Treat it as executable documentation of the rewrite contract; the genuine end-to-end coverage
-     * that the produced route really rewrites correctly lives in {@code
-     * ApisixSagaHandlerRoutingTest} (real APISIX via Testcontainers). If the production regex
-     * changes, update both.
+     * that the produced route really rewrites correctly lives in {@code ApisixSagaHandlerRoutingIT}
+     * (real APISIX via Testcontainers). If the production regex changes, update both.
      */
     private String applyRewrite(String datasetId, String upstreamPath, String requestPath) {
       String regex = "^/v1/datasets/" + datasetId + "(/.*)?$";
@@ -2285,11 +2500,16 @@ class ApisixSagaHandlerTest {
     return handler;
   }
 
+  /** Extracts the {@code plugins} block from a captured route body. */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> pluginsOf(Map<String, Object> routeBody) {
+    return (Map<String, Object>) routeBody.get("plugins");
+  }
+
   /** Extracts the {@code plugins.proxy-rewrite} block from a captured route body. */
   @SuppressWarnings("unchecked")
   private static Map<String, Object> proxyRewriteOf(Map<String, Object> routeBody) {
-    Map<String, Object> plugins = (Map<String, Object>) routeBody.get("plugins");
-    return (Map<String, Object>) plugins.get("proxy-rewrite");
+    return (Map<String, Object>) pluginsOf(routeBody).get("proxy-rewrite");
   }
 
   /**

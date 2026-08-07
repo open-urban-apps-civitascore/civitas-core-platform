@@ -2,6 +2,7 @@ auth {
   mode: oauth2
 }
 
+
 auth:oauth2 {
   grant_type: password
   access_token_url: {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
@@ -17,4 +18,18 @@ auth:oauth2 {
   token_header_prefix: Bearer
   auto_fetch_token: true
   auto_refresh_token: false
+}
+
+docs {
+  Requests run through APISIX (baseUrl), so OPA decides them and computes the scope headers
+  the backend filters by. The suite therefore exercises the real authorization path instead
+  of simulating it: APISIX strips any client-supplied X-Allowed-Scope-Ids / X-Allowed-Pool-Ids,
+  so a request cannot widen its own scope.
+
+  The tenant-wide test user (dev@civitas.local) receives the wildcard scope, which is why no
+  request needs to declare a scope of its own.
+
+  The `local-direct` environment points baseUrl at the backend port instead, bypassing the
+  gateway. Scope-guarded endpoints reject those requests, so it is only useful for the ones
+  that impose no scope filtering.
 }

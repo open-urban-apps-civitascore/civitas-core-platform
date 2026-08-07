@@ -8,6 +8,7 @@ import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
@@ -18,6 +19,9 @@ import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.repository.specification.DataSourceDatapoolUsability;
+import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import de.civitascore.portal.util.InvalidInputException;
@@ -31,6 +35,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -52,6 +60,8 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final DataSetRepository dataSetRepository;
   private final PipelineRepository pipelineRepository;
   private final DataPoolRepository dataPoolRepository;
+  private final ScopeAccessAuthorizer scopeAccessAuthorizer;
+  private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -94,6 +104,34 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   }
 
   /**
+   * Restricts the generic CRUD update to DRAFT data sources. A released (AVAILABLE) data source may
+   * only be changed through {@link #updateReleasedMeta(UUID, DataSourceInputDTO)}, which is the
+   * single point that enforces the in-use constraints and re-asserts the DataSource→DataPool scope
+   * rule for the datasets the source already feeds. Without this restriction the generic route
+   * would reach {@link #postConvertToEntity} — which applies a new datapool scope unconditionally —
+   * and silently bypass both guards.
+   *
+   * @param id the data source ID
+   * @param input the update input
+   * @return the updated data source
+   * @throws InvalidInputException if the data source is not in DRAFT status
+   */
+  @Override
+  @Transactional
+  public DataSource update(UUID id, DataSourceInputDTO input) {
+    DataSource existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataSourceStatus() != DataSourceStatus.DRAFT) {
+      throw new InvalidInputException(
+          getEntityName(),
+          id,
+          "DataSource can only be updated in DRAFT status, current status: "
+              + existingEntity.getDataSourceStatus()
+              + ". Use the released metadata endpoint instead.");
+    }
+    return super.update(id, input);
+  }
+
+  /**
    * Links the data structure version to the data source after DTO-to-entity conversion. Validates
    * that the referenced version is in AVAILABLE status and its parent data structure is also
    * AVAILABLE.
@@ -106,10 +144,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   @Override
   protected DataSource postConvertToEntity(DataSource entity, DataSourceInputDTO input) {
     if (input.getDataStructureVersionId() != null) {
-      DataStructureVersion dsv =
-          dataStructureVersionService.findByIdOrThrow(input.getDataStructureVersionId());
-      validateDataStructureVersionLinkable(dsv);
-      entity.setDataStructureVersion(dsv);
+      entity.setDataStructureVersion(resolveAuthorizedVersion(input.getDataStructureVersionId()));
     } else {
       entity.setDataStructureVersion(null);
     }
@@ -340,6 +375,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
     if (input.getDatapoolScope() != null) {
       applyDatapoolScope(entity, input.getDatapoolScope());
+      if (inUse) {
+        revalidateLinkedDatasetsAgainstNewScope(entity);
+      }
     }
 
     if (!inUse) {
@@ -347,6 +385,27 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
 
     return save(entity);
+  }
+
+  /**
+   * Re-asserts the DataSource→DataPool scope rule after this DataSource's own scope was narrowed,
+   * for every dataset it already feeds. Narrowing a bound DataSource (e.g. {@code ALL → SPECIFIC}
+   * excluding a pool it is linked into, or {@code → NONE}) would otherwise reach the same persisted
+   * state the pipeline-write validation rejects, without any path re-checking it. Each referencing
+   * pipeline is validated against its own dataset's datapool; the managed DataSource already
+   * carries the new scope.
+   *
+   * @param dataSource the DataSource whose scope has just been changed
+   * @throws de.civitascore.portal.util.DataSourceScopeViolationException if it is now out of scope
+   *     for any dataset it feeds
+   */
+  private void revalidateLinkedDatasetsAgainstNewScope(DataSource dataSource) {
+    List<DataSource> sources = List.of(dataSource);
+    pipelineRepository
+        .findByDataSourcesId(dataSource.getId())
+        .forEach(
+            pipeline ->
+                datapoolScopeValidator.validate(sources, pipeline.getDataSet().getDataPool()));
   }
 
   private void validateInUseConstraints(DataSourceInputDTO input, DataSource entity) {
@@ -378,10 +437,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       entity.setConnectorType(input.getConnectorType());
     }
     if (input.getDataStructureVersionId() != null) {
-      DataStructureVersion dsv =
-          dataStructureVersionService.findByIdOrThrow(input.getDataStructureVersionId());
-      validateDataStructureVersionLinkable(dsv);
-      entity.setDataStructureVersion(dsv);
+      entity.setDataStructureVersion(resolveAuthorizedVersion(input.getDataStructureVersionId()));
     }
     if (input.getConfiguration() != null) {
       ConnectorType type = entity.getConnectorType();
@@ -440,6 +496,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
 
   private List<DataPool> resolveSpecificDatapools(DatapoolScopeInputDTO scope) {
     requireDatapoolIdsNotEmpty(scope);
+    // The datapool ids reference a DATAPOOL-scoped entity, which the DATASOURCE-typed route header
+    // cannot cover — authorize the caller against them before binding.
+    scopeAccessAuthorizer.authorizeReferences(ScopeType.DATAPOOL, scope.getDatapoolIds());
     List<DataPool> resolvedPools = dataPoolRepository.findAllById(scope.getDatapoolIds());
     validateAllDatapoolsFound(scope.getDatapoolIds(), resolvedPools);
     return resolvedPools;
@@ -485,6 +544,26 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   }
 
   /**
+   * Returns the AVAILABLE data sources a dataset in the given datapool may build a pipeline from,
+   * ordered by name.
+   *
+   * <p>Restricted to AVAILABLE because {@code PipelineService} rejects anything else on save, so
+   * offering a DRAFT source would only produce a failure one step later.
+   *
+   * @param dataPool the datapool of the dataset, or {@code null} for a pool-less dataset
+   * @return the usable data sources, ordered by name
+   */
+  @Transactional(readOnly = true)
+  public List<DataSource> findUsableIn(DataPool dataPool) {
+    Specification<DataSource> usable =
+        DataSourceDatapoolUsability.usableInPool(dataPool == null ? null : dataPool.getId())
+            .and(
+                (root, query, cb) ->
+                    cb.equal(root.get("dataSourceStatus"), DataSourceStatus.AVAILABLE));
+    return findAll(usable, Pageable.unpaged(Sort.by(Sort.Direction.ASC, "name"))).getContent();
+  }
+
+  /**
    * Returns the data structure version linked to the given data source, or {@code null} if none is
    * linked.
    *
@@ -500,6 +579,28 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
     return dataStructureVersionService.findByIdOrThrow(
         dataSource.getDataStructureVersion().getId());
+  }
+
+  /**
+   * Resolves a data structure version by ID, authorizing the caller against its parent data
+   * structure. The version id in the request body references a DATASTRUCTURE-scoped entity, which
+   * the DATASOURCE-typed route header cannot cover; assignments scope on the parent structure, so
+   * authorization targets {@code dataStructure.id}, not the version id.
+   */
+  private DataStructureVersion resolveAuthorizedVersion(UUID versionId) {
+    DataStructureVersion dsv = dataStructureVersionService.findByIdOrThrow(versionId);
+    // A missing version (findByIdOrThrow → 404) and an unauthorized one must be indistinguishable
+    // from the outside, otherwise the 404-vs-403 difference is an existence oracle over version
+    // ids. Map the denial onto the same not-found response; ScopeAccessAuthorizer has already
+    // logged the real authorization denial server-side for audit.
+    try {
+      scopeAccessAuthorizer.authorizeReferences(
+          ScopeType.DATASTRUCTURE, Set.of(dsv.getDataStructure().getId()));
+    } catch (AccessDeniedException e) {
+      throw new ResourceNotFoundException(getEntityName(), versionId);
+    }
+    validateDataStructureVersionLinkable(dsv);
+    return dsv;
   }
 
   private void validateDataStructureVersionLinkable(DataStructureVersion dsv) {

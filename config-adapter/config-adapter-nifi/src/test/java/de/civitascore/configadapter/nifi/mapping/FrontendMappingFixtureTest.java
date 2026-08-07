@@ -38,7 +38,7 @@ class FrontendMappingFixtureTest {
         "urn:core:platform:civitas:datastructure:common:Source:ggb6odzea5:1.0.0", mapping.source());
 
     List<UpdateRecordProperty> props =
-        new RecordPathCompiler().compile(mapping, GeometryEncoding.WKT);
+        new RecordPathCompiler().compile(mapping, GeometryEncoding.WKT).properties();
     Map<String, UpdateRecordProperty> byPath =
         props.stream().collect(Collectors.toMap(UpdateRecordProperty::recordPath, p -> p));
 
@@ -47,10 +47,13 @@ class FrontendMappingFixtureTest {
     assertEquals(ReplacementStrategy.RECORD_PATH_VALUE, byPath.get("/titel").strategy());
 
     // toString over a nested path
-    assertEquals("toString(/klasse/offen)", byPath.get("/groups/boolean").value());
+    assertEquals("toString(/klasse/offen, 'UTF-8')", byPath.get("/groups/boolean").value());
 
-    // toDate with pattern
-    assertEquals("toDate(/klasse/Stufe, 'yyyy-MM-dd')", byPath.get("/groups/datum").value());
+    // A stored mapping keeps its op token, so this fixture pins what an editor-authored `toDate`
+    // compiles to — the value a pipeline saved before the date/timestamp split now writes.
+    assertEquals(
+        "format(toDate(/klasse/Stufe, 'yyyy-MM-dd'), 'yyyy-MM-dd')",
+        byPath.get("/groups/datum").value());
 
     // concat of two source paths
     assertEquals("concat(/adresse, /klasse/Bezeichnung)", byPath.get("/adresse").value());
@@ -69,7 +72,7 @@ class FrontendMappingFixtureTest {
 
     MappingConfig mapping = new MappingConfigParser().parse(root);
     List<UpdateRecordProperty> props =
-        new RecordPathCompiler().compile(mapping, GeometryEncoding.WKT);
+        new RecordPathCompiler().compile(mapping, GeometryEncoding.WKT).properties();
     Map<String, UpdateRecordProperty> byPath =
         props.stream().collect(Collectors.toMap(UpdateRecordProperty::recordPath, p -> p));
 

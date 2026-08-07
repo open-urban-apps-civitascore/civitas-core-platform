@@ -42,8 +42,8 @@ export interface BasePipelineNodeProps {
   isSelected: boolean
   /** Main label text */
   label: string
-  /** Optional sublabel (e.g., selected entity name) */
-  sublabel?: string
+  /** Optional sublabel (e.g., selected entity name); may be a node when resolved dynamically */
+  sublabel?: ReactNode
   /** Lucide icon component */
   icon?: LucideIcon
   /** Show left (input) handle */

@@ -10,27 +10,19 @@
 
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { DataModelImportModal } from '@/app/(main)/datasources/[datasourceId]/components/datastructure-tab/DataModelImportModal'
-import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+import { useActivePipeline } from '../../../_hooks/use-active-pipeline'
+import { parseCompositeKey, useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
 import { usePipelinePermissions } from '../../../_hooks/use-pipeline-permissions'
+import { isValidTableName, MAX_TABLE_NAME_LENGTH } from '../../../_services/dataSinkNameService'
 import type { GeoPersistenceNodeData } from '../../../_types/nodes'
 import { EntityMetadata } from '../components/EntityMetadata'
-
-/**
- * Parses the composite selection key from DataModelImportModal.
- * The key format is "datastructureId/versionId".
- */
-const parseCompositeKey = (key: string): { datastructureId: string; versionId: string } | null => {
-  const parts = key.split('/')
-  if (parts.length !== 2) return null
-  return { datastructureId: parts[0], versionId: parts[1] }
-}
 
 interface GeoPersistencePanelProps {
   data: GeoPersistenceNodeData
@@ -41,48 +33,38 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
   const t = useTranslations('pipelineEditor')
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canReadDatastructures } = usePipelinePermissions(datasetId)
+  const { selectedNode, pipelineUsingTableName } = useActivePipeline()
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
-  const [pendingKey, setPendingKey] = useState<string | null>(null)
 
-  const parsed = useMemo(() => (pendingKey ? parseCompositeKey(pendingKey) : null), [pendingKey])
+  const conflictingPipeline = selectedNode ? pipelineUsingTableName(selectedNode.id, data.tableName) : null
+  const hasInvalidCharacters = data.tableName !== '' && !isValidTableName(data.tableName)
 
-  const { data: versionResponse } = useGetDatastructureVersion({
-    datastructureId: parsed?.datastructureId ?? '',
-    versionId: parsed?.versionId ?? '',
-    isEnabled: !!parsed,
-  })
-
-  useEffect(() => {
-    if (!versionResponse?.data || !pendingKey) return
-
-    const { dataStructure, version } = versionResponse.data
-    onUpdate({
-      dataStructureVersionId: pendingKey,
-      dataStructureName: dataStructure?.name ?? '',
-      versionNumber: version ?? '',
-      configured: data.tableName.trim().length > 0,
-    })
-    setPendingKey(null)
-  }, [versionResponse?.data, pendingKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const { name: dataStructureName, versionNumber } = useDatastructureVersionInfo(data.dataStructureVersionId)
 
   const handleTableNameChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const tableName = e.target.value.replace(/[^a-zA-Z0-9_]/g, '')
+      const tableName = e.target.value
       onUpdate({
         tableName,
-        configured: tableName.trim().length > 0 && !!data.dataStructureVersionId,
+        configured: isValidTableName(tableName) && !!data.dataStructureVersionId,
       })
     },
     [data.dataStructureVersionId, onUpdate],
   )
 
-  const handleSelectVersion = useCallback((selection: Record<string, boolean>) => {
-    const selectedKey = Object.keys(selection).find(key => selection[key])
-    if (selectedKey && parseCompositeKey(selectedKey)) {
-      setPendingKey(selectedKey)
-    }
-    setIsImportModalOpen(false)
-  }, [])
+  const handleSelectVersion = useCallback(
+    (selection: Record<string, boolean>) => {
+      const selectedKey = Object.keys(selection).find(key => selection[key])
+      if (selectedKey && parseCompositeKey(selectedKey)) {
+        onUpdate({
+          dataStructureVersionId: selectedKey,
+          configured: isValidTableName(data.tableName),
+        })
+      }
+      setIsImportModalOpen(false)
+    },
+    [data.tableName, onUpdate],
+  )
 
   return (
     <div className="space-y-4 p-4">
@@ -93,7 +75,20 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
           value={data.tableName}
           onChange={handleTableNameChange}
           placeholder={t('geoPersistencePanel.tableNamePlaceholder')}
+          maxLength={MAX_TABLE_NAME_LENGTH}
+          aria-invalid={hasInvalidCharacters || conflictingPipeline !== null}
         />
+        {hasInvalidCharacters && (
+          <p className="text-xs text-destructive">{t('geoPersistencePanel.tableNameInvalid')}</p>
+        )}
+        {!hasInvalidCharacters && conflictingPipeline !== null && (
+          <p className="text-xs text-destructive">
+            {t('validation.messages.duplicateTableName', {
+              tableName: data.tableName.trim(),
+              pipeline: conflictingPipeline,
+            })}
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -110,8 +105,8 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
           <EntityMetadata
             title={t('geoPersistencePanel.details')}
             items={[
-              { label: t('geoPersistencePanel.dataStructureName'), value: data.dataStructureName },
-              { label: t('geoPersistencePanel.versionNumber'), value: data.versionNumber },
+              { label: t('geoPersistencePanel.dataStructureName'), value: dataStructureName },
+              { label: t('geoPersistencePanel.versionNumber'), value: versionNumber },
             ]}
           />
           {canReadDatastructures && parseCompositeKey(data.dataStructureVersionId) && (

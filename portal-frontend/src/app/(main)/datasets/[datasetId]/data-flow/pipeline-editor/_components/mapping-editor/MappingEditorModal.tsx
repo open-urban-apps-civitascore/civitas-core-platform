@@ -172,7 +172,10 @@ export const MappingEditorModal = ({
     initialized.current = true
   }, [open, isReady, sourceTree, targetTree, config, setNodes, setEdges])
 
-  const endpointInfo = (nodeId: string, handleId: string): { type: PortType; sub?: string } | null => {
+  const endpointInfo = (
+    nodeId: string,
+    handleId: string,
+  ): { type: PortType; sub?: string; accepts?: readonly string[] } | null => {
     if (nodeId === SOURCE_NODE_ID) {
       const field = sourceFields.get(handleId)
       if (!field) return null
@@ -192,7 +195,7 @@ export const MappingEditorModal = ({
     const def = mappingRegistry.byType[data.defType]
     const ports = [...(data.inputs ?? def?.inputs ?? []), ...(data.outputs ?? def?.outputs ?? [])]
     const port = ports.find(p => p.id === handleId)
-    return port ? { type: port.type, sub: port.dataType } : null
+    return port ? { type: port.type, sub: port.dataType, accepts: port.accepts } : null
   }
 
   /**
@@ -200,13 +203,20 @@ export const MappingEditorModal = ({
    *  - both have the same portType category (scalar / geometry / array / object)
    *  - AND for scalar/geometry ports: the subtype matches exactly (int↔int, str↔str, Point↔Point, …)
    *    — type conversions must go through an explicit conversion node.
+   * Exception: an input port with an `accepts` set matches by membership instead of exact equality —
+   * e.g. a numeric conversion input accepts str/int/number and rejects uuid/bool/date/geometry.
    */
   const portsCompatible = useCallback(
-    (from: { type: PortType; sub?: string } | null, to: { type: PortType; sub?: string } | null): boolean => {
+    (
+      from: { type: PortType; sub?: string; accepts?: readonly string[] } | null,
+      to: { type: PortType; sub?: string; accepts?: readonly string[] } | null,
+    ): boolean => {
       if (!from || !to) return false
       if (from.type !== to.type) return false
-      if ((from.type === 'scalar' || from.type === 'geometry') && from.sub && to.sub && from.sub !== to.sub)
-        return false
+      if (from.type === 'scalar' || from.type === 'geometry') {
+        if (to.accepts) return !!from.sub && to.accepts.includes(from.sub)
+        if (from.sub && to.sub && from.sub !== to.sub) return false
+      }
       return true
     },
     [],
@@ -246,12 +256,19 @@ export const MappingEditorModal = ({
     (_event, connectionState) => {
       // connectionState.isValid is false when the drag ended on an incompatible handle
       if (connectionState && !connectionState.isValid && pendingConnection.current) {
-        const from = endpointInfo(pendingConnection.current.nodeId, pendingConnection.current.handleId)
-        // Only show the message when we can identify the source type (not a missed drop into empty space)
-        if (from?.sub) {
-          toast.error(t('errors.typeMismatchWithType', { type: from.sub }))
-        } else if (from) {
-          toast.error(t('errors.typeMismatch'))
+        const fromDir = connectionState.fromHandle?.type
+        const toDir = connectionState.toHandle?.type
+        // Same-direction drop (output-output or input-input)
+        if (toDir && fromDir === toDir) {
+          toast.error(fromDir === 'source' ? t('errors.outputToOutput') : t('errors.inputToInput'))
+        } else {
+          const from = endpointInfo(pendingConnection.current.nodeId, pendingConnection.current.handleId)
+          // Only show the message when we can identify the source type (not a missed drop into empty space)
+          if (from?.sub) {
+            toast.error(t('errors.typeMismatchWithType', { type: from.sub }))
+          } else if (from) {
+            toast.error(t('errors.typeMismatch'))
+          }
         }
       }
       pendingConnection.current = null

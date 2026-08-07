@@ -56,7 +56,17 @@ public class DataSetOutputDTO extends BaseOutputDTO {
 
   @Schema(
       description =
-          "Type of saga currently in progress (CREATE, UPDATE, DELETE), or null when idle",
+          "Type of saga currently in progress (CREATE, UPDATE, UNRELEASE, DELETE), or null when"
+              + " idle",
       accessMode = Schema.AccessMode.READ_ONLY)
   private PendingSagaType pendingSagaType;
+
+  @Schema(
+      description =
+          "Whether a provisioning saga has completed successfully, so whatever sinks the dataset"
+              + " carried at release physically exist (a PostGIS table / FROST project). Stays true"
+              + " across an unrelease. Used to warn before a destructive sink change that would"
+              + " rebuild the table.",
+      accessMode = Schema.AccessMode.READ_ONLY)
+  private Boolean provisioned;
 }
