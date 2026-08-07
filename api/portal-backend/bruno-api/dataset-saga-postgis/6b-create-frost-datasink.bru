@@ -1,0 +1,60 @@
+meta {
+  name: 6b. Create FROST DataSink
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{pgDataSetId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "FROST",
+    "configuration": {}
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('pgFrostDataSinkId', res.body.id);
+  }
+}
+
+tests {
+  test("DataSink created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Has FROST type", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.dataSinkType).to.equal('FROST');
+    }
+  });
+}
+
+docs {
+  **PostGIS saga step 6b** — Prerequisites: dataset created (step 5).
+
+  The dataset publishes an STA named API, and release rejects an STA API that has no FROST sink
+  behind it — the route would resolve to a FROST project that is never provisioned. FROST sinks
+  carry no configuration of their own; the project is provisioned when the dataset is released.
+
+  **Expected Response:** 201 Created, body contains `id` and `dataSinkType: "FROST"`.
+
+  **Post-condition:** Save `pgFrostDataSinkId` from `body.id`. Removed with the dataset in the cleanup steps.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSink record created in `portal_backend` DB, FK `dataset_id` → this dataset |
+  | Config Adapter | — (FROST project is provisioned when the DataSet is released) |
+  | External System | — |
+}

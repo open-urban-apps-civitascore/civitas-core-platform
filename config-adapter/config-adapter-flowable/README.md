@@ -11,17 +11,17 @@ One BPMN process per saga type; the trigger's `sagaType` selects it.
 
 | `sagaType` | Process | Step order | On step failure |
 |---|---|---|---|
-| `DATASET_CREATE` | `dataset-create` | FROST `CREATE_PROJECT` → APISIX `CREATE_ROUTE` → geo branch → pipeline branch | reverse-order compensation |
-| `DATASET_UPDATE` | `dataset-update` | FROST `UPDATE_PROJECT` → APISIX `UPDATE_ROUTE` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` | reverse-order compensation; a failing prune is absorbed and the saga still succeeds |
+| `DATASET_CREATE` | `dataset-create` | FROST branch → APISIX `CREATE_ROUTE` → geo branch → pipeline branch | reverse-order compensation |
+| `DATASET_UPDATE` | `dataset-update` | FROST branch → APISIX `UPDATE_ROUTE` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` | reverse-order compensation; a failing prune is absorbed and the saga still succeeds |
 | `DATASET_DELETE` | `dataset-delete` | pipeline branch → APISIX `DELETE_ROUTE` → geo teardown → FROST `DELETE_PROJECT` | best-effort: the chain continues, no compensation |
 | `DATASET_UNRELEASE` | `dataset-unrelease` | pipeline branch → APISIX `DELETE_ROUTE` | best-effort: the chain continues, no compensation |
 
-| Saga | Geo branch (`hasGeoSink`) | Pipeline branch (`hasPipelines`) |
-|---|---|---|
-| Create | PostGIS `PROVISION_SINK` → GeoServer `CREATE_WORKSPACE` → `CREATE_DATASTORE` → `PROVISION_LAYERS` when `hasLayers` | `DEPLOY_PIPELINES` |
-| Update | GeoServer `UPDATE_WORKSPACE` | `UPDATE_PIPELINES` |
-| Delete | GeoServer `DELETE_WORKSPACE` → PostGIS `DEPROVISION_SINK` | `DELETE_PIPELINES` |
-| Unrelease | — | `DELETE_PIPELINES` |
+| Saga | FROST branch (`hasFrostSink`) | Geo branch (`hasGeoSink`) | Pipeline branch (`hasPipelines`) |
+|---|---|---|---|
+| Create | FROST `CREATE_PROJECT` | PostGIS `PROVISION_SINK` → GeoServer `CREATE_WORKSPACE` → `CREATE_DATASTORE` → `PROVISION_LAYERS` when `hasLayers` | `DEPLOY_PIPELINES` |
+| Update | FROST `UPDATE_PROJECT` | GeoServer `UPDATE_WORKSPACE` | `UPDATE_PIPELINES` |
+| Delete | — | GeoServer `DELETE_WORKSPACE` → PostGIS `DEPROVISION_SINK` | `DELETE_PIPELINES` |
+| Unrelease | — | — | `DELETE_PIPELINES` |
 
 The update saga's prune sits behind its own `hasGeoSink` gateway after the pipeline branch: a pruned feature type
 cannot be restored, so it MUST follow the last failable step — see
@@ -36,17 +36,23 @@ Compensation chains run in full reverse order:
 | Create | `DELETE_PIPELINES` → `DELETE_WORKSPACE` → `DEPROVISION_SINK` → `DELETE_ROUTE` → `DELETE_PROJECT` |
 | Update | `DELETE_PIPELINES` → `RESTORE_WORKSPACE` → `RESTORE_ROUTE` → `RESTORE_PROJECT` |
 
-The GeoServer link of each chain is gated on the same derived flag as the forward branch, so a saga that never touched
-GeoServer attempts no teardown.
+The FROST and GeoServer links of each chain are gated on the same derived flag as the forward branch, so a saga
+attempts no compensation for a branch it never ran.
 
 ## Branch flags
 
 Derived from the trigger payload by the consumer and never read from it. Gating the geo branch keeps a deployment
 without a GeoServer adapter from failing every delete, and avoids a recursive workspace delete on a dataset that has
-no geo data.
+no geo data. Gating the FROST branch keeps a dataset that stores nothing in FROST from being given a project, and
+leaves the APISIX step without an `upstreamUrl` — which it requires only for an `STA` slug.
+
+The flags gate provisioning, not teardown: `DELETE_PROJECT` runs for every delete saga, keyed on the recorded
+`projectId` the trigger carries, so a FROST sink removed before the dataset cannot strand the project. The geo
+teardown is the exception, because the table it drops is named only in the sink entry a removal takes away.
 
 | Flag | True when |
 |---|---|
+| `hasFrostSink` | `datasinks` is a list holding an entry whose `type` is `FROST` |
 | `hasGeoSink` | `datasinks` is a list holding an entry whose `type` is `POSTGIS` |
 | `hasLayers` | `layers` is a non-empty list |
 | `hasPipelines` | `dataPipelines` or `pipelineIds` is a non-empty list |
@@ -56,12 +62,12 @@ no geo data.
 - **Steps execute in-process.** A step resolves the adapter's `SagaCommandHandler` from the registry by name and calls
   it directly, so no Kafka round trip is paid per step and no step-level topics exist.
 - **`frost` and `apisix` MUST be registered** — the startup check demands both regardless of which sagas the
-  deployment runs, and their absence fails startup. `nifi`, `geoserver` and `postgis` resolve lazily per step, so a
-  deployment without them boots; a forward step reaching an absent handler raises a saga failure routed through the
-  normal path rather than crashing.
+  deployment runs, and their absence fails startup — every delete saga runs `DELETE_PROJECT`, whatever the dataset's
+  sinks are. `nifi`, `geoserver` and `postgis` resolve lazily per step, so a deployment without them boots; a
+  forward step reaching an absent handler raises a saga failure routed through the normal path rather than crashing.
 - **Compensation is best-effort.** A teardown that fails or finds no handler is recorded in `compensationErrors` and
   the chain continues; the result then reports `FAILED` rather than `COMPENSATED`. Each step records what it created
-  under its own step id and its teardown acts on that record, so a teardown is never gated on configuration.
+  under its own step id and its teardown acts on that record rather than on current configuration.
 - **Triggers are idempotent.** The Kafka record coordinate — topic, partition and offset — is the process business
   key, checked against both running and finished instances, so a redelivered record starts no second saga.
 - **A malformed trigger is dropped, not retried.** A missing or non-string `sagaType`/`datasetId`, or an unknown saga

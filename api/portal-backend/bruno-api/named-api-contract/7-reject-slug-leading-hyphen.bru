@@ -1,0 +1,50 @@
+meta {
+  name: 7. Reject slug with a leading hyphen
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "Named API Contract Leading Hyphen Slug",
+    "description": "Negative fixture — the slug shape must be the only reason this create fails.",
+    "openDataAccess": false,
+    "namedApis": [
+      { "name": "Leading Hyphen Slug", "slug": "-lead", "standard": "STA", "version": "1.1" }
+    ]
+  }
+}
+
+tests {
+  const body = res.body || {};
+
+  test("Status code is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Response is a problem document", function() {
+    expect(body.detail !== undefined || body.title !== undefined).to.be.true;
+  });
+}
+
+docs {
+  **Contract step 7** — Reject a slug that starts with a hyphen.
+
+  Hyphens are allowed only between alphanumerics. A leading (or trailing) hyphen reads as a
+  malformed path segment and is easy to confuse with a flag or an empty segment when the slug is
+  copied into tooling, so the shape regex anchors both ends on `[a-z0-9]`.
+
+  Everything else in the body is valid, so a 400 here can only come from the slug.
+
+  **Precondition:** none.
+
+  **Expected Response:** 400 Bad Request, `application/problem+json`.
+
+  **Post-condition:** none — no dataset is created, so nothing to clean up.
+}

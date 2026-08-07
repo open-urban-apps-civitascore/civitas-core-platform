@@ -28,13 +28,15 @@ import org.owasp.encoder.Encode;
  *
  * <ul>
  *   <li>{@code CREATE_PROJECT} — POST /Projects
- *   <li>{@code UPDATE_PROJECT} — PATCH /Projects({projectId})
+ *   <li>{@code UPDATE_PROJECT} — PATCH /Projects({projectId}), falling back to CREATE_PROJECT when
+ *       the dataset has no project yet (a FROST sink added after a release without one)
  *   <li>{@code DELETE_PROJECT} — DELETE all Things of the project (cascades to their Datastreams
  *       and Observations), then DELETE /Projects({projectId}). As a CREATE_PROJECT compensation it
  *       is a no-op when the create only reused a pre-existing project ({@code created=false}), so a
  *       later step's failure cannot destroy the data the unrelease flow preserves.
  *   <li>{@code RESTORE_PROJECT} — PATCH /Projects({projectId}) with previous state (update
- *       compensation)
+ *       compensation). Delegates to {@code DELETE_PROJECT} when the update provisioned the project
+ *       rather than patching one, since there is no previous state to restore.
  * </ul>
  *
  * <p>Compensation operations: {@code DELETE_PROJECT} to compensate a {@code CREATE_PROJECT}, {@code
@@ -269,7 +271,19 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleUpdateProject(SagaCommandMessage command) {
-    String projectId = requireString(command, KEY_PROJECT_ID);
+    // A FROST sink added to a dataset that was released without one has no project yet, and the
+    // update saga is gated on the sink rather than on the project. Provision it here instead of
+    // failing: the create path is find-or-create on a name carrying the dataset id, so it is
+    // idempotent and can only ever bind this dataset to its own project.
+    if (!(command.payload().get(KEY_PROJECT_ID) instanceof String projectId)
+        || projectId.isBlank()) {
+      log.info(
+          "UPDATE_PROJECT: dataset {} has no FROST project yet — provisioning it. saga={}",
+          Encode.forJava((String) command.payload().get("datasetId")),
+          Encode.forJava(command.sagaId()));
+      return handleCreateProject(command);
+    }
+
     String datasetName = requireString(command, "datasetName");
     String datasetId = requireString(command, "datasetId");
     String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
@@ -465,6 +479,15 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleRestoreProject(SagaCommandMessage command) {
+    // The created marker is only written by the create path, so its presence means UPDATE_PROJECT
+    // provisioned the project instead of patching an existing one. There is no previous state to
+    // restore then — the exact inverse is the delete, which itself preserves a project it merely
+    // reused (created=false). PATCHing here would instead blank the description of a project that
+    // should have been removed.
+    if (command.payload().containsKey(KEY_CREATED)) {
+      return handleDeleteProject(command);
+    }
+
     String projectId = requireString(command, KEY_PROJECT_ID);
     Object previousName = command.payload().get("previousName");
     String previousDescription = (String) command.payload().getOrDefault("previousDescription", "");

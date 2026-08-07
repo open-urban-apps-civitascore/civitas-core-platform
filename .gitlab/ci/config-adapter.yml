@@ -130,9 +130,6 @@ dependency-prune-config-adapter:
   script:
     - cd config-adapter
     - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Drevision=$CONFIG_ADAPTER_VERSION -DfailOnWarning=true -DignoreNonCompile=false
-  allow_failure:
-    exit_codes:
-      - 1
 
 # Surefire unit tests only. Container-based tests are named *IT.java and run under failsafe, so
 # this job requires no Docker.

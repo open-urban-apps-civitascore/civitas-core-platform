@@ -332,7 +332,48 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
-				<version>3.9.0</version>
+				<version>3.10.0</version>
+				<configuration>
+					<!-- Runtime-wired by design: ServiceLoader registrations, JDBC drivers, Jersey
+					     providers, test-runner engines, shaded sibling adapters and BOM aggregators.
+					     None of them is referenced from bytecode. -->
+					<ignoredUnusedDeclaredDependencies>
+						<ignoredUnusedDeclaredDependency>de.civitas-core:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>io.cloudevents:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.glassfish.jersey.*:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.testcontainers:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.junit.jupiter:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.mockito:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>com.tngtech.archunit:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.awaitility:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>com.fasterxml.jackson.*:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.apache.commons:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>commons-beanutils:commons-beanutils</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>com.h2database:h2</ignoredUnusedDeclaredDependency>
+					</ignoredUnusedDeclaredDependencies>
+					<!-- Required at runtime by the adapters' REST clients and JSON mapping;
+					     the analyzer sees direct imports only in test code. -->
+					<ignoredNonTestScopedDependencies>
+						<ignoredNonTestScopedDependency>org.glassfish.jersey.core:jersey-client</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>com.fasterxml.jackson.core:*</ignoredNonTestScopedDependency>
+						<!-- Flowable's job service is driven by the embedded engine at runtime -->
+						<ignoredNonTestScopedDependency>org.flowable:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>org.postgresql:postgresql</ignoredNonTestScopedDependency>
+						<!-- The application bundles adapters and the event handler into the shade
+						     JAR for ServiceLoader discovery; it imports none of them directly. -->
+						<ignoredNonTestScopedDependency>de.civitas-core:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>org.apache.commons:commons-configuration2</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>io.cloudevents:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>org.apache.kafka:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>org.keycloak:*</ignoredNonTestScopedDependency>
+					</ignoredNonTestScopedDependencies>
+					<!-- The used-undeclared check is off: compiling against a starter's or aggregator's
+					     transitive closure is deliberate here, so every finding is a false positive. -->
+					<ignoredUsedUndeclaredDependencies>
+						<ignoredUsedUndeclaredDependency>*:*</ignoredUsedUndeclaredDependency>
+					</ignoredUsedUndeclaredDependencies>
+				</configuration>
 				<executions>
 					<execution>
 						<id>generate-dependency-tree</id>

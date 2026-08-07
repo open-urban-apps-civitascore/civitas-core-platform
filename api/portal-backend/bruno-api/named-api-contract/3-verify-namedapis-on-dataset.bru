@@ -1,0 +1,64 @@
+meta {
+  name: 3. Verify named APIs on the dataset resource
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{napiContractDataSetId}}
+}
+
+
+tests {
+  const namedApis = (res.body && res.body.namedApis) || [];
+  const slugs = namedApis.map(function(api) { return api.slug; }).sort();
+
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Dataset embeds both named APIs", function() {
+    expect(res.body.namedApis).to.be.an('array');
+    expect(res.body.namedApis).to.have.lengthOf(2);
+  });
+  test("Slugs round-trip exactly as submitted", function() {
+    expect(slugs).to.deep.equal(['map', 'things']);
+  });
+  test("Each named API carries a routable standard", function() {
+    namedApis.forEach(function(api) {
+      expect(['STA', 'OWS']).to.include(api.standard);
+    });
+  });
+  test("Gateway route ids stay internal", function() {
+    namedApis.forEach(function(api) {
+      expect(api).to.not.have.property('routeId');
+    });
+  });
+  test("Version round-trips on the STA entry", function() {
+    const sta = namedApis.find(function(api) { return api.standard === 'STA'; });
+    expect(sta.version).to.equal('1.1');
+  });
+}
+
+docs {
+  **Contract step 3** — Assert the named APIs round-trip on the dataset resource itself.
+
+  Unlike the discovery endpoint (step 2), `GET /v1/datasets/{id}` is the **editor** view: it always
+  embeds the dataset's named APIs regardless of lifecycle status, because the owner has to be able
+  to see and edit what they configured while the dataset is still `DRAFT`.
+
+  The route-id assertion pins an encapsulation boundary: the gateway route reference is infrastructure
+  state owned by the release saga and must never surface on the output DTO, in any lifecycle status.
+
+  **Precondition:** `napiContractDataSetId` is set (step 1).
+
+  **Expected Response:** 200 OK, `namedApis` holds exactly the `things` (STA) and `map` (OWS)
+  entries, neither exposing a route reference.
+
+  **Post-condition:** none.
+}

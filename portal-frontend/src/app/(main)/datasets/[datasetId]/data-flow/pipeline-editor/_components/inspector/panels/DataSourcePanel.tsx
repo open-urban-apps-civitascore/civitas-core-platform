@@ -9,6 +9,9 @@
  */
 import { useTranslations } from 'next-intl'
 
+import { usePermissions } from '@/hooks/use-permissions'
+import { PERMISSION_NAMES } from '@/types/currentUser'
+
 import { usePipelineDatasources } from '../../../_hooks/use-pipeline-datasources'
 import { datasourceToSelectable } from '../../../_services/entityService'
 import type { DataSourceNodeData } from '../../../_types/nodes'
@@ -21,7 +24,9 @@ interface DataSourcePanelProps {
 
 export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate }) => {
   const t = useTranslations('pipelineEditor')
-  const { entities, isLoading, isError, canReadDatasources, getEntityById, getName } = usePipelineDatasources()
+  const { hasPermission } = usePermissions()
+  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
+  const { entities, isLoading, isError, getEntityById, getName } = usePipelineDatasources()
 
   const selectedEntity = data.entityId !== undefined ? getEntityById(data.entityId) : undefined
 
@@ -48,7 +53,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
     <div className="space-y-4 p-4">
       <EntitySelector
         label={t('dataSourcePanel.label')}
-        placeholder={canReadDatasources ? t('dataSourcePanel.placeholder') : t('dataSourcePanel.noPermission')}
+        placeholder={t('dataSourcePanel.placeholder')}
         entities={selectableEntities}
         selectedId={data.entityId}
         isLoading={isLoading}
@@ -63,16 +68,17 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
             title={t('dataSourcePanel.details')}
             items={[
               { label: t('dataSourcePanel.connector'), value: selectedEntity.connectorType ?? undefined },
-              { label: t('dataSourcePanel.status'), value: selectedEntity.dataSourceStatus },
               { label: t('dataSourcePanel.description'), value: selectedEntity.description ?? undefined },
             ]}
           />
-          <button
-            onClick={() => window.open(`/datasources/${data.entityId}`, '_blank')}
-            className="w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            {t('dataSourcePanel.showDataStructure')}
-          </button>
+          {canReadDatasources && (
+            <button
+              onClick={() => window.open(`/datasources/${data.entityId}`, '_blank')}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              {t('dataSourcePanel.showDataStructure')}
+            </button>
+          )}
         </>
       )}
     </div>

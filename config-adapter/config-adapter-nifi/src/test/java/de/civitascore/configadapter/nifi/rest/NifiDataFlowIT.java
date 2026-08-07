@@ -23,6 +23,7 @@ import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
 import jakarta.ws.rs.core.Response;
 import java.io.InputStream;
@@ -249,9 +250,14 @@ class NifiDataFlowIT extends AbstractNifiIT {
     Map<String, String> sourceProperties = new LinkedHashMap<>();
     sourceProperties.put("Broker URI", brokerUri);
     sourceProperties.put("Topic Filter", topic);
+    Map<String, Map<String, String>> controllerServiceProperties = Map.of();
     if (tls) {
       sourceProperties.put(
           "SSL Context Service", "${CS:" + MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE + "}");
+      controllerServiceProperties =
+          Map.of(
+              MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE,
+              MqttTruststoreConfig.nodeTruststore().sslContextProperties());
     }
     String snapshot =
         NifiTestFixtures.flowBuilder()
@@ -267,7 +273,7 @@ class NifiDataFlowIT extends AbstractNifiIT {
                         FrostSinkStage.FROST_PROJECT_ID,
                         PROJECT_ID),
                     List.of(),
-                    Map.of(),
+                    controllerServiceProperties,
                     null,
                     null));
     if (tls) {
@@ -278,9 +284,10 @@ class NifiDataFlowIT extends AbstractNifiIT {
       boolean passwordParameterFound = false;
       for (JsonNode parameter :
           root.path("parameterContexts")
-              .path(MqttSourceStage.NODE_TRUSTSTORE_PARAMETER_CONTEXT)
+              .path(MqttTruststoreConfig.DEFAULT_PARAMETER_CONTEXT)
               .path("parameters")) {
-        if (MqttSourceStage.TRUSTSTORE_PASSWORD_PARAMETER.equals(parameter.path("name").asText())) {
+        if (MqttTruststoreConfig.DEFAULT_PASSWORD_PARAMETER.equals(
+            parameter.path("name").asText())) {
           ((ObjectNode) parameter).put("value", MQTT_TRUSTSTORE_PASSWORD);
           passwordParameterFound = true;
           break;
@@ -288,7 +295,7 @@ class NifiDataFlowIT extends AbstractNifiIT {
       }
       if (!passwordParameterFound) {
         throw new IllegalStateException(
-            "TLS flow does not declare " + MqttSourceStage.TRUSTSTORE_PASSWORD_PARAMETER);
+            "TLS flow does not declare " + MqttTruststoreConfig.DEFAULT_PASSWORD_PARAMETER);
       }
       client.deployFlow(new DeploymentPlan(pipelineId, mapper.writeValueAsString(root), Map.of()));
     }

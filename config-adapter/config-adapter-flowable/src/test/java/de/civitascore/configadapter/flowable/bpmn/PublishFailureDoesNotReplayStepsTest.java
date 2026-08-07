@@ -88,6 +88,7 @@ class PublishFailureDoesNotReplayStepsTest {
     vars.put("sagaId", "saga-publish-fail");
     vars.put("datasetId", "ds-1");
     vars.put("hasPipelines", false);
+    vars.put("hasFrostSink", true);
 
     processEngine.getRuntimeService().startProcessInstanceByKey("dataset-create", vars);
     FlowableTestSupport.executeAllJobs(processEngine);

@@ -112,6 +112,7 @@ class ResultPublishingTest {
       vars.put("sagaId", "saga-3step");
       vars.put("datasetId", "ds-1");
       vars.put("hasPipelines", true);
+      vars.put("hasFrostSink", true);
       start("dataset-create", vars);
 
       @SuppressWarnings("unchecked")
@@ -230,6 +231,7 @@ class ResultPublishingTest {
     vars.put("sagaId", sagaId);
     vars.put("datasetId", "ds-1");
     vars.put("hasPipelines", false);
+    vars.put("hasFrostSink", true);
     return vars;
   }
 
@@ -238,6 +240,7 @@ class ResultPublishingTest {
     vars.put("sagaId", sagaId);
     vars.put("datasetId", "ds-1");
     vars.put("hasPipelines", false);
+    vars.put("hasFrostSink", true);
     vars.put("projectId", "p-1");
     vars.put("routeId", "r-1");
     return vars;
