@@ -23,6 +23,8 @@ import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -473,7 +475,7 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Create without a model does not touch Model Forge and leaves the version unset")
+    @DisplayName("Create without a model does not touch Model Forge and gets a provisional version")
     void createWithoutModelSkipsRegistry() {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
@@ -495,8 +497,92 @@ class DataStructureVersionServiceTest {
 
       verify(modelRegistryGateway, org.mockito.Mockito.never())
           .storeModel(any(), any(), any(), any(), any());
-      assertThat(result.getVersion()).isNull();
+      // Never null: the portal frontend sorts on the version string and dies on null. The
+      // provisional is overwritten by the registry pin on the first model store.
+      assertThat(result.getVersion()).isEqualTo("1.0.0-draft");
       assertThat(result.getModelUrn()).isNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("Provisional version for model-less drafts")
+  class ProvisionalVersionTests {
+
+    private DataStructure parentWithVersions(String... siblingVersions) {
+      DataStructure parent = new DataStructure();
+      parent.setId(UUID.randomUUID());
+      HashSet<DataStructureVersion> siblings = new HashSet<>();
+      for (String v : siblingVersions) {
+        DataStructureVersion sibling = new DataStructureVersion();
+        sibling.setId(UUID.randomUUID());
+        sibling.setVersion(v);
+        siblings.add(sibling);
+      }
+      parent.setDataStructureVersions(siblings);
+      when(dataStructureService.findByIdOrThrow(parent.getId())).thenReturn(parent);
+      lenient().when(modelRegistryGateway.validateSchema(null)).thenReturn(List.of());
+      return parent;
+    }
+
+    private DataStructureVersion convert(DataStructure parent) {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureId(parent.getId());
+      return dataStructureVersionService.postConvertToEntity(new DataStructureVersion(), input);
+    }
+
+    @Test
+    @DisplayName("first version of a structure gets 1.0.0-draft")
+    void firstDraftGetsBaseProvisional() {
+      DataStructure parent = parentWithVersions();
+
+      DataStructureVersion entity = convert(parent);
+
+      assertThat(entity.getVersion()).isEqualTo("1.0.0-draft");
+    }
+
+    @Test
+    @DisplayName("provisional bumps the highest sibling patch")
+    void provisionalBumpsHighestSibling() {
+      DataStructure parent = parentWithVersions("1.0.0", "1.0.2");
+
+      DataStructureVersion entity = convert(parent);
+
+      assertThat(entity.getVersion()).isEqualTo("1.0.3-draft");
+    }
+
+    @Test
+    @DisplayName("provisional siblings count too, so parallel drafts do not collide")
+    void provisionalSiblingsAreCounted() {
+      DataStructure parent = parentWithVersions("1.0.0", "1.0.1-draft");
+
+      DataStructureVersion entity = convert(parent);
+
+      assertThat(entity.getVersion()).isEqualTo("1.0.2-draft");
+    }
+
+    @Test
+    @DisplayName("unparseable sibling versions are ignored")
+    void unparseableSiblingsAreIgnored() {
+      DataStructure parent = parentWithVersions("kaputt", "2.x");
+
+      DataStructureVersion entity = convert(parent);
+
+      assertThat(entity.getVersion()).isEqualTo("1.0.0-draft");
+    }
+
+    @Test
+    @DisplayName("a stored model keeps the registry-minted version — no provisional")
+    void registryPinWinsWhenModelIsStored() {
+      DataStructure parent = parentWithVersions();
+      when(modelRegistryGateway.validateSchema(any(Map.class))).thenReturn(List.of());
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureId(parent.getId());
+      input.setModel(Map.of("type", "object"));
+
+      DataStructureVersion entity =
+          dataStructureVersionService.postConvertToEntity(new DataStructureVersion(), input);
+
+      assertThat(entity.getVersion()).isEqualTo("1.0.0");
     }
   }
 }
