@@ -47,13 +47,16 @@ interface PipelineListProps {
   datasetId: string
   pipelines: PipelineBasicInfo[]
   canCreatePipeline: boolean
+  canEditDataset: boolean
 }
 
-export const PipelineList = ({ datasetId, pipelines, canCreatePipeline }: PipelineListProps) => {
+export const PipelineList = ({ datasetId, pipelines, canCreatePipeline, canEditDataset }: PipelineListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.pipelines')
   const locale = useLocale()
   const { data: pipelinesData } = useGetPipelines(datasetId)
-  const { data: datasourcesData } = useGetUsableDatasources(datasetId)
+  // The connector source requires DATASET_UPDATE, which a viewer does not hold — asking anyway
+  // would only produce a denial per render.
+  const { data: datasourcesData } = useGetUsableDatasources(datasetId, { isEnabled: canEditDataset })
   const seenErrors = useRef(new Set<string>())
 
   useEffect(() => {

@@ -1,14 +1,8 @@
 'use client'
 
 /**
- * usePipelineDatasources Hook
- *
- * Source for datasource data in the pipeline editor. Fetches the datasources
- * available for the current dataset once (cached by react-query) and serves both the
- * DataSource inspector selector and the canvas node name resolution from that same request.
- *
- * `getName` resolves an id against that list, falling back to the anonymous label for ids
- * absent from it (a datasource no longer available or outside the datapool).
+ * One request serves both the inspector selector and the canvas node names, so selecting a source
+ * and rendering its label cannot disagree.
  */
 
 import { useParams } from 'next/navigation'
@@ -24,7 +18,11 @@ export interface PipelineDatasources {
   isLoading: boolean
   isError: boolean
   getEntityById: (id: string) => DatasourceSummary | undefined
-  /** Resolves a datasource name from its id, or the anonymous fallback when it is not accessible. */
+  /**
+   * Resolves a datasource name from its id. Undefined while the list is unavailable, so a failed
+   * request does not read as a canvas full of anonymous sources; the fallback label marks an id the
+   * loaded list does not contain.
+   */
   getName: (entityId: string | undefined) => string | undefined
 }
 
@@ -40,11 +38,10 @@ export const usePipelineDatasources = (): PipelineDatasources => {
       if (entityId === undefined) return undefined
       const entity = getEntityById(entityId)
       if (entity) return entity.name
-      // Avoid flashing the anonymous label while the list is still being fetched.
-      if (isLoading) return undefined
+      if (isLoading || isError) return undefined
       return t('dataSourcePanel.anonymousName')
     },
-    [getEntityById, isLoading, t],
+    [getEntityById, isLoading, isError, t],
   )
 
   return {
