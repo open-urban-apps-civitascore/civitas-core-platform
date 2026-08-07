@@ -41,17 +41,6 @@ public interface DataSourceMapper
   @Override
   DataSourceInputDTO toInput(DataSource entity);
 
-  /**
-   * Projects a data source for a caller authorized on the consuming dataset rather than on the
-   * source. Mapped by an explicit allow-list: with by-name mapping, declaring a field on the DTO
-   * would be enough to start emitting it, and {@code configuration} holds the connector
-   * credentials.
-   */
-  @BeanMapping(ignoreByDefault = true)
-  @Mapping(target = "id")
-  @Mapping(target = "name")
-  @Mapping(target = "description")
-  @Mapping(target = "connectorType")
   DataSourceSummaryDTO toSummary(DataSource entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
