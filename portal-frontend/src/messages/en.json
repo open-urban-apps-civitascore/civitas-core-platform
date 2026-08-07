@@ -1370,7 +1370,8 @@
       "diagramUnresolvable": "\"{name}\" provides no mappable fields: {reason}",
       "toolbar": {
         "title": "Mapping",
-        "status": "{mapped} mapped · {unmapped} unmapped"
+        "status": "{mapped} mapped · {unmapped} unmapped",
+        "errors": "{count, plural, one {# error} other {# errors}}"
       },
       "palette": {
         "title": "Transforms"
@@ -1388,7 +1389,8 @@
         "typeMismatchWithType": "Types don't match ({type}). Add a conversion function.",
         "typeMismatch": "Types don't match. Add a conversion function.",
         "outputToOutput": "Two outputs can't be connected.",
-        "inputToInput": "Two inputs can't be connected."
+        "inputToInput": "Two inputs can't be connected.",
+        "connectionsBroken": "{count, plural, one {# connection no longer matches} other {# connections no longer match}} the new type ({type})."
       },
       "unconnectedWarning": {
         "title": "Remove unconnected transforms?",

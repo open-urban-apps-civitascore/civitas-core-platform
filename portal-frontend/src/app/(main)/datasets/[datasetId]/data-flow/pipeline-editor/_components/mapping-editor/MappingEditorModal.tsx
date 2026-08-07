@@ -16,7 +16,7 @@ import {
   InspectorShell,
   PaletteShell,
 } from '@/components/node-editor'
-import type { PortType, TransformNodeData } from '@/components/node-editor/types'
+import type { PortDef, PortType, TransformNodeData } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -26,7 +26,7 @@ import { buildDataStructureUrn } from '@/utils/urn'
 import type { StaTargetVocabulary } from '../../_constants/staTargetCatalog'
 import { deriveStaMatchKeys } from '../../_constants/staTargetCatalog'
 import type { MappingConfig } from './_types'
-import { ARRAY_EDGE_STYLE } from './_types'
+import { ARRAY_EDGE_STYLE, INVALID_EDGE_STYLE } from './_types'
 import {
   compileCanvas,
   decompileConfig,
@@ -38,7 +38,7 @@ import { TransformInspector } from './inspector/TransformInspector'
 import { MegaNode } from './nodes/MegaNode'
 import { flattenTree, objectFieldsCompatible, requiredFieldPaths } from './schema/fieldTree'
 import { versionToSchemaTree } from './schema/versionTree'
-import { computeStatus } from './status'
+import { computeStatus, portsCompatible } from './status'
 import type { MappingTransformDef } from './transforms'
 import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
 
@@ -195,23 +195,6 @@ export const MappingEditorModal = ({
     return port ? { type: port.type, sub: port.dataType } : null
   }
 
-  /**
-   * Two ports are compatible when:
-   *  - both have the same portType category (scalar / geometry / array / object)
-   *  - AND for scalar/geometry ports: the subtype matches exactly (int↔int, str↔str, Point↔Point, …)
-   *    — type conversions must go through an explicit conversion node.
-   */
-  const portsCompatible = useCallback(
-    (from: { type: PortType; sub?: string } | null, to: { type: PortType; sub?: string } | null): boolean => {
-      if (!from || !to) return false
-      if (from.type !== to.type) return false
-      if ((from.type === 'scalar' || from.type === 'geometry') && from.sub && to.sub && from.sub !== to.sub)
-        return false
-      return true
-    },
-    [],
-  )
-
   const isValidConnection: IsValidConnection = useCallback(
     connection => {
       const from = endpointInfo(connection.source, connection.sourceHandle ?? '')
@@ -232,7 +215,7 @@ export const MappingEditorModal = ({
     },
     // endpointInfo reads nodes/sourceFields/targetFields via closure — include them
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [nodes, sourceFields, targetFields, portsCompatible],
+    [nodes, sourceFields, targetFields],
   )
 
   /** Tracks the source endpoint of an in-progress drag so we can show a toast on failure. */
@@ -304,8 +287,27 @@ export const MappingEditorModal = ({
     setNodes(nds => [...nds, { id, type: 'transform', position, data }])
   }
 
+  /** Outgoing edges of `nodeId` that the rewritten output port no longer type-matches. */
+  const edgesBrokenBy = (nodeId: string, port: PortDef): Edge[] =>
+    edges.filter(
+      e =>
+        e.source === nodeId &&
+        (e.sourceHandle ?? '') === port.id &&
+        !portsCompatible({ type: port.type, sub: port.dataType }, endpointInfo(e.target, e.targetHandle ?? '')),
+    )
+
   const updateConfig = (key: string, value: string) => {
     if (!selectedId) return
+
+    const selectedDefType = (nodes.find(n => n.id === selectedId)?.data as TransformNodeData | undefined)?.defType
+    if (key === 'type' && selectedDefType === 'const') {
+      const newPort = literalOutputPort(value || LITERAL_DEFAULT_TYPE)
+      const broken = edgesBrokenBy(selectedId, newPort)
+      if (broken.length > 0) {
+        toast.error(t('errors.connectionsBroken', { count: broken.length, type: newPort.dataType ?? '' }))
+      }
+    }
+
     setNodes(nds =>
       nds.map(node => {
         if (node.id !== selectedId) return node
@@ -328,6 +330,8 @@ export const MappingEditorModal = ({
     [edges, nodes, sourceFields, targetFields],
   )
 
+  // Port statuses are injected for rendering only — never into the `nodes` state, so
+  // compileCanvas keeps seeing the persisted node data.
   const displayNodes = useMemo(
     () =>
       nodes.map(node =>
@@ -339,10 +343,17 @@ export const MappingEditorModal = ({
                 portStatus: node.data.role === 'source' ? status.sourcePortStatus : status.targetPortStatus,
               },
             }
-          : node,
+          : { ...node, data: { ...node.data, portStatus: status.transformPortStatus[node.id] } },
       ),
     [nodes, status],
   )
+
+  const displayEdges = useMemo(() => {
+    const invalid = new Set(status.invalidEdgeIds)
+    return edges.map(edge =>
+      invalid.has(edge.id) ? { ...edge, style: { ...edge.style, ...INVALID_EDGE_STYLE } } : edge,
+    )
+  }, [edges, status.invalidEdgeIds])
 
   const selectedNode = nodes.find(n => n.id === selectedId)
   const selectedData = selectedNode?.type === 'transform' ? (selectedNode.data as TransformNodeData) : undefined
@@ -386,14 +397,19 @@ export const MappingEditorModal = ({
     performExit(action)
   }
 
-  const { mapped, unmapped } = status.counts
+  const { mapped, unmapped, errors } = status.counts
 
   const toolbar = (
     <div className="grid grid-cols-3 items-center px-4 py-2">
       <DialogTitle className="text-base">{name || t('toolbar.title')}</DialogTitle>
-      <span className="text-center text-xs text-muted-foreground">{t('toolbar.status', { mapped, unmapped })}</span>
+      <span className="text-center text-xs text-muted-foreground">
+        {t('toolbar.status', { mapped, unmapped })}
+        {errors > 0 && (
+          <span className="ml-2 font-medium text-destructive">{t('toolbar.errors', { count: errors })}</span>
+        )}
+      </span>
       <div className="flex items-center justify-end gap-2">
-        <Button size="sm" onClick={() => requestExit('apply')} disabled={!isReady}>
+        <Button size="sm" onClick={() => requestExit('apply')} disabled={!isReady || errors > 0}>
           {tCommon('actions.apply')}
         </Button>
         <Button size="sm" variant="outline" onClick={() => requestExit('close')}>
@@ -439,7 +455,7 @@ export const MappingEditorModal = ({
           >
             <CanvasScaffold
               nodes={displayNodes}
-              edges={edges}
+              edges={displayEdges}
               nodeTypes={nodeTypes}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}

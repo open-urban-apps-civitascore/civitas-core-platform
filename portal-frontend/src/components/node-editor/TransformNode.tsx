@@ -2,20 +2,26 @@
 
 import type { NodeProps } from '@xyflow/react'
 
+import type { PortStatus } from './PortHandle'
 import { PortHandle } from './PortHandle'
 import type { NodeRegistry, PortDef, TransformNodeData } from './types'
 
-const InputRow = ({ port }: { port: PortDef }) => (
+interface RowProps {
+  port: PortDef
+  status?: PortStatus
+}
+
+const InputRow = ({ port, status }: RowProps) => (
   <div className="flex items-center gap-1 py-0.5 pr-2 text-xs">
-    <PortHandle id={port.id} portType={port.type} side="left" />
+    <PortHandle id={port.id} portType={port.type} side="left" status={status} />
     <span className="truncate text-muted-foreground">{port.label}</span>
   </div>
 )
 
-const OutputRow = ({ port }: { port: PortDef }) => (
+const OutputRow = ({ port, status }: RowProps) => (
   <div className="flex items-center justify-end gap-1 py-0.5 pl-2 text-xs">
     <span className="truncate text-muted-foreground">{port.label}</span>
-    <PortHandle id={port.id} portType={port.type} side="right" />
+    <PortHandle id={port.id} portType={port.type} side="right" status={status} />
   </div>
 )
 
@@ -41,12 +47,12 @@ export const createTransformNodeType = (registry: NodeRegistry) => {
         <div className="grid grid-cols-2 gap-x-3 py-1">
           <div>
             {inputs.map(port => (
-              <InputRow key={port.id} port={port} />
+              <InputRow key={port.id} port={port} status={d.portStatus?.[port.id]} />
             ))}
           </div>
           <div>
             {outputs.map(port => (
-              <OutputRow key={port.id} port={port} />
+              <OutputRow key={port.id} port={port} status={d.portStatus?.[port.id]} />
             ))}
           </div>
         </div>

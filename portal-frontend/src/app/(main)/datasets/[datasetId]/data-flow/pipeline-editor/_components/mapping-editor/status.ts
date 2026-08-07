@@ -16,10 +16,44 @@ export interface MappingCounts {
 export interface MappingStatus {
   sourcePortStatus: Record<string, PortStatus>
   targetPortStatus: Record<string, PortStatus>
+  /** nodeId → portId → status, for transform nodes only. */
+  transformPortStatus: Record<string, Record<string, PortStatus>>
+  invalidEdgeIds: string[]
   counts: MappingCounts
 }
 
-export type EndpointInfo = (nodeId: string, handleId: string) => { type: PortType; sub?: string } | null
+export interface PortInfo {
+  type: PortType
+  sub?: string
+}
+
+export type EndpointInfo = (nodeId: string, handleId: string) => PortInfo | null
+
+/**
+ * Two ports are compatible when:
+ *  - both have the same portType category (scalar / geometry / array / object)
+ *  - AND for scalar/geometry ports: the subtype matches exactly (int↔int, str↔str, Point↔Point, …)
+ *    — type conversions must go through an explicit conversion node.
+ * An absent `sub` on either side is a wildcard, which is how conversion nodes accept any scalar.
+ */
+export const portsCompatible = (from: PortInfo | null, to: PortInfo | null): boolean => {
+  if (!from || !to) return false
+  if (from.type !== to.type) return false
+  if ((from.type === 'scalar' || from.type === 'geometry') && from.sub && to.sub && from.sub !== to.sub) return false
+  return true
+}
+
+/**
+ * Edges whose two endpoints resolve but whose types no longer match — e.g. after a literal's
+ * type was changed while it was already connected. An endpoint that cannot be resolved is left
+ * alone: a saved path the schema no longer carries is a different problem and must not block saving.
+ */
+export const findInvalidEdges = (edges: Edge[], endpointInfo: EndpointInfo): Edge[] =>
+  edges.filter(edge => {
+    const from = endpointInfo(edge.source, edge.sourceHandle ?? '')
+    const to = endpointInfo(edge.target, edge.targetHandle ?? '')
+    return !!from && !!to && !portsCompatible(from, to)
+  })
 
 /** True when `path` is a descendant of `ancestor` in the JSONPath hierarchy. */
 const isDescendantOf = (path: string, ancestor: string): boolean =>
@@ -59,6 +93,19 @@ export const computeStatus = (
 ): MappingStatus => {
   const sourcePortStatus: Record<string, PortStatus> = {}
   const targetPortStatus: Record<string, PortStatus> = {}
+  const transformPortStatus: Record<string, Record<string, PortStatus>> = {}
+
+  const invalidEdges = findInvalidEdges(edges, endpointInfo)
+  // Both ends of a broken edge go red so the cause (e.g. the retyped literal) is visible too.
+  // Mega-node ports are covered by source/targetPortStatus instead.
+  const markMismatch = (nodeId: string, handleId: string) => {
+    if (nodeId === SOURCE_NODE_ID || nodeId === TARGET_NODE_ID) return
+    transformPortStatus[nodeId] = { ...transformPortStatus[nodeId], [handleId]: 'mismatch' }
+  }
+  invalidEdges.forEach(edge => {
+    markMismatch(edge.source, edge.sourceHandle ?? '')
+    markMismatch(edge.target, edge.targetHandle ?? '')
+  })
 
   const consumed = new Set(edges.filter(e => e.source === SOURCE_NODE_ID).map(e => e.sourceHandle ?? ''))
   sourceFields.forEach((_field, path) => {
@@ -74,7 +121,8 @@ export const computeStatus = (
 
   let mapped = 0
   let unmapped = 0
-  let errors = 0
+  // Broken edges are counted here; the direct-edge branch below must not count them again.
+  let errors = invalidEdges.length
 
   targetFields.forEach((field, path) => {
     const edge = targetEdges.find(e => (e.targetHandle ?? '') === path)
@@ -83,18 +131,11 @@ export const computeStatus = (
     // Directly connected target port.
     if (edge) {
       const src = endpointInfo(edge.source, edge.sourceHandle ?? '')
-      // Port category mismatch (scalar/geometry vs object/array), OR — for scalar/geometry
-      // ports — a concrete subtype mismatch such as Point vs Polygon. The source's `sub`
-      // carries the concrete field type, so comparing it to the target's `type` catches it directly.
-      const hasCategoryMismatch = !!src && src.type !== field.portType
-      const hasSubtypeMismatch =
-        !!src && (field.portType === 'scalar' || field.portType === 'geometry') && !!src.sub && src.sub !== field.type
-      const isMismatch = hasCategoryMismatch || hasSubtypeMismatch
+      const isMismatch = !!src && !portsCompatible(src, { type: field.portType, sub: field.type })
 
       targetPortStatus[path] = isMismatch ? 'mismatch' : 'mapped'
 
-      if (isLeaf && isMismatch) errors++
-      else if (isLeaf) mapped++
+      if (isLeaf && !isMismatch) mapped++
       return
     }
 
@@ -126,5 +167,11 @@ export const computeStatus = (
     if (isLeaf) unmapped++
   })
 
-  return { sourcePortStatus, targetPortStatus, counts: { mapped, unmapped, errors } }
+  return {
+    sourcePortStatus,
+    targetPortStatus,
+    transformPortStatus,
+    invalidEdgeIds: invalidEdges.map(e => e.id),
+    counts: { mapped, unmapped, errors },
+  }
 }

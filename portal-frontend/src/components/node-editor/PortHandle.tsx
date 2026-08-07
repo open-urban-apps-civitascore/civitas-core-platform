@@ -6,12 +6,14 @@ import type { PortType } from './types'
 
 export type PortStatus = 'default' | 'mapped' | 'consumed' | 'unmapped' | 'mismatch' | 'unused'
 
+export const MISMATCH_COLOR = '#dc2626'
+
 const STATUS_COLOR: Record<PortStatus, string> = {
   default: '#64748b',
   mapped: '#16a34a',
   consumed: '#16a34a',
   unmapped: '#d97706',
-  mismatch: '#dc2626',
+  mismatch: MISMATCH_COLOR,
   unused: '#cbd5e1',
 }
 
