@@ -106,21 +106,17 @@ publication and pruning; `datasinks` only resolves native table names and the na
 
 ## Configuration
 
-Property keys carry the `geoserver.` prefix. Env vars, production values and secret handling live in
+Property keys carry the `geoserver.` prefix. The values that ship, env vars and secret handling live in
 [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-| Property | Coded default |
+| Property | Role |
 |---|---|
-| `geoserver.topics` | — required for config events; without it the adapter subscribes to nothing |
-| `geoserver.url` | `http://localhost:8080/geoserver` — trailing slashes stripped |
-| `geoserver.public.url` | value of `geoserver.url` — base of the WFS/WMS URLs in saga results |
-| `geoserver.admin.user` | — **required** |
-| `geoserver.admin.password` | — **required**, accepts `ENC(…)` |
-| `geoserver.postgis.host` | `localhost` |
-| `geoserver.postgis.port` | `5432` |
-| `geoserver.postgis.database` | `civitas_geo` |
-| `geoserver.postgis.user` | — required for saga steps |
-| `geoserver.postgis.password` | — required for saga steps, accepts `ENC(…)` |
+| `geoserver.topics` | Required for config events; without it the adapter subscribes to nothing |
+| `geoserver.url` | Base URL of the management REST API; trailing slashes stripped |
+| `geoserver.public.url` | Base of the WFS/WMS URLs reported in saga results |
+| `geoserver.admin.user` / `.password` | MUST both resolve non-blank or initialization fails; the password accepts `ENC(…)` |
+| `geoserver.postgis.host` / `.port` / `.database` | Datastore connection the workspace publishes from |
+| `geoserver.postgis.user` / `.password` | Required for saga steps; the password accepts `ENC(…)` |
 
 No `geoserver.postgis.schema` is read: the datastore schema is the derived workspace name. The `postgis.*` keys
 are read by the saga handler only.

@@ -22,9 +22,11 @@ mvn spotless:check   # check formatting (runs automatically during verify)
 mvn package -Pdist -pl config-adapter-application   # fat JAR with all adapter plugins
 ```
 
-`-Pdist` is required. Without it the JAR carries no adapter plugins and the bootstrap fails with `Adapter not found via ServiceLoader`.
+`-Pdist` is required: without it the JAR carries no adapter plugins and the bootstrap fails with `Adapter not found via ServiceLoader`.
 
-PMD, CPD and SpotBugs are bound per-module at `verify` with `failOnViolation`/`failOnError`. `mvn test` does not run them, so a green `mvn test` is not a green build. Rulesets live in `<module>/pmd-rules.xml` and `<module>/spotbugs-exclude.xml`.
+PMD, CPD and SpotBugs are bound per-module at `verify` with `failOnViolation`/`failOnError`, so a green `mvn test` is not a green build. Rulesets live in `<module>/pmd-rules.xml` and `<module>/spotbugs-exclude.xml`.
+
+[`README.md`](README.md) owns the build and test documentation; add build detail there rather than here.
 
 ## Architecture
 
@@ -97,9 +99,21 @@ Config value types live in `config-adapter-api` under `model/<service>/`. `IdmCo
 
 `config-adapter-flowable` needs its own `flowable` database and user, created by `docker/postgres/init-flowable.sql` mounted into `/docker-entrypoint-initdb.d/`. PostgreSQL runs init scripts **only when initializing an empty data volume**, so a volume carrying data from any earlier start has no `flowable` database and the adapter crash-loops on startup. `docker compose down -v && docker compose up -d` recreates the volume and re-runs the script.
 
-Runtime config: `config-adapter-application/src/main/resources/application.properties`. Every property is overridable via env var — dots **and** dashes become underscores and the key is uppercased, so `kafka.bootstrap.servers` → `KAFKA_BOOTSTRAP_SERVERS`. An empty env var resolves to the property default and is therefore indistinguishable from an unset one; a property MUST NOT be documented as "leave empty to disable", an explicit sentinel value is required instead.
+Runtime config resolves in three layers: env var, then `config-adapter-application/src/main/resources/application.properties`, then a default in the reading code. Every property is overridable via env var — dots **and** dashes become underscores and the key is uppercased, so `kafka.bootstrap.servers` → `KAFKA_BOOTSTRAP_SERVERS`.
 
-## Further reading
+Which layer supplies a value matters when documenting one. The packaged properties file overrides the code default, so a constant in an adapter is the effective default only for a key that file omits — `DEPLOYMENT.md` reports what actually ships, and that is the value to state. An empty env var is indistinguishable from an unset one, falling through to both lower layers; a property MUST NOT be documented as "leave empty to disable", an explicit sentinel value is required instead.
 
-- [`DEPLOYMENT.md`](DEPLOYMENT.md) — operator-facing configuration for the whole application
-- [`docs/adr-plain-jdbc-ddl.md`](docs/adr-plain-jdbc-ddl.md) — ADR on plain JDBC for DDL
+## Documentation
+
+Each fact has one home. Read the document that owns an area before changing code in it, and update that document in the same change.
+
+| Document | Owns |
+|---|---|
+| [`README.md`](README.md) | Framework contract, event flow, module map, error-code bands, build and test commands, alignment with the deployment repository |
+| [`DEPLOYMENT.md`](DEPLOYMENT.md) | Every environment variable, port, probe, secret and operational behaviour |
+| `config-adapter-<name>/README.md` | That adapter's operations, invariants, properties and error codes |
+| [`docs/adr-plain-jdbc-ddl.md`](docs/adr-plain-jdbc-ddl.md) | Why DDL is applied over plain JDBC |
+
+What obliges a documentation edit: a new or renamed property, or a changed startup requirement → `DEPLOYMENT.md`. A new `AdapterErrorCode` → the error-code table of the module that raises it. A changed saga step or branch condition → `config-adapter-flowable/README.md` and the module owning the step. A renamed adapter, a new property without a default, or a renamed topic → the alignment rules in `README.md`, because each of those breaks a deployment rather than degrading it.
+
+The adapter READMEs record behaviour that is expensive to re-derive from the source — idempotency handling, HTTP status quirks, rejection rules. Consult them rather than re-reading the adapter.

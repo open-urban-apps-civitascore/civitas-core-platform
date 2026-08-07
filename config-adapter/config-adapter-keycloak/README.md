@@ -36,10 +36,11 @@ representation for the resource type; unknown fields are ignored. A result event
 
 - **The Keycloak connection is validated at startup.** Initialization calls the server-info endpoint and
   fails with a configuration error if the URL is unreachable or the admin credentials are rejected.
-- **Idempotency is a guarantee, not a fallback.** In every resource handler, HTTP 409 on `CREATE` is a
-  success — the existing resource is looked up by name and reported, and for a user, roles and group
-  memberships are synchronised onto the existing account so a replayed create converges rather than
-  failing. A missing resource on `DELETE` is a success: the resource is already gone.
+- **This adapter absorbs duplicates in every resource handler**, which is a property of these handlers
+  rather than of the framework contract. HTTP 409 on `CREATE` is a success — the existing resource is
+  looked up by name and reported, and for a user, roles and group memberships are synchronised onto the
+  existing account so a replayed create converges rather than failing. A missing resource on `DELETE` is a
+  success: the resource is already gone.
 - **Membership is synchronised declaratively.** For users and groups, `realmRoles`, `clientRoles` and
   `groups` describe the desired end state. Entries present in the event but not in Keycloak are added,
   entries present in Keycloak but not in the event are removed, and the rest are left alone. A role that
@@ -62,23 +63,21 @@ representation for the resource type; unknown fields are ignored. A result event
 
 ## Configuration
 
-Keys carry the `keycloak.` prefix. Env-var names, production values, secret handling and container
+Keys carry the `keycloak.` prefix. The values that ship, env-var names, secret handling and container
 configuration live in [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-| Property | Coded default |
+| Property | Role |
 |---|---|
-| `keycloak.topics` | — required; without it the adapter subscribes to nothing and is skipped |
-| `keycloak.url` | `http://localhost:8080` |
-| `keycloak.realm` | `master` |
-| `keycloak.username` | `admin` |
-| `keycloak.password` | `admin` |
-| `keycloak.client.id` | `admin-cli` |
-| `keycloak.invitation.client.id` | — |
-| `keycloak.invitation.redirect.uri` | — |
+| `keycloak.topics` | Required; without it the adapter subscribes to nothing and is skipped |
+| `keycloak.url` | Base URL of the Keycloak server |
+| `keycloak.realm` | Realm the admin client authenticates against |
+| `keycloak.username` / `.password` | Admin credentials. The password has a fallback, so an unset value produces an authentication failure rather than a configuration error — set it explicitly |
+| `keycloak.client.id` | Admin client used for the Admin REST API |
+| `keycloak.invitation.client.id` | Client of the invitation email's link target |
+| `keycloak.invitation.redirect.uri` | Redirect target of the invitation email's link |
 
-The two invitation properties give the client and redirect target of the invitation email's link. They MUST
-be set together or not at all; setting exactly one fails startup. When neither is set, the actions email
-uses Keycloak's own default link target.
+The two invitation properties MUST be set together or not at all; setting exactly one fails startup. With
+neither set, the actions email uses Keycloak's own default link target.
 
 ## Error codes
 

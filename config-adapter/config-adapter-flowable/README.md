@@ -95,22 +95,18 @@ The result producer runs with `acks=all` and idempotence enabled.
 
 ## Configuration
 
-Env vars, production values and database provisioning live in [../DEPLOYMENT.md](../DEPLOYMENT.md).
+The values that ship, env vars and database provisioning live in [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-| Property | Coded default |
+| Property | Role |
 |---|---|
-| `flowable.jdbc.url` | — |
-| `flowable.jdbc.username` | — |
-| `flowable.jdbc.password` | — **required** |
-| `flowable.kafka.group.id` | `config-adapter-flowable-group` |
-| `kafka.bootstrap.servers` | `localhost:9092` |
-| `pipeline.status-topic` | `de.civitascore.pipeline.status` |
+| `flowable.jdbc.url` / `.username` / `.password` | Saga state database |
+| `flowable.kafka.group.id` | Consumer group of the saga trigger consumer |
+| `kafka.bootstrap.servers` | Broker list, shared with the adapter consumers |
+| `pipeline.status-topic` | Topic carrying pipeline state transitions |
 
-The three JDBC properties have no coded default, and all three MUST resolve or startup fails with an
-incomplete-configuration error. The packaged `application.properties` supplies a url and a username, so only an
-unresolved password fails startup; an unset `FLOWABLE_JDBC_URL` connects to the packaged database instead. An empty
-environment variable resolves as unset, so the properties file value applies. Flowable requires a database of its
-own, separate from any other component's.
+All three JDBC properties MUST resolve or startup fails with an incomplete-configuration error. A url and a
+username ship with values, so only an unresolved password fails startup; an unset `FLOWABLE_JDBC_URL` connects to
+the development database instead. Flowable requires a database of its own, separate from any other component's.
 
 ## Testing
 

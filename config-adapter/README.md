@@ -63,7 +63,9 @@ An adapter reads its topics from `<adapterName>.topics`. Every entry is validate
 
 ### Error codes
 
-Codes are banded: `1xxx` validation (fatal), `2xxx` connectivity (retryable), `3xxx` adapter-specific with one band per adapter — `30xx` Keycloak, `31xx` APISIX, `32xx` FROST, `34xx` GeoServer, `35xx` PostGIS, `36xx` NiFi — and `9xxx` framework-level: unexpected failures plus `9004` configuration errors. Retryable exception types drive the backoff loop; fatal ones go straight to the dead-letter queue — the `retryable` flag each code carries is metadata, not the dispatch input. Each code also carries an internal log template, which stays in the logs and out of the result event.
+Codes are banded: `1xxx` validation (fatal), `2xxx` connectivity (retryable), `3xxx` adapter-specific with one band per adapter — `30xx` Keycloak, `31xx` APISIX, `32xx` FROST, `34xx` GeoServer, `35xx` PostGIS, `36xx` NiFi — and `9xxx` framework-level: unexpected failures plus `9004` configuration errors.
+
+**The exception type decides retry, not the code.** A retryable exception type drives the backoff loop and a fatal one goes straight to the dead-letter queue. The `retryable` flag each code carries is metadata for the reader and the result event; nothing dispatches on it. Each code also carries an internal log template, which stays in the logs and out of the result event.
 
 Each adapter's README lists the codes that adapter raises. The codes below are framework-wide or have no module README of their own:
 

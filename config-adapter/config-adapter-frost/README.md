@@ -83,21 +83,19 @@ Kafka. It handles project-level operations only:
 
 ## Configuration
 
-Keys carry the `frost.` prefix. Env-var names, production values, secret handling and container
+Keys carry the `frost.` prefix. The values that ship, env-var names, secret handling and container
 configuration live in [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-| Property | Coded default |
+| Property | Role |
 |---|---|
-| `frost.topics` | — required for config events; without it the adapter subscribes to nothing |
-| `frost.url` | `http://localhost:8080/v1.1` |
-| `frost.public.url` | value of `frost.url` |
-| `frost.basic.auth.username` | — |
-| `frost.basic.auth.password` | — |
-| `frost.api.key` | — |
-| `frost.api.key.header` | `X-API-Key` |
+| `frost.topics` | Required for config events; without it the adapter subscribes to nothing |
+| `frost.url` | Base URL at which the adapter reaches FROST; a trailing slash is stripped |
+| `frost.public.url` | Externally visible base URL reported in saga results; read by the saga handler only |
+| `frost.basic.auth.username` / `.password` | Basic Auth credentials |
+| `frost.api.key` | API key, as an alternative to Basic Auth |
+| `frost.api.key.header` | Header carrying the API key |
 
 One of `frost.basic.auth.username` or `frost.api.key` MUST be set; the Basic Auth user takes precedence.
-`frost.url` has a trailing slash stripped, and `frost.public.url` is read by the saga handler only.
 
 ## Error codes
 

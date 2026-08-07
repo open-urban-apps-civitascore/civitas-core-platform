@@ -133,26 +133,24 @@ stays `JSONB` and is never followed as a parent.
 
 ## Configuration
 
-Keys carry the `postgis.` prefix. Env-var names, production values and secret handling live in
+Keys carry the `postgis.` prefix. The values that ship, env-var names and secret handling live in
 [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-| Property | Coded default |
+| Property | Role |
 |---|---|
-| `postgis.topics` | — |
-| `postgis.jdbc.url` | — |
-| `postgis.jdbc.user` | — |
-| `postgis.jdbc.password` | empty |
-| `postgis.jdbc.maxPoolSize` | `5` |
-| `postgis.jdbc.connectionTimeoutMs` | `5000` |
-| `CIVITAS_MASTER_KEY` (env var only) | — |
+| `postgis.topics` | Topics subscribed on the config-event path |
+| `postgis.jdbc.url` | Target database |
+| `postgis.jdbc.user` | Connecting role; needs the privileges for the DDL it issues |
+| `postgis.jdbc.password` | Passed through verbatim; `ENC(…)` is not supported here |
+| `postgis.jdbc.maxPoolSize` | Connection pool size |
+| `postgis.jdbc.connectionTimeoutMs` | Pool connection timeout |
+| `CIVITAS_MASTER_KEY` (env var only) | Decrypts `ENC(…)` role passwords carried in event payloads |
 
-An unresolved `postgis.jdbc.url` or `postgis.jdbc.user` fails initialization with a message naming the key, but the
-packaged `application.properties` supplies both — so an unset `POSTGIS_JDBC_URL` connects to the packaged database
-rather than failing. Only the password has no packaged value. A
+An unresolved `postgis.jdbc.url` or `postgis.jdbc.user` fails initialization with a message naming the key, but both
+ship with a value — so an unset `POSTGIS_JDBC_URL` connects to the development database rather than failing. A
 non-numeric `postgis.jdbc.maxPoolSize` or `postgis.jdbc.connectionTimeoutMs` fails initialization with a
-number-format error naming only the offending value, not the key. `postgis.jdbc.user` needs the privileges
-for the DDL it issues. A missing `CIVITAS_MASTER_KEY` is logged at startup and fails any event carrying an
-encrypted password.
+number-format error naming only the offending value, not the key. A missing `CIVITAS_MASTER_KEY` is logged at
+startup and fails any event carrying an encrypted password.
 
 ## Error codes
 

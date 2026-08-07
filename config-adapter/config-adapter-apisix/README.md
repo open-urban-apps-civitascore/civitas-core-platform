@@ -111,24 +111,23 @@ DELETE are absorbed as success.
 
 ## Configuration
 
-Keys carry the `apisix.` prefix. Env-var names, production values and gateway provisioning live in
+Keys carry the `apisix.` prefix. The values that ship, env-var names and gateway provisioning live in
 [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-| Property | Coded default | Used by |
-|---|---|---|
-| `apisix.topics` | — | events |
-| `apisix.admin.url` | `http://localhost:9180` | both |
-| `apisix.admin.key` | — **required** | both |
-| `apisix.api.host` | — **required** | saga |
-| `apisix.api.public.url` | — **required** | saga |
-| `apisix.plugin.config.id` | — **required** | saga |
-| `apisix.service.id` | — **required** | saga |
-| `apisix.frost.basic.auth.username` | — | saga |
-| `apisix.frost.basic.auth.password` | — | saga |
-| `apisix.frost.api.key` | — | saga |
-| `apisix.frost.api.key.header` | `X-API-Key` | saga |
-| `apisix.geoserver.url` | `http://localhost:8080/geoserver` | saga |
-| `apisix.proxy.rewrite.headers.remove` | — | saga |
+| Property | Required | Used by |
+|---|:--:|---|
+| `apisix.topics` | for config events | events |
+| `apisix.admin.url` | | both |
+| `apisix.admin.key` | yes | both |
+| `apisix.api.host` | yes | saga |
+| `apisix.api.public.url` | yes | saga |
+| `apisix.plugin.config.id` | yes | saga |
+| `apisix.service.id` | yes | saga |
+| `apisix.frost.basic.auth.username` / `.password` | one FROST credential | saga |
+| `apisix.frost.api.key` | one FROST credential | saga |
+| `apisix.frost.api.key.header` | | saga |
+| `apisix.geoserver.url` | | saga |
+| `apisix.proxy.rewrite.headers.remove` | | saga |
 
 Either `apisix.frost.basic.auth.username` (with its password) or `apisix.frost.api.key` MUST be set, and
 `apisix.frost.api.key.header` MUST NOT be blank while an API key is set. A blank `apisix.admin.key` and

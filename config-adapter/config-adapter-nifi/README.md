@@ -36,17 +36,17 @@ Any other operation, and any unknown per-pipeline `action`, fails naming the off
 
 A TLS MQTT broker is supported: the flow mints an SSL context service over the NiFi node truststore and declares the deployment-owned Parameter Context that supplies the truststore password, which the flow itself never carries a value for. A SQL source re-reads the whole table on every run and tracks no high-water column, on an explicit cron or the source fragment's built-in schedule.
 
-| Sink | Datasink types | Accepts | Mapping | Tail region |
+| Sink | Datasink types | Accepts | Mapping | Write behaviour |
 |---|---|---|---|---|
 | PostGIS | `postgis`, `postgresql`, `postgres` | `RECORDS` | Compiled RecordPath writes the sink's record shape directly | One terminal record-writing processor over the platform-managed pool, into the per-DataSet schema |
-| FROST | `frost`, `sta` | `STA_ENVELOPE` without a mapping, `RECORDS` with one | Compiled to flat fields a **sink pre-region** hands to the sink's own region | Passthrough: two independent upsert legs over the source's own SensorThings envelope. Mapped: one linear per-record find-or-create chain |
+| FROST | `frost`, `sta` | `STA_ENVELOPE` without a mapping, `RECORDS` with one | Compiled to flat fields handed to the sink's own request chain | Passthrough: two independent upsert legs over the source's own SensorThings envelope. Mapped: one linear per-record find-or-create chain |
 
-Each HTTP request in a sink's region states one **HTTP response use**, which fixes both whether the response body is captured into an attribute and the relationship the request's success continues on. The single on-path transform kind is the record mapping; instances are unbounded and chainable. Its grammar is closed: a field value is a source path, or one of copy, constant, concatenation, geographic point and the conversions `toString`, `toInt`, `toFloat`, `toDate` and `format`. Numeric conversions are transparent — coercion happens at the sink against the real column types, so the compilation needs no schema knowledge. Geometry is the one axis on which compilation depends on the sink: WKT for PostGIS, a GeoJSON object for FROST.
+The single on-path transform kind is the record mapping; instances are unbounded and chainable. Its grammar is closed: a field value is a source path, or one of copy, constant, concatenation, geographic point and the conversions `toString`, `toInt`, `toFloat`, `toDate` and `format`. Numeric conversions are transparent — coercion happens at the sink against the real column types, so the compilation needs no schema knowledge. Geometry is the one axis on which compilation depends on the sink: WKT for PostGIS, a GeoJSON object for FROST.
 
 ## Behaviour
 
-- **Three phases complete before the first REST call.** Derivation parses the graph and derives the **flow path**, dispatching on node roles rather than raw type strings and failing loud on anything that would silently change the path. Plan resolves the datasource and the typed **sink spec** from the catalogs, has each transform kind compile its nodes behind the transform-node-type descriptor, runs each **stage**'s plan half, and decrypts credentials into a separate sensitive map. Build composes source → convert → transform… → sink.
-- **Only whitelisted components can be minted.** Every processor and controller service comes from the curated **fragment whitelist**, so no tenant-derived value reaches the component loader and neither scripting nor Jolt is reachable from this module. The **stage registry** is hand-wired at handler initialization rather than classpath-discovered, and its construction fails if any declared source type, sink type or transform node kind has no implementation — vocabulary drift breaks adapter startup instead of a deployment.
+- **Three phases complete before the first REST call.** Derivation parses the graph and resolves the linear path from source to sink, dispatching on node roles rather than raw type strings and failing loud on anything that would silently change that path. Planning resolves the datasource and a typed sink specification from the catalogs, has each transform kind compile its own nodes, and decrypts credentials into a separate sensitive map. Building composes source → convert → transform… → sink.
+- **Only whitelisted components can be minted.** Every processor and controller service comes from a curated set of flow fragments, so no tenant-derived value reaches the component loader and neither scripting nor Jolt is reachable from this module. The table binding each source type, sink type and transform kind to its implementation is hand-wired at handler initialization rather than classpath-discovered, and its construction fails when a declared kind has no implementation — vocabulary drift breaks adapter startup instead of a deployment.
 - **Redeploys are idempotent.** The process group is resolved by a stable name derived from the pipeline id, stopped and deleted, then uploaded afresh. An unchanged pipeline graph yields a byte-identical flow definition whose components keep the identity they had in the previous deployment. Property and array insertion order, fragment resource names and controller-service friendly names all take part in that identity: changing any of them replaces every component in a live NiFi even though the graph did not change.
 - **A mapping fans out on arrays.** A mapping reading source paths below an array becomes one record per element ahead of its own processors, forking on the innermost shared array and derived from the source side only. Shapes that would fan out into nothing, into ambiguity, or into silently duplicated rows are rejected at compile time; a fan-out yielding zero records at runtime routes to the error sink instead of travelling on as an empty success. A multi-node mapping chain is only shallowly supported: each node compiles against the paths it was authored with, so neighbours agree on a declared structure rather than on the shape actually emitted.
 - **PostGIS writes are keyed.** With resolved primary-key columns the write is an upsert on them, so a re-reading scheduled source updates rows instead of duplicating them; without them it is a plain insert. The keys come from the shared explicit-wins-else-marker rule, so they are identical to the table's primary key. A fan-out whose every key column is mapped from outside the array is rejected — all rows would share one key.
@@ -56,7 +56,7 @@ Each HTTP request in a sink's region states one **HTTP response use**, which fix
 - **The handler is optional at boot.** A failed initialization drops it and the application boots without it, naming the dropped handler in the startup log; datasets needing a pipeline then fail at their deployment step. Most misconfiguration — an absent FROST or PostGIS URL, an absent OIDC client secret or master key — does not fail initialization at all, only the first affected deployment. It is not gated by the `adapters` list, which governs Kafka-consuming adapters only.
 - **A daemon thread reports runtime state.** It polls NiFi's bulletin board and per-group processor states, discovers managed process groups it did not deploy itself, and publishes state transitions as pipeline status events. An error is published once when a pipeline leaves the healthy state; a return to health only after several consecutive healthy polls. Every message and stack trace leaving the adapter has URLs and credential-shaped values redacted, and a published failure carries the error code's safe external message.
 
-Deploy and redeploy touch these resources in order. A failure after the upload deletes the half-deployed group on a best-effort basis before the original error propagates, and a delete resolves the group by name and runs the same stop, disable and delete sequence — a missing group is a no-op.
+Deploy and redeploy touch these resources in order.
 
 1. The OpenID Connect provider's token endpoint. The adapter sends the client-credentials access token as a bearer token, caches it until shortly before expiry, and on a 401 refreshes once and replays. This endpoint has its own certificate-validating client, so relaxing TLS verification for NiFi never relaxes it here.
 2. The root process group. The 403 an OIDC-secured NiFi returns before the service account holds canvas rights self-heals: the missing root read and write policies are provisioned from the global rights the account already holds, then the step continues. It is a no-op once the policies exist.
@@ -65,6 +65,8 @@ Deploy and redeploy touch these resources in order. A failure after the upload d
 5. The controller-service and processor endpoints, to patch sensitive properties.
 6. The group's controller-service state endpoint, then polling until all are enabled.
 7. The group's state endpoint, then polling until every processor is running.
+
+A failure at or after step 4 deletes the half-deployed group on a best-effort basis before the original error propagates. A teardown resolves the group by name as in step 3 and runs the same stop, disable and delete sequence; a group that is already absent is a no-op.
 
 | Outcome | Classification |
 |---|---|
@@ -78,24 +80,18 @@ Deploy and redeploy touch these resources in order. A failure after the upload d
 
 ## Configuration
 
-Keys are read under the `nifi.` prefix. Environment variables, production values and hardening live in [../DEPLOYMENT.md](../DEPLOYMENT.md).
+Keys are read under the `nifi.` prefix. The values that ship, environment variables and hardening live in [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-| Property | Coded default |
+| Property | Role |
 |---|---|
-| `nifi.url` | `https://localhost:8443` |
-| `nifi.tls.insecure` | `true` — MUST be `false` outside development; logs a warning while enabled |
-| `nifi.oidc.token-uri` | a `localhost` Keycloak realm token endpoint |
-| `nifi.oidc.client-id` | `nifi` |
-| `nifi.oidc.client-secret` | empty — required; NiFi authentication fails until it is set |
-| `nifi.oidc.scope` | unset |
-| `nifi.frost.url` | unset — required for FROST pipelines |
-| `nifi.frost.basic.auth.username` | falls back to `frost.basic.auth.username`; absent credentials leave the flow's FROST calls unauthenticated |
-| `nifi.frost.basic.auth.password` | falls back to `frost.basic.auth.password`; required once a username is set |
-| `nifi.postgis.url` | unset — required for PostGIS pipelines |
-| `nifi.postgis.user` | unset |
-| `nifi.postgis.password` | unset |
-| `nifi.runtime-monitor.interval-ms` | `5000` |
-| `nifi.master-key` | falls back to `CIVITAS_MASTER_KEY`; required once any datasource carries an `ENC(...)` value |
+| `nifi.url` | Base URL of the NiFi REST API |
+| `nifi.tls.insecure` | MUST be `false` outside development; logs a warning while enabled |
+| `nifi.oidc.token-uri` / `.client-id` / `.client-secret` / `.scope` | Client-credentials token endpoint and client. The secret is required; NiFi authentication fails until it is set |
+| `nifi.frost.url` | Required for FROST pipelines |
+| `nifi.frost.basic.auth.username` / `.password` | Credentials the generated flow uses for FROST; fall back to the unprefixed `frost.basic.auth.*`. Absent credentials leave the flow's FROST calls unauthenticated; the password is required once a username is set |
+| `nifi.postgis.url` / `.user` / `.password` | Required for PostGIS pipelines |
+| `nifi.runtime-monitor.interval-ms` | Poll interval of the runtime status thread |
+| `nifi.master-key` | Falls back to `CIVITAS_MASTER_KEY`; required once any datasource carries an `ENC(...)` value |
 
 ## Error codes
 

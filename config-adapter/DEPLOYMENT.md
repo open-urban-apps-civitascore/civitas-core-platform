@@ -163,7 +163,9 @@ Levels are overridden with JVM system properties, the one place `-D` flags do wo
 
 ### 2.4 Per-Adapter Connection Settings
 
-Env-var names for the per-adapter connection settings. Each module's README owns the property contract, its defaults and its behaviour.
+Env-var names for the per-adapter connection settings. Each module's README owns the property contract and the adapter's behaviour.
+
+> **Every setting in this section ships either with a local-development value or unset, and none of the shipped values is production-appropriate.** Set each one explicitly rather than relying on what ships — the development values point at `localhost` or at the local compose stack's hostnames, so an unset variable produces a connection failure against the wrong host rather than a configuration error. Where an absent value has some other consequence, it is called out below.
 
 **Keycloak**
 
@@ -265,11 +267,14 @@ Secrets to inject rather than bake in: `CIVITAS_MASTER_KEY`, `APISIX_ADMIN_KEY`,
 ## 5. Operational Behaviour
 
 - **Startup order.** Configuration is loaded, one Kafka consumer is created per enabled adapter, saga handlers are discovered and initialised, the health server binds, the consumers and the orchestrator start, and readiness is latched once everything is running.
-- **Shutdown.** `SIGTERM` writes a log line and the JVM then halts. No consumer or orchestrator cleanup runs and no in-flight work is drained, so `terminationGracePeriodSeconds` does not affect shutdown duration. A saga killed mid-flight leaves no Flowable state — the step chain is one transaction and rolls back — so recovery is by Kafka redelivery of the trigger, which restarts the saga from its first step; already-applied side effects are re-attempted and absorbed by adapter idempotency.
 - **Threading.** Consumer loops run on virtual threads and there are no concurrency knobs; the NiFi runtime monitor is the one platform thread. Event processing is strictly **sequential per adapter**: one record at a time, with offsets committed as the polled batch progresses rather than per record. Retry backoff blocks that adapter's consumer thread, so a slow external system delays every subsequent event for that adapter — the main reason to keep the backoff configuration modest.
 - **Scaling.** Each replica runs its own Flowable async executor against the shared state database and joins the same consumer groups. Kafka partitioning divides the event load and hands each trigger to exactly one replica, while Flowable's job locking covers only the asynchronous result-publish jobs; nothing else in this application coordinates replicas. Validate a multi-replica configuration in a staging environment before relying on it.
 - **Pipeline monitoring.** When the NiFi handler is active, a background thread polls NiFi and publishes pipeline state **transitions** to `pipeline.status-topic`. Recovery requires three consecutive healthy polls, so a flapping pipeline cannot flood the topic.
 - **A saga result reporting `FAILED` with `compensated: false`.** Teardown itself failed, so side effects from the steps that had completed remain in place and nothing retries them. The failing teardowns are named only in the `Compensation failed` log lines carrying that `sagaId`; clearing them is a manual step.
+
+> **Shutdown does not drain, so `terminationGracePeriodSeconds` has no effect.** `SIGTERM` writes a log line and the JVM then halts: no consumer or orchestrator cleanup runs and no in-flight work is completed, so raising the grace period changes nothing about shutdown duration or safety.
+>
+> **A saga killed mid-flight leaves no Flowable state.** The step chain is one transaction and rolls back, so there is nothing for the engine to resume. Recovery is by Kafka redelivery of the trigger, which **restarts that saga from its first step**; side effects already applied are re-attempted and absorbed by adapter idempotency. Plan rollout and node-drain windows around a restart from step 1 rather than a resume.
 
 ## 6. docker-compose Example
 
