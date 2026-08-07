@@ -6,8 +6,9 @@
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
-    # Always run on main and develop branch
+    # Always run on main, staging and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     # Run on MR only when config-adapter files change
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -69,8 +70,9 @@ generate-graph-config-adapter:
     # Always run on tags
     - if: $CI_COMMIT_TAG
 
-    # Always run on main and develop branch
+    # Always run on main, staging and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     # Always run on MR pipelines
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -294,7 +296,7 @@ publish-config-adapter:
         - job: integration-test-config-adapter-nifi
         - job: integration-test-config-adapter-gateway-idm
         - job: integration-test-config-adapter-data-services
-    # Tags/main/develop: publish only after tests pass
+    # Tags/main/staging/develop: publish only after tests pass
     - if: $CI_COMMIT_TAG
       needs:
         - job: setup-version-config-adapter
@@ -306,6 +308,15 @@ publish-config-adapter:
         - job: integration-test-config-adapter-data-services
 
     - if: $CI_COMMIT_BRANCH == "main"
+      needs:
+        - job: setup-version-config-adapter
+        - job: build-config-adapter
+          optional: true
+        - job: test-config-adapter
+        - job: integration-test-config-adapter-nifi
+        - job: integration-test-config-adapter-gateway-idm
+        - job: integration-test-config-adapter-data-services
+    - if: $CI_COMMIT_BRANCH == "staging"
       needs:
         - job: setup-version-config-adapter
         - job: build-config-adapter
