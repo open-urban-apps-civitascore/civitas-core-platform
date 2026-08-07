@@ -2,6 +2,7 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.entity.DataPool;
@@ -153,14 +154,15 @@ class DataSetUsableDataSourcesIntegrationTest
     }
 
     @Test
-    @DisplayName("Entries carry id and name only, never connector configuration")
-    void entriesCarryIdAndNameOnly() {
+    @DisplayName("Entries carry id, name and connector type, never connector configuration")
+    void entriesCarryIdNameAndConnectorType() {
       createDataSource("aaa-unrestricted", DatapoolScopeType.ALL);
 
       List<Map<String, Object>> body = getUsable(createDataSetInPool("ds", null), "*", null);
 
       assertThat(body).hasSize(1);
-      assertThat(body.get(0)).containsOnlyKeys("id", "name");
+      assertThat(body.get(0)).containsOnlyKeys("id", "name", "connectorType");
+      assertThat(body.get(0)).containsEntry("connectorType", ConnectorType.SQL.name());
     }
 
     @Test
@@ -304,6 +306,10 @@ class DataSetUsableDataSourcesIntegrationTest
     DataSource ds = new DataSource();
     ds.setName(name);
     ds.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+    ds.setConnectorType(ConnectorType.SQL);
+    // Populated so the projection assertion proves the configuration is withheld rather than merely
+    // absent from the fixture.
+    ds.setConfiguration(Map.of("jdbcUrl", "jdbc:postgresql://db/secret", "password", "s3cret"));
     ds.setDatapoolScopeType(scopeType);
     ds.setScopedDataPools(
         new HashSet<>(
