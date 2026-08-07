@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Binary, Calendar, CalendarClock, Clock, Combine, Hash, MapPin, Type } from 'lucide-react'
+import { Binary, Calendar, CalendarClock, Clock, Combine, Fingerprint, Hash, MapPin, Type } from 'lucide-react'
 
 import type { ConfigField, PortDef, TransformDef } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
@@ -183,6 +183,10 @@ const conversions: MappingTransformDef[] = [
   // toFloat: accepts only numerically-parseable scalars (str/int/number), produces number. Wire op
   // stays 'toFloat' (backend contract); only the display label is 'toNumber'.
   conversion('toFloat', 'str / int', undefined, 'number', Binary, [], 'toNumber', NUMERIC_SUBTYPES),
+  // toUuid: accepts str, produces uuid. No RecordPath function backs it — the value is passed
+  // through and the sink parses it. A uuid source needs no transform; it matches a uuid target
+  // directly.
+  conversion('toUuid', 'str', 'str', 'uuid', Fingerprint),
   // toDate: accepts str and date, produces date
   conversion('toDate', 'str / date', undefined, 'date', Calendar, [patternField], 'toDate', ['str', 'date']),
   // toDateTime: accepts str and datetime, produces datetime

@@ -20,6 +20,7 @@ public enum ConversionOp {
   TO_STRING("toString", false),
   TO_INT("toInt", false),
   TO_FLOAT("toFloat", false),
+  TO_UUID("toUuid", false),
   TO_DATE_TIME("toDateTime", true),
   TO_DATE("toDate", true),
   FORMAT("format", true);

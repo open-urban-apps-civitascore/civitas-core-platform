@@ -460,6 +460,15 @@ class RecordPathCompilerTest {
   }
 
   @Test
+  void toUuidIsTransparent() throws Exception {
+    // Emitting uuid5() here would deploy without error and silently replace every source value
+    // with a freshly minted identifier.
+    var props = byPath(compile("{ \"$.id\": { \"op\": \"toUuid\", \"input\": \"$.raw\" } }"));
+
+    assertEquals("/raw", props.get("/id").value());
+  }
+
+  @Test
   void geoPointForPostgisBecomesWktConcat() throws Exception {
     var props =
         byPath(

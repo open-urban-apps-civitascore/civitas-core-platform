@@ -1417,6 +1417,9 @@
         "toFloat": {
           "description": "str / int → number"
         },
+        "toUuid": {
+          "description": "str → uuid"
+        },
         "toDate": {
           "description": "str → date",
           "fields": {

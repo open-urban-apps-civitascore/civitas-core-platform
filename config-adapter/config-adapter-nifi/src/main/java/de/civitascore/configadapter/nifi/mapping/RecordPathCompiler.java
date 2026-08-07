@@ -25,10 +25,11 @@ import java.util.Map;
  * RecordPath only, never Jolt or scripting. Each target field becomes one property whose name is
  * the destination RecordPath and whose value is either a RecordPath value expression or a literal.
  *
- * <p>Numeric conversions ({@code toInt}/{@code toFloat}) are intentionally transparent here: the
- * value is copied unchanged and the actual coercion happens at the sink — PutDatabaseRecord coerces
- * to the target column types (the PostGIS adapter owns the typed table DDL). This keeps every
- * transform expressible in pure RecordPath, with no schema knowledge in this adapter.
+ * <p>Numeric and UUID conversions ({@code toInt}/{@code toFloat}/{@code toUuid}) are intentionally
+ * transparent here: the value is copied unchanged and the actual coercion happens at the sink —
+ * PutDatabaseRecord coerces to the target column types (the PostGIS adapter owns the typed table
+ * DDL). This keeps every transform expressible in pure RecordPath, with no schema knowledge in this
+ * adapter.
  */
 public class RecordPathCompiler {
 
@@ -257,7 +258,9 @@ public class RecordPathCompiler {
               + ")";
       case FORMAT -> "format(" + inner + ", " + quote(convert.pattern()) + ")";
       case TO_STRING -> "toString(" + inner + ", " + quote(TO_STRING_CHARSET) + ")";
-      case TO_INT, TO_FLOAT -> inner;
+      // RecordPath's only UUID function, uuid5(), mints a new identifier rather than converting
+      // one.
+      case TO_INT, TO_FLOAT, TO_UUID -> inner;
     };
   }
 

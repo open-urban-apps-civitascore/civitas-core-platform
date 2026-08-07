@@ -38,3 +38,12 @@ describe('date conversion inputs', () => {
     expect(mappingRegistry.byType['format'].outputs[0].dataType).toBe('str')
   })
 })
+
+describe('uuid conversion input', () => {
+  // Without toUuid a text source has no route to a uuid target at all: exact-subtype matching
+  // rejects the edge and no other transform in the registry produces one.
+  it('toUuid turns a str source into a uuid', () => {
+    expect(mappingRegistry.byType['toUuid'].inputs[0].dataType).toBe('str')
+    expect(mappingRegistry.byType['toUuid'].outputs[0].dataType).toBe('uuid')
+  })
+})

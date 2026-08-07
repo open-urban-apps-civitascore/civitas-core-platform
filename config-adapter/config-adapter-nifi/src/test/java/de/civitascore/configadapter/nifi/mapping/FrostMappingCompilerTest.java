@@ -737,6 +737,15 @@ class FrostMappingCompilerTest {
   }
 
   @Test
+  void anyResultFromAUuidConvertRendersQuoted() throws Exception {
+    // toUuid sits beside the numeric ops in the compiler but yields text, so grouping it with them
+    // would emit a bare UUID and break the entity body.
+    assertEquals(
+        "\"${sta_2_result:escapeJson()}\"",
+        observationResult(new ConvertNode(ConversionOp.TO_UUID, new CopyNode("$.raw"), null)));
+  }
+
+  @Test
   void anyResultFromACopyRendersQuotedString() throws Exception {
     // A copy is a string source: the ANY placeholder must quote+escape it (unquoted would be
     // invalid JSON for a text result).

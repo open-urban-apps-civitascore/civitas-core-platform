@@ -255,12 +255,14 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
   }
 
   @Test
-  void deployedFlowCoercesNumericConversionsIntoTypedColumns() throws Exception {
+  void deployedFlowCoercesTransparentConversionsIntoTypedColumns() throws Exception {
     // NiFi RecordPath has no toFloat/toInt function — those CORE ops render as a bare value copy
     // and
     // delegate coercion to PutDatabaseRecord. Without this test a silent regression to an emitted
     // toFloat(...) call would fail RecordPath compile at deploy time and no row would ever land,
     // while every unit test still passes.
+    // toUuid fails worse: uuid5() is a valid RecordPath function, so emitting it deploys cleanly
+    // and every row silently carries a freshly minted identifier instead of the source value.
     Map<String, Object> graph =
         map(
             """
@@ -271,7 +273,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                     "fields": { "$.stationid": "$.stationid",
                                 "$.temperature": { "op": "toFloat", "input": "$.temp" },
                                 "$.pressure": { "op": "toFloat", "input": "$.press" },
-                                "$.samples": { "op": "toInt", "input": "$.n" } } } } },
+                                "$.samples": { "op": "toInt", "input": "$.n" },
+                                "$.sensor": { "op": "toUuid", "input": "$.sensor" } } } } },
                 { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
@@ -310,7 +313,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
               () -> {
                 publisher.publish(
                     NUMERIC_TOPIC,
-                    "{\"stationid\":\"S5\",\"temp\":\"21.5\",\"press\":\"1013.25\",\"n\":\"7\"}");
+                    "{\"stationid\":\"S5\",\"temp\":\"21.5\",\"press\":\"1013.25\",\"n\":\"7\","
+                        + "\"sensor\":\"3f2504e0-4f89-11d3-9a0c-0305e82c3301\"}");
                 return numericRowLanded();
               });
     }
@@ -970,13 +974,13 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     }
   }
 
-  /** Asserts the string-typed source values arrived as real numbers in the typed columns. */
+  /** Asserts the string-typed source values arrived as real numbers and a real uuid. */
   private boolean numericRowLanded() throws Exception {
     try (Connection c = dbConnection();
         Statement st = c.createStatement();
         ResultSet rs =
             st.executeQuery(
-                "SELECT temperature, pressure, samples FROM numeric_observation"
+                "SELECT temperature, pressure, samples, sensor FROM numeric_observation"
                     + " WHERE stationid = 'S5'")) {
       if (!rs.next()) {
         return false;
@@ -984,6 +988,9 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
       assertEquals(21.5, rs.getDouble("temperature"), 1e-9);
       assertEquals(new BigDecimal("1013.25"), rs.getBigDecimal("pressure").stripTrailingZeros());
       assertEquals(7L, rs.getLong("samples"));
+      assertEquals(
+          UUID.fromString("3f2504e0-4f89-11d3-9a0c-0305e82c3301"),
+          rs.getObject("sensor", UUID.class));
       return true;
     }
   }
@@ -1086,7 +1093,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
       st.execute("CREATE TABLE chained_fanout_observation (stationid text, measured_at text)");
       st.execute(
           "CREATE TABLE numeric_observation (stationid text, temperature double precision,"
-              + " pressure numeric, samples bigint)");
+              + " pressure numeric, samples bigint, sensor uuid)");
       // the column types DataStructureTableMapper derives for format uuid / date / date-time
       st.execute(
           "CREATE TABLE temporal_observation (stationid text, id uuid, day date,"
