@@ -16,7 +16,6 @@ import { DATASET_STATUS_TYPES } from '@/types/datasets'
 
 export interface PipelinePermissions {
   canDeletePipeline: boolean
-  canReadDatasources: boolean
   canReadDatastructures: boolean
   canCreatePipeline: boolean
   canEditPipeline: boolean
@@ -37,15 +36,14 @@ export const usePipelinePermissions = (datasetId: string, datapoolId?: string): 
   const canCreateDataset = scoped(PERMISSION_NAMES.DATASET_CREATE) && isDraftMode
   const canUpdateDataset = scoped(PERMISSION_NAMES.DATASET_UPDATE) && isDraftMode
   const canDeletePipeline = scoped(PERMISSION_NAMES.DATASET_DELETE) && isDraftMode
-  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
   const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
 
+  // Building a pipeline needs no DATASOURCE_READ: the picker is served through the dataset, and
+  // referencing a source is authorized by that Use relationship rather than by reading the source.
   return {
     canDeletePipeline,
-    canReadDatasources,
     canReadDatastructures,
-    canCreatePipeline:
-      canReadDataset && canCreateDataset && canUpdateDataset && canReadDatasources && canReadDatastructures,
-    canEditPipeline: canReadDataset && canUpdateDataset && canReadDatasources && canReadDatastructures,
+    canCreatePipeline: canReadDataset && canCreateDataset && canUpdateDataset && canReadDatastructures,
+    canEditPipeline: canReadDataset && canUpdateDataset && canReadDatastructures,
   }
 }

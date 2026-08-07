@@ -1233,11 +1233,8 @@
       "details": "Data source details",
       "connector": "Connector",
       "connection": "Connection",
-      "status": "Status",
-      "description": "Description",
       "tags": "Tags",
       "showDataStructure": "Show Data Structure",
-      "noPermission": "No permission to read datasources",
       "anonymousName": "Anonymous Data Source"
     },
     "frostPanel": {

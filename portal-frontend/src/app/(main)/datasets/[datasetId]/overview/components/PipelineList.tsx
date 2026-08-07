@@ -9,14 +9,12 @@ import {
   PIPELINE_NODE_TYPES,
   PipelineOutputDTO,
 } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
-import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
+import { useGetUsableDatasources } from '@/app/services/api/datasets/usable-datasources/clientRequests'
 import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { BasicTooltip } from '@/components/tooltip/Tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { usePermissions } from '@/hooks/use-permissions'
-import { PERMISSION_NAMES } from '@/types/currentUser'
 import { PipelineBasicInfo } from '@/types/datasets'
 import { DATASINK_TYPES } from '@/types/datasinks'
 import { formatDate } from '@/utils/formatDate'
@@ -54,10 +52,8 @@ interface PipelineListProps {
 export const PipelineList = ({ datasetId, pipelines, canCreatePipeline }: PipelineListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.pipelines')
   const locale = useLocale()
-  const { hasPermission } = usePermissions()
-  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
   const { data: pipelinesData } = useGetPipelines(datasetId)
-  const { data: datasourcesData } = useGetDatasources({ isEnabled: canReadDatasources })
+  const { data: datasourcesData } = useGetUsableDatasources(datasetId)
   const seenErrors = useRef(new Set<string>())
 
   useEffect(() => {
