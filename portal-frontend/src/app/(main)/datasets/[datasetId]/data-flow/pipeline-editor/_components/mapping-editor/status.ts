@@ -1,11 +1,12 @@
-import type { Edge } from '@xyflow/react'
+import type { Edge, Node } from '@xyflow/react'
 
 import type { PortStatus } from '@/components/node-editor'
-import type { PortType } from '@/components/node-editor/types'
+import type { PortType, TransformNodeData } from '@/components/node-editor/types'
 
 import type { FieldNode } from './_types'
-import { SOURCE_NODE_ID, TARGET_NODE_ID } from './compile'
+import { findUnconnectedTransformNodes, SOURCE_NODE_ID, TARGET_NODE_ID } from './compile'
 import { resolveCoveredLeaf } from './schema/fieldTree'
+import { mappingRegistry } from './transforms'
 
 export interface MappingCounts {
   mapped: number
@@ -54,6 +55,25 @@ export const findInvalidEdges = (edges: Edge[], endpointInfo: EndpointInfo): Edg
     const to = endpointInfo(edge.target, edge.targetHandle ?? '')
     return !!from && !!to && !portsCompatible(from, to)
   })
+
+/**
+ * Config errors of the transform nodes that will actually be saved, as nodeId → fieldKey →
+ * i18n key. Nodes that don't reach the target are skipped: compileCanvas drops them anyway,
+ * so a freshly dropped, still unwired node must not block saving.
+ */
+export const findNodeConfigErrors = (nodes: Node[], edges: Edge[]): Record<string, Record<string, string>> => {
+  const dropped = new Set(findUnconnectedTransformNodes(nodes, edges).map(n => n.id))
+  const errors: Record<string, Record<string, string>> = {}
+
+  for (const node of nodes) {
+    if (node.type !== 'transform' || dropped.has(node.id)) continue
+    const data = node.data as TransformNodeData
+    const fieldErrors = mappingRegistry.byType[data.defType]?.validate?.(data.config)
+    if (fieldErrors) errors[node.id] = fieldErrors
+  }
+
+  return errors
+}
 
 /** True when `path` is a descendant of `ancestor` in the JSONPath hierarchy. */
 const isDescendantOf = (path: string, ancestor: string): boolean =>

@@ -48,10 +48,12 @@ interface TransformInspectorProps {
   def?: MappingTransformDef
   config: Record<string, unknown>
   onChange: (key: string, value: string) => void
+  /** fieldKey → already-translated message. */
+  errors?: Record<string, string>
 }
 
 /** Inspector body rendered entirely from the selected node's registry entry. */
-export const TransformInspector = ({ def, config, onChange }: TransformInspectorProps) => {
+export const TransformInspector = ({ def, config, onChange, errors }: TransformInspectorProps) => {
   const t = useTranslations('pipelineEditor.mappingEditor.inspector')
 
   if (!def) return null
@@ -71,6 +73,7 @@ export const TransformInspector = ({ def, config, onChange }: TransformInspector
             value={String(config[field.key] ?? field.default ?? '')}
             onChange={value => onChange(field.key, value)}
           />
+          {errors?.[field.key] && <p className="text-xs text-destructive">{errors[field.key]}</p>}
         </div>
       ))}
 

@@ -1398,7 +1398,8 @@
               "placeholder": "Typ auswählen…"
             },
             "value": {
-              "label": "Wert"
+              "label": "Wert",
+              "required": "Ein Wert ist erforderlich."
             }
           }
         },

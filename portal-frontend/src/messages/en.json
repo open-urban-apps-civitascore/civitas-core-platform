@@ -1411,7 +1411,8 @@
               "placeholder": "Select type…"
             },
             "value": {
-              "label": "Value"
+              "label": "Value",
+              "required": "A value is required."
             }
           }
         },

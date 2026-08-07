@@ -38,7 +38,7 @@ import { TransformInspector } from './inspector/TransformInspector'
 import { MegaNode } from './nodes/MegaNode'
 import { flattenTree, objectFieldsCompatible, requiredFieldPaths } from './schema/fieldTree'
 import { versionToSchemaTree } from './schema/versionTree'
-import { computeStatus, portsCompatible } from './status'
+import { computeStatus, findNodeConfigErrors, portsCompatible } from './status'
 import type { MappingTransformDef } from './transforms'
 import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
 
@@ -330,8 +330,10 @@ export const MappingEditorModal = ({
     [edges, nodes, sourceFields, targetFields],
   )
 
-  // Port statuses are injected for rendering only — never into the `nodes` state, so
-  // compileCanvas keeps seeing the persisted node data.
+  const configErrors = useMemo(() => findNodeConfigErrors(nodes, edges), [nodes, edges])
+
+  // Port statuses and error flags are injected for rendering only — never into the `nodes`
+  // state, so compileCanvas keeps seeing the persisted node data.
   const displayNodes = useMemo(
     () =>
       nodes.map(node =>
@@ -343,9 +345,16 @@ export const MappingEditorModal = ({
                 portStatus: node.data.role === 'source' ? status.sourcePortStatus : status.targetPortStatus,
               },
             }
-          : { ...node, data: { ...node.data, portStatus: status.transformPortStatus[node.id] } },
+          : {
+              ...node,
+              data: {
+                ...node.data,
+                portStatus: status.transformPortStatus[node.id],
+                hasError: !!configErrors[node.id],
+              },
+            },
       ),
-    [nodes, status],
+    [nodes, status, configErrors],
   )
 
   const displayEdges = useMemo(() => {
@@ -359,6 +368,14 @@ export const MappingEditorModal = ({
   const selectedData = selectedNode?.type === 'transform' ? (selectedNode.data as TransformNodeData) : undefined
   // Look up the def from the translated registry so the inspector receives translated labels
   const selectedDef = selectedData ? translatedRegistry.byType[selectedData.defType] : undefined
+  // validate() returns i18n keys; translate here so the inspector just renders strings.
+  const selectedErrors = useMemo(() => {
+    const keys = selectedId ? configErrors[selectedId] : undefined
+    if (!keys) return undefined
+    return Object.fromEntries(
+      Object.entries(keys).map(([fieldKey, messageKey]) => [fieldKey, t(messageKey as Parameters<typeof t>[0])]),
+    )
+  }, [selectedId, configErrors, t])
 
   // Transform nodes that aren't wired to the output — compileCanvas drops these on save.
   const unconnectedTransforms = useMemo(() => findUnconnectedTransformNodes(nodes, edges), [nodes, edges])
@@ -397,19 +414,20 @@ export const MappingEditorModal = ({
     performExit(action)
   }
 
-  const { mapped, unmapped, errors } = status.counts
+  const { mapped, unmapped } = status.counts
+  const errorCount = status.counts.errors + Object.keys(configErrors).length
 
   const toolbar = (
     <div className="grid grid-cols-3 items-center px-4 py-2">
       <DialogTitle className="text-base">{name || t('toolbar.title')}</DialogTitle>
       <span className="text-center text-xs text-muted-foreground">
         {t('toolbar.status', { mapped, unmapped })}
-        {errors > 0 && (
-          <span className="ml-2 font-medium text-destructive">{t('toolbar.errors', { count: errors })}</span>
+        {errorCount > 0 && (
+          <span className="ml-2 font-medium text-destructive">{t('toolbar.errors', { count: errorCount })}</span>
         )}
       </span>
       <div className="flex items-center justify-end gap-2">
-        <Button size="sm" onClick={() => requestExit('apply')} disabled={!isReady || errors > 0}>
+        <Button size="sm" onClick={() => requestExit('apply')} disabled={!isReady || errorCount > 0}>
           {tCommon('actions.apply')}
         </Button>
         <Button size="sm" variant="outline" onClick={() => requestExit('close')}>
@@ -448,7 +466,12 @@ export const MappingEditorModal = ({
                 emptyMessage={t('inspector.emptyMessage')}
               >
                 {selectedDef && selectedData && (
-                  <TransformInspector def={selectedDef} config={selectedData.config} onChange={updateConfig} />
+                  <TransformInspector
+                    def={selectedDef}
+                    config={selectedData.config}
+                    onChange={updateConfig}
+                    errors={selectedErrors}
+                  />
                 )}
               </InspectorShell>
             }

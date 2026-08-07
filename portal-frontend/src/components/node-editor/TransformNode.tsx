@@ -37,8 +37,8 @@ export const createTransformNodeType = (registry: NodeRegistry) => {
     return (
       <div
         className={`min-w-[150px] rounded-md border bg-background shadow-sm ${
-          isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-border'
-        }`}
+          d.hasError ? 'border-destructive' : isSelected ? 'border-primary' : 'border-border'
+        } ${isSelected ? 'ring-2 ring-primary/30' : ''}`}
       >
         <div className="flex items-center gap-1.5 border-b border-border px-2 py-1 text-xs font-medium text-foreground">
           {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}

@@ -49,6 +49,8 @@ export interface TransformNodeData extends Record<string, unknown> {
   outputs?: PortDef[]
   /** portId → status; injected for display only, never persisted. */
   portStatus?: Record<string, PortStatus>
+  /** Injected for display only, never persisted. */
+  hasError?: boolean
 }
 
 export interface NodeRegistry<T extends TransformDef = TransformDef> {

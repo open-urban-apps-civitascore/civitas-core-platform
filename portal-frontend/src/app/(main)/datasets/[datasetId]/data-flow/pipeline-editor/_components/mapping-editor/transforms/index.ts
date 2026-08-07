@@ -15,6 +15,8 @@ export interface MappingTransformDef extends TransformDef {
   toValueNode: (inputs: ValueNode[], config: Record<string, unknown>) => ValueNode
   opInputs: (op: OpNode) => ValueNode[]
   opConfig: (op: OpNode) => Record<string, unknown>
+  /** Per-field config errors as i18n keys, relative to `pipelineEditor.mappingEditor`. */
+  validate?: (config: Record<string, unknown>) => Record<string, string> | undefined
 }
 
 const scalar = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'scalar', dataType })
@@ -118,6 +120,8 @@ const literal: MappingTransformDef = {
   }),
   opInputs: () => [],
   opConfig: op => (op.op === 'const' ? { value: op.value, type: op.valueType ?? LITERAL_DEFAULT_TYPE } : {}),
+  validate: cfg =>
+    String(cfg.value ?? '').trim() === '' ? { value: 'transforms.literal.fields.value.required' } : undefined,
 }
 
 const concat: MappingTransformDef = {

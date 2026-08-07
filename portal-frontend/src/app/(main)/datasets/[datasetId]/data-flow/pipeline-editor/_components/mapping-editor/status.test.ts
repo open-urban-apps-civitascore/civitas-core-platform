@@ -1,10 +1,10 @@
-import type { Edge } from '@xyflow/react'
+import type { Edge, Node } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 
 import type { FieldNode } from './_types'
 import { SOURCE_NODE_ID, TARGET_NODE_ID } from './compile'
 import type { EndpointInfo, PortInfo } from './status'
-import { computeStatus, findInvalidEdges, portsCompatible } from './status'
+import { computeStatus, findInvalidEdges, findNodeConfigErrors, portsCompatible } from './status'
 
 const field = (path: string, type: FieldNode['type'], portType: FieldNode['portType']): [string, FieldNode] => [
   path,
@@ -88,6 +88,46 @@ describe('findInvalidEdges', () => {
   it('leaves an edge alone when an endpoint cannot be resolved', () => {
     const edges = [edge('e1', 'literal', 'out', TARGET_NODE_ID, '$.gone')]
     expect(findInvalidEdges(edges, endpointInfo)).toEqual([])
+  })
+})
+
+describe('findNodeConfigErrors', () => {
+  const literal = (id: string, value: string): Node => ({
+    id,
+    type: 'transform',
+    position: { x: 0, y: 0 },
+    data: { defType: 'const', config: { type: 'String', value } },
+  })
+  const toTarget = (id: string, source: string) => edge(id, source, 'out', TARGET_NODE_ID, '$.title')
+
+  it('reports a connected literal with an empty value', () => {
+    expect(findNodeConfigErrors([literal('lit', '')], [toTarget('e1', 'lit')])).toEqual({
+      lit: { value: 'transforms.literal.fields.value.required' },
+    })
+  })
+
+  it('treats a whitespace-only value as empty', () => {
+    expect(findNodeConfigErrors([literal('lit', '   ')], [toTarget('e1', 'lit')])).toEqual({
+      lit: { value: 'transforms.literal.fields.value.required' },
+    })
+  })
+
+  it('accepts a connected literal that carries a value', () => {
+    expect(findNodeConfigErrors([literal('lit', 'x')], [toTarget('e1', 'lit')])).toEqual({})
+  })
+
+  it('ignores an unconnected literal, which compileCanvas drops anyway', () => {
+    expect(findNodeConfigErrors([literal('lit', '')], [])).toEqual({})
+  })
+
+  it('ignores nodes whose def has no validate hook', () => {
+    const toString: Node = {
+      id: 'conv',
+      type: 'transform',
+      position: { x: 0, y: 0 },
+      data: { defType: 'toString', config: {} },
+    }
+    expect(findNodeConfigErrors([toString], [toTarget('e1', 'conv')])).toEqual({})
   })
 })
 
