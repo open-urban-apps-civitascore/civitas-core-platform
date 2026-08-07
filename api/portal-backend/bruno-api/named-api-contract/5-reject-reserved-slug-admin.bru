@@ -1,0 +1,57 @@
+meta {
+  name: 5. Reject the reserved slug admin
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "Named API Contract Reserved Admin",
+    "description": "Negative fixture — the reserved slug must be the only reason this create fails.",
+    "openDataAccess": false,
+    "namedApis": [
+      { "name": "Reserved Admin", "slug": "admin", "standard": "STA", "version": "1.1" }
+    ]
+  }
+}
+
+tests {
+  const body = res.body || {};
+  // Bean-validation failures put the reason in the per-field message, not in `detail`.
+  const fieldMessages = (body.fieldErrors || []).map(function(fe) { return fe.message; }).join(' ');
+  const problemText = [body.detail, body.title, fieldMessages].join(' ').toLowerCase();
+
+  test("Status code is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Response is a problem document", function() {
+    expect(body.detail !== undefined || body.title !== undefined).to.be.true;
+  });
+  test("Rejection states the slug is reserved", function() {
+    expect(problemText).to.contain('reserved');
+  });
+}
+
+docs {
+  **Contract step 5** — Reject the reserved slug `admin`.
+
+  `admin` is held back for platform endpoints under `/v1/datasets/{id}/...`. Reserving it up front
+  keeps a future administrative path from being shadowed by a tenant-chosen named API — the
+  blocklist can only be tightened cheaply before datasets in the field depend on the name.
+
+  Everything else in the body is valid, so a 400 here can only come from the slug.
+
+  **Precondition:** none.
+
+  **Expected Response:** 400 Bad Request, `application/problem+json` whose field error names the
+  slug as reserved.
+
+  **Post-condition:** none — no dataset is created, so nothing to clean up.
+}
