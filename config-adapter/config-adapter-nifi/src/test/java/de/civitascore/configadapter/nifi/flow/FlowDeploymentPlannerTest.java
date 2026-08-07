@@ -37,6 +37,7 @@ import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
@@ -1053,6 +1054,75 @@ class FlowDeploymentPlannerTest {
               .peek(service -> assertEquals(sslContextId, service.path("identifier").asText()))
               .count();
       assertEquals(1, matchingServices);
+    }
+  }
+
+  @Test
+  void mqttTlsBindsTheConfiguredTruststoreInsteadOfTheNodeOne() throws Exception {
+    Datasource source = mqttSource(null);
+    source.handleUnknownProperty("tls", Map.of("enabled", true));
+    source.handleUnknownProperty("urls", List.of("ssl://broker.example:8883"));
+    MqttTruststoreConfig dedicated =
+        new MqttTruststoreConfig(
+            "/opt/mqtt-tls/truststore.p12",
+            "PKCS12",
+            "MQTT_TRUSTSTORE_PASSWORD",
+            "MQTT Broker CAs");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          NifiTestFixtures.planner(resolver, dedicated)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-tls-dedicated", graphWithMapping(), source, postgisSink()))
+              .snapshotJson();
+      JsonNode root = mapper.readTree(snapshot);
+      JsonNode sslContext =
+          StreamSupport.stream(
+                  root.path("flowContents").path("controllerServices").spliterator(), false)
+              .filter(
+                  service ->
+                      "org.apache.nifi.ssl.StandardSSLContextService"
+                          .equals(service.path("type").asText()))
+              .findFirst()
+              .orElseThrow();
+      assertEquals(
+          "/opt/mqtt-tls/truststore.p12",
+          sslContext.path("properties").path("Truststore Filename").asText());
+      assertEquals(
+          "#{MQTT_TRUSTSTORE_PASSWORD}",
+          sslContext.path("properties").path("Truststore Password").asText());
+      assertEquals(
+          "MQTT Broker CAs", root.path("flowContents").path("parameterContextName").asText());
+      assertEquals(
+          "MQTT_TRUSTSTORE_PASSWORD",
+          root.path("parameterContexts")
+              .path("MQTT Broker CAs")
+              .path("parameters")
+              .path(0)
+              .path("name")
+              .asText());
+    }
+  }
+
+  @Test
+  void mqttTlsWithoutAConfiguredTruststoreIsRejected() throws Exception {
+    // Deploying a TLS source with no trust anchor would either leave the service invalid or fall
+    // back to a plaintext connection; neither may pass silently.
+    Datasource source = mqttSource(null);
+    source.handleUnknownProperty("tls", Map.of("enabled", true));
+    source.handleUnknownProperty("urls", List.of("ssl://broker.example:8883"));
+    MqttTruststoreConfig unset = new MqttTruststoreConfig("", "PKCS12", "", "");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  NifiTestFixtures.planner(resolver, unset)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-tls-no-store", graphWithMapping(), source, postgisSink())));
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+      assertTrue(ex.getInternalMessage().contains("nifi.mqtt.truststore.path"));
     }
   }
 

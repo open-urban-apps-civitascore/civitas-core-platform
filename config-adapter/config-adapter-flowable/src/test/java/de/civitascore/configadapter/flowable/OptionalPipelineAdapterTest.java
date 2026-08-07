@@ -103,6 +103,7 @@ class OptionalPipelineAdapterTest {
     vars.put("sagaId", sagaId);
     vars.put("datasetId", "ds-1");
     vars.put("hasPipelines", hasPipelines);
+    vars.put("hasFrostSink", true);
     return vars;
   }
 

@@ -25,6 +25,7 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.ForkPlan;
 import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan;
@@ -116,24 +117,38 @@ class NifiFlowBuilderTest {
     assertTrue(found, "DBCP reference must point to a real controller service");
   }
 
-  @Test
-  void mqttTlsAddsOneJvmTruststoreSslContextServiceAndReferencesIt() throws Exception {
+  /**
+   * A TLS MQTT spec: the processor references the SSL Context Service, and the trust anchor arrives
+   * as controller-service properties.
+   */
+  private static FlowBuildSpec mqttTlsSpec(MqttTruststoreConfig truststore) {
+    return mqttTlsSpec(truststore.sslContextProperties());
+  }
+
+  private static FlowBuildSpec mqttTlsSpec(Map<String, String> truststoreProperties) {
     FlowBuildSpec plain = mqttToPostgis(mapping());
     Map<String, String> tlsProperties = new LinkedHashMap<>(plain.sourceProperties());
     tlsProperties.put("Broker URI", "ssl://mqtt:8883");
     tlsProperties.put(
         "SSL Context Service", "${CS:" + MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE + "}");
-    FlowBuildSpec tls =
-        new FlowBuildSpec(
-            plain.processGroupName(),
-            plain.sourceType(),
-            tlsProperties,
-            plain.sinkType(),
-            plain.sinkProperties(),
-            plain.transforms(),
-            plain.controllerServiceProperties(),
-            plain.sourceCron(),
-            plain.sinkPreRegion());
+    Map<String, Map<String, String>> serviceProperties =
+        new LinkedHashMap<>(plain.controllerServiceProperties());
+    serviceProperties.put(MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE, truststoreProperties);
+    return new FlowBuildSpec(
+        plain.processGroupName(),
+        plain.sourceType(),
+        tlsProperties,
+        plain.sinkType(),
+        plain.sinkProperties(),
+        plain.transforms(),
+        serviceProperties,
+        plain.sourceCron(),
+        plain.sinkPreRegion());
+  }
+
+  @Test
+  void mqttTlsAddsOneJvmTruststoreSslContextServiceAndReferencesIt() throws Exception {
+    FlowBuildSpec tls = mqttTlsSpec(MqttTruststoreConfig.nodeTruststore());
 
     JsonNode flow = build(tls);
     JsonNode services = flow.path("flowContents").path("controllerServices");
@@ -147,15 +162,15 @@ class NifiFlowBuilderTest {
         sslContext.path("properties").path("Truststore Password").asText());
     assertEquals("PKCS12", sslContext.path("properties").path("Truststore Type").asText());
     assertEquals(
-        MqttSourceStage.NODE_TRUSTSTORE_PARAMETER_CONTEXT,
+        MqttTruststoreConfig.DEFAULT_PARAMETER_CONTEXT,
         flow.path("flowContents").path("parameterContextName").asText());
     JsonNode truststorePassword =
         flow.path("parameterContexts")
-            .path(MqttSourceStage.NODE_TRUSTSTORE_PARAMETER_CONTEXT)
+            .path(MqttTruststoreConfig.DEFAULT_PARAMETER_CONTEXT)
             .path("parameters")
             .path(0);
     assertEquals(
-        MqttSourceStage.TRUSTSTORE_PASSWORD_PARAMETER, truststorePassword.path("name").asText());
+        MqttTruststoreConfig.DEFAULT_PASSWORD_PARAMETER, truststorePassword.path("name").asText());
     assertTrue(truststorePassword.path("sensitive").asBoolean());
     assertTrue(truststorePassword.path("value").isMissingNode());
     assertTrue(sslContext.path("properties").path("Keystore Filename").isNull());
@@ -166,6 +181,31 @@ class NifiFlowBuilderTest {
             .path("SSL Context Service")
             .asText());
     assertEquals(builder.build(tls), builder.build(tls), "TLS snapshot must remain deterministic");
+  }
+
+  @Test
+  void passwordlessMqttTruststoreDeclaresNoParameterContext() throws Exception {
+    MqttTruststoreConfig truststore =
+        new MqttTruststoreConfig(
+            "/opt/mqtt-tls/truststore.p12", "PKCS12", MqttTruststoreConfig.NO_PASSWORD, "");
+    NifiFlowBuilder passwordless = NifiTestFixtures.flowBuilder(truststore);
+    FlowBuildSpec tls = mqttTlsSpec(truststore);
+
+    JsonNode flow = mapper.readTree(passwordless.build(tls));
+
+    JsonNode sslContext = component(flow, "controllerServices", "StandardSSLContextService");
+    assertEquals(
+        "/opt/mqtt-tls/truststore.p12",
+        sslContext.path("properties").path("Truststore Filename").asText());
+    assertTrue(
+        sslContext.path("properties").path("Truststore Password").isNull(),
+        "a truststore that opens without a password must not reference a parameter");
+    assertTrue(
+        flow.path("parameterContexts").isEmpty(),
+        "no sensitive parameter means no parameter context to provision");
+    assertTrue(
+        flow.path("flowContents").path("parameterContextName").isMissingNode(),
+        "the process group must not bind to a parameter context it does not use");
   }
 
   @Test

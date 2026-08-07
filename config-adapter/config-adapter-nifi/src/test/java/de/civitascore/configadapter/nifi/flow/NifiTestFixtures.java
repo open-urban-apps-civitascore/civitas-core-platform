@@ -22,6 +22,7 @@ import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.nifi.flow.stage.source.SqlSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.transform.MappingNodeType;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
@@ -48,6 +49,11 @@ public final class NifiTestFixtures {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
+  private static final PlatformSinkConfig DEFAULT_PLATFORM_SINK =
+      new PlatformSinkConfig("jdbc:postgresql://db:5432/civitas", "nifi", "db-secret");
+
+  private static final String DEFAULT_FROST_BASE_URL = "http://frost:8080/FROST-Server/v1.1";
+
   private NifiTestFixtures() {}
 
   static byte[] stretchedKey() throws Exception {
@@ -59,8 +65,18 @@ public final class NifiTestFixtures {
       SqlSourceProbe probe,
       PlatformSinkConfig platformSink,
       String frostBaseUrl) {
+    return stageRegistry(
+        resolver, probe, platformSink, frostBaseUrl, MqttTruststoreConfig.nodeTruststore());
+  }
+
+  public static StageRegistry stageRegistry(
+      CredentialResolver resolver,
+      SqlSourceProbe probe,
+      PlatformSinkConfig platformSink,
+      String frostBaseUrl,
+      MqttTruststoreConfig mqttTruststore) {
     return new StageRegistry(
-        List.of(new MqttSourceStage(resolver), new SqlSourceStage(resolver, probe)),
+        List.of(new MqttSourceStage(resolver, mqttTruststore), new SqlSourceStage(resolver, probe)),
         List.of(
             new PostgisSinkStage(platformSink),
             new FrostSinkStage(frostBaseUrl, FrostSinkAuth.basicAuth("frost", "secret"))),
@@ -69,7 +85,12 @@ public final class NifiTestFixtures {
 
   /** A builder over stages whose bind halves are never exercised (build-level tests). */
   public static NifiFlowBuilder flowBuilder() {
-    return new NifiFlowBuilder(stageRegistry(null, SqlSourceProbe.NO_OP, null, null));
+    return flowBuilder(MqttTruststoreConfig.nodeTruststore());
+  }
+
+  public static NifiFlowBuilder flowBuilder(MqttTruststoreConfig mqttTruststore) {
+    return new NifiFlowBuilder(
+        stageRegistry(null, SqlSourceProbe.NO_OP, null, null, mqttTruststore));
   }
 
   static FlowDeploymentPlanner planner(CredentialResolver resolver) {
@@ -77,11 +98,17 @@ public final class NifiTestFixtures {
   }
 
   static FlowDeploymentPlanner planner(CredentialResolver resolver, SqlSourceProbe probe) {
+    return planner(resolver, probe, DEFAULT_PLATFORM_SINK, DEFAULT_FROST_BASE_URL);
+  }
+
+  static FlowDeploymentPlanner planner(
+      CredentialResolver resolver, MqttTruststoreConfig mqttTruststore) {
     return planner(
         resolver,
-        probe,
-        new PlatformSinkConfig("jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
-        "http://frost:8080/FROST-Server/v1.1");
+        SqlSourceProbe.NO_OP,
+        DEFAULT_PLATFORM_SINK,
+        DEFAULT_FROST_BASE_URL,
+        mqttTruststore);
   }
 
   public static FlowDeploymentPlanner planner(
@@ -89,7 +116,18 @@ public final class NifiTestFixtures {
       SqlSourceProbe probe,
       PlatformSinkConfig platformSink,
       String frostBaseUrl) {
-    StageRegistry registry = stageRegistry(resolver, probe, platformSink, frostBaseUrl);
+    return planner(
+        resolver, probe, platformSink, frostBaseUrl, MqttTruststoreConfig.nodeTruststore());
+  }
+
+  public static FlowDeploymentPlanner planner(
+      CredentialResolver resolver,
+      SqlSourceProbe probe,
+      PlatformSinkConfig platformSink,
+      String frostBaseUrl,
+      MqttTruststoreConfig mqttTruststore) {
+    StageRegistry registry =
+        stageRegistry(resolver, probe, platformSink, frostBaseUrl, mqttTruststore);
     return new FlowDeploymentPlanner(new GraphParser(), new NifiFlowBuilder(registry), registry);
   }
 

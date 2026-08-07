@@ -124,6 +124,9 @@ export type OpNode =
 /** A path string is shorthand for a copy. */
 export type ValueNode = string | OpNode
 
+/** Ops with their own canvas node; 'copy' is the direct edge. */
+export type TransformOp = Exclude<OpNode['op'], 'copy'>
+
 export interface MappingConfig {
   /** JSON Schema URI — always "https://civitasconnect.digital/core/mapping/v1" */
   $schema?: string

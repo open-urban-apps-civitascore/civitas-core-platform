@@ -5,13 +5,14 @@ import type { ConfigField, PortDef, TransformDef } from '@/components/node-edito
 import { buildRegistry } from '@/components/node-editor/types'
 import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '@/components/uml-modeler/constants/umlTypes'
 
-import type { ConversionOp, OpNode, ValueNode } from '../_types'
+import type { ConversionOp, OpNode, TransformOp, ValueNode } from '../_types'
 import { NUMERIC_SUBTYPES } from '../_types'
 import { GEOMETRY, PRIMITIVE } from '../schema/adapter'
 
 /** A registry entry: the single source of truth for a node's ports, config and compiled op. */
 export interface MappingTransformDef extends TransformDef {
-  op: string
+  type: TransformOp
+  op: TransformOp
   toValueNode: (inputs: ValueNode[], config: Record<string, unknown>) => ValueNode
   opInputs: (op: OpNode) => ValueNode[]
   opConfig: (op: OpNode) => Record<string, unknown>
@@ -226,3 +227,5 @@ const conversions: MappingTransformDef[] = [
 ]
 
 export const mappingRegistry = buildRegistry<MappingTransformDef>([literal, concat, geoPoint, ...conversions])
+
+export const transformDef = (op: TransformOp) => mappingRegistry.byType[op]

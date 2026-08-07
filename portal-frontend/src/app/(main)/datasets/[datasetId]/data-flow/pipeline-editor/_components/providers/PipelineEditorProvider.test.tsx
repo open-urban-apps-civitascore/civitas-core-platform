@@ -131,7 +131,7 @@ const makeNode = (id: string, type: PipelineNodeType = PIPELINE_NODE_TYPES.Start
   } as ControlNodeData,
 })
 
-const makeGeoPersistenceNode = (id: string, entityId?: string): PipelineNode => ({
+const makeGeoPersistenceNode = (id: string, entityId?: string, tableName = `table_${id}`): PipelineNode => ({
   id,
   type: PIPELINE_NODE_TYPES.GeoPersistence,
   position: { x: 0, y: 0 },
@@ -140,7 +140,7 @@ const makeGeoPersistenceNode = (id: string, entityId?: string): PipelineNode => 
     configured: true,
     entityType: 'persistence',
     entityId,
-    tableName: `table_${id}`,
+    tableName,
   } as unknown as ControlNodeData,
 })
 
@@ -742,6 +742,55 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       expect(contextRef.current?.getNodeValidationSeverity('node-1')).toBe('error')
+    })
+  })
+
+  describe('pipelineUsingTableName', () => {
+    const sessionWithGeoNode = (sessionId: string, nodeId: string, tableName: string) =>
+      makeSession({
+        id: sessionId,
+        name: sessionId,
+        pipeline: {
+          ...createEmptyPipeline(sessionId),
+          id: `pipeline-${sessionId}`,
+          nodes: [makeGeoPersistenceNode(nodeId, undefined, tableName)],
+        },
+      })
+
+    it('is null for the name the node itself uses', () => {
+      renderProvider(sessionWithGeoNode('session-1', 'persist-1', 'roads'))
+
+      expect(contextRef.current?.pipelineUsingTableName('persist-1', 'roads')).toBeNull()
+    })
+
+    it('names the other pipeline of the dataset using the name, ignoring case', () => {
+      renderProviderWithSessions([
+        sessionWithGeoNode('session-1', 'persist-1', 'roads'),
+        sessionWithGeoNode('session-2', 'persist-2', 'Roads'),
+      ])
+
+      expect(contextRef.current?.pipelineUsingTableName('persist-1', 'ROADS')).toBe('session-2')
+    })
+
+    it('is null for an empty name', () => {
+      renderProvider(sessionWithGeoNode('session-1', 'persist-1', 'roads'))
+
+      expect(contextRef.current?.pipelineUsingTableName('persist-2', '  ')).toBeNull()
+    })
+
+    it('passes the names used outside the validated pipeline to the validation service', () => {
+      renderProviderWithSessions([
+        sessionWithGeoNode('session-1', 'persist-1', 'roads'),
+        sessionWithGeoNode('session-2', 'persist-2', 'Rivers'),
+      ])
+
+      act(() => {
+        contextRef.current?.runValidation()
+      })
+
+      expect(vi.mocked(validatePipelineWithNodeStatus)).toHaveBeenLastCalledWith(expect.anything(), {
+        tableNameOwners: { rivers: 'session-2' },
+      })
     })
   })
 
@@ -1366,6 +1415,37 @@ describe('PipelineEditorProviderComponent', () => {
 
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.datasourceScopeViolation')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
+    })
+
+    it('reports a duplicate table name instead of a generic save failure on a 409 error', async () => {
+      const axiosError = new AxiosError(
+        'Conflict',
+        undefined,
+        { headers: new AxiosHeaders(), method: 'POST', url: '/datasinks' } as InternalAxiosRequestConfig,
+        undefined,
+        {
+          status: 409,
+          statusText: 'Conflict',
+          headers: new AxiosHeaders(),
+          config: { headers: new AxiosHeaders(), method: 'POST', url: '/datasinks' } as InternalAxiosRequestConfig,
+          data: {
+            detail: "DataSink with configuration.tableName 'roads' and dataSetId 'dataset-1' already exists",
+            type: 'urn:civitas:error:CONFLICT',
+          },
+        },
+      )
+      mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.tableNameConflict')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('header.saveFailed')
     })
 
     it('returns false on a 422 error', async () => {

@@ -1,7 +1,12 @@
 import { AxiosError, AxiosHeaders, InternalAxiosRequestConfig } from 'axios'
 import { describe, expect, it } from 'vitest'
 
-import { isDatapoolScopeViolationError, isNameConflictError, isPermissionsError } from './errors'
+import {
+  isDatapoolScopeViolationError,
+  isNameConflictError,
+  isPermissionsError,
+  isTableNameConflictError,
+} from './errors'
 
 const getError = (status: number, detail?: string, type?: string) => {
   return new AxiosError(
@@ -107,5 +112,26 @@ describe('isDatapoolScopeViolationError', () => {
 
   it('returns false for non-axios errors', () => {
     expect(isDatapoolScopeViolationError(new Error('plain error'))).toBe(false)
+  })
+})
+
+describe('isTableNameConflictError', () => {
+  it('returns true for a 409 error naming the tableName field', () => {
+    const error = getError(409, "DataSink with configuration.tableName 'roads' and dataSetId 'ds-1' already exists")
+    expect(isTableNameConflictError(error)).toBe(true)
+  })
+
+  it('returns false for a 409 error about another field', () => {
+    const error = getError(409, 'Group with name "Local Data Consumers" already exists')
+    expect(isTableNameConflictError(error)).toBe(false)
+  })
+
+  it('returns false for non-409 status codes', () => {
+    const error = getError(400, "DataSink with configuration.tableName 'roads' already exists")
+    expect(isTableNameConflictError(error)).toBe(false)
+  })
+
+  it('returns false for non-axios errors', () => {
+    expect(isTableNameConflictError(new Error('plain error'))).toBe(false)
   })
 })
