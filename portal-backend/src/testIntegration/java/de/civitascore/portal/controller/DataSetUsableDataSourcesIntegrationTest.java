@@ -2,7 +2,6 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.entity.DataPool;
@@ -48,8 +47,6 @@ class DataSetUsableDataSourcesIntegrationTest
   private static final String SCOPE_HEADER = "X-Allowed-Scope-Ids";
   private static final String POOL_HEADER = "X-Allowed-Pool-Ids";
   private static final String DATASETS_ENDPOINT = "/datasets";
-  private static final String DATA_SOURCE_DESCRIPTION =
-      "Traffic sensor readings from the north ring";
 
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataPoolRepository dataPoolRepository;
@@ -156,16 +153,14 @@ class DataSetUsableDataSourcesIntegrationTest
     }
 
     @Test
-    @DisplayName("Entries carry id, name, description and connector type, never the configuration")
-    void entriesCarryPickerFieldsOnly() {
+    @DisplayName("Entries carry id and name only, never connector configuration")
+    void entriesCarryIdAndNameOnly() {
       createDataSource("aaa-unrestricted", DatapoolScopeType.ALL);
 
       List<Map<String, Object>> body = getUsable(createDataSetInPool("ds", null), "*", null);
 
       assertThat(body).hasSize(1);
-      assertThat(body.get(0)).containsOnlyKeys("id", "name", "description", "connectorType");
-      assertThat(body.get(0)).containsEntry("connectorType", ConnectorType.SQL.name());
-      assertThat(body.get(0)).containsEntry("description", DATA_SOURCE_DESCRIPTION);
+      assertThat(body.get(0)).containsOnlyKeys("id", "name");
     }
 
     @Test
@@ -308,12 +303,7 @@ class DataSetUsableDataSourcesIntegrationTest
   private UUID createDataSource(String name, DatapoolScopeType scopeType, UUID... scopedPoolIds) {
     DataSource ds = new DataSource();
     ds.setName(name);
-    ds.setDescription(DATA_SOURCE_DESCRIPTION);
     ds.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-    ds.setConnectorType(ConnectorType.SQL);
-    // Populated so the projection assertion proves the configuration is withheld rather than merely
-    // absent from the fixture.
-    ds.setConfiguration(Map.of("jdbcUrl", "jdbc:postgresql://db/secret", "password", "s3cret"));
     ds.setDatapoolScopeType(scopeType);
     ds.setScopedDataPools(
         new HashSet<>(

@@ -109,6 +109,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     dataset.datapool?.id,
   )
 
+  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
   const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
 
   const searchParams = useSearchParams()
@@ -153,7 +154,13 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   }, [dataset])
 
   const canCreatePipeline =
-    canRead && canCreate && canUpdate && canReadDatastructures && isDraftMode && isServerDraftState
+    canRead &&
+    canCreate &&
+    canUpdate &&
+    canReadDatasources &&
+    canReadDatastructures &&
+    isDraftMode &&
+    isServerDraftState
 
   const hasUnsavedChanges = form.formState.isDirty || hasStatusChanged
   const hasOnlyStatusChanges = !form.formState.isDirty && hasStatusChanged
@@ -352,12 +359,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       buttons: [],
       content: (
         <>
-          <PipelineList
-            datasetId={dataset.id}
-            pipelines={pipelineList}
-            canCreatePipeline={canCreatePipeline}
-            canEditDataset={!isReadOnly}
-          />
+          <PipelineList datasetId={dataset.id} pipelines={pipelineList} canCreatePipeline={canCreatePipeline} />
           <div className="border-t" />
           <ApiList
             datasetId={dataset.id}
