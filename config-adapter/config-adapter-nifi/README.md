@@ -34,7 +34,7 @@ Any other operation, and any unknown per-pipeline `action`, fails naming the off
 | MQTT (push) | `mqtt` | `STA_ENVELOPE` | Rejected — the source self-triggers on broker messages | Broker URLs, exactly one topic filter |
 | SQL (pull) | `sql`, `postgresql`, `postgres`, `jdbc` | `RECORDS` | Accepted | Table, DSN |
 
-A TLS MQTT broker is supported: the flow mints an SSL context service over the NiFi node truststore and declares the deployment-owned Parameter Context that supplies the truststore password, which the flow itself never carries a value for. A SQL source re-reads the whole table on every run and tracks no high-water column, on an explicit cron or the source fragment's built-in schedule.
+A TLS MQTT broker is supported: the flow mints an SSL context service over the truststore that `nifi.mqtt.truststore.*` names — NiFi's node truststore by default — and declares the deployment-owned Parameter Context that supplies its password, which the flow itself never carries a value for. A SQL source re-reads the whole table on every run and tracks no high-water column, on an explicit cron or the source fragment's built-in schedule.
 
 | Sink | Datasink types | Accepts | Mapping | Write behaviour |
 |---|---|---|---|---|
@@ -90,6 +90,8 @@ Keys are read under the `nifi.` prefix. The values that ship, environment variab
 | `nifi.frost.url` | Required for FROST pipelines |
 | `nifi.frost.basic.auth.username` / `.password` | Credentials the generated flow uses for FROST; fall back to the unprefixed `frost.basic.auth.*`. Absent credentials leave the flow's FROST calls unauthenticated; the password is required once a username is set |
 | `nifi.postgis.url` / `.user` / `.password` | Required for PostGIS pipelines |
+| `nifi.mqtt.truststore.path` / `.type` | Trust anchor for MQTT broker certificates, resolved inside NiFi. Required once a datasource enables TLS |
+| `nifi.mqtt.truststore.password-parameter` / `.parameter-context` | Names of the sensitive parameter and its Parameter Context; `none` as the parameter declares a truststore without a password |
 | `nifi.runtime-monitor.interval-ms` | Poll interval of the runtime status thread |
 | `nifi.master-key` | Falls back to `CIVITAS_MASTER_KEY`; required once any datasource carries an `ENC(...)` value |
 
