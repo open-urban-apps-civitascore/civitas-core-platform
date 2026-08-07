@@ -350,7 +350,7 @@ export const MappingEditorModal = ({
               data: {
                 ...node.data,
                 portStatus: status.transformPortStatus[node.id],
-                hasError: !!configErrors[node.id],
+                hasError: !!configErrors.byNode[node.id],
               },
             },
       ),
@@ -370,7 +370,7 @@ export const MappingEditorModal = ({
   const selectedDef = selectedData ? translatedRegistry.byType[selectedData.defType] : undefined
   // validate() returns i18n keys; translate here so the inspector just renders strings.
   const selectedErrors = useMemo(() => {
-    const keys = selectedId ? configErrors[selectedId] : undefined
+    const keys = selectedId ? configErrors.byNode[selectedId] : undefined
     if (!keys) return undefined
     return Object.fromEntries(
       Object.entries(keys).map(([fieldKey, messageKey]) => [fieldKey, t(messageKey as Parameters<typeof t>[0])]),
@@ -415,7 +415,7 @@ export const MappingEditorModal = ({
   }
 
   const { mapped, unmapped } = status.counts
-  const errorCount = status.counts.errors + Object.keys(configErrors).length
+  const errorCount = status.counts.errors + configErrors.blockingCount
 
   const toolbar = (
     <div className="grid grid-cols-3 items-center px-4 py-2">

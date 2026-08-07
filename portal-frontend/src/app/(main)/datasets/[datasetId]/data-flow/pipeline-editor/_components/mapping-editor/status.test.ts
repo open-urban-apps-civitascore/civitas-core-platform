@@ -98,36 +98,58 @@ describe('findNodeConfigErrors', () => {
     position: { x: 0, y: 0 },
     data: { defType: 'const', config: { type: 'String', value } },
   })
+  const conv: Node = {
+    id: 'conv',
+    type: 'transform',
+    position: { x: 0, y: 0 },
+    data: { defType: 'toString', config: {} },
+  }
   const toTarget = (id: string, source: string) => edge(id, source, 'out', TARGET_NODE_ID, '$.title')
+  const required = { value: 'transforms.literal.fields.value.required' }
 
-  it('reports a connected literal with an empty value', () => {
+  it('reports a literal wired into a transform that does not reach the target yet', () => {
+    const edges = [edge('e1', 'lit', 'out', 'conv', 'in')]
+    expect(findNodeConfigErrors([literal('lit', ''), conv], edges)).toEqual({
+      byNode: { lit: required },
+      blockingCount: 0,
+    })
+  })
+
+  it('counts a literal that reaches the target through a transform as blocking', () => {
+    const edges = [edge('e1', 'lit', 'out', 'conv', 'in'), toTarget('e2', 'conv')]
+    expect(findNodeConfigErrors([literal('lit', ''), conv], edges)).toEqual({
+      byNode: { lit: required },
+      blockingCount: 1,
+    })
+  })
+
+  it('counts a literal wired straight into the target as blocking', () => {
     expect(findNodeConfigErrors([literal('lit', '')], [toTarget('e1', 'lit')])).toEqual({
-      lit: { value: 'transforms.literal.fields.value.required' },
+      byNode: { lit: required },
+      blockingCount: 1,
     })
   })
 
   it('treats a whitespace-only value as empty', () => {
     expect(findNodeConfigErrors([literal('lit', '   ')], [toTarget('e1', 'lit')])).toEqual({
-      lit: { value: 'transforms.literal.fields.value.required' },
+      byNode: { lit: required },
+      blockingCount: 1,
     })
   })
 
   it('accepts a connected literal that carries a value', () => {
-    expect(findNodeConfigErrors([literal('lit', 'x')], [toTarget('e1', 'lit')])).toEqual({})
+    expect(findNodeConfigErrors([literal('lit', 'x')], [toTarget('e1', 'lit')])).toEqual({
+      byNode: {},
+      blockingCount: 0,
+    })
   })
 
-  it('ignores an unconnected literal, which compileCanvas drops anyway', () => {
-    expect(findNodeConfigErrors([literal('lit', '')], [])).toEqual({})
+  it('ignores a literal that is not wired to anything', () => {
+    expect(findNodeConfigErrors([literal('lit', '')], [])).toEqual({ byNode: {}, blockingCount: 0 })
   })
 
   it('ignores nodes whose def has no validate hook', () => {
-    const toString: Node = {
-      id: 'conv',
-      type: 'transform',
-      position: { x: 0, y: 0 },
-      data: { defType: 'toString', config: {} },
-    }
-    expect(findNodeConfigErrors([toString], [toTarget('e1', 'conv')])).toEqual({})
+    expect(findNodeConfigErrors([conv], [toTarget('e1', 'conv')])).toEqual({ byNode: {}, blockingCount: 0 })
   })
 })
 

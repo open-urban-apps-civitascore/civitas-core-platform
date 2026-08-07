@@ -56,23 +56,35 @@ export const findInvalidEdges = (edges: Edge[], endpointInfo: EndpointInfo): Edg
     return !!from && !!to && !portsCompatible(from, to)
   })
 
+export interface NodeConfigErrors {
+  /** nodeId → fieldKey → i18n key, for every wired transform node. */
+  byNode: Record<string, Record<string, string>>
+  /** How many of those reach the target and therefore block saving. */
+  blockingCount: number
+}
+
 /**
- * Config errors of the transform nodes that will actually be saved, as nodeId → fieldKey →
- * i18n key. Nodes that don't reach the target are skipped: compileCanvas drops them anyway,
- * so a freshly dropped, still unwired node must not block saving.
+ * Config errors of the transform nodes the user has wired up. A node is checked once it has an
+ * outgoing edge, so the error shows the moment the connection is drawn. Only nodes that reach
+ * the target count as blocking: compileCanvas drops the rest, and the unconnected-transform
+ * warning already covers them.
  */
-export const findNodeConfigErrors = (nodes: Node[], edges: Edge[]): Record<string, Record<string, string>> => {
+export const findNodeConfigErrors = (nodes: Node[], edges: Edge[]): NodeConfigErrors => {
+  const wired = new Set(edges.map(e => e.source))
   const dropped = new Set(findUnconnectedTransformNodes(nodes, edges).map(n => n.id))
-  const errors: Record<string, Record<string, string>> = {}
+  const byNode: Record<string, Record<string, string>> = {}
+  let blockingCount = 0
 
   for (const node of nodes) {
-    if (node.type !== 'transform' || dropped.has(node.id)) continue
+    if (node.type !== 'transform' || !wired.has(node.id)) continue
     const data = node.data as TransformNodeData
     const fieldErrors = mappingRegistry.byType[data.defType]?.validate?.(data.config)
-    if (fieldErrors) errors[node.id] = fieldErrors
+    if (!fieldErrors) continue
+    byNode[node.id] = fieldErrors
+    if (!dropped.has(node.id)) blockingCount++
   }
 
-  return errors
+  return { byNode, blockingCount }
 }
 
 /** True when `path` is a descendant of `ancestor` in the JSONPath hierarchy. */
