@@ -585,4 +585,27 @@ class DataStructureVersionServiceTest {
       assertThat(entity.getVersion()).isEqualTo("1.0.0");
     }
   }
+
+  @Nested
+  @DisplayName("Association wiring on create")
+  class AssociationWiringTests {
+
+    @Test
+    @DisplayName("create adds the version to the parent's in-memory collection")
+    void createSyncsBothSidesOfTheAssociation() {
+      DataStructure parent = new DataStructure();
+      parent.setId(UUID.randomUUID());
+      when(dataStructureService.findByIdOrThrow(parent.getId())).thenReturn(parent);
+      lenient().when(modelRegistryGateway.validateSchema(null)).thenReturn(List.of());
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureId(parent.getId());
+
+      DataStructureVersion entity =
+          dataStructureVersionService.postConvertToEntity(new DataStructureVersion(), input);
+
+      // Callers composing create and release inside one persistence context (the bundle import)
+      // depend on this: the structure's release validation reads exactly this collection.
+      assertThat(parent.getDataStructureVersions()).containsExactly(entity);
+    }
+  }
 }

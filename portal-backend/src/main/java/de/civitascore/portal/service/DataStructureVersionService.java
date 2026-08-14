@@ -67,11 +67,16 @@ public class DataStructureVersionService
   @Override
   protected DataStructureVersion postConvertToEntity(
       DataStructureVersion entity, DataStructureVersionInputDTO input) {
-    // Set dataStructure
+    // Set dataStructure — both sides: callers composing create and release inside one
+    // transaction (the bundle import) read the parent's in-memory collection in
+    // validateRelease, and Hibernate never refreshes it for an already-managed entity.
     Optional.ofNullable(input.getDataStructureId())
         .map(dataStructureService::findByIdOrThrow)
         .ifPresentOrElse(
-            entity::setDataStructure,
+            structure -> {
+              entity.setDataStructure(structure);
+              structure.getDataStructureVersions().add(entity);
+            },
             () -> {
               throw new InvalidInputException(
                   "dataStructureId", entity.getId(), "dataStructureId cannot be null or blank");
@@ -99,8 +104,8 @@ public class DataStructureVersionService
   /**
    * The next plausible version string for a model-less draft: highest parseable sibling version
    * (provisional siblings count too, so two parallel drafts do not collide) with the patch bumped,
-   * or {@code 1.0.0} for the first version — always with the {@code -draft} suffix, so it cannot
-   * be mistaken for a registry-minted number.
+   * or {@code 1.0.0} for the first version — always with the {@code -draft} suffix, so it cannot be
+   * mistaken for a registry-minted number.
    */
   private String provisionalVersion(DataStructure parent) {
     int[] max = null;
@@ -132,9 +137,10 @@ public class DataStructureVersionService
     if (version == null) {
       return null;
     }
-    String bare = version.endsWith(PROVISIONAL_SUFFIX)
-        ? version.substring(0, version.length() - PROVISIONAL_SUFFIX.length())
-        : version;
+    String bare =
+        version.endsWith(PROVISIONAL_SUFFIX)
+            ? version.substring(0, version.length() - PROVISIONAL_SUFFIX.length())
+            : version;
     String[] parts = bare.split("\\.");
     if (parts.length != 3) {
       return null;
