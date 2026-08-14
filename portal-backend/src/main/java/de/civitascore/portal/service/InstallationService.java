@@ -21,7 +21,9 @@ public class InstallationService {
 
   private final BundleInstallationRepository bundleInstallationRepository;
 
-  /** A page of recorded installations; sort order comes from the pageable (default: newest first). */
+  /**
+   * A page of recorded installations; sort order comes from the pageable (default: newest first).
+   */
   @Transactional(readOnly = true)
   public Page<InstallationOutputDTO> findAll(Pageable pageable) {
     return bundleInstallationRepository.findAll(pageable).map(InstallationService::toOutput);

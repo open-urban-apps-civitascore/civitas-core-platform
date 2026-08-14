@@ -14,14 +14,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Exposes the install provenance recorded by the bundle import: which bundle was installed when,
- * by whom, and what it created or reused. This is the platform-side answer to "which artifacts in
- * this instance came from an install" — clients (marketplace UI, CLIs) read it instead of keeping
- * their own bookkeeping.
+ * Exposes the install provenance recorded by the bundle import: which bundle was installed when, by
+ * whom, and what it created or reused. This is the platform-side answer to "which artifacts in this
+ * instance came from an install" — clients (marketplace UI, CLIs) read it instead of keeping their
+ * own bookkeeping.
  *
  * <p>Gated by {@code INSTALLATION_READ}, granted tenant-wide to administrative roles. The list is
- * deliberately not scope-filtered: provenance references datasets across scopes, so it is an
- * audit view for roles that may see the whole instance — not a per-scope resource.
+ * deliberately not scope-filtered: provenance references datasets across scopes, so it is an audit
+ * view for roles that may see the whole instance — not a per-scope resource.
  */
 @RestController
 @RequestMapping("/installations")

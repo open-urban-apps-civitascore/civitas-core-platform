@@ -30,8 +30,9 @@ public class InstalledArtifact extends BaseEntity {
   @JoinColumn(name = "installation_id", nullable = false)
   private BundleInstallation installation;
 
-  /** Stable ordering within the installation; assigned by {@link
-   * BundleInstallation#addArtifact}. */
+  /**
+   * Stable ordering within the installation; assigned by {@link BundleInstallation#addArtifact}.
+   */
   @Column(name = "position", nullable = false)
   private int position;
 

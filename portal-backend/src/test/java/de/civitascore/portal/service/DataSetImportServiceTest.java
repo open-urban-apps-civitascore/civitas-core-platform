@@ -14,10 +14,10 @@ import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
 import de.civitascore.portal.model.entity.BundleInstallation;
 import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.input.DataSetImportInputDTO;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSourceImportInputDTO;
@@ -168,7 +168,8 @@ class DataSetImportServiceTest {
 
   @Test
   void importDataSet_recordsBundleIdentityAndReuseInProvenance() {
-    stubUrnHelpers();
+    // Structure-only bundle: only the versioned-URN resolution is exercised.
+    when(modelRegistryGateway.logicalUrn(VERSIONED_URN)).thenReturn(STRUCTURE_URN);
     DataStructureVersion version = version();
     when(dataStructureImportService.importOrReuse(any(DataStructureImportInputDTO.class)))
         .thenReturn(new ImportResolution(version, true));
@@ -190,8 +191,7 @@ class DataSetImportServiceTest {
     assertThat(recorded.getArtifacts())
         .singleElement()
         .satisfies(
-            artifact ->
-                assertThat(artifact.getAction()).isEqualTo(InstalledArtifactAction.REUSED));
+            artifact -> assertThat(artifact.getAction()).isEqualTo(InstalledArtifactAction.REUSED));
   }
 
   @Test
