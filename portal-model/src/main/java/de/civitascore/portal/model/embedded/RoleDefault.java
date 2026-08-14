@@ -26,7 +26,8 @@ public enum RoleDefault {
       PermissionName.GROUP_READ,
       PermissionName.GROUP_UPDATE,
       PermissionName.GROUP_DELETE,
-      PermissionName.PERMISSION_READ),
+      PermissionName.PERMISSION_READ,
+      PermissionName.INSTALLATION_READ),
 
   DATA_ARCHITECT(
       "Data Architect",
@@ -48,7 +49,8 @@ public enum RoleDefault {
       PermissionName.DATAPOOL_READ,
       PermissionName.DATAPOOL_CREATE,
       PermissionName.DATAPOOL_UPDATE,
-      PermissionName.DATAPOOL_DELETE),
+      PermissionName.DATAPOOL_DELETE,
+      PermissionName.INSTALLATION_READ),
 
   DATA_CONSUMER(
       "Data Consumer",

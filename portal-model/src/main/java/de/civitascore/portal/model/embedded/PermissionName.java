@@ -52,6 +52,7 @@ public enum PermissionName implements GrantedAuthority {
   // Data access and management.
   DATASET_CREATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASET_READ(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
+  INSTALLATION_READ(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASET_UPDATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASET_DELETE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASET_RELEASE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),

@@ -220,6 +220,10 @@
       "_collection": true,
       "POST": "DATASET_CREATE"
     },
+    "/v1/installations": {
+      "_collection": true,
+      "GET": "INSTALLATION_READ"
+    },
     "/v1/datapools": {
       "_collection": true,
       "GET": "DATAPOOL_READ",

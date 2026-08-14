@@ -157,6 +157,10 @@ test_endpoints_contains_imports_datasets if {
 	portal_backend.endpoints["/v1/imports/datasets"]
 }
 
+test_endpoints_contains_installations if {
+	portal_backend.endpoints["/v1/installations"]
+}
+
 # The import path must resolve via EXACT match — without its own registry entry,
 # "datastructures" would be read as an {id} under /v1/imports/{id} (or the path
 # would stay unknown) and POST could never be authorized.

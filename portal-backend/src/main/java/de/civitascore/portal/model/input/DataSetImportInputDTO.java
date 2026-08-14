@@ -25,6 +25,16 @@ public class DataSetImportInputDTO extends BaseDataEntityInputDTO {
 
   private String description;
 
+  @Size(max = 1024, message = "bundleUrn must not exceed 1024 characters") @Schema(
+      description =
+          "Catalogue identity of the bundle this import comes from. Recorded verbatim in the"
+              + " install provenance, never interpreted — a bundle without catalogue identity"
+              + " simply installs without one.")
+  private String bundleUrn;
+
+  @Size(max = 255, message = "bundleVersion must not exceed 255 characters") @Schema(description = "Version of the catalogue bundle, recorded alongside bundleUrn")
+  private String bundleVersion;
+
   @Schema(description = "Optional datapool the dataset belongs to")
   private java.util.UUID datapoolId;
 
