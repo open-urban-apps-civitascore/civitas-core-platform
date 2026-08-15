@@ -3,6 +3,7 @@ package de.civitascore.portal.model.output;
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
@@ -29,7 +30,7 @@ public class InstallationOutputDTO extends BaseOutputDTO {
   @Schema(description = "User id the install ran as (audit created_by)")
   private UUID installedBy;
 
-  private List<InstalledArtifactOutputDTO> artifacts;
+  private List<InstalledArtifactOutputDTO> artifacts = new ArrayList<>();
 
   @Data
   @Builder

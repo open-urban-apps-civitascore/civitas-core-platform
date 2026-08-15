@@ -26,8 +26,7 @@ public enum RoleDefault {
       PermissionName.GROUP_READ,
       PermissionName.GROUP_UPDATE,
       PermissionName.GROUP_DELETE,
-      PermissionName.PERMISSION_READ,
-      PermissionName.INSTALLATION_READ),
+      PermissionName.PERMISSION_READ),
 
   DATA_ARCHITECT(
       "Data Architect",

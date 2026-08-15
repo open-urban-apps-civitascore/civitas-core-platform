@@ -19,9 +19,11 @@ import org.springframework.web.bind.annotation.RestController;
  * instance came from an install" — clients (marketplace UI, CLIs) read it instead of keeping their
  * own bookkeeping.
  *
- * <p>Gated by {@code INSTALLATION_READ}, granted tenant-wide to administrative roles. The list is
- * deliberately not scope-filtered: provenance references datasets across scopes, so it is an audit
- * view for roles that may see the whole instance — not a per-scope resource.
+ * <p>Gated by {@code INSTALLATION_READ}, granted tenant-wide to the Data Architect — installing is
+ * a data concern, and the Tenant Admin role is defined as exactly the {@code TENANT_ADMINISTRATION}
+ * permission category (an invariant {@code RoleInitializerTest} pins). The list is deliberately not
+ * scope-filtered: provenance references datasets across scopes, so it is an audit view for roles
+ * that may see the whole instance — not a per-scope resource.
  */
 @RestController
 @RequestMapping("/installations")
