@@ -13,7 +13,7 @@ import lombok.EqualsAndHashCode;
  * one transaction — the backend orchestrates the graph; the caller never has to replay the UI's
  * cascade of requests.
  *
- * <p>Increment 1 accepts the dataset shell, data structures and data sources. The fields for the
+ * <p>Accepts the dataset shell, data structures, data sources and mappings. The fields for the
  * remaining artifact types exist so that callers sending them get an explicit 400 ("not yet
  * supported") instead of silent dropping.
  */
@@ -44,8 +44,11 @@ public class DataSetImportInputDTO extends BaseDataEntityInputDTO {
   @Valid @Schema(description = "Data sources shipped with this bundle, referencing structures by URN")
   private List<DataSourceImportInputDTO> dataSources = List.of();
 
-  @Schema(description = "Not yet supported by the import — sending a non-empty list yields 400")
-  private List<Object> mappings;
+  @Valid @Schema(
+      description =
+          "Mappings shipped with this bundle, each stored under its own authored CORE URN and"
+              + " referencing the structures it transforms between by URN")
+  private List<MappingImportInputDTO> mappings = List.of();
 
   @Schema(description = "Not yet supported by the import — sending a non-empty list yields 400")
   private List<Object> pipelines;

@@ -1,0 +1,90 @@
+meta {
+  name: Import Bundle with Mapping (create)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/imports/datasets
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Bruno Flow Mapping Use Case",
+    "description": "Bundle: one new structure plus a mapping onto the structure from 04",
+    "dataStructures": [
+      {
+        "name": "Bruno Flow Mapping-Quellstruktur",
+        "description": "New in this bundle — the mapping reads from it",
+        "model": {
+          "$id": "urn:core:city:openurbanapps:datastructure:test:brunomapsource:r{{runId}}",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "value": { "type": "number" },
+            "measuredAt": { "type": "string" }
+          }
+        }
+      }
+    ],
+    "dataSources": [],
+    "mappings": [
+      {
+        "name": "Bruno Flow Mapping",
+        "description": "Maps the bundled structure onto the one 04 installed",
+        "mappingUrn": "urn:core:city:openurbanapps:mapping:test:brunoflow:r{{runId}}",
+        "document": {
+          "title": "Bruno Flow Mapping",
+          "source": "urn:core:city:openurbanapps:datastructure:test:brunomapsource:r{{runId}}",
+          "target": "urn:core:city:openurbanapps:datastructure:test:brunobundle:r{{runId}}",
+          "fields": {
+            "$.count": { "op": "toInt", "input": "$.value" }
+          }
+        }
+      }
+    ]
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar('mappingDataSetId', res.body.dataSetId);
+  }
+}
+
+tests {
+  test("creates the dataset shell", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.dataSetId).to.be.a('string');
+  });
+  test("stores the mapping under the URN the bundle authored", function() {
+    expect(res.body.mappings).to.have.length(1);
+    expect(res.body.mappings[0].urn).to.equal(
+      'urn:core:city:openurbanapps:mapping:test:brunoflow:r' + bru.getVar('runId'));
+    expect(res.body.mappings[0].action).to.equal('CREATED');
+  });
+  test("a mapping has no host shell", function() {
+    expect(res.body.mappings[0].id).to.equal(null);
+  });
+}
+
+docs {
+  The mapping increment's happy path. Two things are proven here that nothing
+  else covers:
+
+  1. Identity is honoured. The response urn must be exactly the authored
+     mappingUrn — Model Forge mints a random disambiguator when it creates an
+     artifact itself, so a minted URN showing up here would mean re-installs
+     duplicate their mappings instead of resolving to the same identity.
+  2. Both reference branches resolve: `source` names a structure from this same
+     bundle (resolved from the bundle map), `target` one that 04 already
+     installed (resolved from the database).
+
+  Depends on 04 (the target structure).
+}

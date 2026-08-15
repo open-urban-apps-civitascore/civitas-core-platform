@@ -254,6 +254,17 @@ public class ModelRegistryGateway {
   }
 
   /**
+   * Whether {@code id} is a well-formed CORE URN whose artifact type is {@code mapping}. Exposed
+   * for the same reason as {@link #isDataStructureUrn}: a bundled mapping brings its own identity,
+   * and the host has to reject a URN of the wrong artifact type before storing — without host
+   * services importing Model Forge's {@code UrnParser} directly (see {@code
+   * ModelForgeBoundaryTest}).
+   */
+  public boolean isMappingUrn(String id) {
+    return UrnParser.isUrn(id) && "mapping".equals(UrnParser.artifactTypeFromUrn(id));
+  }
+
+  /**
    * The versioned CORE URNs of a given artifact type that {@code urn} depends on, read from Model
    * Forge's dependency graph. This is the envelope-level way for host orchestration to learn, e.g.,
    * which Mappings a pipeline references — <b>without ever parsing the pipeline's content</b> (the

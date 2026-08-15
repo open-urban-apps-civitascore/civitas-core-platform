@@ -1,0 +1,64 @@
+meta {
+  name: Second Bundle reuses the same Mapping
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/imports/datasets
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Bruno Flow Mapping Use Case II",
+    "description": "A second use case shipping the identical mapping — must reuse it",
+    "dataStructures": [],
+    "dataSources": [],
+    "mappings": [
+      {
+        "name": "Bruno Flow Mapping",
+        "description": "Byte-identical document to 07",
+        "mappingUrn": "urn:core:city:openurbanapps:mapping:test:brunoflow:r{{runId}}",
+        "document": {
+          "title": "Bruno Flow Mapping",
+          "source": "urn:core:city:openurbanapps:datastructure:test:brunomapsource:r{{runId}}",
+          "target": "urn:core:city:openurbanapps:datastructure:test:brunobundle:r{{runId}}",
+          "fields": {
+            "$.count": { "op": "toInt", "input": "$.value" }
+          }
+        }
+      }
+    ]
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar('mappingReuseDataSetId', res.body.dataSetId);
+  }
+}
+
+tests {
+  test("reuses the installed mapping instead of duplicating it", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.mappings).to.have.length(1);
+    expect(res.body.mappings[0].action).to.equal('REUSED');
+    expect(res.body.mappings[0].urn).to.equal(
+      'urn:core:city:openurbanapps:mapping:test:brunoflow:r' + bru.getVar('runId'));
+  });
+}
+
+docs {
+  Two use cases sharing one mapping is the point of URN identity — the same
+  argument that makes a shared Fachmodell REUSED for structures. The reused
+  mapping is not written again at all, so its registry version stays where 07
+  left it: a re-install must not look like an edit.
+
+  Depends on 07.
+}

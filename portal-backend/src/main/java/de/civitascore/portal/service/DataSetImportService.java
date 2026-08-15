@@ -12,12 +12,14 @@ import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSourceImportInputDTO;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataStructureImportInputDTO;
+import de.civitascore.portal.model.input.MappingImportInputDTO;
 import de.civitascore.portal.model.output.DataSetImportOutputDTO;
 import de.civitascore.portal.model.output.DataSetImportOutputDTO.ImportedArtifactDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.BundleInstallationRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.service.DataStructureImportService.ImportResolution;
+import de.civitascore.portal.service.MappingImportService.MappingResolution;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -31,8 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Imports a self-contained dataset bundle in one call: data structures first (created, or reused
  * when the same URN identity is already installed with identical content), then data sources
- * resolving their structure reference by URN, then the dataset shell — all in one transaction, so a
- * rejected artifact rolls back the whole install.
+ * resolving their structure reference by URN, then mappings resolving theirs, then the dataset
+ * shell — all in one transaction, so a rejected artifact rolls back the whole install.
  *
  * <p>Contained structures are released to AVAILABLE right away (a catalogue artifact is finished
  * content, and sources can only link to AVAILABLE versions — see {@link
@@ -40,14 +42,15 @@ import org.springframework.transaction.annotation.Transactional;
  * release remains a separate, permission-gated step and no saga is touched here ({@link
  * DataSetService} publishes infrastructure sagas only on dataset release).
  *
- * <p>Increment 1: dataset shell + data structures + data sources. Mappings, pipelines and data
- * sinks are rejected with an explicit message until their increments land.
+ * <p>Supported bundle parts: dataset shell + data structures + data sources + mappings. Pipelines
+ * and data sinks are rejected with an explicit message until their increments land.
  */
 @Service
 @RequiredArgsConstructor
 public class DataSetImportService {
 
   private final DataStructureImportService dataStructureImportService;
+  private final MappingImportService mappingImportService;
   private final DataStructureVersionRepository dataStructureVersionRepository;
   private final ModelRegistryGateway modelRegistryGateway;
   private final DataSourceService dataSourceService;
@@ -55,15 +58,16 @@ public class DataSetImportService {
   private final BundleInstallationRepository bundleInstallationRepository;
 
   /**
-   * Imports the bundle. Contained structures resolve by URN identity (create / reuse / conflict);
-   * sources may reference structures from the bundle or already installed ones.
+   * Imports the bundle. Contained structures and mappings resolve by URN identity (create / reuse /
+   * conflict); sources and mappings may reference structures from the bundle or already installed
+   * ones.
    *
    * @param input the self-contained bundle
    * @return a summary naming the created dataset and what happened to each contained artifact
    * @throws InvalidInputException for unsupported bundle parts, unresolvable structure references,
    *     or invalid contained artifacts (400)
    * @throws de.civitascore.portal.util.UniqueConstraintViolationException when a contained
-   *     structure's identity is installed with different content (409)
+   *     structure or mapping identity is installed with different content (409)
    */
   @Transactional
   public DataSetImportOutputDTO importDataSet(DataSetImportInputDTO input) {
@@ -123,7 +127,36 @@ public class DataSetImportService {
               .build());
     }
 
-    // 3 · The dataset shell, last — nothing may reference it yet in increment 1.
+    // 3 · Mappings: registry-only artifacts, stored under the URN the bundle authored. After the
+    // structures, whose identities their source/target must resolve against, and after the sources
+    // so provenance and response read in chain order (source → mapping).
+    List<ImportedArtifactDTO> mappingResults = new ArrayList<>();
+    List<String> mappingUrns = new ArrayList<>();
+    for (MappingImportInputDTO mapping : input.getMappings()) {
+      requireResolvableStructureReferences(mapping, structuresByLogicalUrn);
+      MappingResolution resolution = mappingImportService.importOrReuse(mapping);
+      InstalledArtifactAction action =
+          resolution.reused() ? InstalledArtifactAction.REUSED : InstalledArtifactAction.CREATED;
+      mappingUrns.add(resolution.logicalUrn());
+      // Mirror image of a data source: a mapping has registry identity but no shell row, so the
+      // line carries the urn and leaves shellId null.
+      artifactLines.add(
+          artifactLine(
+              InstalledArtifactType.MAPPING,
+              mapping.getName(),
+              null,
+              resolution.logicalUrn(),
+              action));
+      mappingResults.add(
+          ImportedArtifactDTO.builder()
+              .name(mapping.getName())
+              .id(null)
+              .urn(resolution.logicalUrn())
+              .action(action)
+              .build());
+    }
+
+    // 4 · The dataset shell, last — the host artifacts do not reference it.
     DataSetInputDTO dataSetInput = new DataSetInputDTO();
     dataSetInput.setName(input.getName());
     dataSetInput.setDescription(input.getDescription());
@@ -131,18 +164,29 @@ public class DataSetImportService {
     dataSetInput.setAssignments(input.getAssignments());
     DataSet dataSet = dataSetService.create(dataSetInput);
 
-    // 4 · Provenance, in the same transaction: the record exists exactly iff the install
+    // 5 · Manifest membership for the registry-only artifacts. Without it a bundled mapping belongs
+    // to no dataset and shows up under the "orphans by type" query — the use case would install its
+    // mapping and then disown it. Cannot happen inside the loop above: the manifest exists only
+    // once
+    // DataSetService has persisted the shell.
+    String manifestUrn = dataSet.getManifestLogicalUrn();
+    if (manifestUrn != null) {
+      mappingUrns.forEach(urn -> modelRegistryGateway.linkToDataSet(manifestUrn, urn));
+    }
+
+    // 6 · Provenance, in the same transaction: the record exists exactly iff the install
     // committed. Without it the created/reused knowledge dies with this HTTP response, and
     // "installed by a bundle" versus "created by hand" is unanswerable later.
     BundleInstallation installation = recordInstallation(input, dataSet, artifactLines);
 
-    return DataSetImportOutputDTO.builder()
-        .dataSetId(dataSet.getId())
-        .dataSetName(dataSet.getName())
-        .installationId(installation.getId())
-        .dataStructures(structureResults)
-        .dataSources(sourceResults)
-        .build();
+    DataSetImportOutputDTO output = new DataSetImportOutputDTO();
+    output.setDataSetId(dataSet.getId());
+    output.setDataSetName(dataSet.getName());
+    output.setInstallationId(installation.getId());
+    output.setDataStructures(structureResults);
+    output.setDataSources(sourceResults);
+    output.setMappings(mappingResults);
+    return output;
   }
 
   private BundleInstallation recordInstallation(
@@ -207,6 +251,50 @@ public class DataSetImportService {
                         + " installed"));
   }
 
+  /**
+   * Guards the data structures a mapping names in {@code source}/{@code target}: each must be a
+   * {@code :datastructure:} CORE URN that this bundle ships or that is already installed.
+   *
+   * <p>This has to happen in the host. Model Forge does not existence-check these references: its
+   * {@code x-core-ref} validation reads annotations off the written document, and those annotations
+   * live in {@code mapping.schema.json} (the meta-schema), not in a mapping instance. An unchecked
+   * typo would install "successfully" as a dangling graph edge and only surface when a pipeline
+   * tries to deploy it. Both keys are optional in the schema, so only present ones are checked — a
+   * mapping without them is legal.
+   */
+  private void requireResolvableStructureReferences(
+      MappingImportInputDTO mapping, Map<String, ImportResolution> structuresByLogicalUrn) {
+    Map<String, Object> document = mapping.getDocument();
+    if (document == null) {
+      return;
+    }
+    for (String key : List.of("source", "target")) {
+      if (!(document.get(key) instanceof String reference) || reference.isBlank()) {
+        continue;
+      }
+      if (!modelRegistryGateway.isDataStructureUrn(reference)) {
+        throw new InvalidInputException(
+            "Mapping",
+            mapping.getName(),
+            "%s must be a CORE URN of artifact type 'datastructure', got: %s"
+                .formatted(key, reference));
+      }
+      String logicalUrn = modelRegistryGateway.logicalUrn(reference);
+      if (structuresByLogicalUrn.containsKey(logicalUrn)) {
+        continue;
+      }
+      if (dataStructureVersionRepository
+          .findFirstByModelUrnStartingWith(logicalUrn + ":")
+          .isEmpty()) {
+        throw new InvalidInputException(
+            "Mapping",
+            mapping.getName(),
+            "%s references data structure '%s', which is neither part of this bundle nor installed"
+                .formatted(key, logicalUrn));
+      }
+    }
+  }
+
   private DataSourceInputDTO toDataSourceInput(
       DataSourceImportInputDTO source, DataStructureVersion version) {
     DataSourceInputDTO dto = new DataSourceInputDTO();
@@ -221,16 +309,14 @@ public class DataSetImportService {
 
   private void rejectUnsupportedParts(DataSetImportInputDTO input) {
     boolean hasUnsupported =
-        (input.getMappings() != null && !input.getMappings().isEmpty())
-            || (input.getPipelines() != null && !input.getPipelines().isEmpty())
+        (input.getPipelines() != null && !input.getPipelines().isEmpty())
             || (input.getDataSinks() != null && !input.getDataSinks().isEmpty());
     if (hasUnsupported) {
       throw new InvalidInputException(
           "DataSet",
           input.getName(),
-          "This import currently supports the dataset shell, dataStructures and dataSources."
-              + " Mappings, pipelines and dataSinks are not yet supported by the import"
-              + " endpoint.");
+          "This import currently supports the dataset shell, dataStructures, dataSources and"
+              + " mappings. Pipelines and dataSinks are not yet supported by the import endpoint.");
     }
   }
 }

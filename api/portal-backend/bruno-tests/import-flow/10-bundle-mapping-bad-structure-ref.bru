@@ -1,0 +1,54 @@
+meta {
+  name: Mapping with unresolvable structure reference → 400
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/imports/datasets
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Bruno Flow Mapping Dangling",
+    "description": "The mapping's source structure exists nowhere",
+    "dataStructures": [],
+    "dataSources": [],
+    "mappings": [
+      {
+        "name": "Bruno Flow Mapping Dangling",
+        "mappingUrn": "urn:core:city:openurbanapps:mapping:test:brunodangling:r{{runId}}",
+        "document": {
+          "title": "Bruno Flow Mapping Dangling",
+          "source": "urn:core:city:openurbanapps:datastructure:test:existiertnicht:r{{runId}}",
+          "fields": {
+            "$.count": { "op": "toInt", "input": "$.value" }
+          }
+        }
+      }
+    ]
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("rejects a mapping whose structure reference resolves nowhere", function() {
+    expect(res.status).to.equal(400);
+    expect(res.body.detail).to.include('neither part of this bundle nor installed');
+  });
+}
+
+docs {
+  This guard has to live in the portal, which is the whole reason this test
+  exists. Model Forge does NOT existence-check a mapping's source/target: its
+  x-core-ref validation reads annotations off the written document, and those
+  annotations sit in mapping.schema.json (the meta-schema), never in a mapping
+  instance. Without the host guard a typo would install "successfully" as a
+  dangling graph edge and only surface much later, when a pipeline tries to
+  deploy it.
+}

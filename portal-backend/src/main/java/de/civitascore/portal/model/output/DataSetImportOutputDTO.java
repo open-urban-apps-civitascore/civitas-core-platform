@@ -2,6 +2,7 @@ package de.civitascore.portal.model.output;
 
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
@@ -10,9 +11,13 @@ import lombok.Data;
 /**
  * Result summary of a dataset bundle import: the created dataset shell plus what happened to each
  * contained artifact (created vs. reused by URN identity).
+ *
+ * <p>Plain {@code @Data} rather than {@code @Builder}: every OutputDTO in this package has to offer
+ * a no-arg constructor and non-null collections (pinned by {@code
+ * OutputDtoCollectionInitializationTest}), and combining that with a builder invites the Lombok
+ * trap where a builder-created instance skips the field initializers.
  */
 @Data
-@Builder
 public class DataSetImportOutputDTO {
 
   private UUID dataSetId;
@@ -21,8 +26,14 @@ public class DataSetImportOutputDTO {
   @Schema(description = "Id of the provenance record written for this install")
   private UUID installationId;
 
-  private List<ImportedArtifactDTO> dataStructures;
-  private List<ImportedArtifactDTO> dataSources;
+  private List<ImportedArtifactDTO> dataStructures = new ArrayList<>();
+  private List<ImportedArtifactDTO> dataSources = new ArrayList<>();
+
+  @Schema(
+      description =
+          "Mappings of this install. 'id' is null — a mapping has no host shell, it exists only as a"
+              + " registry artifact identified by its URN.")
+  private List<ImportedArtifactDTO> mappings = new ArrayList<>();
 
   @Data
   @Builder

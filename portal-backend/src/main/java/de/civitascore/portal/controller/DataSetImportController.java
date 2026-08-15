@@ -32,37 +32,40 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @Tag(
     name = "Data Set Import",
     description =
-        "One-call import of a dataset bundle: shell, data structures and data sources"
-            + " (mappings/pipelines/sinks follow in later increments)")
+        "One-call import of a dataset bundle: shell, data structures, data sources and mappings"
+            + " (pipelines/sinks follow in later increments)")
 public class DataSetImportController {
 
   private final DataSetImportService dataSetImportService;
 
   /**
-   * Imports a dataset bundle: structures (create or reuse by URN identity), sources referencing
-   * them, and the dataset shell — atomically.
+   * Imports a dataset bundle: structures (create or reuse by URN identity), sources and mappings
+   * referencing them, and the dataset shell — atomically.
    *
    * @param input the validated bundle
    * @return an import summary with HTTP 201 and a Location header pointing to the dataset
    */
   @Operation(
-      summary = "Import a dataset bundle (shell + data structures + data sources) in one call",
+      summary =
+          "Import a dataset bundle (shell + data structures + data sources + mappings) in one call",
       description =
           "Creates everything in DRAFT within one transaction. Contained data structures resolve"
               + " by URN identity: unknown → created, installed with identical content → reused,"
-              + " installed with different content → 409. Releasing remains a separate step.")
+              + " installed with different content → 409. A mapping resolves the same way by its"
+              + " author-supplied mappingUrn, and is linked into the new dataset's manifest."
+              + " Releasing remains a separate step.")
   @ApiResponse(responseCode = "201", description = "Bundle imported; summary returned")
   @ApiResponse(
       responseCode = "400",
       description =
-          "Invalid bundle (unsupported parts, unresolvable structure reference, invalid"
-              + " contained artifact); nothing is created",
+          "Invalid bundle (unsupported parts, unresolvable structure reference from a source or a"
+              + " mapping, invalid contained artifact); nothing is created",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "409",
       description =
-          "A contained data structure's identity is already installed with different content;"
-              + " nothing is created",
+          "A contained data structure or mapping identity is already installed with different"
+              + " content; nothing is created",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @PostMapping("/datasets")
   @ResponseStatus(HttpStatus.CREATED)

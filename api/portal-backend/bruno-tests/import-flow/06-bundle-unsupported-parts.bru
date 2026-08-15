@@ -1,5 +1,5 @@
 meta {
-  name: Bundle with mappings → 400 (increment 1)
+  name: Bundle with pipelines → 400 (not yet supported)
   type: http
   seq: 6
 }
@@ -13,10 +13,10 @@ post {
 body:json {
   {
     "name": "Bruno Flow Zukunftsbundle",
-    "description": "Mappings are not part of increment 1",
+    "description": "Pipelines are not supported by the import yet",
     "dataStructures": [],
     "dataSources": [],
-    "mappings": [
+    "pipelines": [
       { "name": "noch nicht unterstützt" }
     ]
   }
@@ -34,7 +34,9 @@ tests {
 }
 
 docs {
-  Honest 400 instead of silently dropping bundle parts: mappings, pipelines
-  and dataSinks wait for their increments. When increment 2 lands, this test
-  is the reminder to flip the expectation.
+  Honest 400 instead of silently dropping bundle parts. Mappings graduated out
+  of this test when their increment landed (see 07-10); pipelines and dataSinks
+  wait for theirs. When the pipeline increment lands, this test is the reminder
+  to flip the expectation again — keep it pointing at whatever is still
+  unsupported rather than deleting it.
 }

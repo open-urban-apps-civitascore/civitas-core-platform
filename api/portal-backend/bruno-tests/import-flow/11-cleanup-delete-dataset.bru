@@ -1,7 +1,7 @@
 meta {
   name: Cleanup — delete dataset shell
   type: http
-  seq: 7
+  seq: 11
 }
 
 delete {
@@ -24,5 +24,6 @@ docs {
   Best-effort cleanup: the dataset shell from 04 is deleted via the regular
   CRUD endpoint. The imported structures stay (DRAFT, run-unique URNs) —
   deleting them safely involves the version/registry pin and is left to the
-  portal UI for now.
+  portal UI for now. Same for the mapping artifact from 07: deleting the
+  datasets only drops the manifest membership, not the mapping itself.
 }

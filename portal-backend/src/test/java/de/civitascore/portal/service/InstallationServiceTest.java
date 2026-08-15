@@ -74,4 +74,39 @@ class InstallationServiceTest {
               assertThat(artifact.getShellId()).isEqualTo(line.getShellId());
             });
   }
+
+  /**
+   * A mapping line is registry-only: urn set, shellId null. Pins that the missing shell id is a
+   * legitimate, mappable state rather than an accident to be defended against.
+   */
+  @Test
+  void findAll_mapsRegistryOnlyMappingLineWithoutShellId() {
+    BundleInstallation installation = new BundleInstallation();
+    installation.setId(UUID.randomUUID());
+    installation.setCreatedAt(LocalDateTime.of(2026, 8, 14, 12, 0));
+    installation.setDataSetId(UUID.randomUUID());
+    installation.setDataSetName("Verkehrszählung");
+    InstalledArtifact line = new InstalledArtifact();
+    line.setArtifactType(InstalledArtifactType.MAPPING);
+    line.setName("Zählung → Observation");
+    line.setUrn("urn:core:city:openurbanapps:mapping:mobility:zaehlungtoobservation:default");
+    line.setAction(InstalledArtifactAction.CREATED);
+    installation.addArtifact(line);
+    Pageable pageable = PageRequest.of(0, 20);
+    when(bundleInstallationRepository.findAll(pageable))
+        .thenReturn(new PageImpl<>(List.of(installation), pageable, 1));
+
+    Page<InstallationOutputDTO> page = installationService.findAll(pageable);
+
+    assertThat(page.getContent().getFirst().getArtifacts())
+        .singleElement()
+        .satisfies(
+            artifact -> {
+              assertThat(artifact.getArtifactType()).isEqualTo(InstalledArtifactType.MAPPING);
+              assertThat(artifact.getShellId()).isNull();
+              assertThat(artifact.getUrn())
+                  .isEqualTo(
+                      "urn:core:city:openurbanapps:mapping:mobility:zaehlungtoobservation:default");
+            });
+  }
 }

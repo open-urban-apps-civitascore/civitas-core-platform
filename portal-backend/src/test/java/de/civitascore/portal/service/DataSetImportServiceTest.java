@@ -23,11 +23,13 @@ import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSourceImportInputDTO;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataStructureImportInputDTO;
+import de.civitascore.portal.model.input.MappingImportInputDTO;
 import de.civitascore.portal.model.output.DataSetImportOutputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.BundleInstallationRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.service.DataStructureImportService.ImportResolution;
+import de.civitascore.portal.service.MappingImportService.MappingResolution;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.List;
 import java.util.Map;
@@ -42,10 +44,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link DataSetImportService}: orchestration order (structures → sources →
- * dataset), URN-based structure resolution for sources (bundle first, then installed), and the
- * explicit rejection of not-yet-supported bundle parts. The collaborating services are mocked;
- * their own guards are covered in {@link DataStructureImportServiceTest}.
+ * Unit tests for {@link DataSetImportService}: orchestration order (structures → sources → mappings
+ * → dataset → manifest links), URN-based structure resolution for sources and mappings (bundle
+ * first, then installed), and the explicit rejection of not-yet-supported bundle parts. The
+ * collaborating services are mocked; their own guards are covered in {@link
+ * DataStructureImportServiceTest} and {@link MappingImportServiceTest}.
  */
 @ExtendWith(MockitoExtension.class)
 class DataSetImportServiceTest {
@@ -53,8 +56,13 @@ class DataSetImportServiceTest {
   private static final String STRUCTURE_URN =
       "urn:core:city:openurbanapps:datastructure:environment:airqualitystation:default";
   private static final String VERSIONED_URN = STRUCTURE_URN + ":1.0.0";
+  private static final String MAPPING_URN =
+      "urn:core:city:openurbanapps:mapping:environment:stationtoobservation:default";
+  private static final String MANIFEST_URN =
+      "urn:core:city:openurbanapps:dataset:environment:airquality:default";
 
   @Mock private DataStructureImportService dataStructureImportService;
+  @Mock private MappingImportService mappingImportService;
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private DataSourceService dataSourceService;
@@ -80,14 +88,43 @@ class DataSetImportServiceTest {
     return source;
   }
 
+  private static MappingImportInputDTO mappingInput(Map<String, Object> document) {
+    MappingImportInputDTO mapping = new MappingImportInputDTO();
+    mapping.setName("Station → Observation");
+    mapping.setMappingUrn(MAPPING_URN);
+    mapping.setDocument(document);
+    return mapping;
+  }
+
+  /** A mapping document that reads from the bundled structure. */
+  private static Map<String, Object> mappingDocument(String sourceUrn) {
+    return Map.of("source", sourceUrn, "fields", Map.of("$.result", "$.value"));
+  }
+
   private static DataSetImportInputDTO bundle(
       List<DataStructureImportInputDTO> structures, List<DataSourceImportInputDTO> sources) {
+    return bundle(structures, sources, List.of());
+  }
+
+  private static DataSetImportInputDTO bundle(
+      List<DataStructureImportInputDTO> structures,
+      List<DataSourceImportInputDTO> sources,
+      List<MappingImportInputDTO> mappings) {
     DataSetImportInputDTO input = new DataSetImportInputDTO();
     input.setName("Air Quality");
     input.setDescription("Bundle description");
     input.setDataStructures(structures);
     input.setDataSources(sources);
+    input.setMappings(mappings);
     return input;
+  }
+
+  private static DataSet dataSetWithManifest() {
+    DataSet dataSet = new DataSet();
+    dataSet.setId(UUID.randomUUID());
+    dataSet.setName("Air Quality");
+    dataSet.setManifestLogicalUrn(MANIFEST_URN);
+    return dataSet;
   }
 
   private DataStructureVersion version() {
@@ -243,6 +280,166 @@ class DataSetImportServiceTest {
         .hasMessageContaining("dataStructureUrn");
 
     verify(dataSourceService, never()).create(any());
+    verify(dataSetService, never()).create(any());
+  }
+
+  @Test
+  void importDataSet_storesMappingAfterStructuresAndLinksItIntoTheManifestAfterTheDataSet() {
+    when(modelRegistryGateway.logicalUrn(VERSIONED_URN)).thenReturn(STRUCTURE_URN);
+    when(modelRegistryGateway.isDataStructureUrn(STRUCTURE_URN)).thenReturn(true);
+    when(modelRegistryGateway.logicalUrn(STRUCTURE_URN)).thenReturn(STRUCTURE_URN);
+    DataStructureVersion version = version();
+    when(dataStructureImportService.importOrReuse(any(DataStructureImportInputDTO.class)))
+        .thenReturn(new ImportResolution(version, false));
+    when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
+        .thenReturn(new MappingResolution(MAPPING_URN, false));
+    DataSet dataSet = dataSetWithManifest();
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSet);
+    stubInstallationSave();
+
+    DataSetImportOutputDTO output =
+        importService.importDataSet(
+            bundle(
+                List.of(structureInput()),
+                List.of(),
+                List.of(mappingInput(mappingDocument(STRUCTURE_URN)))));
+
+    // A mapping may only be stored once the structures it names exist, and it can only be linked
+    // once the dataset's manifest does.
+    var order =
+        inOrder(
+            dataStructureImportService, mappingImportService, dataSetService, modelRegistryGateway);
+    order.verify(dataStructureImportService).importOrReuse(any());
+    order.verify(mappingImportService).importOrReuse(any());
+    order.verify(dataSetService).create(any());
+    order.verify(modelRegistryGateway).linkToDataSet(MANIFEST_URN, MAPPING_URN);
+
+    assertThat(output.getMappings()).hasSize(1);
+    assertThat(output.getMappings().getFirst().getUrn()).isEqualTo(MAPPING_URN);
+    assertThat(output.getMappings().getFirst().getId()).isNull();
+    assertThat(output.getMappings().getFirst().getAction())
+        .isEqualTo(InstalledArtifactAction.CREATED);
+  }
+
+  /**
+   * The provenance rule for a registry-only artifact: a urn (it has registry identity) and no
+   * shellId (it has no host row) — the mirror image of a data source.
+   */
+  @Test
+  void importDataSet_recordsMappingLineWithUrnAndWithoutShellId() {
+    when(modelRegistryGateway.isDataStructureUrn(STRUCTURE_URN)).thenReturn(true);
+    when(modelRegistryGateway.logicalUrn(STRUCTURE_URN)).thenReturn(STRUCTURE_URN);
+    when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(STRUCTURE_URN + ":"))
+        .thenReturn(Optional.of(version()));
+    when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
+        .thenReturn(new MappingResolution(MAPPING_URN, false));
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
+    stubInstallationSave();
+
+    importService.importDataSet(
+        bundle(List.of(), List.of(), List.of(mappingInput(mappingDocument(STRUCTURE_URN)))));
+
+    verify(bundleInstallationRepository).save(installationCaptor.capture());
+    assertThat(installationCaptor.getValue().getArtifacts())
+        .singleElement()
+        .satisfies(
+            artifact -> {
+              assertThat(artifact.getArtifactType()).isEqualTo(InstalledArtifactType.MAPPING);
+              assertThat(artifact.getUrn()).isEqualTo(MAPPING_URN);
+              assertThat(artifact.getShellId()).isNull();
+              assertThat(artifact.getAction()).isEqualTo(InstalledArtifactAction.CREATED);
+            });
+  }
+
+  @Test
+  void importDataSet_whenMappingIdentityAlreadyInstalled_recordsItAsReused() {
+    when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
+        .thenReturn(new MappingResolution(MAPPING_URN, true));
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
+    stubInstallationSave();
+
+    DataSetImportOutputDTO output =
+        importService.importDataSet(
+            bundle(List.of(), List.of(), List.of(mappingInput(Map.of("fields", Map.of())))));
+
+    assertThat(output.getMappings().getFirst().getAction())
+        .isEqualTo(InstalledArtifactAction.REUSED);
+    verify(bundleInstallationRepository).save(installationCaptor.capture());
+    assertThat(installationCaptor.getValue().getArtifacts())
+        .singleElement()
+        .satisfies(
+            artifact -> assertThat(artifact.getAction()).isEqualTo(InstalledArtifactAction.REUSED));
+  }
+
+  /** source/target are optional in mapping.schema.json, so the guard must be conditional. */
+  @Test
+  void importDataSet_whenMappingHasNoStructureReferences_isAccepted() {
+    when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
+        .thenReturn(new MappingResolution(MAPPING_URN, false));
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
+    stubInstallationSave();
+
+    importService.importDataSet(
+        bundle(List.of(), List.of(), List.of(mappingInput(Map.of("fields", Map.of())))));
+
+    verify(modelRegistryGateway, never()).isDataStructureUrn(any());
+    verify(mappingImportService).importOrReuse(any());
+  }
+
+  /** A structure shipped by the same bundle resolves from the bundle map — no database lookup. */
+  @Test
+  void importDataSet_whenMappingReferencesBundledStructure_resolvesWithoutTouchingTheRepository() {
+    when(modelRegistryGateway.logicalUrn(VERSIONED_URN)).thenReturn(STRUCTURE_URN);
+    when(modelRegistryGateway.isDataStructureUrn(STRUCTURE_URN)).thenReturn(true);
+    when(modelRegistryGateway.logicalUrn(STRUCTURE_URN)).thenReturn(STRUCTURE_URN);
+    when(dataStructureImportService.importOrReuse(any(DataStructureImportInputDTO.class)))
+        .thenReturn(new ImportResolution(version(), false));
+    when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
+        .thenReturn(new MappingResolution(MAPPING_URN, false));
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
+    stubInstallationSave();
+
+    importService.importDataSet(
+        bundle(
+            List.of(structureInput()),
+            List.of(),
+            List.of(mappingInput(mappingDocument(STRUCTURE_URN)))));
+
+    verify(dataStructureVersionRepository, never()).findFirstByModelUrnStartingWith(any());
+  }
+
+  @Test
+  void importDataSet_whenMappingStructureReferenceUnresolvable_rejectsBeforeCreatingAnything() {
+    when(modelRegistryGateway.isDataStructureUrn(STRUCTURE_URN)).thenReturn(true);
+    when(modelRegistryGateway.logicalUrn(STRUCTURE_URN)).thenReturn(STRUCTURE_URN);
+    when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(STRUCTURE_URN + ":"))
+        .thenReturn(Optional.empty());
+
+    DataSetImportInputDTO input =
+        bundle(List.of(), List.of(), List.of(mappingInput(mappingDocument(STRUCTURE_URN))));
+
+    assertThatThrownBy(() -> importService.importDataSet(input))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("neither part of this bundle nor installed");
+
+    verify(mappingImportService, never()).importOrReuse(any());
+    verify(dataSetService, never()).create(any());
+    verify(bundleInstallationRepository, never()).save(any());
+  }
+
+  @Test
+  void importDataSet_whenMappingStructureReferenceIsNoDataStructureUrn_rejects() {
+    when(modelRegistryGateway.isDataStructureUrn(MAPPING_URN)).thenReturn(false);
+
+    // A mapping URN where a structure URN belongs.
+    DataSetImportInputDTO input =
+        bundle(List.of(), List.of(), List.of(mappingInput(mappingDocument(MAPPING_URN))));
+
+    assertThatThrownBy(() -> importService.importDataSet(input))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("source must be a CORE URN of artifact type 'datastructure'");
+
+    verify(mappingImportService, never()).importOrReuse(any());
     verify(dataSetService, never()).create(any());
   }
 
