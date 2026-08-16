@@ -26,7 +26,6 @@ import de.civitascore.portal.model.input.DataStructureImportInputDTO;
 import de.civitascore.portal.model.input.MappingImportInputDTO;
 import de.civitascore.portal.model.output.DataSetImportOutputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.BundleInstallationRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.service.DataStructureImportService.ImportResolution;
 import de.civitascore.portal.service.MappingImportService.MappingResolution;
@@ -67,12 +66,13 @@ class DataSetImportServiceTest {
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private DataSourceService dataSourceService;
   @Mock private DataSetService dataSetService;
-  @Mock private BundleInstallationRepository bundleInstallationRepository;
+  @Mock private InstallationRecorder installationRecorder;
   @InjectMocks private DataSetImportService importService;
 
   @Captor private ArgumentCaptor<DataSourceInputDTO> sourceInputCaptor;
   @Captor private ArgumentCaptor<DataSetInputDTO> dataSetInputCaptor;
-  @Captor private ArgumentCaptor<BundleInstallation> installationCaptor;
+  @Captor private ArgumentCaptor<List<InstalledArtifact>> artifactLinesCaptor;
+  @Captor private ArgumentCaptor<String> bundleIdCaptor;
 
   private static DataStructureImportInputDTO structureInput() {
     DataStructureImportInputDTO structure = new DataStructureImportInputDTO();
@@ -144,17 +144,25 @@ class DataSetImportServiceTest {
     lenient().when(modelRegistryGateway.logicalUrn(VERSIONED_URN)).thenReturn(STRUCTURE_URN);
   }
 
-  /** Stubs the provenance save to assign an id, as JPA does on persist. */
-  private UUID stubInstallationSave() {
+  /** Stubs the provenance write to return a saved installation, as the recorder does. */
+  private UUID stubInstallationRecord() {
     UUID installationId = UUID.randomUUID();
-    when(bundleInstallationRepository.save(any(BundleInstallation.class)))
-        .thenAnswer(
-            invocation -> {
-              BundleInstallation saved = invocation.getArgument(0);
-              saved.setId(installationId);
-              return saved;
-            });
+    BundleInstallation saved = new BundleInstallation();
+    saved.setId(installationId);
+    when(installationRecorder.record(any(), any(), any(), any(), any())).thenReturn(saved);
     return installationId;
+  }
+
+  /** The artifact lines the orchestrator handed to the recorder. */
+  private List<InstalledArtifact> recordedLines() {
+    verify(installationRecorder).record(any(), any(), any(), any(), artifactLinesCaptor.capture());
+    return artifactLinesCaptor.getValue();
+  }
+
+  /** The bundle identity the orchestrator handed to the recorder. */
+  private String recordedBundleId() {
+    verify(installationRecorder).record(bundleIdCaptor.capture(), any(), any(), any(), any());
+    return bundleIdCaptor.getValue();
   }
 
   @Test
@@ -171,7 +179,7 @@ class DataSetImportServiceTest {
     dataSet.setId(UUID.randomUUID());
     dataSet.setName("Air Quality");
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSet);
-    UUID installationId = stubInstallationSave();
+    UUID installationId = stubInstallationRecord();
 
     DataSetImportOutputDTO output =
         importService.importDataSet(
@@ -192,15 +200,14 @@ class DataSetImportServiceTest {
         .isEqualTo(InstalledArtifactAction.CREATED);
     assertThat(output.getDataSources()).hasSize(1);
 
-    // Provenance is written in the same transaction, one line per touched artifact.
-    verify(bundleInstallationRepository).save(installationCaptor.capture());
-    BundleInstallation recorded = installationCaptor.getValue();
-    assertThat(recorded.getDataSetId()).isEqualTo(dataSet.getId());
-    assertThat(recorded.getArtifacts())
+    // Provenance is written in the same transaction, one line per touched artifact — the dataset
+    // included, and last, because that is when it came into being.
+    assertThat(recordedLines())
         .extracting(InstalledArtifact::getArtifactType, InstalledArtifact::getAction)
-        .containsExactlyInAnyOrder(
+        .containsExactly(
             tuple(InstalledArtifactType.DATA_STRUCTURE, InstalledArtifactAction.CREATED),
-            tuple(InstalledArtifactType.DATA_SOURCE, InstalledArtifactAction.CREATED));
+            tuple(InstalledArtifactType.DATA_SOURCE, InstalledArtifactAction.CREATED),
+            tuple(InstalledArtifactType.DATA_SET, InstalledArtifactAction.CREATED));
   }
 
   @Test
@@ -214,21 +221,19 @@ class DataSetImportServiceTest {
     dataSet.setId(UUID.randomUUID());
     dataSet.setName("Air Quality");
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSet);
-    stubInstallationSave();
+    stubInstallationRecord();
 
     DataSetImportInputDTO input = bundle(List.of(structureInput()), List.of());
-    input.setBundleUrn("urn:catalog:openurbanapps:usecase:airquality");
+    input.setBundleId("urn:catalog:openurbanapps:usecase:airquality");
     input.setBundleVersion("1.2.0");
     importService.importDataSet(input);
 
-    verify(bundleInstallationRepository).save(installationCaptor.capture());
-    BundleInstallation recorded = installationCaptor.getValue();
-    assertThat(recorded.getBundleUrn()).isEqualTo("urn:catalog:openurbanapps:usecase:airquality");
-    assertThat(recorded.getBundleVersion()).isEqualTo("1.2.0");
-    assertThat(recorded.getArtifacts())
-        .singleElement()
-        .satisfies(
-            artifact -> assertThat(artifact.getAction()).isEqualTo(InstalledArtifactAction.REUSED));
+    assertThat(recordedBundleId()).isEqualTo("urn:catalog:openurbanapps:usecase:airquality");
+    assertThat(recordedLines())
+        .extracting(InstalledArtifact::getArtifactType, InstalledArtifact::getAction)
+        .containsExactly(
+            tuple(InstalledArtifactType.DATA_STRUCTURE, InstalledArtifactAction.REUSED),
+            tuple(InstalledArtifactType.DATA_SET, InstalledArtifactAction.CREATED));
   }
 
   @Test
@@ -242,7 +247,7 @@ class DataSetImportServiceTest {
     createdSource.setName("Station Feed");
     when(dataSourceService.create(any(DataSourceInputDTO.class))).thenReturn(createdSource);
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
-    stubInstallationSave();
+    stubInstallationRecord();
 
     importService.importDataSet(bundle(List.of(), List.of(sourceInput(STRUCTURE_URN))));
 
@@ -295,7 +300,7 @@ class DataSetImportServiceTest {
         .thenReturn(new MappingResolution(MAPPING_URN, false));
     DataSet dataSet = dataSetWithManifest();
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSet);
-    stubInstallationSave();
+    stubInstallationRecord();
 
     DataSetImportOutputDTO output =
         importService.importDataSet(
@@ -334,17 +339,16 @@ class DataSetImportServiceTest {
     when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
         .thenReturn(new MappingResolution(MAPPING_URN, false));
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
-    stubInstallationSave();
+    stubInstallationRecord();
 
     importService.importDataSet(
         bundle(List.of(), List.of(), List.of(mappingInput(mappingDocument(STRUCTURE_URN)))));
 
-    verify(bundleInstallationRepository).save(installationCaptor.capture());
-    assertThat(installationCaptor.getValue().getArtifacts())
+    assertThat(recordedLines())
+        .filteredOn(line -> line.getArtifactType() == InstalledArtifactType.MAPPING)
         .singleElement()
         .satisfies(
             artifact -> {
-              assertThat(artifact.getArtifactType()).isEqualTo(InstalledArtifactType.MAPPING);
               assertThat(artifact.getUrn()).isEqualTo(MAPPING_URN);
               assertThat(artifact.getShellId()).isNull();
               assertThat(artifact.getAction()).isEqualTo(InstalledArtifactAction.CREATED);
@@ -356,7 +360,7 @@ class DataSetImportServiceTest {
     when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
         .thenReturn(new MappingResolution(MAPPING_URN, true));
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
-    stubInstallationSave();
+    stubInstallationRecord();
 
     DataSetImportOutputDTO output =
         importService.importDataSet(
@@ -364,8 +368,8 @@ class DataSetImportServiceTest {
 
     assertThat(output.getMappings().getFirst().getAction())
         .isEqualTo(InstalledArtifactAction.REUSED);
-    verify(bundleInstallationRepository).save(installationCaptor.capture());
-    assertThat(installationCaptor.getValue().getArtifacts())
+    assertThat(recordedLines())
+        .filteredOn(line -> line.getArtifactType() == InstalledArtifactType.MAPPING)
         .singleElement()
         .satisfies(
             artifact -> assertThat(artifact.getAction()).isEqualTo(InstalledArtifactAction.REUSED));
@@ -377,7 +381,7 @@ class DataSetImportServiceTest {
     when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
         .thenReturn(new MappingResolution(MAPPING_URN, false));
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
-    stubInstallationSave();
+    stubInstallationRecord();
 
     importService.importDataSet(
         bundle(List.of(), List.of(), List.of(mappingInput(Map.of("fields", Map.of())))));
@@ -397,7 +401,7 @@ class DataSetImportServiceTest {
     when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
         .thenReturn(new MappingResolution(MAPPING_URN, false));
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
-    stubInstallationSave();
+    stubInstallationRecord();
 
     importService.importDataSet(
         bundle(
@@ -424,7 +428,7 @@ class DataSetImportServiceTest {
 
     verify(mappingImportService, never()).importOrReuse(any());
     verify(dataSetService, never()).create(any());
-    verify(bundleInstallationRepository, never()).save(any());
+    verify(installationRecorder, never()).record(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -454,6 +458,6 @@ class DataSetImportServiceTest {
 
     verify(dataStructureImportService, never()).importOrReuse(any());
     verify(dataSetService, never()).create(any());
-    verify(bundleInstallationRepository, never()).save(any());
+    verify(installationRecorder, never()).record(any(), any(), any(), any(), any());
   }
 }

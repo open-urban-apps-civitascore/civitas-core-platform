@@ -16,5 +16,12 @@ public enum InstalledArtifactType {
    * A registry-only artifact: unlike the two above, a mapping has no host shell row, so its
    * provenance line carries a URN but no {@code shellId}.
    */
-  MAPPING
+  MAPPING,
+
+  /**
+   * The dataset an install produced. Recorded as a line rather than in the installation header,
+   * because an install need not produce one at all (the single-structure import does not) and
+   * because a line can carry its own create/reuse action.
+   */
+  DATA_SET
 }

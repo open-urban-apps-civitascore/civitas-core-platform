@@ -3,6 +3,8 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -11,8 +13,11 @@ import static org.mockito.Mockito.when;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.InstalledArtifactAction;
+import de.civitascore.portal.model.embedded.InstalledArtifactType;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.input.DataStructureImportInputDTO;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
@@ -21,6 +26,7 @@ import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,6 +58,7 @@ class DataStructureImportServiceTest {
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private DataStructureRepository dataStructureRepository;
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
+  @Mock private InstallationRecorder installationRecorder;
   @InjectMocks private DataStructureImportService importService;
 
   /** Stubs the guard chain for inputs that carry the valid datastructure URN. */
@@ -60,8 +67,23 @@ class DataStructureImportServiceTest {
     when(modelRegistryGateway.logicalUrn(DATASTRUCTURE_URN)).thenReturn(DATASTRUCTURE_URN);
   }
 
+  /**
+   * A version as the create path returns it: pinned to a shell row and to a registry version. Pure
+   * factory on purpose — a helper that also stubs cannot be passed to {@code thenReturn(...)}:
+   * Mockito rejects that as nested stubbing.
+   */
+  private static DataStructureVersion createdVersion(UUID structureId) {
+    DataStructure structure = new DataStructure();
+    structure.setId(structureId);
+    DataStructureVersion version = new DataStructureVersion();
+    version.setModelUrn(DATASTRUCTURE_URN + ":1.0.0");
+    version.setDataStructure(structure);
+    return version;
+  }
+
   @Captor private ArgumentCaptor<DataStructureInputDTO> structureInputCaptor;
   @Captor private ArgumentCaptor<DataStructureVersionInputDTO> versionInputCaptor;
+  @Captor private ArgumentCaptor<List<InstalledArtifact>> artifactLinesCaptor;
 
   private static DataStructureImportInputDTO importInput(Map<String, Object> model) {
     DataStructureImportInputDTO input = new DataStructureImportInputDTO();
@@ -85,7 +107,7 @@ class DataStructureImportServiceTest {
     DataStructure structure = new DataStructure();
     structure.setId(structureId);
     when(dataStructureService.create(any(DataStructureInputDTO.class))).thenReturn(structure);
-    DataStructureVersion version = new DataStructureVersion();
+    DataStructureVersion version = createdVersion(structureId);
     when(dataStructureVersionService.create(any(DataStructureVersionInputDTO.class)))
         .thenReturn(version);
 
@@ -107,6 +129,46 @@ class DataStructureImportServiceTest {
     assertThat(versionInput.getModelName()).isEqualTo("AirQualityStation");
     assertThat(versionInput.getModel()).containsKey("$defs");
     assertThat(versionInput.getStyles()).containsKey("nodes");
+  }
+
+  /**
+   * The single-artifact path records provenance too, so "installed" means the same thing whichever
+   * endpoint did it. It produces no dataset, which is why the header carries none.
+   */
+  @Test
+  void importDataStructure_recordsProvenanceWithoutADataset() {
+    stubValidUrn();
+    UUID structureId = UUID.randomUUID();
+    DataStructure structure = new DataStructure();
+    structure.setId(structureId);
+    when(dataStructureService.create(any(DataStructureInputDTO.class))).thenReturn(structure);
+    when(dataStructureVersionService.create(any(DataStructureVersionInputDTO.class)))
+        .thenReturn(createdVersion(structureId));
+    // The recorded line carries the logical URN, not the versioned one Model Forge returns.
+    when(modelRegistryGateway.logicalUrn(DATASTRUCTURE_URN + ":1.0.0"))
+        .thenReturn(DATASTRUCTURE_URN);
+    DataStructureImportInputDTO input = importInput();
+    input.setBundleId("urn:openurbanapps:datastructure:airqualitystation");
+    input.setBundleVersion("1.0.0");
+
+    importService.importDataStructure(input);
+
+    verify(installationRecorder)
+        .record(
+            eq("urn:openurbanapps:datastructure:airqualitystation"),
+            eq("1.0.0"),
+            isNull(),
+            isNull(),
+            artifactLinesCaptor.capture());
+    assertThat(artifactLinesCaptor.getValue())
+        .singleElement()
+        .satisfies(
+            line -> {
+              assertThat(line.getArtifactType()).isEqualTo(InstalledArtifactType.DATA_STRUCTURE);
+              assertThat(line.getShellId()).isEqualTo(structureId);
+              assertThat(line.getUrn()).isEqualTo(DATASTRUCTURE_URN);
+              assertThat(line.getAction()).isEqualTo(InstalledArtifactAction.CREATED);
+            });
   }
 
   @Test

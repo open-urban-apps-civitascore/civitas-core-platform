@@ -3,6 +3,7 @@ package de.civitascore.portal.model.input;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import java.util.Map;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -38,4 +39,14 @@ public class DataStructureImportInputDTO extends BaseDataEntityInputDTO {
 
   @Schema(description = "UI layout for the model, stored alongside it as x-ui-styles")
   private Map<String, Object> styles;
+
+  @Size(max = 1024, message = "bundleId must not exceed 1024 characters") @Schema(
+      description =
+          "Catalogue identity of the entry this import comes from, in whatever scheme the catalogue"
+              + " uses. Recorded verbatim in the install provenance, never interpreted — an import"
+              + " without catalogue identity simply records none.")
+  private String bundleId;
+
+  @Size(max = 255, message = "bundleVersion must not exceed 255 characters") @Schema(description = "Version of the catalogue entry, recorded alongside bundleId")
+  private String bundleVersion;
 }

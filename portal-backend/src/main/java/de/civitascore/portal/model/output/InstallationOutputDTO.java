@@ -20,7 +20,7 @@ import lombok.EqualsAndHashCode;
 public class InstallationOutputDTO extends BaseOutputDTO {
 
   @Schema(description = "Catalogue identity of the bundle, as declared by the installing caller")
-  private String bundleUrn;
+  private String bundleId;
 
   private String bundleVersion;
 

@@ -17,15 +17,14 @@ import lombok.Setter;
 import org.hibernate.annotations.BatchSize;
 
 /**
- * One bundle install as it happened: which bundle (as declared by the caller), which dataset shell
- * it produced, and — via {@link InstalledArtifact} — what it did to every contained artifact.
- * Written in the same transaction as the import itself, so the record exists exactly iff the
- * install committed. Who and when come from the audit columns ({@code createdBy}, {@code
- * createdAt}).
+ * One install as it happened: which bundle (as declared by the caller) and — via {@link
+ * InstalledArtifact} — what it did to every artifact it touched. Written in the same transaction as
+ * the import itself, so the record exists exactly iff the install committed. Who and when come from
+ * the audit columns ({@code createdBy}, {@code createdAt}).
  *
- * <p>Append-only history: the referenced dataset and artifacts are stored as plain ids and names,
- * not foreign keys, so the record survives their deletion — which is what makes it usable for
- * uninstall and reference counting later.
+ * <p>Append-only history: referenced artifacts are stored as plain ids and URNs, not foreign keys,
+ * so the record survives their deletion — which is what makes it usable for uninstall and reference
+ * counting later.
  */
 @Getter
 @Setter
@@ -33,17 +32,26 @@ import org.hibernate.annotations.BatchSize;
 @Table(name = "bundle_installations")
 public class BundleInstallation extends BaseEntity {
 
-  /** Catalogue identity of the installed bundle, as declared by the caller. Optional. */
-  @Column(name = "bundle_urn", length = 1024)
-  private String bundleUrn;
+  /**
+   * Catalogue identity of the installed bundle, as declared by the caller — recorded verbatim and
+   * never interpreted. Deliberately not called a URN: the value follows whatever scheme the
+   * catalogue uses and is not required to be a CORE URN.
+   */
+  @Column(name = "bundle_id", length = 1024)
+  private String bundleId;
 
   @Column(name = "bundle_version")
   private String bundleVersion;
 
-  @Column(name = "data_set_id", nullable = false)
+  /**
+   * The dataset this install produced, if any — a denormalised copy so the install list renders a
+   * title without joining the lines. The authoritative record is the {@code DATA_SET} artifact
+   * line; null for installs that produce no dataset, such as the single-structure import.
+   */
+  @Column(name = "data_set_id")
   private UUID dataSetId;
 
-  @Column(name = "data_set_name", nullable = false)
+  @Column(name = "data_set_name")
   private String dataSetName;
 
   /**

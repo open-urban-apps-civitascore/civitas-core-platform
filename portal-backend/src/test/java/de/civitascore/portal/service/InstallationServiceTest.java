@@ -38,7 +38,7 @@ class InstallationServiceTest {
     installation.setId(UUID.randomUUID());
     installation.setCreatedAt(LocalDateTime.of(2026, 8, 14, 12, 0));
     installation.setCreatedBy(UUID.randomUUID());
-    installation.setBundleUrn("urn:catalog:openurbanapps:usecase:verkehrszaehlung");
+    installation.setBundleId("urn:catalog:openurbanapps:usecase:verkehrszaehlung");
     installation.setBundleVersion("1.0.0");
     installation.setDataSetId(UUID.randomUUID());
     installation.setDataSetName("Verkehrszählung");
@@ -60,7 +60,7 @@ class InstallationServiceTest {
     assertThat(output.getId()).isEqualTo(installation.getId());
     assertThat(output.getCreatedAt()).isEqualTo(installation.getCreatedAt());
     assertThat(output.getInstalledBy()).isEqualTo(installation.getCreatedBy());
-    assertThat(output.getBundleUrn())
+    assertThat(output.getBundleId())
         .isEqualTo("urn:catalog:openurbanapps:usecase:verkehrszaehlung");
     assertThat(output.getDataSetName()).isEqualTo("Verkehrszählung");
     assertThat(output.getArtifacts())

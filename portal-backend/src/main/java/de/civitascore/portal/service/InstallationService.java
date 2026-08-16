@@ -34,7 +34,7 @@ public class InstallationService {
     output.setId(installation.getId());
     output.setCreatedAt(installation.getCreatedAt());
     output.setModifiedAt(installation.getModifiedAt());
-    output.setBundleUrn(installation.getBundleUrn());
+    output.setBundleId(installation.getBundleId());
     output.setBundleVersion(installation.getBundleVersion());
     output.setDataSetId(installation.getDataSetId());
     output.setDataSetName(installation.getDataSetName());

@@ -3,6 +3,8 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.InstalledArtifactAction;
+import de.civitascore.portal.model.embedded.InstalledArtifactType;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureImportInputDTO;
@@ -13,6 +15,7 @@ import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -44,6 +47,7 @@ public class DataStructureImportService {
   private final ModelRegistryGateway modelRegistryGateway;
   private final DataStructureRepository dataStructureRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
+  private final InstallationRecorder installationRecorder;
 
   /**
    * A bundle-import resolution: the version a containing artifact should reference, and whether it
@@ -67,7 +71,25 @@ public class DataStructureImportService {
   public DataStructureVersion importDataStructure(DataStructureImportInputDTO input) {
     String modelId = requireDataStructureId(input);
     rejectAlreadyInstalled(modelId);
-    return create(input);
+    DataStructureVersion version = create(input);
+
+    // Provenance for the single-artifact path too, so "installed" means the same thing regardless
+    // of which endpoint did it. No dataset is produced here — that is why the installation header
+    // carries none and the structure is simply the install's only line.
+    installationRecorder.record(
+        input.getBundleId(),
+        input.getBundleVersion(),
+        null,
+        null,
+        List.of(
+            InstallationRecorder.line(
+                InstalledArtifactType.DATA_STRUCTURE,
+                input.getName(),
+                version.getDataStructure().getId(),
+                modelRegistryGateway.logicalUrn(version.getModelUrn()),
+                InstalledArtifactAction.CREATED)));
+
+    return version;
   }
 
   /**

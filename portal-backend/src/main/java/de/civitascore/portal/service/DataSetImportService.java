@@ -16,7 +16,6 @@ import de.civitascore.portal.model.input.MappingImportInputDTO;
 import de.civitascore.portal.model.output.DataSetImportOutputDTO;
 import de.civitascore.portal.model.output.DataSetImportOutputDTO.ImportedArtifactDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.BundleInstallationRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.service.DataStructureImportService.ImportResolution;
 import de.civitascore.portal.service.MappingImportService.MappingResolution;
@@ -55,7 +54,7 @@ public class DataSetImportService {
   private final ModelRegistryGateway modelRegistryGateway;
   private final DataSourceService dataSourceService;
   private final DataSetService dataSetService;
-  private final BundleInstallationRepository bundleInstallationRepository;
+  private final InstallationRecorder installationRecorder;
 
   /**
    * Imports the bundle. Contained structures and mappings resolve by URN identity (create / reuse /
@@ -88,7 +87,7 @@ public class DataSetImportService {
       InstalledArtifactAction action =
           resolution.reused() ? InstalledArtifactAction.REUSED : InstalledArtifactAction.CREATED;
       artifactLines.add(
-          artifactLine(
+          InstallationRecorder.line(
               InstalledArtifactType.DATA_STRUCTURE,
               structure.getName(),
               shellId,
@@ -112,7 +111,7 @@ public class DataSetImportService {
       // URN here would duplicate that URN in the provenance — and credit it to the wrong bundle
       // when the structure was merely reused — so the urn stays null for sources.
       artifactLines.add(
-          artifactLine(
+          InstallationRecorder.line(
               InstalledArtifactType.DATA_SOURCE,
               created.getName(),
               created.getId(),
@@ -141,7 +140,7 @@ public class DataSetImportService {
       // Mirror image of a data source: a mapping has registry identity but no shell row, so the
       // line carries the urn and leaves shellId null.
       artifactLines.add(
-          artifactLine(
+          InstallationRecorder.line(
               InstalledArtifactType.MAPPING,
               mapping.getName(),
               null,
@@ -174,10 +173,27 @@ public class DataSetImportService {
       mappingUrns.forEach(urn -> modelRegistryGateway.linkToDataSet(manifestUrn, urn));
     }
 
-    // 6 · Provenance, in the same transaction: the record exists exactly iff the install
+    // 6 · The dataset is a touched artifact like any other, so it gets its own line — last,
+    // because that is when it came into being. It has both a shell row and a registry identity
+    // (its manifest), so unlike a source or a mapping the line carries both.
+    artifactLines.add(
+        InstallationRecorder.line(
+            InstalledArtifactType.DATA_SET,
+            dataSet.getName(),
+            dataSet.getId(),
+            manifestUrn,
+            InstalledArtifactAction.CREATED));
+
+    // 7 · Provenance, in the same transaction: the record exists exactly iff the install
     // committed. Without it the created/reused knowledge dies with this HTTP response, and
     // "installed by a bundle" versus "created by hand" is unanswerable later.
-    BundleInstallation installation = recordInstallation(input, dataSet, artifactLines);
+    BundleInstallation installation =
+        installationRecorder.record(
+            input.getBundleId(),
+            input.getBundleVersion(),
+            dataSet.getId(),
+            dataSet.getName(),
+            artifactLines);
 
     DataSetImportOutputDTO output = new DataSetImportOutputDTO();
     output.setDataSetId(dataSet.getId());
@@ -187,32 +203,6 @@ public class DataSetImportService {
     output.setDataSources(sourceResults);
     output.setMappings(mappingResults);
     return output;
-  }
-
-  private BundleInstallation recordInstallation(
-      DataSetImportInputDTO input, DataSet dataSet, List<InstalledArtifact> artifactLines) {
-    BundleInstallation installation = new BundleInstallation();
-    installation.setBundleUrn(input.getBundleUrn());
-    installation.setBundleVersion(input.getBundleVersion());
-    installation.setDataSetId(dataSet.getId());
-    installation.setDataSetName(dataSet.getName());
-    artifactLines.forEach(installation::addArtifact);
-    return bundleInstallationRepository.save(installation);
-  }
-
-  private static InstalledArtifact artifactLine(
-      InstalledArtifactType type,
-      String name,
-      UUID shellId,
-      String urn,
-      InstalledArtifactAction action) {
-    InstalledArtifact artifact = new InstalledArtifact();
-    artifact.setArtifactType(type);
-    artifact.setName(name);
-    artifact.setShellId(shellId);
-    artifact.setUrn(urn);
-    artifact.setAction(action);
-    return artifact;
   }
 
   private DataStructureVersion resolveStructureReference(
