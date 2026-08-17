@@ -42,7 +42,7 @@ skip_build_arg=""
 no_clean_arg=""
 
 # Optional infra services (default: start them). These are Kafka-decoupled from the modeling
-# path (frontend → APISIX → backend → Keycloak/Postgres/Kafka + embedded Model Forge), so they
+# path (frontend → APISIX → backend → Keycloak/Postgres/Kafka), so they
 # can be skipped when you only need to model DataStructures/Datasets/Pipelines and don't deploy.
 # Turned off by --no-frost/--no-geoserver/--no-nifi, or all at once (plus config-adapter) by --modeling.
 START_FROST=true
@@ -869,11 +869,12 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
         echo "  Config Adapter JAR built"
     fi
 
-    # Model Forge is embedded in portal-backend (core-model-forge-* artifacts) AND is the source of
-    # the Admin UI fat JAR (the reactor build packages core-model-forge-admin-ui too). Build it into
-    # the container Maven cache first so portal-backend can resolve core-model-forge-*:0.1.0-SNAPSHOT
-    # locally — it is not published to the external registry in a fresh dev setup. Model Forge keeps
-    # its own fixed version (no -Drevision). Only the Java jars are needed.
+    # Model Forge is the source of the Admin UI fat JAR (the reactor build packages
+    # core-model-forge-admin-ui too), so build it into the container Maven cache before the image
+    # build. portal-backend does not consume core-model-forge-* yet, so this is only needed for the
+    # Admin UI today; it is kept on the backend path as well so the dependency, once declared,
+    # resolves locally rather than from the external registry. Model Forge keeps its own fixed
+    # version (no -Drevision). Only the Java jars are needed.
     if [ "$backend_option" = "1" ] || [ "$START_ADMIN_UI" = "true" ]; then
         if ! mvn_build "$SCRIPT_DIR/../model-forge" $MVN_CLEAN install -DskipTests -Dspotless.check.skip=true -Dspotbugs.skip=true -q; then
             echo "ERROR: Model Forge build failed"

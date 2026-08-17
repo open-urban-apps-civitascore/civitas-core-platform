@@ -4,8 +4,8 @@
 # embedded Java libraries (model-forge-contract / -runtime / -spring-boot-starter, plus the
 # model-forge-admin-ui demo host). It builds like portal-model / config-adapter: build + test
 # the Maven reactor, then publish the Maven artifacts to the project registry so consumers
-# (portal-backend) can resolve them. (The TypeScript/Zod CORE types are generated directly in
-# portal-frontend from the CORE JSON Schemas — see portal-frontend/scripts/generate-core-types.mjs.)
+# (portal-backend) can resolve them. This reactor no longer ships an npm types module; the
+# TypeScript/Zod CORE types are generated in portal-frontend from the CORE JSON Schemas.
 #
 # Not ported (handled elsewhere or obsolete in the mono-repo):
 #   - Security templates (SAST / Secret-Detection / Dependency-Scanning): included globally in .gitlab-ci.yml
@@ -91,9 +91,8 @@ validate-schemas-model-forge:
       exit $FAILED
 
 # Build + test the whole reactor. `mvn verify` also runs the quality gates bound to the
-# verify phase (spotless format check, spotbugs static analysis) and regenerates + builds
-# the npm types module via frontend-maven-plugin. Needs Docker-in-Docker for the
-# Testcontainers-based tests (PostGIS registry client, admin-ui boot test).
+# verify phase (spotless format check, spotbugs static analysis). Needs Docker-in-Docker for
+# the Testcontainers-based tests (admin-ui boot test against a real PostgreSQL).
 test-model-forge:
   extends: .only-model-forge-changes
   image: maven:3.9-eclipse-temurin-25
@@ -115,7 +114,6 @@ test-model-forge:
         - model-forge/pom.xml
     paths:
       - .m2/repository
-      - model-forge/core-model-forge-types/node_modules
   script:
     - cd model-forge
     - mvn $MAVEN_CLI_OPTS verify

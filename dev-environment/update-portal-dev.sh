@@ -13,8 +13,8 @@
 #                       image (Dockerfile.frontend), so we just rebuild the image.
 #   - portal-backend  : the Dockerfile copies a pre-built fat JAR, so we build the
 #                       JAR first (containerized Maven, same .m2 volume as the
-#                       start script) — including the embedded model-forge — then
-#                       rebuild the image.
+#                       start script) — model-forge included, so its artifacts are
+#                       in the cache — then rebuild the image.
 #   - config-adapter  : same as the backend (pre-built fat JAR via -Pdist).
 #
 # In every case the container is recreated with --force-recreate, because a
@@ -70,7 +70,7 @@ all three are rebuilt.
 
 Components:
   -f, --frontend         portal-frontend
-  -b, --backend          portal-backend (rebuilds embedded model-forge too)
+  -b, --backend          portal-backend (rebuilds model-forge too)
   -c, --config-adapter   config-adapter
   -a, --all              all three (explicit)
 
@@ -188,18 +188,19 @@ if [ "$DO_CONFIG" = "true" ]; then
     echo
 fi
 
-# ---- portal-backend (embedded model-forge + pre-built fat JAR) --------------
+# ---- portal-backend (model-forge cache warm + pre-built fat JAR) -------------
 if [ "$DO_BACKEND" = "true" ]; then
     echo "== portal-backend =="
     # portal-model is a backend dependency resolved from the shared .m2 cache; rebuild it first so a
     # changed model (new entity/saga-payload field) is picked up. Not gated by --skip-model-forge —
-    # that flag is about the embedded model-forge, a separate dependency.
+    # that flag is about model-forge, a separate module.
     echo "  Building portal-model ($DEV_VERSION) — backend dependency..."
     mvn_in_container "$PROJECT_ROOT/portal-model" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q
     if [ "$SKIP_MODEL_FORGE" = "false" ]; then
-        # model-forge is embedded in the backend as core-model-forge-*:0.1.0-SNAPSHOT
-        # (fixed version, no -Drevision). Rebuild it into the cache first so the backend
-        # resolves it.
+        # model-forge publishes core-model-forge-*:0.1.0-SNAPSHOT (fixed version, no
+        # -Drevision). The backend does not depend on it yet; rebuilding it into the cache
+        # keeps the Admin UI jar current and makes the dependency resolvable locally once
+        # it is declared.
         echo "  Building model-forge (0.1.0-SNAPSHOT)..."
         mvn_in_container "$PROJECT_ROOT/model-forge" $MVN_CLEAN install -DskipTests \
             -Dspotless.check.skip=true -Dspotbugs.skip=true -q
