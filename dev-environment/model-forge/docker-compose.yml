@@ -7,12 +7,12 @@ services:
       POSTGRES_USER: model_forge
       POSTGRES_PASSWORD: model_forge
     ports:
-      # Host port 5433, not 5432: the main dev-environment Postgres (portal-backend's
-      # database, see ../postgres/docker-compose.yml) already binds 5432. This compose is
-      # meant to run alongside that stack for the combined local demo (see local-demo.md),
-      # so the admin-ui's own Postgres gets a distinct host port. Point the admin-ui at it
-      # via SPRING_DATASOURCE_URL — see local-demo.md.
-      - "5433:5432"
+      # Host port 5439: this compose is meant to run alongside the main dev stack (see
+      # local-demo.md), so it must avoid every host port that stack already binds — 5432 is
+      # portal-backend's database (../postgres/docker-compose.yml) and 5433 is Keycloak's
+      # (../keycloak/docker-compose.yml). Point the admin-ui at this instance via
+      # SPRING_DATASOURCE_URL — see local-demo.md.
+      - "5439:5432"
     volumes:
       - model_forge_admin_data:/var/lib/postgresql/data
     healthcheck:

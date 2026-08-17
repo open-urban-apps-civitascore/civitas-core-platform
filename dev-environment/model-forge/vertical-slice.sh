@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 #
-# Vertical slice: create a schema via portal-backend (which persists it through the
+# NOT YET FUNCTIONAL — requires a portal-backend integration that does not exist yet.
+#
+# The flow below assumes creating a DataStructure version through portal-backend also
+# persists a Model Forge Element. It does not: portal-backend has no dependency on the
+# Model Forge libraries, so it writes only its own entity and nothing to the registry.
+# The script therefore runs to completion but finds no artifact, and the Admin UI it
+# starts shows an empty registry. Keep it as the harness for the integration step.
+#
+# Intended flow: create a schema via portal-backend (which will persist it through the
 # embedded Model Forge) and then browse it in the Model Forge Admin UI — with the
 # Admin UI pointed at portal-backend's OWN database, so you see exactly what the
 # backend created.
@@ -34,7 +42,9 @@ KC_USERNAME="${KC_USERNAME:-dev@civitas.local}"
 KC_PASSWORD="${KC_PASSWORD:-dev123}"
 
 # --- Admin UI, pointed at portal-backend's DB / model_forge schema -----------
-ADMIN_UI_PORT="${ADMIN_UI_PORT:-8092}"   # 8090=Kafka UI, 8091=authz-repository — both taken by the stack
+# 8090=Kafka UI, 8091=authz-repository, 8092=the model-forge-admin-ui container that
+# start-portal-dev.sh already starts — all taken by the stack.
+ADMIN_UI_PORT="${ADMIN_UI_PORT:-8093}"
 PORTAL_DB_URL="${PORTAL_DB_URL:-jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable}"
 PORTAL_DB_USER="${PORTAL_DB_USER:-admin}"
 PORTAL_DB_PASS="${PORTAL_DB_PASS:-admin}"
@@ -75,5 +85,4 @@ SPRING_DATASOURCE_URL="$PORTAL_DB_URL" \
 SPRING_DATASOURCE_USERNAME="$PORTAL_DB_USER" \
 SPRING_DATASOURCE_PASSWORD="$PORTAL_DB_PASS" \
 MODEL_FORGE_ADMIN_UI_SEED_ENABLED=false \
-MODEL_FORGE_REGISTRY_MIGRATIONS_ENABLED=false \
 exec mvn -q spring-boot:run
