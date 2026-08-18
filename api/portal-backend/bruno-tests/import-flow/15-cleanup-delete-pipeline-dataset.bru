@@ -1,0 +1,30 @@
+meta {
+  name: Cleanup — delete pipeline dataset
+  type: http
+  seq: 15
+}
+
+delete {
+  url: {{baseUrl}}/datasets/{{pipelineDataSetId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("pipeline dataset removed", function() {
+    expect([200, 204]).to.include(res.status);
+  });
+}
+
+docs {
+  Best-effort cleanup for 14, same caveats as 11: the dataset shell goes, the
+  imported structure stays (DRAFT-released, run-unique URN). Known upstream
+  issue: registry artifacts of a deleted dataset are currently orphaned rather
+  than removed (see the meta repo's 2026-08-16 upstream findings), so repeated
+  runs accumulate registry entries — harmless for the tests, which key
+  everything by runId.
+}

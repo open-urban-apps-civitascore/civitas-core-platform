@@ -13,9 +13,9 @@ import lombok.EqualsAndHashCode;
  * one transaction — the backend orchestrates the graph; the caller never has to replay the UI's
  * cascade of requests.
  *
- * <p>Accepts the dataset shell, data structures, data sources and mappings. The fields for the
- * remaining artifact types exist so that callers sending them get an explicit 400 ("not yet
- * supported") instead of silent dropping.
+ * <p>Accepts the dataset shell, data structures, data sources, mappings, data sinks and pipelines —
+ * every part a runnable use case needs. Sinks and pipelines are created on the bundle's dataset; a
+ * pipeline's graph references its bundle siblings by name (see {@link PipelineImportInputDTO}).
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -50,9 +50,15 @@ public class DataSetImportInputDTO extends BaseDataEntityInputDTO {
               + " referencing the structures it transforms between by URN")
   private List<MappingImportInputDTO> mappings = List.of();
 
-  @Schema(description = "Not yet supported by the import — sending a non-empty list yields 400")
-  private List<Object> pipelines;
+  @Valid @Schema(
+      description =
+          "Data sinks shipped with this bundle, created on the bundle's dataset. Referenced by"
+              + " pipelines in the same bundle via their bundle-local name.")
+  private List<DataSinkImportInputDTO> dataSinks = List.of();
 
-  @Schema(description = "Not yet supported by the import — sending a non-empty list yields 400")
-  private List<Object> dataSinks;
+  @Valid @Schema(
+      description =
+          "Pipelines shipped with this bundle, created on the bundle's dataset. Node references"
+              + " name bundle members; the import rewrites them to the created artifacts' URNs.")
+  private List<PipelineImportInputDTO> pipelines = List.of();
 }

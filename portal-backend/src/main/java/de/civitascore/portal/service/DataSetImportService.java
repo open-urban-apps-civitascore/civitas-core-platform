@@ -1,18 +1,25 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
 import de.civitascore.portal.model.entity.BundleInstallation;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.InstalledArtifact;
+import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetImportInputDTO;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSinkImportInputDTO;
+import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.DataSourceImportInputDTO;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataStructureImportInputDTO;
 import de.civitascore.portal.model.input.MappingImportInputDTO;
+import de.civitascore.portal.model.input.PipelineImportInputDTO;
+import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.model.output.DataSetImportOutputDTO;
 import de.civitascore.portal.model.output.DataSetImportOutputDTO.ImportedArtifactDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
@@ -21,10 +28,15 @@ import de.civitascore.portal.service.DataStructureImportService.ImportResolution
 import de.civitascore.portal.service.MappingImportService.MappingResolution;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,16 +45,19 @@ import org.springframework.transaction.annotation.Transactional;
  * Imports a self-contained dataset bundle in one call: data structures first (created, or reused
  * when the same URN identity is already installed with identical content), then data sources
  * resolving their structure reference by URN, then mappings resolving theirs, then the dataset
- * shell — all in one transaction, so a rejected artifact rolls back the whole install.
+ * shell, then the sinks and pipelines that hang off it — all in one transaction, so a rejected
+ * artifact rolls back the whole install.
  *
  * <p>Contained structures are released to AVAILABLE right away (a catalogue artifact is finished
  * content, and sources can only link to AVAILABLE versions — see {@link
- * DataStructureImportService#ensureAvailable}); the dataset shell and its sources stay DRAFT, so
- * release remains a separate, permission-gated step and no saga is touched here ({@link
- * DataSetService} publishes infrastructure sagas only on dataset release).
+ * DataStructureImportService#ensureAvailable}). Sources a bundle pipeline wires in are released for
+ * the same reason: {@link PipelineService} only links AVAILABLE sources. The dataset shell itself
+ * stays DRAFT, so release remains a separate, permission-gated step and no saga is touched here
+ * ({@link DataSetService} publishes infrastructure sagas only on dataset release).
  *
- * <p>Supported bundle parts: dataset shell + data structures + data sources + mappings. Pipelines
- * and data sinks are rejected with an explicit message until their increments land.
+ * <p>Sinks and pipelines carry no portable identity — their URNs are minted by the receiving
+ * instance — so unlike structures and mappings they are always CREATED, never reused, and the
+ * bundle references them by bundle-local name rather than by URN.
  */
 @Service
 @RequiredArgsConstructor
@@ -53,6 +68,8 @@ public class DataSetImportService {
   private final DataStructureVersionRepository dataStructureVersionRepository;
   private final ModelRegistryGateway modelRegistryGateway;
   private final DataSourceService dataSourceService;
+  private final DataSinkService dataSinkService;
+  private final PipelineService pipelineService;
   private final DataSetService dataSetService;
   private final InstallationRecorder installationRecorder;
 
@@ -70,8 +87,6 @@ public class DataSetImportService {
    */
   @Transactional
   public DataSetImportOutputDTO importDataSet(DataSetImportInputDTO input) {
-    rejectUnsupportedParts(input);
-
     // 1 · Structures: create or reuse, keyed by logical URN for the sources to reference.
     // Response and provenance lines are both derived from the domain result — neither view
     // feeds the other, so a cosmetic response change can never alter the recorded history.
@@ -103,10 +118,19 @@ public class DataSetImportService {
     }
 
     // 2 · Sources: resolve the structure reference (bundle first, then installed), then create.
+    // Collected by bundle-local name for the pipelines to reference; a duplicated name is only an
+    // error if a pipeline actually references it — resolveByName rejects the ambiguity then.
     List<ImportedArtifactDTO> sourceResults = new ArrayList<>();
+    Map<String, DataSource> sourcesByName = new LinkedHashMap<>();
+    Set<String> ambiguousNames = new HashSet<>();
     for (DataSourceImportInputDTO source : input.getDataSources()) {
-      DataStructureVersion version = resolveStructureReference(source, structuresByLogicalUrn);
+      DataStructureVersion version =
+          resolveStructureReference(
+              source.getDataStructureUrn(), "DataSource", source.getName(), structuresByLogicalUrn);
       DataSource created = dataSourceService.create(toDataSourceInput(source, version));
+      if (sourcesByName.putIfAbsent(created.getName(), created) != null) {
+        ambiguousNames.add(created.getName());
+      }
       // A data source has no registry identity of its own. Recording the referenced structure's
       // URN here would duplicate that URN in the provenance — and credit it to the wrong bundle
       // when the structure was merely reused — so the urn stays null for sources.
@@ -131,12 +155,16 @@ public class DataSetImportService {
     // so provenance and response read in chain order (source → mapping).
     List<ImportedArtifactDTO> mappingResults = new ArrayList<>();
     List<String> mappingUrns = new ArrayList<>();
+    Map<String, String> mappingUrnsByName = new LinkedHashMap<>();
     for (MappingImportInputDTO mapping : input.getMappings()) {
       requireResolvableStructureReferences(mapping, structuresByLogicalUrn);
       MappingResolution resolution = mappingImportService.importOrReuse(mapping);
       InstalledArtifactAction action =
           resolution.reused() ? InstalledArtifactAction.REUSED : InstalledArtifactAction.CREATED;
       mappingUrns.add(resolution.logicalUrn());
+      if (mappingUrnsByName.putIfAbsent(mapping.getName(), resolution.logicalUrn()) != null) {
+        ambiguousNames.add(mapping.getName());
+      }
       // Mirror image of a data source: a mapping has registry identity but no shell row, so the
       // line carries the urn and leaves shellId null.
       artifactLines.add(
@@ -155,27 +183,16 @@ public class DataSetImportService {
               .build());
     }
 
-    // 4 · The dataset shell, last — the host artifacts do not reference it.
+    // 4 · The dataset shell — before sinks and pipelines, which are created on it. It gets its
+    // provenance line here, in touch order; it has both a shell row and a registry identity (its
+    // manifest), so unlike a source or a mapping the line carries both.
     DataSetInputDTO dataSetInput = new DataSetInputDTO();
     dataSetInput.setName(input.getName());
     dataSetInput.setDescription(input.getDescription());
     dataSetInput.setDatapoolId(input.getDatapoolId());
     dataSetInput.setAssignments(input.getAssignments());
     DataSet dataSet = dataSetService.create(dataSetInput);
-
-    // 5 · Manifest membership for the registry-only artifacts. Without it a bundled mapping belongs
-    // to no dataset and shows up under the "orphans by type" query — the use case would install its
-    // mapping and then disown it. Cannot happen inside the loop above: the manifest exists only
-    // once
-    // DataSetService has persisted the shell.
     String manifestUrn = dataSet.getManifestLogicalUrn();
-    if (manifestUrn != null) {
-      mappingUrns.forEach(urn -> modelRegistryGateway.linkToDataSet(manifestUrn, urn));
-    }
-
-    // 6 · The dataset is a touched artifact like any other, so it gets its own line — last,
-    // because that is when it came into being. It has both a shell row and a registry identity
-    // (its manifest), so unlike a source or a mapping the line carries both.
     artifactLines.add(
         InstallationRecorder.line(
             InstalledArtifactType.DATA_SET,
@@ -184,7 +201,76 @@ public class DataSetImportService {
             manifestUrn,
             InstalledArtifactAction.CREATED));
 
-    // 7 · Provenance, in the same transaction: the record exists exactly iff the install
+    // 5 · Sinks, before the pipelines that link them. The bundle authors the target structure in
+    // configuration.element as a CORE URN; the sink contract wants the resolved version's model
+    // URN, so the reference is rewritten before DataSinkService validates and stores it. Sink
+    // names are the handles pipelines resolve against, so they must be unique outright.
+    List<ImportedArtifactDTO> sinkResults = new ArrayList<>();
+    Map<String, DataSink> sinksByName = new LinkedHashMap<>();
+    for (DataSinkImportInputDTO sink : input.getDataSinks()) {
+      if (sinksByName.containsKey(sink.getName())) {
+        throw new InvalidInputException(
+            "DataSink", sink.getName(), "duplicate data sink name in bundle");
+      }
+      DataSink created =
+          dataSinkService.create(toDataSinkInput(sink, dataSet, structuresByLogicalUrn));
+      sinksByName.put(sink.getName(), created);
+      artifactLines.add(
+          InstallationRecorder.line(
+              InstalledArtifactType.DATA_SINK,
+              sink.getName(),
+              created.getId(),
+              created.getConfigurationLogicalUrn(),
+              InstalledArtifactAction.CREATED));
+      sinkResults.add(
+          ImportedArtifactDTO.builder()
+              .name(sink.getName())
+              .id(created.getId())
+              .urn(created.getConfigurationLogicalUrn())
+              .action(InstalledArtifactAction.CREATED)
+              .build());
+    }
+
+    // 6 · Pipelines. The graph is the single source of truth: name references are rewritten to
+    // the created artifacts' minted URNs, and the source/sink links are derived from exactly
+    // those resolutions — no separate id lists that could drift from the graph.
+    List<ImportedArtifactDTO> pipelineResults = new ArrayList<>();
+    for (PipelineImportInputDTO pipeline : input.getPipelines()) {
+      PipelineWiring wiring =
+          resolvePipelineReferences(
+              pipeline, sourcesByName, sinksByName, mappingUrnsByName, ambiguousNames);
+      // A pipeline can only link AVAILABLE sources; a bundle source it wires in is finished
+      // catalogue content, so release it — same rationale (and same upstream design note) as
+      // DataStructureImportService.ensureAvailable for structures.
+      wiring.linkedSources().stream()
+          .filter(source -> source.getDataSourceStatus() == DataSourceStatus.DRAFT)
+          .forEach(source -> dataSourceService.release(source.getId()));
+      Pipeline created = pipelineService.create(toPipelineInput(pipeline, dataSet, wiring));
+      artifactLines.add(
+          InstallationRecorder.line(
+              InstalledArtifactType.PIPELINE,
+              pipeline.getName(),
+              created.getId(),
+              created.getModelLogicalUrn(),
+              InstalledArtifactAction.CREATED));
+      pipelineResults.add(
+          ImportedArtifactDTO.builder()
+              .name(pipeline.getName())
+              .id(created.getId())
+              .urn(created.getModelLogicalUrn())
+              .action(InstalledArtifactAction.CREATED)
+              .build());
+    }
+
+    // 7 · Manifest membership for the registry-only artifacts. Without it a bundled mapping
+    // belongs to no dataset and shows up under the "orphans by type" query — the use case would
+    // install its mapping and then disown it. A pipeline links its own reference closure when
+    // PipelineService stores it; the explicit link keeps mapping-only bundles covered.
+    if (manifestUrn != null) {
+      mappingUrns.forEach(urn -> modelRegistryGateway.linkToDataSet(manifestUrn, urn));
+    }
+
+    // 8 · Provenance, in the same transaction: the record exists exactly iff the install
     // committed. Without it the created/reused knowledge dies with this HTTP response, and
     // "installed by a bundle" versus "created by hand" is unanswerable later.
     BundleInstallation installation =
@@ -202,17 +288,27 @@ public class DataSetImportService {
     output.setDataStructures(structureResults);
     output.setDataSources(sourceResults);
     output.setMappings(mappingResults);
+    output.setDataSinks(sinkResults);
+    output.setPipelines(pipelineResults);
     return output;
   }
 
+  /**
+   * Resolves a data structure reference for any bundle artifact that carries one — a source's
+   * {@code dataStructureUrn} or a sink's {@code configuration.element}. Bundle structures win over
+   * installed ones; an installed DRAFT structure is released on the way (a structure a bundle wires
+   * into its flow is finished catalogue content).
+   */
   private DataStructureVersion resolveStructureReference(
-      DataSourceImportInputDTO source, Map<String, ImportResolution> structuresByLogicalUrn) {
-    String reference = source.getDataStructureUrn();
+      String reference,
+      String artifactKind,
+      String artifactName,
+      Map<String, ImportResolution> structuresByLogicalUrn) {
     if (!modelRegistryGateway.isDataStructureUrn(reference)) {
       throw new InvalidInputException(
-          "DataSource",
-          source.getName(),
-          "dataStructureUrn must be a CORE URN of artifact type 'datastructure', got: "
+          artifactKind,
+          artifactName,
+          "structure reference must be a CORE URN of artifact type 'datastructure', got: "
               + reference);
     }
     String logicalUrn = modelRegistryGateway.logicalUrn(reference);
@@ -234,8 +330,8 @@ public class DataSetImportService {
         .orElseThrow(
             () ->
                 new InvalidInputException(
-                    "DataSource",
-                    source.getName(),
+                    artifactKind,
+                    artifactName,
                     "references data structure '%s', which is neither part of this bundle nor"
                             .formatted(logicalUrn)
                         + " installed"));
@@ -297,16 +393,166 @@ public class DataSetImportService {
     return dto;
   }
 
-  private void rejectUnsupportedParts(DataSetImportInputDTO input) {
-    boolean hasUnsupported =
-        (input.getPipelines() != null && !input.getPipelines().isEmpty())
-            || (input.getDataSinks() != null && !input.getDataSinks().isEmpty());
-    if (hasUnsupported) {
-      throw new InvalidInputException(
-          "DataSet",
-          input.getName(),
-          "This import currently supports the dataset shell, dataStructures, dataSources and"
-              + " mappings. Pipelines and dataSinks are not yet supported by the import endpoint.");
+  private DataSinkInputDTO toDataSinkInput(
+      DataSinkImportInputDTO sink,
+      DataSet dataSet,
+      Map<String, ImportResolution> structuresByLogicalUrn) {
+    DataSinkInputDTO dto = new DataSinkInputDTO();
+    dto.setDataSinkType(sink.getDataSinkType());
+    dto.setDataSetId(dataSet.getId());
+    Map<String, Object> configuration = sink.getConfiguration();
+    if (configuration != null) {
+      // Copy before rewriting — the input DTO stays as authored.
+      Map<String, Object> rewritten = new LinkedHashMap<>(configuration);
+      if (rewritten.get("element") instanceof String element && !element.isBlank()) {
+        DataStructureVersion version =
+            resolveStructureReference(element, "DataSink", sink.getName(), structuresByLogicalUrn);
+        // The versioned model URN — what DataSinkService validates and Model Forge records as
+        // the datasink-element edge. The bundle authors the logical URN because it cannot know
+        // which version the receiving instance resolves.
+        rewritten.put("element", version.getModelUrn());
+      }
+      dto.setConfiguration(rewritten);
     }
+    return dto;
+  }
+
+  /**
+   * The wiring one bundle pipeline resolves to: its graph with every name reference rewritten to a
+   * minted CORE URN, and the source/sink links derived from those resolutions. Sources are kept as
+   * entities because the caller must release DRAFT ones before {@link PipelineService} will link
+   * them.
+   */
+  private record PipelineWiring(
+      Map<String, Object> model, List<DataSource> linkedSources, Set<UUID> sinkIds) {}
+
+  /**
+   * Walks the pipeline graph and resolves its references. A {@code sourceRef}/{@code
+   * sinkRef}/{@code mappingRef} value starting with {@code urn:} passes through verbatim (and
+   * derives no link — the artifact is expected to exist on the instance); any other value must name
+   * a bundle member of the matching type. The input model is never mutated.
+   */
+  private PipelineWiring resolvePipelineReferences(
+      PipelineImportInputDTO pipeline,
+      Map<String, DataSource> sourcesByName,
+      Map<String, DataSink> sinksByName,
+      Map<String, String> mappingUrnsByName,
+      Set<String> ambiguousNames) {
+    Map<String, Object> model = pipeline.getModel();
+    List<DataSource> linkedSources = new ArrayList<>();
+    Set<UUID> sinkIds = new LinkedHashSet<>();
+    if (model == null || !(model.get("nodes") instanceof List<?> nodes)) {
+      return new PipelineWiring(model, linkedSources, sinkIds);
+    }
+
+    List<Object> rewrittenNodes = new ArrayList<>(nodes.size());
+    for (Object nodeRaw : nodes) {
+      if (!(nodeRaw instanceof Map<?, ?> nodeMap)) {
+        rewrittenNodes.add(nodeRaw);
+        continue;
+      }
+      Map<String, Object> node = new LinkedHashMap<>();
+      nodeMap.forEach((key, value) -> node.put(String.valueOf(key), value));
+
+      rewriteReference(
+          pipeline,
+          node,
+          "sourceRef",
+          ambiguousNames,
+          name -> {
+            DataSource source = sourcesByName.get(name);
+            if (source == null) {
+              return null;
+            }
+            // Found, but not referencable: the graph needs the minted configuration URN, and a
+            // source without connector configuration never got one. Conflating this with "name
+            // unknown" sends the author hunting for a typo that does not exist.
+            if (source.getConfigurationUrn() == null) {
+              throw new InvalidInputException(
+                  "Pipeline",
+                  pipeline.getName(),
+                  ("sourceRef '%s' resolves to a bundle data source without connector"
+                          + " configuration — a pipeline cannot reference it")
+                      .formatted(name));
+            }
+            linkedSources.add(source);
+            return source.getConfigurationUrn();
+          });
+      rewriteReference(
+          pipeline,
+          node,
+          "sinkRef",
+          ambiguousNames,
+          name -> {
+            DataSink sink = sinksByName.get(name);
+            if (sink == null) {
+              return null;
+            }
+            // Same distinction as for sources: a FROST sink created without configuration has no
+            // minted URN a graph could point at.
+            if (sink.getConfigurationUrn() == null) {
+              throw new InvalidInputException(
+                  "Pipeline",
+                  pipeline.getName(),
+                  ("sinkRef '%s' resolves to a bundle data sink without configuration — a"
+                          + " pipeline cannot reference it")
+                      .formatted(name));
+            }
+            sinkIds.add(sink.getId());
+            return sink.getConfigurationUrn();
+          });
+      rewriteReference(pipeline, node, "mappingRef", ambiguousNames, mappingUrnsByName::get);
+
+      rewrittenNodes.add(node);
+    }
+
+    Map<String, Object> rewrittenModel = new LinkedHashMap<>(model);
+    rewrittenModel.put("nodes", rewrittenNodes);
+    return new PipelineWiring(rewrittenModel, linkedSources, sinkIds);
+  }
+
+  private void rewriteReference(
+      PipelineImportInputDTO pipeline,
+      Map<String, Object> node,
+      String refKey,
+      Set<String> ambiguousNames,
+      Function<String, String> resolveName) {
+    if (!(node.get(refKey) instanceof String reference)
+        || reference.isBlank()
+        || reference.startsWith("urn:")) {
+      return;
+    }
+    if (ambiguousNames.contains(reference)) {
+      throw new InvalidInputException(
+          "Pipeline",
+          pipeline.getName(),
+          "%s '%s' is ambiguous — more than one bundle artifact carries that name"
+              .formatted(refKey, reference));
+    }
+    String resolved = resolveName.apply(reference);
+    if (resolved == null) {
+      throw new InvalidInputException(
+          "Pipeline",
+          pipeline.getName(),
+          "%s references '%s', which is not part of this bundle".formatted(refKey, reference));
+    }
+    node.put(refKey, resolved);
+  }
+
+  private PipelineInputDTO toPipelineInput(
+      PipelineImportInputDTO pipeline, DataSet dataSet, PipelineWiring wiring) {
+    PipelineInputDTO dto = new PipelineInputDTO();
+    dto.setName(pipeline.getName());
+    dto.setDescription(pipeline.getDescription());
+    dto.setDataSetId(dataSet.getId());
+    dto.setModel(wiring.model());
+    dto.setStyles(pipeline.getStyles());
+    Set<UUID> sourceIds =
+        wiring.linkedSources().stream()
+            .map(DataSource::getId)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    dto.setDataSourceIds(sourceIds.isEmpty() ? null : sourceIds);
+    dto.setDataSinkIds(wiring.sinkIds().isEmpty() ? null : wiring.sinkIds());
+    return dto;
   }
 }

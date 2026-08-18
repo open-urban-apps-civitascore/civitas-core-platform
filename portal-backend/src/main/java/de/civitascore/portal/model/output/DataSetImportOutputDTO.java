@@ -35,6 +35,18 @@ public class DataSetImportOutputDTO {
               + " registry artifact identified by its URN.")
   private List<ImportedArtifactDTO> mappings = new ArrayList<>();
 
+  @Schema(
+      description =
+          "Data sinks created on the bundle's dataset. 'urn' is the sink's minted configuration"
+              + " URN; always CREATED — a sink has no portable identity to reuse.")
+  private List<ImportedArtifactDTO> dataSinks = new ArrayList<>();
+
+  @Schema(
+      description =
+          "Pipelines created on the bundle's dataset. 'urn' is the pipeline's minted model URN;"
+              + " always CREATED.")
+  private List<ImportedArtifactDTO> pipelines = new ArrayList<>();
+
   @Data
   @Builder
   public static class ImportedArtifactDTO {

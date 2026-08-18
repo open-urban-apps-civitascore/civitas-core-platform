@@ -10,20 +10,28 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
 import de.civitascore.portal.model.entity.BundleInstallation;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.InstalledArtifact;
+import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetImportInputDTO;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSinkImportInputDTO;
+import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.DataSourceImportInputDTO;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataStructureImportInputDTO;
 import de.civitascore.portal.model.input.MappingImportInputDTO;
+import de.civitascore.portal.model.input.PipelineImportInputDTO;
+import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.model.output.DataSetImportOutputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -44,10 +52,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Unit tests for {@link DataSetImportService}: orchestration order (structures → sources → mappings
- * → dataset → manifest links), URN-based structure resolution for sources and mappings (bundle
- * first, then installed), and the explicit rejection of not-yet-supported bundle parts. The
- * collaborating services are mocked; their own guards are covered in {@link
- * DataStructureImportServiceTest} and {@link MappingImportServiceTest}.
+ * → dataset → sinks → pipelines → manifest links), URN-based structure resolution for sources,
+ * mappings and sink elements (bundle first, then installed), and the pipeline graph rewrite that
+ * turns bundle-local name references into the created artifacts' minted URNs. The collaborating
+ * services are mocked; their own guards are covered in {@link DataStructureImportServiceTest} and
+ * {@link MappingImportServiceTest}.
  */
 @ExtendWith(MockitoExtension.class)
 class DataSetImportServiceTest {
@@ -65,6 +74,8 @@ class DataSetImportServiceTest {
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private DataSourceService dataSourceService;
+  @Mock private DataSinkService dataSinkService;
+  @Mock private PipelineService pipelineService;
   @Mock private DataSetService dataSetService;
   @Mock private InstallationRecorder installationRecorder;
   @InjectMocks private DataSetImportService importService;
@@ -117,6 +128,64 @@ class DataSetImportServiceTest {
     input.setDataSources(sources);
     input.setMappings(mappings);
     return input;
+  }
+
+  private static DataSinkImportInputDTO sinkInput(String name, String elementUrn) {
+    DataSinkImportInputDTO sink = new DataSinkImportInputDTO();
+    sink.setName(name);
+    sink.setDataSinkType(DataSinkType.POSTGIS);
+    // Immutable on purpose: the import must copy before rewriting, never mutate the input.
+    sink.setConfiguration(Map.of("tableName", "measurements", "element", elementUrn));
+    return sink;
+  }
+
+  private static PipelineImportInputDTO pipelineInput(Map<String, Object> model) {
+    PipelineImportInputDTO pipeline = new PipelineImportInputDTO();
+    pipeline.setName("Zählung zu Messung");
+    pipeline.setModel(model);
+    return pipeline;
+  }
+
+  /** A linear source → mapping → sink graph referencing bundle members by name. */
+  private static Map<String, Object> pipelineModel(
+      String sourceRef, String mappingRef, String sinkRef) {
+    return Map.of(
+        "nodes",
+        List.of(
+            Map.of("id", "n-source", "kind", "source", "sourceRef", sourceRef),
+            Map.of("id", "n-mapping", "kind", "mapping", "mappingRef", mappingRef),
+            Map.of("id", "n-sink", "kind", "sink", "sinkRef", sinkRef)),
+        "edges",
+        List.of(
+            Map.of("id", "e1", "source", "n-source", "target", "n-mapping"),
+            Map.of("id", "e2", "source", "n-mapping", "target", "n-sink")));
+  }
+
+  /** A created source as DataSourceService returns it: id, name, minted config URN, DRAFT. */
+  private static DataSource createdSource(String name) {
+    DataSource source = new DataSource();
+    source.setId(UUID.randomUUID());
+    source.setName(name);
+    source.setConfigurationUrn("urn:core:platform:civitas:datasource:common:feed:x1y2z3:1.0.0");
+    source.setDataSourceStatus(DataSourceStatus.DRAFT);
+    return source;
+  }
+
+  /** A created sink as DataSinkService returns it: id plus minted configuration pins. */
+  private static DataSink createdSink() {
+    DataSink sink = new DataSink();
+    sink.setId(UUID.randomUUID());
+    sink.setConfigurationLogicalUrn("urn:core:platform:civitas:datasink:common:table:a1b2c3");
+    sink.setConfigurationUrn("urn:core:platform:civitas:datasink:common:table:a1b2c3:1.0.0");
+    return sink;
+  }
+
+  /** A created pipeline as PipelineService returns it: id plus minted model pin. */
+  private static Pipeline createdPipeline() {
+    Pipeline pipeline = new Pipeline();
+    pipeline.setId(UUID.randomUUID());
+    pipeline.setModelLogicalUrn("urn:core:platform:civitas:pipeline:common:flow:p1p2p3");
+    return pipeline;
   }
 
   private static DataSet dataSetWithManifest() {
@@ -282,7 +351,7 @@ class DataSetImportServiceTest {
     assertThatThrownBy(
             () -> importService.importDataSet(bundle(List.of(), List.of(sourceInput("not-a-urn")))))
         .isInstanceOf(InvalidInputException.class)
-        .hasMessageContaining("dataStructureUrn");
+        .hasMessageContaining("structure reference must be a CORE URN");
 
     verify(dataSourceService, never()).create(any());
     verify(dataSetService, never()).create(any());
@@ -448,16 +517,213 @@ class DataSetImportServiceTest {
   }
 
   @Test
-  void importDataSet_withUnsupportedParts_rejectsWithClearMessage() {
+  void importDataSet_rewritesSinkElementToTheResolvedVersionedUrn() {
+    stubUrnHelpers();
+    when(dataStructureImportService.importOrReuse(any(DataStructureImportInputDTO.class)))
+        .thenReturn(new ImportResolution(version(), false));
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSetWithManifest());
+    DataSink sink = createdSink();
+    when(dataSinkService.create(any(DataSinkInputDTO.class))).thenReturn(sink);
+    stubInstallationRecord();
+
+    DataSetImportInputDTO input = bundle(List.of(structureInput()), List.of());
+    // The bundle authors the target structure's LOGICAL urn — it cannot know which version the
+    // receiving instance resolves.
+    input.setDataSinks(List.of(sinkInput("PostGIS Tabelle", STRUCTURE_URN)));
+    DataSetImportOutputDTO output = importService.importDataSet(input);
+
+    ArgumentCaptor<DataSinkInputDTO> sinkCaptor = ArgumentCaptor.forClass(DataSinkInputDTO.class);
+    verify(dataSinkService).create(sinkCaptor.capture());
+    assertThat(sinkCaptor.getValue().getConfiguration().get("element")).isEqualTo(VERSIONED_URN);
+    assertThat(sinkCaptor.getValue().getDataSetId()).isNotNull();
+
+    assertThat(output.getDataSinks())
+        .singleElement()
+        .satisfies(
+            result -> {
+              assertThat(result.getId()).isEqualTo(sink.getId());
+              assertThat(result.getUrn()).isEqualTo(sink.getConfigurationLogicalUrn());
+              assertThat(result.getAction()).isEqualTo(InstalledArtifactAction.CREATED);
+            });
+  }
+
+  @Test
+  void importDataSet_wiresPipelineGraphAndDerivesLinksFromNameReferences() {
+    stubUrnHelpers();
+    when(dataStructureImportService.importOrReuse(any(DataStructureImportInputDTO.class)))
+        .thenReturn(new ImportResolution(version(), false));
+    DataSource source = createdSource("Station Feed");
+    when(dataSourceService.create(any(DataSourceInputDTO.class))).thenReturn(source);
+    when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
+        .thenReturn(new MappingResolution(MAPPING_URN, false));
+    DataSet dataSet = dataSetWithManifest();
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSet);
+    DataSink sink = createdSink();
+    when(dataSinkService.create(any(DataSinkInputDTO.class))).thenReturn(sink);
+    Pipeline pipeline = createdPipeline();
+    when(pipelineService.create(any(PipelineInputDTO.class))).thenReturn(pipeline);
+    stubInstallationRecord();
+
+    DataSetImportInputDTO input =
+        bundle(
+            List.of(structureInput()),
+            List.of(sourceInput(STRUCTURE_URN)),
+            List.of(mappingInput(mappingDocument(STRUCTURE_URN))));
+    input.setDataSinks(List.of(sinkInput("PostGIS Tabelle", STRUCTURE_URN)));
+    input.setPipelines(
+        List.of(
+            pipelineInput(
+                pipelineModel("Station Feed", "Station → Observation", "PostGIS Tabelle"))));
+    DataSetImportOutputDTO output = importService.importDataSet(input);
+
+    // The graph's name references are rewritten to the minted URNs of the created artifacts…
+    ArgumentCaptor<PipelineInputDTO> pipelineCaptor =
+        ArgumentCaptor.forClass(PipelineInputDTO.class);
+    verify(pipelineService).create(pipelineCaptor.capture());
+    PipelineInputDTO created = pipelineCaptor.getValue();
+    assertThat(created.getDataSetId()).isEqualTo(dataSet.getId());
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> nodes = (List<Map<String, Object>>) created.getModel().get("nodes");
+    assertThat(nodes.get(0)).containsEntry("sourceRef", source.getConfigurationUrn());
+    assertThat(nodes.get(1)).containsEntry("mappingRef", MAPPING_URN);
+    assertThat(nodes.get(2)).containsEntry("sinkRef", sink.getConfigurationUrn());
+
+    // …the source/sink links are derived from exactly those resolutions…
+    assertThat(created.getDataSourceIds()).containsExactly(source.getId());
+    assertThat(created.getDataSinkIds()).containsExactly(sink.getId());
+
+    // …and the DRAFT bundle source is released first, because pipelines only link AVAILABLE ones.
+    verify(dataSourceService).release(source.getId());
+
+    // Provenance lines in touch order; sink and pipeline always CREATED.
+    assertThat(recordedLines())
+        .extracting(InstalledArtifact::getArtifactType)
+        .containsExactly(
+            InstalledArtifactType.DATA_STRUCTURE,
+            InstalledArtifactType.DATA_SOURCE,
+            InstalledArtifactType.MAPPING,
+            InstalledArtifactType.DATA_SET,
+            InstalledArtifactType.DATA_SINK,
+            InstalledArtifactType.PIPELINE);
+    assertThat(output.getPipelines())
+        .singleElement()
+        .satisfies(
+            result -> {
+              assertThat(result.getId()).isEqualTo(pipeline.getId());
+              assertThat(result.getUrn()).isEqualTo(pipeline.getModelLogicalUrn());
+              assertThat(result.getAction()).isEqualTo(InstalledArtifactAction.CREATED);
+            });
+  }
+
+  @Test
+  void importDataSet_passesLiteralUrnReferencesThroughWithoutLinking() {
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSetWithManifest());
+    Pipeline pipeline = createdPipeline();
+    when(pipelineService.create(any(PipelineInputDTO.class))).thenReturn(pipeline);
+    stubInstallationRecord();
+
+    String literalRef = "urn:core:platform:civitas:datasource:common:existing:q9w8e7:2.0.0";
     DataSetImportInputDTO input = bundle(List.of(), List.of());
-    input.setPipelines(List.of(Map.of("name", "pipeline")));
+    input.setPipelines(
+        List.of(
+            pipelineInput(
+                Map.of(
+                    "nodes",
+                    List.of(Map.of("id", "n1", "kind", "source", "sourceRef", literalRef))))));
+    importService.importDataSet(input);
+
+    ArgumentCaptor<PipelineInputDTO> pipelineCaptor =
+        ArgumentCaptor.forClass(PipelineInputDTO.class);
+    verify(pipelineService).create(pipelineCaptor.capture());
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> nodes =
+        (List<Map<String, Object>>) pipelineCaptor.getValue().getModel().get("nodes");
+    assertThat(nodes.get(0)).containsEntry("sourceRef", literalRef);
+    // A literal URN derives no link and releases nothing — the artifact is expected to exist.
+    assertThat(pipelineCaptor.getValue().getDataSourceIds()).isNull();
+    verify(dataSourceService, never()).release(any());
+  }
+
+  @Test
+  void importDataSet_whenPipelineReferencesUnknownName_rejects() {
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSetWithManifest());
+
+    DataSetImportInputDTO input = bundle(List.of(), List.of());
+    input.setPipelines(
+        List.of(
+            pipelineInput(
+                Map.of(
+                    "nodes",
+                    List.of(
+                        Map.of(
+                            "id",
+                            "n1",
+                            "kind",
+                            "datasource",
+                            "sourceRef",
+                            "Unbekannte Quelle"))))));
 
     assertThatThrownBy(() -> importService.importDataSet(input))
         .isInstanceOf(InvalidInputException.class)
-        .hasMessageContaining("not yet supported");
+        .hasMessageContaining("sourceRef references 'Unbekannte Quelle'");
 
-    verify(dataStructureImportService, never()).importOrReuse(any());
-    verify(dataSetService, never()).create(any());
+    verify(pipelineService, never()).create(any());
+    verify(installationRecorder, never()).record(any(), any(), any(), any(), any());
+  }
+
+  /**
+   * A config-less source resolves by name but has no minted configuration URN a graph could point
+   * at. This must be its own message — "not part of this bundle" would send the author hunting for
+   * a typo that does not exist. Found live: the 1.1.0 catalogue source shipped without connector
+   * configuration.
+   */
+  @Test
+  void importDataSet_whenPipelineReferencesConfiglessSource_saysSoInsteadOfNameNotFound() {
+    stubUrnHelpers();
+    when(dataStructureImportService.importOrReuse(any(DataStructureImportInputDTO.class)))
+        .thenReturn(new ImportResolution(version(), false));
+    DataSource configless = createdSource("Zählstellen-Feed");
+    configless.setConfigurationUrn(null);
+    when(dataSourceService.create(any(DataSourceInputDTO.class))).thenReturn(configless);
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSetWithManifest());
+
+    DataSetImportInputDTO input =
+        bundle(List.of(structureInput()), List.of(sourceInput(STRUCTURE_URN)));
+    input.setPipelines(
+        List.of(
+            pipelineInput(
+                Map.of(
+                    "nodes",
+                    List.of(
+                        Map.of(
+                            "id", "n1", "kind", "source", "sourceRef", "Zählstellen-Feed"))))));
+
+    assertThatThrownBy(() -> importService.importDataSet(input))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("without connector configuration");
+
+    verify(pipelineService, never()).create(any());
+    verify(installationRecorder, never()).record(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void importDataSet_whenSinkNamesCollide_rejects() {
+    stubUrnHelpers();
+    when(dataStructureImportService.importOrReuse(any(DataStructureImportInputDTO.class)))
+        .thenReturn(new ImportResolution(version(), false));
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSetWithManifest());
+    when(dataSinkService.create(any(DataSinkInputDTO.class))).thenReturn(createdSink());
+
+    DataSetImportInputDTO input = bundle(List.of(structureInput()), List.of());
+    input.setDataSinks(
+        List.of(
+            sinkInput("PostGIS Tabelle", STRUCTURE_URN),
+            sinkInput("PostGIS Tabelle", STRUCTURE_URN)));
+
+    assertThatThrownBy(() -> importService.importDataSet(input))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("duplicate data sink name");
+
     verify(installationRecorder, never()).record(any(), any(), any(), any(), any());
   }
 }

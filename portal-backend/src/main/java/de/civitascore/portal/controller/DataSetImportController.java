@@ -47,19 +47,22 @@ public class DataSetImportController {
    */
   @Operation(
       summary =
-          "Import a dataset bundle (shell + data structures + data sources + mappings) in one call",
+          "Import a dataset bundle (shell + structures + sources + mappings + sinks + pipelines)"
+              + " in one call",
       description =
-          "Creates everything in DRAFT within one transaction. Contained data structures resolve"
-              + " by URN identity: unknown → created, installed with identical content → reused,"
+          "Creates everything within one transaction. Contained data structures resolve by URN"
+              + " identity: unknown → created, installed with identical content → reused,"
               + " installed with different content → 409. A mapping resolves the same way by its"
               + " author-supplied mappingUrn, and is linked into the new dataset's manifest."
-              + " Releasing remains a separate step.")
+              + " Sinks and pipelines are created on the bundle's dataset; a pipeline's graph"
+              + " references its bundle siblings by name, rewritten to the created artifacts'"
+              + " URNs. Releasing the dataset remains a separate step.")
   @ApiResponse(responseCode = "201", description = "Bundle imported; summary returned")
   @ApiResponse(
       responseCode = "400",
       description =
-          "Invalid bundle (unsupported parts, unresolvable structure reference from a source or a"
-              + " mapping, invalid contained artifact); nothing is created",
+          "Invalid bundle (unresolvable structure or pipeline reference, ambiguous or duplicate"
+              + " bundle-local name, invalid contained artifact); nothing is created",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "409",
