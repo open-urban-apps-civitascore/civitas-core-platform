@@ -10,6 +10,7 @@ import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.ConfigEventPublisherService;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -175,7 +176,11 @@ public class UserInitializer {
       userConfig.setEmailVerified(true);
     } else {
       userConfig.setEmailVerified(false);
-      userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+      List<String> requiredActions = new ArrayList<>(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+      if (keycloakProperties.enforceOtp()) {
+        requiredActions.add("CONFIGURE_TOTP");
+      }
+      userConfig.setRequiredActions(requiredActions);
     }
 
     try {
