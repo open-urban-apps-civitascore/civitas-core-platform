@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.StyleMapper;
@@ -13,6 +15,7 @@ import de.civitascore.portal.model.input.StyleInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.StyleRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
@@ -24,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +37,9 @@ class StyleServiceTest {
   @Mock private StyleMapper styleMapper;
   @Mock private DataSetRepository dataSetRepository;
   @Mock private LayerRepository layerRepository;
+
+  // Real instance, not a mock: these tests assert on the rejection it produces.
+  @Spy private SldContentValidator sldContentValidator = new SldContentValidator();
 
   @InjectMocks private StyleService styleService;
 
@@ -207,6 +214,66 @@ class StyleServiceTest {
       when(styleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       assertThatCode(() -> styleService.update(styleId, input)).doesNotThrowAnyException();
+    }
+  }
+
+  @Nested
+  @DisplayName("preSave() — SLD content")
+  class PreSaveSldContent {
+
+    private static final String DOCTYPE_SLD =
+        "<?xml version=\"1.0\"?><!DOCTYPE StyledLayerDescriptor><StyledLayerDescriptor/>";
+
+    @Test
+    @DisplayName("Should reject a create whose SLD declares a DOCTYPE, before persisting it")
+    void shouldRejectDoctypeOnCreate() {
+      UUID dataSetId = UUID.randomUUID();
+      DataSet ds = dataSet(dataSetId);
+
+      StyleInputDTO input = new StyleInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setName("my-style");
+      input.setSldContent(DOCTYPE_SLD);
+
+      Style entity = new Style();
+      entity.setDataSet(ds);
+      entity.setName("my-style");
+      entity.setSldContent(DOCTYPE_SLD);
+
+      when(styleMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> styleService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DOCTYPE");
+      verify(styleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should reject an update whose SLD declares a DOCTYPE, leaving the stored style")
+    void shouldRejectDoctypeOnUpdate() {
+      UUID styleId = UUID.randomUUID();
+      UUID dataSetId = UUID.randomUUID();
+      DataSet ds = dataSet(dataSetId);
+
+      Style existing = new Style();
+      existing.setId(styleId);
+      existing.setDataSet(ds);
+      existing.setName("my-style");
+      existing.setSldContent(DOCTYPE_SLD);
+
+      StyleInputDTO input = new StyleInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setName("my-style");
+      input.setSldContent(DOCTYPE_SLD);
+
+      when(styleRepository.findById(styleId)).thenReturn(Optional.of(existing));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> styleService.update(styleId, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DOCTYPE");
+      verify(styleRepository, never()).save(any());
     }
   }
 

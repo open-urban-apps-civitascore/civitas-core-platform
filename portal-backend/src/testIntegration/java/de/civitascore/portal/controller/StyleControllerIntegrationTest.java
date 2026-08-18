@@ -266,6 +266,64 @@ class StyleControllerIntegrationTest
   }
 
   @Nested
+  @DisplayName("SLD Content Tests")
+  class SldContentTests {
+
+    @Test
+    @DisplayName("Should return 400 naming DOCTYPE when creating a Style whose SLD declares one")
+    void shouldReturn400OnDoctypeCreate() {
+      StyleInputDTO input = createValidInput();
+      input.setSldContent(
+          "<?xml version=\"1.0\"?><!DOCTYPE StyledLayerDescriptor>"
+              + "<StyledLayerDescriptor version=\"1.0.0\"/>");
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail()).contains("DOCTYPE", "sldContent");
+      assertThat(styleRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should return 400 when updating a Style to an SLD that declares a DOCTYPE")
+    void shouldReturn400OnDoctypeUpdate() {
+      StyleOutputDTO created = performCreate(createValidInput()).getBody();
+      assertThat(created).isNotNull();
+
+      StyleInputDTO update = createUpdateInput();
+      update.setSldContent(
+          "<?xml version=\"1.0\"?><!DOCTYPE StyledLayerDescriptor [ <!ENTITY x \"y\"> ]>"
+              + "<StyledLayerDescriptor version=\"1.0.0\"/>");
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + created.getId(),
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              update);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(styleRepository.findById(created.getId()))
+          .get()
+          .extracting(Style::getSldContent)
+          .isEqualTo("<StyledLayerDescriptor version=\"1.0.0\"/>");
+    }
+
+    @Test
+    @DisplayName("Should accept an SLD carrying a DOCTYPE only inside a comment, as GeoServer does")
+    void shouldAcceptDoctypeInsideComment() {
+      StyleInputDTO input = createValidInput();
+      input.setSldContent(
+          "<?xml version=\"1.0\"?><!-- <!DOCTYPE StyledLayerDescriptor> -->"
+              + "<StyledLayerDescriptor version=\"1.0.0\"/>");
+
+      assertThat(performCreate(input).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+  }
+
+  @Nested
   @DisplayName("Delete Protection Tests")
   class DeleteProtectionTests {
 

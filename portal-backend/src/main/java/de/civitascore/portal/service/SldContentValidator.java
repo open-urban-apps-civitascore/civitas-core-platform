@@ -1,0 +1,110 @@
+package de.civitascore.portal.service;
+
+import de.civitascore.portal.util.InvalidInputException;
+import java.io.StringReader;
+import javax.xml.XMLConstants;
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Component;
+
+/**
+ * Rejects SLD documents GeoServer cannot parse: one that declares a DTD, and one that is not
+ * well-formed XML. GeoServer refuses both with an opaque server error while publishing, so checking
+ * here turns a late saga failure into a field-level error at submission.
+ */
+@Component
+public class SldContentValidator {
+
+  /** Field name reported to the client so it can highlight the offending input. */
+  private static final String FIELD = "sldContent";
+
+  private static final String RESOURCE_TYPE = "Style";
+
+  /**
+   * Verifies that GeoServer would accept this SLD document. Blank content is left to {@code
+   * NotBlank} on the input DTO.
+   *
+   * @throws InvalidInputException if the document declares a DTD or is not well-formed XML
+   */
+  public void validate(String sldContent) {
+    if (StringUtils.isBlank(sldContent)) {
+      return;
+    }
+
+    XMLStreamReader reader = null;
+    try {
+      reader = secureFactory().createXMLStreamReader(new StringReader(sldContent));
+      while (reader.hasNext()) {
+        if (reader.next() == XMLStreamConstants.DTD) {
+          throw doctypeDeclared();
+        }
+      }
+    } catch (XMLStreamException e) {
+      // A DOCTYPE pointing at an external DTD fails on the denied access before it is reported as
+      // an event, so it reaches this branch instead.
+      throw declaresDoctype(sldContent) ? doctypeDeclared() : notWellFormed(e);
+    } finally {
+      closeQuietly(reader);
+    }
+  }
+
+  /**
+   * A parser that reports a DTD as an event so a declared one can be named in the error, while
+   * fetching nothing it references. Entity references are never expanded, and a document whose DTD
+   * lives outside it is refused rather than retrieved — GeoServer rejects that document too.
+   */
+  private static XMLInputFactory secureFactory() {
+    XMLInputFactory factory = XMLInputFactory.newFactory();
+    factory.setProperty(XMLInputFactory.SUPPORT_DTD, true);
+    factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+    factory.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
+    factory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+    return factory;
+  }
+
+  /** Whether a rejected document declares a DTD, which decides only which message it gets. */
+  private static boolean declaresDoctype(String sldContent) {
+    return sldContent.contains("<!DOCTYPE");
+  }
+
+  private static InvalidInputException doctypeDeclared() {
+    return new InvalidInputException(
+        RESOURCE_TYPE,
+        FIELD,
+        "Style "
+            + FIELD
+            + " must not declare a DOCTYPE. GeoServer refuses any document containing a"
+            + " <!DOCTYPE ...> declaration — remove that line and upload the style again.");
+  }
+
+  private static InvalidInputException notWellFormed(XMLStreamException cause) {
+    int line = cause.getLocation() != null ? cause.getLocation().getLineNumber() : -1;
+    int column = cause.getLocation() != null ? cause.getLocation().getColumnNumber() : -1;
+    // The parser's own wording is deliberately not echoed: the JDK localises it to the server's
+    // default locale, which would make a client-facing message depend on where the backend runs.
+    return new InvalidInputException(
+        RESOURCE_TYPE,
+        FIELD,
+        "Style "
+            + FIELD
+            + " is not well-formed XML at line "
+            + line
+            + ", column "
+            + column
+            + ". Fix the XML at that position and upload the style again.");
+  }
+
+  private static void closeQuietly(XMLStreamReader reader) {
+    if (reader == null) {
+      return;
+    }
+    try {
+      reader.close();
+    } catch (XMLStreamException e) {
+      // Nothing actionable: the document has already been accepted or rejected.
+    }
+  }
+}
