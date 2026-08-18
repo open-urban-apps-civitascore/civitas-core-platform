@@ -1,0 +1,28 @@
+meta {
+  name: Uninstall — delete the installation
+  type: http
+  seq: 18
+}
+
+delete {
+  url: {{baseUrl}}/installations/{{uninstallInstallationId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("uninstalled", function() {
+    expect(res.status).to.equal(204);
+  });
+}
+
+docs {
+  Slice 1 of uninstall: structure-only installations. Deletes the structure
+  (shell, version, registry model) through the regular delete path and marks
+  the installation uninstalled — the record survives as history. 19 proves the
+  deletion actually happened.
+}

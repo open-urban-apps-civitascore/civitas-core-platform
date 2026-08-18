@@ -1,0 +1,44 @@
+meta {
+  name: Uninstall — locate the installation by bundleId
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/installations?size=200
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const target = 'urn:openurbanapps:datastructure:brunouninstall:r' + bru.getVar('runId');
+    const match = (res.body.content || []).find(row => row.bundleId === target && !row.uninstalledAt);
+    if (match) {
+      bru.setVar('uninstallInstallationId', match.id);
+    }
+  }
+}
+
+tests {
+  test("the installation from 16 is recorded and active", function() {
+    expect(res.status).to.equal(200);
+    const target = 'urn:openurbanapps:datastructure:brunouninstall:r' + bru.getVar('runId');
+    const match = (res.body.content || []).find(row => row.bundleId === target);
+    expect(match).to.not.equal(undefined);
+    expect(match.uninstalledAt).to.satisfy(v => v === null || v === undefined);
+    expect(match.artifacts).to.have.length(1);
+    expect(match.artifacts[0].artifactType).to.equal('DATA_STRUCTURE');
+    expect(match.artifacts[0].action).to.equal('CREATED');
+  });
+}
+
+docs {
+  The provenance answers "which installation put this here" — by bundleId,
+  because that is the identity the catalogue owns. Also pins that a fresh
+  installation carries no uninstalledAt.
+}

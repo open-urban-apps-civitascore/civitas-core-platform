@@ -311,3 +311,11 @@ test_is_collection_endpoint_datapools if {
 test_not_collection_endpoint_datapools_resource if {
 	not portal_backend.is_collection_endpoint with input as portal_request("GET", "/v1/datapools/pool-123")
 }
+
+test_endpoints_contains_installations if {
+	portal_backend.endpoints["/v1/installations"]
+}
+
+test_endpoints_contains_installations_id_delete if {
+	portal_backend.endpoints["/v1/installations/{id}"].DELETE == "INSTALLATION_DELETE"
+}

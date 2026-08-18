@@ -1,0 +1,43 @@
+meta {
+  name: Uninstall proof — the same identity imports again
+  type: http
+  seq: 19
+}
+
+post {
+  url: {{baseUrl}}/imports/datastructures
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Bruno Uninstall Struktur",
+    "description": "Re-import after uninstall — must be a fresh 201, not a 409",
+    "model": {
+      "$id": "urn:core:city:openurbanapps:datastructure:test:brunouninstall:r{{runId}}",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "value": { "type": "number" }
+      }
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("the identity is free again", function() {
+    expect(res.status).to.equal(201);
+  });
+}
+
+docs {
+  The strongest proof 18 can get: the same URN identity imports again with 201.
+  If uninstall had left the shell or the registry artifact behind, this would
+  be the 409 from the reimport turnstile (see 02). The re-imported structure
+  stays behind (run-unique URN, DRAFT) — same cleanup caveat as flow 11.
+}

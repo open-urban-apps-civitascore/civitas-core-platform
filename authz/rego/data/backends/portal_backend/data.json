@@ -2,7 +2,6 @@
   "_comment": "Portal Backend API permission mappings. Owner: Team 2",
   "_version": "1.0.0",
   "_backend_id": "portal-backend",
-
   "endpoints": {
     "/v1/users/me": {
       "GET": null
@@ -42,7 +41,10 @@
       "DELETE": "GROUP_DELETE"
     },
     "/v1/groups/{id}/assignments": {
-      "PUT": ["ASSIGNMENT_CREATE", "ASSIGNMENT_DELETE"]
+      "PUT": [
+        "ASSIGNMENT_CREATE",
+        "ASSIGNMENT_DELETE"
+      ]
     },
     "/v1/permissions": {
       "_collection": true,
@@ -86,7 +88,10 @@
       "POST": "DATASET_RELEASE"
     },
     "/v1/datasets/{id}/released/meta": {
-      "PUT": ["DATASET_UPDATE", "DATASET_RELEASE"]
+      "PUT": [
+        "DATASET_UPDATE",
+        "DATASET_RELEASE"
+      ]
     },
     "/v1/datasets/{id}/assignments": {
       "GET": "DATASET_READ"
@@ -165,7 +170,10 @@
       "POST": "DATASOURCE_RELEASE"
     },
     "/v1/datasources/{id}/released/meta": {
-      "PUT": ["DATASOURCE_UPDATE", "DATASOURCE_RELEASE"]
+      "PUT": [
+        "DATASOURCE_UPDATE",
+        "DATASOURCE_RELEASE"
+      ]
     },
     "/v1/datasources/{id}/assignments": {
       "GET": "DATASOURCE_READ"
@@ -188,7 +196,10 @@
       "POST": "DATASTRUCTURE_RELEASE"
     },
     "/v1/datastructures/{id}/released/meta": {
-      "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
+      "PUT": [
+        "DATASTRUCTURE_UPDATE",
+        "DATASTRUCTURE_RELEASE"
+      ]
     },
     "/v1/datastructures/{id}/assignments": {
       "GET": "DATASTRUCTURE_READ"
@@ -210,7 +221,10 @@
       "POST": "DATASTRUCTURE_RELEASE"
     },
     "/v1/datastructures/{id}/versions/{id}/released/meta": {
-      "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
+      "PUT": [
+        "DATASTRUCTURE_UPDATE",
+        "DATASTRUCTURE_RELEASE"
+      ]
     },
     "/v1/imports/datastructures": {
       "_collection": true,
@@ -223,6 +237,9 @@
     "/v1/installations": {
       "_collection": true,
       "GET": "INSTALLATION_READ"
+    },
+    "/v1/installations/{id}": {
+      "DELETE": "INSTALLATION_DELETE"
     },
     "/v1/datapools": {
       "_collection": true,
@@ -238,6 +255,6 @@
     "/v1/datapools/{id}/assignments": {
       "GET": "DATAPOOL_READ"
     },
-    "_removed_for_v2": "catalogs and dataspaces removed — not implemented in v2.0 (see #989). OPA denies as unknown_endpoint."
+    "_removed_for_v2": "catalogs and dataspaces removed \u2014 not implemented in v2.0 (see #989). OPA denies as unknown_endpoint."
   }
 }

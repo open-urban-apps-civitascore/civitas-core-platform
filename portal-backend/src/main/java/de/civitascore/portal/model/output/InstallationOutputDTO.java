@@ -3,6 +3,7 @@ package de.civitascore.portal.model.output;
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -29,6 +30,9 @@ public class InstallationOutputDTO extends BaseOutputDTO {
 
   @Schema(description = "User id the install ran as (audit created_by)")
   private UUID installedBy;
+
+  @Schema(description = "When this installation was uninstalled; null while active")
+  private LocalDateTime uninstalledAt;
 
   private List<InstalledArtifactOutputDTO> artifacts = new ArrayList<>();
 

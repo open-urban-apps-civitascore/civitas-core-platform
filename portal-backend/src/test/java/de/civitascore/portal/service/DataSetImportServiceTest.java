@@ -695,8 +695,7 @@ class DataSetImportServiceTest {
                 Map.of(
                     "nodes",
                     List.of(
-                        Map.of(
-                            "id", "n1", "kind", "source", "sourceRef", "Zählstellen-Feed"))))));
+                        Map.of("id", "n1", "kind", "source", "sourceRef", "Zählstellen-Feed"))))));
 
     assertThatThrownBy(() -> importService.importDataSet(input))
         .isInstanceOf(InvalidInputException.class)

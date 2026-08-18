@@ -8,6 +8,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -53,6 +54,14 @@ public class BundleInstallation extends BaseEntity {
 
   @Column(name = "data_set_name")
   private String dataSetName;
+
+  /**
+   * When this installation was uninstalled; null while active. The one permitted amendment to the
+   * journal: a single terminal timestamp — lines and header survive, so "was installed from X to Y"
+   * stays answerable. Who uninstalled follows from {@code modifiedBy} of the same write.
+   */
+  @Column(name = "uninstalled_at")
+  private LocalDateTime uninstalledAt;
 
   /**
    * Ordered list, not a set: lines are append-only with no dedup semantics, and the explicit
