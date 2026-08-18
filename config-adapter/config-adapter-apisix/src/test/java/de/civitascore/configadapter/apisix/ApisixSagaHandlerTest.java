@@ -663,13 +663,14 @@ class ApisixSagaHandlerTest {
         // id "ds-001" normalizes to the workspace "ds_001".
         assertEquals("ds-001-ows", routeBody.get("upstream_id"));
         assertArrayEquals(
-            new String[] {
-              "^/v1/datasets/ds-001/map/?$",
-              "/geoserver/ds_001/ows",
-              "^/v1/datasets/ds-001/map(/.+)$",
-              "/geoserver/ds_001/ows$1"
-            },
+            new String[] {"^/v1/datasets/ds-001/map/?$", "/geoserver/ds_001/ows"},
             (String[]) proxyRewriteOf(routeBody).get("regex_uri"));
+        // An OWS endpoint takes its parameters in the query string, so the route matches the bare
+        // address and the trailing-slash form only — a sub-path would reach the unthrottled
+        // service.
+        assertArrayEquals(
+            new String[] {"/v1/datasets/ds-001/map", "/v1/datasets/ds-001/map/"},
+            (String[]) routeBody.get("uris"));
         // Protected → gateway gate present.
         assertEquals("auth-plugin-1", routeBody.get("plugin_config_id"));
         // The route self-describes its standard but carries NO FROST upstream credential.
@@ -784,11 +785,13 @@ class ApisixSagaHandlerTest {
         Map<String, Object> staRoute = entityCaptor.getAllValues().get(2).getEntity();
         Map<String, Object> owsRoute = entityCaptor.getAllValues().get(3).getEntity();
 
+        // The two standards match differently: STA addresses entities by sub-path, while an OWS
+        // endpoint takes its parameters in the query string and matches its address exactly.
         assertArrayEquals(
             new String[] {"/v1/datasets/ds-001/data", "/v1/datasets/ds-001/data/*"},
             (String[]) staRoute.get("uris"));
         assertArrayEquals(
-            new String[] {"/v1/datasets/ds-001/map", "/v1/datasets/ds-001/map/*"},
+            new String[] {"/v1/datasets/ds-001/map", "/v1/datasets/ds-001/map/"},
             (String[]) owsRoute.get("uris"));
         assertEquals("ds-001", staRoute.get("upstream_id"));
         assertEquals("ds-001-ows", owsRoute.get("upstream_id"));
@@ -1981,6 +1984,10 @@ class ApisixSagaHandlerTest {
                 "^/v1/datasets/ds-001(/.+)$",
                 "/FROST-Server/v1.1/Projects(1)$1"),
             RouteAuthConfigurer.readStringList(proxyRewrite.get("regex_uri")));
+        // An STA endpoint addresses entities by sub-path, so the wildcard stays.
+        assertEquals(
+            List.of("/v1/datasets/ds-001", "/v1/datasets/ds-001/*"),
+            RouteAuthConfigurer.readStringList(capturePutBody().get("uris")));
       }
     }
 
@@ -2378,8 +2385,9 @@ class ApisixSagaHandlerTest {
      * genuine end-to-end coverage that a real gateway rewrites this way lives in {@code
      * ApisixSagaHandlerRoutingIT}.
      */
-    private String applyRewrite(String routePath, String upstreamPath, String requestPath) {
-      String[] pairs = PathRewrite.pairs(routePath, upstreamPath);
+    private String applyRewrite(
+        String routePath, String upstreamPath, RouteUpstreamKind kind, String requestPath) {
+      String[] pairs = PathRewrite.pairs(routePath, upstreamPath, kind);
       for (int i = 0; i < pairs.length; i += 2) {
         Matcher matcher = Pattern.compile(pairs[i]).matcher(requestPath);
         if (matcher.matches()) {
@@ -2394,25 +2402,26 @@ class ApisixSagaHandlerTest {
         delimiter = '|',
         nullValues = "NULL",
         value = {
-          "rewrites sub-path to upstream path | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001/Things | /FROST-Server/v1.1/Projects(1)/Things",
-          "rewrites nested sub-path | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001/Things(42)/Datastreams | /FROST-Server/v1.1/Projects(1)/Things(42)/Datastreams",
-          "rewrites base path without trailing slash | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1)",
-          "drops a lone trailing slash, which FROST answers with 404 | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001/ | /FROST-Server/v1.1/Projects(1)",
-          "rewrites with query string in path | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001/Things?$top=10&$skip=0 | /FROST-Server/v1.1/Projects(1)/Things?$top=10&$skip=0",
-          "keeps an OWS request on the throttled map service | /v1/datasets/ds-001/map | /geoserver/ds_001/ows | /v1/datasets/ds-001/map | /geoserver/ds_001/ows",
-          "drops a lone trailing slash, which GeoServer routes to the unthrottled admin service | /v1/datasets/ds-001/map | /geoserver/ds_001/ows | /v1/datasets/ds-001/map/ | /geoserver/ds_001/ows",
-          "keeps a deeper OWS sub-path | /v1/datasets/ds-001/map | /geoserver/ds_001/ows | /v1/datasets/ds-001/map/wfs | /geoserver/ds_001/ows/wfs",
-          "does not match different dataset ID | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-002/Things | NULL",
-          "does not match unrelated path | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /api/v1/users | NULL",
-          "does not match legacy /datasets path without /v1 prefix | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /datasets/ds-001/Things | NULL",
+          "rewrites sub-path to upstream path | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001/Things | /FROST-Server/v1.1/Projects(1)/Things",
+          "rewrites nested sub-path | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001/Things(42)/Datastreams | /FROST-Server/v1.1/Projects(1)/Things(42)/Datastreams",
+          "rewrites base path without trailing slash | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1)",
+          "drops a lone trailing slash, which FROST answers with 404 | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001/ | /FROST-Server/v1.1/Projects(1)",
+          "rewrites with query string in path | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001/Things?$top=10&$skip=0 | /FROST-Server/v1.1/Projects(1)/Things?$top=10&$skip=0",
+          "keeps an OWS request on the throttled map service | OWS | /v1/datasets/ds-001/map | /geoserver/ds_001/ows | /v1/datasets/ds-001/map | /geoserver/ds_001/ows",
+          "drops a lone trailing slash, which GeoServer routes to the unthrottled admin service | OWS | /v1/datasets/ds-001/map | /geoserver/ds_001/ows | /v1/datasets/ds-001/map/ | /geoserver/ds_001/ows",
+          "does not rewrite an OWS sub-path, which the route no longer matches | OWS | /v1/datasets/ds-001/map | /geoserver/ds_001/ows | /v1/datasets/ds-001/map/wfs | NULL",
+          "does not match different dataset ID | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-002/Things | NULL",
+          "does not match unrelated path | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /api/v1/users | NULL",
+          "does not match legacy /datasets path without /v1 prefix | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /datasets/ds-001/Things | NULL",
         })
     void shouldApplyRewriteRegex(
         String description,
+        RouteUpstreamKind kind,
         String routePath,
         String upstreamPath,
         String requestPath,
         String expected) {
-      String result = applyRewrite(routePath, upstreamPath, requestPath);
+      String result = applyRewrite(routePath, upstreamPath, kind, requestPath);
       assertEquals(expected, result);
     }
   }

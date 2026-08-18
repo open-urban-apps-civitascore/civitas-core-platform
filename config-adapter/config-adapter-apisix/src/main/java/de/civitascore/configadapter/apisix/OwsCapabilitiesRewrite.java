@@ -57,7 +57,7 @@ final class OwsCapabilitiesRewrite {
       Map<String, Object> plugins,
       Map<String, Object> proxyRewrite,
       String apiHost) {
-    String externalPath = firstUri(route);
+    String externalPath = PathRewrite.firstUri(route);
     String workspacePath = upstreamWorkspacePath(proxyRewrite);
     if (externalPath == null || workspacePath == null) {
       return;
@@ -75,20 +75,6 @@ final class OwsCapabilitiesRewrite {
     plugins.put("response-rewrite", responseRewrite);
 
     stripRequestBodyEncoding(proxyRewrite);
-  }
-
-  /**
-   * First URI a route matches — its external path (e.g. {@code /v1/datasets/{id}/{slug}}). Reads
-   * {@code uris} (what CREATE writes) and falls back to a singular {@code uri} (APISIX may return
-   * either form on read-back).
-   */
-  private static String firstUri(Map<String, Object> route) {
-    List<String> uris = RouteAuthConfigurer.readStringList(route.get("uris"));
-    if (!uris.isEmpty()) {
-      return uris.get(0);
-    }
-    Object uri = route.get("uri");
-    return uri instanceof String s && !s.isBlank() ? s : null;
   }
 
   /**

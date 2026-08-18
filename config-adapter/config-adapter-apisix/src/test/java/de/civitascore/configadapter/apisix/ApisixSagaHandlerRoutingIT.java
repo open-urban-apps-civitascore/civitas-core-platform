@@ -12,6 +12,7 @@ package de.civitascore.configadapter.apisix;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -483,14 +484,28 @@ class ApisixSagaHandlerRoutingIT extends AbstractApisixIT {
           objectMapper.readTree(trailingSlash.body()).get("path").asText(),
           "a trailing slash must resolve to the same upstream path as the bare OWS endpoint");
 
-      // A deeper sub-path keeps its suffix rather than collapsing onto the OWS endpoint.
-      HttpResponse<String> subPath =
-          sendGatewayRequest("/v1/datasets/" + datasetId + "/" + owsSlug + "/wfs", API_HOST);
+      // An OWS endpoint takes its parameters in the query string, so a sub-path is not part of its
+      // address. GeoServer answers such a path from its admin service, where the map-rendering
+      // limit
+      // is switched off, so the gateway must not forward it at all.
+      // Routes provisioned by sibling tests outlive them in this shared gateway, so one of those
+      // may
+      // answer instead of nothing at all. What matters is that the workspace OWS path is not
+      // reached.
+      for (String subPath : List.of("/wfs", "/x", "/a/b", "/wfs/")) {
+        HttpResponse<String> belowEndpoint =
+            sendGatewayRequest("/v1/datasets/" + datasetId + "/" + owsSlug + subPath, API_HOST);
+        boolean reachedOws =
+            belowEndpoint.statusCode() != 404
+                && objectMapper
+                    .readTree(belowEndpoint.body())
+                    .get("path")
+                    .asText()
+                    .startsWith("/geoserver/");
 
-      assertEquals(
-          "/geoserver/" + workspace + "/ows/wfs",
-          objectMapper.readTree(subPath.body()).get("path").asText(),
-          "a sub-path below the OWS endpoint must be forwarded unchanged");
+        assertFalse(
+            reachedOws, "a sub-path below the OWS endpoint must not reach GeoServer — " + subPath);
+      }
     }
   }
 
