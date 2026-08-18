@@ -97,6 +97,10 @@ class SldContentValidatorTest {
             sld(XML_DECL).replace("<Name>probe</Name>", "<Name>&undeclared;</Name>"),
             Outcome.REJECTED_AS_MALFORMED),
         arguments(
+            "a malformed document whose only DOCTYPE text sits in a comment",
+            XML_DECL + "<!-- <!DOCTYPE StyledLayerDescriptor> --><StyledLayerDescriptor>",
+            Outcome.REJECTED_AS_MALFORMED),
+        arguments(
             "nested entity declarations that would expand on parsing",
             sld(
                 XML_DECL

@@ -82,9 +82,8 @@ services:
     user: "1000:1000"
     container_name: civitas-geoserver
     hostname: civitas-geoserver
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
+    # Carries the shared configuration, so it waits for the same services every other one does.
+    depends_on: *gs-dependencies
     environment:
       <<: *common_env
       GEOSERVER_BASE_PATH: /geoserver
