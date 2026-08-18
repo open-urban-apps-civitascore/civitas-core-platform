@@ -51,6 +51,15 @@ public class InstalledArtifact extends BaseEntity {
   @Column(name = "urn", length = 1024)
   private String urn;
 
+  /**
+   * The VERSIONED urn of the resolved artifact, where one exists — which concrete version this
+   * install created or reused. The {@code urn} column above stays the stable logical identity that
+   * reference counting keys on; this column answers the update flow's question. Null for sources
+   * (no registry identity) and for lines recorded before the column existed.
+   */
+  @Column(name = "versioned_urn", length = 1024)
+  private String versionedUrn;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "action", nullable = false)
   private InstalledArtifactAction action;

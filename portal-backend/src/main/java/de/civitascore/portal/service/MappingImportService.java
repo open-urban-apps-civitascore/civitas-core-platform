@@ -31,10 +31,11 @@ public class MappingImportService {
   private final ModelRegistryGateway modelRegistryGateway;
 
   /**
-   * A bundle-import resolution for one mapping: the logical URN it is stored under, and whether an
-   * identical mapping was already installed ({@code reused}) or this call created it.
+   * A bundle-import resolution for one mapping: the logical URN it is stored under, the versioned
+   * URN of the resolved version — what pipeline nodes pin and the provenance records — and whether
+   * an identical mapping was already installed ({@code reused}) or this call created it.
    */
-  public record MappingResolution(String logicalUrn, boolean reused) {}
+  public record MappingResolution(String logicalUrn, String versionedUrn, boolean reused) {}
 
   /**
    * Stores the mapping under its authored URN, or resolves it to the already installed one.
@@ -59,11 +60,12 @@ public class MappingImportService {
       }
       // No registry write at all: storing an unchanged document would still bump the artifact's
       // version and make a re-install look like an edit.
-      return new MappingResolution(logicalUrn, true);
+      return new MappingResolution(
+          logicalUrn, mappingService.currentVersionedUrn(logicalUrn).orElse(logicalUrn), true);
     }
 
-    String storedUrn = mappingService.store(logicalUrn, input.getDocument()).logicalUrn();
-    return new MappingResolution(storedUrn, false);
+    ModelRegistryGateway.ModelPin pin = mappingService.store(logicalUrn, input.getDocument());
+    return new MappingResolution(pin.logicalUrn(), pin.versionedUrn(), false);
   }
 
   /**

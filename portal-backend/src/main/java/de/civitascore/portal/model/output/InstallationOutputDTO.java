@@ -46,6 +46,9 @@ public class InstallationOutputDTO extends BaseOutputDTO {
     @Schema(description = "Logical CORE URN, where the artifact type carries one")
     private String urn;
 
+    @Schema(description = "Versioned CORE URN this install resolved, where recorded")
+    private String versionedUrn;
+
     @Schema(description = "What the install did with the artifact")
     private InstalledArtifactAction action;
   }

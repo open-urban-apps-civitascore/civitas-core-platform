@@ -49,9 +49,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class DataStructureImportServiceTest {
 
   private static final String DATASTRUCTURE_URN =
-      "urn:core:city:openurbanapps:datastructure:environment:airqualitystation:default";
+      "urn:core:standard:openurbanapps:datastructure:environment:airqualitystation:default";
   private static final String ELEMENT_URN =
-      "urn:core:city:openurbanapps:element:environment:messwert:default";
+      "urn:core:standard:openurbanapps:element:environment:messwert:default";
 
   @Mock private DataStructureService dataStructureService;
   @Mock private DataStructureVersionService dataStructureVersionService;
@@ -167,6 +167,7 @@ class DataStructureImportServiceTest {
               assertThat(line.getArtifactType()).isEqualTo(InstalledArtifactType.DATA_STRUCTURE);
               assertThat(line.getShellId()).isEqualTo(structureId);
               assertThat(line.getUrn()).isEqualTo(DATASTRUCTURE_URN);
+              assertThat(line.getVersionedUrn()).isEqualTo(DATASTRUCTURE_URN + ":1.0.0");
               assertThat(line.getAction()).isEqualTo(InstalledArtifactAction.CREATED);
             });
   }

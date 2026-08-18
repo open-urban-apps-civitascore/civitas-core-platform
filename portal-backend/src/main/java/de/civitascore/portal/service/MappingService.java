@@ -41,6 +41,14 @@ public class MappingService {
   }
 
   /**
+   * The versioned URN of the mapping's current version — what a pipeline node should pin. Empty
+   * when no mapping exists at the URN.
+   */
+  public Optional<String> currentVersionedUrn(String urn) {
+    return registry.currentModelUrn(urn);
+  }
+
+  /**
    * Whether a mapping artifact exists at this (logical or versioned) CORE URN. Used by the bundle
    * import to tell "create at the authored URN" from "this identity is already installed".
    */

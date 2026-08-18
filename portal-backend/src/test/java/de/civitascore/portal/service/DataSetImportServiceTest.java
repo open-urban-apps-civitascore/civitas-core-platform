@@ -62,12 +62,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class DataSetImportServiceTest {
 
   private static final String STRUCTURE_URN =
-      "urn:core:city:openurbanapps:datastructure:environment:airqualitystation:default";
+      "urn:core:standard:openurbanapps:datastructure:environment:airqualitystation:default";
   private static final String VERSIONED_URN = STRUCTURE_URN + ":1.0.0";
   private static final String MAPPING_URN =
-      "urn:core:city:openurbanapps:mapping:environment:stationtoobservation:default";
+      "urn:core:standard:openurbanapps:mapping:environment:stationtoobservation:default";
+  private static final String MAPPING_VERSIONED_URN = MAPPING_URN + ":1.0.0";
   private static final String MANIFEST_URN =
-      "urn:core:city:openurbanapps:dataset:environment:airquality:default";
+      "urn:core:standard:openurbanapps:dataset:environment:airquality:default";
 
   @Mock private DataStructureImportService dataStructureImportService;
   @Mock private MappingImportService mappingImportService;
@@ -366,7 +367,7 @@ class DataSetImportServiceTest {
     when(dataStructureImportService.importOrReuse(any(DataStructureImportInputDTO.class)))
         .thenReturn(new ImportResolution(version, false));
     when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
-        .thenReturn(new MappingResolution(MAPPING_URN, false));
+        .thenReturn(new MappingResolution(MAPPING_URN, MAPPING_VERSIONED_URN, false));
     DataSet dataSet = dataSetWithManifest();
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSet);
     stubInstallationRecord();
@@ -406,7 +407,7 @@ class DataSetImportServiceTest {
     when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(STRUCTURE_URN + ":"))
         .thenReturn(Optional.of(version()));
     when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
-        .thenReturn(new MappingResolution(MAPPING_URN, false));
+        .thenReturn(new MappingResolution(MAPPING_URN, MAPPING_VERSIONED_URN, false));
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
     stubInstallationRecord();
 
@@ -427,7 +428,7 @@ class DataSetImportServiceTest {
   @Test
   void importDataSet_whenMappingIdentityAlreadyInstalled_recordsItAsReused() {
     when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
-        .thenReturn(new MappingResolution(MAPPING_URN, true));
+        .thenReturn(new MappingResolution(MAPPING_URN, MAPPING_VERSIONED_URN, true));
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
     stubInstallationRecord();
 
@@ -448,7 +449,7 @@ class DataSetImportServiceTest {
   @Test
   void importDataSet_whenMappingHasNoStructureReferences_isAccepted() {
     when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
-        .thenReturn(new MappingResolution(MAPPING_URN, false));
+        .thenReturn(new MappingResolution(MAPPING_URN, MAPPING_VERSIONED_URN, false));
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
     stubInstallationRecord();
 
@@ -468,7 +469,7 @@ class DataSetImportServiceTest {
     when(dataStructureImportService.importOrReuse(any(DataStructureImportInputDTO.class)))
         .thenReturn(new ImportResolution(version(), false));
     when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
-        .thenReturn(new MappingResolution(MAPPING_URN, false));
+        .thenReturn(new MappingResolution(MAPPING_URN, MAPPING_VERSIONED_URN, false));
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
     stubInstallationRecord();
 
@@ -555,7 +556,7 @@ class DataSetImportServiceTest {
     DataSource source = createdSource("Station Feed");
     when(dataSourceService.create(any(DataSourceInputDTO.class))).thenReturn(source);
     when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
-        .thenReturn(new MappingResolution(MAPPING_URN, false));
+        .thenReturn(new MappingResolution(MAPPING_URN, MAPPING_VERSIONED_URN, false));
     DataSet dataSet = dataSetWithManifest();
     when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSet);
     DataSink sink = createdSink();
@@ -585,7 +586,8 @@ class DataSetImportServiceTest {
     @SuppressWarnings("unchecked")
     List<Map<String, Object>> nodes = (List<Map<String, Object>>) created.getModel().get("nodes");
     assertThat(nodes.get(0)).containsEntry("sourceRef", source.getConfigurationUrn());
-    assertThat(nodes.get(1)).containsEntry("mappingRef", MAPPING_URN);
+    // Pinned, not logical: a logical reference silently means "current version".
+    assertThat(nodes.get(1)).containsEntry("mappingRef", MAPPING_VERSIONED_URN);
     assertThat(nodes.get(2)).containsEntry("sinkRef", sink.getConfigurationUrn());
 
     // …the source/sink links are derived from exactly those resolutions…

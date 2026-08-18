@@ -434,6 +434,15 @@ public class ModelRegistryGateway {
   }
 
   /**
+   * The versioned CORE URN of the artifact's current version, resolved through the facade — the
+   * contract records always carry the concrete version, so a logical URN in resolves to the current
+   * versioned one. Empty when the artifact does not exist.
+   */
+  public Optional<String> currentModelUrn(String urn) {
+    return modelForge.getArtifact(new ArtifactId(urn)).map(view -> view.artifactId().value());
+  }
+
+  /**
    * Whether the given content+styles equal the document already pinned by {@code versionedUrn} (the
    * registry's self-description stamps are ignored). Callers use this to skip the registry write on
    * updates that do not change the stored document — otherwise every host-side metadata update

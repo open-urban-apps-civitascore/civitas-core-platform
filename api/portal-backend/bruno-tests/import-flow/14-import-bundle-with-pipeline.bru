@@ -19,7 +19,7 @@ body:json {
         "name": "Bruno Flow Pipelinestruktur",
         "description": "Target structure the sink persists",
         "model": {
-          "$id": "urn:core:city:openurbanapps:datastructure:test:brunopipeline:r{{runId}}",
+          "$id": "urn:core:standard:openurbanapps:datastructure:test:brunopipeline:r{{runId}}",
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
           "properties": {
@@ -33,7 +33,7 @@ body:json {
       {
         "name": "Bruno Flow Pipelinequelle",
         "description": "Feed the pipeline reads from",
-        "dataStructureUrn": "urn:core:city:openurbanapps:datastructure:test:brunopipeline:r{{runId}}"
+        "dataStructureUrn": "urn:core:standard:openurbanapps:datastructure:test:brunopipeline:r{{runId}}"
       }
     ],
     "dataSinks": [
@@ -42,7 +42,7 @@ body:json {
         "dataSinkType": "POSTGIS",
         "configuration": {
           "tableName": "bruno_pipeline_r{{runId}}",
-          "element": "urn:core:city:openurbanapps:datastructure:test:brunopipeline:r{{runId}}"
+          "element": "urn:core:standard:openurbanapps:datastructure:test:brunopipeline:r{{runId}}"
         }
       }
     ],
@@ -103,7 +103,7 @@ docs {
      URNs — the import rewrites them to the minted configuration URNs of the
      artifacts it just created. Minted-ness is visible in the response: the
      sink/pipeline urns are urn:core:platform:… (instance-minted), unlike the
-     authored urn:core:city:openurbanapps:… identities of structure and
+     authored urn:core:standard:openurbanapps:… identities of structure and
      mapping flows.
   2. The sink's element arrives as the structure's LOGICAL urn (a bundle cannot
      know the receiving instance's version) and is accepted — meaning the

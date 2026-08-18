@@ -19,11 +19,11 @@ body:json {
     "mappings": [
       {
         "name": "Bruno Flow Mapping",
-        "mappingUrn": "urn:core:city:openurbanapps:mapping:test:brunoflow:r{{runId}}",
+        "mappingUrn": "urn:core:standard:openurbanapps:mapping:test:brunoflow:r{{runId}}",
         "document": {
           "title": "Bruno Flow Mapping",
-          "source": "urn:core:city:openurbanapps:datastructure:test:brunomapsource:r{{runId}}",
-          "target": "urn:core:city:openurbanapps:datastructure:test:brunobundle:r{{runId}}",
+          "source": "urn:core:standard:openurbanapps:datastructure:test:brunomapsource:r{{runId}}",
+          "target": "urn:core:standard:openurbanapps:datastructure:test:brunobundle:r{{runId}}",
           "fields": {
             "$.count": { "op": "toFloat", "input": "$.value" }
           }

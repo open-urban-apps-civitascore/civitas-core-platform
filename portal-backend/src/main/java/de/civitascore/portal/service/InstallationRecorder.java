@@ -55,19 +55,22 @@ public class InstallationRecorder {
   /**
    * One provenance line. Which of {@code shellId} and {@code urn} is set says which layer the
    * artifact lives in: a data structure has both, a data source only a shell row, a mapping only a
-   * registry identity.
+   * registry identity. {@code versionedUrn} additionally records WHICH version this install
+   * resolved — the logical {@code urn} stays the stable identity reference counting keys on.
    */
   public static InstalledArtifact line(
       InstalledArtifactType type,
       String name,
       UUID shellId,
       String urn,
+      String versionedUrn,
       InstalledArtifactAction action) {
     InstalledArtifact artifact = new InstalledArtifact();
     artifact.setArtifactType(type);
     artifact.setName(name);
     artifact.setShellId(shellId);
     artifact.setUrn(urn);
+    artifact.setVersionedUrn(versionedUrn);
     artifact.setAction(action);
     return artifact;
   }

@@ -19,7 +19,7 @@ body:json {
         "name": "Bruno Flow Struktur",
         "description": "Identical to 01 — must resolve to REUSED",
         "model": {
-          "$id": "urn:core:city:openurbanapps:datastructure:test:brunoflow:r{{runId}}",
+          "$id": "urn:core:standard:openurbanapps:datastructure:test:brunoflow:r{{runId}}",
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
           "properties": {
@@ -32,7 +32,7 @@ body:json {
         "name": "Bruno Flow Bundle-Struktur",
         "description": "New in this bundle — must be CREATED",
         "model": {
-          "$id": "urn:core:city:openurbanapps:datastructure:test:brunobundle:r{{runId}}",
+          "$id": "urn:core:standard:openurbanapps:datastructure:test:brunobundle:r{{runId}}",
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
           "properties": {
@@ -45,7 +45,7 @@ body:json {
       {
         "name": "Bruno Flow Quelle",
         "description": "References the bundled structure by logical URN",
-        "dataStructureUrn": "urn:core:city:openurbanapps:datastructure:test:brunobundle:r{{runId}}"
+        "dataStructureUrn": "urn:core:standard:openurbanapps:datastructure:test:brunobundle:r{{runId}}"
       }
     ]
   }

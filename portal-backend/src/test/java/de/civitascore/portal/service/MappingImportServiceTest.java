@@ -15,6 +15,7 @@ import de.civitascore.portal.service.MappingImportService.MappingResolution;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -32,7 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MappingImportServiceTest {
 
   private static final String LOGICAL_URN =
-      "urn:core:city:openurbanapps:mapping:mobility:zaehlungtoobservation:default";
+      "urn:core:standard:openurbanapps:mapping:mobility:zaehlungtoobservation:default";
   private static final String VERSIONED_URN = LOGICAL_URN + ":1.0.0";
   private static final Map<String, Object> DOCUMENT =
       Map.of("fields", Map.of("$.result", Map.of("op", "toInt", "input", "$.vehicleCount")));
@@ -75,6 +76,8 @@ class MappingImportServiceTest {
     when(modelRegistryGateway.logicalUrn(LOGICAL_URN)).thenReturn(LOGICAL_URN);
     when(mappingService.exists(LOGICAL_URN)).thenReturn(true);
     when(mappingService.isUnchanged(LOGICAL_URN, DOCUMENT)).thenReturn(true);
+    when(mappingService.currentVersionedUrn(LOGICAL_URN))
+        .thenReturn(Optional.of(LOGICAL_URN + ":1.0.0"));
 
     MappingResolution resolution = mappingImportService.importOrReuse(input(LOGICAL_URN));
 
@@ -98,7 +101,7 @@ class MappingImportServiceTest {
 
   @Test
   void importOrReuse_whenUrnIsNotAMappingUrn_rejects() {
-    String structureUrn = "urn:core:city:openurbanapps:datastructure:mobility:zaehlung:default";
+    String structureUrn = "urn:core:standard:openurbanapps:datastructure:mobility:zaehlung:default";
     when(modelRegistryGateway.isMappingUrn(structureUrn)).thenReturn(false);
 
     assertThatThrownBy(() -> mappingImportService.importOrReuse(input(structureUrn)))

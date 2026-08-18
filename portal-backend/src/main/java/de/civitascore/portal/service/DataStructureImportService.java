@@ -87,6 +87,7 @@ public class DataStructureImportService {
                 input.getName(),
                 version.getDataStructure().getId(),
                 modelRegistryGateway.logicalUrn(version.getModelUrn()),
+                version.getModelUrn(),
                 InstalledArtifactAction.CREATED)));
 
     return version;

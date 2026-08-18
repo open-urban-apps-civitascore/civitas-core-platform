@@ -20,11 +20,11 @@ body:json {
       {
         "name": "Bruno Flow Mapping",
         "description": "Byte-identical document to 07",
-        "mappingUrn": "urn:core:city:openurbanapps:mapping:test:brunoflow:r{{runId}}",
+        "mappingUrn": "urn:core:standard:openurbanapps:mapping:test:brunoflow:r{{runId}}",
         "document": {
           "title": "Bruno Flow Mapping",
-          "source": "urn:core:city:openurbanapps:datastructure:test:brunomapsource:r{{runId}}",
-          "target": "urn:core:city:openurbanapps:datastructure:test:brunobundle:r{{runId}}",
+          "source": "urn:core:standard:openurbanapps:datastructure:test:brunomapsource:r{{runId}}",
+          "target": "urn:core:standard:openurbanapps:datastructure:test:brunobundle:r{{runId}}",
           "fields": {
             "$.count": { "op": "toInt", "input": "$.value" }
           }
@@ -50,7 +50,7 @@ tests {
     expect(res.body.mappings).to.have.length(1);
     expect(res.body.mappings[0].action).to.equal('REUSED');
     expect(res.body.mappings[0].urn).to.equal(
-      'urn:core:city:openurbanapps:mapping:test:brunoflow:r' + bru.getVar('runId'));
+      'urn:core:standard:openurbanapps:mapping:test:brunoflow:r' + bru.getVar('runId'));
   });
 }
 

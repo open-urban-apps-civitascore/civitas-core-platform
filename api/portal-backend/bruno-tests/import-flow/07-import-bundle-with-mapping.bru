@@ -19,7 +19,7 @@ body:json {
         "name": "Bruno Flow Mapping-Quellstruktur",
         "description": "New in this bundle — the mapping reads from it",
         "model": {
-          "$id": "urn:core:city:openurbanapps:datastructure:test:brunomapsource:r{{runId}}",
+          "$id": "urn:core:standard:openurbanapps:datastructure:test:brunomapsource:r{{runId}}",
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
           "properties": {
@@ -34,11 +34,11 @@ body:json {
       {
         "name": "Bruno Flow Mapping",
         "description": "Maps the bundled structure onto the one 04 installed",
-        "mappingUrn": "urn:core:city:openurbanapps:mapping:test:brunoflow:r{{runId}}",
+        "mappingUrn": "urn:core:standard:openurbanapps:mapping:test:brunoflow:r{{runId}}",
         "document": {
           "title": "Bruno Flow Mapping",
-          "source": "urn:core:city:openurbanapps:datastructure:test:brunomapsource:r{{runId}}",
-          "target": "urn:core:city:openurbanapps:datastructure:test:brunobundle:r{{runId}}",
+          "source": "urn:core:standard:openurbanapps:datastructure:test:brunomapsource:r{{runId}}",
+          "target": "urn:core:standard:openurbanapps:datastructure:test:brunobundle:r{{runId}}",
           "fields": {
             "$.count": { "op": "toInt", "input": "$.value" }
           }
@@ -66,7 +66,7 @@ tests {
   test("stores the mapping under the URN the bundle authored", function() {
     expect(res.body.mappings).to.have.length(1);
     expect(res.body.mappings[0].urn).to.equal(
-      'urn:core:city:openurbanapps:mapping:test:brunoflow:r' + bru.getVar('runId'));
+      'urn:core:standard:openurbanapps:mapping:test:brunoflow:r' + bru.getVar('runId'));
     expect(res.body.mappings[0].action).to.equal('CREATED');
   });
   test("a mapping has no host shell", function() {

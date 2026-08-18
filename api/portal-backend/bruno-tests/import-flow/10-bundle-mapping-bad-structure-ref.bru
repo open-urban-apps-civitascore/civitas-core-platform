@@ -19,10 +19,10 @@ body:json {
     "mappings": [
       {
         "name": "Bruno Flow Mapping Dangling",
-        "mappingUrn": "urn:core:city:openurbanapps:mapping:test:brunodangling:r{{runId}}",
+        "mappingUrn": "urn:core:standard:openurbanapps:mapping:test:brunodangling:r{{runId}}",
         "document": {
           "title": "Bruno Flow Mapping Dangling",
-          "source": "urn:core:city:openurbanapps:datastructure:test:existiertnicht:r{{runId}}",
+          "source": "urn:core:standard:openurbanapps:datastructure:test:existiertnicht:r{{runId}}",
           "fields": {
             "$.count": { "op": "toInt", "input": "$.value" }
           }

@@ -70,7 +70,7 @@ class InstallationServiceTest {
     line.setArtifactType(InstalledArtifactType.DATA_STRUCTURE);
     line.setName("Zählstelle");
     line.setShellId(UUID.randomUUID());
-    line.setUrn("urn:core:city:openurbanapps:datastructure:mobility:zaehlstelle:default");
+    line.setUrn("urn:core:standard:openurbanapps:datastructure:mobility:zaehlstelle:default");
     line.setAction(InstalledArtifactAction.CREATED);
     installation.addArtifact(line);
     Pageable pageable = PageRequest.of(0, 20);
@@ -113,7 +113,7 @@ class InstallationServiceTest {
     InstalledArtifact line = new InstalledArtifact();
     line.setArtifactType(InstalledArtifactType.MAPPING);
     line.setName("Zählung → Observation");
-    line.setUrn("urn:core:city:openurbanapps:mapping:mobility:zaehlungtoobservation:default");
+    line.setUrn("urn:core:standard:openurbanapps:mapping:mobility:zaehlungtoobservation:default");
     line.setAction(InstalledArtifactAction.CREATED);
     installation.addArtifact(line);
     Pageable pageable = PageRequest.of(0, 20);
@@ -130,7 +130,7 @@ class InstallationServiceTest {
               assertThat(artifact.getShellId()).isNull();
               assertThat(artifact.getUrn())
                   .isEqualTo(
-                      "urn:core:city:openurbanapps:mapping:mobility:zaehlungtoobservation:default");
+                      "urn:core:standard:openurbanapps:mapping:mobility:zaehlungtoobservation:default");
             });
   }
 
@@ -145,7 +145,8 @@ class InstallationServiceTest {
     line.setArtifactType(InstalledArtifactType.DATA_STRUCTURE);
     line.setName("Luftqualitäts-Messstation");
     line.setShellId(UUID.randomUUID());
-    line.setUrn("urn:core:city:openurbanapps:datastructure:environment:airqualitystation:default");
+    line.setUrn(
+        "urn:core:standard:openurbanapps:datastructure:environment:airqualitystation:default");
     line.setAction(action);
     installation.addArtifact(line);
     return installation;
@@ -235,7 +236,7 @@ class InstallationServiceTest {
             InstalledArtifactType.DATA_STRUCTURE,
             "Verkehrszählung",
             UUID.randomUUID(),
-            "urn:core:city:openurbanapps:datastructure:mobility:verkehrszaehlung:default");
+            "urn:core:standard:openurbanapps:datastructure:mobility:verkehrszaehlung:default");
     InstalledArtifact source =
         line(InstalledArtifactType.DATA_SOURCE, "Zählstellen-Feed", UUID.randomUUID(), null);
     InstalledArtifact mapping =
@@ -243,7 +244,7 @@ class InstallationServiceTest {
             InstalledArtifactType.MAPPING,
             "Zählung zu Messung",
             null,
-            "urn:core:city:openurbanapps:mapping:mobility:zaehlungzumessung:default");
+            "urn:core:standard:openurbanapps:mapping:mobility:zaehlungzumessung:default");
     InstalledArtifact dataSetLine =
         line(
             InstalledArtifactType.DATA_SET,

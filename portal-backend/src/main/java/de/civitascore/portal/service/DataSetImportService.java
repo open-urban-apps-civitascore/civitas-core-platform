@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -107,6 +108,7 @@ public class DataSetImportService {
               structure.getName(),
               shellId,
               logicalUrn,
+              resolution.version().getModelUrn(),
               action));
       structureResults.add(
           ImportedArtifactDTO.builder()
@@ -140,6 +142,7 @@ public class DataSetImportService {
               created.getName(),
               created.getId(),
               null,
+              null,
               InstalledArtifactAction.CREATED));
       sourceResults.add(
           ImportedArtifactDTO.builder()
@@ -162,7 +165,9 @@ public class DataSetImportService {
       InstalledArtifactAction action =
           resolution.reused() ? InstalledArtifactAction.REUSED : InstalledArtifactAction.CREATED;
       mappingUrns.add(resolution.logicalUrn());
-      if (mappingUrnsByName.putIfAbsent(mapping.getName(), resolution.logicalUrn()) != null) {
+      // Pipelines pin the VERSIONED urn: a logical reference silently means "current version",
+      // and the platform convention documents only pinned or :latest reference forms.
+      if (mappingUrnsByName.putIfAbsent(mapping.getName(), resolution.versionedUrn()) != null) {
         ambiguousNames.add(mapping.getName());
       }
       // Mirror image of a data source: a mapping has registry identity but no shell row, so the
@@ -173,6 +178,7 @@ public class DataSetImportService {
               mapping.getName(),
               null,
               resolution.logicalUrn(),
+              resolution.versionedUrn(),
               action));
       mappingResults.add(
           ImportedArtifactDTO.builder()
@@ -199,6 +205,7 @@ public class DataSetImportService {
             dataSet.getName(),
             dataSet.getId(),
             manifestUrn,
+            dataSet.getManifestUrn(),
             InstalledArtifactAction.CREATED));
 
     // 5 · Sinks, before the pipelines that link them. The bundle authors the target structure in
@@ -221,6 +228,7 @@ public class DataSetImportService {
               sink.getName(),
               created.getId(),
               created.getConfigurationLogicalUrn(),
+              created.getConfigurationUrn(),
               InstalledArtifactAction.CREATED));
       sinkResults.add(
           ImportedArtifactDTO.builder()
@@ -252,6 +260,7 @@ public class DataSetImportService {
               pipeline.getName(),
               created.getId(),
               created.getModelLogicalUrn(),
+              created.getModelUrn(),
               InstalledArtifactAction.CREATED));
       pipelineResults.add(
           ImportedArtifactDTO.builder()
@@ -262,12 +271,24 @@ public class DataSetImportService {
               .build());
     }
 
-    // 7 · Manifest membership for the registry-only artifacts. Without it a bundled mapping
-    // belongs to no dataset and shows up under the "orphans by type" query — the use case would
-    // install its mapping and then disown it. A pipeline links its own reference closure when
-    // PipelineService stores it; the explicit link keeps mapping-only bundles covered.
+    // 7 · Manifest membership for EVERY member the bundle touched. The CORE-IR manifest is the
+    // bracketing document — a member the manifest does not reference shows up under the
+    // "orphans by type" query although it belongs to this use case. A pipeline links its own
+    // reference closure when PipelineService stores it, but a pipeline-less bundle has no
+    // closure — so link explicitly; Model Forge skips members already listed.
     if (manifestUrn != null) {
+      structuresByLogicalUrn
+          .keySet()
+          .forEach(urn -> modelRegistryGateway.linkToDataSet(manifestUrn, urn));
+      sourcesByName.values().stream()
+          .map(DataSource::getConfigurationLogicalUrn)
+          .filter(Objects::nonNull)
+          .forEach(urn -> modelRegistryGateway.linkToDataSet(manifestUrn, urn));
       mappingUrns.forEach(urn -> modelRegistryGateway.linkToDataSet(manifestUrn, urn));
+      sinksByName.values().stream()
+          .map(DataSink::getConfigurationLogicalUrn)
+          .filter(Objects::nonNull)
+          .forEach(urn -> modelRegistryGateway.linkToDataSet(manifestUrn, urn));
     }
 
     // 8 · Provenance, in the same transaction: the record exists exactly iff the install

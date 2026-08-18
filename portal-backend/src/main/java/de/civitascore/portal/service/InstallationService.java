@@ -276,6 +276,7 @@ public class InstallationService {
                         .name(artifact.getName())
                         .shellId(artifact.getShellId())
                         .urn(artifact.getUrn())
+                        .versionedUrn(artifact.getVersionedUrn())
                         .action(artifact.getAction())
                         .build())
             .toList());
