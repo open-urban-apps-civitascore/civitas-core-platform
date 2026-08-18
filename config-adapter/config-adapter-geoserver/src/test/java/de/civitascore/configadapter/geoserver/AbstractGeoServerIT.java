@@ -24,18 +24,19 @@ import org.testcontainers.utility.DockerImageName;
  * <ul>
  *   <li>{@code geoserverdb} — PostGIS, catalog backend (pgconfig) and spatial data
  *   <li>{@code rabbitmq} — Spring Cloud Bus for catalog event propagation
- *   <li>{@code discovery} — Consul service discovery
- *   <li>{@code config} — Spring Cloud Config server (native profile)
  *   <li>{@code restconfig} — GeoServer Cloud REST API service (under test)
  * </ul>
  *
+ * <p>The service runs under the {@code standalone} profile, which means no service discovery and no
+ * config server — the shape production uses. RabbitMQ is not optional under it: the image exits
+ * during startup when the broker host does not resolve.
+ *
  * <p>Uses the singleton container pattern: containers start once per JVM and are shared across all
- * subclasses to avoid the ~60–90s GeoServer Cloud startup cost on every test class.
+ * subclasses to avoid the GeoServer Cloud startup cost on every test class.
  */
 @SuppressWarnings("resource")
 abstract class AbstractGeoServerIT {
 
-  protected static final String GEOSERVER_CLOUD_VERSION = "2.28.3.0";
   protected static final String ADMIN_USER = "admin";
   protected static final String ADMIN_PASSWORD = "geoserver";
   protected static final String POSTGIS_DB = "geoserver";
@@ -48,8 +49,6 @@ abstract class AbstractGeoServerIT {
 
   protected static final GenericContainer<?> POSTGIS;
   protected static final GenericContainer<?> RABBITMQ;
-  protected static final GenericContainer<?> DISCOVERY;
-  protected static final GenericContainer<?> CONFIG;
   protected static final GenericContainer<?> RESTCONFIG;
 
   static {
@@ -78,40 +77,12 @@ abstract class AbstractGeoServerIT {
                     .withStartupTimeout(Duration.ofMinutes(2)));
     RABBITMQ.start();
 
-    DISCOVERY =
-        new GenericContainer<>(
-                DockerImageName.parse(
-                    "geoservercloud/geoserver-cloud-discovery:" + GEOSERVER_CLOUD_VERSION))
-            .withNetwork(NETWORK)
-            .withNetworkAliases("discovery")
-            .withExposedPorts(8761)
-            .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)));
-    DISCOVERY.start();
-
-    CONFIG =
-        new GenericContainer<>(
-                DockerImageName.parse(
-                    "geoservercloud/geoserver-cloud-config:" + GEOSERVER_CLOUD_VERSION))
-            .withNetwork(NETWORK)
-            .withNetworkAliases("config")
-            .withExposedPorts(8080)
-            .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(4)));
-    CONFIG.start();
-
     RESTCONFIG =
-        new GenericContainer<>(
-                DockerImageName.parse(
-                    "geoservercloud/geoserver-cloud-rest:" + GEOSERVER_CLOUD_VERSION))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.GEOSERVER_CLOUD_REST))
             .withNetwork(NETWORK)
             .withNetworkAliases("restconfig")
             .withExposedPorts(8080)
-            .withEnv("SPRING_PROFILES_ACTIVE", "pgconfig")
-            .withEnv("EUREKA_SERVER_URL", "http://discovery:8761/eureka/")
-            .withEnv("SPRING_CLOUD_CONFIG_URI", "http://config:8080")
-            .withEnv("SPRING_CLOUD_CONFIG_FAIL_FAST", "true")
-            .withEnv("SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS", "30")
-            .withEnv("SPRING_CLOUD_CONFIG_RETRY_INITIAL_INTERVAL", "2000")
-            .withEnv("SPRING_CLOUD_CONFIG_RETRY_MAX_INTERVAL", "5000")
+            .withEnv("SPRING_PROFILES_ACTIVE", "standalone,pgconfig")
             .withEnv("PGCONFIG_HOST", POSTGIS_HOST_ALIAS)
             .withEnv("PGCONFIG_PORT", "5432")
             .withEnv("PGCONFIG_DATABASE", POSTGIS_DB)
@@ -136,8 +107,6 @@ abstract class AbstractGeoServerIT {
             new Thread(
                 () -> {
                   RESTCONFIG.stop();
-                  CONFIG.stop();
-                  DISCOVERY.stop();
                   RABBITMQ.stop();
                   POSTGIS.stop();
                   NETWORK.close();
