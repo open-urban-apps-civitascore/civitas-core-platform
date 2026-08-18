@@ -1,11 +1,11 @@
 meta {
-  name: Cleanup — delete pipeline dataset
+  name: Cleanup — uninstall the pipeline bundle
   type: http
   seq: 15
 }
 
 delete {
-  url: {{baseUrl}}/datasets/{{pipelineDataSetId}}
+  url: {{baseUrl}}/installations/{{pipelineInstallationId}}
   body: none
   auth: bearer
 }
@@ -15,16 +15,16 @@ auth:bearer {
 }
 
 tests {
-  test("pipeline dataset removed", function() {
-    expect([200, 204]).to.include(res.status);
+  test("bundle uninstalled", function() {
+    expect(res.status).to.equal(204);
   });
 }
 
 docs {
-  Best-effort cleanup for 14, same caveats as 11: the dataset shell goes, the
-  imported structure stays (DRAFT-released, run-unique URN). Known upstream
-  issue: registry artifacts of a deleted dataset are currently orphaned rather
-  than removed (see the meta repo's 2026-08-16 upstream findings), so repeated
-  runs accumulate registry entries — harmless for the tests, which key
-  everything by runId.
+  Cleanup via the real feature: the bundle uninstall tears down everything 14
+  created, in reverse touch order — pipeline, sink, dataset (with the explicit
+  manifest repair for the upstream postDelete bypass), source (unreleased
+  first, mirroring the import's implicit release) and structure. Unlike the
+  old direct dataset delete this leaves NO registry orphans behind, so
+  repeated runs no longer accumulate artifacts.
 }

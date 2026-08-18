@@ -59,21 +59,25 @@ public class InstallationController {
   }
 
   /**
-   * Uninstalls a structure-only installation. See {@link InstallationService#uninstall} for the
-   * semantics; the provenance record itself survives as history with its {@code uninstalledAt} set.
+   * Uninstalls an installation. See {@link InstallationService#uninstall} for the semantics; the
+   * provenance record itself survives as history with its {@code uninstalledAt} set.
    */
   @Operation(
-      summary = "Uninstall a structure-only installation",
+      summary = "Uninstall an installation (reverse-order teardown of what it created)",
       description =
-          "Deletes every data structure this installation CREATED (shell, versions and registry"
-              + " model, through the regular delete path and all its guards) and marks the"
-              + " installation uninstalled. REUSED artifacts are never deleted — uninstalling only"
-              + " withdraws this installation's claim. Use-case installations are refused until"
-              + " the bundle-teardown increment lands.")
+          "Tears down everything this installation CREATED, in reverse touch order — pipelines,"
+              + " sinks, the dataset, mappings, sources, structures — each through its domain"
+              + " service's regular delete path, then marks the installation uninstalled."
+              + " Package-database semantics: REUSED artifacts are never deleted, and a CREATED"
+              + " artifact still referenced by another active installation is kept until the last"
+              + " claim goes. Released/provisioned datasets are refused — unrelease first;"
+              + " asynchronous infrastructure teardown is a later increment.")
   @ApiResponse(responseCode = "204", description = "Uninstalled; the record remains as history")
   @ApiResponse(
       responseCode = "400",
-      description = "Already uninstalled, or the installation is not structure-only",
+      description =
+          "Already uninstalled, a saga is in flight, or the dataset is released/provisioned or"
+              + " not in DRAFT",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "404",
@@ -82,8 +86,8 @@ public class InstallationController {
   @ApiResponse(
       responseCode = "409",
       description =
-          "A contained data structure is referenced by another active installation, or is still"
-              + " in use by a data source or sink",
+          "An artifact is still in use outside this installation's scope, e.g. a structure held"
+              + " by a hand-created data source or a mapping still referenced by a pipeline",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)

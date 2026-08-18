@@ -3,24 +3,32 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
 import de.civitascore.portal.model.entity.BundleInstallation;
+import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.output.InstallationOutputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.BundleInstallationRepository;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceInUseException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,6 +48,12 @@ class InstallationServiceTest {
 
   @Mock private BundleInstallationRepository bundleInstallationRepository;
   @Mock private DataStructureService dataStructureService;
+  @Mock private DataSourceService dataSourceService;
+  @Mock private DataSinkService dataSinkService;
+  @Mock private PipelineService pipelineService;
+  @Mock private DataSetService dataSetService;
+  @Mock private MappingService mappingService;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
   @InjectMocks private InstallationService installationService;
 
   @Test
@@ -156,9 +170,12 @@ class InstallationServiceTest {
     assertThat(installation.getUninstalledAt()).isNotNull();
   }
 
-  /** CREATED here, REUSED by another active install → 409, nothing deleted, nothing marked. */
+  /**
+   * CREATED here but still claimed by another active install → KEPT, like a shared package
+   * dependency: it disappears only when the last claim goes. The uninstall itself proceeds.
+   */
   @Test
-  void uninstall_whenAnotherActiveInstallationReferencesTheStructure_rejects() {
+  void uninstall_keepsStructureStillClaimedByAnotherActiveInstallation() {
     BundleInstallation installation = structureInstallation(InstalledArtifactAction.CREATED);
     when(bundleInstallationRepository.findById(installation.getId()))
         .thenReturn(Optional.of(installation));
@@ -166,12 +183,11 @@ class InstallationServiceTest {
             installation.getArtifacts().getFirst().getUrn(), installation.getId()))
         .thenReturn(1L);
 
-    assertThatThrownBy(() -> installationService.uninstall(installation.getId()))
-        .isInstanceOf(ResourceInUseException.class)
-        .hasMessageContaining("other active installation");
+    installationService.uninstall(installation.getId());
 
     verify(dataStructureService, never()).deleteById(any());
-    verify(bundleInstallationRepository, never()).save(any());
+    assertThat(installation.getUninstalledAt()).isNotNull();
+    verify(bundleInstallationRepository).save(installation);
   }
 
   /** A REUSED line deletes nothing — this install only withdraws its claim. */
@@ -188,23 +204,154 @@ class InstallationServiceTest {
     verify(bundleInstallationRepository).save(installation);
   }
 
-  /** Use-case bundles wait for the reverse-order teardown increment — refuse, do not half-do. */
+  /** One provenance line, CREATED. */
+  private static InstalledArtifact line(
+      InstalledArtifactType type, String name, UUID shellId, String urn) {
+    InstalledArtifact artifact = new InstalledArtifact();
+    artifact.setArtifactType(type);
+    artifact.setName(name);
+    artifact.setShellId(shellId);
+    artifact.setUrn(urn);
+    artifact.setAction(InstalledArtifactAction.CREATED);
+    return artifact;
+  }
+
+  private static Optional<ModelRegistryGateway.RegistryDocument> presentDocument() {
+    return Optional.of(new ModelRegistryGateway.RegistryDocument(Map.of(), null));
+  }
+
+  /**
+   * The full bundle teardown: reverse touch order, the explicit manifest repair (upstream
+   * postDelete bypass), and the unrelease-before-delete mirror for the source the import had
+   * released.
+   */
   @Test
-  void uninstall_useCaseInstallation_rejectsWithClearMessage() {
-    BundleInstallation installation = structureInstallation(InstalledArtifactAction.CREATED);
-    InstalledArtifact dataSetLine = new InstalledArtifact();
-    dataSetLine.setArtifactType(InstalledArtifactType.DATA_SET);
-    dataSetLine.setName("Verkehrszählung");
-    dataSetLine.setAction(InstalledArtifactAction.CREATED);
-    installation.addArtifact(dataSetLine);
+  void uninstall_bundleTearsDownInReverseOrderWithManifestRepair() {
+    BundleInstallation installation = new BundleInstallation();
+    installation.setId(UUID.randomUUID());
+    installation.setBundleId("urn:openurbanapps:usecase:verkehrszaehlung");
+    InstalledArtifact structure =
+        line(
+            InstalledArtifactType.DATA_STRUCTURE,
+            "Verkehrszählung",
+            UUID.randomUUID(),
+            "urn:core:city:openurbanapps:datastructure:mobility:verkehrszaehlung:default");
+    InstalledArtifact source =
+        line(InstalledArtifactType.DATA_SOURCE, "Zählstellen-Feed", UUID.randomUUID(), null);
+    InstalledArtifact mapping =
+        line(
+            InstalledArtifactType.MAPPING,
+            "Zählung zu Messung",
+            null,
+            "urn:core:city:openurbanapps:mapping:mobility:zaehlungzumessung:default");
+    InstalledArtifact dataSetLine =
+        line(
+            InstalledArtifactType.DATA_SET,
+            "Verkehrszählung",
+            UUID.randomUUID(),
+            "urn:core:platform:civitas:dataset:common:Verkehrsz-hlung:x1y2z3a4b5");
+    InstalledArtifact sink =
+        line(
+            InstalledArtifactType.DATA_SINK,
+            "Verkehrsmessung-Tabelle",
+            UUID.randomUUID(),
+            "urn:core:platform:civitas:datasink:common:verkehrsmessung:c6d7e8f9g0");
+    InstalledArtifact pipeline =
+        line(
+            InstalledArtifactType.PIPELINE,
+            "Zählung zu Messung",
+            UUID.randomUUID(),
+            "urn:core:platform:civitas:pipeline:common:flow:h1i2j3k4l5");
+    List.of(structure, source, mapping, dataSetLine, sink, pipeline)
+        .forEach(installation::addArtifact);
     when(bundleInstallationRepository.findById(installation.getId()))
         .thenReturn(Optional.of(installation));
 
+    DataSet dataSet = new DataSet();
+    dataSet.setId(dataSetLine.getShellId());
+    dataSet.setName("Verkehrszählung");
+    dataSet.setDataSetStatus(DataSetStatus.DRAFT);
+    when(dataSetService.findById(dataSetLine.getShellId())).thenReturn(Optional.of(dataSet));
+    when(bundleInstallationRepository.countOtherActiveInstallationsReferencing(
+            any(), eq(installation.getId())))
+        .thenReturn(0L);
+    when(pipelineService.existsById(pipeline.getShellId())).thenReturn(true);
+    when(dataSinkService.existsById(sink.getShellId())).thenReturn(true);
+    when(dataSetService.existsById(dataSetLine.getShellId())).thenReturn(true);
+    // The upstream bypass leaves the manifest behind — fetchPayload still finds it.
+    when(modelRegistryGateway.fetchPayload(dataSetLine.getUrn())).thenReturn(presentDocument());
+    when(modelRegistryGateway.fetchPayload(mapping.getUrn())).thenReturn(presentDocument());
+    DataSource sourceEntity = new DataSource();
+    sourceEntity.setId(source.getShellId());
+    sourceEntity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+    when(dataSourceService.findById(source.getShellId())).thenReturn(Optional.of(sourceEntity));
+    when(dataStructureService.existsById(structure.getShellId())).thenReturn(true);
+
+    installationService.uninstall(installation.getId());
+
+    InOrder order =
+        inOrder(
+            pipelineService,
+            dataSinkService,
+            dataSetService,
+            modelRegistryGateway,
+            mappingService,
+            dataSourceService,
+            dataStructureService);
+    order.verify(pipelineService).deleteById(pipeline.getShellId());
+    order.verify(dataSinkService).deleteById(sink.getShellId());
+    order.verify(dataSetService).deleteById(dataSetLine.getShellId());
+    order.verify(modelRegistryGateway).deleteDataSet(dataSetLine.getUrn());
+    order.verify(mappingService).delete(mapping.getUrn(), false);
+    order.verify(dataSourceService).unrelease(source.getShellId());
+    order.verify(dataSourceService).deleteById(source.getShellId());
+    order.verify(dataStructureService).deleteById(structure.getShellId());
+    assertThat(installation.getUninstalledAt()).isNotNull();
+    verify(bundleInstallationRepository).save(installation);
+  }
+
+  /** READY needs an unstage first; refuse before touching anything. */
+  @Test
+  void uninstall_whenDataSetNotDraft_refusesWithActionableMessage() {
+    BundleInstallation installation = new BundleInstallation();
+    installation.setId(UUID.randomUUID());
+    InstalledArtifact dataSetLine =
+        line(InstalledArtifactType.DATA_SET, "Verkehrszählung", UUID.randomUUID(), null);
+    installation.addArtifact(dataSetLine);
+    when(bundleInstallationRepository.findById(installation.getId()))
+        .thenReturn(Optional.of(installation));
+    DataSet dataSet = new DataSet();
+    dataSet.setDataSetStatus(DataSetStatus.READY);
+    when(dataSetService.findById(dataSetLine.getShellId())).thenReturn(Optional.of(dataSet));
+
     assertThatThrownBy(() -> installationService.uninstall(installation.getId()))
         .isInstanceOf(InvalidInputException.class)
-        .hasMessageContaining("structure-only");
+        .hasMessageContaining("unstage");
 
-    verify(dataStructureService, never()).deleteById(any());
+    verify(dataSetService, never()).deleteById(any());
+    verify(bundleInstallationRepository, never()).save(any());
+  }
+
+  /** Provisioned infrastructure needs the asynchronous saga teardown — a later increment. */
+  @Test
+  void uninstall_whenDataSetProvisioned_refuses() {
+    BundleInstallation installation = new BundleInstallation();
+    installation.setId(UUID.randomUUID());
+    InstalledArtifact dataSetLine =
+        line(InstalledArtifactType.DATA_SET, "Verkehrszählung", UUID.randomUUID(), null);
+    installation.addArtifact(dataSetLine);
+    when(bundleInstallationRepository.findById(installation.getId()))
+        .thenReturn(Optional.of(installation));
+    DataSet dataSet = new DataSet();
+    dataSet.setDataSetStatus(DataSetStatus.DRAFT);
+    dataSet.setProvisioned(true);
+    when(dataSetService.findById(dataSetLine.getShellId())).thenReturn(Optional.of(dataSet));
+
+    assertThatThrownBy(() -> installationService.uninstall(installation.getId()))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("unrelease");
+
+    verify(dataSetService, never()).deleteById(any());
     verify(bundleInstallationRepository, never()).save(any());
   }
 
