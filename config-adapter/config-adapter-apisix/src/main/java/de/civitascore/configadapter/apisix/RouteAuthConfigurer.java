@@ -101,7 +101,7 @@ final class RouteAuthConfigurer {
     // /FROST-Server/v1.1/Projects(1)/Things. OWS: /v1/datasets/{id}/{slug}?service=WFS →
     // /geoserver/{workspace}/ows?service=WFS (query string preserved by APISIX).
     Map<String, Object> proxyRewrite = new HashMap<>();
-    proxyRewrite.put("regex_uri", new String[] {"^" + routePath + "(/.*)?$", upstreamPath + "$1"});
+    proxyRewrite.put("regex_uri", PathRewrite.pairs(routePath, upstreamPath));
     Map<String, Object> plugins = new HashMap<>();
     plugins.put("proxy-rewrite", proxyRewrite);
     body.put("plugins", plugins);
@@ -155,6 +155,8 @@ final class RouteAuthConfigurer {
     if (proxyRewrite == null) {
       return;
     }
+    PathRewrite.normalize(proxyRewrite);
+
     // STA routes inject the FROST upstream credential; OWS map-service routes carry none.
     mergeProxyRewriteHeaders(proxyRewrite, managedHeader, sta);
 

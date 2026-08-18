@@ -122,7 +122,7 @@ class ApisixSagaHandlerIT extends AbstractApisixIT {
         "uris must contain the /v1/datasets/{id}/{slug}/* wildcard — got: " + uris);
 
     String regex = value.get("plugins").get("proxy-rewrite").get("regex_uri").get(0).asText();
-    assertEquals("^/v1/datasets/" + datasetId + "/" + SLUG + "(/.*)?$", regex);
+    assertEquals("^/v1/datasets/" + datasetId + "/" + SLUG + "/?$", regex);
   }
 
   @Test
@@ -184,9 +184,9 @@ class ApisixSagaHandlerIT extends AbstractApisixIT {
 
     String regex = proxyRewrite.get("regex_uri").get(0).asText();
     assertEquals(
-        "^/v1/datasets/" + datasetId + "/" + SLUG + "(/.*)?$",
+        "^/v1/datasets/" + datasetId + "/" + SLUG + "/?$",
         regex,
-        "UPDATE must preserve the existing regex_uri (Finding 1 — PATCH would have wiped it)");
+        "UPDATE must keep the path rewrite mapping this route — a PATCH would have wiped it");
   }
 
   private SagaCommandMessage updateRouteCommand(String datasetId, boolean openDataAccess) {

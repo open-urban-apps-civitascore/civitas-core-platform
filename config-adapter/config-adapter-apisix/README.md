@@ -60,9 +60,16 @@ Publication is per named API, not per dataset.
   plus `status: 1`. Host pinning and the `/v1/datasets/{id}` prefix — strictly more specific than a `/v1/*`
   catch-all — make dispatch deterministic without a second virtual host.
 - `proxy-rewrite` maps gateway path to upstream path via
-  `regex_uri: ["^{routePath}(/.*)?$", "{upstreamPath}$1"]`, and APISIX preserves the query string. The
-  upstream path is the FROST project path for `STA` and `{geoserver path}/{workspace}/ows` for `OWS`, the
-  workspace name deriving from the dataset id by the same rule the GeoServer adapter applies.
+  `regex_uri: ["^{routePath}/?$", "{upstreamPath}", "^{routePath}(/.+)$", "{upstreamPath}$1"]`, and APISIX
+  preserves the query string. The upstream path is the FROST project path for `STA` and
+  `{geoserver path}/{workspace}/ows` for `OWS`, the workspace name deriving from the dataset id by the same
+  rule the GeoServer adapter applies.
+- APISIX tries those pairs in order and keeps the first match, so a request ending in a slash is handed to
+  the same upstream path as one without it, while a deeper sub-path keeps its suffix. Forwarding the slash
+  verbatim reaches a different upstream resource: FROST answers it with 404, and GeoServer serves it from
+  its admin service, where the map-rendering concurrency limit is switched off. `UPDATE_ROUTE` and
+  `RESTORE_ROUTE` replace a single-pair rewrite found on an existing route, so a route provisioned earlier
+  is corrected without re-provisioning its dataset.
 - `OWS` routes carry a `response-rewrite` filter rewriting GeoServer's self-referential capabilities URLs
   onto the route's external endpoint, and strip the request `Accept-Encoding`, because that filter matches
   raw response bytes and would otherwise pass a gzipped capabilities document through unchanged.

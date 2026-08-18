@@ -466,6 +466,31 @@ class ApisixSagaHandlerRoutingIT extends AbstractApisixIT {
       assertEquals(
           "WFS", query.get("service").asText(), "OGC service query parameter must be preserved");
       assertEquals("GetCapabilities", query.get("request").asText());
+
+      // GeoServer answers a trailing-slash OWS path from its admin service, which does not apply
+      // the map-rendering limit, so the gateway must hand both forms to the same upstream path.
+      HttpResponse<String> trailingSlash =
+          sendGatewayRequest(
+              "/v1/datasets/" + datasetId + "/" + owsSlug + "/?service=WFS&request=GetCapabilities",
+              API_HOST);
+
+      assertEquals(
+          200,
+          trailingSlash.statusCode(),
+          "a trailing slash must still reach the OWS upstream — body: " + trailingSlash.body());
+      assertEquals(
+          echoed.get("path").asText(),
+          objectMapper.readTree(trailingSlash.body()).get("path").asText(),
+          "a trailing slash must resolve to the same upstream path as the bare OWS endpoint");
+
+      // A deeper sub-path keeps its suffix rather than collapsing onto the OWS endpoint.
+      HttpResponse<String> subPath =
+          sendGatewayRequest("/v1/datasets/" + datasetId + "/" + owsSlug + "/wfs", API_HOST);
+
+      assertEquals(
+          "/geoserver/" + workspace + "/ows/wfs",
+          objectMapper.readTree(subPath.body()).get("path").asText(),
+          "a sub-path below the OWS endpoint must be forwarded unchanged");
     }
   }
 
