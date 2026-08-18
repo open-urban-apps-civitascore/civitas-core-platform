@@ -53,14 +53,16 @@ public class SldContentValidator {
 
   /**
    * A parser that reports a DTD as an event so a declared one can be named in the error, while
-   * fetching nothing it references. Entity references are never expanded, and a document whose DTD
-   * lives outside it is refused rather than retrieved — GeoServer rejects that document too.
+   * fetching nothing a document references. A document declaring a DTD is refused before anything
+   * in it is expanded, so resolving entity references only ever applies to the five XML defines
+   * itself — which is what makes an undefined reference a fault the user hears about here rather
+   * than from GeoServer later.
    */
   private static XMLInputFactory secureFactory() {
     XMLInputFactory factory = XMLInputFactory.newFactory();
     factory.setProperty(XMLInputFactory.SUPPORT_DTD, true);
     factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
-    factory.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
+    factory.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, true);
     factory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
     return factory;
   }

@@ -82,7 +82,28 @@ class SldContentValidatorTest {
             "unclosed root element",
             XML_DECL + "<StyledLayerDescriptor><NamedLayer>",
             Outcome.REJECTED_AS_MALFORMED),
-        arguments("content that is not XML at all", "not xml", Outcome.REJECTED_AS_MALFORMED));
+        arguments("content that is not XML at all", "not xml", Outcome.REJECTED_AS_MALFORMED),
+        arguments(
+            "the five entities XML defines itself",
+            sld(XML_DECL)
+                .replace("<Name>probe</Name>", "<Name>&amp; &lt; &gt; &quot; &apos;</Name>"),
+            Outcome.ACCEPTED),
+        arguments(
+            "a character reference",
+            sld(XML_DECL).replace("<Name>probe</Name>", "<Name>&#65;</Name>"),
+            Outcome.ACCEPTED),
+        arguments(
+            "a reference to an entity nothing declares, which GeoServer also refuses",
+            sld(XML_DECL).replace("<Name>probe</Name>", "<Name>&undeclared;</Name>"),
+            Outcome.REJECTED_AS_MALFORMED),
+        arguments(
+            "nested entity declarations that would expand on parsing",
+            sld(
+                XML_DECL
+                    + "<!DOCTYPE StyledLayerDescriptor [ <!ENTITY a \"aaaaaaaa\">"
+                    + " <!ENTITY b \"&a;&a;&a;&a;&a;&a;&a;&a;\">"
+                    + " <!ENTITY c \"&b;&b;&b;&b;&b;&b;&b;&b;\"> ]>"),
+            Outcome.REJECTED_AS_DOCTYPE));
   }
 
   @ParameterizedTest(name = "{0} → {2}")
