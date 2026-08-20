@@ -2,7 +2,6 @@ import { useMutation } from '@tanstack/react-query'
 
 import { apiRequest, type ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import type { MappingField } from '@/generated/core'
-import { useDataQuery } from '@/hooks/use-data-query'
 
 /**
  * API client for CORE Mapping artifacts.
@@ -46,36 +45,6 @@ export interface MappingArtifactResponse {
   logicalUrn: string
   versionedUrn: string
 }
-
-/** An installed DataStructureVersion a mapping's structure reference resolved to. */
-export interface ResolvedStructureVersion {
-  id: string
-  dataStructureId: string
-  version: string | null
-}
-
-/**
- * The document served by `GET /v1/mappings?urn=…`: the authored body (content plus re-merged
- * `positions`) with the source/target references additionally resolved to installed shells by the
- * backend — absent when the referenced structure is not installed.
- */
-export interface MappingArtifactDocument extends MappingArtifactBody {
-  sourceVersion?: ResolvedStructureVersion
-  targetVersion?: ResolvedStructureVersion
-}
-
-/**
- * Fetches a Mapping artifact's authored document by its (logical or versioned) CORE URN.
- * GET /v1/mappings?urn=…
- */
-export const useGetMapping = (urn: string | undefined) =>
-  useDataQuery<MappingArtifactDocument>({
-    key: 'mappings',
-    params: urn ? new URLSearchParams({ urn }) : undefined,
-    isEnabled: Boolean(urn),
-    headers: { [API_REQUEST_HEADER]: 'true' },
-    errorMessage: 'An error occurred while fetching the mapping.',
-  })
 
 /**
  * Creates a new Mapping artifact.

@@ -57,13 +57,6 @@ interface MappingEditorModalProps {
   target: SchemaRef
   config: MappingConfig
   onSave: (config: MappingConfig, targetRequiredFields: string[], staMatchKeys: StaTargetVocabulary) => void
-  /**
-   * Display-only mode for mappings installed from a catalogue bundle: the canvas stays navigable
-   * (pan/zoom/select) but graph mutations are inert and Apply is not offered — editing an
-   * installed artifact is an open design question (in-place version vs copy-on-write fork), so
-   * nothing here may save.
-   */
-  isReadOnly?: boolean
 }
 
 const FULLSCREEN =
@@ -77,7 +70,6 @@ export const MappingEditorModal = ({
   target,
   config,
   onSave,
-  isReadOnly = false,
 }: MappingEditorModalProps) => {
   const t = useTranslations('pipelineEditor.mappingEditor')
   const tCommon = useTranslations('common')
@@ -381,14 +373,13 @@ export const MappingEditorModal = ({
 
   const performExit = (action: 'apply' | 'close') => {
     setPendingExit(null)
-    if (action === 'apply' && !isReadOnly) doSave()
+    if (action === 'apply') doSave()
     onOpenChange(false)
   }
 
   // Warn before leaving if unconnected transforms would be discarded; otherwise exit directly.
-  // Read-only viewing has nothing to lose, so it never warns.
   const requestExit = (action: 'apply' | 'close') => {
-    if (!isReadOnly && unconnectedTransforms.length > 0) {
+    if (unconnectedTransforms.length > 0) {
       setPendingExit(action)
       return
     }
@@ -402,13 +393,9 @@ export const MappingEditorModal = ({
       <DialogTitle className="text-base">{name || t('toolbar.title')}</DialogTitle>
       <span className="text-center text-xs text-muted-foreground">{t('toolbar.status', { mapped, unmapped })}</span>
       <div className="flex items-center justify-end gap-2">
-        {isReadOnly ? (
-          <span className="text-xs text-muted-foreground">{t('readOnlyHint')}</span>
-        ) : (
-          <Button size="sm" onClick={() => requestExit('apply')} disabled={!isReady}>
-            {tCommon('actions.apply')}
-          </Button>
-        )}
+        <Button size="sm" onClick={() => requestExit('apply')} disabled={!isReady}>
+          {tCommon('actions.apply')}
+        </Button>
         <Button size="sm" variant="outline" onClick={() => requestExit('close')}>
           {tCommon('actions.close')}
         </Button>
@@ -445,11 +432,7 @@ export const MappingEditorModal = ({
                 emptyMessage={t('inspector.emptyMessage')}
               >
                 {selectedDef && selectedData && (
-                  <TransformInspector
-                    def={selectedDef}
-                    config={selectedData.config}
-                    onChange={isReadOnly ? () => undefined : updateConfig}
-                  />
+                  <TransformInspector def={selectedDef} config={selectedData.config} onChange={updateConfig} />
                 )}
               </InspectorShell>
             }
@@ -460,14 +443,13 @@ export const MappingEditorModal = ({
               nodeTypes={nodeTypes}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
-              // Read-only: keep the canvas navigable, make every graph mutation inert.
-              onConnect={isReadOnly ? () => undefined : onConnect}
-              onConnectStart={isReadOnly ? () => undefined : onConnectStart}
-              onConnectEnd={isReadOnly ? () => undefined : onConnectEnd}
-              isValidConnection={isReadOnly ? () => false : isValidConnection}
-              onDropNode={isReadOnly ? () => undefined : onDropNode}
+              onConnect={onConnect}
+              onConnectStart={onConnectStart}
+              onConnectEnd={onConnectEnd}
+              isValidConnection={isValidConnection}
+              onDropNode={onDropNode}
               onSelectionChange={setSelectedId}
-              deleteKeyCode={isReadOnly ? [] : ['Delete', 'Backspace']}
+              deleteKeyCode={['Delete', 'Backspace']}
             />
           </EditorLayout>
         </DialogContent>
