@@ -2,7 +2,6 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.PayloadKind;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -11,22 +10,18 @@ import org.springframework.stereotype.Service;
 /**
  * First-class Mapping artifacts. A Mapping is a CORE document (a field-to-field transform between
  * two DataStructures) whose CONTENT lives only in Model Forge; the host is a thin pass-through that
- * reads only the envelope (a display title and, on read-back, the source/target structure
- * references for shell resolution) and NEVER inspects the mapping rules. Mappings are referenced by
- * URN from pipelines and — in future — maintained standalone. Model Forge validates the document
- * against {@code mapping.schema.json} and stamps its {@code $schema} + {@code id} on store.
+ * reads only the envelope (a display title) and NEVER inspects the mapping rules. Mappings are
+ * referenced by URN from pipelines and — in future — maintained standalone. Model Forge validates
+ * the document against {@code mapping.schema.json} and stamps its {@code $schema} + {@code id} on
+ * store.
  */
 @Service
 public class MappingService {
 
   private final ModelRegistryGateway registry;
-  private final DataStructureVersionRepository dataStructureVersionRepository;
 
-  public MappingService(
-      ModelRegistryGateway registry,
-      DataStructureVersionRepository dataStructureVersionRepository) {
+  public MappingService(ModelRegistryGateway registry) {
     this.registry = registry;
-    this.dataStructureVersionRepository = dataStructureVersionRepository;
   }
 
   /**
@@ -85,45 +80,9 @@ public class MappingService {
     return registry.isUnchanged(urn, document.content(), document.styles());
   }
 
-  /**
-   * The mapping's authored document, read back from Model Forge in the same shape the editor
-   * writes: the content (rules) plus the UI node layout re-merged as {@code positions}. The
-   * document's structure references are additionally resolved to installed shells — {@code
-   * sourceVersion}/{@code targetVersion} with {@code id}, {@code dataStructureId} and {@code
-   * version} — the same soft-reference resolution the sink output uses, so the editor can load the
-   * referenced schemas without a URN lookup of its own. An unresolvable reference simply leaves its
-   * key out. Empty when the mapping does not exist.
-   */
+  /** The mapping's content (rules), read back from Model Forge, or empty when it does not exist. */
   public Optional<Map<String, Object>> get(String urn) {
-    return registry.fetchPayload(urn).map(this::authoredView);
-  }
-
-  private Map<String, Object> authoredView(ModelRegistryGateway.RegistryDocument doc) {
-    Map<String, Object> out = new LinkedHashMap<>(doc.content() == null ? Map.of() : doc.content());
-    Object positions = doc.styles() == null ? null : doc.styles().get("positions");
-    if (positions != null) {
-      out.put("positions", positions);
-    }
-    putResolvedStructureRef(out, "source", "sourceVersion");
-    putResolvedStructureRef(out, "target", "targetVersion");
-    return out;
-  }
-
-  /** Resolves a structure soft reference to the installed version's shell coordinates. */
-  private void putResolvedStructureRef(Map<String, Object> doc, String refKey, String outKey) {
-    if (!(doc.get(refKey) instanceof String reference) || reference.isBlank()) {
-      return;
-    }
-    dataStructureVersionRepository
-        .findFirstByModelUrnStartingWith(registry.logicalUrn(reference) + ":")
-        .ifPresent(
-            version -> {
-              Map<String, Object> summary = new LinkedHashMap<>();
-              summary.put("id", version.getId());
-              summary.put("dataStructureId", version.getDataStructure().getId());
-              summary.put("version", version.getVersion());
-              doc.put(outKey, summary);
-            });
+    return registry.fetchPayload(urn).map(ModelRegistryGateway.RegistryDocument::content);
   }
 
   /**
