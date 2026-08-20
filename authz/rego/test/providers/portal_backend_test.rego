@@ -157,10 +157,6 @@ test_endpoints_contains_imports_datasets if {
 	portal_backend.endpoints["/v1/imports/datasets"]
 }
 
-test_endpoints_contains_installations if {
-	portal_backend.endpoints["/v1/installations"]
-}
-
 # The import path must resolve via EXACT match — without its own registry entry,
 # "datastructures" would be read as an {id} under /v1/imports/{id} (or the path
 # would stay unknown) and POST could never be authorized.
@@ -318,4 +314,16 @@ test_endpoints_contains_installations if {
 
 test_endpoints_contains_installations_id_delete if {
 	portal_backend.endpoints["/v1/installations/{id}"].DELETE == "INSTALLATION_DELETE"
+}
+
+# Installations are TENANT resources: without this classification,
+# expected_scope_type stays undefined on /v1/installations/{id} and every
+# resource-endpoint permission rule fails — the mapping above alone is not enough.
+test_expected_scope_type_installations_tenant if {
+	result := portal_backend.expected_scope_type with input as portal_request("DELETE", "/v1/installations/58588b3b-6acd-4390-a780-d5c73e98aa8c")
+	result == "TENANT"
+}
+
+test_is_resource_endpoint_installations if {
+	portal_backend.is_resource_endpoint with input as portal_request("DELETE", "/v1/installations/58588b3b-6acd-4390-a780-d5c73e98aa8c")
 }
