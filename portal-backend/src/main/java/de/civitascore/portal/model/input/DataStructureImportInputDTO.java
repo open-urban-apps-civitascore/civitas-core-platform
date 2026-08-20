@@ -40,13 +40,13 @@ public class DataStructureImportInputDTO extends BaseDataEntityInputDTO {
   @Schema(description = "UI layout for the model, stored alongside it as x-ui-styles")
   private Map<String, Object> styles;
 
-  @Size(max = 1024, message = "bundleId must not exceed 1024 characters") @Schema(
+  @Size(max = 1024, message = "catalogEntryId must not exceed 1024 characters") @Schema(
       description =
           "Catalogue identity of the entry this import comes from, in whatever scheme the catalogue"
               + " uses. Recorded verbatim in the install provenance, never interpreted — an import"
               + " without catalogue identity simply records none.")
-  private String bundleId;
+  private String catalogEntryId;
 
-  @Size(max = 255, message = "bundleVersion must not exceed 255 characters") @Schema(description = "Version of the catalogue entry, recorded alongside bundleId")
-  private String bundleVersion;
+  @Size(max = 255, message = "catalogEntryVersion must not exceed 255 characters") @Schema(description = "Version of the catalogue entry, recorded alongside catalogEntryId")
+  private String catalogEntryVersion;
 }

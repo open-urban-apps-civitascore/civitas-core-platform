@@ -12,18 +12,17 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
- * One bundle install as recorded at import time: header plus one line per touched artifact. The
- * install timestamp is the inherited {@code createdAt}; the actor is exposed as {@code
- * installedBy}.
+ * One install as recorded at import time: header plus one line per touched artifact. The install
+ * timestamp is the inherited {@code createdAt}; the actor is exposed as {@code installedBy}.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class InstallationOutputDTO extends BaseOutputDTO {
 
-  @Schema(description = "Catalogue identity of the bundle, as declared by the installing caller")
-  private String bundleId;
+  @Schema(description = "Catalogue identity of the entry, as declared by the installing caller")
+  private String catalogEntryId;
 
-  private String bundleVersion;
+  private String catalogEntryVersion;
 
   private UUID dataSetId;
   private String dataSetName;

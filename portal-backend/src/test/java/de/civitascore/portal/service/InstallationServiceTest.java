@@ -13,13 +13,13 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
-import de.civitascore.portal.model.entity.BundleInstallation;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.Installation;
 import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.output.InstallationOutputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.BundleInstallationRepository;
+import de.civitascore.portal.repository.InstallationRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -46,7 +46,7 @@ import org.springframework.data.domain.Pageable;
 @ExtendWith(MockitoExtension.class)
 class InstallationServiceTest {
 
-  @Mock private BundleInstallationRepository bundleInstallationRepository;
+  @Mock private InstallationRepository installationRepository;
   @Mock private DataStructureService dataStructureService;
   @Mock private DataSourceService dataSourceService;
   @Mock private DataSinkService dataSinkService;
@@ -58,12 +58,12 @@ class InstallationServiceTest {
 
   @Test
   void findAll_mapsHeaderAuditAndArtifactLines() {
-    BundleInstallation installation = new BundleInstallation();
+    Installation installation = new Installation();
     installation.setId(UUID.randomUUID());
     installation.setCreatedAt(LocalDateTime.of(2026, 8, 14, 12, 0));
     installation.setCreatedBy(UUID.randomUUID());
-    installation.setBundleId("urn:catalog:openurbanapps:usecase:verkehrszaehlung");
-    installation.setBundleVersion("1.0.0");
+    installation.setCatalogEntryId("urn:catalog:openurbanapps:usecase:verkehrszaehlung");
+    installation.setCatalogEntryVersion("1.0.0");
     installation.setDataSetId(UUID.randomUUID());
     installation.setDataSetName("Verkehrszählung");
     InstalledArtifact line = new InstalledArtifact();
@@ -74,7 +74,7 @@ class InstallationServiceTest {
     line.setAction(InstalledArtifactAction.CREATED);
     installation.addArtifact(line);
     Pageable pageable = PageRequest.of(0, 20);
-    when(bundleInstallationRepository.findAll(pageable))
+    when(installationRepository.findAll(pageable))
         .thenReturn(new PageImpl<>(List.of(installation), pageable, 1));
 
     Page<InstallationOutputDTO> page = installationService.findAll(pageable);
@@ -84,7 +84,7 @@ class InstallationServiceTest {
     assertThat(output.getId()).isEqualTo(installation.getId());
     assertThat(output.getCreatedAt()).isEqualTo(installation.getCreatedAt());
     assertThat(output.getInstalledBy()).isEqualTo(installation.getCreatedBy());
-    assertThat(output.getBundleId())
+    assertThat(output.getCatalogEntryId())
         .isEqualTo("urn:catalog:openurbanapps:usecase:verkehrszaehlung");
     assertThat(output.getDataSetName()).isEqualTo("Verkehrszählung");
     assertThat(output.getArtifacts())
@@ -105,7 +105,7 @@ class InstallationServiceTest {
    */
   @Test
   void findAll_mapsRegistryOnlyMappingLineWithoutShellId() {
-    BundleInstallation installation = new BundleInstallation();
+    Installation installation = new Installation();
     installation.setId(UUID.randomUUID());
     installation.setCreatedAt(LocalDateTime.of(2026, 8, 14, 12, 0));
     installation.setDataSetId(UUID.randomUUID());
@@ -117,7 +117,7 @@ class InstallationServiceTest {
     line.setAction(InstalledArtifactAction.CREATED);
     installation.addArtifact(line);
     Pageable pageable = PageRequest.of(0, 20);
-    when(bundleInstallationRepository.findAll(pageable))
+    when(installationRepository.findAll(pageable))
         .thenReturn(new PageImpl<>(List.of(installation), pageable, 1));
 
     Page<InstallationOutputDTO> page = installationService.findAll(pageable);
@@ -137,10 +137,10 @@ class InstallationServiceTest {
   /**
    * A structure-only installation with one CREATED line, as the single-structure import writes it.
    */
-  private static BundleInstallation structureInstallation(InstalledArtifactAction action) {
-    BundleInstallation installation = new BundleInstallation();
+  private static Installation structureInstallation(InstalledArtifactAction action) {
+    Installation installation = new Installation();
     installation.setId(UUID.randomUUID());
-    installation.setBundleId("urn:openurbanapps:datastructure:airqualitystation");
+    installation.setCatalogEntryId("urn:openurbanapps:datastructure:airqualitystation");
     InstalledArtifact line = new InstalledArtifact();
     line.setArtifactType(InstalledArtifactType.DATA_STRUCTURE);
     line.setName("Luftqualitäts-Messstation");
@@ -154,11 +154,11 @@ class InstallationServiceTest {
 
   @Test
   void uninstall_deletesCreatedStructureAndMarksTheInstallation() {
-    BundleInstallation installation = structureInstallation(InstalledArtifactAction.CREATED);
+    Installation installation = structureInstallation(InstalledArtifactAction.CREATED);
     UUID shellId = installation.getArtifacts().getFirst().getShellId();
-    when(bundleInstallationRepository.findById(installation.getId()))
+    when(installationRepository.findById(installation.getId()))
         .thenReturn(Optional.of(installation));
-    when(bundleInstallationRepository.countOtherActiveInstallationsReferencing(
+    when(installationRepository.countOtherActiveInstallationsReferencing(
             installation.getArtifacts().getFirst().getUrn(), installation.getId()))
         .thenReturn(0L);
     when(dataStructureService.existsById(shellId)).thenReturn(true);
@@ -167,7 +167,7 @@ class InstallationServiceTest {
 
     verify(dataStructureService).deleteById(shellId);
     // The journal survives — only the terminal timestamp is set.
-    verify(bundleInstallationRepository).save(installation);
+    verify(installationRepository).save(installation);
     assertThat(installation.getUninstalledAt()).isNotNull();
   }
 
@@ -177,10 +177,10 @@ class InstallationServiceTest {
    */
   @Test
   void uninstall_keepsStructureStillClaimedByAnotherActiveInstallation() {
-    BundleInstallation installation = structureInstallation(InstalledArtifactAction.CREATED);
-    when(bundleInstallationRepository.findById(installation.getId()))
+    Installation installation = structureInstallation(InstalledArtifactAction.CREATED);
+    when(installationRepository.findById(installation.getId()))
         .thenReturn(Optional.of(installation));
-    when(bundleInstallationRepository.countOtherActiveInstallationsReferencing(
+    when(installationRepository.countOtherActiveInstallationsReferencing(
             installation.getArtifacts().getFirst().getUrn(), installation.getId()))
         .thenReturn(1L);
 
@@ -188,21 +188,21 @@ class InstallationServiceTest {
 
     verify(dataStructureService, never()).deleteById(any());
     assertThat(installation.getUninstalledAt()).isNotNull();
-    verify(bundleInstallationRepository).save(installation);
+    verify(installationRepository).save(installation);
   }
 
   /** A REUSED line deletes nothing — this install only withdraws its claim. */
   @Test
   void uninstall_reusedLine_withdrawsTheClaimWithoutDeleting() {
-    BundleInstallation installation = structureInstallation(InstalledArtifactAction.REUSED);
-    when(bundleInstallationRepository.findById(installation.getId()))
+    Installation installation = structureInstallation(InstalledArtifactAction.REUSED);
+    when(installationRepository.findById(installation.getId()))
         .thenReturn(Optional.of(installation));
 
     installationService.uninstall(installation.getId());
 
     verify(dataStructureService, never()).deleteById(any());
     assertThat(installation.getUninstalledAt()).isNotNull();
-    verify(bundleInstallationRepository).save(installation);
+    verify(installationRepository).save(installation);
   }
 
   /** One provenance line, CREATED. */
@@ -228,9 +228,9 @@ class InstallationServiceTest {
    */
   @Test
   void uninstall_bundleTearsDownInReverseOrderWithManifestRepair() {
-    BundleInstallation installation = new BundleInstallation();
+    Installation installation = new Installation();
     installation.setId(UUID.randomUUID());
-    installation.setBundleId("urn:openurbanapps:usecase:verkehrszaehlung");
+    installation.setCatalogEntryId("urn:openurbanapps:usecase:verkehrszaehlung");
     InstalledArtifact structure =
         line(
             InstalledArtifactType.DATA_STRUCTURE,
@@ -265,7 +265,7 @@ class InstallationServiceTest {
             "urn:core:platform:civitas:pipeline:common:flow:h1i2j3k4l5");
     List.of(structure, source, mapping, dataSetLine, sink, pipeline)
         .forEach(installation::addArtifact);
-    when(bundleInstallationRepository.findById(installation.getId()))
+    when(installationRepository.findById(installation.getId()))
         .thenReturn(Optional.of(installation));
 
     DataSet dataSet = new DataSet();
@@ -273,7 +273,7 @@ class InstallationServiceTest {
     dataSet.setName("Verkehrszählung");
     dataSet.setDataSetStatus(DataSetStatus.DRAFT);
     when(dataSetService.findById(dataSetLine.getShellId())).thenReturn(Optional.of(dataSet));
-    when(bundleInstallationRepository.countOtherActiveInstallationsReferencing(
+    when(installationRepository.countOtherActiveInstallationsReferencing(
             any(), eq(installation.getId())))
         .thenReturn(0L);
     when(pipelineService.existsById(pipeline.getShellId())).thenReturn(true);
@@ -308,18 +308,18 @@ class InstallationServiceTest {
     order.verify(dataSourceService).deleteById(source.getShellId());
     order.verify(dataStructureService).deleteById(structure.getShellId());
     assertThat(installation.getUninstalledAt()).isNotNull();
-    verify(bundleInstallationRepository).save(installation);
+    verify(installationRepository).save(installation);
   }
 
   /** READY needs an unstage first; refuse before touching anything. */
   @Test
   void uninstall_whenDataSetNotDraft_refusesWithActionableMessage() {
-    BundleInstallation installation = new BundleInstallation();
+    Installation installation = new Installation();
     installation.setId(UUID.randomUUID());
     InstalledArtifact dataSetLine =
         line(InstalledArtifactType.DATA_SET, "Verkehrszählung", UUID.randomUUID(), null);
     installation.addArtifact(dataSetLine);
-    when(bundleInstallationRepository.findById(installation.getId()))
+    when(installationRepository.findById(installation.getId()))
         .thenReturn(Optional.of(installation));
     DataSet dataSet = new DataSet();
     dataSet.setDataSetStatus(DataSetStatus.READY);
@@ -330,18 +330,18 @@ class InstallationServiceTest {
         .hasMessageContaining("unstage");
 
     verify(dataSetService, never()).deleteById(any());
-    verify(bundleInstallationRepository, never()).save(any());
+    verify(installationRepository, never()).save(any());
   }
 
   /** Provisioned infrastructure needs the asynchronous saga teardown — a later increment. */
   @Test
   void uninstall_whenDataSetProvisioned_refuses() {
-    BundleInstallation installation = new BundleInstallation();
+    Installation installation = new Installation();
     installation.setId(UUID.randomUUID());
     InstalledArtifact dataSetLine =
         line(InstalledArtifactType.DATA_SET, "Verkehrszählung", UUID.randomUUID(), null);
     installation.addArtifact(dataSetLine);
-    when(bundleInstallationRepository.findById(installation.getId()))
+    when(installationRepository.findById(installation.getId()))
         .thenReturn(Optional.of(installation));
     DataSet dataSet = new DataSet();
     dataSet.setDataSetStatus(DataSetStatus.DRAFT);
@@ -353,14 +353,14 @@ class InstallationServiceTest {
         .hasMessageContaining("unrelease");
 
     verify(dataSetService, never()).deleteById(any());
-    verify(bundleInstallationRepository, never()).save(any());
+    verify(installationRepository, never()).save(any());
   }
 
   @Test
   void uninstall_alreadyUninstalled_rejects() {
-    BundleInstallation installation = structureInstallation(InstalledArtifactAction.CREATED);
+    Installation installation = structureInstallation(InstalledArtifactAction.CREATED);
     installation.setUninstalledAt(LocalDateTime.of(2026, 8, 15, 9, 0));
-    when(bundleInstallationRepository.findById(installation.getId()))
+    when(installationRepository.findById(installation.getId()))
         .thenReturn(Optional.of(installation));
 
     assertThatThrownBy(() -> installationService.uninstall(installation.getId()))
@@ -371,11 +371,11 @@ class InstallationServiceTest {
   /** Deleted by hand already? The journal records history; mark uninstalled instead of failing. */
   @Test
   void uninstall_whenShellAlreadyGone_stillMarksUninstalled() {
-    BundleInstallation installation = structureInstallation(InstalledArtifactAction.CREATED);
+    Installation installation = structureInstallation(InstalledArtifactAction.CREATED);
     UUID shellId = installation.getArtifacts().getFirst().getShellId();
-    when(bundleInstallationRepository.findById(installation.getId()))
+    when(installationRepository.findById(installation.getId()))
         .thenReturn(Optional.of(installation));
-    when(bundleInstallationRepository.countOtherActiveInstallationsReferencing(
+    when(installationRepository.countOtherActiveInstallationsReferencing(
             installation.getArtifacts().getFirst().getUrn(), installation.getId()))
         .thenReturn(0L);
     when(dataStructureService.existsById(shellId)).thenReturn(false);
@@ -384,6 +384,6 @@ class InstallationServiceTest {
 
     verify(dataStructureService, never()).deleteById(any());
     assertThat(installation.getUninstalledAt()).isNotNull();
-    verify(bundleInstallationRepository).save(installation);
+    verify(installationRepository).save(installation);
   }
 }

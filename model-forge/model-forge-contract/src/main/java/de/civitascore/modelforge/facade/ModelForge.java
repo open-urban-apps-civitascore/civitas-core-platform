@@ -9,6 +9,8 @@ import de.civitascore.modelforge.contract.ArtifactWriteResult;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
+import de.civitascore.modelforge.contract.ImportArtifactCommand;
+import de.civitascore.modelforge.contract.ImportArtifactResult;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.ImportSmartDataModelCommand;
@@ -79,6 +81,33 @@ public interface ModelForge {
      *     validation or has an unresolved {@code x-core-ref} foreign key
      */
     ImportResult importFromXRepository(ImportXRepositoryCommand command);
+
+    /**
+     * Imports one artifact from a CORE artifact envelope ({@code artifact-envelope.schema.json}),
+     * <em>keeping</em> the caller-declared identity — the {@code importSchema} identity exception
+     * ("a declared real CORE-URN {@code $id} is kept") generalised to the opaque CORE kinds, for
+     * artifacts whose identity an external authority manages and that must resolve to the same URN
+     * on every importing instance.
+     *
+     * <p>The envelope is validated against its schema. {@code artifactId} must be a logical CORE
+     * URN whose artifact-type segment names an opaque kind (mapping, pipeline, datasource,
+     * datasink, dataset) and matches {@code artifactType}; the content-format hint {@code JSON}
+     * defers to the URN segment. Idempotent turnstile semantics: an unknown identity is created at
+     * {@code firstVersion.version} (the same explicit-version escape hatch external XÖV imports
+     * use); an identity already stored with identical content — ignoring the stamped
+     * {@code $schema}/{@code id} — is returned unchanged with {@code created=false}; different
+     * content is refused. {@code JSON_SCHEMA} and {@code XSD} envelopes are deliberate follow-up
+     * work — import schema content through {@link #importSchema(ImportSchemaCommand)} or
+     * {@link #importFromXRepository(ImportXRepositoryCommand)} for now.
+     *
+     * @param command the envelope to import
+     * @return the versioned pin the registry resolved, flagged created or reused
+     * @throws ValidationFailedException when the envelope, its identity, or its content fails
+     *     validation
+     * @throws de.civitascore.modelforge.contract.ArtifactContentConflictException when the declared
+     *     identity already exists with different content
+     */
+    ImportArtifactResult importArtifact(ImportArtifactCommand command);
 
     // ── Read ─────────────────────────────────────────────────────────────────
 

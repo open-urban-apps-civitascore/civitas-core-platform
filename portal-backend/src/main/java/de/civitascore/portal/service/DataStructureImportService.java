@@ -77,8 +77,8 @@ public class DataStructureImportService {
     // of which endpoint did it. No dataset is produced here — that is why the installation header
     // carries none and the structure is simply the install's only line.
     installationRecorder.record(
-        input.getBundleId(),
-        input.getBundleVersion(),
+        input.getCatalogEntryId(),
+        input.getCatalogEntryVersion(),
         null,
         null,
         List.of(

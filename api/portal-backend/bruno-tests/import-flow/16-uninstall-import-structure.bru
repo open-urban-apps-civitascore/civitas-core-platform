@@ -14,8 +14,8 @@ body:json {
   {
     "name": "Bruno Uninstall Struktur",
     "description": "Created only to be uninstalled again",
-    "bundleId": "urn:openurbanapps:datastructure:brunouninstall:r{{runId}}",
-    "bundleVersion": "1.0.0",
+    "catalogEntryId": "urn:openurbanapps:datastructure:brunouninstall:r{{runId}}",
+    "catalogEntryVersion": "1.0.0",
     "model": {
       "$id": "urn:core:standard:openurbanapps:datastructure:test:brunouninstall:r{{runId}}",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -38,7 +38,7 @@ tests {
 }
 
 docs {
-  Setup for the uninstall slice (17-19). The bundleId is how 17 finds the
+  Setup for the uninstall slice (17-19). The catalogEntryId is how 17 finds the
   installation record — the single-structure import response carries no
   installationId, which is a known gap, not a feature.
 }

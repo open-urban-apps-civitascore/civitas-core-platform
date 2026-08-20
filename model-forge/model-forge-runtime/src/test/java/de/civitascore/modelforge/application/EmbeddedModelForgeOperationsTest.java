@@ -45,6 +45,7 @@ class EmbeddedModelForgeOperationsTest {
     private ElementCommandService elementCommandService;
     private SchemaImportService schemaImportService;
     private ViewService viewService;
+    private de.civitascore.modelforge.validation.CoreSchemaValidator coreSchemaValidator;
     private EmbeddedModelForgeOperations operations;
 
     @BeforeEach
@@ -71,7 +72,7 @@ class EmbeddedModelForgeOperationsTest {
             // These are orchestration tests (URN stamping, registry routing, dependency lists) — CORE
             // schema conformance is covered by CoreSchemaValidatorTest. Mock the validator so the
             // now-mandatory write-time validation doesn't reject the minimal fixtures used here.
-            mock(de.civitascore.modelforge.validation.CoreSchemaValidator.class),
+            coreSchemaValidator = mock(de.civitascore.modelforge.validation.CoreSchemaValidator.class),
             new ReferenceExistenceValidator(registry, refExtractor),
             graph,
             registry,
@@ -418,5 +419,120 @@ class EmbeddedModelForgeOperationsTest {
                 operations.createArtifact(new CreateArtifactCommand(ArtifactKind.ELEMENT, "Sensor", schema)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("importSchema");
+    }
+
+    // ── importArtifact (envelope door) ──
+
+    private static final String MAPPING_URN =
+        "urn:core:standard:openurbanapps:mapping:mobility:zaehlungzumessung:t6iap1st7k";
+
+    private tools.jackson.databind.node.ObjectNode envelope(
+            String artifactType, String artifactId, JsonNode content) {
+        var envelope = mapper.createObjectNode();
+        envelope.put("$schema", "https://civitasconnect.digital/core/artifact-envelope/v1");
+        envelope.put("artifactId", artifactId);
+        envelope.put("artifactType", artifactType);
+        var firstVersion = envelope.putObject("firstVersion");
+        firstVersion.put("version", "1.0.0");
+        var inner = firstVersion.putObject("content");
+        inner.put("contentType", "application/json");
+        inner.set("content", content);
+        return envelope;
+    }
+
+    @Test
+    void importArtifactCreatesAtTheDeclaredUrnWithTheEnvelopeVersion() {
+        JsonNode content = mapper.createObjectNode().put("title", "Zählung → Messung");
+        when(registry.storeAt(eq(ArtifactKind.MAPPING), eq(MAPPING_URN), any(),
+                eq(VersionBump.PATCH), eq("1.0.0")))
+            .thenReturn(MAPPING_URN + ":1.0.0");
+
+        var result = operations.importArtifact(
+            new de.civitascore.modelforge.contract.ImportArtifactCommand(
+                envelope("MAPPING", MAPPING_URN, content)));
+
+        assertThat(result.created()).isTrue();
+        assertThat(result.artifactId().value()).isEqualTo(MAPPING_URN + ":1.0.0");
+        var stored = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry).storeAt(eq(ArtifactKind.MAPPING), eq(MAPPING_URN), stored.capture(),
+            eq(VersionBump.PATCH), eq("1.0.0"));
+        // The declared identity is kept and stamped — never re-minted.
+        assertThat(stored.getValue().path("id").asString()).isEqualTo(MAPPING_URN);
+        assertThat(stored.getValue().path("$schema").asString())
+            .isEqualTo("https://civitasconnect.digital/core/mapping/v1");
+        verify(graph).registerFromRegistry(MAPPING_URN);
+    }
+
+    @Test
+    void importArtifactReusesAnIdenticallyStoredArtifactWithoutWriting() {
+        var content = mapper.createObjectNode().put("title", "Zählung → Messung");
+        var stored = content.deepCopy();
+        stored.put("$schema", "https://civitasconnect.digital/core/mapping/v1");
+        stored.put("id", MAPPING_URN);
+        when(registry.fetch(MAPPING_URN)).thenReturn(Optional.of(stored));
+        when(registry.resolveReference(MAPPING_URN)).thenReturn(Optional.of(MAPPING_URN + ":1.0.0"));
+
+        var result = operations.importArtifact(
+            new de.civitascore.modelforge.contract.ImportArtifactCommand(
+                envelope("MAPPING", MAPPING_URN, content)));
+
+        assertThat(result.created()).isFalse();
+        assertThat(result.artifactId().value()).isEqualTo(MAPPING_URN + ":1.0.0");
+        verify(registry, org.mockito.Mockito.never())
+            .storeAt(any(), anyString(), any(), any(), any());
+    }
+
+    @Test
+    void importArtifactRefusesDifferentContentAtTheSameIdentity() {
+        var stored = mapper.createObjectNode().put("title", "etwas anderes");
+        stored.put("id", MAPPING_URN);
+        when(registry.fetch(MAPPING_URN)).thenReturn(Optional.of(stored));
+        JsonNode content = mapper.createObjectNode().put("title", "Zählung → Messung");
+
+        assertThatThrownBy(() -> operations.importArtifact(
+                new de.civitascore.modelforge.contract.ImportArtifactCommand(
+                    envelope("MAPPING", MAPPING_URN, content))))
+            .isInstanceOf(de.civitascore.modelforge.contract.ArtifactContentConflictException.class)
+            .hasMessageContaining(MAPPING_URN);
+        verify(registry, org.mockito.Mockito.never())
+            .storeAt(any(), anyString(), any(), any(), any());
+    }
+
+    @Test
+    void importArtifactRejectsAMismatchedArtifactTypeHint() {
+        String pipelineUrn = "urn:core:standard:openurbanapps:pipeline:mobility:import:a1b2c3d4e5";
+        JsonNode content = mapper.createObjectNode().put("title", "x");
+
+        assertThatThrownBy(() -> operations.importArtifact(
+                new de.civitascore.modelforge.contract.ImportArtifactCommand(
+                    envelope("MAPPING", pipelineUrn, content))))
+            .isInstanceOf(de.civitascore.modelforge.contract.ValidationFailedException.class)
+            .hasMessageContaining("does not match");
+    }
+
+    @Test
+    void importArtifactRejectsSchemaContentEnvelopes() {
+        String elementUrn = "urn:core:standard:openurbanapps:element:common:GeoPoint:a1b2c3d4e5";
+        JsonNode content = mapper.createObjectNode().put("type", "object");
+
+        assertThatThrownBy(() -> operations.importArtifact(
+                new de.civitascore.modelforge.contract.ImportArtifactCommand(
+                    envelope("JSON_SCHEMA", elementUrn, content))))
+            .isInstanceOf(de.civitascore.modelforge.contract.ValidationFailedException.class)
+            .hasMessageContaining("importSchema");
+    }
+
+    @Test
+    void importArtifactRejectsAnInvalidEnvelope() {
+        when(coreSchemaValidator.validateEnvelope(any())).thenReturn(List.of(
+            new de.civitascore.modelforge.contract.Diagnostic(
+                de.civitascore.modelforge.contract.DiagnosticSeverity.ERROR,
+                "artifactId is required", "artifact-schema-violation", "/artifactId")));
+
+        assertThatThrownBy(() -> operations.importArtifact(
+                new de.civitascore.modelforge.contract.ImportArtifactCommand(
+                    mapper.createObjectNode())))
+            .isInstanceOf(de.civitascore.modelforge.contract.ValidationFailedException.class)
+            .hasMessageContaining("artifact-envelope");
     }
 }

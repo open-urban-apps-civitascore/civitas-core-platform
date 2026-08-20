@@ -16,9 +16,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * One artifact line of a {@link BundleInstallation}: what kind of artifact, which shell row and URN
- * it ended up as, and whether this install created it or merely linked an existing one. Shell id
- * and URN are plain values, not foreign keys — see the parent's append-only contract.
+ * One artifact line of an {@link Installation}: what kind of artifact, which shell row and URN it
+ * ended up as, and whether this install created it or merely linked an existing one. Shell id and
+ * URN are plain values, not foreign keys — see the parent's append-only contract.
  */
 @Getter
 @Setter
@@ -28,11 +28,9 @@ public class InstalledArtifact extends BaseEntity {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "installation_id", nullable = false)
-  private BundleInstallation installation;
+  private Installation installation;
 
-  /**
-   * Stable ordering within the installation; assigned by {@link BundleInstallation#addArtifact}.
-   */
+  /** Stable ordering within the installation; assigned by {@link Installation#addArtifact}. */
   @Column(name = "position", nullable = false)
   private int position;
 

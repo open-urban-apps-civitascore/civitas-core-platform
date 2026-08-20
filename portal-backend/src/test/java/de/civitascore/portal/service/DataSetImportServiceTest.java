@@ -14,12 +14,12 @@ import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
-import de.civitascore.portal.model.entity.BundleInstallation;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.entity.Installation;
 import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetImportInputDTO;
@@ -84,7 +84,7 @@ class DataSetImportServiceTest {
   @Captor private ArgumentCaptor<DataSourceInputDTO> sourceInputCaptor;
   @Captor private ArgumentCaptor<DataSetInputDTO> dataSetInputCaptor;
   @Captor private ArgumentCaptor<List<InstalledArtifact>> artifactLinesCaptor;
-  @Captor private ArgumentCaptor<String> bundleIdCaptor;
+  @Captor private ArgumentCaptor<String> catalogEntryIdCaptor;
 
   private static DataStructureImportInputDTO structureInput() {
     DataStructureImportInputDTO structure = new DataStructureImportInputDTO();
@@ -217,7 +217,7 @@ class DataSetImportServiceTest {
   /** Stubs the provenance write to return a saved installation, as the recorder does. */
   private UUID stubInstallationRecord() {
     UUID installationId = UUID.randomUUID();
-    BundleInstallation saved = new BundleInstallation();
+    Installation saved = new Installation();
     saved.setId(installationId);
     when(installationRecorder.record(any(), any(), any(), any(), any())).thenReturn(saved);
     return installationId;
@@ -230,9 +230,9 @@ class DataSetImportServiceTest {
   }
 
   /** The bundle identity the orchestrator handed to the recorder. */
-  private String recordedBundleId() {
-    verify(installationRecorder).record(bundleIdCaptor.capture(), any(), any(), any(), any());
-    return bundleIdCaptor.getValue();
+  private String recordedCatalogEntryId() {
+    verify(installationRecorder).record(catalogEntryIdCaptor.capture(), any(), any(), any(), any());
+    return catalogEntryIdCaptor.getValue();
   }
 
   @Test
@@ -281,7 +281,7 @@ class DataSetImportServiceTest {
   }
 
   @Test
-  void importDataSet_recordsBundleIdentityAndReuseInProvenance() {
+  void importDataSet_recordsCatalogEntryIdentityAndReuseInProvenance() {
     // Structure-only bundle: only the versioned-URN resolution is exercised.
     when(modelRegistryGateway.logicalUrn(VERSIONED_URN)).thenReturn(STRUCTURE_URN);
     DataStructureVersion version = version();
@@ -294,11 +294,11 @@ class DataSetImportServiceTest {
     stubInstallationRecord();
 
     DataSetImportInputDTO input = bundle(List.of(structureInput()), List.of());
-    input.setBundleId("urn:catalog:openurbanapps:usecase:airquality");
-    input.setBundleVersion("1.2.0");
+    input.setCatalogEntryId("urn:catalog:openurbanapps:usecase:airquality");
+    input.setCatalogEntryVersion("1.2.0");
     importService.importDataSet(input);
 
-    assertThat(recordedBundleId()).isEqualTo("urn:catalog:openurbanapps:usecase:airquality");
+    assertThat(recordedCatalogEntryId()).isEqualTo("urn:catalog:openurbanapps:usecase:airquality");
     assertThat(recordedLines())
         .extracting(InstalledArtifact::getArtifactType, InstalledArtifact::getAction)
         .containsExactly(

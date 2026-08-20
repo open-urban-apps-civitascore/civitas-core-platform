@@ -18,7 +18,7 @@ import lombok.Setter;
 import org.hibernate.annotations.BatchSize;
 
 /**
- * One install as it happened: which bundle (as declared by the caller) and — via {@link
+ * One install as it happened: which catalogue entry (as declared by the caller) and — via {@link
  * InstalledArtifact} — what it did to every artifact it touched. Written in the same transaction as
  * the import itself, so the record exists exactly iff the install committed. Who and when come from
  * the audit columns ({@code createdBy}, {@code createdAt}).
@@ -30,19 +30,19 @@ import org.hibernate.annotations.BatchSize;
 @Getter
 @Setter
 @Entity
-@Table(name = "bundle_installations")
-public class BundleInstallation extends BaseEntity {
+@Table(name = "installations")
+public class Installation extends BaseEntity {
 
   /**
-   * Catalogue identity of the installed bundle, as declared by the caller — recorded verbatim and
+   * Catalogue identity of the installed entry, as declared by the caller — recorded verbatim and
    * never interpreted. Deliberately not called a URN: the value follows whatever scheme the
    * catalogue uses and is not required to be a CORE URN.
    */
-  @Column(name = "bundle_id", length = 1024)
-  private String bundleId;
+  @Column(name = "catalog_entry_id", length = 1024)
+  private String catalogEntryId;
 
-  @Column(name = "bundle_version")
-  private String bundleVersion;
+  @Column(name = "catalog_entry_version")
+  private String catalogEntryVersion;
 
   /**
    * The dataset this install produced, if any — a denormalised copy so the install list renders a

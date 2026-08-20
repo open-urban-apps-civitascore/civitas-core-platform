@@ -4,13 +4,13 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
-import de.civitascore.portal.model.entity.BundleInstallation;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.Installation;
 import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.output.InstallationOutputDTO;
 import de.civitascore.portal.model.output.InstallationOutputDTO.InstalledArtifactOutputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.BundleInstallationRepository;
+import de.civitascore.portal.repository.InstallationRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.time.LocalDateTime;
@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class InstallationService {
 
-  private final BundleInstallationRepository bundleInstallationRepository;
+  private final InstallationRepository installationRepository;
   private final DataStructureService dataStructureService;
   private final DataSourceService dataSourceService;
   private final DataSinkService dataSinkService;
@@ -48,7 +48,7 @@ public class InstallationService {
    */
   @Transactional(readOnly = true)
   public Page<InstallationOutputDTO> findAll(Pageable pageable) {
-    return bundleInstallationRepository.findAll(pageable).map(InstallationService::toOutput);
+    return installationRepository.findAll(pageable).map(InstallationService::toOutput);
   }
 
   /**
@@ -83,13 +83,13 @@ public class InstallationService {
    */
   @Transactional
   public void uninstall(UUID installationId) {
-    BundleInstallation installation =
-        bundleInstallationRepository
+    Installation installation =
+        installationRepository
             .findById(installationId)
             .orElseThrow(
                 () ->
                     new ResourceNotFoundException(
-                        BundleInstallation.class.getSimpleName(), installationId));
+                        Installation.class.getSimpleName(), installationId));
 
     if (installation.getUninstalledAt() != null) {
       throw new InvalidInputException(
@@ -110,7 +110,7 @@ public class InstallationService {
       }
       if (line.getUrn() != null) {
         long claims =
-            bundleInstallationRepository.countOtherActiveInstallationsReferencing(
+            installationRepository.countOtherActiveInstallationsReferencing(
                 line.getUrn(), installationId);
         if (claims > 0) {
           // Shared-dependency semantics: the artifact outlives this install because someone
@@ -138,7 +138,7 @@ public class InstallationService {
     }
 
     installation.setUninstalledAt(LocalDateTime.now());
-    bundleInstallationRepository.save(installation);
+    installationRepository.save(installation);
   }
 
   /**
@@ -146,7 +146,7 @@ public class InstallationService {
    * provisioned, no saga in flight. Everything else needs the asynchronous unrelease/delete sagas —
    * a later increment, refused honestly instead of half-done.
    */
-  private void requireTearableDataSet(BundleInstallation installation) {
+  private void requireTearableDataSet(Installation installation) {
     installation.getArtifacts().stream()
         .filter(line -> line.getArtifactType() == InstalledArtifactType.DATA_SET)
         .filter(line -> line.getAction() == InstalledArtifactAction.CREATED)
@@ -256,14 +256,14 @@ public class InstallationService {
     dataSourceService.deleteById(source.getId());
   }
 
-  private static InstallationOutputDTO toOutput(BundleInstallation installation) {
+  private static InstallationOutputDTO toOutput(Installation installation) {
     InstallationOutputDTO output = new InstallationOutputDTO();
     output.setId(installation.getId());
     output.setCreatedAt(installation.getCreatedAt());
     output.setModifiedAt(installation.getModifiedAt());
     output.setUninstalledAt(installation.getUninstalledAt());
-    output.setBundleId(installation.getBundleId());
-    output.setBundleVersion(installation.getBundleVersion());
+    output.setCatalogEntryId(installation.getCatalogEntryId());
+    output.setCatalogEntryVersion(installation.getCatalogEntryVersion());
     output.setDataSetId(installation.getDataSetId());
     output.setDataSetName(installation.getDataSetName());
     output.setInstalledBy(installation.getCreatedBy());

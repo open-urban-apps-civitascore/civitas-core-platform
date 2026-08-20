@@ -148,8 +148,8 @@ class DataStructureImportServiceTest {
     when(modelRegistryGateway.logicalUrn(DATASTRUCTURE_URN + ":1.0.0"))
         .thenReturn(DATASTRUCTURE_URN);
     DataStructureImportInputDTO input = importInput();
-    input.setBundleId("urn:openurbanapps:datastructure:airqualitystation");
-    input.setBundleVersion("1.0.0");
+    input.setCatalogEntryId("urn:openurbanapps:datastructure:airqualitystation");
+    input.setCatalogEntryVersion("1.0.0");
 
     importService.importDataStructure(input);
 

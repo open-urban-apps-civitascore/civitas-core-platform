@@ -1,5 +1,5 @@
 meta {
-  name: Uninstall — locate the installation by bundleId
+  name: Uninstall — locate the installation by catalogEntryId
   type: http
   seq: 17
 }
@@ -17,7 +17,7 @@ auth:bearer {
 script:post-response {
   if (res.status === 200) {
     const target = 'urn:openurbanapps:datastructure:brunouninstall:r' + bru.getVar('runId');
-    const match = (res.body.content || []).find(row => row.bundleId === target && !row.uninstalledAt);
+    const match = (res.body.content || []).find(row => row.catalogEntryId === target && !row.uninstalledAt);
     if (match) {
       bru.setVar('uninstallInstallationId', match.id);
     }
@@ -28,7 +28,7 @@ tests {
   test("the installation from 16 is recorded and active", function() {
     expect(res.status).to.equal(200);
     const target = 'urn:openurbanapps:datastructure:brunouninstall:r' + bru.getVar('runId');
-    const match = (res.body.content || []).find(row => row.bundleId === target);
+    const match = (res.body.content || []).find(row => row.catalogEntryId === target);
     expect(match).to.not.equal(undefined);
     expect(match.uninstalledAt).to.satisfy(v => v === null || v === undefined);
     expect(match.artifacts).to.have.length(1);
@@ -38,7 +38,7 @@ tests {
 }
 
 docs {
-  The provenance answers "which installation put this here" — by bundleId,
+  The provenance answers "which installation put this here" — by catalogEntryId,
   because that is the identity the catalogue owns. Also pins that a fresh
   installation carries no uninstalledAt.
 }

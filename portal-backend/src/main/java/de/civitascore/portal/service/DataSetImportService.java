@@ -3,11 +3,11 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
-import de.civitascore.portal.model.entity.BundleInstallation;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.entity.Installation;
 import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetImportInputDTO;
@@ -58,7 +58,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Sinks and pipelines carry no portable identity — their URNs are minted by the receiving
  * instance — so unlike structures and mappings they are always CREATED, never reused, and the
- * bundle references them by bundle-local name rather than by URN.
+ * bundle references them by bundle-local name rather than by URN. ("Bundle" here always means the
+ * artifact set of one import call — unrelated to Model Forge's read-side "bundled view".)
  */
 @Service
 @RequiredArgsConstructor
@@ -294,10 +295,10 @@ public class DataSetImportService {
     // 8 · Provenance, in the same transaction: the record exists exactly iff the install
     // committed. Without it the created/reused knowledge dies with this HTTP response, and
     // "installed by a bundle" versus "created by hand" is unanswerable later.
-    BundleInstallation installation =
+    Installation installation =
         installationRecorder.record(
-            input.getBundleId(),
-            input.getBundleVersion(),
+            input.getCatalogEntryId(),
+            input.getCatalogEntryVersion(),
             dataSet.getId(),
             dataSet.getName(),
             artifactLines);
