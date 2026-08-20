@@ -1258,7 +1258,9 @@
       "selectDatastructure": "Select datastructure…",
       "inputDatastructure": "Input datastructure",
       "outputDatastructure": "Output datastructure",
-      "openMappingEditor": "Open mapping editor"
+      "openMappingEditor": "Open mapping editor",
+      "installedHint": "Mapping installed from the catalogue — its content is shown from the registry. Editing is not supported yet.",
+      "installedLoading": "Loading mapping…"
     },
     "entitySelector": {
       "selectEntity": "Select an entity...",
@@ -1353,6 +1355,7 @@
     },
     "lines": "{count, plural, one {# line} other {# lines}}",
     "mappingEditor": {
+      "readOnlyHint": "View only — installed mapping",
       "modelUnresolvable": "The stored schema of \"{name}\" could not be read. Showing the diagram structure instead — it may differ from the structure used at deploy time.",
       "diagramUnresolvable": "\"{name}\" provides no mappable fields: {reason}",
       "toolbar": {

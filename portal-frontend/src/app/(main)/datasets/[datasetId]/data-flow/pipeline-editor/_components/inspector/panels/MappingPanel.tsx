@@ -5,6 +5,8 @@
  *
  * Inspector panel for the Mapping node: name + source/target datastructure
  * selectors. Opens the fullscreen Schema-as-MegaNode editor when all are set.
+ * A mapping installed from a catalogue bundle renders read-only instead: its
+ * content lives behind `mappingRef` in the registry and is fetched for display.
  */
 
 import { useParams } from 'next/navigation'
@@ -12,6 +14,7 @@ import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
 import { DataModelImportModal } from '@/app/(main)/datasources/[datasourceId]/components/datastructure-tab/DataModelImportModal'
+import { useGetMapping } from '@/app/services/api/mappings/clientRequests'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -68,6 +71,26 @@ const DatastructureField = ({ label, placeholder, selectedKey, name, onSelect }:
   )
 }
 
+/** Read-only counterpart of DatastructureField for mappings installed from the catalogue. */
+const InstalledStructureField = ({
+  label,
+  name,
+  urn,
+  fallback,
+}: {
+  label: string
+  name?: string
+  urn?: string
+  fallback: string
+}) => (
+  <div className="space-y-2">
+    <Label>{label}</Label>
+    <div className="w-full rounded-md border px-3 py-2 text-sm text-muted-foreground" title={urn}>
+      <span className="truncate">{name ?? urn ?? fallback}</span>
+    </div>
+  </div>
+)
+
 interface MappingPanelProps {
   data: MappingNodeData
   onUpdate: (data: Partial<MappingNodeData>) => void
@@ -86,6 +109,27 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
   // Names are not stored on the node — resolve them from the version references at render time.
   const { name: sourceName } = useDatastructureVersionInfo(sourceKey ?? undefined)
   const { name: targetName } = useDatastructureVersionInfo(targetKey ?? undefined)
+
+  // A mapping installed from a catalogue bundle: its content lives behind mappingRef in the
+  // registry, not in editor state — the exact shape the validation escape recognises. The panel
+  // shows that content read-only and never writes it onto the node; editing an installed
+  // standard-scope artifact (in-place version vs copy-on-write fork) is an open upstream design
+  // question, so nothing on this path may save.
+  const isInstalledArtifact =
+    Boolean(data.mappingRef) && Object.keys(data.mappingConfig?.fields ?? {}).length === 0
+  const mappingQuery = useGetMapping(
+    isInstalledArtifact ? (data.mappingLogicalUrn ?? data.mappingRef) : undefined,
+  )
+  const installedDoc = mappingQuery.data?.data
+  const installedSource = installedDoc?.sourceVersion
+  const installedTarget = installedDoc?.targetVersion
+  const { name: installedSourceName } = useDatastructureVersionInfo(
+    installedSource ? `${installedSource.dataStructureId}/${installedSource.id}` : undefined,
+  )
+  const { name: installedTargetName } = useDatastructureVersionInfo(
+    installedTarget ? `${installedTarget.dataStructureId}/${installedTarget.id}` : undefined,
+  )
+  const canOpenInstalled = Boolean(installedDoc?.fields && installedSource && installedTarget)
 
   // The node is "configured" (deployable) ONLY after the field mapping has been saved (handleSave).
   // The name and the source/target selection alone never mark it configured — otherwise a node with
@@ -118,6 +162,61 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
 
   const handleSave = (config: MappingConfig, targetRequiredFields: string[], staMatchKeys: StaTargetVocabulary) =>
     onUpdate({ mappingConfig: config, targetRequiredFields, staMatchKeys, configured: true })
+
+  if (isInstalledArtifact) {
+    return (
+      <div className="space-y-4 p-4">
+        <div className="space-y-2">
+          <Label htmlFor="mappingName">{t('name')}</Label>
+          <Input id="mappingName" value={data.label} onChange={handleName} placeholder={t('namePlaceholder')} />
+        </div>
+
+        <p className="text-sm text-muted-foreground">{t('installedHint')}</p>
+
+        <InstalledStructureField
+          label={t('inputDatastructure')}
+          name={installedSourceName}
+          urn={installedDoc?.source}
+          fallback={t('installedLoading')}
+        />
+        <InstalledStructureField
+          label={t('outputDatastructure')}
+          name={installedTargetName}
+          urn={installedDoc?.target}
+          fallback={t('installedLoading')}
+        />
+
+        <Button className="w-full" disabled={!canOpenInstalled} onClick={() => setIsEditorOpen(true)}>
+          {t('openMappingEditor')}
+        </Button>
+
+        {canOpenInstalled && (
+          <MappingEditorModal
+            open={isEditorOpen}
+            onOpenChange={setIsEditorOpen}
+            name={data.label}
+            source={{
+              datastructureId: installedSource!.dataStructureId,
+              versionId: installedSource!.id,
+              name: installedSourceName,
+            }}
+            target={{
+              datastructureId: installedTarget!.dataStructureId,
+              versionId: installedTarget!.id,
+              name: installedTargetName,
+            }}
+            // The registry document mirrors the editor's config shape (fields + positions).
+            config={{
+              fields: installedDoc!.fields as MappingConfig['fields'],
+              positions: installedDoc!.positions ?? {},
+            }}
+            isReadOnly
+            onSave={() => undefined}
+          />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4 p-4">

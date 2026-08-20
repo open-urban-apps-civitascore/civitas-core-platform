@@ -1245,7 +1245,9 @@
       "selectDatastructure": "Datenstruktur auswählen…",
       "inputDatastructure": "Eingangs-Datenstruktur",
       "outputDatastructure": "Ausgangs-Datenstruktur",
-      "openMappingEditor": "Mapping-Editor öffnen"
+      "openMappingEditor": "Mapping-Editor öffnen",
+      "installedHint": "Aus dem Katalog installiertes Mapping — der Inhalt wird aus der Registry angezeigt. Bearbeitung wird noch nicht unterstützt.",
+      "installedLoading": "Mapping wird geladen…"
     },
     "entitySelector": {
       "selectEntity": "Entität auswählen...",
@@ -1340,6 +1342,7 @@
     },
     "lines": "{count, plural, one {# Zeile} other {# Zeilen}}",
     "mappingEditor": {
+      "readOnlyHint": "Nur Ansicht — installiertes Mapping",
       "modelUnresolvable": "Das gespeicherte Schema von „{name}“ konnte nicht gelesen werden. Angezeigt wird die Diagrammstruktur — sie kann von der Struktur abweichen, die beim Deployment verwendet wird.",
       "diagramUnresolvable": "„{name}“ liefert keine abbildbaren Felder: {reason}",
       "toolbar": {
