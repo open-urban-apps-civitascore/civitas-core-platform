@@ -97,7 +97,9 @@ public class DataStructureImportService {
    * Bundle variant of {@link #importDataStructure}: instead of rejecting an already installed model
    * identity, it resolves it — per contained structure the dataset import distinguishes create (URN
    * unknown), reuse (URN installed with identical content; two use cases sharing one Fachmodell is
-   * the point of URN identity) and conflict (URN installed with different content).
+   * the point of URN identity) and conflict (URN installed with different content). "Identical"
+   * means the portable model: UI layout ({@code x-ui-styles}) is instance-authored presentation and
+   * is ignored, so a layout rearranged in this instance's editor never blocks a reuse.
    *
    * @param input the import input for one bundled structure
    * @return the version to reference, flagged whether it was reused or created
@@ -113,8 +115,8 @@ public class DataStructureImportService {
         dataStructureVersionRepository.findFirstByModelUrnStartingWith(logicalUrn + ":");
     if (installed.isPresent()) {
       DataStructureVersion version = installed.get();
-      if (!modelRegistryGateway.isUnchanged(
-          version.getModelUrn(), input.getModel(), input.getStyles())) {
+      if (!modelRegistryGateway.isUnchangedIgnoringUiStyles(
+          version.getModelUrn(), input.getModel())) {
         throw new UniqueConstraintViolationException(
             ("A data structure for model '%s' is already installed with different content."
                     + " Updating an existing installation is not supported yet.")

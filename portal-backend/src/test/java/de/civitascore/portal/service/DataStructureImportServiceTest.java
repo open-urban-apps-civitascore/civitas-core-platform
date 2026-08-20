@@ -237,8 +237,10 @@ class DataStructureImportServiceTest {
     installed.setModelUrn(DATASTRUCTURE_URN + ":1.0.0");
     when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(DATASTRUCTURE_URN + ":"))
         .thenReturn(Optional.of(installed));
-    when(modelRegistryGateway.isUnchanged(
-            org.mockito.ArgumentMatchers.eq(DATASTRUCTURE_URN + ":1.0.0"), any(), any()))
+    // The styles-blind variant is the turnstile's comparison: instance-authored UI layout must
+    // never block a reuse, so the bundle's styles are not part of the identical-content decision.
+    when(modelRegistryGateway.isUnchangedIgnoringUiStyles(
+            org.mockito.ArgumentMatchers.eq(DATASTRUCTURE_URN + ":1.0.0"), any()))
         .thenReturn(true);
 
     DataStructureImportService.ImportResolution resolution =
@@ -257,8 +259,8 @@ class DataStructureImportServiceTest {
     installed.setModelUrn(DATASTRUCTURE_URN + ":1.0.0");
     when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(DATASTRUCTURE_URN + ":"))
         .thenReturn(Optional.of(installed));
-    when(modelRegistryGateway.isUnchanged(
-            org.mockito.ArgumentMatchers.eq(DATASTRUCTURE_URN + ":1.0.0"), any(), any()))
+    when(modelRegistryGateway.isUnchangedIgnoringUiStyles(
+            org.mockito.ArgumentMatchers.eq(DATASTRUCTURE_URN + ":1.0.0"), any()))
         .thenReturn(false);
 
     assertThatThrownBy(() -> importService.importOrReuse(importInput()))

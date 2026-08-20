@@ -509,6 +509,25 @@ public class ModelRegistryGateway {
   }
 
   /**
+   * Like {@link #isUnchanged}, but blind to {@value #X_UI_STYLES}: the install turnstile compares
+   * portable content only. UI layout is instance-authored presentation, so a stored document that
+   * differs from the bundle solely in layout still counts as identical — the import reuses it,
+   * keeping the instance's layout, instead of conflicting. Update paths keep using {@link
+   * #isUnchanged}: there a styles-only change must mint a version, or layout edits would be lost.
+   */
+  public boolean isUnchangedIgnoringUiStyles(String versionedUrn, Map<String, Object> content) {
+    // mergeStyles with null styles already drops an inbound x-ui-styles key from the candidate.
+    JsonNode candidate = comparable(mergeStyles(content, null));
+    return modelForge
+        .getArtifact(new ArtifactId(versionedUrn))
+        .map(ArtifactView::content)
+        .map(ModelRegistryGateway::comparable)
+        .map(ModelRegistryGateway::withoutUiStyles)
+        .map(candidate::equals)
+        .orElse(false);
+  }
+
+  /**
    * Deletes the payload artifact (all versions) behind a logical URN. No-op semantics are Model
    * Forge's.
    */
@@ -622,6 +641,15 @@ public class ModelRegistryGateway {
     copy.remove("id");
     copy.remove("$id");
     return copy;
+  }
+
+  /**
+   * Removes the {@value #X_UI_STYLES} block for the styles-blind comparison. Only ever applied to
+   * the copies {@link #comparable} returns, so the stored original is never mutated.
+   */
+  private static JsonNode withoutUiStyles(JsonNode document) {
+    ((ObjectNode) document).remove(X_UI_STYLES);
+    return document;
   }
 
   /**
