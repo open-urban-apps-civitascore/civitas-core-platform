@@ -501,13 +501,19 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         return urnKind;
     }
 
-    /** A copy of the document without the registry's identity/self-description stamps. */
+    /**
+     * A copy of the document without the registry's identity/self-description stamps and without
+     * the host-authored {@code x-ui-styles} presentation block. UI layout is not content: an
+     * artifact whose stored document differs from the envelope only in layout is reused (the
+     * instance keeps its layout) instead of conflicting.
+     */
     private static JsonNode comparable(JsonNode document) {
         if (document instanceof tools.jackson.databind.node.ObjectNode object) {
             var copy = object.deepCopy();
             copy.remove("$schema");
             copy.remove("id");
             copy.remove("$id");
+            copy.remove("x-ui-styles");
             return copy;
         }
         return document;

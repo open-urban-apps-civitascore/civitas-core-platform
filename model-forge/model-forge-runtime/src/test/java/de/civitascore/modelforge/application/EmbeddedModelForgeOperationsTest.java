@@ -483,6 +483,28 @@ class EmbeddedModelForgeOperationsTest {
     }
 
     @Test
+    void importArtifactIsBlindToUiStylesWhenComparingContent() {
+        var content = mapper.createObjectNode().put("title", "Zählung → Messung");
+        var stored = content.deepCopy();
+        stored.put("$schema", "https://civitasconnect.digital/core/mapping/v1");
+        stored.put("id", MAPPING_URN);
+        stored.putObject("x-ui-styles").putObject("positions").putObject("n1").put("x", 42);
+        when(registry.fetch(MAPPING_URN)).thenReturn(Optional.of(stored));
+        when(registry.resolveReference(MAPPING_URN)).thenReturn(Optional.of(MAPPING_URN + ":1.0.0"));
+
+        var result = operations.importArtifact(
+            new de.civitascore.modelforge.contract.ImportArtifactCommand(
+                envelope("MAPPING", MAPPING_URN, content)));
+
+        // UI layout is host-authored presentation, not content: the stored artifact keeps its
+        // layout and the import resolves to it instead of conflicting.
+        assertThat(result.created()).isFalse();
+        assertThat(result.artifactId().value()).isEqualTo(MAPPING_URN + ":1.0.0");
+        verify(registry, org.mockito.Mockito.never())
+            .storeAt(any(), anyString(), any(), any(), any());
+    }
+
+    @Test
     void importArtifactRefusesDifferentContentAtTheSameIdentity() {
         var stored = mapper.createObjectNode().put("title", "etwas anderes");
         stored.put("id", MAPPING_URN);
