@@ -8,13 +8,17 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.model.entity.DataStructure;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelPin;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.RegistryDocument;
 import de.civitascore.portal.modelregistry.PayloadKind;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -37,6 +41,7 @@ class MappingServiceTest {
   private static final String VERSIONED_URN = LOGICAL_URN + ":1.0.0";
 
   @Mock private ModelRegistryGateway registry;
+  @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @InjectMocks private MappingService mappingService;
 
   @Captor private ArgumentCaptor<Optional<String>> logicalUrnCaptor;
@@ -189,6 +194,92 @@ class MappingServiceTest {
 
     assertThat(mappingService.get("urn:core:platform:civitas:mapping:common:missing:zzz9999999"))
         .isEmpty();
+  }
+
+  /** The read-back mirrors the POST/PUT body shape: the UI layout re-merges as `positions`. */
+  @Test
+  void get_mergesTheUiLayoutBackIntoTheDocument() {
+    Map<String, Object> positions = Map.of("$.geom", Map.of("x", 1, "y", 2));
+    when(registry.fetchPayload(VERSIONED_URN))
+        .thenReturn(
+            Optional.of(
+                new RegistryDocument(Map.of("fields", Map.of()), Map.of("positions", positions))));
+
+    Optional<Map<String, Object>> result = mappingService.get(VERSIONED_URN);
+
+    assertThat(result).isPresent();
+    assertThat(result.get()).containsEntry("positions", positions);
+  }
+
+  /**
+   * The document's structure references resolve to installed shells (the sink-output pattern), so
+   * the editor can load the referenced schemas without a URN lookup of its own.
+   */
+  @Test
+  void get_resolvesStructureReferencesToInstalledShells() {
+    String sourceUrn = "urn:core:standard:openurbanapps:datastructure:test:quelle:aaa1111111";
+    String targetUrn = "urn:core:standard:openurbanapps:datastructure:test:ziel:bbb2222222";
+    when(registry.fetchPayload(VERSIONED_URN))
+        .thenReturn(
+            Optional.of(
+                new RegistryDocument(
+                    Map.of("source", sourceUrn, "target", targetUrn, "fields", Map.of()), null)));
+    when(registry.logicalUrn(sourceUrn)).thenReturn(sourceUrn);
+    when(registry.logicalUrn(targetUrn)).thenReturn(targetUrn);
+    DataStructureVersion sourceVersion = installedVersion("1.0.0");
+    DataStructureVersion targetVersion = installedVersion("2.1.0");
+    when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(sourceUrn + ":"))
+        .thenReturn(Optional.of(sourceVersion));
+    when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(targetUrn + ":"))
+        .thenReturn(Optional.of(targetVersion));
+
+    Map<String, Object> result = mappingService.get(VERSIONED_URN).orElseThrow();
+
+    assertThat(result.get("sourceVersion"))
+        .isEqualTo(
+            Map.of(
+                "id",
+                sourceVersion.getId(),
+                "dataStructureId",
+                sourceVersion.getDataStructure().getId(),
+                "version",
+                "1.0.0"));
+    assertThat(result.get("targetVersion"))
+        .isEqualTo(
+            Map.of(
+                "id",
+                targetVersion.getId(),
+                "dataStructureId",
+                targetVersion.getDataStructure().getId(),
+                "version",
+                "2.1.0"));
+  }
+
+  /** A reference nothing is installed for simply leaves its key out — no error, no null entry. */
+  @Test
+  void get_leavesUnresolvableStructureReferencesOut() {
+    String sourceUrn = "urn:core:standard:openurbanapps:datastructure:test:quelle:aaa1111111";
+    when(registry.fetchPayload(VERSIONED_URN))
+        .thenReturn(
+            Optional.of(
+                new RegistryDocument(Map.of("source", sourceUrn, "fields", Map.of()), null)));
+    when(registry.logicalUrn(sourceUrn)).thenReturn(sourceUrn);
+    when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(sourceUrn + ":"))
+        .thenReturn(Optional.empty());
+
+    Map<String, Object> result = mappingService.get(VERSIONED_URN).orElseThrow();
+
+    assertThat(result).doesNotContainKeys("sourceVersion", "targetVersion");
+  }
+
+  private static DataStructureVersion installedVersion(String version) {
+    DataStructure structure = new DataStructure();
+    structure.setId(UUID.randomUUID());
+    DataStructureVersion installed = new DataStructureVersion();
+    installed.setId(UUID.randomUUID());
+    installed.setVersion(version);
+    installed.setDataStructure(structure);
+    return installed;
   }
 
   @Test
