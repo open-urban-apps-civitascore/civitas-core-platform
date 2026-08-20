@@ -41,6 +41,19 @@ public class MappingService {
   }
 
   /**
+   * Imports the authored mapping document at its catalogue-declared logical URN through Model
+   * Forge's envelope door: created on first install (identity kept), reused when an identical
+   * mapping is already installed, refused (409) when the identity holds different content. The
+   * document is split exactly like {@link #store}, so both paths agree on what "identical" means.
+   */
+  public ModelRegistryGateway.EnvelopeImportResult importAt(
+      String logicalUrn, Map<String, Object> doc) {
+    AuthoredDocument document = authored(doc);
+    return registry.importPayloadAt(
+        PayloadKind.MAPPING, logicalUrn, document.content(), document.styles());
+  }
+
+  /**
    * The versioned URN of the mapping's current version — what a pipeline node should pin. Empty
    * when no mapping exists at the URN.
    */

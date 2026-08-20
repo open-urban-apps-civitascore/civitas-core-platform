@@ -13,11 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
  * identical content (reuse), or installed with different content (conflict) — the same turnstile
  * {@link DataStructureImportService#importOrReuse} applies to structures.
  *
- * <p>Why the bundle must bring the URN: Model Forge owns identity on <em>create</em> and mints a
- * random disambiguator, discarding any id the caller sent. Storing under an author-chosen URN is
- * the only way a re-installed bundle resolves to the same mapping instead of adding a duplicate.
- * Writing to a URN that does not exist yet inserts the artifact at its initial version — the same
- * generic write path a follow-up version takes.
+ * <p>Why the bundle must bring the URN: identity managed by an external authority (the catalogue)
+ * must resolve to the same mapping on every install instead of adding a duplicate. The whole
+ * turnstile — keep the declared identity, reuse on identical content, refuse different content —
+ * lives in Model Forge's envelope import; this service only translates the bundle DTO into that
+ * door and its conflict into the host's 409.
  *
  * <p>Bundle semantics only. The mapping's references to data structures are validated by the
  * orchestrating {@link DataSetImportService}, which is the only place that knows what else this
@@ -50,22 +50,17 @@ public class MappingImportService {
   @Transactional
   public MappingResolution importOrReuse(MappingImportInputDTO input) {
     String logicalUrn = requireMappingUrn(input);
-
-    if (mappingService.exists(logicalUrn)) {
-      if (!mappingService.isUnchanged(logicalUrn, input.getDocument())) {
-        throw new UniqueConstraintViolationException(
-            ("A mapping for '%s' is already installed with different content. Updating an existing"
-                    + " installation is not supported yet.")
-                .formatted(logicalUrn));
-      }
-      // No registry write at all: storing an unchanged document would still bump the artifact's
-      // version and make a re-install look like an edit.
+    try {
+      ModelRegistryGateway.EnvelopeImportResult imported =
+          mappingService.importAt(logicalUrn, input.getDocument());
       return new MappingResolution(
-          logicalUrn, mappingService.currentVersionedUrn(logicalUrn).orElse(logicalUrn), true);
+          imported.pin().logicalUrn(), imported.pin().versionedUrn(), !imported.created());
+    } catch (UniqueConstraintViolationException e) {
+      throw new UniqueConstraintViolationException(
+          ("A mapping for '%s' is already installed with different content. Updating an existing"
+                  + " installation is not supported yet.")
+              .formatted(logicalUrn));
     }
-
-    ModelRegistryGateway.ModelPin pin = mappingService.store(logicalUrn, input.getDocument());
-    return new MappingResolution(pin.logicalUrn(), pin.versionedUrn(), false);
   }
 
   /**

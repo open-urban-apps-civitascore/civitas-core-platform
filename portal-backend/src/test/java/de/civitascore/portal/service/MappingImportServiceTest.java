@@ -15,7 +15,6 @@ import de.civitascore.portal.service.MappingImportService.MappingResolution;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -53,50 +52,53 @@ class MappingImportServiceTest {
   }
 
   @Test
-  void importOrReuse_whenUrnUnknown_storesAtTheAuthoredUrnAndReportsCreated() {
+  void importOrReuse_whenUrnUnknown_importsAtTheAuthoredUrnAndReportsCreated() {
     when(modelRegistryGateway.isMappingUrn(LOGICAL_URN)).thenReturn(true);
     when(modelRegistryGateway.logicalUrn(LOGICAL_URN)).thenReturn(LOGICAL_URN);
-    when(mappingService.exists(LOGICAL_URN)).thenReturn(false);
-    when(mappingService.store(eq(LOGICAL_URN), any()))
-        .thenReturn(new ModelPin(LOGICAL_URN, VERSIONED_URN, "1.0.0"));
+    when(mappingService.importAt(eq(LOGICAL_URN), any()))
+        .thenReturn(
+            new ModelRegistryGateway.EnvelopeImportResult(
+                new ModelPin(LOGICAL_URN, VERSIONED_URN, "1.0.0"), true));
 
     MappingResolution resolution = mappingImportService.importOrReuse(input(LOGICAL_URN));
 
     assertThat(resolution.reused()).isFalse();
     assertThat(resolution.logicalUrn()).isEqualTo(LOGICAL_URN);
-    // The authored identity is what reaches the registry — anything else and a re-install would
-    // mint a duplicate instead of resolving to the same mapping.
-    verify(mappingService).store(urnCaptor.capture(), eq(DOCUMENT));
+    assertThat(resolution.versionedUrn()).isEqualTo(VERSIONED_URN);
+    // The authored identity is what reaches the envelope door — anything else and a re-install
+    // would mint a duplicate instead of resolving to the same mapping.
+    verify(mappingService).importAt(urnCaptor.capture(), eq(DOCUMENT));
     assertThat(urnCaptor.getValue()).isEqualTo(LOGICAL_URN);
   }
 
   @Test
-  void importOrReuse_whenInstalledWithIdenticalContent_reusesWithoutWriting() {
+  void importOrReuse_whenInstalledWithIdenticalContent_reportsReused() {
     when(modelRegistryGateway.isMappingUrn(LOGICAL_URN)).thenReturn(true);
     when(modelRegistryGateway.logicalUrn(LOGICAL_URN)).thenReturn(LOGICAL_URN);
-    when(mappingService.exists(LOGICAL_URN)).thenReturn(true);
-    when(mappingService.isUnchanged(LOGICAL_URN, DOCUMENT)).thenReturn(true);
-    when(mappingService.currentVersionedUrn(LOGICAL_URN))
-        .thenReturn(Optional.of(LOGICAL_URN + ":1.0.0"));
+    when(mappingService.importAt(eq(LOGICAL_URN), any()))
+        .thenReturn(
+            new ModelRegistryGateway.EnvelopeImportResult(
+                new ModelPin(LOGICAL_URN, VERSIONED_URN, "1.0.0"), false));
 
     MappingResolution resolution = mappingImportService.importOrReuse(input(LOGICAL_URN));
 
     assertThat(resolution.reused()).isTrue();
     assertThat(resolution.logicalUrn()).isEqualTo(LOGICAL_URN);
-    verify(mappingService, never()).store(any(), any());
+    assertThat(resolution.versionedUrn()).isEqualTo(VERSIONED_URN);
   }
 
   @Test
   void importOrReuse_whenInstalledWithDifferentContent_throwsConflict() {
     when(modelRegistryGateway.isMappingUrn(LOGICAL_URN)).thenReturn(true);
     when(modelRegistryGateway.logicalUrn(LOGICAL_URN)).thenReturn(LOGICAL_URN);
-    when(mappingService.exists(LOGICAL_URN)).thenReturn(true);
-    when(mappingService.isUnchanged(LOGICAL_URN, DOCUMENT)).thenReturn(false);
+    when(mappingService.importAt(eq(LOGICAL_URN), any()))
+        .thenThrow(
+            new UniqueConstraintViolationException(
+                "Artifact '" + LOGICAL_URN + "' already exists with different content"));
 
     assertThatThrownBy(() -> mappingImportService.importOrReuse(input(LOGICAL_URN)))
         .isInstanceOf(UniqueConstraintViolationException.class)
         .hasMessageContaining("already installed with different content");
-    verify(mappingService, never()).store(any(), any());
   }
 
   @Test
@@ -107,7 +109,7 @@ class MappingImportServiceTest {
     assertThatThrownBy(() -> mappingImportService.importOrReuse(input(structureUrn)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("mappingUrn");
-    verify(mappingService, never()).store(any(), any());
+    verify(mappingService, never()).importAt(any(), any());
   }
 
   /** A caller who pasted a versioned URN is handled, not rejected — Model Forge owns versions. */
@@ -115,13 +117,14 @@ class MappingImportServiceTest {
   void importOrReuse_whenUrnIsVersioned_normalisesToLogicalBeforeStoring() {
     when(modelRegistryGateway.isMappingUrn(VERSIONED_URN)).thenReturn(true);
     when(modelRegistryGateway.logicalUrn(VERSIONED_URN)).thenReturn(LOGICAL_URN);
-    when(mappingService.exists(LOGICAL_URN)).thenReturn(false);
-    when(mappingService.store(eq(LOGICAL_URN), any()))
-        .thenReturn(new ModelPin(LOGICAL_URN, VERSIONED_URN, "1.0.0"));
+    when(mappingService.importAt(eq(LOGICAL_URN), any()))
+        .thenReturn(
+            new ModelRegistryGateway.EnvelopeImportResult(
+                new ModelPin(LOGICAL_URN, VERSIONED_URN, "1.0.0"), true));
 
     MappingResolution resolution = mappingImportService.importOrReuse(input(VERSIONED_URN));
 
     assertThat(resolution.logicalUrn()).isEqualTo(LOGICAL_URN);
-    verify(mappingService).store(LOGICAL_URN, DOCUMENT);
+    verify(mappingService).importAt(LOGICAL_URN, DOCUMENT);
   }
 }
