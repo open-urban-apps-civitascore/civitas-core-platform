@@ -19,6 +19,7 @@ import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
+  useGetDataSinks,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
@@ -103,6 +104,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Backend API Hooks =====
   const pipelinesQuery = useGetPipelines(datasetId)
+  // The dataset's sinks feed the CORE-model hydration: a styles-less pipeline (bundle import)
+  // resolves each sink node's real type (frost vs geoPersistence) and entity through them.
+  const dataSinksQuery = useGetDataSinks(datasetId)
   const datasetQuery = useGetDataset({ id: datasetId })
   const createPipelineMutation = useCreatePipeline(datasetId)
   const updatePipelineMutation = useUpdatePipeline(datasetId)
@@ -141,6 +145,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   useEffect(() => {
     if (hasLoadedRef.current) return
     if (!pipelinesQuery.data?.data) return
+    // Wait for the sinks while they load so the hydration can type its sink nodes; a failed
+    // sinks query (isPending false, no data) degrades to hydration without sink details.
+    if (dataSinksQuery.isPending) return
 
     hasLoadedRef.current = true
     const pipelineDTOs = pipelinesQuery.data.data
@@ -151,7 +158,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     }
 
     // Convert backend DTOs to sessions
-    const sessions = pipelineDTOs.map(dto => createSessionFromBackendDTO(dto))
+    const dataSinks = dataSinksQuery.data?.data ?? []
+    const sessions = pipelineDTOs.map(dto => createSessionFromBackendDTO(dto, dataSinks))
     // Preselect the session whose backend pipeline id matches the ?pipeline= search param,
     // so deep-links from the dataset overview open the right tab.
     const matchedSession = requestedPipelineId ? sessions.find(s => s.pipeline.id === requestedPipelineId) : undefined
@@ -164,7 +172,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     for (const session of sessions) {
       dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(session.pipeline)
     }
-  }, [pipelinesQuery.data, sessionManager, requestedPipelineId])
+  }, [pipelinesQuery.data, dataSinksQuery.isPending, dataSinksQuery.data, sessionManager, requestedPipelineId])
 
   // ===== Validation State =====
   const [validationResult, setValidationResult] = useState<ValidationResultWithNodeStatus | null>(null)

@@ -5,10 +5,13 @@
  *
  */
 
+import { DATASINK_TYPES, type DataSink } from '@/types/datasinks'
+
 import { ENTITY_TYPES, type PipelineNodeData } from '../_types/nodes'
 import type { Pipeline, PipelineNode, PipelineOutputDTO, PipelineStylesPayload } from '../_types/pipeline'
 import type { PipelineSession, PipelineSessionAction, PipelineSessionState } from '../_types/session'
 import { createEmptyPipeline } from './pipelineService'
+import { isValidNifiCron } from './validationService'
 
 // ============================================================================
 // CORE-model fallback hydration
@@ -46,14 +49,17 @@ const logicalUrn = (urn: string): string => {
  * honest fallback.
  *
  * Hydrated nodes carry the fields the SAVE path emits refs from (`configurationUrn`,
- * `mappingRef`), so re-saving a hydrated pipeline preserves its wiring. What they cannot carry are
- * instance details only the editor's pickers know (`entityId`, entity metadata, a mapping's editor
- * config) — the inspector shows those as unconfigured until re-picked. Known limitation: a CORE
- * `sink` node does not say which sink type it is, so it hydrates as geoPersistence; FROST sinks
- * from a bundle would need the sink config fetched to tell — not worth it until a bundle ships
- * one.
+ * `mappingRef`), and `configured` is derived from ref presence — a node whose reference resolves
+ * against the installed artifacts IS configured; instance-authored editor state must never be the
+ * bar for content that arrived through the bundle import.
+ *
+ * A CORE `sink` node does not say which sink type it is, so the caller passes the dataset's sinks
+ * (`dataSinks`): the node whose `sinkRef` matches a sink's `configurationUrn` hydrates with that
+ * sink's real type (frost vs geoPersistence), its `entityId` (so a later editor save updates the
+ * existing sink instead of minting a twin) and its table/structure details. An unmatched sink
+ * falls back to an unconfigured geoPersistence node, the pre-existing behaviour.
  */
-export const hydrateStylesFromCoreModel = (model: object): PipelineStylesPayload | null => {
+export const hydrateStylesFromCoreModel = (model: object, dataSinks: DataSink[] = []): PipelineStylesPayload | null => {
   const coreModel = model as CoreModel
   if (!Array.isArray(coreModel.nodes) || coreModel.nodes.length === 0) return null
 
@@ -74,22 +80,51 @@ export const hydrateStylesFromCoreModel = (model: object): PipelineStylesPayload
             entityType: ENTITY_TYPES.Datasource,
             entityName: coreNode.label,
             configurationUrn: coreNode.sourceRef,
+            configured: Boolean(coreNode.sourceRef),
           } as PipelineNodeData,
         }
         break
-      case 'sink':
-        node = {
-          id: coreNode.id,
-          type: 'geoPersistence',
-          position,
-          data: {
-            ...base,
-            entityType: ENTITY_TYPES.Persistence,
-            configurationUrn: coreNode.sinkRef,
-            tableName: '',
-          } as PipelineNodeData,
+      case 'sink': {
+        const sink = dataSinks.find(candidate => candidate.configurationUrn === coreNode.sinkRef)
+        if (sink?.dataSinkType === DATASINK_TYPES.FROST) {
+          node = {
+            id: coreNode.id,
+            type: 'frost',
+            position,
+            data: {
+              ...base,
+              entityType: ENTITY_TYPES.Frost,
+              entityId: sink.id,
+              configurationUrn: coreNode.sinkRef,
+              // Registry defaults: the FROST panel is read-only, the server is platform-owned.
+              serverName: 'Sensor Data Storage',
+              serverUrl: '',
+              version: '1.1',
+              configured: true,
+            } as PipelineNodeData,
+          }
+        } else {
+          const version = sink?.configuration?.dataStructureVersion
+          const dataStructureVersionId = version ? `${version.dataStructureId}/${version.id}` : undefined
+          const tableName = sink?.configuration?.tableName ?? ''
+          node = {
+            id: coreNode.id,
+            type: 'geoPersistence',
+            position,
+            data: {
+              ...base,
+              entityType: ENTITY_TYPES.Persistence,
+              entityId: sink?.id,
+              configurationUrn: coreNode.sinkRef,
+              tableName,
+              dataStructureVersionId,
+              // Same bar the GeoPersistence panel applies: table name plus target structure.
+              configured: tableName.trim().length > 0 && dataStructureVersionId !== undefined,
+            } as PipelineNodeData,
+          }
         }
         break
+      }
       case 'mapping':
         node = {
           id: coreNode.id,
@@ -102,21 +137,43 @@ export const hydrateStylesFromCoreModel = (model: object): PipelineStylesPayload
             // Minimal valid config: the mapping's real content lives behind mappingRef; the
             // mapping sub-editor starts empty until the artifact is loaded/re-authored.
             mappingConfig: { fields: {}, positions: {} },
+            configured: Boolean(coreNode.mappingRef),
           } as PipelineNodeData,
         }
         break
       case 'start':
       case 'end':
-        node = { id: coreNode.id, type: coreNode.kind, position, data: base as PipelineNodeData }
+        node = {
+          id: coreNode.id,
+          type: coreNode.kind,
+          position,
+          data: {
+            ...base,
+            // Mirror the registry defaults so the inspector's isData guards recognise the node.
+            nodeType: coreNode.kind,
+            configured: true,
+            description:
+              coreNode.kind === 'start'
+                ? 'Entry point of the pipeline. Execution begins here.'
+                : 'Exit point of the pipeline. Execution completes here.',
+          } as PipelineNodeData,
+        }
         break
-      case 'cron':
+      case 'cron': {
+        const cronExpression = coreNode.cronExpression ?? ''
         node = {
           id: coreNode.id,
           type: 'cron',
           position,
-          data: { ...base, cronExpression: coreNode.cronExpression ?? '' } as PipelineNodeData,
+          data: {
+            ...base,
+            cronExpression,
+            // Same bar the cron panel applies on edit.
+            configured: cronExpression.trim() !== '' && isValidNifiCron(cronExpression.trim()),
+          } as PipelineNodeData,
         }
         break
+      }
       default:
         // CORE knows kinds the editor has no visual for yet (filter, enrich, split) — skip
         // rather than crash; the model stays intact, only the canvas omits them.
@@ -174,9 +231,10 @@ export const createInitialSessionState = (initialSession?: PipelineSession): Pip
  * Creates a PipelineSession from a backend PipelineOutputDTO.
  * Parses the `styles` JSON string to restore nodes, edges, and viewport. A pipeline without
  * styles (e.g. installed by the marketplace bundle import, which authors only the CORE model)
- * hydrates from the model instead of rendering an empty canvas.
+ * hydrates from the model instead of rendering an empty canvas; `dataSinks` (the dataset's sinks)
+ * lets that hydration resolve each sink node's real type and entity.
  */
-export const createSessionFromBackendDTO = (dto: PipelineOutputDTO): PipelineSession => {
+export const createSessionFromBackendDTO = (dto: PipelineOutputDTO, dataSinks: DataSink[] = []): PipelineSession => {
   const now = new Date()
   let parsedStyles: PipelineStylesPayload | null = null
 
@@ -189,7 +247,7 @@ export const createSessionFromBackendDTO = (dto: PipelineOutputDTO): PipelineSes
   }
 
   if (!parsedStyles?.nodes?.length && dto.model) {
-    parsedStyles = hydrateStylesFromCoreModel(dto.model) ?? parsedStyles
+    parsedStyles = hydrateStylesFromCoreModel(dto.model, dataSinks) ?? parsedStyles
   }
 
   const pipeline: Pipeline = {
