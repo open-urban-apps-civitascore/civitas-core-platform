@@ -33,9 +33,12 @@ public class DataSinkImportInputDTO extends BaseInputDTO {
 
   @Schema(
       description =
-          "Type-specific configuration. For POSTGIS: tableName plus element; element may be the"
-              + " target structure's CORE URN (logical or versioned), resolved against the bundle"
-              + " first and the installed instance second, then rewritten to the resolved"
-              + " version's model URN.")
+          "Type-specific configuration. POSTGIS: tableName plus element. FROST: an empty object"
+              + " for a passthrough sink (the source delivers the SensorThings envelope itself),"
+              + " or just element when a mapping targets this sink. In both cases element may be"
+              + " the target structure's CORE URN (logical or versioned), resolved against the"
+              + " bundle first and the installed instance second, then rewritten to the resolved"
+              + " version's model URN. Send {} rather than omitting the field: only a stored"
+              + " configuration mints the URN a bundle pipeline's sinkRef can resolve to.")
   private Map<String, Object> configuration;
 }

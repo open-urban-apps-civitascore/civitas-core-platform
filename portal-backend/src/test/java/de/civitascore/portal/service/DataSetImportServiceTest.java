@@ -548,6 +548,63 @@ class DataSetImportServiceTest {
             });
   }
 
+  /**
+   * A FROST sink is a first-class bundle member: no tableName, and the configuration may be
+   * completely empty (passthrough — the source delivers the SensorThings envelope itself). The
+   * import passes it through untouched; DataSinkService then mints the configuration URN from the
+   * stamped connectionType alone, which is what makes the sink referencable by a bundle pipeline.
+   */
+  @Test
+  void importDataSet_passesAFrostSinkWithEmptyConfigurationThroughUntouched() {
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSetWithManifest());
+    DataSink sink = createdSink();
+    when(dataSinkService.create(any(DataSinkInputDTO.class))).thenReturn(sink);
+    stubInstallationRecord();
+
+    DataSetImportInputDTO input = bundle(List.of(), List.of());
+    DataSinkImportInputDTO frost = new DataSinkImportInputDTO();
+    frost.setName("FROST Server");
+    frost.setDataSinkType(DataSinkType.FROST);
+    // Empty on purpose, not null: only a stored configuration mints a URN a sinkRef can resolve.
+    frost.setConfiguration(Map.of());
+    input.setDataSinks(List.of(frost));
+
+    DataSetImportOutputDTO output = importService.importDataSet(input);
+
+    ArgumentCaptor<DataSinkInputDTO> sinkCaptor = ArgumentCaptor.forClass(DataSinkInputDTO.class);
+    verify(dataSinkService).create(sinkCaptor.capture());
+    assertThat(sinkCaptor.getValue().getDataSinkType()).isEqualTo(DataSinkType.FROST);
+    assertThat(sinkCaptor.getValue().getConfiguration()).isEmpty();
+    assertThat(output.getDataSinks())
+        .singleElement()
+        .satisfies(
+            result -> assertThat(result.getAction()).isEqualTo(InstalledArtifactAction.CREATED));
+  }
+
+  /** A mapped FROST sink references its target structure; the element rewrite is type-blind. */
+  @Test
+  void importDataSet_rewritesAFrostSinkElementLikeAPostgisOne() {
+    stubUrnHelpers();
+    when(dataStructureImportService.importOrReuse(any(DataStructureImportInputDTO.class)))
+        .thenReturn(new ImportResolution(version(), false));
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(dataSetWithManifest());
+    when(dataSinkService.create(any(DataSinkInputDTO.class))).thenReturn(createdSink());
+    stubInstallationRecord();
+
+    DataSetImportInputDTO input = bundle(List.of(structureInput()), List.of());
+    DataSinkImportInputDTO frost = new DataSinkImportInputDTO();
+    frost.setName("FROST Server");
+    frost.setDataSinkType(DataSinkType.FROST);
+    frost.setConfiguration(Map.of("element", STRUCTURE_URN));
+    input.setDataSinks(List.of(frost));
+
+    importService.importDataSet(input);
+
+    ArgumentCaptor<DataSinkInputDTO> sinkCaptor = ArgumentCaptor.forClass(DataSinkInputDTO.class);
+    verify(dataSinkService).create(sinkCaptor.capture());
+    assertThat(sinkCaptor.getValue().getConfiguration().get("element")).isEqualTo(VERSIONED_URN);
+  }
+
   @Test
   void importDataSet_wiresPipelineGraphAndDerivesLinksFromNameReferences() {
     stubUrnHelpers();

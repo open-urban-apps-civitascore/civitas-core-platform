@@ -1,0 +1,106 @@
+meta {
+  name: Import Bundle with FROST Sink (passthrough)
+  type: http
+  seq: 20
+}
+
+post {
+  url: {{baseUrl}}/imports/datasets
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Bruno Flow FROST Use Case",
+    "description": "Passthrough shape: structure, source and a FROST sink with an empty configuration",
+    "dataStructures": [
+      {
+        "name": "Bruno Flow STA-Struktur",
+        "description": "SensorThings envelope format the source delivers",
+        "model": {
+          "$id": "urn:core:standard:openurbanapps:datastructure:test:brunofrost:r{{runId}}",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "result": { "type": "number" },
+            "phenomenonTime": { "type": "string" }
+          }
+        }
+      }
+    ],
+    "dataSources": [
+      {
+        "name": "Bruno Flow STA-Quelle",
+        "description": "Feed that delivers the SensorThings envelope itself",
+        "dataStructureUrn": "urn:core:standard:openurbanapps:datastructure:test:brunofrost:r{{runId}}"
+      }
+    ],
+    "dataSinks": [
+      {
+        "name": "Bruno Flow FROST-Server",
+        "dataSinkType": "FROST",
+        "configuration": {}
+      }
+    ],
+    "pipelines": [
+      {
+        "name": "Bruno Flow FROST Pipeline",
+        "description": "Wires the passthrough source straight into the FROST sink by name",
+        "model": {
+          "nodes": [
+            { "id": "n-source", "kind": "source", "label": "Quelle", "sourceRef": "Bruno Flow STA-Quelle" },
+            { "id": "n-sink", "kind": "sink", "label": "FROST", "sinkRef": "Bruno Flow FROST-Server" }
+          ],
+          "edges": [
+            { "id": "e1", "source": "n-source", "target": "n-sink" }
+          ]
+        }
+      }
+    ]
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar('frostDataSetId', res.body.dataSetId);
+    bru.setVar('frostInstallationId', res.body.installationId);
+  }
+}
+
+tests {
+  test("creates the dataset with the FROST sink", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.dataSetId).to.be.a('string');
+  });
+  test("the empty-configuration FROST sink still gets a minted urn", function() {
+    expect(res.body.dataSinks).to.have.length(1);
+    expect(res.body.dataSinks[0].action).to.equal('CREATED');
+    expect(res.body.dataSinks[0].urn).to.match(/^urn:core:/);
+  });
+  test("the pipeline resolves the FROST sink by name", function() {
+    expect(res.body.pipelines).to.have.length(1);
+    expect(res.body.pipelines[0].action).to.equal('CREATED');
+  });
+}
+
+docs {
+  The FROST counterpart of 14: a sink without tableName, whose configuration is
+  an EMPTY object. Two things are proven that 14 cannot cover:
+
+  1. The bundle import has no PostGIS assumption — a FROST sink passes the
+     type-dispatched validation with {} (passthrough: the source delivers the
+     SensorThings envelope itself, so the sink carries no target structure).
+  2. {} is enough to mint a configuration URN: the platform stamps the
+     connectionType into the stored payload, and only that stored payload gives
+     the sink a URN a bundle pipeline's sinkRef can resolve — a sink imported
+     with NO configuration field at all would be rejected at the pipeline step.
+
+  Not covered: the mapped FROST variant (configuration.element referencing the
+  Thing-shaped target structure) — unit-covered in DataSetImportServiceTest,
+  and the rebuilt air-quality use case will exercise it end to end.
+}
