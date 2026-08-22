@@ -154,14 +154,15 @@ public class DataSetImportService {
               .build());
     }
 
-    // 3 · Mappings: registry-only artifacts, stored under the URN the bundle authored. After the
-    // structures, whose identities their source/target must resolve against, and after the sources
-    // so provenance and response read in chain order (source → mapping).
+    // 3 · Mappings: registry-only artifacts, stored under the URN the bundle authored, with their
+    // source/target bound to the resolved structure versions. After the structures, whose
+    // identities those references resolve against, and after the sources so provenance and
+    // response read in chain order (source → mapping).
     List<ImportedArtifactDTO> mappingResults = new ArrayList<>();
     List<String> mappingUrns = new ArrayList<>();
     Map<String, String> mappingUrnsByName = new LinkedHashMap<>();
     for (MappingImportInputDTO mapping : input.getMappings()) {
-      requireResolvableStructureReferences(mapping, structuresByLogicalUrn);
+      bindStructureReferences(mapping, structuresByLogicalUrn);
       MappingResolution resolution = mappingImportService.importOrReuse(mapping);
       InstalledArtifactAction action =
           resolution.reused() ? InstalledArtifactAction.REUSED : InstalledArtifactAction.CREATED;
@@ -360,26 +361,37 @@ public class DataSetImportService {
   }
 
   /**
-   * Guards the data structures a mapping names in {@code source}/{@code target}: each must be a
-   * {@code :datastructure:} CORE URN that this bundle ships or that is already installed.
+   * Binds the data structures a mapping names in {@code source}/{@code target} to the versions this
+   * instance resolved, rewriting each reference to that version's model URN — the mirror of what
+   * {@link #toDataSinkInput} does for a sink's {@code element}.
    *
-   * <p>This has to happen in the host. Model Forge does not existence-check these references: its
-   * {@code x-core-ref} validation reads annotations off the written document, and those annotations
-   * live in {@code mapping.schema.json} (the meta-schema), not in a mapping instance. An unchecked
-   * typo would install "successfully" as a dangling graph edge and only surface when a pipeline
-   * tries to deploy it. Both keys are optional in the schema, so only present ones are checked — a
+   * <p>A bundle authors the logical (version-free) URN because it cannot know which version the
+   * receiving instance mints or reuses. The NiFi mapping compiler validates both keys against the
+   * full CORE URN pattern, whose version segment is mandatory, so a logical reference reaches
+   * deployment as "source is not a valid CORE URN" — after the release already reported success.
+   * Binding here, where the resolved version is in hand, keeps bundles version-agnostic and the
+   * compiler strict, and pins the shape the mapping's field paths were written against. It is the
+   * same convention pipelines already follow for their mapping references.
+   *
+   * <p>Resolution doubles as the existence check, which has to happen in the host: Model Forge does
+   * not check these references, because its {@code x-core-ref} validation reads annotations off the
+   * written document and those live in {@code mapping.schema.json} (the meta-schema), not in a
+   * mapping instance. Both keys are optional in that schema, so only present ones are bound — a
    * mapping without them is legal.
    */
-  private void requireResolvableStructureReferences(
+  private void bindStructureReferences(
       MappingImportInputDTO mapping, Map<String, ImportResolution> structuresByLogicalUrn) {
     Map<String, Object> document = mapping.getDocument();
     if (document == null) {
       return;
     }
+    Map<String, Object> bound = null;
     for (String key : List.of("source", "target")) {
       if (!(document.get(key) instanceof String reference) || reference.isBlank()) {
         continue;
       }
+      // Checked here, not only inside resolveStructureReference, so the message names which of the
+      // two keys is wrong — a mapping carries both, unlike a source or a sink.
       if (!modelRegistryGateway.isDataStructureUrn(reference)) {
         throw new InvalidInputException(
             "Mapping",
@@ -387,19 +399,18 @@ public class DataSetImportService {
             "%s must be a CORE URN of artifact type 'datastructure', got: %s"
                 .formatted(key, reference));
       }
-      String logicalUrn = modelRegistryGateway.logicalUrn(reference);
-      if (structuresByLogicalUrn.containsKey(logicalUrn)) {
-        continue;
+      DataStructureVersion version =
+          resolveStructureReference(
+              reference, "Mapping", mapping.getName(), structuresByLogicalUrn);
+      if (bound == null) {
+        // Replace the document rather than rewriting in place: the authored map may be immutable,
+        // and an untouched reference leaves it alone entirely.
+        bound = new LinkedHashMap<>(document);
       }
-      if (dataStructureVersionRepository
-          .findFirstByModelUrnStartingWith(logicalUrn + ":")
-          .isEmpty()) {
-        throw new InvalidInputException(
-            "Mapping",
-            mapping.getName(),
-            "%s references data structure '%s', which is neither part of this bundle nor installed"
-                .formatted(key, logicalUrn));
-      }
+      bound.put(key, version.getModelUrn());
+    }
+    if (bound != null) {
+      mapping.setDocument(bound);
     }
   }
 

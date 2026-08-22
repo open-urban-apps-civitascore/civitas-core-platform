@@ -82,6 +82,7 @@ class DataSetImportServiceTest {
   @InjectMocks private DataSetImportService importService;
 
   @Captor private ArgumentCaptor<DataSourceInputDTO> sourceInputCaptor;
+  @Captor private ArgumentCaptor<MappingImportInputDTO> mappingInputCaptor;
   @Captor private ArgumentCaptor<DataSetInputDTO> dataSetInputCaptor;
   @Captor private ArgumentCaptor<List<InstalledArtifact>> artifactLinesCaptor;
   @Captor private ArgumentCaptor<String> catalogEntryIdCaptor;
@@ -515,6 +516,62 @@ class DataSetImportServiceTest {
 
     verify(mappingImportService, never()).importOrReuse(any());
     verify(dataSetService, never()).create(any());
+  }
+
+  /**
+   * The NiFi mapping compiler validates source/target against the full CORE URN pattern, whose
+   * version segment is mandatory: an unbound logical reference deploys as "not a valid CORE URN"
+   * long after the release reported success. Both keys are bound, like a sink's element.
+   */
+  @Test
+  void importDataSet_bindsMappingStructureReferencesToTheResolvedVersionedUrn() {
+    stubUrnHelpers();
+    when(dataStructureImportService.importOrReuse(any(DataStructureImportInputDTO.class)))
+        .thenReturn(new ImportResolution(version(), false));
+    when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
+        .thenReturn(new MappingResolution(MAPPING_URN, MAPPING_VERSIONED_URN, false));
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
+    stubInstallationRecord();
+
+    importService.importDataSet(
+        bundle(
+            List.of(structureInput()),
+            List.of(),
+            List.of(
+                mappingInput(
+                    Map.of(
+                        "source",
+                        STRUCTURE_URN,
+                        "target",
+                        STRUCTURE_URN,
+                        "fields",
+                        Map.of("$.result", "$.value"))))));
+
+    verify(mappingImportService).importOrReuse(mappingInputCaptor.capture());
+    assertThat(mappingInputCaptor.getValue().getDocument())
+        .containsEntry("source", VERSIONED_URN)
+        .containsEntry("target", VERSIONED_URN)
+        // Everything the bundle authored beside the two references survives untouched.
+        .containsEntry("fields", Map.of("$.result", "$.value"));
+  }
+
+  /** A reference to an already-installed structure binds to the stored version, not to 1.0.0. */
+  @Test
+  void importDataSet_bindsMappingReferenceAgainstAnInstalledStructure() {
+    when(modelRegistryGateway.isDataStructureUrn(STRUCTURE_URN)).thenReturn(true);
+    when(modelRegistryGateway.logicalUrn(STRUCTURE_URN)).thenReturn(STRUCTURE_URN);
+    when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(STRUCTURE_URN + ":"))
+        .thenReturn(Optional.of(version()));
+    when(mappingImportService.importOrReuse(any(MappingImportInputDTO.class)))
+        .thenReturn(new MappingResolution(MAPPING_URN, MAPPING_VERSIONED_URN, false));
+    when(dataSetService.create(any(DataSetInputDTO.class))).thenReturn(new DataSet());
+    stubInstallationRecord();
+
+    importService.importDataSet(
+        bundle(List.of(), List.of(), List.of(mappingInput(mappingDocument(STRUCTURE_URN)))));
+
+    verify(mappingImportService).importOrReuse(mappingInputCaptor.capture());
+    assertThat(mappingInputCaptor.getValue().getDocument()).containsEntry("source", VERSIONED_URN);
   }
 
   @Test
