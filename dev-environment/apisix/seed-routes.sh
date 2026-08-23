@@ -91,6 +91,12 @@ if [ "$MODE" = "allowall" ]; then
       "remove": ["X-Allowed-Pool-Ids"]
     }
   }'
+  # No send_headers_upstream here: in allow-all every endpoint is null-permission, so
+  # OPA's decision carries no headers (rule 1, "authenticated_endpoint") — and the opa
+  # plugin then OVERWRITES the listed headers with nothing, erasing the wildcard that
+  # proxy-rewrite (rewrite phase, runs earlier) just set. The backend 403s on the
+  # missing header. Full mode keeps the forwarding: there OPA does emit the scopes.
+  OPA_HEADERS=''
 else
   echo "Creating plugin config: full authz (OPA scope filtering)..."
   PROXY_REWRITE='{
@@ -98,6 +104,7 @@ else
       "remove": ["X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids"]
     }
   }'
+  OPA_HEADERS='"send_headers_upstream": ["X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids"],'
 fi
 
 curl -sf -X PUT "$ADMIN_URL/apisix/admin/plugin_configs/1" \
@@ -130,8 +137,8 @@ curl -sf -X PUT "$ADMIN_URL/apisix/admin/plugin_configs/1" \
         \"policy\": \"civitas/authz/decision\",
         \"with_route\": true,
         \"with_service\": true,
-        \"with_consumer\": false,
-        \"send_headers_upstream\": [\"X-Allowed-Scope-Ids\", \"X-Allowed-Pool-Ids\"]
+        $OPA_HEADERS
+        \"with_consumer\": false
       },
       \"proxy-rewrite\": $PROXY_REWRITE,
       \"request-id\": {
