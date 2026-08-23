@@ -9,7 +9,7 @@ import {
   SOURCE_NODE_ID,
   TARGET_NODE_ID,
 } from './compile'
-import { concatInputPorts, mappingRegistry } from './transforms'
+import { concatInputPorts, transformDef } from './transforms'
 
 const sourceTree: SchemaTree = {
   name: 'src',
@@ -17,8 +17,8 @@ const sourceTree: SchemaTree = {
     { path: '$.id', name: 'id', type: 'int', portType: 'scalar' },
     { path: '$.suffix', name: 'suffix', type: 'str', portType: 'scalar' },
     { path: '$.name', name: 'name', type: 'str', portType: 'scalar' },
-    { path: '$.longitude', name: 'longitude', type: 'float', portType: 'scalar' },
-    { path: '$.latitude', name: 'latitude', type: 'float', portType: 'scalar' },
+    { path: '$.longitude', name: 'longitude', type: 'number', portType: 'scalar' },
+    { path: '$.latitude', name: 'latitude', type: 'number', portType: 'scalar' },
   ],
 }
 
@@ -31,8 +31,8 @@ const targetTree: SchemaTree = {
   ],
 }
 
-const toString = mappingRegistry.byType.toString
-const concat = mappingRegistry.byType.concat
+const toStringDef = transformDef('toString')
+const concat = transformDef('concat')
 
 const nodes: Node[] = [
   { id: SOURCE_NODE_ID, type: 'mega', position: { x: 0, y: 0 }, data: { role: 'source', fields: sourceTree.fields } },
@@ -41,7 +41,7 @@ const nodes: Node[] = [
     id: 'i',
     type: 'transform',
     position: { x: 300, y: 40 },
-    data: { defType: 'toString', config: {}, inputs: toString.inputs, outputs: toString.outputs },
+    data: { defType: 'toString', config: {}, inputs: toStringDef.inputs, outputs: toStringDef.outputs },
   },
   {
     id: 'c',
@@ -72,7 +72,7 @@ describe('mapping editor compile', () => {
   })
 
   it('compiles a geoPoint node from longitude + latitude', () => {
-    const geoPointDef = mappingRegistry.byType.geoPoint
+    const geoPointDef = transformDef('geoPoint')
 
     const geoNodes: Node[] = [
       {
@@ -110,7 +110,7 @@ describe('mapping editor compile', () => {
   })
 
   it('keeps geoPoint inputs positionally aligned when only latitude is wired', () => {
-    const geoPointDef = mappingRegistry.byType.geoPoint
+    const geoPointDef = transformDef('geoPoint')
 
     const geoNodes: Node[] = [
       {
@@ -156,7 +156,7 @@ describe('mapping editor compile', () => {
   })
 
   it('keeps geoPoint inputs positionally aligned when only longitude is wired', () => {
-    const geoPointDef = mappingRegistry.byType.geoPoint
+    const geoPointDef = transformDef('geoPoint')
 
     const geoNodes: Node[] = [
       {
@@ -191,7 +191,7 @@ describe('mapping editor compile', () => {
   it('drops an unconnected interior concat port instead of persisting an empty input', () => {
     // in0 and in2 are wired, in1 is left empty — the compiled inputs must be compacted so the
     // backend never receives a bare '' (which it rejects as a blank copy source path).
-    const concatDef = mappingRegistry.byType.concat
+    const concatDef = transformDef('concat')
 
     const cNodes: Node[] = [
       {
@@ -271,6 +271,55 @@ describe('mapping editor compile', () => {
 
   it('flags nothing when every transform reaches the target', () => {
     expect(findUnconnectedTransformNodes(nodes, edges)).toHaveLength(0)
+  })
+
+  it('round-trips a toDateTime node, keeping it distinct from toDate', () => {
+    const toDateTime = transformDef('toDateTime')
+    const dtTarget: SchemaTree = {
+      name: 'tgt',
+      fields: [{ path: '$.observedAt', name: 'observedAt', type: 'datetime', portType: 'scalar' }],
+    }
+    const dtNodes: Node[] = [
+      {
+        id: SOURCE_NODE_ID,
+        type: 'mega',
+        position: { x: 0, y: 0 },
+        data: { role: 'source', fields: sourceTree.fields },
+      },
+      {
+        id: TARGET_NODE_ID,
+        type: 'mega',
+        position: { x: 700, y: 0 },
+        data: { role: 'target', fields: dtTarget.fields },
+      },
+      {
+        id: 'dt',
+        type: 'transform',
+        position: { x: 300, y: 40 },
+        data: {
+          defType: 'toDateTime',
+          config: { pattern: "yyyy-MM-dd'T'HH:mm:ssXXX" },
+          inputs: toDateTime.inputs,
+          outputs: toDateTime.outputs,
+        },
+      },
+    ]
+    const dtEdges: Edge[] = [
+      { id: 'd1', source: SOURCE_NODE_ID, sourceHandle: '$.name', target: 'dt', targetHandle: 'in' },
+      { id: 'd2', source: 'dt', sourceHandle: 'out', target: TARGET_NODE_ID, targetHandle: '$.observedAt' },
+    ]
+
+    const compiled = compileCanvas(dtNodes, dtEdges)
+    expect(compiled.fields['$.observedAt']).toEqual({
+      op: 'toDateTime',
+      input: '$.name',
+      pattern: "yyyy-MM-dd'T'HH:mm:ssXXX",
+    })
+
+    const built = decompileConfig({ ...compiled }, sourceTree, dtTarget)
+    const restored = built.nodes.find(n => n.type === 'transform')
+    expect(restored?.data.defType).toBe('toDateTime')
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(compiled.fields)
   })
 
   it('round-trips: compile → decompile → compile is stable', () => {

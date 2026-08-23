@@ -1,4 +1,4 @@
-import { getDatasetAssignments } from '@/app/services/api/datasets/serverRequests'
+import { getDataset, getDatasetAssignments } from '@/app/services/api/datasets/serverRequests'
 import { mapAssignmentApiResponseToTable } from '@/utils/assignments'
 
 import { AssignmentsList } from './components/AssignmentsList'
@@ -11,10 +11,13 @@ const AccessManagementPage = async (props: AccessManagementPageProps) => {
   const { params } = props
   const { datasetId } = await params
 
-  const { data: datasetAssignments } = await getDatasetAssignments(datasetId)
+  const [{ data: dataset }, { data: datasetAssignments }] = await Promise.all([
+    getDataset(datasetId),
+    getDatasetAssignments(datasetId),
+  ])
   const groupRoleAssignments = mapAssignmentApiResponseToTable(datasetAssignments)
 
-  return <AssignmentsList datasetId={datasetId} initialAssignments={groupRoleAssignments} />
+  return <AssignmentsList dataset={dataset} initialAssignments={groupRoleAssignments} />
 }
 
 export default AccessManagementPage

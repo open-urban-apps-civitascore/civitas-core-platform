@@ -28,6 +28,7 @@ dev-environment/nifi/drivers/*.jar
 
 # Claude Code state (symlinked to private archive repo)
 **/CLAUDE.md
+/portal-backend/CONTEXT.md
 /.claude
 /docs/claude
 /.playwright-mcp

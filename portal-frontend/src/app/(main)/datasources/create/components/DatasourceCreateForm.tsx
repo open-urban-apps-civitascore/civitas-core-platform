@@ -91,7 +91,7 @@ export const DatasourceCreateForm = () => {
   return (
     <PageContainer testId="createDatasourcePage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <PageHeader title={t('create.title')} subtitle={t('create.subtitle')} customElement={customElementCreateMode} />
-      <PageBackground className="overflow-y-auto">
+      <PageBackground className="overflow-y-auto" hasBackground>
         <ContentCard className={cn('overflow-auto')}>
           <Form {...form}>
             <form

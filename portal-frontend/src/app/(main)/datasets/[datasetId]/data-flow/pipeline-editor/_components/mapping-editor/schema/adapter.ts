@@ -17,16 +17,12 @@ export { GEOMETRY }
 
 export const PRIMITIVE: Record<string, FieldType> = {
   String: 'str',
-  Character: 'str',
-  Uuid: 'str',
+  Uuid: 'uuid',
   Integer: 'int',
-  Long: 'int',
-  Short: 'int',
-  Byte: 'int',
-  Float: 'float',
-  Double: 'float',
+  Number: 'number',
   Boolean: 'bool',
   Date: 'date',
+  DateTime: 'datetime',
 }
 
 const lowerFirst = (value: string): string => value.charAt(0).toLowerCase() + value.slice(1)
@@ -69,7 +65,10 @@ const indexDiagram = (diagram: UMLDiagram): DiagramIndex => {
       const part = byKey.get(containment.partId)
       if (!container || !part) continue
 
-      const name = containment.role || rel.name || lowerFirst(part.name)
+      // Mirrors the export's chain, which deliberately skips the relationship name — see
+      // buildClassSchema. Both walkers must yield the same field paths, they are the mapping
+      // contract.
+      const name = containment.role || lowerFirst(part.name)
       const list = outgoing.get(container.id) ?? []
       list.push({ target: part, name, many: containment.isMany })
       outgoing.set(container.id, list)

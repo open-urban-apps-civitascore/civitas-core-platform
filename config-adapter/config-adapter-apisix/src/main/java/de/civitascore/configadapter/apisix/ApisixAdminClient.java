@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.apisix;
 
 import de.civitascore.configadapter.adapter.AbstractSagaCommandHandler.SagaApiException;
+import de.civitascore.configadapter.util.BackoffCalculator;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.client.Invocation;
@@ -35,6 +36,15 @@ final class ApisixAdminClient {
   private static final String ROUTES_PATH = "/apisix/admin/routes/";
   private static final String UPSTREAMS_PATH = "/apisix/admin/upstreams/";
   private static final String X_API_KEY = "X-API-KEY";
+
+  /**
+   * Retry budget for {@link #deleteUpstream}. Only the gateway's stale route-reference rejection is
+   * retried, and only long enough for a worker's route cache to catch up — see {@link
+   * UpstreamReferenceCheck}.
+   */
+  private static final int UPSTREAM_DELETE_MAX_ATTEMPTS = 3;
+
+  private static final BackoffCalculator UPSTREAM_DELETE_BACKOFF = new BackoffCalculator(250, 1000);
 
   private static final Logger LOG = LoggerFactory.getLogger(ApisixAdminClient.class);
 
@@ -94,9 +104,43 @@ final class ApisixAdminClient {
     return delete(ROUTES_PATH + routeId, operationDesc);
   }
 
-  /** See {@link #delete(String, String)}. */
+  /**
+   * See {@link #delete(String, String)}, plus a bounded retry while the gateway still reports a
+   * stale route reference ({@link UpstreamReferenceCheck}): three attempts give the route cache
+   * ~750ms to catch up. A reference still reported after that is surfaced rather than waited out,
+   * since a route outliving its dataset must not be hidden by retrying longer.
+   */
   boolean deleteUpstream(String upstreamId, String operationDesc) {
-    return delete(UPSTREAMS_PATH + upstreamId, operationDesc);
+    for (int attempt = 1; ; attempt++) {
+      try {
+        return delete(UPSTREAMS_PATH + upstreamId, operationDesc);
+      } catch (SagaApiException ex) {
+        if (attempt >= UPSTREAM_DELETE_MAX_ATTEMPTS
+            || !UpstreamReferenceCheck.isStaleRouteReference(ex.statusCode(), ex.getMessage())) {
+          throw ex;
+        }
+        LOG.info(
+            "{} — upstream {} still referenced by a route (attempt {}/{}); retrying after the"
+                + " gateway route cache catches up",
+            Encode.forJava(operationDesc),
+            Encode.forJava(upstreamId),
+            attempt,
+            UPSTREAM_DELETE_MAX_ATTEMPTS);
+        boolean interruptedWhileWaiting = false;
+        try {
+          Thread.sleep(UPSTREAM_DELETE_BACKOFF.calculate(attempt));
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          ex.addSuppressed(interrupted);
+          interruptedWhileWaiting = true;
+        }
+        if (interruptedWhileWaiting) {
+          // Surface the gateway rejection, not the interruption: it names the referencing route,
+          // which is what the saga needs. The interruption rides along as a suppressed cause.
+          throw ex;
+        }
+      }
+    }
   }
 
   /**

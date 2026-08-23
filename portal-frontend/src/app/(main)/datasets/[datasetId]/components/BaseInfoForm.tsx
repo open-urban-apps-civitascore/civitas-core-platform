@@ -27,6 +27,7 @@ interface BaseInfoFormProps {
 export const BaseInfoForm = (props: BaseInfoFormProps) => {
   const { form, isReadOnly, isLoading, datapoolOptions } = props
   const t = useTranslations('datasets')
+  const tCommon = useTranslations('common')
 
   const { hasPermission, hasScopedPermission } = usePermissions()
   const canReadDatapools = hasPermission(PERMISSION_NAMES.DATAPOOL_READ)
@@ -74,7 +75,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
               <DetailsFieldContainer className="max-w-300">
                 <FormSelect
                   id="datasetDatapool"
-                  placeholder={t('form.datapoolSelectPlaceholder')}
+                  placeholder={canReadDatapools ? t('form.datapoolSelectPlaceholder') : tCommon('info.notAvailable')}
                   label={t('form.datapoolSelect')}
                   options={permissionGuardedDatapoolOptions}
                   form={form}
@@ -85,6 +86,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
                     setPendingDatapoolId(value === 'none' ? null : value)
                     setIsWarningModalOpen(true)
                   }}
+                  hasPlaceholderWhenDisabled
                 />
               </DetailsFieldContainer>
               <DetailsFieldContainer className="max-w-300">

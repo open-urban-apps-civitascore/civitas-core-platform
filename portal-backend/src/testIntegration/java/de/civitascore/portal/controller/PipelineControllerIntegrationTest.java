@@ -1093,8 +1093,11 @@ class PipelineControllerIntegrationTest
               new HttpEntity<>(input, createAuthHeaders()),
               String.class);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).contains("AVAILABLE status");
+      // 422 with a status-agnostic message: a DRAFT source answers exactly like a nonexistent or
+      // out-of-pool one, so referencing cannot be used to probe the DataSource table.
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody()).contains("cannot be used by this Dataset's pipelines");
+      assertThat(response.getBody()).doesNotContain("AVAILABLE status");
     }
 
     @Test
@@ -1132,8 +1135,11 @@ class PipelineControllerIntegrationTest
               new HttpEntity<>(input, createAuthHeaders()),
               String.class);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).contains("AVAILABLE status");
+      // 422 with a status-agnostic message: a DRAFT source answers exactly like a nonexistent or
+      // out-of-pool one, so referencing cannot be used to probe the DataSource table.
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody()).contains("cannot be used by this Dataset's pipelines");
+      assertThat(response.getBody()).doesNotContain("AVAILABLE status");
     }
 
     @Test
@@ -1178,8 +1184,11 @@ class PipelineControllerIntegrationTest
               new HttpEntity<>(updateInput, createAuthHeaders()),
               String.class);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).contains("AVAILABLE status");
+      // 422 with a status-agnostic message: a DRAFT source answers exactly like a nonexistent or
+      // out-of-pool one, so referencing cannot be used to probe the DataSource table.
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody()).contains("cannot be used by this Dataset's pipelines");
+      assertThat(response.getBody()).doesNotContain("AVAILABLE status");
     }
 
     @Test

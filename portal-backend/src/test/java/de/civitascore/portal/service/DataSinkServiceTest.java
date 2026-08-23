@@ -31,6 +31,9 @@ import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,6 +42,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -466,6 +471,294 @@ class DataSinkServiceTest {
 
       assertThatThrownBy(() -> dataSinkService.create(input))
           .isInstanceOf(InvalidInputException.class);
+    }
+  }
+
+  @Nested
+  @DisplayName("POSTGIS tableName uniqueness within the dataset")
+  class PostgisTableNameUniqueness {
+
+    private DataSink postgisSink(UUID id, UUID dataSetId, String tableName) {
+      return postgisSink(id, dataSetId, tableName, null);
+    }
+
+    /**
+     * A stored POSTGIS sink in the registry model: the entity carries only its configuration URN,
+     * the document (tableName, optionally dataStructureVersionId) is served by the mocked gateway.
+     * Each sink gets its own URN so siblings resolve to their own documents.
+     */
+    private DataSink postgisSink(UUID id, UUID dataSetId, String tableName, UUID dsvId) {
+      DataSink sink = new DataSink();
+      sink.setId(id);
+      sink.setDataSet(dataSet(dataSetId));
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      String urn = "urn:test:sink:" + tableName + ":" + id;
+      sink.setConfigurationUrn(urn);
+      Map<String, Object> document = new HashMap<>(Map.of("tableName", tableName));
+      if (dsvId != null) {
+        document.put("dataStructureVersionId", dsvId.toString());
+      }
+      lenient()
+          .when(modelRegistryGateway.fetchPayload(urn))
+          .thenReturn(Optional.of(new ModelRegistryGateway.RegistryDocument(document, null)));
+      return sink;
+    }
+
+    private DataSinkInputDTO postgisInput(UUID dataSetId, String tableName, UUID dsvId) {
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSinkType(DataSinkType.POSTGIS);
+      input.setConfiguration(
+          new HashMap<>(
+              Map.of(
+                  "tableName",
+                  tableName,
+                  "dataStructureVersionId",
+                  dsvId.toString(),
+                  "element",
+                  ELEMENT_URN)));
+      return input;
+    }
+
+    private void stubCreate(UUID dataSetId, UUID dsvId, DataSinkInputDTO input) {
+      DataSink entity = new DataSink();
+      entity.setDataSinkType(DataSinkType.POSTGIS);
+      when(dataSinkMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      lenient()
+          .when(dataStructureVersionRepository.findById(dsvId))
+          .thenReturn(Optional.of(dataStructureVersion(dsvId)));
+      // The create path stores the configuration (central storePayload stub pins
+      // STORED_VERSIONED_URN) and the uniqueness check reads it back from the registry.
+      lenient()
+          .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
+          .thenReturn(
+              Optional.of(
+                  new ModelRegistryGateway.RegistryDocument(
+                      new HashMap<>(input.getConfiguration()), null)));
+    }
+
+    @Test
+    @DisplayName("Should reject a tableName already used by a sibling sink of the same dataset")
+    void shouldRejectDuplicateTableName() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
+      stubCreate(dataSetId, dsvId, input);
+      DataSink sibling = postgisSink(UUID.randomUUID(), dataSetId, "messwerte");
+      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of(sibling));
+
+      assertThatThrownBy(() -> dataSinkService.create(input))
+          .isInstanceOf(UniqueConstraintViolationException.class)
+          .hasMessageContaining("messwerte")
+          .hasMessageContaining("Another POSTGIS DataSink");
+    }
+
+    @Test
+    @DisplayName("Should reject a tableName differing from a sibling only in case")
+    void shouldRejectCaseOnlyDifference() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSinkInputDTO input = postgisInput(dataSetId, "MESSWERTE", dsvId);
+      stubCreate(dataSetId, dsvId, input);
+      DataSink sibling = postgisSink(UUID.randomUUID(), dataSetId, "messwerte");
+      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of(sibling));
+
+      assertThatThrownBy(() -> dataSinkService.create(input))
+          .isInstanceOf(UniqueConstraintViolationException.class);
+    }
+
+    @Test
+    @DisplayName("Should accept a tableName only used by a FROST sibling's unrelated configuration")
+    void shouldIgnoreFrostSiblings() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSink frostSibling = new DataSink();
+      frostSibling.setId(UUID.randomUUID());
+      frostSibling.setDataSet(dataSet(dataSetId));
+      frostSibling.setDataSinkType(DataSinkType.FROST);
+      // A FROST sink stores nothing in the registry (both URN columns stay null), so it cannot
+      // even carry a colliding tableName — the check must skip it by type.
+
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
+      stubCreate(dataSetId, dsvId, input);
+      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of(frostSibling));
+      when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      assertThat(dataSinkService.create(input)).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Should accept a distinct tableName alongside a sibling sink")
+    void shouldAcceptDistinctTableName() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSinkInputDTO input = postgisInput(dataSetId, "andere_tabelle", dsvId);
+      stubCreate(dataSetId, dsvId, input);
+      DataSink sibling = postgisSink(UUID.randomUUID(), dataSetId, "messwerte");
+      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of(sibling));
+      when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      assertThat(dataSinkService.create(input)).isNotNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = {
+          "  messwerte  ",
+          "mess werte",
+          "1messwerte",
+          "mess-werte",
+          "messwerte;",
+          "Meßwerte",
+          "mess\"werte",
+          "mess.werte",
+          "1"
+        })
+    @DisplayName("Should reject a tableName that is not a plain unquoted identifier")
+    void shouldRejectNonIdentifierTableName(String tableName) {
+      assertThatThrownBy(() -> createWithTableName(tableName))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("letters, digits and underscores");
+    }
+
+    @Test
+    @DisplayName("Should reject a tableName longer than a PostgreSQL identifier")
+    void shouldRejectOverlongTableName() {
+      assertThatThrownBy(() -> createWithTableName("t".repeat(64)))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("at most 63");
+    }
+
+    @Test
+    @DisplayName("Should accept a tableName at the maximum identifier length")
+    void shouldAcceptTableNameAtMaximumLength() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSinkInputDTO input = postgisInput(dataSetId, "t".repeat(63), dsvId);
+      stubCreate(dataSetId, dsvId, input);
+      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of());
+      when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      assertThat(dataSinkService.create(input)).isNotNull();
+    }
+
+    private void createWithTableName(String tableName) {
+      UUID dataSetId = UUID.randomUUID();
+      DataSinkInputDTO input = postgisInput(dataSetId, tableName, UUID.randomUUID());
+      when(dataSinkMapper.toEntity(any())).thenReturn(new DataSink());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      dataSinkService.create(input);
+    }
+
+    /** Without the id comparison every PATCH of a POSTGIS sink would collide with itself. */
+    @Test
+    @DisplayName("Should not treat the updated sink itself as a conflicting sibling")
+    void shouldExcludeItselfOnUpdate() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID sinkId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSink existing = postgisSink(sinkId, dataSetId, "messwerte", dsvId);
+
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
+
+      when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(existing));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      lenient()
+          .when(dataStructureVersionRepository.findById(dsvId))
+          .thenReturn(Optional.of(dataStructureVersion(dsvId)));
+      DataSink selfInList = postgisSink(sinkId, dataSetId, "messwerte");
+      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of(selfInList));
+      when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      lenient()
+          .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
+          .thenReturn(
+              Optional.of(
+                  new ModelRegistryGateway.RegistryDocument(
+                      new HashMap<>(input.getConfiguration()), null)));
+
+      assertThat(dataSinkService.update(sinkId, input)).isNotNull();
+    }
+
+    /**
+     * Self-exclusion and duplicate detection share one stream, so broadening the identity check
+     * would disable uniqueness for every update while the self-exclusion test stays green.
+     */
+    @Test
+    @DisplayName("Should reject renaming a sink onto a sibling's tableName")
+    void shouldRejectDuplicateTableNameOnUpdate() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID sinkId = UUID.randomUUID();
+      UUID siblingId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSink existing = postgisSink(sinkId, dataSetId, "andere_tabelle", dsvId);
+
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
+
+      when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(existing));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      lenient()
+          .when(dataStructureVersionRepository.findById(dsvId))
+          .thenReturn(Optional.of(dataStructureVersion(dsvId)));
+      // The update stores the incoming configuration (central storePayload stub pins
+      // STORED_VERSIONED_URN); the uniqueness check reads the renamed tableName from there.
+      lenient()
+          .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
+          .thenReturn(
+              Optional.of(
+                  new ModelRegistryGateway.RegistryDocument(
+                      new HashMap<>(input.getConfiguration()), null)));
+      DataSink selfInList = postgisSink(sinkId, dataSetId, "andere_tabelle");
+      DataSink sibling = postgisSink(siblingId, dataSetId, "messwerte");
+      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of(selfInList, sibling));
+
+      assertThatThrownBy(() -> dataSinkService.update(sinkId, input))
+          .isInstanceOf(UniqueConstraintViolationException.class)
+          .hasMessageContaining("messwerte");
+    }
+
+    /**
+     * An update carries the stored tableName forward, so a sink that already collides is rejected
+     * by a request that never mentioned the name. A create-shaped message would send the caller
+     * looking for the fault in their request body.
+     */
+    @Test
+    @DisplayName("Should name the stored tableName as the conflict when an update changed nothing")
+    void shouldAttributeTheConflictToTheStoredNameOnUpdate() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID sinkId = UUID.randomUUID();
+      UUID siblingId = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+
+      DataSink existing = postgisSink(sinkId, dataSetId, "messwerte", dsvId);
+
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
+
+      when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(existing));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      lenient()
+          .when(dataStructureVersionRepository.findById(dsvId))
+          .thenReturn(Optional.of(dataStructureVersion(dsvId)));
+      lenient()
+          .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
+          .thenReturn(
+              Optional.of(
+                  new ModelRegistryGateway.RegistryDocument(
+                      new HashMap<>(input.getConfiguration()), null)));
+      DataSink selfInList = postgisSink(sinkId, dataSetId, "messwerte");
+      DataSink sibling = postgisSink(siblingId, dataSetId, "messwerte");
+      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of(selfInList, sibling));
+
+      assertThatThrownBy(() -> dataSinkService.update(sinkId, input))
+          .isInstanceOf(UniqueConstraintViolationException.class)
+          .hasMessageContaining("rename it");
     }
   }
 

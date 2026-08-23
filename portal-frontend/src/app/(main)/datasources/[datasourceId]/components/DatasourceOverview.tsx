@@ -67,6 +67,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     datasource.id,
   )
   const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
+  const canEdit =
+    datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE ? canUpdate && canRelease : canUpdate
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -96,7 +98,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   )
   const [assignedDatapools, setAssignedDatapools] = useState<Datapool[]>([])
   const [isAddDatapoolModalOpen, setIsAddDatapoolModalOpen] = useState(false)
-  const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')
+  const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit' || !canEdit)
 
   // Derive initial IDs from the datasource's linked version summary
   const initialDatastructureId = datasource.dataStructureVersion?.dataStructureId ?? null
@@ -106,8 +108,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const [selectedDatastructureId, setSelectedDatastructureId] = useState<string | null>(initialDatastructureId)
 
   useEffect(() => {
-    setIsReadOnly(searchParams.get('mode') !== 'edit')
-  }, [searchParams])
+    setIsReadOnly(searchParams.get('mode') !== 'edit' || !canEdit)
+  }, [searchParams, canEdit])
 
   useEffect(() => {
     setAssignedDatapools(initialDatapools)
@@ -277,20 +279,21 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         }}
         customElement={
           <PageEditControls<DatasourceStatusType>
-            status={dataSourceStatus}
-            onStatusChange={handleStatusChange}
-            statusOptions={Object.values(DATASOURCE_STATUS_TYPES)}
-            canStage={canStage}
-            canRelease={canRelease}
+            statusProps={{
+              status: dataSourceStatus,
+              onStatusChange: handleStatusChange,
+              statusOptions: Object.values(DATASOURCE_STATUS_TYPES),
+              canStage,
+              canRelease,
+              availableHint: !canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined,
+            }}
             confirmButtonType="button"
             onConfirmClick={handleSave}
             isConfirmButtonDisabled={isConfirmButtonDisabled}
             isCancelButtonDisabled={isLoadingDatasource}
             onCancelClick={handleExit}
             hasCard={false}
-            canEdit={
-              datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE ? canUpdate && canRelease : canUpdate
-            }
+            canEdit={canEdit}
             isReadOnly={isReadOnly}
             onEditClick={() => updateMode(true)}
             cancelButtonTitle={tCommon('actions.exit')}

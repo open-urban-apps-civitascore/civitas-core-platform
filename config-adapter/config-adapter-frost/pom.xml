@@ -22,16 +22,12 @@
             <artifactId>config-adapter-api</artifactId>
             <version>${revision}</version>
         </dependency>
-
         <dependency>
-            <groupId>io.cloudevents</groupId>
-            <artifactId>cloudevents-api</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>io.cloudevents</groupId>
-            <artifactId>cloudevents-core</artifactId>
-            <version>${cloudevents.version}</version>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-api</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
         </dependency>
 
         <dependency>
@@ -132,7 +128,7 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
+                <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
                     <!-- JDK 21+ requires add-opens for Jersey PATCH method support via reflection -->
                     <argLine>@{argLine} --add-opens java.base/java.net=ALL-UNNAMED</argLine>

@@ -14,6 +14,8 @@ import static org.awaitility.Awaitility.await;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.nifi.auth.OidcClientCredentialsTokenProvider;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import java.nio.file.Files;
@@ -27,6 +29,7 @@ import java.util.function.Consumer;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import org.awaitility.Awaitility;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.FixedHostPortGenericContainer;
 import org.testcontainers.containers.GenericContainer;
@@ -84,12 +87,16 @@ abstract class AbstractNifiIT {
   private static boolean infraReady;
 
   static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+
     KEYCLOAK =
-        new FixedHostPortGenericContainer<>("quay.io/keycloak/keycloak:26.0")
+        new FixedHostPortGenericContainer<>(TestContainerImages.KEYCLOAK)
             .withFixedExposedPort(KEYCLOAK_PORT, 8080)
             .withExposedPorts(8080)
-            .withEnv("KEYCLOAK_ADMIN", "admin")
-            .withEnv("KEYCLOAK_ADMIN_PASSWORD", "admin")
+            .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
+            .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin")
             .withEnv("KC_HTTP_ENABLED", "true")
             .withEnv("KC_HOSTNAME_STRICT", "false")
             // Pin the issuer to the exact host:port both sides use, regardless of request host.
@@ -199,7 +206,7 @@ abstract class AbstractNifiIT {
     }
   }
 
-  private static void runKeytool(String... cmd) throws Exception {
+  protected static void runKeytool(String... cmd) throws Exception {
     Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
     if (!process.waitFor(60, TimeUnit.SECONDS)) {
       process.destroyForcibly();
@@ -259,7 +266,7 @@ abstract class AbstractNifiIT {
     dockerHost = DockerClientFactory.instance().dockerHostIpAddress();
 
     nifi =
-        new FixedHostPortGenericContainer<>("apache/nifi:2.9.0")
+        new FixedHostPortGenericContainer<>(TestContainerImages.NIFI)
             .withFixedExposedPort(hostPort, 8443)
             // Secure NiFi with OpenID Connect against the shared Keycloak; the config-adapter
             // authenticates as the 'nifi' service account (client-credentials grant).
@@ -318,7 +325,8 @@ abstract class AbstractNifiIT {
             "https://" + dockerHost + ":" + hostPort,
             new OidcClientCredentialsTokenProvider(
                 tokenUri, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, null, httpClient),
-            httpClient);
+            httpClient,
+            MqttTruststoreConfig.nodeTruststore());
 
     // NiFi keeps initialising after the port opens; poll the REST API (with a real, token-backed
     // request) until it both accepts the OIDC token and has materialised the root process group.

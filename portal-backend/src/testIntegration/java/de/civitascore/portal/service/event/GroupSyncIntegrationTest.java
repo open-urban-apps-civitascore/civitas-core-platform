@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.keycloak.representations.idm.GroupRepresentation;
@@ -148,6 +150,100 @@ class GroupSyncIntegrationTest extends BaseEventPublishingIntegrationTest {
                   .hasSize(1)
                   .anyMatch(g -> g.getName().equals(newName));
             });
+  }
+
+  @Test
+  @DisplayName("Should sync group members to Keycloak when creating a group with members")
+  void shouldSyncGroupMembersToKeycloakOnCreate() {
+    var user = userService.create(createValidUserInput());
+    assertThat(user.getExternalId()).as("User must have externalId after creation").isNotNull();
+
+    GroupInputDTO groupInput = new GroupInputDTO();
+    groupInput.setName("membergrp" + System.currentTimeMillis());
+    groupInput.setMemberIds(List.of(user.getId()));
+    Group group = groupService.create(groupInput);
+    assertThat(group.getExternalId()).isNotNull();
+
+    await()
+        .atMost(Duration.ofSeconds(15))
+        .untilAsserted(
+            () ->
+                assertThat(findKeycloakGroupMembers(group.getExternalId()))
+                    .as("Created group should contain the member in Keycloak")
+                    .hasSize(1)
+                    .anyMatch(m -> m.getId().equals(user.getExternalId())));
+  }
+
+  @Test
+  @DisplayName("Should diff group members on update — adds new, removes dropped")
+  void shouldDiffGroupMembersOnUpdate() {
+    var user1 = userService.create(createValidUserInput());
+    var user2 = userService.create(createValidUserInput());
+
+    GroupInputDTO groupInput = new GroupInputDTO();
+    groupInput.setName("diffgrp" + System.currentTimeMillis());
+    groupInput.setMemberIds(List.of(user1.getId()));
+    Group group = groupService.create(groupInput);
+    assertThat(group.getExternalId()).isNotNull();
+
+    await()
+        .atMost(Duration.ofSeconds(15))
+        .untilAsserted(
+            () ->
+                assertThat(findKeycloakGroupMembers(group.getExternalId()))
+                    .hasSize(1)
+                    .anyMatch(m -> m.getId().equals(user1.getExternalId())));
+
+    // Replace members with user2 only: user1 must be removed, user2 added.
+    GroupInputDTO updateInput = new GroupInputDTO();
+    updateInput.setName(group.getName());
+    updateInput.setMemberIds(List.of(user2.getId()));
+    groupService.update(group.getId(), updateInput);
+
+    await()
+        .atMost(Duration.ofSeconds(15))
+        .untilAsserted(
+            () ->
+                assertThat(findKeycloakGroupMembers(group.getExternalId()))
+                    .as("Update should add user2 and remove user1")
+                    .hasSize(1)
+                    .anyMatch(m -> m.getId().equals(user2.getExternalId())));
+  }
+
+  @Test
+  @DisplayName("Should skip an unsynced member (null externalId) without failing the event")
+  void shouldSkipUnsyncedMemberWithoutFailingEvent() {
+    var synced = userService.create(createValidUserInput());
+    assertThat(synced.getExternalId()).isNotNull();
+
+    // Persist a user directly with no Keycloak reference — simulates a member not yet synced.
+    User unsynced =
+        userRepository.save(
+            User.builder()
+                .firstName("Unsynced")
+                .lastName("Member")
+                .email("unsynced." + UUID.randomUUID().toString().substring(0, 8) + "@example.com")
+                .build());
+    assertThat(unsynced.getExternalId()).isNull();
+
+    GroupInputDTO groupInput = new GroupInputDTO();
+    groupInput.setName("skipgrp" + System.currentTimeMillis());
+    groupInput.setMemberIds(List.of(synced.getId(), unsynced.getId()));
+    Group group = groupService.create(groupInput);
+
+    // The event must succeed (group synced) even though one member has no externalId.
+    assertThat(group.getExternalId())
+        .as("Group create must not fail on unsynced member")
+        .isNotNull();
+
+    await()
+        .atMost(Duration.ofSeconds(15))
+        .untilAsserted(
+            () ->
+                assertThat(findKeycloakGroupMembers(group.getExternalId()))
+                    .as("Only the synced member is added; the unsynced one is skipped")
+                    .hasSize(1)
+                    .anyMatch(m -> m.getId().equals(synced.getExternalId())));
   }
 
   @Test

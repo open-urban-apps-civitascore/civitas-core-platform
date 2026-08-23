@@ -1,6 +1,7 @@
 import z from 'zod'
 
 export const LAYER_DESCRIPTION_MAX_LENGTH = 150
+export const LAYER_TITLE_MAX_LENGTH = 80
 
 export const BoundingBoxResponseSchema = z.object({
   minX: z.number(),
@@ -71,11 +72,16 @@ const BoundingBoxFormFieldsSchema = z.object({
 export const LayerFormSchema = z
   .object({
     id: z.string(),
-    title: z.string().trim().min(1, 'common.errors.required'),
+    title: z
+      .string()
+      .trim()
+      .min(1, 'common.errors.required')
+      .max(LAYER_TITLE_MAX_LENGTH, 'datasets.overview.completion.apis.config.errors.title.tooLong'),
     layerName: z
       .string()
       .trim()
       .min(1, 'common.errors.required')
+      .max(LAYER_TITLE_MAX_LENGTH, 'datasets.overview.completion.apis.config.errors.layerName.tooLong')
       .regex(/^[A-Za-z0-9_-]*$/, 'common.errors.invalidCharacters')
       .regex(/^[^0-9]/, 'common.errors.mustNotStartWithNumber'),
     description: z
@@ -106,6 +112,16 @@ export const LayerFormSchema = z
       })
     }
   })
+
+export const LayersFormSchema = z.array(LayerFormSchema).superRefine((layers, ctx) => {
+  const seenNames = new Set<string>()
+  layers.forEach((layer, index) => {
+    if (!layer.layerName) return
+    if (seenNames.has(layer.layerName))
+      ctx.addIssue({ code: 'custom', message: 'common.errors.nameExists', path: [index, 'layerName'] })
+    seenNames.add(layer.layerName)
+  })
+})
 
 export const LayerPayloadSchema = LayerBaseSchema.extend({
   defaultStyleId: z.uuid().optional().nullable(),

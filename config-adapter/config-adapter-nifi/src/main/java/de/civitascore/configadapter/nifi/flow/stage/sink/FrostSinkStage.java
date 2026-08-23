@@ -75,6 +75,43 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
   private static final List<String> HTTP_FAILURE_RELATIONSHIPS =
       List.of("Failure", "Retry", "No Retry");
 
+  /** Attribute the FROST response body is captured into, read by the error sink's log message. */
+  private static final String RESPONSE_BODY_ATTRIBUTE = "frost.response.body";
+
+  /**
+   * What an InvokeHTTP request does with its response, which decides the relationship its 2xx
+   * FlowFile leaves on. Capturing the body into an attribute suppresses the response FlowFile on
+   * success, so only {@code Original} carries the request FlowFile onwards and {@code Response}
+   * never receives anything — one decision, never two.
+   */
+  private enum HttpResponseUse {
+    CAPTURE_INTO_ATTRIBUTE("Original", true),
+    /**
+     * Required wherever a downstream EvaluateJsonPath reads the response, such as every
+     * find-or-create lookup.
+     */
+    READ_FROM_CONTENT("Response", false),
+    CAPTURE_AND_END(null, true),
+    END(null, false);
+
+    private final String continuation;
+    private final boolean capturesBody;
+
+    HttpResponseUse(String continuation, boolean capturesBody) {
+      this.continuation = continuation;
+      this.capturesBody = capturesBody;
+    }
+
+    /** The relationship the 2xx FlowFile leaves on, or null where the request is terminal. */
+    String continuation() {
+      return continuation;
+    }
+
+    boolean capturesBody() {
+      return capturesBody;
+    }
+  }
+
   private final String frostBaseUrl;
   private final FrostSinkAuth frostAuth;
 
@@ -486,11 +523,10 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     if (plan.observationBody() != null) {
       Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "obsBody");
       setProp(renderBody, "Replacement Value", plan.observationBody());
-      Processor post = loadFrostHttp(ctx, null, "obsPost");
+      Processor post = loadFrostHttp(ctx, HttpResponseUse.CAPTURE_AND_END, "obsPost");
       setProp(post, "HTTP Method", "POST");
       setProp(post, "HTTP URL", base + "/Observations");
       setProp(post, "Request Content-Type", "application/json");
-      setProp(post, "Response Body Attribute Name", "frost.response.body");
       ctx.addProcessor(renderBody);
       ctx.addProcessor(post);
       connect(ctx, tails, renderBody);
@@ -539,7 +575,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       List<Tail> upstream,
       Processor errorSink)
       throws FatalAdapterException {
-    Processor get = loadFrostHttp(ctx, "Response", disc + "Get");
+    Processor get = loadFrostHttp(ctx, HttpResponseUse.READ_FROM_CONTENT, disc + "Get");
     setProp(get, "HTTP Method", "GET");
     setProp(get, "HTTP URL", lookupUrl);
     Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
@@ -551,7 +587,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       ctx.addProcessor(p);
     }
     connect(ctx, upstream, get);
-    removeAutoTerminated(get, "Response");
+    openContinuation(get);
     ctx.addChainConnection(get, extractId);
     ctx.addChainConnection(extractId, route);
     routeHttpFailures(ctx, get, errorSink);
@@ -567,16 +603,11 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
     Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", disc + "Body");
     setProp(renderBody, "Replacement Value", body);
-    Processor post = loadFrostHttp(ctx, "Response", disc + "Post");
+    Processor post = loadFrostHttp(ctx, HttpResponseUse.CAPTURE_INTO_ATTRIBUTE, disc + "Post");
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", postUrl);
     setProp(post, "Request Content-Type", "application/json");
-    // Capture the FROST response body ONLY on the POST: a rejected create answers 4xx with the
-    // failing constraint in the body, which the error sink logs. The GET/reGet responses must stay
-    // in the FlowFile content — the EvaluateJsonPath extractors read $.value[0].@iot.id from it, so
-    // diverting their body to an attribute would break find-or-create entirely.
-    setProp(post, "Response Body Attribute Name", "frost.response.body");
-    Processor reGet = loadFrostHttp(ctx, "Response", disc + "ReGet");
+    Processor reGet = loadFrostHttp(ctx, HttpResponseUse.READ_FROM_CONTENT, disc + "ReGet");
     setProp(reGet, "HTTP Method", "GET");
     setProp(reGet, "HTTP URL", lookupUrl);
     Processor reId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "ReId");
@@ -595,9 +626,9 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     }
     ctx.addConnection(route, renderBody, "new");
     ctx.addChainConnection(renderBody, post);
-    removeAutoTerminated(post, "Response");
+    openContinuation(post);
     ctx.addChainConnection(post, reGet);
-    removeAutoTerminated(reGet, "Response");
+    openContinuation(reGet);
     ctx.addChainConnection(reGet, reId);
     ctx.addChainConnection(reId, confirm);
     ctx.routeFailure(renderBody, errorSink);
@@ -625,7 +656,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       List<Tail> upstream,
       Processor errorSink)
       throws FatalAdapterException {
-    Processor get = loadFrostHttp(ctx, "Response", disc + "Get");
+    Processor get = loadFrostHttp(ctx, HttpResponseUse.READ_FROM_CONTENT, disc + "Get");
     setProp(get, "HTTP Method", "GET");
     setProp(get, "HTTP URL", navigationUrl + "?$top=1");
     Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
@@ -637,7 +668,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       ctx.addProcessor(processor);
     }
     connect(ctx, upstream, get);
-    removeAutoTerminated(get, "Response");
+    openContinuation(get);
     ctx.addChainConnection(get, extractId);
     ctx.addChainConnection(extractId, route);
     routeHttpFailures(ctx, get, errorSink);
@@ -647,20 +678,19 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
     Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", disc + "Body");
     setProp(renderBody, "Replacement Value", body);
-    Processor post = loadFrostHttp(ctx, "Original", disc + "Post");
+    Processor post = loadFrostHttp(ctx, HttpResponseUse.CAPTURE_INTO_ATTRIBUTE, disc + "Post");
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", navigationUrl);
     setProp(post, "Request Content-Type", "application/json");
-    setProp(post, "Response Body Attribute Name", "frost.response.body");
     ctx.addProcessor(renderBody);
     ctx.addProcessor(post);
     ctx.addConnection(route, renderBody, "new");
     ctx.addChainConnection(renderBody, post);
-    removeAutoTerminated(post, "Original");
+    openContinuation(post);
     ctx.routeFailure(renderBody, errorSink);
     routeHttpFailures(ctx, post, errorSink);
 
-    return List.of(new Tail(post, "Original"), updated);
+    return List.of(Tail.continuing(post), updated);
   }
 
   /** Resolves a single-valued navigation entity and PATCHes the concrete entity by its id. */
@@ -674,7 +704,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       List<Tail> upstream,
       Processor errorSink)
       throws FatalAdapterException {
-    Processor get = loadFrostHttp(ctx, "Response", disc + "Get");
+    Processor get = loadFrostHttp(ctx, HttpResponseUse.READ_FROM_CONTENT, disc + "Get");
     setProp(get, "HTTP Method", "GET");
     setProp(get, "HTTP URL", navigationUrl);
     Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
@@ -686,7 +716,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       ctx.addProcessor(processor);
     }
     connect(ctx, upstream, get);
-    removeAutoTerminated(get, "Response");
+    openContinuation(get);
     ctx.addChainConnection(get, extractId);
     ctx.addChainConnection(extractId, route);
     routeHttpFailures(ctx, get, errorSink);
@@ -708,24 +738,38 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       throws FatalAdapterException {
     Processor updateBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", disc + "UpdateBody");
     setProp(updateBody, "Replacement Value", body);
-    Processor patch = loadFrostHttp(ctx, "Original", disc + "Patch");
+    Processor patch = loadFrostHttp(ctx, HttpResponseUse.CAPTURE_INTO_ATTRIBUTE, disc + "Patch");
     setProp(patch, "HTTP Method", "PATCH");
     setProp(patch, "HTTP URL", entityUrl + "(${" + idAttribute + "})");
     setProp(patch, "Request Content-Type", "application/json");
-    setProp(patch, "Response Body Attribute Name", "frost.response.body");
     ctx.addProcessor(updateBody);
     ctx.addProcessor(patch);
     removeAutoTerminated(route, "unmatched");
     ctx.addConnection(route, updateBody, "unmatched");
     ctx.addChainConnection(updateBody, patch);
-    removeAutoTerminated(patch, "Original");
+    openContinuation(patch);
     ctx.routeFailure(updateBody, errorSink);
     routeHttpFailures(ctx, patch, errorSink);
-    return new Tail(patch, "Original");
+    return Tail.continuing(patch);
   }
 
   /** A stage outcome: the processor and the relationship the next stage consumes. */
-  private record Tail(Processor processor, String relationship) {}
+  private record Tail(Processor processor, String relationship) {
+    Tail {
+      // A nameless relationship survives connect() — "unmatched".equals(null) is merely false — and
+      // would reach the snapshot as a connection selecting nothing, so nothing is ever transferred
+      // over it.
+      if (relationship == null) {
+        throw new IllegalArgumentException(
+            "tail of '" + processor.id() + "' names no relationship for the next stage");
+      }
+    }
+
+    /** The tail of an InvokeHTTP, continuing on the relationship it was loaded to leave on. */
+    static Tail continuing(Processor http) {
+      return new Tail(http, http.outRelationship());
+    }
+  }
 
   private void connect(BuildContext ctx, List<Tail> tails, Processor next) {
     for (Tail tail : tails) {
@@ -779,7 +823,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
     Processor restore = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "thingRestore");
     setProp(restore, "Replacement Value", "${frost.body}");
-    Processor post = loadFrostHttp(ctx, null, "thingPost");
+    Processor post = loadFrostHttp(ctx, HttpResponseUse.END, "thingPost");
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", base + "/Things");
     setProp(post, "Request Content-Type", "application/json");
@@ -787,11 +831,10 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     Processor updateRestore =
         ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "thingUpdateRestore");
     setProp(updateRestore, "Replacement Value", "${frost.body}");
-    Processor patch = loadFrostHttp(ctx, null, "thingPatch");
+    Processor patch = loadFrostHttp(ctx, HttpResponseUse.CAPTURE_AND_END, "thingPatch");
     setProp(patch, "HTTP Method", "PATCH");
     setProp(patch, "HTTP URL", base + "/Things(${frost.id})");
     setProp(patch, "Request Content-Type", "application/json");
-    setProp(patch, "Response Body Attribute Name", "frost.response.body");
 
     ctx.addProcessor(restore);
     ctx.addProcessor(post);
@@ -851,7 +894,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     setProp(inject, "Replacement Strategy", "Regex Replace");
     setProp(inject, "Search Value", "^\\{");
     setProp(inject, "Replacement Value", "{\"Datastream\":{\"@iot.id\":${frost.id}},");
-    Processor post = loadFrostHttp(ctx, null, "obsPost");
+    Processor post = loadFrostHttp(ctx, HttpResponseUse.END, "obsPost");
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", base + "/Observations");
     setProp(post, "Request Content-Type", "application/json");
@@ -904,7 +947,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       setProp(extractRef, ref.getKey(), ref.getValue());
     }
 
-    Processor get = loadFrostHttp(ctx, "Response", disc + "Get");
+    Processor get = loadFrostHttp(ctx, HttpResponseUse.READ_FROM_CONTENT, disc + "Get");
     setProp(get, "HTTP Method", "GET");
     setProp(get, "HTTP URL", leg.getUrl());
 
@@ -922,13 +965,10 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     ctx.addChainConnection(split, extractBody);
     ctx.addChainConnection(extractBody, extractRef);
     ctx.addChainConnection(extractRef, get);
-    removeAutoTerminated(get, "Response");
+    openContinuation(get);
     ctx.addChainConnection(get, extractId);
     ctx.addChainConnection(extractId, route);
-    for (String relationship : HTTP_FAILURE_RELATIONSHIPS) {
-      removeAutoTerminated(get, relationship);
-      ctx.addConnection(get, errorSink, relationship);
-    }
+    routeHttpFailures(ctx, get, errorSink);
     // A malformed envelope (split) or an unparseable lookup response (extract) must be logged, not
     // dropped — route every intermediate 'failure' to the error sink.
     for (Processor stage : List.of(split, extractBody, extractRef, extractId)) {
@@ -944,14 +984,32 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     }
   }
 
-  /** Loads an InvokeHTTP processor and applies the non-secret half of FROST Basic Auth, if used. */
-  private Processor loadFrostHttp(BuildContext ctx, String relationship, String discriminator)
+  /**
+   * Loads an InvokeHTTP processor for the given response use, which fixes both its continuation
+   * relationship and whether the body is captured, and applies the non-secret half of FROST Basic
+   * Auth, if used.
+   */
+  private Processor loadFrostHttp(BuildContext ctx, HttpResponseUse use, String discriminator)
       throws FatalAdapterException {
-    Processor http = ctx.loadProcessor(Fragment.INVOKE_HTTP, relationship, discriminator);
+    Processor http = ctx.loadProcessor(Fragment.INVOKE_HTTP, use.continuation(), discriminator);
+    if (use.capturesBody()) {
+      setProp(http, "Response Body Attribute Name", RESPONSE_BODY_ATTRIBUTE);
+    }
     String username = ctx.spec().sinkProperties().get(FROST_BASIC_AUTH_USERNAME);
     if (username != null) {
       setProp(http, "Request Username", username);
     }
     return http;
+  }
+
+  /**
+   * Un-terminates the relationship an InvokeHTTP was loaded to continue on, so it can be connected.
+   */
+  private static void openContinuation(Processor http) {
+    if (http.outRelationship() == null) {
+      throw new IllegalArgumentException(
+          "terminal InvokeHTTP '" + http.id() + "' has no continuation to open");
+    }
+    removeAutoTerminated(http, http.outRelationship());
   }
 }

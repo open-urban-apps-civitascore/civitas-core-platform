@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Pipeline, PipelineNode } from '../_types/pipeline'
 import { createEmptyPipeline } from './pipelineService'
-import { isValidNifiCron, validatePipeline } from './validationService'
+import { isValidNifiCron, type PipelineValidationContext, validatePipeline } from './validationService'
 
 interface TestNode {
   id: string
@@ -964,5 +964,63 @@ describe('validateCronAndMappingWired', () => {
       ],
     )
     expect(validatePipeline(pipeline).errors.some(error => error.messageKey === NOT_WIRED_KEY)).toBe(false)
+  })
+})
+
+describe('validateUniqueGeoPersistenceTableNames', () => {
+  const DUPLICATE_KEY = 'validation.messages.duplicateTableName'
+
+  const geoWithTable = (id: string, tableName: string): TestNode => ({
+    id,
+    type: 'geoPersistence',
+    data: { label: id, configured: true, entityType: 'persistence', tableName },
+  })
+
+  const duplicateErrors = (pipeline: Pipeline, context?: PipelineValidationContext) =>
+    validatePipeline(pipeline, context).errors.filter(error => error.messageKey === DUPLICATE_KEY)
+
+  it('flags the second node of a duplicate pair with its own pipeline name', () => {
+    const pipeline = pipelineWith([geoWithTable('geo-1', 'roads'), geoWithTable('geo-2', 'roads')])
+    const errors = duplicateErrors(pipeline)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('geo-2')
+    expect(errors[0].messageParams).toEqual({ tableName: 'roads', pipeline: pipeline.name })
+  })
+
+  it('compares trimmed and case-insensitively, like the backend', () => {
+    const pipeline = pipelineWith([geoWithTable('geo-1', 'roads'), geoWithTable('geo-2', ' Roads ')])
+    expect(duplicateErrors(pipeline)).toHaveLength(1)
+  })
+
+  it('accepts distinct names and ignores nodes without a name', () => {
+    const pipeline = pipelineWith([
+      geoWithTable('geo-1', 'roads'),
+      geoWithTable('geo-2', 'rivers'),
+      geoWithTable('geo-3', ''),
+      geoWithTable('geo-4', '  '),
+    ])
+    expect(duplicateErrors(pipeline)).toEqual([])
+  })
+
+  it('names the other pipeline for a name used outside this one', () => {
+    const pipeline = pipelineWith([geoWithTable('geo-1', 'Roads')])
+    const errors = duplicateErrors(pipeline, { tableNameOwners: { roads: 'Water' } })
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('geo-1')
+    expect(errors[0].messageParams).toEqual({ tableName: 'Roads', pipeline: 'Water' })
+  })
+
+  it('reports every node of a name used twice here and elsewhere', () => {
+    const pipeline = pipelineWith([geoWithTable('geo-1', 'roads'), geoWithTable('geo-2', 'roads')])
+    const errors = duplicateErrors(pipeline, { tableNameOwners: { roads: 'Water' } })
+    expect(errors.map(error => [error.elementId, error.messageParams?.pipeline])).toEqual([
+      ['geo-1', 'Water'],
+      ['geo-2', pipeline.name],
+    ])
+  })
+
+  it('accepts a pipeline whose names are not used elsewhere', () => {
+    const pipeline = pipelineWith([geoWithTable('geo-1', 'roads')])
+    expect(duplicateErrors(pipeline, { tableNameOwners: { rivers: 'Water' } })).toEqual([])
   })
 })

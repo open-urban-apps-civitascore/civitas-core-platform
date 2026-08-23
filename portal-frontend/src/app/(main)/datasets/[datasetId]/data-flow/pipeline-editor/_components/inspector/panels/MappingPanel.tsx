@@ -62,6 +62,7 @@ const DatastructureField = ({ label, placeholder, selectedKey, name, onSelect }:
           selectedVersion={selectedKey}
           datasourceTitle={name || label}
           onSelectVersion={handleSelect}
+          canRemoveSelection={false}
         />
       )}
     </div>

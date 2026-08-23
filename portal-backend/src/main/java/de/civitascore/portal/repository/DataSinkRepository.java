@@ -1,5 +1,6 @@
 package de.civitascore.portal.repository;
 
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSink;
 import java.util.List;
 import java.util.Optional;
@@ -26,8 +27,11 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
 
   List<DataSink> findByDataSetId(UUID dataSetId);
 
+  boolean existsByDataSetIdAndDataSinkType(UUID dataSetId, DataSinkType dataSinkType);
+
   // Sink -> DataStructureVersion references are no longer a relational column: a sink carries the
   // version's model URN in its registry-stored configuration ("element" field). The in-use guard
   // therefore asks Model Forge for dependents of the model URN
-  // (ModelRegistryGateway#isReferencedBySink) instead of querying this table.
+  // (ModelRegistryGateway#isReferencedBySink) instead of querying this table. Main's JSONB
+  // existence queries over the dropped `configuration` column were superseded by that path.
 }

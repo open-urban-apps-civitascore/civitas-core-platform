@@ -16,6 +16,7 @@ import {
 } from '../_constants/staTargetCatalog'
 import { isCronNodeData, isDataSourceNodeData, isGeoPersistenceNodeData, isMappingNodeData } from '../_types/nodes'
 import { type Pipeline, PIPELINE_NODE_TYPES, type PipelineNode } from '../_types/pipeline'
+import { normalizeTableName, type TableNameOwners } from './dataSinkNameService'
 
 // ============================================================================
 // NiFi Cron Validation
@@ -114,10 +115,22 @@ interface ValidationRule {
   id: string
   name: string
   description: string
-  validate: (pipeline: Pipeline) => {
+  validate: (
+    pipeline: Pipeline,
+    context: PipelineValidationContext,
+  ) => {
     errors: PipelineValidationError[]
     warnings: PipelineValidationWarning[]
   }
+}
+
+/**
+ * Data a rule needs that is not part of the pipeline itself.
+ *
+ */
+export interface PipelineValidationContext {
+  /** Table names used outside this pipeline, mapped to the pipeline using them (see dataSinkNameService). */
+  tableNameOwners?: TableNameOwners
 }
 
 /**
@@ -330,27 +343,27 @@ const validateOrphanNodes: ValidationRule = {
 const validateUniqueGeoPersistenceTableNames: ValidationRule = {
   id: 'unique-geo-persistence-table-names',
   name: 'Unique Geo Persistence Table Names',
-  description: 'No two GeoPersistence nodes within a pipeline may have the same table name',
-  validate: (pipeline: Pipeline) => {
+  description: 'A geo persistence table name may be used only once per dataset',
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
-    const seen = new Map<string, string>()
+    const ownersElsewhere = context.tableNameOwners ?? {}
+    const seen = new Set<string>()
 
     pipeline.nodes.forEach(node => {
       if (!isGeoPersistenceNodeData(node.data)) return
-      const tableName = node.data.tableName.trim()
+      const tableName = normalizeTableName(node.data.tableName)
       if (!tableName) return
 
-      if (seen.has(tableName)) {
-        errors.push({
-          id: crypto.randomUUID(),
-          type: 'node',
-          elementId: node.id,
-          messageKey: 'validation.messages.duplicateTableName',
-          severity: 'error',
-        })
-      } else {
-        seen.set(tableName, node.id)
+      const owner = seen.has(tableName) ? pipeline.name : ownersElsewhere[tableName]
+      if (owner) {
+        errors.push(
+          errorAt(node, 'validation.messages.duplicateTableName', {
+            tableName: node.data.tableName.trim(),
+            pipeline: owner,
+          }),
+        )
       }
+      seen.add(tableName)
     })
 
     return { errors, warnings: [] }
@@ -1088,12 +1101,15 @@ export const VALIDATION_RULES: ValidationRule[] = [
  * Returns validation result with errors and warnings.
  *
  */
-export const validatePipeline = (pipeline: Pipeline): PipelineValidationResult => {
+export const validatePipeline = (
+  pipeline: Pipeline,
+  context: PipelineValidationContext = {},
+): PipelineValidationResult => {
   const allErrors: PipelineValidationError[] = []
   const allWarnings: PipelineValidationWarning[] = []
 
   VALIDATION_RULES.forEach(rule => {
-    const { errors, warnings } = rule.validate(pipeline)
+    const { errors, warnings } = rule.validate(pipeline, context)
     allErrors.push(...errors)
     allWarnings.push(...warnings)
   })
@@ -1110,8 +1126,11 @@ export const validatePipeline = (pipeline: Pipeline): PipelineValidationResult =
  * Used for visual indicators on canvas nodes.
  *
  */
-export const validatePipelineWithNodeStatus = (pipeline: Pipeline): ValidationResultWithNodeStatus => {
-  const result = validatePipeline(pipeline)
+export const validatePipelineWithNodeStatus = (
+  pipeline: Pipeline,
+  context: PipelineValidationContext = {},
+): ValidationResultWithNodeStatus => {
+  const result = validatePipeline(pipeline, context)
   const nodeStatuses = new Map<string, NodeValidationStatus>()
 
   // Initialize all nodes with clean status

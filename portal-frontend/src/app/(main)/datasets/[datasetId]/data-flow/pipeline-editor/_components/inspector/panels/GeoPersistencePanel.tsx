@@ -17,8 +17,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+import { useActivePipeline } from '../../../_hooks/use-active-pipeline'
 import { parseCompositeKey, useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
 import { usePipelinePermissions } from '../../../_hooks/use-pipeline-permissions'
+import { isValidTableName, MAX_TABLE_NAME_LENGTH } from '../../../_services/dataSinkNameService'
 import type { GeoPersistenceNodeData } from '../../../_types/nodes'
 import { EntityMetadata } from '../components/EntityMetadata'
 
@@ -31,16 +33,20 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
   const t = useTranslations('pipelineEditor')
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canReadDatastructures } = usePipelinePermissions(datasetId)
+  const { selectedNode, pipelineUsingTableName } = useActivePipeline()
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+
+  const conflictingPipeline = selectedNode ? pipelineUsingTableName(selectedNode.id, data.tableName) : null
+  const hasInvalidCharacters = data.tableName !== '' && !isValidTableName(data.tableName)
 
   const { name: dataStructureName, versionNumber } = useDatastructureVersionInfo(data.dataStructureVersionId)
 
   const handleTableNameChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const tableName = e.target.value.replace(/[^a-zA-Z0-9_]/g, '')
+      const tableName = e.target.value
       onUpdate({
         tableName,
-        configured: tableName.trim().length > 0 && !!data.dataStructureVersionId,
+        configured: isValidTableName(tableName) && !!data.dataStructureVersionId,
       })
     },
     [data.dataStructureVersionId, onUpdate],
@@ -52,7 +58,7 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
       if (selectedKey && parseCompositeKey(selectedKey)) {
         onUpdate({
           dataStructureVersionId: selectedKey,
-          configured: data.tableName.trim().length > 0,
+          configured: isValidTableName(data.tableName),
         })
       }
       setIsImportModalOpen(false)
@@ -69,7 +75,20 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
           value={data.tableName}
           onChange={handleTableNameChange}
           placeholder={t('geoPersistencePanel.tableNamePlaceholder')}
+          maxLength={MAX_TABLE_NAME_LENGTH}
+          aria-invalid={hasInvalidCharacters || conflictingPipeline !== null}
         />
+        {hasInvalidCharacters && (
+          <p className="text-xs text-destructive">{t('geoPersistencePanel.tableNameInvalid')}</p>
+        )}
+        {!hasInvalidCharacters && conflictingPipeline !== null && (
+          <p className="text-xs text-destructive">
+            {t('validation.messages.duplicateTableName', {
+              tableName: data.tableName.trim(),
+              pipeline: conflictingPipeline,
+            })}
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">

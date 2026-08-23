@@ -8,7 +8,7 @@ import {
 } from '@xyflow/react'
 
 import type { DiagramAction, UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
-import type { UMLRelationship } from '../types/uml'
+import type { UMLElementType, UMLRelationship } from '../types/uml'
 
 const hasSemanticNodeChanges = (changes: NodeChange[]) =>
   changes.some(change => change.type !== 'select' && change.type !== 'dimensions')
@@ -273,7 +273,44 @@ export const validateConnection = (diagram: UMLDiagram, connection: Connection):
   return true
 }
 
-// Validation for specific UML relationship types
+/**
+ * Separate from {@link validateRelationshipConnection} so retyping an existing edge can reuse these
+ * rules without the duplicate check, which would reject that edge as a duplicate of itself.
+ */
+export const isRelationshipAllowedBetween = (
+  sourceType: UMLElementType,
+  targetType: UMLElementType,
+  relationshipType: string,
+): boolean => {
+  switch (relationshipType) {
+    case 'inheritance':
+      // Classes/abstract classes can inherit from classes/abstract classes
+      // Interfaces can inherit from interfaces
+      if (sourceType === 'interface') return targetType === 'interface'
+      if (sourceType === 'class' || sourceType === 'abstractClass')
+        return targetType === 'class' || targetType === 'abstractClass'
+      return false
+
+    case 'realization':
+      // Classes and abstract classes can realize interfaces
+      return (sourceType === 'class' || sourceType === 'abstractClass') && targetType === 'interface'
+
+    case 'composition':
+    case 'aggregation':
+      // The "whole" sits at the edge target — that is where the diamond is drawn (markerEnd) and
+      // what umlContainment reads as the container. It must be a class or abstract class; the
+      // "part" at the source can be any element, an enumeration included.
+      return targetType === 'class' || targetType === 'abstractClass'
+
+    case 'association':
+    case 'dependency':
+      return true
+
+    default:
+      return true
+  }
+}
+
 export const validateRelationshipConnection = (
   diagram: UMLDiagram,
   connection: Connection,
@@ -290,34 +327,7 @@ export const validateRelationshipConnection = (
     return false
   }
 
-  const sourceType = sourceNode.data.element.type
-  const targetType = targetNode.data.element.type
-
-  switch (relationshipType) {
-    case 'inheritance':
-      // Classes/abstract classes can inherit from classes/abstract classes
-      // Interfaces can inherit from interfaces
-      if (sourceType === 'interface') return targetType === 'interface'
-      if (sourceType === 'class' || sourceType === 'abstractClass')
-        return targetType === 'class' || targetType === 'abstractClass'
-      return false
-
-    case 'realization':
-      // Classes and abstract classes can realize interfaces
-      return (sourceType === 'class' || sourceType === 'abstractClass') && targetType === 'interface'
-
-    case 'composition':
-    case 'aggregation':
-      // The "whole" must be a class or abstract class; the "part" can be any element
-      return sourceType === 'class' || sourceType === 'abstractClass'
-
-    case 'association':
-    case 'dependency':
-      return true
-
-    default:
-      return true
-  }
+  return isRelationshipAllowedBetween(sourceNode.data.element.type, targetNode.data.element.type, relationshipType)
 }
 
 // Diagram serialization

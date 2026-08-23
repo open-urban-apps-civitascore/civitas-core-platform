@@ -1,0 +1,84 @@
+meta {
+  name: 11a. Verify UNRELEASE saga complete
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{pgDataSetId}}
+}
+
+script:pre-request {
+  // Wait for the UNRELEASE saga to finish (pendingSagaType cleared, status READY) before the
+  // delete in step 12. Without this wait, the delete would 400 with a still-pending saga and the
+  // teardown would leak resources.
+  const axios = require('axios');
+  const baseUrl = bru.getEnvVar('baseUrl');
+  const keycloakUrl = bru.getEnvVar('keycloakUrl');
+  const datasetId = bru.getVar('pgDataSetId');
+
+  // Bruno's QuickJS sandbox has no URLSearchParams — build the form body by hand.
+  const form = [
+    ['grant_type', 'password'],
+    ['client_id', bru.getEnvVar('clientId')],
+    ['client_secret', bru.getEnvVar('clientSecret')],
+    ['username', bru.getEnvVar('username')],
+    ['password', bru.getEnvVar('password')],
+  ].map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+
+  const tokenResp = await axios.post(
+    `${keycloakUrl}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`,
+    form,
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+  );
+  const token = tokenResp.data.access_token;
+
+  for (let i = 0; i < 30; i++) {
+    // The QuickJS sandbox does not honour validateStatus across the VM boundary, so a
+    // transient 401/403 while OPA data propagates rejects the promise. Guard each attempt
+    // separately so one such response does not abort the whole poll.
+    let resp;
+    try {
+      resp = await axios.get(
+        `${baseUrl}/datasets/${datasetId}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+    } catch (e) { /* transient; retry */ }
+    if (resp && resp.status === 200 && resp.data && resp.data.pendingSagaType === null
+        && resp.data.dataSetStatus === 'READY') {
+      break;
+    }
+    await new Promise(r => setTimeout(r, 2000));
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("UNRELEASE saga completed (pendingSagaType cleared, status READY)", function() {
+    expect(res.body.pendingSagaType).to.be.null;
+    expect(res.body.dataSetStatus).to.equal('READY');
+  });
+
+  test("Sink stays provisioned (unrelease keeps the sink, unlike delete)", function() {
+    expect(res.body.provisioned).to.equal(true);
+  });
+}
+
+docs {
+  **PostGIS saga step 11a** — Poll until the UNRELEASE saga triggered by step 11 has completed.
+
+  Runs between the unrelease (step 11) and the delete (step 12): polls (up to 60s) until `pendingSagaType` is `null` and the status is back to `READY`. Required so the delete doesn't 400 on a still-pending saga.
+
+  `provisioned` must still be `true` here — that is what separates unrelease (pipeline torn down, sink preserved) from delete (sink dropped too). Step 13 asserts the delete side.
+
+  **Expected Response:** 200 OK with `pendingSagaType: null`, `dataSetStatus: READY`, `provisioned: true`.
+}

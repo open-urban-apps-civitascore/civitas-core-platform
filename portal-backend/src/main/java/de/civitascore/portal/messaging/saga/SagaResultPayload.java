@@ -27,7 +27,9 @@ public record SagaResultPayload(
     String failedStep,
     String error,
     Boolean compensated,
-    Map<String, Object> pipelineStatus) {
+    Map<String, Object> pipelineStatus,
+    // Reported by a step that succeeded only in part
+    List<String> staleFeatureTypes) {
   public SagaResultPayload(
       String datasetId,
       String projectId,
@@ -50,6 +52,34 @@ public record SagaResultPayload(
         failedStep,
         error,
         compensated,
+        null,
+        null);
+  }
+
+  public SagaResultPayload(
+      String datasetId,
+      String projectId,
+      String baseUrl,
+      Map<String, String> routeIds,
+      String serviceId,
+      String publicUrl,
+      List<String> pipelineIds,
+      String failedStep,
+      String error,
+      Boolean compensated,
+      Map<String, Object> pipelineStatus) {
+    this(
+        datasetId,
+        projectId,
+        baseUrl,
+        routeIds,
+        serviceId,
+        publicUrl,
+        pipelineIds,
+        failedStep,
+        error,
+        compensated,
+        pipelineStatus,
         null);
   }
 }

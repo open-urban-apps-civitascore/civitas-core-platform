@@ -33,6 +33,9 @@ import org.slf4j.LoggerFactory;
  *       NETWORK_ERROR})
  *   <li>HTTP 5xx → {@link RetryableAdapterException} ({@code SERVICE_UNAVAILABLE})
  *   <li>HTTP 409 on CREATE / 404 on DELETE → success (idempotent)
+ *   <li>HTTP 400 on UPSTREAM_DELETE naming a still-referencing route → {@link
+ *       RetryableAdapterException} ({@code SERVICE_UNAVAILABLE}), see {@link
+ *       UpstreamReferenceCheck}
  *   <li>Other HTTP 4xx and unexpected runtime failures → {@link FatalAdapterException}
  * </ul>
  *
@@ -150,7 +153,8 @@ final class ApisixAdminOperations {
 
   /**
    * Throws the classified exception for error status codes: 5xx retryable, 4xx fatal — except the
-   * idempotent no-ops (409 on CREATE: already exists; 404 on DELETE: already gone).
+   * idempotent no-ops (409 on CREATE: already exists; 404 on DELETE: already gone) and a stale
+   * route reference on UPSTREAM_DELETE, which is retryable rather than fatal.
    */
   private void handleHttpResponse(
       Response response, AdapterErrorCode errorCode, AdapterOperation operation)
@@ -162,6 +166,19 @@ final class ApisixAdminOperations {
     }
 
     String body = response.readEntity(String.class);
+    if (operation == AdapterOperation.UPSTREAM_DELETE
+        && UpstreamReferenceCheck.isStaleRouteReference(status, body)) {
+      // Not a client error: the referencing route may already be deleted and merely still visible
+      // in the gateway's route cache. Retryable so the framework's backoff re-attempts it, rather
+      // than DLQ-ing the delete and leaving the upstream orphaned.
+      LOG.warn(
+          "APISIX upstream still referenced by a route during {}: {} {}",
+          operation.getDescription(),
+          status,
+          Encode.forJava(body));
+      throw new RetryableAdapterException(
+          AdapterErrorCode.SERVICE_UNAVAILABLE, ApisixAdapter.ADAPTER_NAME, status);
+    }
     if (status >= Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
       LOG.warn(
           "APISIX server error during {}: {} {}",

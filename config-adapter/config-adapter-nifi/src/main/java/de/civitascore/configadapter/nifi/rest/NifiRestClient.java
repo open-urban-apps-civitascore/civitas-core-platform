@@ -19,6 +19,8 @@ import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
@@ -76,17 +78,27 @@ public class NifiRestClient implements AutoCloseable {
    */
   private volatile String token;
 
+  /** Only its names are used, to point a validation failure at the right parameter context. */
+  private final MqttTruststoreConfig mqttTruststore;
+
   /**
    * Creates a client.
    *
    * @param baseUrl the NiFi base URL (e.g. {@code https://nifi:8443})
    * @param tokenProvider supplies (and refreshes) the OIDC bearer token sent to NiFi
    * @param client the JAX-RS client to use
+   * @param mqttTruststore the configured MQTT trust anchor, named in truststore-password
+   *     diagnostics
    */
-  public NifiRestClient(String baseUrl, NifiTokenProvider tokenProvider, Client client) {
+  public NifiRestClient(
+      String baseUrl,
+      NifiTokenProvider tokenProvider,
+      Client client,
+      MqttTruststoreConfig mqttTruststore) {
     this.baseUrl = baseUrl;
     this.tokenProvider = tokenProvider;
     this.client = client;
+    this.mqttTruststore = mqttTruststore;
   }
 
   /** A reference to a NiFi process group with its optimistic-locking revision. */
@@ -678,12 +690,14 @@ public class NifiRestClient implements AutoCloseable {
       // A service whose configuration is INVALID will never reach ENABLED, so polling for it is
       // pointless: fail fast and FATALLY (a retryable timeout would loop forever under redelivery).
       if (awaitingEnabled && "INVALID".equals(component.path("validationStatus").asText())) {
+        String name = component.path("name").asText();
         throw new FatalAdapterException(
             AdapterErrorCode.NIFI_FLOW_ERROR,
             "controller service '"
-                + component.path("name").asText()
+                + name
                 + "' is INVALID and will never enable: "
-                + validationErrors(component));
+                + validationErrors(component)
+                + provisioningHint(name));
       }
       if (!state.equals(component.path("state").asText())) {
         allInState = false;
@@ -708,6 +722,23 @@ public class NifiRestClient implements AutoCloseable {
       joined.append(error.asText());
     }
     return joined.toString();
+  }
+
+  /**
+   * Points at the deployment-owned parameter context behind the MQTT SSL Context Service. Where the
+   * deployment has not populated it, the context exists but holds no password and NiFi reports an
+   * unrelated-looking truststore-password error.
+   */
+  private String provisioningHint(String serviceName) {
+    if (!MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE.equals(serviceName)
+        || !mqttTruststore.hasPasswordParameter()) {
+      return "";
+    }
+    return " — check that parameter context '"
+        + mqttTruststore.parameterContext()
+        + "' provides a value for the sensitive parameter '"
+        + mqttTruststore.passwordParameter()
+        + "'";
   }
 
   /**

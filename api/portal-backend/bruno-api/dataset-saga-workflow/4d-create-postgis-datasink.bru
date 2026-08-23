@@ -1,0 +1,65 @@
+meta {
+  name: 4d. Create POSTGIS DataSink (backs the OWS named API)
+  type: http
+  seq: 17
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sagaDataSetId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "POSTGIS",
+    "configuration": {
+      "tableName": "saga_workflow_observations",
+      "dataStructureVersionId": "{{sagaDataStructureVersionId}}"
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaPostgisDataSinkId', res.body.id);
+  }
+}
+
+tests {
+  test("DataSink created", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+
+  test("Has POSTGIS type", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.dataSinkType).to.equal('POSTGIS');
+    }
+  });
+}
+
+docs {
+  **Saga step 4d of 18** — Prerequisites: dataset created (step 4) with its OWS named API, structure version released (step 3d).
+
+  Creates the POSTGIS DataSink that backs the dataset's OWS named API. Release rejects an OWS named API with no POSTGIS sink behind it, because the route rewrites to a GeoServer workspace that is never provisioned — the published endpoint would 404. This sink is what makes the map surface complete and step 8 releasable.
+
+  The sink is discovered by the saga via the dataset id, so it is deliberately not declared in the pipeline (step 5): the pipeline's flow ingests into FROST only, and adding a PostGIS branch would change what step 9d verifies.
+
+  **Expected Response:** 201 Created, body contains `id` and `dataSinkType: "POSTGIS"`. 409 if the sink already existed (idempotent).
+
+  **Post-condition:** Save `sagaPostgisDataSinkId` from `body.id` (deleted in cleanup step 12c).
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSink record created in `portal_backend` DB, FK `dataset_id` → this dataset |
+  | Config Adapter | — (table and GeoServer workspace are provisioned when the DATASET_CREATE saga runs in step 8) |
+  | External System | — |
+}

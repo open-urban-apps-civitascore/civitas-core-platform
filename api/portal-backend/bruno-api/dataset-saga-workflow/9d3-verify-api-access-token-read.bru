@@ -1,0 +1,88 @@
+meta {
+  name: 9d3. Verify api-access Token Reads Protected Named API
+  type: http
+  seq: 26
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/{{sagaSlug}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{sagaApiAccessToken}}
+}
+
+script:pre-request {
+  // OPA's authorization data for a freshly released dataset propagates asynchronously and is cached
+  // briefly, so an immediate read can transiently 401/403. Poll until it succeeds (max 30s) so the
+  // assertions test the access contract, not the propagation race.
+  const axios = require('axios');
+  const url = `${bru.getEnvVar('apisixApiUrl')}/v1/datasets/${bru.getVar('sagaDataSetId')}/${bru.getVar('sagaSlug')}`;
+  const token = bru.getVar('sagaApiAccessToken');
+
+  // Fail loudly rather than poll with an empty bearer — that would burn 30s and then assert against
+  // an anonymous 401 that has nothing to do with this test.
+  if (!token) {
+    throw new Error('sagaApiAccessToken is not set — step 1 must mint an api-access token first');
+  }
+
+  // Guard each attempt separately: the QuickJS sandbox does not honour validateStatus across the VM
+  // boundary, so a 401/403 rejects the promise and would otherwise abort the whole loop.
+  let authorized = false;
+  for (let i = 0; i < 15 && !authorized; i++) {
+    try {
+      const resp = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10000,
+      });
+      authorized = resp.status === 200;
+    } catch (e) { /* transient 401/403 while OPA data propagates; retry */ }
+    if (!authorized) {
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  if (!authorized) {
+    throw new Error('Protected named-API read never returned 200 within 30s — OPA authorization did not propagate');
+  }
+}
+
+tests {
+  test("api-access bearer reads the protected named API through the gateway (200)", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is the upstream JSON payload", function() {
+    expect(res.body).to.be.an('object');
+  });
+}
+
+docs {
+  **The external-consumer contract: a public-client token reads a protected named API.**
+
+  This is the headline named-API test. It sends the `api-access` bearer minted in step 9d2 to
+  `{apisixApiUrl}/v1/datasets/{id}/{slug}` and requires 200 with a JSON payload from the upstream. That
+  proves the documented contract end to end: an external consumer authenticating against the **public**
+  `api-access` Keycloak client — no client secret, no portal session — can read a dataset's named API
+  through the gateway while the dataset is still protected (`openDataAccess=false`).
+
+  Compare with step 9c: the same URL, the same route, the same OPA policy — only the credential differs.
+  The pair pins that access is decided by the caller's identity, not by a separate "public" route variant.
+
+  The pre-request polls for up to 30 seconds because OPA's authorization attributes for a freshly
+  released dataset propagate asynchronously, so an immediate read can transiently be denied.
+
+  **Precondition:** `sagaApiAccessToken` set (step 9d2); `sagaDataSetId` / `sagaSlug` set; the dataset is
+  AVAILABLE with `openDataAccess=false`; the token's user holds read access on the dataset.
+
+  **Expected Response:** 200 OK, body is a JSON object from the named API's upstream.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | — |
+  | Config Adapter | — |
+  | External System | Read-only GET against the named API's upstream |
+}

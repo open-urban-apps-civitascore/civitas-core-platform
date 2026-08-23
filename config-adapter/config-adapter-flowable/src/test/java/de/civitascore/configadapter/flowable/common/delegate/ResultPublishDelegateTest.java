@@ -78,6 +78,7 @@ class ResultPublishDelegateTest {
     vars.put("sagaId", "saga-1");
     vars.put("datasetId", "ds-1");
     vars.put("hasPipelines", false);
+    vars.put("hasFrostSink", true);
 
     processEngine.getRuntimeService().startProcessInstanceByKey("dataset-create", vars);
     FlowableTestSupport.executeAllJobs(processEngine);
@@ -106,6 +107,7 @@ class ResultPublishDelegateTest {
     vars.put("sagaId", "saga-2");
     vars.put("datasetId", "ds-1");
     vars.put("hasPipelines", false);
+    vars.put("hasFrostSink", true);
 
     processEngine.getRuntimeService().startProcessInstanceByKey("dataset-create", vars);
     FlowableTestSupport.executeAllJobs(processEngine);

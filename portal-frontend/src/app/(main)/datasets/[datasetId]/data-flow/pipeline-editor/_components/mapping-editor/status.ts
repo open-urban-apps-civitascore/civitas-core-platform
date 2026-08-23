@@ -19,7 +19,10 @@ export interface MappingStatus {
   counts: MappingCounts
 }
 
-export type EndpointInfo = (nodeId: string, handleId: string) => { type: PortType; sub?: string } | null
+export type EndpointInfo = (
+  nodeId: string,
+  handleId: string,
+) => { type: PortType; sub?: string; accepts?: readonly string[] } | null
 
 /** True when `path` is a descendant of `ancestor` in the JSONPath hierarchy. */
 const isDescendantOf = (path: string, ancestor: string): boolean =>
