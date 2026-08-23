@@ -141,40 +141,88 @@ FROM JSONB_ARRAY_ELEMENTS(pg_temp.json_array_or_empty(styles -> 'nodes')) AS nod
      JSONB_ARRAY_ELEMENTS(pg_temp.json_array_or_empty(operation -> 'parameters')) AS parameter;
 $$ LANGUAGE SQL STABLE;
 
+-- Where the diagram lives differs by branch, so the rewrite is applied per storage shape:
+--
+--   * `data_structure_versions.styles` — the pre-Model-Forge shape this migration was written
+--     against. Still present upstream; dropped here by V1_2_10 (drop_inline_model_payloads).
+--   * `model_forge.artifact.content -> 'x-ui-styles'` — where the Model Forge integration keeps
+--     the same diagram. The gateway merges the host's `styles` map into the stored document under
+--     that keyword and splits it off again on read, so the node shape is identical and the
+--     rewrite functions above apply unchanged.
+--
+-- Both branches are guarded on existence rather than assumed, so this file runs on either shape
+-- without a second migration having to know which one it met.
 DO
 $$
     DECLARE
         migrated_rows  BIGINT;
         stale_versions BIGINT;
     BEGIN
-        -- An IMMUTABLE function is not eliminated as a common subexpression across SET and WHERE,
-        -- so the rewrite is computed once in a subquery rather than twice per row.
-        UPDATE data_structure_versions v
-        SET styles = candidate.rewritten
-        FROM (SELECT id,
-                     JSONB_SET(styles, '{nodes}', pg_temp.rewrite_nodes(styles -> 'nodes')) AS rewritten
-              FROM data_structure_versions
-              WHERE styles IS NOT NULL
-                AND JSONB_TYPEOF(styles -> 'nodes') = 'array') AS candidate
-        WHERE v.id = candidate.id
-          AND candidate.rewritten IS DISTINCT FROM v.styles;
+        IF EXISTS (SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'data_structure_versions'
+                     AND column_name = 'styles') THEN
+            -- An IMMUTABLE function is not eliminated as a common subexpression across SET and
+            -- WHERE, so the rewrite is computed once in a subquery rather than twice per row.
+            UPDATE data_structure_versions v
+            SET styles = candidate.rewritten
+            FROM (SELECT id,
+                         JSONB_SET(styles, '{nodes}', pg_temp.rewrite_nodes(styles -> 'nodes')) AS rewritten
+                  FROM data_structure_versions
+                  WHERE styles IS NOT NULL
+                    AND JSONB_TYPEOF(styles -> 'nodes') = 'array') AS candidate
+            WHERE v.id = candidate.id
+              AND candidate.rewritten IS DISTINCT FROM v.styles;
 
-        GET DIAGNOSTICS migrated_rows = ROW_COUNT;
-        RAISE INFO 'UML type consolidation rewrote % data structure version(s)', migrated_rows;
+            GET DIAGNOSTICS migrated_rows = ROW_COUNT;
+            RAISE INFO 'UML type consolidation rewrote % data structure version(s)', migrated_rows;
 
-        -- A retired name left anywhere means the rewrite missed a location the diagram actually
-        -- uses. Failing here is the point: those names resolve to a different column type
-        -- downstream, so a partial migration is worse than none.
-        SELECT count(*)
-        INTO stale_versions
-        FROM data_structure_versions v
-        WHERE v.styles IS NOT NULL
-          AND EXISTS (SELECT 1
-                      FROM pg_temp.uml_type_values(v.styles) AS type_value
-                      WHERE pg_temp.renamed_uml_type(type_value) IS DISTINCT FROM type_value);
+            -- A retired name left anywhere means the rewrite missed a location the diagram
+            -- actually uses. Failing here is the point: those names resolve to a different column
+            -- type downstream, so a partial migration is worse than none.
+            SELECT count(*)
+            INTO stale_versions
+            FROM data_structure_versions v
+            WHERE v.styles IS NOT NULL
+              AND EXISTS (SELECT 1
+                          FROM pg_temp.uml_type_values(v.styles) AS type_value
+                          WHERE pg_temp.renamed_uml_type(type_value) IS DISTINCT FROM type_value);
 
-        IF stale_versions > 0 THEN
-            RAISE EXCEPTION 'UML type consolidation incomplete; % version(s) still carry a retired type name', stale_versions;
+            IF stale_versions > 0 THEN
+                RAISE EXCEPTION 'UML type consolidation incomplete; % version(s) still carry a retired type name', stale_versions;
+            END IF;
+        END IF;
+
+        IF EXISTS (SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'model_forge'
+                     AND table_name = 'artifact_representation'
+                     AND column_name = 'content_jsonb') THEN
+            UPDATE model_forge.artifact_representation r
+            SET content_jsonb = candidate.rewritten
+            FROM (SELECT id,
+                         JSONB_SET(content_jsonb,
+                                   '{x-ui-styles,nodes}',
+                                   pg_temp.rewrite_nodes(content_jsonb -> 'x-ui-styles' -> 'nodes')) AS rewritten
+                  FROM model_forge.artifact_representation
+                  WHERE JSONB_TYPEOF(content_jsonb -> 'x-ui-styles' -> 'nodes') = 'array') AS candidate
+            WHERE r.id = candidate.id
+              AND candidate.rewritten IS DISTINCT FROM r.content_jsonb;
+
+            GET DIAGNOSTICS migrated_rows = ROW_COUNT;
+            RAISE INFO 'UML type consolidation rewrote % Model Forge representation(s)', migrated_rows;
+
+            SELECT count(*)
+            INTO stale_versions
+            FROM model_forge.artifact_representation r
+            WHERE EXISTS (SELECT 1
+                          FROM pg_temp.uml_type_values(r.content_jsonb -> 'x-ui-styles') AS type_value
+                          WHERE pg_temp.renamed_uml_type(type_value) IS DISTINCT FROM type_value);
+
+            IF stale_versions > 0 THEN
+                RAISE EXCEPTION 'UML type consolidation incomplete; % representation(s) still carry a retired type name', stale_versions;
+            END IF;
         END IF;
     END
 $$;
