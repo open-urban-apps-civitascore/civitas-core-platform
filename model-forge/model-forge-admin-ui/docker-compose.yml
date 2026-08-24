@@ -7,7 +7,11 @@ services:
       POSTGRES_USER: model_forge
       POSTGRES_PASSWORD: model_forge
     ports:
-      - "5432:5432"
+      # Host port 5439, not 5432: 5432 is the portal Postgres of the main dev stack
+      # (dev-environment/postgres/docker-compose.yml) and 5433 is Keycloak's. Matches
+      # dev-environment/model-forge/docker-compose.yml so both spellings of standalone
+      # mode use the same port.
+      - "5439:5432"
     volumes:
       - model_forge_admin_data:/var/lib/postgresql/data
     healthcheck:
