@@ -13,8 +13,10 @@
 # Admin UI pointed at portal-backend's OWN database, so you see exactly what the
 # backend created.
 #
-# This differs from local-demo.md, where the Admin UI runs against a SEPARATE database
-# (model_forge_admin) and therefore never shows portal-backend's artifacts.
+# Same database as local-demo.md's default (portal_backend, admin/admin) — it is
+# local-demo.md's STANDALONE section that switches to a SEPARATE database
+# (model_forge_admin, model_forge/model_forge) and therefore never shows portal-backend's
+# artifacts.
 #
 # Prerequisite: the platform stack must already be running, e.g.:
 #   cd dev-environment && ./start-portal-dev.sh --authz=allowall --config-adapter=auto --backend=auto --frontend=auto
@@ -42,8 +44,9 @@ KC_USERNAME="${KC_USERNAME:-dev@civitas.local}"
 KC_PASSWORD="${KC_PASSWORD:-dev123}"
 
 # --- Admin UI, pointed at portal-backend's DB / model_forge schema -----------
-# 8090=Kafka UI, 8091=authz-repository, 8092=the model-forge-admin-ui container that
-# start-portal-dev.sh already starts — all taken by the stack.
+# 8092 is the Admin UI's own default, but start-portal-dev.sh already runs the
+# model-forge-admin-ui container there; 8090=Kafka UI and 8091=authz-repository are
+# taken too — hence 8093 for this by-hand instance.
 ADMIN_UI_PORT="${ADMIN_UI_PORT:-8093}"
 PORTAL_DB_URL="${PORTAL_DB_URL:-jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable}"
 PORTAL_DB_USER="${PORTAL_DB_USER:-admin}"
@@ -74,11 +77,13 @@ echo "    DataStructure id = $DS_ID"
 curl -fsS -X POST "$BACKEND_URL/v1/datastructures/$DS_ID/versions" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"dataStructureVersionSource":"OWN","version":"1.0.0","description":"Vertical-slice schema version","modelName":"VerticalSliceModel","model":{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"VerticalSliceModel","type":"object","properties":{"name":{"type":"string"},"count":{"type":"integer"}}},"styles":{}}' >/dev/null
-echo "    schema version 1.0.0 stored -> a Model Forge Element was persisted in the model_forge schema"
+echo "    DataStructure version 1.0.0 stored as a portal-backend entity"
+echo "    NOTE: nothing lands in the model_forge schema — portal-backend has no Model Forge"
+echo "          integration yet, so the registry stays empty until that step exists."
 
 echo "==> 4/4  Starting the Model Forge Admin UI against portal-backend's database ..."
-echo "    -> open  http://localhost:$ADMIN_UI_PORT   (look for 'VerticalSliceModel' under Elements)"
-echo "    (Ctrl+C stops the Admin UI. The created artifact stays in the DB.)"
+echo "    -> open  http://localhost:$ADMIN_UI_PORT   (the Elements list will be EMPTY, see the NOTE above)"
+echo "    (Ctrl+C stops the Admin UI. The created DataStructure version stays in the DB.)"
 cd "$ADMIN_UI_DIR"
 SERVER_PORT="$ADMIN_UI_PORT" \
 SPRING_DATASOURCE_URL="$PORTAL_DB_URL" \

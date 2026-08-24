@@ -4,10 +4,10 @@ A one-shot **vertical slice**: create a schema through `portal-backend` and see 
 resulting Model Forge **Element** in the Admin UI — with the Admin UI pointed at
 portal-backend's *own* database.
 
-> This is the counterpart to [local-demo.md](local-demo.md). There the Admin UI runs
-> against a **separate** database (`model_forge_admin`) and therefore never shows what
-> portal-backend created. Here the Admin UI reads portal-backend's `model_forge` schema
-> directly, so you see exactly the artifacts the backend persisted.
+> This is the counterpart to [local-demo.md](local-demo.md), and uses the same database as
+> its default: `portal_backend` with `admin`/`admin`. Only local-demo.md's **standalone**
+> section switches to a **separate** database (`model_forge_admin` with
+> `model_forge`/`model_forge`), which therefore never shows what portal-backend created.
 
 > **NOT YET FUNCTIONAL — requires a portal-backend integration that does not exist yet.**
 > `portal-backend` has no dependency on the Model Forge libraries, so creating a
@@ -24,11 +24,12 @@ shows up.
 
 The Admin UI is started with:
 
-* `SPRING_DATASOURCE_URL` → `…/portal_backend` (not its default `model_forge_admin`)
+* `SPRING_DATASOURCE_URL` → `…/portal_backend` (the same database as its default, spelled
+  out here so the script does not depend on that default)
 * `MODEL_FORGE_ADMIN_UI_SEED_ENABLED=false` → don't seed the SensorThings examples into
-  portal-backend's registry
-* `SERVER_PORT=8093` → the main stack already uses 8090 (Kafka UI), 8091
-  (authz-repository) and 8092 (the `model-forge-admin-ui` container)
+  portal-backend's registry (this is also the default)
+* `SERVER_PORT=8093` → the Admin UI's own default is 8092, which the main stack's
+  `model-forge-admin-ui` container already holds (8090 is Kafka UI, 8091 authz-repository)
 
 Migrations are left **enabled** (the default): nothing else creates the `model_forge`
 schema today, so the Admin UI creates it. Disabling them against a database where the
@@ -47,8 +48,10 @@ cd dev-environment
 bash model-forge/vertical-slice.sh
 ```
 
-Then open **http://localhost:8093** and look for `VerticalSliceModel` under Elements.
-Ctrl+C stops the Admin UI; the created artifact stays in the database.
+Then open **http://localhost:8093**. Until the portal-backend integration exists the
+Elements list stays **empty** — the DataStructure version is stored as a portal-backend
+entity only, with nothing written to the `model_forge` schema. Ctrl+C stops the Admin UI;
+the created DataStructure version stays in the database.
 
 ## Requirements
 

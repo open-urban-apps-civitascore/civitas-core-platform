@@ -60,8 +60,8 @@ the `model_forge` schema itself on first start. Anything you see there is what *
 there through these pages. To browse the bundled OGC SensorThings examples instead, use
 standalone mode below.
 
-To run it by hand rather than as a container — pick a free port, since 8090 is Kafka UI
-and 8092 is the container from Step 1:
+To run it by hand rather than as a container — pick a free port, since its default 8092 is
+already taken by the container from Step 1 (and 8090 is Kafka UI):
 
 ```bash
 cd ../../model-forge/model-forge-admin-ui
@@ -96,21 +96,24 @@ SensorThings example schemas, so there is something to explore immediately.
 ### Why the port overrides
 
 The Admin UI's [application.yml](../../model-forge/model-forge-admin-ui/src/main/resources/application.yml)
-defaults to port `8090` and database `localhost:5432` — fine when run in
-isolation, but both collide with the main stack when run together for this
-demo:
+defaults to port `8092` and datasource `localhost:5432/portal_backend` (user
+`admin`/`admin`) — exactly what the container from Step 1 uses. Running a *second*
+instance by hand alongside that container therefore needs a port override:
 
 | Port | Main stack | Admin UI default | Conflict |
 |------|------------|-------------------|----------|
-| `5432` | PostgreSQL (portal-backend's DB) | Admin UI's own DB | Yes → compose here uses `5439` instead |
-| `5433` | PostgreSQL (Keycloak's DB) | — | Would also collide; hence `5439`, not `5433` |
-| `8090` | Kafka UI | Admin UI web app | Yes → override with `SERVER_PORT=8093` |
+| `5432` | PostgreSQL (portal-backend's DB) | the Admin UI's default datasource | No — that is the intended target |
+| `5433` | PostgreSQL (Keycloak's DB) | — | Would collide with a standalone DB; hence `5439` |
+| `8090` | Kafka UI | — | — |
+| `8092` | Model Forge Admin UI container (Step 1) | Admin UI web app | Yes → override with `SERVER_PORT=8093` |
 
-If you only ever run the Admin UI on its own (Step 1 stopped), the defaults
-(`8090` / `5432`, no env overrides, `docker-compose.yml` in
-[../../model-forge/model-forge-admin-ui/](../../model-forge/model-forge-admin-ui/))
-work fine too — the port shift above is only needed for running both stacks
-side by side, which is what this guide is about.
+The shipped defaults describe **local-demo mode**: the `portal_backend` database with
+`admin`/`admin`. They do *not* match this module's own
+[docker-compose.yml](../../model-forge/model-forge-admin-ui/docker-compose.yml), which
+creates database `model_forge_admin` with user `model_forge` — that compose (a duplicate of
+this folder's, same container name and host port `5439`) belongs to **standalone mode**, so
+starting it without also passing the `SPRING_DATASOURCE_*` overrides from the section above
+leaves the Admin UI pointed at `portal_backend` and the new database unused.
 
 ## Key URLs (combined)
 
@@ -147,8 +150,8 @@ this folder shows `model-forge-admin-postgres` as healthy, and that
 `docker-compose.yml` (`5439` by default).
 
 **Admin UI won't bind its port** — something is already on `8093`, or you forgot
-`SERVER_PORT` and it collided with Kafka UI on `8090`. The main stack also already
-publishes `8089`, `8091` and `8092`, so pick a port outside that set.
+`SERVER_PORT` and it collided with the Step 1 container on its default `8092`. The main
+stack also already publishes `8089`, `8090` and `8091`, so pick a port outside that set.
 
 **Admin UI is empty** — expected on a fresh stack. It points at portal-backend's
 database, but portal-backend does not write to Model Forge yet, so the registry only

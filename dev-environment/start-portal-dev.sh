@@ -829,8 +829,9 @@ docker rm -f civitas-portal-backend 2>/dev/null || true
 docker rm -f civitas-portal-frontend 2>/dev/null || true
 sleep 1
 
-# Now kill any remaining non-Docker processes on these ports
-for port in 8088 8089 3000; do
+# Now kill any remaining non-Docker processes on these ports (8092 = Model Forge Admin UI,
+# which local-demo.md/vertical-slice.sh also run by hand outside Docker)
+for port in 8088 8089 3000 8092; do
     if [ "$OS_TYPE" = "Darwin" ]; then
         pid=$(lsof -ti :"$port" 2>/dev/null | head -1)
     else
@@ -881,6 +882,20 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
             exit 1
         fi
         echo "  Model Forge built"
+    fi
+
+    # --skip-build never runs the Model Forge build, but the Admin UI image copies the fat JAR
+    # straight out of target/. With no JAR the image build fails with a confusing COPY error, so
+    # fail here with the actionable message instead.
+    if [ "$SKIP_BUILD" = "true" ] && [ "$START_ADMIN_UI" = "true" ]; then
+        ADMIN_UI_TARGET="$SCRIPT_DIR/../model-forge/model-forge-admin-ui/target"
+        if ! ls "$ADMIN_UI_TARGET"/core-model-forge-admin-ui-*[0-9T].jar >/dev/null 2>&1; then
+            echo "ERROR: --skip-build was passed but no Admin UI JAR exists in"
+            echo "       model-forge/model-forge-admin-ui/target/"
+            echo "       Run once without --skip-build, or start with --no-admin-ui."
+            exit 1
+        fi
+        echo "  (--skip-build) Admin UI JAR present — note it may be STALE; drop --skip-build to rebuild"
     fi
 
     # Portal Backend JAR (needed by portal-backend Dockerfile)
@@ -1185,6 +1200,26 @@ if [ "$backend_option" = "1" ]; then
     if [ "$BACKEND_READY" = false ]; then
         echo "  WARNING: Portal Backend may not be ready yet (timeout after 180s)"
         echo "           Check: docker compose -f apps/docker-compose.yml logs portal-backend"
+    fi
+    echo
+fi
+
+# The Admin UI logs "Started AdminUiApplication" BEFORE its graph warmup runs, so a failed
+# start still looks successful in the log — probe the port instead of trusting the log line.
+if [ "$START_ADMIN_UI" = "true" ]; then
+    echo "Waiting for Model Forge Admin UI to be healthy..."
+    ADMIN_UI_READY=false
+    for i in $(seq 1 60); do
+        if curl -s -f "http://localhost:8092/" >/dev/null 2>&1; then
+            echo "  Model Forge Admin UI is ready"
+            ADMIN_UI_READY=true
+            break
+        fi
+        sleep 2
+    done
+    if [ "$ADMIN_UI_READY" = false ]; then
+        echo "  WARNING: Model Forge Admin UI may not be ready yet (timeout after 120s)"
+        echo "           Check: docker compose -f apps/docker-compose.yml logs model-forge-admin-ui"
     fi
     echo
 fi

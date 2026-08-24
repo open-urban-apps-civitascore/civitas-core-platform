@@ -186,8 +186,9 @@ services:
       start_period: 30s
 
   # Model Forge Admin UI — registry console (Wicket + Spring Boot). Standalone app (not embedded in
-  # portal-backend); points at portal-backend's DB (the model_forge schema) so it shows exactly what
-  # the platform created. Started by start-portal-dev.sh unless --no-admin-ui.
+  # portal-backend); points at portal-backend's DB and creates/owns the model_forge schema there.
+  # portal-backend does not write to that registry yet, so on a fresh stack the console is empty and
+  # shows only what you create through its pages. Started by start-portal-dev.sh unless --no-admin-ui.
   model-forge-admin-ui:
     build:
       context: ../../model-forge/model-forge-admin-ui
