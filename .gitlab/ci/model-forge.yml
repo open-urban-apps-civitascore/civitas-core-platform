@@ -72,7 +72,10 @@ generate-graph-model-forge:
       - model-forge/maven.graph.json
       - model-forge/*/maven.graph.json
 
-# Validate the CORE-IR JSON Schemas against the JSON Schema metaschema.
+# Validate the CORE-IR JSON Schemas against the JSON Schema metaschema, and every document in
+# the model-forge/schemas catalogue against the CORE schema it declares. Nothing in the Maven
+# build consumes that catalogue, so without the second step a demo/use-case document can drift
+# out of the CORE contract unnoticed and only fail when a host imports it.
 # (The docs-drift half of the original job is dropped — the docs schema copies now live
 #  in the documentation repo.)
 validate-schemas-model-forge:
@@ -83,11 +86,83 @@ validate-schemas-model-forge:
   script:
     - pip install --quiet check-jsonschema
     - |
+      CORE_DIR=model-forge/model-forge-runtime/src/main/resources
+      CATALOGUE=model-forge/schemas
       FAILED=0
-      for f in model-forge/model-forge-runtime/src/main/resources/*.schema.json; do
+
+      # 1. The CORE-IR meta-schemas themselves must be well-formed JSON Schema 2020-12 documents.
+      for f in "$CORE_DIR"/*.schema.json; do
+        [ -f "$f" ] || continue
         echo "Validating $f ..."
         check-jsonschema --check-metaschema "$f" || FAILED=1
       done
+
+      # 2. Resolve each catalogue document to the CORE schema its own "$schema" declares. Emits
+      #    "<core schema file> <document>" per line; "METASCHEMA" for plain JSON Schema element
+      #    documents, "PARSE_ERROR" for malformed JSON. Documents without a "$schema" (fixture
+      #    seed data) are not emitted and therefore not validated.
+      cat > /tmp/resolve-core-schema.py <<'PY'
+      import json
+      import sys
+      from pathlib import Path
+
+      CORE_MAP = {
+          "https://civitasconnect.digital/core/datasource/v1": "datasource.schema.json",
+          "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource": "datasource.schema.json",
+          "https://civitasconnect.digital/core/datasink/v1": "datasink.schema.json",
+          "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSink": "datasink.schema.json",
+          "https://civitasconnect.digital/core/mapping/v1": "mapping.schema.json",
+          "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping": "mapping.schema.json",
+          "https://civitasconnect.digital/core/pipeline/v1": "pipeline.schema.json",
+          "https://civitasconnect.digital/core-dataset/v1#/$defs/Pipeline": "pipeline.schema.json",
+          "https://civitasconnect.digital/core-dataset/v1": "dataset.schema.json",
+          "https://civitasconnect.digital/core-datastructure/v1": "datastructure.schema.json",
+          "https://civitasconnect.digital/core/artifact-envelope/v1": "artifact-envelope.schema.json",
+      }
+      METASCHEMAS = {
+          "https://json-schema.org/draft/2020-12/schema",
+          "http://json-schema.org/draft/2020-12/schema",
+      }
+
+      for path in sorted(Path(sys.argv[1]).rglob("*.json")):
+          try:
+              document = json.loads(path.read_text(encoding="utf-8"))
+          except json.JSONDecodeError:
+              print(f"PARSE_ERROR {path}")
+              continue
+          declared = document.get("$schema") if isinstance(document, dict) else None
+          if declared in CORE_MAP:
+              print(f"{CORE_MAP[declared]} {path}")
+          elif declared in METASCHEMAS:
+              print(f"METASCHEMA {path}")
+      PY
+
+      # 3. Validate every resolved document. The directory check keeps the job green if the
+      #    catalogue is ever moved, and the per-file check keeps a stale manifest entry from
+      #    being handed to the validator as a filename.
+      if [ -d "$CATALOGUE" ]; then
+        python3 /tmp/resolve-core-schema.py "$CATALOGUE" > /tmp/core-documents.txt
+        while read -r schema doc; do
+          [ -f "$doc" ] || continue
+          case "$schema" in
+            PARSE_ERROR)
+              echo "Not valid JSON: $doc"
+              FAILED=1
+              ;;
+            METASCHEMA)
+              echo "Validating $doc ..."
+              check-jsonschema --check-metaschema "$doc" || FAILED=1
+              ;;
+            *)
+              echo "Validating $doc against $schema ..."
+              check-jsonschema --schemafile "$CORE_DIR/$schema" "$doc" || FAILED=1
+              ;;
+          esac
+        done < /tmp/core-documents.txt
+      else
+        echo "No $CATALOGUE directory — skipping catalogue validation."
+      fi
+
       exit $FAILED
 
 # Build + test the whole reactor. `mvn verify` also runs the quality gates bound to the
