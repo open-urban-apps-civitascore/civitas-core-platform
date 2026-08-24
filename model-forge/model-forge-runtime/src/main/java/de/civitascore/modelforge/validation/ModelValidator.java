@@ -2,6 +2,7 @@ package de.civitascore.modelforge.validation;
 
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SchemaValidatorsConfig;
 import com.networknt.schema.ValidationMessage;
 import de.civitascore.modelforge.contract.Diagnostic;
 import de.civitascore.modelforge.contract.DiagnosticSeverity;
@@ -13,7 +14,9 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Validates JSON documents against JSON Schema 2020-12.
@@ -33,6 +36,15 @@ public class ModelValidator {
     private final JsonSchemaFactory schemaRegistry = CoreJsonSchemaFactory.withCoreAnnotations();
 
     /**
+     * Pins the validator's message locale. Instance-validation messages come from the library's
+     * resource bundles, which resolve against the JVM default locale, while this class's own
+     * diagnostics are hardcoded English — so without pinning, one response could mix languages
+     * depending on the host's locale.
+     */
+    private final SchemaValidatorsConfig config =
+        SchemaValidatorsConfig.builder().locale(Locale.ENGLISH).build();
+
+    /**
      * Validate {@code data} against {@code schema}.
      *
      * @return empty list if valid; one {@link Diagnostic} per violation otherwise
@@ -43,7 +55,7 @@ public class ModelValidator {
             // neutralise them first (mirroring validateSchema) so the validator does not try
             // to dereference urn:core:... and fail every conforming instance with a
             // "validator-error". The dependency graph owns urn-ref existence, not validation.
-            JsonSchema jsonSchema = schemaRegistry.getSchema(JacksonBridge.toJackson2(neutralizeCoreUrnRefs(schema)));
+            JsonSchema jsonSchema = schemaRegistry.getSchema(JacksonBridge.toJackson2(neutralizeCoreUrnRefs(schema)), config);
             List<ValidationMessage> errors = jsonSchema.validate(JacksonBridge.toJackson2(data)).stream().toList();
             return errors.stream()
                 .map(e -> SchemaErrors.toDiagnostic(e, "validation"))
@@ -75,8 +87,14 @@ public class ModelValidator {
      * @return empty list if valid; a single error diagnostic if parsing fails
      */
     public List<Diagnostic> validateSchema(JsonNode schema) {
+        // Check local pointers ourselves first. The library reports a dangling $ref only through a
+        // thrown fault, which the catch below has to reduce to a generic message so no third-party
+        // detail escapes — leaving the author with no idea which pointer is wrong. This check is
+        // first-party, so it can name the pointer and its location safely.
+        List<Diagnostic> dangling = danglingLocalRefs(schema);
+        if (!dangling.isEmpty()) return dangling;
         try {
-            schemaRegistry.getSchema(JacksonBridge.toJackson2(neutralizeCoreUrnRefs(schema))).initializeValidators();
+            schemaRegistry.getSchema(JacksonBridge.toJackson2(neutralizeCoreUrnRefs(schema)), config).initializeValidators();
             return List.of();
         } catch (StackOverflowError e) {
             return List.of(new Diagnostic(DiagnosticSeverity.ERROR,
@@ -88,6 +106,43 @@ public class ModelValidator {
             log.warn("Invalid JSON Schema submitted for parsing", e);
             return List.of(new Diagnostic(DiagnosticSeverity.ERROR, "Invalid JSON Schema", "schema-parse", null));
         }
+    }
+
+    /**
+     * One diagnostic per local {@code $ref} whose JSON Pointer does not resolve within the document,
+     * each naming the offending pointer and the path it sits at. A {@code $ref} of {@code "#"} is
+     * the document root and always resolves; CORE-URN refs are not local and are out of scope here.
+     */
+    private static List<Diagnostic> danglingLocalRefs(JsonNode root) {
+        List<Diagnostic> out = new ArrayList<>();
+        collectDanglingRefs(root, root, "$", out);
+        return out;
+    }
+
+    private static void collectDanglingRefs(
+            JsonNode root, JsonNode node, String path, List<Diagnostic> out) {
+        if (node == null) return;
+        if (node.isArray()) {
+            int i = 0;
+            for (JsonNode child : node) {
+                collectDanglingRefs(root, child, path + "[" + i++ + "]", out);
+            }
+            return;
+        }
+        if (!node.isObject()) return;
+        node.properties().forEach(e -> {
+            JsonNode value = e.getValue();
+            if ("$ref".equals(e.getKey()) && value.isTextual() && value.asText().startsWith("#")) {
+                String ref = value.asText();
+                String pointer = ref.substring(1);
+                if (!pointer.isEmpty() && root.at(pointer).isMissingNode()) {
+                    out.add(new Diagnostic(DiagnosticSeverity.ERROR,
+                        "Unresolved local $ref '" + ref + "'", "schema-parse", path));
+                }
+            } else {
+                collectDanglingRefs(root, value, path + "." + e.getKey(), out);
+            }
+        });
     }
 
     /**

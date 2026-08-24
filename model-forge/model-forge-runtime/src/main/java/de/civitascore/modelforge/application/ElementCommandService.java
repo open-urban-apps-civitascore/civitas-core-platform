@@ -47,6 +47,13 @@ public class ElementCommandService {
      *     itself, so no read-back is needed
      */
     public String storeJsonSchema(String urn, JsonNode schema, VersionBump bump) {
+        // A JSON Schema document is an object. Nothing upstream enforces that — saveArtifact routes
+        // ELEMENT on isTextual() alone and the CORE validator has no ELEMENT schema — so an array or
+        // scalar would otherwise reach the cast below and surface as a 500 instead of a rejection.
+        if (schema == null || !schema.isObject()) {
+            throw new IllegalArgumentException(
+                "A JSON Schema Element must be a JSON object: " + urn);
+        }
         ObjectNode updated = (ObjectNode) schema.deepCopy();
         String existingId = updated.path("$id").asText(null);
         if (!UrnParser.isUrn(existingId)) updated.put("$id", urn);
