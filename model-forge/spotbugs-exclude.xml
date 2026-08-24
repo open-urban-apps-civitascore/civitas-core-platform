@@ -18,7 +18,7 @@
     accessors/constructors would add cost and noise for no benefit.
   -->
   <Match>
-    <Class name="~de\.civitascore\.modelforge\.(domain|dto|application)\..*"/>
+    <Class name="~de\.civitascore\.modelforge\.(domain|application)\..*"/>
     <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
   </Match>
 
@@ -34,15 +34,15 @@
 
   <!--
     EI_EXPOSE_REP2 on constructors of Spring beans (@Service / @Component) and the
-    core.facade adapters the starter's auto-configuration wires by hand (e.g.
-    DefaultModelForge storing its ModelForgeOperations port). These constructors
-    store constructor-injected collaborators: other Spring singletons plus shared
+    facade implementation the starter's auto-configuration wires by hand (e.g.
+    EmbeddedModelForgeOperations storing its ports). These constructors store
+    constructor-injected collaborators: other Spring singletons plus shared
     infrastructure such as ObjectMapper and ArtifactRegistry. Spring/the
     auto-configuration owns these singletons' lifecycle; defensive-copying an
     injected bean or port is neither possible nor desirable.
   -->
   <Match>
-    <Class name="~de\.civitascore\.modelforge\.(application|graph|validation|xsd|store|persistence\.postgres|core\.facade|integrations(\.xrepository)?)\..*"/>
+    <Class name="~de\.civitascore\.modelforge\.(application|graph|validation|xsd|persistence\.postgres|integrations(\.xrepository)?)\..*"/>
     <Method name="&lt;init&gt;"/>
     <Bug pattern="EI_EXPOSE_REP2"/>
   </Match>

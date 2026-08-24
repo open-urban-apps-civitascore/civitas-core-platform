@@ -9,7 +9,7 @@
 [![Release](https://gitlab.com/kernblick_oss/civitas-core/model-forge/-/badges/release.svg)](https://gitlab.com/kernblick_oss/civitas-core/model-forge/-/releases)
 [![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL_1.2-blue.svg)](LICENSE)
 [![Java 25](https://img.shields.io/badge/Java-25-orange.svg)](https://adoptium.net/)
-[![Spring Boot 4.0](https://img.shields.io/badge/Spring%20Boot-4.0-6DB33F.svg)](https://spring.io/projects/spring-boot)
+[![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F.svg)](https://spring.io/projects/spring-boot)
 [![JSON Schema 2020-12](https://img.shields.io/badge/JSON_Schema-2020--12-blue.svg)](https://json-schema.org/draft/2020-12)
 [![SBOM: CycloneDX](https://img.shields.io/badge/SBOM-CycloneDX-4DB6AC.svg)](https://gitlab.com/kernblick_oss/civitas-core/model-forge/-/dependencies)
 
@@ -106,11 +106,11 @@ host write and the registry write).
 
 ## Local Build
 
-From the repository root:
+There is no root `pom.xml` in this repository — run Maven from `model-forge/`:
 
-```powershell
-.\mvnw.cmd test
-.\mvnw.cmd verify
+```bash
+mvn test
+mvn verify
 ```
 
 The TypeScript/Zod CORE types are generated in the frontend directly from these runtime JSON
@@ -133,9 +133,8 @@ The directories intended to move 1:1 into `civitas-core-platform` are:
 developer/debug UI that consumes the library through the public facade, like
 any other host application.
 
-`docs` is kept as a hand-off archive for the existing documentation plus
-schema and use-case examples under `docs/schemas`. It is not part of
-the embedded runtime move set.
+Schema and use-case examples are kept under `model-forge/schemas/`. They are
+not part of the embedded runtime move set.
 
 The remaining root-level build/release scaffolding should be replaced by the
 monorepo's own build, CI and documentation structure.

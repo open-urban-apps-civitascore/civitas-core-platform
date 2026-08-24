@@ -70,9 +70,7 @@
                 <bannedDependencies>
                   <searchTransitive>false</searchTransitive>
                   <excludes>
-                    <exclude>de.civitascore:core-model-forge-core</exclude>
-                    <exclude>de.civitascore:core-model-forge-application</exclude>
-                    <exclude>de.civitascore:core-model-forge-persistence-postgres</exclude>
+                    <exclude>de.civitascore:core-model-forge-runtime</exclude>
                     <exclude>de.civitascore:core-model-forge-spring-boot-starter</exclude>
                     <exclude>org.springframework:spring-jdbc</exclude>
                     <exclude>org.flywaydb:*</exclude>

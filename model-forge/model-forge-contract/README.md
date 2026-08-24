@@ -11,8 +11,9 @@ contract.
 
 | Package | Contents |
 |---------|----------|
-| `de.civitascore.modelforge.domain` | CORE domain records: `DataSetDto`, `ElementDto`, `DataSourceDto`, `DataSinkDto`, `MappingDto`, `PipelineDto`, `DataStructureDto` and the generic `Envelope<T>` wrapper |
-| `de.civitascore.modelforge.dto` | Internal diagnostic result records shared by the validation and application layers: `DiagnosticDto`, `ValidationResultDto` |
+| `de.civitascore.modelforge.contract` | Commands, queries, results and exceptions: `CreateArtifactCommand`, `SaveArtifactCommand`, `ImportSchemaCommand`, `ArtifactId`, `ArtifactKind`, `ArtifactView`, `ArtifactWriteResult`, `ValidationResult`, `Diagnostic`, … |
+| `de.civitascore.modelforge.facade` | `ModelForge`, the embedded facade interface a host calls |
+| `de.civitascore.modelforge.domain` | `Formats`, the shared format and content-type tokens |
 | `de.civitascore.modelforge.urn` | `UrnParser`, a stateless helper for parsing CORE URNs |
 
 The jar intentionally does not contain controllers, services, persistence code,
@@ -25,13 +26,13 @@ Spring Boot configuration, an HTTP transport client or TypeScript types.
 
 Runtime dependencies for consumers are limited to:
 
-- `com.fasterxml.jackson.core:jackson-databind`
+- `tools.jackson.core:jackson-databind` (Jackson 3)
 
 No Spring Boot runtime is required by this module.
 
 ## Local Build
 
-From the repository root:
+There is no root `pom.xml` in this repository — run Maven from `model-forge/`:
 
 ```bash
 mvn -pl model-forge-contract -am test
@@ -112,60 +113,57 @@ dependencies {
 Build an embedded facade command:
 
 ```java
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 ObjectMapper objectMapper = new ObjectMapper();
 JsonNode schema = objectMapper.readTree("""
     {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+      "$id": "urn:core:platform:civitas:element:common:GeoPoint:k3f9a2b7qx:1.0.0",
       "title": "GeoPoint",
       "type": "object"
     }
     """);
 
-var command = new ImportSchemaCommand(schema, "default");
+var command = new ImportSchemaCommand(schema);
 ```
 
-Use the shared domain records:
+Create a new artifact — the caller supplies only a display name; Model Forge mints the URN
+and the version and returns the versioned pin in `ArtifactWriteResult.artifactId()`:
 
 ```java
-import de.civitascore.modelforge.domain.DataSetDto;
-import java.util.List;
+import de.civitascore.modelforge.contract.ArtifactKind;
+import de.civitascore.modelforge.contract.CreateArtifactCommand;
 
-var dataSet = new DataSetDto(
-    "urn:core:platform:civitas:dataset:common:Default:1.0.0",
-    "Default",
-    null,
-    "1.0.0",
-    List.of(),
-    List.of(),
-    List.of(),
-    List.of(),
-    List.of()
-);
+var command = new CreateArtifactCommand(ArtifactKind.DATA_SET, "Air Quality", content);
 ```
 
-Parse CORE URNs without Spring:
+Take an `ArtifactId` apart, or parse CORE URNs directly, without Spring:
 
 ```java
+import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.urn.UrnParser;
 
-String urn = "urn:core:platform:civitas:element:common:GeoPoint:1.0.0";
+var id = new ArtifactId("urn:core:platform:civitas:element:common:GeoPoint:k3f9a2b7qx:1.0.0");
 
-String name = UrnParser.nameFromUrn(urn);       // "GeoPoint"
-String version = UrnParser.versionFromUrn(urn); // "1.0.0"
-String logical = UrnParser.logicalUrn(urn);     // "urn:core:platform:civitas:element:common:GeoPoint"
+id.name();       // "GeoPoint"
+id.version();    // "1.0.0"
+id.logicalUrn(); // "urn:core:platform:civitas:element:common:GeoPoint:k3f9a2b7qx"
+
+String version = UrnParser.versionFromUrn(id.logicalUrn()); // null — logical URNs carry no version
 ```
+
+A CORE URN has eight colon-separated segments in its logical form
+(`urn:core:<scope>:<owner>:<type>:<domain>:<name>:<disambiguator>`) and nine when a version is
+pinned. `versionFromUrn` returns `null` for the logical form.
 
 ## Versioning
 
-The repository uses semantic-release for release management (see
-[`.releaserc.json`](../.releaserc.json) and the CI/CD docs). Until a release tag
-is published, consumers should use the current snapshot version:
-`0.1.0-SNAPSHOT`.
+The mono-repo owns the release process; this module does not use semantic-release.
+Until a release tag is published, consumers should use the current snapshot
+version: `0.1.0-SNAPSHOT`.
 
 Breaking changes to public records or utility method behavior require a major
 version bump once the project leaves the initial `0.x` phase.

@@ -12,9 +12,11 @@ import org.springframework.context.annotation.Configuration;
  * fresh admin-ui has a real, cross-referenced model to explore. Delegates to {@link SeedImporter},
  * the same logic the {@code SeedPage} UI uses.
  *
- * <p>Enabled with {@code model-forge.admin-ui.seed.enabled=true} (the default in the admin-ui's
- * {@code application.yml}). Idempotent: an Element whose logical URN already resolves is skipped, and
- * a single failed import is logged without aborting startup.
+ * <p>Enabled with {@code model-forge.admin-ui.seed.enabled=true}. The admin-ui's
+ * {@code application.yml} deliberately defaults it to {@code false}, so pointing the UI at
+ * portal-backend's registry never seeds the bundled examples into it; turn it on only for a
+ * standalone instance with its own database. Idempotent: an Element whose logical URN already
+ * resolves is skipped, and a single failed import is logged without aborting startup.
  */
 @Configuration
 public class StaSeedConfiguration {
