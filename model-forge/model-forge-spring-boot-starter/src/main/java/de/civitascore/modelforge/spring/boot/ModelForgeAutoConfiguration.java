@@ -333,6 +333,12 @@ public class ModelForgeAutoConfiguration {
             .table(registry.migrationTable())
             .locations("classpath:db/model-forge/migration")
             .baselineOnMigrate(true)
+            // Baseline at the first migration's own version, mirroring portal-backend
+            // (baseline-version: 1.0.0 against its V1_0_0__baseline.sql). baselineOnMigrate only
+            // fires for a schema that exists and is NON-empty without a history table, i.e. one
+            // whose tables are already present — and V1's CREATE TABLE statements are not
+            // idempotent, so re-running it there would fail. Baselining at 1 skips it correctly.
+            .baselineVersion("1")
             .load();
     }
 
