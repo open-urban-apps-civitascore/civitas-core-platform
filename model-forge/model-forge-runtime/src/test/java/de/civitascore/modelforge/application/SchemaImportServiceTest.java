@@ -18,8 +18,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -50,6 +52,7 @@ class SchemaImportServiceTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private ArtifactRegistry registry;
+    private RemoteSchemaRepository remoteFetcher;
     private DependencyGraphService graph;
     private SchemaImportService svc;
 
@@ -57,13 +60,16 @@ class SchemaImportServiceTest {
     void setUp() {
         registry = mock(ArtifactRegistry.class);
         when(registry.resolveReference(anyString())).thenReturn(Optional.empty());
+        // A mock does not run the interface's default methods, so the transaction seam has to be
+        // stubbed to actually execute the work — otherwise the whole import silently stores nothing.
+        when(registry.inTransaction(any())).thenAnswer(call -> call.getArgument(0, Supplier.class).get());
         ModelValidator validator = mock(ModelValidator.class);
         when(validator.validateSchema(any())).thenReturn(List.of());
         UrnService urns = new UrnService("platform", "civitas", "common", "1.0.0");
         SchemaRefExtractor refExtractor = new SchemaRefExtractor();
         graph = new DependencyGraphService(registry);
         ReferenceExistenceValidator refExistence = new ReferenceExistenceValidator(registry, refExtractor);
-        RemoteSchemaRepository remoteFetcher = mock(RemoteSchemaRepository.class);
+        remoteFetcher = mock(RemoteSchemaRepository.class);
         svc = new SchemaImportService(validator, mapper, registry,
                 urns, refExtractor, graph, refExistence, remoteFetcher,
                 new CoreSchemaValidator(mapper));
@@ -554,5 +560,108 @@ class SchemaImportServiceTest {
         verify(registry).storeDataStructure(anyString(), manifest.capture());
         assertThat(manifest.getValue().path("$defs").toString())
             .contains(urnOf(stored, "Alpha"), urnOf(stored, "Beta"));
+    }
+
+    // ── Derived identity for externally-identified imports ──────────────────────
+
+    @Test
+    void keyedImport_derivesTheSameUrnForTheSameUpstreamKey() {
+        String url = "https://raw.githubusercontent.com/x/schema.json";
+        when(remoteFetcher.fetchJson(url)).thenReturn(mapper.readTree("""
+            { "title": "WeatherObserved", "type": "object",
+              "properties": { "temperature": {"type": "number"} } }
+            """));
+
+        String first = importedRootUrn(url, "smart-data-models:Weather/WeatherObserved");
+        clearInvocations(registry);
+        String second = importedRootUrn(url, "smart-data-models:Weather/WeatherObserved");
+
+        // Same upstream key → same logical URN, so the registry versions the artifact instead of
+        // creating an unrelated duplicate. A random disambiguator could never do this.
+        assertThat(UrnParser.logicalUrn(second)).isEqualTo(UrnParser.logicalUrn(first));
+    }
+
+    @Test
+    void keyedImport_keepsDifferentUpstreamsApartDespiteTheSameEntityName() {
+        String url = "https://raw.githubusercontent.com/x/schema.json";
+        when(remoteFetcher.fetchJson(url)).thenReturn(mapper.readTree("""
+            { "title": "WeatherObserved", "type": "object" }
+            """));
+
+        String weather = importedRootUrn(url, "smart-data-models:Weather/WeatherObserved");
+        clearInvocations(registry);
+        String environment = importedRootUrn(url, "smart-data-models:Environment/WeatherObserved");
+
+        assertThat(UrnParser.logicalUrn(environment)).isNotEqualTo(UrnParser.logicalUrn(weather));
+    }
+
+    @Test
+    void keyedImport_leavesAnExistingCoreUrnIdentityAlone() {
+        String url = "https://raw.githubusercontent.com/x/schema.json";
+        String ownId = "urn:core:platform:civitas:element:common:Given:abcdefghij:1.0.0";
+        when(remoteFetcher.fetchJson(url)).thenReturn(mapper.readTree("""
+            { "$id": "%s", "title": "Given", "type": "object" }
+            """.formatted(ownId)));
+
+        assertThat(importedRootUrn(url, "smart-data-models:Weather/Given")).isEqualTo(ownId);
+    }
+
+    /** The $id of the first Element the keyed import stored. */
+    private String importedRootUrn(String url, String stableKey) {
+        svc.importFromUrl(url, stableKey);
+        ArgumentCaptor<JsonNode> stored = ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry, atLeastOnce()).storeElement(
+            anyString(), stored.capture(), anySet(), anySet(), nullable(String.class));
+        return stored.getAllValues().getFirst().path("$id").asText(null);
+    }
+
+    // ── Atomicity ───────────────────────────────────────────────────────────────
+
+    @Test
+    void multiElementImport_runsInsideOneRegistryTransaction() {
+        JsonNode schema = mapper.readTree("""
+            { "title": "Bundle",
+              "$defs": { "Alpha": {"type":"object"}, "Beta": {"type":"object"} } }
+            """);
+
+        svc.importSchema(new SchemaImportRequest(schema));
+
+        // One transaction spanning both Elements and the grouping manifest — not one per write.
+        verify(registry).inTransaction(any());
+    }
+
+    @Test
+    void whenALaterElementFails_noGraphNodeIsPublishedForTheEarlierOnes() {
+        DependencyGraphService graphSpy = mock(DependencyGraphService.class);
+        SchemaImportService service = new SchemaImportService(
+            validatorAcceptingEverything(), mapper, registry,
+            new UrnService("platform", "civitas", "common", "1.0.0"),
+            new SchemaRefExtractor(), graphSpy,
+            new ReferenceExistenceValidator(registry, new SchemaRefExtractor()),
+            mock(RemoteSchemaRepository.class), new CoreSchemaValidator(mapper));
+
+        // First Element stores fine; the second is rejected by the registry mid-import.
+        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class)))
+            .thenReturn("urn:core:platform:civitas:element:common:Alpha:aaaaaaaaaa:1.0.0")
+            .thenThrow(new IllegalArgumentException("rejected"));
+
+        JsonNode schema = mapper.readTree("""
+            { "title": "Bundle",
+              "$defs": { "Alpha": {"type":"object"}, "Beta": {"type":"object"} } }
+            """);
+
+        assertThatThrownBy(() -> service.importSchema(new SchemaImportRequest(schema)))
+            .isInstanceOf(IllegalArgumentException.class);
+
+        // The durable write rolls back, and the in-memory graph — which does not roll back — must
+        // therefore never have been touched, or the failed import leaves phantom nodes behind.
+        verify(graphSpy, never()).register(anyString(), anySet());
+        verify(graphSpy, never()).registerFromRegistry(anyString());
+    }
+
+    private ModelValidator validatorAcceptingEverything() {
+        ModelValidator validator = mock(ModelValidator.class);
+        when(validator.validateSchema(any())).thenReturn(List.of());
+        return validator;
     }
 }

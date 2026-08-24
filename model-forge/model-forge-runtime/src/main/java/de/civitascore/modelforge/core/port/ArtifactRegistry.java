@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Core-facing storage boundary for Model Forge artifacts.
@@ -18,6 +19,23 @@ import java.util.Set;
  * write runs inside a surrounding transaction whose effects are not yet visible to other reads.
  */
 public interface ArtifactRegistry {
+
+    /**
+     * Runs {@code work} so that every registry write inside it commits or rolls back together.
+     *
+     * <p>This is the seam that lets an application-layer operation spanning several writes — a
+     * multi-element import, say — be atomic without the application layer depending on a
+     * transaction framework. An implementation that has no transactions (an in-memory test double)
+     * keeps the default, which simply runs the work; a store that does have them overrides it. The
+     * individual write methods join the surrounding transaction rather than opening their own, so
+     * nesting is safe.
+     *
+     * <p>Only durable state is covered. An in-memory projection such as the dependency graph is not
+     * rolled back, so publish to it <em>after</em> this method returns, never inside {@code work}.
+     */
+    default <T> T inTransaction(Supplier<T> work) {
+        return work.get();
+    }
 
     /**
      * Outgoing reference edges of the given artifact version, grouped by stored reference type

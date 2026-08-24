@@ -666,6 +666,16 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     }
 
     /**
+     * Spans one transaction across several writes. The per-write {@link #inTxResult} calls inside
+     * {@code work} use the default {@code REQUIRED} propagation, so they join this transaction
+     * instead of committing individually — which is what makes a multi-write import atomic.
+     */
+    @Override
+    public <T> T inTransaction(Supplier<T> work) {
+        return inTxResult(work);
+    }
+
+    /**
      * Translates a Spring {@link DataAccessException} into the application exception that yields a
      * faithful HTTP status: a data-integrity violation (e.g. a unique/constraint breach) is the
      * caller's fault → {@link IllegalArgumentException} (400); a SQL grammar/programming error is a

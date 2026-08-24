@@ -15,10 +15,11 @@ import java.util.regex.Pattern;
  *   https://raw.githubusercontent.com/smart-data-models/dataModel.<Subject>/master/<DataModel>/schema.json
  * }</pre>
  *
- * <p>The resolved URL is handed to {@link SchemaImportService#importFromUrl} — the same SSRF-checked,
- * no-redirect, server-side fetch the generic import-by-URL endpoint uses (so the browser avoids CORS).
- * This service only constructs and validates the reference; the host is fixed and the path segments
- * are restricted to a safe character set, so a caller cannot redirect the fetch elsewhere.
+ * <p>The resolved URL is handed to {@link SchemaImportService#importFromUrl}, an SSRF-checked,
+ * no-redirect server-side fetch (so the browser avoids CORS). This service only constructs and
+ * validates the reference; the host is fixed and the path segments are restricted to a safe
+ * character set, so a caller cannot redirect the fetch elsewhere. It is currently the only caller
+ * of that fetch — there is no generic import-by-URL surface on the {@code ModelForge} facade.
  */
 public class SmartDataModelsService {
 
@@ -50,7 +51,12 @@ public class SmartDataModelsService {
      * HTTP 400, an unreachable host as HTTP 502.
      */
     public SchemaImportResult importModel(String subject, String dataModel) {
-        return importService.importFromUrl(schemaUrl(subject, dataModel));
+        // (subject, dataModel) is the catalogue's own identifier for the model, so it is a stable
+        // key: re-importing the same model versions the existing artifact instead of duplicating it,
+        // while two subjects sharing an entity name stay distinct.
+        return importService.importFromUrl(
+            schemaUrl(subject, dataModel),
+            "smart-data-models:" + safe(subject, "subject") + "/" + safe(dataModel, "dataModel"));
     }
 
     private static String safe(String segment, String field) {
@@ -61,6 +67,12 @@ public class SmartDataModelsService {
         if (!SAFE_SEGMENT.matcher(trimmed).matches()) {
             throw new IllegalArgumentException(
                 "Smart Data Models '" + field + "' may only contain letters, digits, '.', '-' and '_': " + segment);
+        }
+        // SAFE_SEGMENT admits "." and ".." on its own; URI.create does not normalise, so the origin
+        // would resolve the traversal and serve a different path than the one requested.
+        if (trimmed.equals(".") || trimmed.equals("..")) {
+            throw new IllegalArgumentException(
+                "Smart Data Models '" + field + "' must name a resource, not a relative path: " + segment);
         }
         return trimmed;
     }

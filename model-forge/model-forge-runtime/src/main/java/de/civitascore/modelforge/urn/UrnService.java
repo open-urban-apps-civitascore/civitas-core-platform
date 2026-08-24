@@ -94,6 +94,11 @@ public class UrnService {
         return build("element", name, disambiguator, version);
     }
 
+    /** As {@link #element(String, String, String)} at the configured default version. */
+    public String element(String name, String disambiguator) {
+        return build("element", name, disambiguator, defaultVersion);
+    }
+
     public String dataStructure(String name, String disambiguator) {
         return build("datastructure", name, disambiguator, defaultVersion);
     }

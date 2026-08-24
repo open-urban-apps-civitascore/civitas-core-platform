@@ -129,11 +129,18 @@ public class SchemaImportService {
         // element's pin (first entry, by construction) is carried through so the facade can
         // return it — and every sibling Element's pin, for importedResourceIds — verbatim,
         // without any read-back.
-        List<String> pins = storeElementsInRegistry(elements, explicitVersion);
-        String dataStructurePin = null;
-        if (dataStructure != null) {
-            dataStructurePin = storeDataStructureManifest(dataStructure);
-        }
+        // One transaction for the whole import: every Element plus the grouping manifest commit
+        // together, so a member rejected mid-way cannot leave its predecessors persisted and
+        // ungrouped — an orphan set no re-run could repair, because the write is idempotent per URN.
+        List<String> pins = new ArrayList<>();
+        List<PendingGraphNode> pendingNodes = new ArrayList<>();
+        String dataStructurePin = registry.inTransaction(() -> {
+            pins.addAll(storeElementsInRegistry(elements, explicitVersion, pendingNodes));
+            return dataStructure != null ? storeDataStructureManifest(dataStructure, pendingNodes) : null;
+        });
+        // The dependency graph is in-memory and is not rolled back, so it is published only once the
+        // durable write has committed — otherwise a rolled-back import leaves phantom nodes behind.
+        pendingNodes.forEach(node -> node.publish(graph));
 
         // For a folded datastructure-root the DataStructure IS the model, so its pin is the root
         // (→ version.model_urn); otherwise the root Element's pin (first entry) is the root, as before.
@@ -197,11 +204,49 @@ public class SchemaImportService {
     }
 
     /**
-     * Fetches a JSON Schema from a public {@code url} server-side (so the browser avoids CORS,
-     * e.g. importing from smartdatamodels.org or a raw GitHub URL) and imports it. The URL is
-     * SSRF-checked and fetched without following redirects; a malformed body or unsafe URL
-     * surfaces as HTTP 400, an unreachable host as HTTP 502.
+     * Fetches a JSON Schema from a public {@code url} server-side (so the browser avoids CORS) and
+     * imports it. The URL is SSRF-checked and fetched without following redirects; a malformed body
+     * or unsafe URL surfaces as HTTP 400, an unreachable host as HTTP 502.
+     *
+     * <p><strong>Callers must supply a host they control.</strong> The SSRF check resolves the host
+     * once, and the HTTP client resolves it again on connect, so an untrusted hostname can still be
+     * rebound between the two. Today the only caller is {@code SmartDataModelsService}, which
+     * substitutes character-restricted path segments into a fixed host. Accepting a caller-supplied
+     * hostname here needs connection-level pinning first — see {@code RemoteSchemaFetcher}.
      */
+    /**
+     * As {@link #importFromUrl(String)}, but derives the imported artifact's identity from
+     * {@code stableKey} — the upstream's own identifier — instead of minting a random
+     * disambiguator. Re-importing the same upstream artifact therefore resolves to the same logical
+     * URN, so the registry either recognises it as unchanged or versions it, rather than creating a
+     * duplicate. Same reasoning as the xRepository import, which derives from the standard's
+     * identifier.
+     *
+     * <p>Only the document's own identity is derived. A {@code $defs} member still mints randomly,
+     * so a document with members is idempotent at the root and the grouping but not per member.
+     *
+     * @param stableKey an identifier that names the same upstream artifact across imports and is
+     *     unique across upstreams — include the source, e.g. {@code smart-data-models:Weather/…}
+     */
+    public SchemaImportResult importFromUrl(String url, String stableKey) {
+        JsonNode schema = remoteFetcher.fetchJson(url);
+        return importSchema(new SchemaImportRequest(stampDerivedId(schema, stableKey)));
+    }
+
+    /**
+     * Stamps a deterministic CORE URN as the document's {@code $id} so the import treats it as an
+     * authoritative identity. A document that already carries a CORE URN keeps it — the caller's
+     * identity wins over a derived one.
+     */
+    private JsonNode stampDerivedId(JsonNode schema, String stableKey) {
+        if (schema == null || !schema.isObject()) return schema;
+        if (UrnParser.isUrn(schema.path("$id").asText(null))) return schema;
+        String name = sanitizeId(schema.path("title").asText(null), sanitizeId(stableKey, "element"));
+        ObjectNode copy = (ObjectNode) schema.deepCopy();
+        copy.put("$id", urns.element(name, urns.disambiguatorFor(stableKey)));
+        return copy;
+    }
+
     public SchemaImportResult importFromUrl(String url) {
         JsonNode schema = remoteFetcher.fetchJson(url);
         return importSchema(new SchemaImportRequest(schema));
@@ -514,7 +559,8 @@ public class SchemaImportService {
      *     {@link ArtifactRegistry#storeElement}'s equivalent parameter. Applied uniformly to every
      *     Element this import produces, matching the "one document, one version" mental model.
      */
-    private List<String> storeElementsInRegistry(ObjectNode elements, String explicitVersion) {
+    private List<String> storeElementsInRegistry(
+            ObjectNode elements, String explicitVersion, List<PendingGraphNode> pendingNodes) {
         List<String> pins = new ArrayList<>();
         elements.properties().forEach(e -> {
             JsonNode schema  = e.getValue();
@@ -535,9 +581,40 @@ public class SchemaImportService {
             pins.add(resolvedPin);
             Set<String> allEdges = new LinkedHashSet<>(refs);
             allEdges.addAll(associations);
-            graph.register(resolvedPin, allEdges);
+            pendingNodes.add(PendingGraphNode.edges(resolvedPin, allEdges));
         });
         return pins;
+    }
+
+    /**
+     * A dependency-graph update that has been persisted but not yet published to the in-memory
+     * index, so the whole import can commit first — see {@link ArtifactRegistry#inTransaction}.
+     */
+    private sealed interface PendingGraphNode {
+
+        void publish(DependencyGraphService graph);
+
+        static PendingGraphNode edges(String pin, Set<String> edges) {
+            return new Edges(pin, edges);
+        }
+
+        static PendingGraphNode fromRegistry(String logicalUrn) {
+            return new FromRegistry(logicalUrn);
+        }
+
+        record Edges(String pin, Set<String> edges) implements PendingGraphNode {
+            @Override
+            public void publish(DependencyGraphService graph) {
+                graph.register(pin, edges);
+            }
+        }
+
+        record FromRegistry(String logicalUrn) implements PendingGraphNode {
+            @Override
+            public void publish(DependencyGraphService graph) {
+                graph.registerFromRegistry(logicalUrn);
+            }
+        }
     }
 
     /**
@@ -560,7 +637,7 @@ public class SchemaImportService {
         return manifest;
     }
 
-    private String storeDataStructureManifest(ObjectNode manifest) {
+    private String storeDataStructureManifest(ObjectNode manifest, List<PendingGraphNode> pendingNodes) {
         // The $defs-library DataStructure identifies itself with the JSON-Schema `$id`; a legacy
         // grouping manifest used `id`. Accept either.
         String idField = manifest.has("$id")
@@ -571,8 +648,9 @@ public class SchemaImportService {
         // Mirror the just-persisted elementRefs edges into the in-memory dependency graph. The
         // registry write alone does not touch the graph, so without this the grouping shows no
         // relations and no graph edges until the next full rebuild() — unlike the createArtifact
-        // write path, which pairs every store with registerFromRegistry().
-        graph.registerFromRegistry(dataStructureLogicalUrn);
+        // write path, which pairs every store with registerFromRegistry(). Queued rather than
+        // applied, so it lands only if the surrounding import commits.
+        pendingNodes.add(PendingGraphNode.fromRegistry(dataStructureLogicalUrn));
         return pin;
     }
 
