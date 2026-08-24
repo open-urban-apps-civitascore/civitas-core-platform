@@ -3,7 +3,6 @@ package de.civitascore.modelforge.integrations;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import de.civitascore.modelforge.core.port.RemoteSchemaRepository;
-import de.civitascore.modelforge.integrations.util.PinnedDnsResolver;
 import de.civitascore.modelforge.integrations.util.UrlGuard;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,15 +14,22 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 
 /**
- * Fetches a JSON document from a client-supplied remote URL for import-by-URL (e.g. Smart Data
- * Models, a raw GitHub URL), so a host application's UI can import a schema without the browser
- * hitting CORS.
+ * Fetches a JSON document over HTTP for the schema-import paths (today only Smart Data Models,
+ * whose host is a compile-time constant), so a host application's UI can import a schema without
+ * the browser hitting CORS.
  *
- * <p>The URL is SSRF-checked and resolved to validated public address(es)
- * ({@link UrlGuard#resolveSafeRemoteUrl}); the connection is then pinned to those addresses
- * ({@link PinnedDnsResolver}) so it cannot be DNS-rebound between the check and the connect, and is
- * fetched with timeouts and without following redirects. The body is size-bounded (streamed with a
- * hard byte cap) and parsed as JSON.
+ * <p>The URL is SSRF-checked against {@link UrlGuard#resolveSafeRemoteUrl} and fetched with
+ * timeouts and without following redirects. The body is size-bounded (streamed with a hard byte
+ * cap) and parsed as JSON.
+ *
+ * <p>The check is defence in depth, not a boundary against an untrusted host: every caller builds
+ * its URL from a fixed or operator-configured host, so nothing here narrows an attacker-chosen
+ * target. Note in particular that the host is resolved once for the check and again by
+ * {@link HttpClient} on connect, so a caller that <em>did</em> accept an untrusted hostname would
+ * still be open to DNS rebinding between the two. Closing that window needs connection-level
+ * control of the target address, which {@link HttpClient} does not expose — it would mean driving
+ * the fetch over a socket and taking over SNI and hostname verification. Do that deliberately, as
+ * part of adding such a caller; do not assume this class already protects one.
  *
  * <p>Uses {@link HttpClient} (JDK, no external dependency) rather than Spring's
  * {@code RestTemplate}/{@code RestClient} — this module implements core ports and must stay free of
@@ -63,9 +69,6 @@ public class RemoteSchemaFetcher implements RemoteSchemaRepository {
     public JsonNode fetchJson(String url) {
         UrlGuard.SafeRemoteUrl safe = UrlGuard.resolveSafeRemoteUrl(url);
         byte[] body;
-        // Pin the host to the address(es) validated above for the duration of the fetch, so the
-        // client cannot be DNS-rebound to a private address between the SSRF check and the connect.
-        PinnedDnsResolver.pin(safe.host(), safe.addresses());
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(safe.url()))
                 .timeout(READ_TIMEOUT)
@@ -83,12 +86,12 @@ public class RemoteSchemaFetcher implements RemoteSchemaRepository {
         } catch (IllegalArgumentException e) {
             throw e; // over-limit / bad input
         } catch (IOException | InterruptedException | UncheckedIOException e) {
-            if (Thread.currentThread().isInterrupted()) {
+            // HttpClient clears the interrupt flag before it rethrows InterruptedException, so the
+            // status has to be restored from the exception type — testing the flag here never fires.
+            if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
             throw new IllegalStateException("Failed to fetch schema from " + safe.url() + ": " + e.getMessage(), e);
-        } finally {
-            PinnedDnsResolver.clear();
         }
         if (body.length == 0) {
             throw new IllegalArgumentException("Remote URL returned an empty body: " + safe.url());

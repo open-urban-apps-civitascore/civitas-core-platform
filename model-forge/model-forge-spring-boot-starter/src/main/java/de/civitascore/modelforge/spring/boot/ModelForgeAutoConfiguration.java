@@ -124,10 +124,10 @@ public class ModelForgeAutoConfiguration {
     }
 
     /**
-     * SSRF-guarded fetch-by-URL, safe to enable unconditionally: every call validates and pins
-     * the target host itself ({@code UrlGuard}/{@code PinnedDnsResolver} in
-     * {@code model-forge-integrations}), so there is no unsafe default to gate behind a property.
-     * Backs both generic import-by-URL and {@link #modelForgeSmartDataModelsService}.
+     * HTTP fetch for the schema-import paths, safe to enable unconditionally: every call runs the
+     * {@code UrlGuard} SSRF check, and the only caller
+     * ({@link #modelForgeSmartDataModelsService}) builds its URL from a fixed host — so there is no
+     * unsafe default to gate behind a property.
      */
     @Bean
     @ConditionalOnMissingBean
