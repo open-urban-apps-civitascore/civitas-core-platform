@@ -28,8 +28,16 @@ public final class XsdDocumentation {
             .map(doc -> {
                 NodeList markup = doc.getMarkup();
                 if (markup == null || markup.getLength() == 0) return null;
-                String text = markup.item(0).getTextContent();
-                return text != null && !text.isBlank() ? text.trim() : null;
+                // xs:documentation holds mixed content, so a markup-formatted block (e.g. a nested
+                // <p>) starts with a whitespace text node. Reading only item(0) would see blank and
+                // drop the whole description; concatenate every node instead.
+                StringBuilder text = new StringBuilder();
+                for (int i = 0; i < markup.getLength(); i++) {
+                    String part = markup.item(i).getTextContent();
+                    if (part != null) text.append(part);
+                }
+                String joined = text.toString().trim();
+                return joined.isEmpty() ? null : joined;
             })
             .filter(Objects::nonNull)
             .findFirst();

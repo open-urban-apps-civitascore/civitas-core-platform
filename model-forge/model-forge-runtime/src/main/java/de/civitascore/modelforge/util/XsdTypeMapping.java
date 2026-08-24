@@ -23,7 +23,8 @@ public final class XsdTypeMapping {
         return switch (xsdLocalName) {
             case "integer", "int", "long", "short", "byte",
                  "nonNegativeInteger", "positiveInteger", "nonPositiveInteger",
-                 "negativeInteger", "unsignedInt", "unsignedLong", "unsignedShort" -> Kind.INTEGER;
+                 "negativeInteger", "unsignedInt", "unsignedLong", "unsignedShort",
+                 "unsignedByte" -> Kind.INTEGER;
             case "decimal", "float", "double"  -> Kind.NUMBER;
             case "boolean"                     -> Kind.BOOLEAN;
             case "date"                        -> Kind.DATE;

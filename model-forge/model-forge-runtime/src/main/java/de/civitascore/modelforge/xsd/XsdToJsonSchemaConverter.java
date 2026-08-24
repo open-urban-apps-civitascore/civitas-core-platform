@@ -268,6 +268,27 @@ public class XsdToJsonSchemaConverter implements XsdSchemaConverter {
         // xs:sequence and xs:all children with minOccurs >= 1 are required.
         // xs:choice children are deliberately NOT required here — their exclusive
         // presence is expressed via the oneOf constraint (see choiceAlternatives).
+        collectRequired(particle, required);
+        for (var entry : attrs) {
+            if (entry instanceof XmlSchemaAttribute a && a.getName() != null
+                    && a.getUse() == XmlSchemaUse.REQUIRED) {
+                required.add("@" + a.getName());
+            }
+        }
+        return required;
+    }
+
+    /**
+     * Collects required element names, descending into nested {@code xs:sequence}/{@code xs:all}
+     * groups the same way {@code addParticleProps} does when it declares the properties. Without the
+     * recursion an element with {@code minOccurs="1"} inside a nested group became an optional
+     * property, so the generated schema accepted instances the XSD rejects.
+     *
+     * <p>A nested group whose own {@code minOccurs} is 0 contributes nothing: its children are only
+     * required when the group is present. {@code xs:choice} is skipped at every level — exclusivity
+     * is expressed by the {@code oneOf} that {@code choiceAlternatives} builds.
+     */
+    private void collectRequired(XmlSchemaParticle particle, List<String> required) {
         List<? extends XmlSchemaObjectBase> items = switch (particle) {
             case XmlSchemaSequence s -> s.getItems();
             case XmlSchemaAll      a -> a.getItems();
@@ -277,15 +298,10 @@ public class XsdToJsonSchemaConverter implements XsdSchemaConverter {
             if (item instanceof XmlSchemaElement el && el.getName() != null
                     && el.getMinOccurs() >= 1) {
                 required.add(el.getName());
+            } else if (item instanceof XmlSchemaParticle nested && nested.getMinOccurs() >= 1) {
+                collectRequired(nested, required);
             }
         }
-        for (var entry : attrs) {
-            if (entry instanceof XmlSchemaAttribute a && a.getName() != null
-                    && a.getUse() == XmlSchemaUse.REQUIRED) {
-                required.add("@" + a.getName());
-            }
-        }
-        return required;
     }
 
     // ── Simple type ────────────────────────────────────────────────────────────
@@ -354,18 +370,28 @@ public class XsdToJsonSchemaConverter implements XsdSchemaConverter {
         }
     }
 
+    /**
+     * Maps one XSD facet onto its JSON Schema keyword. A bound that is not numeric — legal XSD, e.g.
+     * {@code xs:minInclusive value="2020-01-01"} on an {@code xs:date} restriction — is skipped
+     * rather than allowed to abort the conversion: the facet has no JSON Schema equivalent, and
+     * failing here would reject the whole document over one untranslatable bound.
+     */
     private void applyFacet(XmlSchemaFacet f, ObjectNode target) {
         String value = String.valueOf(f.getValue());
-        if      (f instanceof XmlSchemaMinLengthFacet)  target.put("minLength",  Integer.parseInt(value));
-        else if (f instanceof XmlSchemaMaxLengthFacet)  target.put("maxLength",  Integer.parseInt(value));
-        else if (f instanceof XmlSchemaPatternFacet)    target.put("pattern",    value);
-        else if (f instanceof XmlSchemaMinInclusiveFacet) target.put("minimum",  Double.parseDouble(value));
-        else if (f instanceof XmlSchemaMaxInclusiveFacet) target.put("maximum",  Double.parseDouble(value));
-        else if (f instanceof XmlSchemaMinExclusiveFacet) target.put("exclusiveMinimum", Double.parseDouble(value));
-        else if (f instanceof XmlSchemaMaxExclusiveFacet) target.put("exclusiveMaximum", Double.parseDouble(value));
-        else if (f instanceof XmlSchemaFractionDigitsFacet) {
-            int digits = Integer.parseInt(value);
-            if (digits > 0) target.put("multipleOf", Math.pow(10, -digits));
+        try {
+            if      (f instanceof XmlSchemaMinLengthFacet)  target.put("minLength",  Integer.parseInt(value));
+            else if (f instanceof XmlSchemaMaxLengthFacet)  target.put("maxLength",  Integer.parseInt(value));
+            else if (f instanceof XmlSchemaPatternFacet)    target.put("pattern",    value);
+            else if (f instanceof XmlSchemaMinInclusiveFacet) target.put("minimum",  Double.parseDouble(value));
+            else if (f instanceof XmlSchemaMaxInclusiveFacet) target.put("maximum",  Double.parseDouble(value));
+            else if (f instanceof XmlSchemaMinExclusiveFacet) target.put("exclusiveMinimum", Double.parseDouble(value));
+            else if (f instanceof XmlSchemaMaxExclusiveFacet) target.put("exclusiveMaximum", Double.parseDouble(value));
+            else if (f instanceof XmlSchemaFractionDigitsFacet) {
+                int digits = Integer.parseInt(value);
+                if (digits > 0) target.put("multipleOf", Math.pow(10, -digits));
+            }
+        } catch (NumberFormatException e) {
+            log.debug("Skipping non-numeric {} facet value '{}'", f.getClass().getSimpleName(), value);
         }
     }
 
