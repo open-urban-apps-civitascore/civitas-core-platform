@@ -18,9 +18,10 @@ import java.util.Objects;
  * <p>{@code dependencies} are the written version's outgoing reference edges, grouped by the
  * stored reference type in document order — e.g. {@code mapping-source}/{@code mapping-target}
  * for a Mapping, {@code pipeline-node} for a Pipeline, {@code datasource-element}/
- * {@code datasink-element} for endpoint payload bindings, {@code dataset-ref}/
- * {@code datasource-ref}/{@code datasink-ref} for DataSet members, {@code datastructure-ref}
- * for DataStructure members, {@code schema-ref}/{@code xsd-import} for Elements. A host can
+ * {@code datasink-element} for endpoint payload bindings, {@code dataset-ref} for DataSet members
+ * (uniformly, whatever the member's kind — that is carried in the reference name),
+ * {@code datastructure-ref} for DataStructure members, {@code schema-ref}/{@code xsd-import}
+ * for Elements. A host can
  * mirror these lists into its own persistence; they are recomputed on every write, so
  * re-reading them after each save keeps the mirror current.
  */

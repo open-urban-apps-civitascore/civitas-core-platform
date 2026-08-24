@@ -6,7 +6,10 @@ import java.util.List;
  * Thrown when {@link de.civitascore.modelforge.facade.ModelForge#deleteArtifact(ArtifactId)}
  * would break the model: other artifacts still reference the one being deleted. Deleting it
  * would leave dangling references, so the delete is rejected — remove or update the listed
- * dependents first. Grouping edges (a DataStructure listing its members) do not block.
+ * dependents first. Grouping edges block as well: a DataStructure listing a member protects it
+ * just like a hard dependency. Only DataSet membership is exempt from unconditional blocking —
+ * it follows the count-based rule on
+ * {@link de.civitascore.modelforge.facade.ModelForge#deleteArtifact(ArtifactId, boolean, boolean)}.
  */
 public class ArtifactInUseException extends ModelForgeException {
 

@@ -165,8 +165,10 @@ public interface ModelForge {
      *
      * @throws de.civitascore.modelforge.contract.ArtifactInUseException when any other artifact
      *     still references this one — the model stays intact; remove or update the listed dependents
-     *     first. Every reference type blocks (a grouping protects its member too); only
-     *     self-references are exempt.
+     *     first. The policy is the one defined on
+     *     {@link #deleteArtifact(ArtifactId, boolean, boolean)}: every reference type blocks
+     *     unconditionally (a grouping protects its member too) except DataSet membership, which is
+     *     count-based; self-references never block.
      */
     default void deleteArtifact(ArtifactId artifactId) {
         deleteArtifact(artifactId, false, false);
