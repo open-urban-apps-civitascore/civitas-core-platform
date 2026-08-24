@@ -162,6 +162,18 @@ class UrnParserTest {
         assertThat(UrnParser.isUrn(VERSIONED + ":extra")).isFalse();
     }
 
+    @Test
+    void isUrn_rejectsEmptySegments() {
+        // A trailing colon is the dangerous case: the default split(":") discards trailing empty
+        // segments, so the count looked right and withVersion then produced a double colon.
+        assertThat(UrnParser.isUrn(LOGICAL + ":")).isFalse();
+        assertThat(UrnParser.withVersion(LOGICAL, "2.0.0")).doesNotContain("::");
+
+        // An empty interior segment carries no identity either.
+        assertThat(UrnParser.isUrn("urn:core:platform:civitas:element::GeoPoint:k3f9a2b7qx")).isFalse();
+        assertThat(UrnParser.isUrn("urn:core::civitas:element:common:GeoPoint:k3f9a2b7qx")).isFalse();
+    }
+
     // ── Disambiguator segment ─────────────────────────────────────────────────
 
     @Test

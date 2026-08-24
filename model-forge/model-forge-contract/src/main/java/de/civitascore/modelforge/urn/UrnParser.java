@@ -48,11 +48,20 @@ public final class UrnParser {
      * minting instead of being trusted verbatim — otherwise it silently corrupts every URN
      * operation downstream (segment-index extraction, version parsing, logical/versioned
      * round-tripping).
+     *
+     * <p>Every segment must be non-empty. The limit of {@code -1} is what enforces this at the end
+     * of the string: the default {@code split(":")} discards trailing empty segments, so a URN with
+     * a trailing colon would otherwise report the full count and be trusted — after which
+     * {@code withVersion} emits a double colon.
      */
     public static boolean isUrn(String id) {
         if (id == null || !id.startsWith("urn:core:")) return false;
-        int segments = id.split(":").length;
-        return segments == LOGICAL_SEGMENTS || segments == VERSIONED_SEGMENTS;
+        String[] parts = id.split(":", -1);
+        if (parts.length != LOGICAL_SEGMENTS && parts.length != VERSIONED_SEGMENTS) return false;
+        for (String part : parts) {
+            if (part.isEmpty()) return false;
+        }
+        return true;
     }
 
     /**
