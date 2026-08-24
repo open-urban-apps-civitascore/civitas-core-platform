@@ -70,11 +70,12 @@ in the concepts — see [ADR-09](../../docs/concepts/architecture-decisions.md).
 
 This schema ships inside the **Model Forge Admin UI** as bundled seed data
 (`model-forge-admin-ui/src/main/resources/seed/sta/sta.schema.json`). The admin-ui imports it
-on startup when seeding is enabled (the default), so a fresh instance already contains the
-STA model:
+on startup when seeding is enabled — **off by default**, because the UI points at
+portal-backend's registry and must not seed the STA examples into it. Enable it only for a
+standalone instance with its own database:
 
 ```yaml
-# application.yml (default in the admin-ui)
+# application.yml default is `false`
 model-forge:
   admin-ui:
     seed:

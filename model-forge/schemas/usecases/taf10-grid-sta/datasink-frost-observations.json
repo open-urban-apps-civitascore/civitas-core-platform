@@ -2,9 +2,6 @@
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSink",
   "id": "urn:core:platform:civitas:datasink:taf10-grid:frost-observations:1.0.0",
   "title": "FROST-Server Grid Observations",
-  "connectionType": "http",
-  "element": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0",
-  "url": "http://frost-server:8080/FROST-Server/v1.1/Observations",
-  "method": "POST",
-  "contentType": "application/json"
+  "connectionType": "frost",
+  "element": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0"
 }

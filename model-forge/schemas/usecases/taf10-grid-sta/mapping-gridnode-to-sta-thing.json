@@ -15,6 +15,14 @@
     "properties.operator": { "op": "copy", "input": "$.operator" },
     "properties.transformerId": { "op": "copy", "input": "$.transformerId" },
     "properties.feederId": { "op": "copy", "input": "$.feederId" },
-    "properties.gridNodeType": { "op": "copy", "input": "$.gridNodeType" }
+    "properties.gridNodeType": { "op": "copy", "input": "$.gridNodeType" },
+
+    "Locations[0].name": { "op": "copy", "input": "$.gridNodeName" },
+    "Locations[0].encodingType": { "op": "const", "value": "application/geo+json" },
+    "Locations[0].location": {
+      "op": "geoPoint",
+      "lon": "$.location.lon",
+      "lat": "$.location.lat"
+    }
   }
 }

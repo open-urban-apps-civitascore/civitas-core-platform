@@ -8,6 +8,7 @@
     "phenomenonTime": { "op": "copy", "input": "$.timestamp" },
     "resultTime":     { "op": "copy", "input": "$.timestamp" },
     "result":         { "op": "copy", "input": "$.voltage.value" },
-    "resultQuality":  { "op": "copy", "input": "$.voltage.quality" }
+    "resultQuality":  { "op": "copy", "input": "$.voltage.quality" },
+    "Datastream.@iot.id": { "op": "copy", "input": "$.frostDatastreamIds.voltage" }
   }
 }

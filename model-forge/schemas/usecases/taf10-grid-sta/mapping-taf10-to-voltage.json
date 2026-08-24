@@ -11,6 +11,7 @@
     "resultQuality": { "op": "copy", "input": "$.voltage.quality" },
     "parameters.gridNodeId": { "op": "copy", "input": "$.gridNodeId" },
     "parameters.observedProperty": { "op": "const", "value": "voltage" },
-    "parameters.unit": { "op": "copy", "input": "$.voltage.unit" }
+    "parameters.unit": { "op": "copy", "input": "$.voltage.unit" },
+    "Datastream.@iot.id": { "op": "copy", "input": "$.frostDatastreamIds.voltage" }
   }
 }

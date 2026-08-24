@@ -14,6 +14,14 @@
     "properties.meterId":     { "op": "copy",   "input": "$.meterId" },
     "properties.operator":    { "op": "copy",   "input": "$.operator" },
     "properties.meterType":   { "op": "copy",   "input": "$.meterType" },
-    "properties.installDate": { "op": "copy",   "input": "$.installDate" }
+    "properties.installDate": { "op": "copy",   "input": "$.installDate" },
+
+    "Locations[0].name":         { "op": "copy",  "input": "$.owner" },
+    "Locations[0].encodingType": { "op": "const", "value": "application/geo+json" },
+    "Locations[0].location": {
+      "op":  "geoPoint",
+      "lon": "$.location.lon",
+      "lat": "$.location.lat"
+    }
   }
 }

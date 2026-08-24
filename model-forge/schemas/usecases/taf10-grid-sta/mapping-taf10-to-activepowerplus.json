@@ -11,6 +11,7 @@
     "resultQuality": { "op": "copy", "input": "$.activePowerPlus.quality" },
     "parameters.gridNodeId": { "op": "copy", "input": "$.gridNodeId" },
     "parameters.observedProperty": { "op": "const", "value": "activePowerPlus" },
-    "parameters.unit": { "op": "copy", "input": "$.activePowerPlus.unit" }
+    "parameters.unit": { "op": "copy", "input": "$.activePowerPlus.unit" },
+    "Datastream.@iot.id": { "op": "copy", "input": "$.frostDatastreamIds.activePowerPlus" }
   }
 }

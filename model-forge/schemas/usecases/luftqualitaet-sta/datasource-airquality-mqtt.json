@@ -4,8 +4,8 @@
   "title": "Luftqualitaet Messstationen MQTT",
   "connectionType": "mqtt",
   "element": "urn:core:platform:civitas:element:luftqualitaet:AirQualityRawReading:1.0.0",
-  "brokerUrl": "mqtt://mosquitto:1883",
-  "topic": "luftqualitaet/readings/+",
-  "clientId": "minifi-airquality",
+  "urls": ["mqtt://mosquitto:1883"],
+  "topics": ["luftqualitaet/readings/+"],
+  "client_id": "minifi-airquality",
   "qos": 1
 }

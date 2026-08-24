@@ -8,6 +8,7 @@
     "phenomenonTime": { "op": "copy", "input": "$.timestamp" },
     "resultTime":     { "op": "copy", "input": "$.timestamp" },
     "result":         { "op": "copy", "input": "$.activePowerMinus.value" },
-    "resultQuality":  { "op": "copy", "input": "$.activePowerMinus.quality" }
+    "resultQuality":  { "op": "copy", "input": "$.activePowerMinus.quality" },
+    "Datastream.@iot.id": { "op": "copy", "input": "$.frostDatastreamIds.activePowerMinus" }
   }
 }

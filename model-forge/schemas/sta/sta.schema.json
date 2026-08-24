@@ -99,7 +99,8 @@
         },
         "Locations": {
           "type": "array",
-          "description": "Association to the Locations the Thing was at.",
+          "minItems": 1,
+          "description": "Association to the Locations the Thing was at. One HistoricalLocation SHALL have one or many Locations.",
           "items": {
             "type": "string",
             "pattern": "^urn:",
@@ -107,7 +108,7 @@
           }
         }
       },
-      "required": ["time"]
+      "required": ["time", "Thing", "Locations"]
     },
     "Datastream": {
       "$id": "urn:core:platform:civitas:element:sta:Datastream:s04brbdcz9:1.0.0",
@@ -161,7 +162,7 @@
           }
         }
       },
-      "required": ["name", "description", "observationType", "unitOfMeasurement"]
+      "required": ["name", "description", "observationType", "unitOfMeasurement", "Thing", "Sensor", "ObservedProperty"]
     },
     "Sensor": {
       "$id": "urn:core:platform:civitas:element:sta:Sensor:m8i4hc3h56:1.0.0",
@@ -231,7 +232,7 @@
           "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:FeatureOfInterest:an2vwx133n:1.0.0" }
         }
       },
-      "required": ["phenomenonTime", "result"]
+      "required": ["phenomenonTime", "result", "Datastream"]
     },
     "FeatureOfInterest": {
       "$id": "urn:core:platform:civitas:element:sta:FeatureOfInterest:an2vwx133n:1.0.0",

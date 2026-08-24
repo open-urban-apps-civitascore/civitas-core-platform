@@ -20,6 +20,10 @@
     "resultQuality": {
       "op": "copy",
       "input": "$.pm25.quality"
+    },
+    "Datastream.@iot.id": {
+      "op": "copy",
+      "input": "$.frostDatastreamIds.pm25"
     }
   }
 }
