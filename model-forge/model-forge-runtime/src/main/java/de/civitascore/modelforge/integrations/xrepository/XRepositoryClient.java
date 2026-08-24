@@ -94,16 +94,27 @@ public class XRepositoryClient implements XRepositoryCatalog {
     public XRepositorySearchResult search(String query, int page, int size) {
         try {
             return callSearch(query, page, size);
+        } catch (IllegalArgumentException e) {
+            throw e; // bad paging input — a caller error, not an upstream outage
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("XRepository search interrupted", e);
         } catch (Exception e) {
             throw new IllegalStateException("XRepository not reachable: " + e.getMessage(), e);
         }
     }
 
     private XRepositorySearchResult callSearch(String query, int page, int size) throws IOException, InterruptedException {
+        if (page < 0) {
+            throw new IllegalArgumentException("XRepository page must not be negative: " + page);
+        }
+        if (size <= 0) {
+            throw new IllegalArgumentException("XRepository page size must be positive: " + size);
+        }
         ObjectNode body = mapper.createObjectNode();
         if (query != null && !query.isBlank()) body.put("match", query);
         body.put("limit", size);
-        body.put("offset", page * size);
+        body.put("offset", (long) page * size);
 
         String url = baseUrl + "/xrepository/suche";
         log.debug("XRepository POST suche: {}", url);
@@ -220,15 +231,31 @@ public class XRepositoryClient implements XRepositoryCatalog {
             return callDownload(identifier);
         } catch (IllegalStateException e) {
             throw e;
+        } catch (IllegalArgumentException e) {
+            // A local size/count cap or a malformed archive — retrying cannot help, so this must
+            // not be reported to the caller as an upstream outage.
+            throw e;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("XSD download interrupted for '" + identifier + "'", e);
         } catch (Exception e) {
             throw new IllegalStateException(
                 "XSD download failed for '" + identifier + "': " + e.getMessage(), e);
         }
     }
 
+    /**
+     * Percent-encodes one URL <em>path</em> segment. {@link URLEncoder} does form encoding, which
+     * maps a space to {@code +} — read as a literal plus sign inside a path — so the space is
+     * re-encoded. A literal plus in the input is already {@code %2B} and stays intact.
+     */
+    private static String encodePathSegment(String segment) {
+        return URLEncoder.encode(segment, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
     private String callDownload(String versionKennung) throws IOException, InterruptedException {
         String url = baseUrl + "/version_standard/"
-            + URLEncoder.encode(versionKennung, StandardCharsets.UTF_8)
+            + encodePathSegment(versionKennung)
             + "/xmlschema";
         log.debug("XRepository xmlschema download: {}", url);
 
@@ -288,7 +315,7 @@ public class XRepositoryClient implements XRepositoryCatalog {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 String name = entry.getName();
-                if (name.endsWith(".xsd") || name.endsWith(".XSD")) {
+                if (name.length() >= 4 && name.regionMatches(true, name.length() - 4, ".xsd", 0, 4)) {
                     if (xsdFiles.size() >= MAX_XSD_FILES) {
                         throw new IllegalArgumentException("ZIP contains too many XSD files (max " + MAX_XSD_FILES + ")");
                     }
