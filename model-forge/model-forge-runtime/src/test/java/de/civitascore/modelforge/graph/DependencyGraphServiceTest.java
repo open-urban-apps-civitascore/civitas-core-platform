@@ -216,18 +216,23 @@ class DependencyGraphServiceTest {
         var executor = Executors.newFixedThreadPool(4);
         var latch = new CountDownLatch(iterations * 2);
 
-        for (int i = 0; i < iterations; i++) {
-            executor.submit(() -> {
-                try { graph.register(B_V, Set.of(C_V)); } finally { latch.countDown(); }
-            });
-            executor.submit(() -> {
-                try { graph.remove(B_V); } finally { latch.countDown(); }
-            });
+        try {
+            for (int i = 0; i < iterations; i++) {
+                executor.submit(() -> {
+                    try { graph.register(B_V, Set.of(C_V)); } finally { latch.countDown(); }
+                });
+                executor.submit(() -> {
+                    try { graph.remove(B_V); } finally { latch.countDown(); }
+                });
+            }
+            assertThat(latch.await(10, TimeUnit.SECONDS))
+                .as("all concurrent register/remove tasks completed in time")
+                .isTrue();
+        } finally {
+            // Without the finally, a failed latch assertion leaks the pool's threads for the rest of
+            // the JVM — the ring test below already does this.
+            executor.shutdownNow();
         }
-        assertThat(latch.await(10, TimeUnit.SECONDS))
-            .as("all concurrent register/remove tasks completed in time")
-            .isTrue();
-        executor.shutdown();
 
         // After all concurrent ops, forward and reverse edges must agree.
         Set<String> bDeps = graph.getDependencies(B);

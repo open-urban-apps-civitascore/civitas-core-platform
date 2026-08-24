@@ -65,9 +65,11 @@ class ModelValidatorTest {
         Diagnostic d = diagnostics.getFirst();
         assertThat(d.severity()).isEqualTo(DiagnosticSeverity.ERROR);
         assertThat(d.code()).isEqualTo("schema-parse");
-        // SEC-2: the client message is generic and stable — it must not leak the
-        // underlying library exception detail.
-        assertThat(d.message()).isEqualTo("Invalid JSON Schema");
+        // The message names the offending pointer and where it sits, which the generic
+        // "Invalid JSON Schema" could not. It is built here, not taken from the library, so no
+        // third-party exception detail is leaked.
+        assertThat(d.message()).isEqualTo("Unresolved local $ref '#/$defs/Missing'");
+        assertThat(d.path()).isEqualTo("$.properties.child");
     }
 
     @Test
@@ -239,8 +241,8 @@ class ModelValidatorTest {
 
         List<Diagnostic> diagnostics = validator.validateData(schema, data);
 
-        // Must terminate; a valid recursive document yields no diagnostics.
-        assertThat(diagnostics).isNotNull();
-        diagnostics.forEach(d -> assertThat(d.severity()).isEqualTo("ERROR"));
+        // Must terminate; a valid recursive document yields no diagnostics. The severity assertion
+        // compared the enum against a String, so it could never have failed even if it ran.
+        assertThat(diagnostics).isEmpty();
     }
 }

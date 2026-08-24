@@ -9,7 +9,7 @@ import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -79,17 +79,17 @@ class CoreSchemaExtensionsTest {
             """)))).isNotEmpty();
     }
 
+    /**
+     * Drives the governance test from {@link #CORE_SCHEMA_RESOURCES} rather than a second literal
+     * list. A duplicated list lets a schema be added to the constant (satisfying the coverage test
+     * below) while silently escaping this one.
+     */
+    static List<String> coreSchemaResources() {
+        return CORE_SCHEMA_RESOURCES;
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {
-        "dataset.schema.json",
-        "datasource.schema.json",
-        "datasink.schema.json",
-        "mapping.schema.json",
-        "pipeline.schema.json",
-        "datastructure.schema.json",
-        "artifact-envelope.schema.json",
-        "core-schema-extensions.schema.json"
-    })
+    @MethodSource("coreSchemaResources")
     void coreSchemas_useOnlyDeclaredXExtensions(String resource) throws Exception {
         JsonSchema extensionSchema = extensionSchema();
         List<String> violations = new ArrayList<>();
@@ -104,6 +104,11 @@ class CoreSchemaExtensionsTest {
         JsonNode extensions = load("core-schema-extensions.schema.json");
         JsonNode pipeline = load("pipeline.schema.json");
 
+        // Both pointers must actually resolve: JsonNode.at() returns the MissingNode singleton for a
+        // pointer that does not, and two MissingNodes compare equal — so renaming either definition
+        // would leave this assertion passing against nothing.
+        assertThat(pipeline.at("/$defs/Position").isMissingNode()).isFalse();
+        assertThat(extensions.at("/$defs/UiPosition").isMissingNode()).isFalse();
         assertThat(pipeline.at("/$defs/Position"))
             .isEqualTo(extensions.at("/$defs/UiPosition"));
     }

@@ -26,10 +26,12 @@ import static org.mockito.Mockito.when;
  * No-Docker slice test for the registry's failure-translation contract: a storage outage
  * (a Spring {@link org.springframework.dao.DataAccessException}) must become a 502
  * {@link RegistryUnavailableException} on every code path — a read (never a false "not found"), a search
- * (never an empty result), and a transactional write. The Testcontainers ITs exercise the happy
- * path; this pins the {@code read()} wrapper's and the write path's error translation without a
- * database, using generic/transient subtypes (resource-failure / query-timeout) rather than the
- * 4xx-mapped integrity/grammar ones.
+ * (never an empty result), and a transactional write. It pins the {@code read()} wrapper's and the
+ * write path's error translation without a database, using generic/transient subtypes
+ * (resource-failure / query-timeout) rather than the 4xx-mapped integrity/grammar ones.
+ *
+ * <p>The registry write path has no real-database test: the only Testcontainers test in the reactor
+ * boots the admin-ui, and it does not cover this client's happy path.
  */
 class PostgresArtifactRegistryClientTest {
 
