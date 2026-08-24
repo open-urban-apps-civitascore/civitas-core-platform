@@ -123,14 +123,13 @@ public class SeedImporter {
     }
 
     private void apply(String name, JsonNode schema, Accumulator acc) {
-        String id = schema.path("$id").asText(null);
-        if (id == null) {
-            // A pure $defs container (no shape/identity of its own) has no top-level $id to probe —
-            // fall back to its first def, which is idempotency-relevant the same way.
-            id = firstDefId(schema.path("$defs"));
-        }
-        if (id != null && UrnParser.isUrn(UrnParser.logicalUrn(id))
-            && modelForge.getArtifact(new ArtifactId(UrnParser.logicalUrn(id))).isPresent()) {
+        // Probe EVERY identity the bundle declares, not just one. A pure $defs container (no shape
+        // of its own) declares one per member, and each member is imported in its own transaction —
+        // so probing a single id reports "already present" while the rest are missing, and no re-run
+        // can ever repair the set.
+        List<String> ids = declaredLogicalUrns(schema);
+        if (!ids.isEmpty()
+            && ids.stream().allMatch(urn -> modelForge.getArtifact(new ArtifactId(urn)).isPresent())) {
             acc.present();
             return;
         }
@@ -142,14 +141,28 @@ public class SeedImporter {
         }
     }
 
-    /** The {@code $id} of the first {@code $defs} entry, or {@code null} if there are none. */
-    private static String firstDefId(JsonNode defs) {
-        if (!defs.isObject()) return null;
-        for (JsonNode def : defs) {
-            String defId = def.path("$id").asText(null);
-            if (defId != null) return defId;
+    /**
+     * Every logical CORE URN the document claims as an identity — its own {@code $id} plus one per
+     * {@code $defs} member. Ids that are not CORE URNs are skipped: they carry no identity to probe.
+     */
+    private static List<String> declaredLogicalUrns(JsonNode schema) {
+        List<String> urns = new ArrayList<>();
+        addIfCoreUrn(schema.path("$id").asText(null), urns);
+        JsonNode defs = schema.path("$defs");
+        if (defs.isObject()) {
+            for (JsonNode def : defs) {
+                addIfCoreUrn(def.path("$id").asText(null), urns);
+            }
         }
-        return null;
+        return urns;
+    }
+
+    private static void addIfCoreUrn(String id, List<String> target) {
+        if (id == null) return;
+        String logical = UrnParser.logicalUrn(id);
+        if (UrnParser.isUrn(logical)) {
+            target.add(logical);
+        }
     }
 
     /** Derives the bundle id (folder under {@code seed/}) from a resource URL. */

@@ -1,5 +1,6 @@
 package de.civitascore.modelforge.adminui.wicket.pages;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import de.civitascore.modelforge.adminui.wicket.BasePage;
 import de.civitascore.modelforge.adminui.wicket.SchemaCatalog;
@@ -13,12 +14,16 @@ import org.apache.wicket.markup.html.form.Button;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.spring.injection.annot.SpringBean;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Ad-hoc validation sandbox: validate a pasted schema on its own, or an instance against it,
  * without persisting anything.
  */
 public class ValidatePage extends BasePage {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ValidatePage.class);
 
     @SpringBean
     private ModelForge modelForge;
@@ -40,23 +45,41 @@ public class ValidatePage extends BasePage {
         form.add(new Button("validateSchema") {
             @Override
             public void onSubmit() {
+                // Only the parse belongs in the "Invalid JSON" catch. Wrapping the facade call too
+                // would report a registry outage as malformed input, sending the user to fix a
+                // document that was fine.
+                JsonNode schema;
                 try {
-                    var schema = mapper.readTree(state.getSchema());
-                    report(modelForge.validateSchema(new ValidateSchemaCommand(schema)));
+                    schema = mapper.readTree(state.getSchema());
                 } catch (Exception e) {
                     error("Invalid JSON: " + e.getMessage());
+                    return;
+                }
+                try {
+                    report(modelForge.validateSchema(new ValidateSchemaCommand(schema)));
+                } catch (Exception e) {
+                    LOG.warn("Schema validation failed", e);
+                    error("Validation failed: " + e.getMessage());
                 }
             }
         });
         form.add(new Button("validateInstance") {
             @Override
             public void onSubmit() {
+                JsonNode schema;
+                JsonNode instance;
                 try {
-                    var schema = mapper.readTree(state.getSchema());
-                    var instance = mapper.readTree(state.getInstance());
-                    report(modelForge.validateInstance(new ValidateInstanceCommand(schema, instance)));
+                    schema = mapper.readTree(state.getSchema());
+                    instance = mapper.readTree(state.getInstance());
                 } catch (Exception e) {
                     error("Invalid JSON: " + e.getMessage());
+                    return;
+                }
+                try {
+                    report(modelForge.validateInstance(new ValidateInstanceCommand(schema, instance)));
+                } catch (Exception e) {
+                    LOG.warn("Instance validation failed", e);
+                    error("Validation failed: " + e.getMessage());
                 }
             }
         });

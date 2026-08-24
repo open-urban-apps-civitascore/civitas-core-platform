@@ -191,7 +191,11 @@ public class ArtifactViewPage extends BasePage {
                     String kind = UrnParser.artifactTypeFromUrn(relUrn);
                     String label = node.label() != null && !node.label().isBlank()
                         ? node.label() : UrnParser.nameFromUrn(relUrn);
-                    return new RelationRow(relUrn, label, KIND_LABELS.getOrDefault(kind, kind == null ? "" : kind));
+                    // The null guard has to be on the KEY: KIND_LABELS is an immutable Map.of(...),
+                    // which throws on a null key however harmless the fallback looks. A relation
+                    // target whose URN is not a CORE URN yields kind == null (see the constructor).
+                    String kindLabel = kind == null ? "" : KIND_LABELS.getOrDefault(kind, kind);
+                    return new RelationRow(relUrn, label, kindLabel);
                 })
                 .toList();
 

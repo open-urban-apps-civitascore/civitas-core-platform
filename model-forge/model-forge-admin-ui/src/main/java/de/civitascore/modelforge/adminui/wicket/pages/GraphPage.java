@@ -103,7 +103,11 @@ public class GraphPage extends BasePage {
             + "    pipeline: {color: {background: '#76b7b2', border: '#3f7a75'}},"
             + "    datasource: {color: {background: '#59a14f', border: '#2f5c29'}},"
             + "    datasink: {color: {background: '#edc948', border: '#a88a12'}},"
-            + "    dataset: {color: {background: '#b07aa1', border: '#6e4568'}}"
+            + "    dataset: {color: {background: '#b07aa1', border: '#6e4568'}},"
+            // A reference target that is not a registered artifact: the edge survives its target's
+            // removal by design, so the node is real but must not read as an existing artifact.
+            + "    unresolved: {shape: 'diamond', color: {background: mfDark ? '#3a3f44' : '#d9dde1',"
+            + "      border: mfDark ? '#6b7681' : '#9aa5b1'}, font: {color: mfDark ? '#9aa5b1' : '#6b7681'}}"
             + "  }"
             + "});"
             // Re-evaluate both DataViews whenever a control changes: recompute the visible-id set
@@ -145,6 +149,9 @@ public class GraphPage extends BasePage {
      * root Element mistakenly persisted under a {@code :datastructure:} URN — would otherwise be
      * mis-coloured as an Element. Unknown/blank segments fall back so every node still gets a group.
      */
+    /** vis-network group for a reference target that no registered artifact backs. */
+    private static final String GROUP_UNRESOLVED = "unresolved";
+
     private static String groupForUrn(String urn, String fallbackType) {
         String type = UrnParser.artifactTypeFromUrn(urn);
         if (type != null && !type.isBlank()) {
@@ -202,7 +209,12 @@ public class GraphPage extends BasePage {
         ObjectMapper mapper = new ObjectMapper();
         for (var node : graph.nodes()) {
             String nodeUrn = UrnParser.logicalUrn(node.artifactId().value());
-            nodeGroups.putIfAbsent(nodeUrn, groupForUrn(nodeUrn, null));
+            // Every registered artifact was seeded into nodeGroups before this loop ran, so a URN
+            // still missing here is a reference target the registry does not hold — deleted, or
+            // never imported. The edge is real (artifact_reference keeps it deliberately), but the
+            // node must be distinguishable from an artifact that exists, which is what made a
+            // deleted target render as an ordinary one.
+            nodeGroups.putIfAbsent(nodeUrn, GROUP_UNRESOLVED);
             nodeLabels.putIfAbsent(nodeUrn, node.label());
         }
         for (var edge : graph.edges()) {
