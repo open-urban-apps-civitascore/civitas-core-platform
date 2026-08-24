@@ -99,10 +99,12 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
     )
   }, [dataSinksData, dataset.pipelines])
 
-  const datastructuresToFetch = postgisDataSinks?.map(dataSink => ({
-    datastructureId: dataSink.configuration.dataStructureVersion.dataStructureId,
-    versionId: dataSink.configuration.dataStructureVersion.id,
-  }))
+  // A sink whose element URN did not resolve carries no version summary — it contributes no
+  // fetch (and later no native CRS) instead of crashing the page.
+  const datastructuresToFetch = postgisDataSinks.flatMap(dataSink => {
+    const version = dataSink.configuration.dataStructureVersion
+    return version ? [{ datastructureId: version.dataStructureId, versionId: version.id }] : []
+  })
 
   const postgisDatastructureQueries = useQueries({
     queries: datastructuresToFetch.map(({ datastructureId, versionId }) => ({
