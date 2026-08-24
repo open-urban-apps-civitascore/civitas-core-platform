@@ -7,7 +7,7 @@ import java.util.Locale;
 
 /**
  * Startup validation for operator-configured external upstream URLs (XRepository, …) and SSRF
- * checks for client-supplied ones (import-by-URL).
+ * checks for the URLs the schema-import paths fetch.
  *
  * <p>A malformed or non-HTTP(S) URL is rejected fast with a clear message instead of
  * surfacing later as an opaque connection failure, and combined with the
@@ -45,20 +45,23 @@ public final class UrlGuard {
     }
 
     /**
-     * Validates a <em>client-supplied</em> remote URL for a server-side fetch (import-by-URL) and
-     * resolves it to the safe public IP address(es) to connect to. Beyond the http(s) check it
+     * Validates a remote URL for a server-side fetch and resolves it to the public IP address(es)
+     * it points at. Beyond the http(s) check it
      * rejects hosts that resolve to a non-public address — see {@link #isBlockedAddress(InetAddress)}
      * (loopback, any-local, link-local, site-local, multicast, IPv4 CGN, IPv6 ULA, IPv4-mapped IPv6)
      * — so a caller cannot steer the server at internal services or the cloud metadata endpoint
      * (169.254.169.254).
      *
-     * <p>The returned {@link SafeRemoteUrl} carries the validated addresses so the caller can
-     * <em>pin</em> the connection to exactly those IPs (via {@link PinnedDnsResolver}) for the
-     * duration of the fetch. That closes the DNS-rebinding / TOCTOU window: the host is resolved and
-     * validated once here, and the HTTP client — re-resolving through the pinned resolver — can only
-     * connect to an already-validated address, never a rebound private one. TLS SNI and certificate
-     * hostname verification are unaffected (the URL keeps its original hostname). Combined with a
-     * no-redirect HTTP client this keeps the fetch on a vetted public host.
+     * <p>The returned {@link SafeRemoteUrl} carries the addresses this check validated, so a caller
+     * can report or assert on them.
+     *
+     * <p><strong>This does not close the DNS-rebinding / TOCTOU window.</strong> The host is
+     * resolved here and resolved again by the HTTP client on connect, so a host that answers
+     * differently the second time is connected to unvalidated. Every current caller builds its URL
+     * from a fixed or operator-configured host, which is what makes that acceptable: an attacker
+     * chooses neither the scheme nor the host, so there is nothing to rebind. A caller that accepts
+     * an untrusted hostname must not rely on this method alone — see
+     * {@code RemoteSchemaFetcher} for what closing the window would take.
      *
      * @throws IllegalArgumentException when the URL is blank, malformed, not http(s), or resolves
      *         to a non-public address
@@ -94,10 +97,10 @@ public final class UrlGuard {
     }
 
     /**
-     * A validated client-supplied remote URL together with the safe public address(es) its host
-     * resolves to — handed to {@link PinnedDnsResolver} so the fetch connects only to these IPs.
-     * The address array is defensively copied on construction and on access ({@link InetAddress}
-     * itself is immutable) so the validated set cannot be mutated after the SSRF check.
+     * A validated remote URL together with the public address(es) its host resolved to at check
+     * time. The address array is defensively copied on construction and on access
+     * ({@link InetAddress} itself is immutable) so the validated set cannot be mutated after the
+     * SSRF check.
      */
     public record SafeRemoteUrl(String url, String host, InetAddress[] addresses) {
         public SafeRemoteUrl {
@@ -113,11 +116,10 @@ public final class UrlGuard {
     /**
      * Whether an address is non-public and so must not be the target of a server-side fetch.
      * Covers the {@link InetAddress} categories (loopback, any-local, link-local, site-local,
-     * multicast) plus ranges the JDK predicates miss: IPv4 carrier-grade NAT (100.64.0.0/10),
-     * IPv6 unique-local addresses (fc00::/7), and embedded-IPv4 IPv6 — both IPv4-mapped
-     * ({@code ::ffff:a.b.c.d}) and IPv4-compatible ({@code ::a.b.c.d}) — which are unwrapped and
-     * re-checked so neither {@code ::ffff:127.0.0.1} nor {@code ::169.254.169.254} can slip past
-     * as "public".
+     * multicast) plus ranges the JDK predicates miss: the non-globally-reachable IPv4 blocks of
+     * RFC 6890, IPv6 unique-local addresses (fc00::/7), and every embedded-IPv4 IPv6 form, which
+     * is unwrapped and re-checked so an embedded private, loopback or metadata address cannot slip
+     * past as "public".
      */
     static boolean isBlockedAddress(InetAddress addr) {
         if (addr.isLoopbackAddress() || addr.isAnyLocalAddress()
@@ -127,25 +129,23 @@ public final class UrlGuard {
         }
         byte[] b = addr.getAddress();
         if (b.length == 4) {
-            int first = b[0] & 0xFF, second = b[1] & 0xFF;
-            // Carrier-grade NAT 100.64.0.0/10 (RFC 6598) — not covered by the JDK predicates.
-            return first == 100 && second >= 64 && second <= 127;
+            return isBlockedIpv4(b);
         }
         if (b.length == 16) {
             // IPv6 unique-local address fc00::/7 (RFC 4193).
             if ((b[0] & 0xFE) == 0xFC) return true;
-            // Embedded IPv4 in IPv6 — unwrap and re-check the trailing IPv4 so the embedded
-            // private/loopback/metadata address cannot slip past as "public":
+            // Embedded IPv4 in IPv6 — unwrap and re-check the trailing IPv4:
             //   - IPv4-mapped     ::ffff:a.b.c.d (::ffff:0:0/96): bytes 0..9 zero, 10..11 = 0xFF
-            //   - IPv4-compatible ::a.b.c.d       (::/96):        bytes 0..11 all zero
-            // ::/:: 1 themselves are already handled above by isAnyLocal/isLoopback.
+            //   - IPv4-compatible ::a.b.c.d      (::/96):         bytes 0..11 all zero
+            //   - NAT64 well-known 64:ff9b::/96 (RFC 6052):       bytes 0..3 = 00 64 ff 9b, 4..11 zero
+            // :: and ::1 are already handled above by isAnyLocal/isLoopback.
             boolean prefixZero = true;
             for (int i = 0; i < 10 && prefixZero; i++) {
                 if (b[i] != 0) prefixZero = false;
             }
             boolean mapped = prefixZero && (b[10] & 0xFF) == 0xFF && (b[11] & 0xFF) == 0xFF;
             boolean compatible = prefixZero && b[10] == 0 && b[11] == 0;
-            if (mapped || compatible) {
+            if (mapped || compatible || isNat64WellKnown(b)) {
                 try {
                     return isBlockedAddress(InetAddress.getByAddress(
                         new byte[]{b[12], b[13], b[14], b[15]}));
@@ -153,7 +153,40 @@ public final class UrlGuard {
                     return true;   // unparseable embedded address: fail closed
                 }
             }
+            // Any other address in 64:ff9b::/32 is a NAT64 translation prefix (IANA
+            // "IPv4-IPv6 Translat.", incl. the RFC 8215 local-use 64:ff9b:1::/48) whose embedding
+            // format we cannot read here, so the embedded IPv4 cannot be checked: fail closed.
+            return isNat64Prefix(b);
         }
         return false;
+    }
+
+    /**
+     * IPv4 blocks RFC 6890 marks as not globally reachable and the JDK predicates miss. The
+     * private ranges (10/8, 172.16/12, 192.168/16), loopback and link-local are already covered by
+     * {@link InetAddress#isSiteLocalAddress()} and friends.
+     */
+    private static boolean isBlockedIpv4(byte[] b) {
+        int first = b[0] & 0xFF, second = b[1] & 0xFF, third = b[2] & 0xFF;
+        if (first == 0) return true;                                    // 0.0.0.0/8    this network
+        if (first == 100 && second >= 64 && second <= 127) return true; // 100.64/10    carrier-grade NAT
+        if (first == 192 && second == 0 && third == 0) return true;     // 192.0.0.0/24 protocol assignments
+        if (first == 198 && (second == 18 || second == 19)) return true; // 198.18/15   benchmarking
+        return (first & 0xF0) == 0xF0;                                  // 240.0.0.0/4 reserved + broadcast
+    }
+
+    /** The RFC 6052 well-known NAT64 prefix 64:ff9b::/96, which embeds IPv4 in the last 4 bytes. */
+    private static boolean isNat64WellKnown(byte[] b) {
+        if (!isNat64Prefix(b)) return false;
+        for (int i = 4; i < 12; i++) {
+            if (b[i] != 0) return false;
+        }
+        return true;
+    }
+
+    /** The IANA IPv4-IPv6 translation prefix 64:ff9b::/32. */
+    private static boolean isNat64Prefix(byte[] b) {
+        return b[0] == 0x00 && (b[1] & 0xFF) == 0x64
+            && (b[2] & 0xFF) == 0xFF && (b[3] & 0xFF) == 0x9B;
     }
 }
