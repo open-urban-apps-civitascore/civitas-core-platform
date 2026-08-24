@@ -30,6 +30,15 @@ public class ArtifactTree extends NestedTree<ArtifactTreeNode> {
     }
 
     /**
+     * The artifact this tree highlights, or {@code null}. Artifact nodes are lazy children of their
+     * type group, so the highlight is not in the initially rendered markup — this exposes it so a
+     * test can assert the tree was given the open artifact without driving a branch expansion.
+     */
+    public String currentUrn() {
+        return currentUrn;
+    }
+
+    /**
      * Supplies our own junction CSS classes instead of the resource-bundle keys {@link Node}
      * defaults to (which resolve to nothing without one of Wicket's bundled tree themes) — same
      * approach as {@link NestedTree#newNodeComponent}, plus the three style-class overrides.

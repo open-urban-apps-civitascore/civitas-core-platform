@@ -57,6 +57,16 @@ public abstract class BasePage extends WebPage {
         add(new BookmarkablePageLink<>("navGraph", GraphPage.class));
         add(new BookmarkablePageLink<>("navNew", ArtifactEditPage.class));
         add(new FeedbackPanel("feedback"));
+    }
+
+    /**
+     * Builds the sidebar here rather than in the constructor: it reads {@link #currentUrn()}, which
+     * subclasses override off their own fields, and those are still unassigned while the base
+     * constructor runs. Wicket calls this once the whole construction chain has completed.
+     */
+    @Override
+    protected void onInitialize() {
+        super.onInitialize();
         buildSidebar();
     }
 

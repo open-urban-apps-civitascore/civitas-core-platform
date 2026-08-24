@@ -37,6 +37,9 @@ public class ArtifactEditPage extends BasePage {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    /** The artifact being edited, or {@code null} when creating — see {@link #currentUrn()}. */
+    private final String editedUrn;
+
     public ArtifactEditPage() {
         this(new PageParameters());
     }
@@ -44,6 +47,7 @@ public class ArtifactEditPage extends BasePage {
     public ArtifactEditPage(PageParameters parameters) {
         String urn = parameters.get("urn").toString(null);
         boolean editing = urn != null && !urn.isBlank();
+        this.editedUrn = editing ? urn : null;
 
         EditState state = new EditState();
         String editorMode = CodeEditorPanel.MODE_JSON;
@@ -111,6 +115,11 @@ public class ArtifactEditPage extends BasePage {
         form.add(new CodeEditorPanel("content", new PropertyModel<>(state, "content"), finalEditorMode, schemaJson, false));
 
         add(form);
+    }
+
+    @Override
+    protected String currentUrn() {
+        return editedUrn;
     }
 
     private static ArtifactKind inferKind(String urn) {

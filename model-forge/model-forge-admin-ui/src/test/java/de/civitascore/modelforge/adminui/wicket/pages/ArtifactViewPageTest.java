@@ -6,7 +6,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.modelforge.adminui.wicket.AbstractWicketPageTest;
+import de.civitascore.modelforge.adminui.wicket.tree.ArtifactTree;
 import de.civitascore.modelforge.contract.ArtifactId;
+import de.civitascore.modelforge.contract.ArtifactSearchQuery;
+import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
@@ -90,6 +93,29 @@ class ArtifactViewPageTest extends AbstractWicketPageTest {
         tester.clickLink("deleteLink");
 
         tester.assertRenderedPage(ArtifactListPage.class);
+    }
+
+    @Test
+    void theSidebarMarksTheOpenArtifactActive() {
+        ArtifactId self = new ArtifactId(URN);
+        when(modelForge.getArtifact(eq(self)))
+            .thenReturn(Optional.of(new ArtifactView(self, JSON.readTree("{\"type\":\"object\"}"))));
+        when(modelForge.dependencies(any(DependencyQuery.class))).thenReturn(empty());
+        when(modelForge.dependents(any(DependencyQuery.class))).thenReturn(empty());
+        when(modelForge.mapsTo(any(DependencyQuery.class))).thenReturn(empty());
+        when(modelForge.mappedFrom(any(DependencyQuery.class))).thenReturn(empty());
+        // The sidebar tree is populated from search(), so the open artifact is one of its nodes.
+        when(modelForge.search(any(ArtifactSearchQuery.class)))
+            .thenReturn(List.of(new ArtifactSummary(self, "element", "Thing", "1.0.0", "json-schema")));
+
+        tester.startPage(ArtifactViewPage.class, new PageParameters().add("urn", URN));
+
+        tester.assertNoErrorMessage();
+        // Artifact nodes are lazy children of their type group, so the "active" class is not in the
+        // initial markup — assert the tree was handed the open artifact instead. This is null when
+        // currentUrn() is read from the base-page constructor, before the subclass assigns its urn.
+        ArtifactTree tree = (ArtifactTree) tester.getLastRenderedPage().get("artifactTree");
+        assertThat(tree.currentUrn()).isEqualTo(URN);
     }
 
     private static DependencyGraphView oneRelated(String name) {
