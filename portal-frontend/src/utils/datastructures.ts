@@ -1,3 +1,4 @@
+import { importDiagramFromJsonSchema } from '@/components/uml-modeler/services/jsonSchemaImportService'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
 import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { DirtyField } from '@/components/uml-modeler/types/session'
@@ -116,7 +117,14 @@ export const buildSessionFromVersion = (
   sessionId?: string,
   created?: Date,
 ) => {
-  const diagram = versionData?.styles || null
+  // Hydration, strictly as a gap-filler: bundle-imported versions carry only the JSON-Schema
+  // model, no drawn diagram — rebuild one from the model so the canvas is not empty. A version
+  // WITH styles is never touched. Viewing loses nothing (the stored model stays as-is); only
+  // saving a NEW version from a hydrated diagram re-exports the schema from UML and drops
+  // schema-only detail the diagram cannot carry (see jsonSchemaImportService).
+  const diagram =
+    versionData?.styles ||
+    (versionData?.model ? importDiagramFromJsonSchema(versionData.model, versionData.modelName || undefined) : null)
   const modelName = versionData?.modelName || null
   const fallbackSession = createEmptySession(modelName || undefined)
 
