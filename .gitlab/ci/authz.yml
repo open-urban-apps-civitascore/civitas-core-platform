@@ -300,6 +300,7 @@ build-opa-image:
       docker buildx build \
         --platform linux/amd64,linux/arm64 \
         --tag $SCAN_IMAGE_TAG \
+        --provenance=false \
         --push \
         --target opa \
         --file authz/Dockerfile .
@@ -349,6 +350,7 @@ build-authz-image:
       docker buildx build \
         --platform linux/amd64,linux/arm64 \
         --tag $SCAN_IMAGE_TAG \
+        --provenance=false \
         --push \
         --target authz-repo-service \
         --file authz/Dockerfile .
