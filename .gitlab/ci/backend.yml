@@ -463,6 +463,7 @@ build-backend-image:
       docker buildx build \
         --platform linux/amd64,linux/arm64 \
         --tag $SCAN_IMAGE_TAG \
+        --provenance=false \
         --push \
         .
   after_script:
