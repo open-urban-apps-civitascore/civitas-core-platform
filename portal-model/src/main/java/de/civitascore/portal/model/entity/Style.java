@@ -17,7 +17,7 @@ import lombok.Setter;
 @Table(name = "styles")
 @Getter
 @Setter
-public class Style extends BaseEntity {
+public class Style extends BaseEntity implements DataSetOwned {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "dataset_id", nullable = false)

@@ -36,7 +36,7 @@ import org.hibernate.type.SqlTypes;
 @Setter
 @SuperBuilder
 @NoArgsConstructor
-public class Pipeline extends NamedEntity {
+public class Pipeline extends NamedEntity implements DataSetOwned {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "dataset_id", nullable = false)

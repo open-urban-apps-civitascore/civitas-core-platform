@@ -29,7 +29,7 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "layers")
 @Getter
 @Setter
-public class Layer extends BaseEntity {
+public class Layer extends BaseEntity implements DataSetOwned {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "dataset_id", nullable = false)

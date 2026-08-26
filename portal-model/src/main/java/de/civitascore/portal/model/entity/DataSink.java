@@ -44,7 +44,7 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "data_sinks")
 @Getter
 @Setter
-public class DataSink extends BaseEntity {
+public class DataSink extends BaseEntity implements DataSetOwned {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "dataset_id", nullable = false)
