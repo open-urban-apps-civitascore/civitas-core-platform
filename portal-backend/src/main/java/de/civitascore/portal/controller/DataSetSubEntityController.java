@@ -34,7 +34,8 @@ public abstract class DataSetSubEntityController<
     extends BaseController<I, O, E, S> {
 
   /**
-   * The entity class, for the {@code dataSetId} path-variable error messages.
+   * Names this controller's entity in the {@code dataSetId} path-variable error and in the
+   * not-found answer for an entity owned by another dataset.
    *
    * @return the entity class this controller manages
    */
