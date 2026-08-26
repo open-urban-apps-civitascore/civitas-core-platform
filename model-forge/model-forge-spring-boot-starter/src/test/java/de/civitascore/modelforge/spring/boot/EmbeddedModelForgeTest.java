@@ -61,6 +61,13 @@ class EmbeddedModelForgeTest {
                 }
 
                 @Override
+                public de.civitascore.modelforge.contract.ImportArtifactResult importArtifact(
+                        de.civitascore.modelforge.contract.ImportArtifactCommand command) {
+                    return new de.civitascore.modelforge.contract.ImportArtifactResult(
+                        new ArtifactId("urn:example:model_forge.artifact"), true, Map.of());
+                }
+
+                @Override
                 public Optional<ArtifactView> getArtifact(ArtifactId artifactId) {
                     return Optional.empty();
                 }

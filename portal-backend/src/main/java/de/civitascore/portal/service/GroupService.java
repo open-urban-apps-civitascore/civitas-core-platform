@@ -8,6 +8,7 @@ import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentGroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
@@ -126,6 +127,17 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
 
     if (entity.getParentGroup() != null && entity.getParentGroup().getExternalId() != null) {
       groupConfig.setParentId(entity.getParentGroup().getExternalId());
+    }
+
+    if (entity.getMembers() != null) {
+      // Members are Keycloak user UUIDs (externalIds). A member normally always has one (user
+      // creation syncs to Keycloak synchronously); a member with none is skipped rather than sent
+      // as null.
+      groupConfig.setMembers(
+          entity.getMembers().stream()
+              .map(User::getExternalId)
+              .filter(externalId -> externalId != null && !externalId.isBlank())
+              .collect(Collectors.toSet()));
     }
 
     return groupConfig;

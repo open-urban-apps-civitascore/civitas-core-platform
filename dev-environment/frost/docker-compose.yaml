@@ -1,14 +1,19 @@
 name: frost_allinone
 services:
   web:
-    #    image: fraunhoferiosb/frost-server:latest
-    image: hylkevds/frost-http-projects:latest
+    image: fraunhoferiosb/frost-server-http:2.7.3
     platform: linux/amd64
     container_name: civitas-frost
     hostname: civitas-frost
     environment:
       # For all settings see: https://fraunhoferiosb.github.io/FROST-Server/settings/settings.html
       - serviceRootUrl=http://localhost:9080/FROST-Server/
+      # Projects data model (project-scoped Things, Users, Roles) — ships in core since 2.7.0,
+      # replacing the hylkevds/frost-http-projects fork. The plugin loads its bundled model
+      # through the modelLoader plugin, which must be enabled too. Default fine-grained access
+      # rules stay off — the dev stack runs FROST without authentication.
+      - plugins_projects_enable=true
+      - plugins_projects_enableDefaultRules=false
       - plugins_modelLoader_enable=true
       - plugins_multiDatastream_enable=false
       - plugins_actuation_enable=false
@@ -19,7 +24,6 @@ services:
       - persistence_db_username=sensorthings
       - persistence_db_password=${FROST_DB_PASSWORD}
       - persistence_autoUpdateDatabase=true
-      - plugins_modelLoader_securityPath=
     expose:
       - "8080"
     ports:
@@ -33,13 +37,18 @@ services:
       - civitas-network
 
   database:
-    image: postgis/postgis:16-3.4-alpine
+    image: postgis/postgis:16-3.5-alpine
     platform: linux/amd64
     container_name: civitas-frost-db
     environment:
       - POSTGRES_DB=sensorthings
       - POSTGRES_USER=sensorthings
       - POSTGRES_PASSWORD=${FROST_DB_PASSWORD}
+    ports:
+      # Host 5435 for local DB tooling (DBeaver, psql from the host); inside the
+      # compose network FROST keeps using database:5432. 5432/5433/5434 belong to
+      # the portal, Keycloak and GeoServer databases, 5544 to the demo source DB.
+      - "5435:5432"
     volumes:
       - postgis_volume:/var/lib/postgresql/data
     healthcheck:

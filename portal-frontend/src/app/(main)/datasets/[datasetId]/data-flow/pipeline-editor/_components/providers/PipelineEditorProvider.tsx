@@ -19,6 +19,7 @@ import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
+  useGetDataSinks,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
@@ -30,10 +31,11 @@ import {
 } from '@/app/services/api/pipelines/clientRequests'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
-import { isDatapoolScopeViolationError } from '@/utils/errors'
+import { isDatapoolScopeViolationError, isTableNameConflictError } from '@/utils/errors'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
+import { tableNameOwnerOutsideNode, tableNameOwnersOutsideSession } from '../../_services/dataSinkNameService'
 import {
   buildDataSinkPayloads,
   buildMappingArtifacts,
@@ -58,6 +60,7 @@ import {
 import { createSessionFromBackendDTO } from '../../_services/sessionService'
 import {
   getNodeValidationSeverity as getNodeValidationSeverityFn,
+  type PipelineValidationContext,
   validatePipelineWithNodeStatus,
   type ValidationResultWithNodeStatus,
 } from '../../_services/validationService'
@@ -103,6 +106,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Backend API Hooks =====
   const pipelinesQuery = useGetPipelines(datasetId)
+  // The dataset's sinks feed the CORE-model hydration: a styles-less pipeline (bundle import)
+  // resolves each sink node's real type (frost vs geoPersistence) and entity through them.
+  const dataSinksQuery = useGetDataSinks(datasetId)
   const datasetQuery = useGetDataset({ id: datasetId })
   const createPipelineMutation = useCreatePipeline(datasetId)
   const updatePipelineMutation = useUpdatePipeline(datasetId)
@@ -141,6 +147,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   useEffect(() => {
     if (hasLoadedRef.current) return
     if (!pipelinesQuery.data?.data) return
+    // Wait for the sinks while they load so the hydration can type its sink nodes; a failed
+    // sinks query (isPending false, no data) degrades to hydration without sink details.
+    if (dataSinksQuery.isPending) return
 
     hasLoadedRef.current = true
     const pipelineDTOs = pipelinesQuery.data.data
@@ -151,7 +160,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     }
 
     // Convert backend DTOs to sessions
-    const sessions = pipelineDTOs.map(dto => createSessionFromBackendDTO(dto))
+    const dataSinks = dataSinksQuery.data?.data ?? []
+    const sessions = pipelineDTOs.map(dto => createSessionFromBackendDTO(dto, dataSinks))
     // Preselect the session whose backend pipeline id matches the ?pipeline= search param,
     // so deep-links from the dataset overview open the right tab.
     const matchedSession = requestedPipelineId ? sessions.find(s => s.pipeline.id === requestedPipelineId) : undefined
@@ -164,7 +174,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     for (const session of sessions) {
       dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(session.pipeline)
     }
-  }, [pipelinesQuery.data, sessionManager, requestedPipelineId])
+  }, [pipelinesQuery.data, dataSinksQuery.isPending, dataSinksQuery.data, sessionManager, requestedPipelineId])
 
   // ===== Validation State =====
   const [validationResult, setValidationResult] = useState<ValidationResultWithNodeStatus | null>(null)
@@ -352,16 +362,30 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     [pipeline],
   )
 
+  // ===== Geo persistence table names =====
+  // The dataset's POSTGIS sinks share one schema, so a table name may be used only once per dataset.
+  const validationContextFor = useCallback(
+    (sessionId: string): PipelineValidationContext => ({
+      tableNameOwners: tableNameOwnersOutsideSession(sessionManager.sessions, sessionId),
+    }),
+    [sessionManager.sessions],
+  )
+
+  const pipelineUsingTableName = useCallback(
+    (nodeId: string, tableName: string) => tableNameOwnerOutsideNode(sessionManager.sessions, nodeId, tableName),
+    [sessionManager.sessions],
+  )
+
   // ===== Validation Operations =====
   const runValidation = useCallback(() => {
-    const result = validatePipelineWithNodeStatus(pipeline)
+    const result = validatePipelineWithNodeStatus(pipeline, activeSession ? validationContextFor(activeSession.id) : {})
     setValidationResult(result)
     // Mark validation as no longer required (it was just run)
     setIsValidationRequired(false)
     // Show validation panel in inspector
     setShouldShowValidationPanel(true)
     return result
-  }, [pipeline])
+  }, [pipeline, activeSession, validationContextFor])
 
   const clearValidation = useCallback(() => {
     setValidationResult(null)
@@ -442,7 +466,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     // Validate all dirty pipelines before saving
     const failedNames: string[] = []
     for (const session of dirtySessions) {
-      const result = validatePipelineWithNodeStatus(session.pipeline)
+      const result = validatePipelineWithNodeStatus(session.pipeline, validationContextFor(session.id))
       if (!result.isValid) {
         failedNames.push(session.name)
       }
@@ -470,6 +494,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     setIsSavingAll(true)
     const saveFailedNames: string[] = []
     const scopeViolationNames: string[] = []
+    const tableNameConflictNames: string[] = []
     try {
       if (hasDestructiveChange) {
         const isConfirmed = await confirmDataLoss()
@@ -552,6 +577,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         } catch (error) {
           if (isDatapoolScopeViolationError(error)) {
             scopeViolationNames.push(session.name)
+          } else if (isTableNameConflictError(error)) {
+            tableNameConflictNames.push(session.name)
           } else {
             saveFailedNames.push(session.name)
           }
@@ -561,10 +588,13 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       if (scopeViolationNames.length > 0) {
         toast.error(t('header.datasourceScopeViolation', { name: scopeViolationNames.join(', ') }))
       }
+      if (tableNameConflictNames.length > 0) {
+        toast.error(t('header.tableNameConflict', { names: tableNameConflictNames.join(', ') }))
+      }
       if (saveFailedNames.length > 0) {
         toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
       }
-      if (scopeViolationNames.length > 0 || saveFailedNames.length > 0) {
+      if (scopeViolationNames.length > 0 || tableNameConflictNames.length > 0 || saveFailedNames.length > 0) {
         return false
       }
 
@@ -585,6 +615,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     datasetId,
     datasetQuery.data,
     confirmDataLoss,
+    validationContextFor,
     t,
   ])
 
@@ -628,6 +659,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       runValidation,
       clearValidation,
       getNodeValidationSeverity,
+      pipelineUsingTableName,
       isValidationRequired,
       canSave,
       shouldShowValidationPanel,
@@ -669,6 +701,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       runValidation,
       clearValidation,
       getNodeValidationSeverity,
+      pipelineUsingTableName,
       isValidationRequired,
       canSave,
       shouldShowValidationPanel,

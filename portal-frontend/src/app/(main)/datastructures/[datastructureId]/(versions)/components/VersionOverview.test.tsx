@@ -50,7 +50,6 @@ vi.mock('@/components/uml-modeler/hooks/use-multi-session-manager', () => ({
 }))
 
 const mockUpdateMutateAsync = vi.fn()
-const mockUpdateReleasedMutateAsync = vi.fn()
 const mockCreateMutateAsync = vi.fn()
 const mockStatusUpdateMutateAsync = vi.fn()
 
@@ -61,10 +60,6 @@ vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
   }),
   useUpdateDatastructureVersion: () => ({
     mutateAsync: mockUpdateMutateAsync,
-    isPending: false,
-  }),
-  useUpdateDatastructureVersionReleased: () => ({
-    mutateAsync: mockUpdateReleasedMutateAsync,
     isPending: false,
   }),
   useStatusUpdateDatastructureVersion: () => ({
@@ -179,7 +174,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     mockPush.mockReset()
     mockRefresh.mockReset()
     mockUpdateMutateAsync.mockResolvedValue({ data: mockVersion })
-    mockUpdateReleasedMutateAsync.mockResolvedValue({ data: mockVersion })
     mockCreateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockStatusUpdateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockSearchParams = new URLSearchParams('mode=edit')
@@ -453,18 +447,62 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
       expect(screen.getByTestId('statusOption-available')).not.toHaveAttribute('data-disabled')
     })
+  })
 
-    it('reverts status from AVAILABLE to DRAFT when the form does not meet the AVAILABLE schema', async () => {
-      const availableVersionWithNoModel: DatastructureVersion = {
-        ...mockVersion,
-        dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
-        modelName: null,
-      }
-      renderComponent({ version: availableVersionWithNoModel })
+  describe('required field validation per status', () => {
+    const selectAvailableStatus = async (user: UserEvent) => {
+      await openStatusDropdown(user)
+      await user.click(screen.getByTestId('statusOption-available'))
+    }
+
+    it('marks the description as invalid when it is cleared while the status is AVAILABLE', async () => {
+      const user = userEvent.setup()
+      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
+      renderComponent({ version: mockVersionWithModel })
+
+      await selectAvailableStatus(user)
+      await user.clear(screen.getByTestId('descriptionTextArea'))
 
       await waitFor(() => {
-        expect(screen.getByTestId('statusDropdown')).toHaveTextContent('Entwurf')
+        expect(screen.getByTestId('descriptionTextArea')).toHaveAttribute('aria-invalid', 'true')
       })
+      expect(screen.getByText(messages.common.errors.required)).toBeInTheDocument()
+    })
+
+    it('keeps the description valid when it is cleared while the status is DRAFT', async () => {
+      const user = userEvent.setup()
+      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
+      renderComponent({ version: mockVersionWithModel })
+
+      await user.clear(screen.getByTestId('descriptionTextArea'))
+
+      expect(screen.getByTestId('descriptionTextArea')).toHaveAttribute('aria-invalid', 'false')
+      expect(screen.queryByText(messages.common.errors.required)).not.toBeInTheDocument()
+    })
+
+    it('disables the save button while a required field is empty at status AVAILABLE', async () => {
+      const user = userEvent.setup()
+      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
+      renderComponent({ version: mockVersionWithModel })
+
+      await selectAvailableStatus(user)
+      expect(screen.getAllByTestId('confirmButton')[0]).toBeEnabled()
+
+      await user.clear(screen.getByTestId('descriptionTextArea'))
+
+      await waitFor(() => {
+        expect(screen.getAllByTestId('confirmButton')[0]).toBeDisabled()
+      })
+    })
+
+    it('keeps the save button enabled with an empty description at status DRAFT', async () => {
+      const user = userEvent.setup()
+      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
+      renderComponent({ version: mockVersionWithModel })
+
+      await user.clear(screen.getByTestId('descriptionTextArea'))
+
+      expect(screen.getAllByTestId('confirmButton')[0]).toBeEnabled()
     })
   })
 
@@ -509,7 +547,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       })
     })
 
-    it('calls the meta endpoint when an AVAILABLE version is updated', async () => {
+    it('sends nothing but the status change for an AVAILABLE version', async () => {
       const user = userEvent.setup()
       const availableVersionWithModel = {
         ...mockVersionWithModel,
@@ -518,19 +556,22 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(availableVersionWithModel))
       renderComponent({ version: availableVersionWithModel })
 
-      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
-      await user.type(descriptionInput, 'Updated description')
+      expect(screen.getByTestId('versionTextField')).toBeDisabled()
+      expect(screen.getByTestId('descriptionTextArea')).toBeDisabled()
 
+      await openStatusDropdown(user)
+      await user.click(screen.getByTestId('statusOption-draft'))
       const confirmButtons = screen.getAllByTestId('confirmButton')
       await user.click(confirmButtons[0])
 
       await waitFor(() => {
-        expect(mockUpdateReleasedMutateAsync).toHaveBeenCalledWith(
+        expect(mockStatusUpdateMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({
-            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/released/meta`,
+            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/unrelease`,
           }),
         )
       })
+      expect(mockUpdateMutateAsync).not.toHaveBeenCalled()
     })
 
     it('calls create API when save is clicked in create mode', async () => {

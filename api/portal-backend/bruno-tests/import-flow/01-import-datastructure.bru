@@ -1,0 +1,63 @@
+meta {
+  name: Import DataStructure
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/imports/datastructures
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Bruno Flow Struktur",
+    "description": "Created by the import test flow",
+    "model": {
+      "$id": "urn:core:standard:openurbanapps:datastructure:test:brunoflow:r{{runId}}",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "value": { "type": "number" },
+        "measuredAt": { "type": "string" }
+      }
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  // Run-unique disambiguator: the 409 turnstile would otherwise fail every
+  // re-run of this flow against the same instance. Set once per run;
+  // 02 reuses the same URN on purpose (conflict case).
+  if (!bru.getVar('runId')) {
+    bru.setVar('runId', String(Date.now()));
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar('importedModelUrn', res.body.modelUrn);
+  }
+}
+
+tests {
+  test("creates structure with pinned versioned URN", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.modelUrn).to.be.a('string');
+    expect(res.body.modelUrn).to.include(':datastructure:');
+    expect(res.body.modelUrn).to.include('brunoflow:r' + bru.getVar('runId'));
+  });
+}
+
+docs {
+  Happy path of POST /v1/imports/datastructures: shell + first version +
+  model registration in one transaction, everything DRAFT.
+
+  The flow leaves its (run-unique, DRAFT) structures behind — there is no
+  import-side delete endpoint. Clean up via the portal UI if they bother you.
+}

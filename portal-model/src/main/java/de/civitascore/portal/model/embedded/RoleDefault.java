@@ -48,7 +48,9 @@ public enum RoleDefault {
       PermissionName.DATAPOOL_READ,
       PermissionName.DATAPOOL_CREATE,
       PermissionName.DATAPOOL_UPDATE,
-      PermissionName.DATAPOOL_DELETE),
+      PermissionName.DATAPOOL_DELETE,
+      PermissionName.INSTALLATION_READ,
+      PermissionName.INSTALLATION_DELETE),
 
   DATA_CONSUMER(
       "Data Consumer",

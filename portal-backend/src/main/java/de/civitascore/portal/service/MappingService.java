@@ -31,13 +31,53 @@ public class MappingService {
    * passed through opaquely to Model Forge.
    */
   public ModelRegistryGateway.ModelPin store(String logicalUrn, Map<String, Object> doc) {
-    Map<String, Object> content = new LinkedHashMap<>(doc == null ? Map.of() : doc);
-    content.remove("logicalUrn");
-    Object positions = content.remove("positions");
-    Map<String, Object> styles =
-        positions instanceof Map<?, ?> ? Map.of("positions", positions) : null;
+    AuthoredDocument document = authored(doc);
     return registry.storePayload(
-        PayloadKind.MAPPING, Optional.ofNullable(logicalUrn), deriveName(content), content, styles);
+        PayloadKind.MAPPING,
+        Optional.ofNullable(logicalUrn),
+        document.name(),
+        document.content(),
+        document.styles());
+  }
+
+  /**
+   * Imports the authored mapping document at its catalogue-declared logical URN through Model
+   * Forge's envelope door: created on first install (identity kept), reused when an identical
+   * mapping is already installed, refused (409) when the identity holds different content. The
+   * document is split exactly like {@link #store}, so both paths agree on what "identical" means.
+   */
+  public ModelRegistryGateway.EnvelopeImportResult importAt(
+      String logicalUrn, Map<String, Object> doc) {
+    AuthoredDocument document = authored(doc);
+    return registry.importPayloadAt(
+        PayloadKind.MAPPING, logicalUrn, document.content(), document.styles());
+  }
+
+  /**
+   * The versioned URN of the mapping's current version — what a pipeline node should pin. Empty
+   * when no mapping exists at the URN.
+   */
+  public Optional<String> currentVersionedUrn(String urn) {
+    return registry.currentModelUrn(urn);
+  }
+
+  /**
+   * Whether a mapping artifact exists at this (logical or versioned) CORE URN. Used by the bundle
+   * import to tell "create at the authored URN" from "this identity is already installed".
+   */
+  public boolean exists(String urn) {
+    return registry.fetchPayload(urn).isPresent();
+  }
+
+  /**
+   * Whether the artifact at {@code urn} already holds exactly this authored document. Deliberately
+   * routed through the same split {@link #store} uses: a reuse decision made on a differently split
+   * document would disagree with what a write actually produces, and every re-install of an
+   * unchanged bundle would be misread as a conflict.
+   */
+  public boolean isUnchanged(String urn, Map<String, Object> doc) {
+    AuthoredDocument document = authored(doc);
+    return registry.isUnchanged(urn, document.content(), document.styles());
   }
 
   /** The mapping's content (rules), read back from Model Forge, or empty when it does not exist. */
@@ -58,6 +98,24 @@ public class MappingService {
     } else {
       registry.deletePayload(urn);
     }
+  }
+
+  /** An authored mapping document, split the way Model Forge stores it. */
+  private record AuthoredDocument(
+      String name, Map<String, Object> content, Map<String, Object> styles) {}
+
+  /**
+   * Splits an authored document into what Model Forge stores: the CORE content, the UI-only node
+   * layout as {@code x-ui-styles}, and the display name derived from the title. Single source of
+   * truth for both writing and comparing.
+   */
+  private static AuthoredDocument authored(Map<String, Object> doc) {
+    Map<String, Object> content = new LinkedHashMap<>(doc == null ? Map.of() : doc);
+    content.remove("logicalUrn");
+    Object positions = content.remove("positions");
+    Map<String, Object> styles =
+        positions instanceof Map<?, ?> ? Map.of("positions", positions) : null;
+    return new AuthoredDocument(deriveName(content), content, styles);
   }
 
   private static String deriveName(Map<String, Object> doc) {

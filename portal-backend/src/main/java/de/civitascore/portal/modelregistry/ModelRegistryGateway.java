@@ -1,5 +1,6 @@
 package de.civitascore.portal.modelregistry;
 
+import de.civitascore.modelforge.contract.ArtifactContentConflictException;
 import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactView;
@@ -7,6 +8,8 @@ import de.civitascore.modelforge.contract.ArtifactWriteResult;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.DiagnosticSeverity;
+import de.civitascore.modelforge.contract.ImportArtifactCommand;
+import de.civitascore.modelforge.contract.ImportArtifactResult;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
@@ -15,6 +18,7 @@ import de.civitascore.modelforge.contract.ValidateSchemaCommand;
 import de.civitascore.modelforge.contract.ValidationResult;
 import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.modelforge.urn.UrnParser;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -244,6 +248,27 @@ public class ModelRegistryGateway {
   }
 
   /**
+   * Whether {@code id} is a well-formed CORE URN whose artifact type is {@code datastructure}.
+   * Exposed for host-side guards — e.g. the import endpoint rejecting a model whose {@code $id}
+   * would make {@link #storeModel} register it as a plain Element — without host services importing
+   * Model Forge's {@code UrnParser} directly (see {@code ModelForgeBoundaryTest}).
+   */
+  public boolean isDataStructureUrn(String id) {
+    return UrnParser.isUrn(id) && "datastructure".equals(UrnParser.artifactTypeFromUrn(id));
+  }
+
+  /**
+   * Whether {@code id} is a well-formed CORE URN whose artifact type is {@code mapping}. Exposed
+   * for the same reason as {@link #isDataStructureUrn}: a bundled mapping brings its own identity,
+   * and the host has to reject a URN of the wrong artifact type before storing — without host
+   * services importing Model Forge's {@code UrnParser} directly (see {@code
+   * ModelForgeBoundaryTest}).
+   */
+  public boolean isMappingUrn(String id) {
+    return UrnParser.isUrn(id) && "mapping".equals(UrnParser.artifactTypeFromUrn(id));
+  }
+
+  /**
    * The versioned CORE URNs of a given artifact type that {@code urn} depends on, read from Model
    * Forge's dependency graph. This is the envelope-level way for host orchestration to learn, e.g.,
    * which Mappings a pipeline references — <b>without ever parsing the pipeline's content</b> (the
@@ -320,6 +345,51 @@ public class ModelRegistryGateway {
                   return result.artifactId();
                 });
     return toPin(root);
+  }
+
+  /** Result of an envelope import: the resolved pin, and whether this call created the artifact. */
+  public record EnvelopeImportResult(ModelPin pin, boolean created) {}
+
+  /**
+   * Imports an opaque payload at a caller-declared logical URN through Model Forge's envelope door
+   * — the identity is KEPT (unlike {@link #storePayload}, whose create path mints). Idempotent
+   * turnstile: an identical existing artifact is reused without a write; different content is
+   * refused and surfaces as the host's 409.
+   *
+   * @throws UniqueConstraintViolationException when the identity exists with different content
+   */
+  public EnvelopeImportResult importPayloadAt(
+      PayloadKind kind,
+      String logicalUrn,
+      Map<String, Object> payload,
+      Map<String, Object> styles) {
+    ObjectNode envelope = objectMapper.createObjectNode();
+    envelope.put("$schema", "https://civitasconnect.digital/core/artifact-envelope/v1");
+    envelope.put("artifactId", logicalUrn);
+    envelope.put("artifactType", envelopeType(kind));
+    ObjectNode firstVersion = envelope.putObject("firstVersion");
+    firstVersion.put("version", "1.0.0");
+    ObjectNode inner = firstVersion.putObject("content");
+    inner.put("contentType", "application/json");
+    inner.set("content", mergeStyles(payload, styles));
+    try {
+      ImportArtifactResult result = modelForge.importArtifact(new ImportArtifactCommand(envelope));
+      logDependencies(result.artifactId(), result.dependencies());
+      return new EnvelopeImportResult(toPin(result.artifactId()), result.created());
+    } catch (ArtifactContentConflictException e) {
+      throw new UniqueConstraintViolationException(e.getMessage());
+    }
+  }
+
+  /** The envelope's {@code artifactType} token for a payload kind. */
+  private static String envelopeType(PayloadKind kind) {
+    return switch (kind) {
+      case MAPPING -> "MAPPING";
+      case PIPELINE -> "PIPELINE";
+      case DATA_SOURCE -> "DATASOURCE";
+      case DATA_SINK -> "DATASINK";
+      case DATA_SET -> "DATASET";
+    };
   }
 
   /**
@@ -413,6 +483,15 @@ public class ModelRegistryGateway {
   }
 
   /**
+   * The versioned CORE URN of the artifact's current version, resolved through the facade — the
+   * contract records always carry the concrete version, so a logical URN in resolves to the current
+   * versioned one. Empty when the artifact does not exist.
+   */
+  public Optional<String> currentModelUrn(String urn) {
+    return modelForge.getArtifact(new ArtifactId(urn)).map(view -> view.artifactId().value());
+  }
+
+  /**
    * Whether the given content+styles equal the document already pinned by {@code versionedUrn} (the
    * registry's self-description stamps are ignored). Callers use this to skip the registry write on
    * updates that do not change the stored document — otherwise every host-side metadata update
@@ -426,6 +505,25 @@ public class ModelRegistryGateway {
         .map(ArtifactView::content)
         .map(ModelRegistryGateway::comparable)
         .map(merged::equals)
+        .orElse(false);
+  }
+
+  /**
+   * Like {@link #isUnchanged}, but blind to {@value #X_UI_STYLES}: the install turnstile compares
+   * portable content only. UI layout is instance-authored presentation, so a stored document that
+   * differs from the bundle solely in layout still counts as identical — the import reuses it,
+   * keeping the instance's layout, instead of conflicting. Update paths keep using {@link
+   * #isUnchanged}: there a styles-only change must mint a version, or layout edits would be lost.
+   */
+  public boolean isUnchangedIgnoringUiStyles(String versionedUrn, Map<String, Object> content) {
+    // mergeStyles with null styles already drops an inbound x-ui-styles key from the candidate.
+    JsonNode candidate = comparable(mergeStyles(content, null));
+    return modelForge
+        .getArtifact(new ArtifactId(versionedUrn))
+        .map(ArtifactView::content)
+        .map(ModelRegistryGateway::comparable)
+        .map(ModelRegistryGateway::withoutUiStyles)
+        .map(candidate::equals)
         .orElse(false);
   }
 
@@ -543,6 +641,15 @@ public class ModelRegistryGateway {
     copy.remove("id");
     copy.remove("$id");
     return copy;
+  }
+
+  /**
+   * Removes the {@value #X_UI_STYLES} block for the styles-blind comparison. Only ever applied to
+   * the copies {@link #comparable} returns, so the stored original is never mutated.
+   */
+  private static JsonNode withoutUiStyles(JsonNode document) {
+    ((ObjectNode) document).remove(X_UI_STYLES);
+    return document;
   }
 
   /**

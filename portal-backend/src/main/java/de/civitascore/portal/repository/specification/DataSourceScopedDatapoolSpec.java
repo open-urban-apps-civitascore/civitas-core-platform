@@ -1,14 +1,10 @@
 package de.civitascore.portal.repository.specification;
 
-import de.civitascore.portal.model.embedded.DatapoolScopeType;
-import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
-import jakarta.persistence.criteria.Subquery;
 import java.io.Serial;
 import java.util.UUID;
 import net.kaczmarzyk.spring.data.jpa.utils.Converter;
@@ -45,18 +41,6 @@ public class DataSourceScopedDatapoolSpec implements Specification<DataSource> {
   @Override
   public Predicate toPredicate(Root<DataSource> root, CriteriaQuery<?> query, CriteriaBuilder cb) {
     UUID datapoolId = UUID.fromString(httpParamValues[0]);
-
-    Subquery<UUID> subquery = query.subquery(UUID.class);
-    Root<DataSource> subRoot = subquery.correlate(root);
-    Join<DataSource, DataPool> scopedPools = subRoot.join("scopedDataPools");
-    subquery.select(scopedPools.get("id")).where(cb.equal(scopedPools.get("id"), datapoolId));
-
-    Predicate isAll = cb.equal(root.get("datapoolScopeType"), DatapoolScopeType.ALL);
-    Predicate isSpecificWithMatch =
-        cb.and(
-            cb.equal(root.get("datapoolScopeType"), DatapoolScopeType.SPECIFIC),
-            cb.exists(subquery));
-
-    return cb.or(isAll, isSpecificWithMatch);
+    return DataSourceDatapoolUsability.usableInPool(datapoolId).toPredicate(root, query, cb);
   }
 }

@@ -4,6 +4,7 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.Diagnostic;
+import de.civitascore.modelforge.contract.DiagnosticSeverity;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
@@ -110,6 +111,20 @@ public class CoreSchemaValidator {
             return List.of();
         }
         return validateAgainst(resource, document);
+    }
+
+    /**
+     * Validates a CORE artifact envelope against {@code artifact-envelope.schema.json} — the
+     * structural gate of the envelope import. A non-object document is itself a violation here
+     * (unlike {@link #validate(ArtifactKind, JsonNode)}, where a non-object cannot reach the
+     * write path at all).
+     */
+    public List<Diagnostic> validateEnvelope(JsonNode envelope) {
+        if (envelope == null || !envelope.isObject()) {
+            return List.of(new Diagnostic(DiagnosticSeverity.ERROR,
+                "The artifact envelope must be a JSON object.", "artifact-schema-violation", "/"));
+        }
+        return validateAgainst("artifact-envelope.schema.json", envelope);
     }
 
     private List<Diagnostic> validateAgainst(String resource, JsonNode document) {

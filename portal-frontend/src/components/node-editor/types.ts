@@ -8,6 +8,12 @@ export interface PortDef {
   type: PortType
   /** Optional primitive subtype (e.g. str/int/date) used for cast detection. */
   dataType?: string
+  /**
+   * Input-only: the set of source subtypes this port accepts. When present, compatibility is a
+   * membership test against this list instead of exact `dataType` equality — e.g. a numeric
+   * conversion input accepts str/int/number but rejects uuid/bool/date.
+   */
+  accepts?: readonly string[]
 }
 
 export type ConfigControl = 'text' | 'number' | 'select'

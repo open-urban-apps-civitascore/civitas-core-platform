@@ -54,17 +54,12 @@ type JsonSchemaObject = Record<string, unknown>
  */
 const PRIMITIVE_TYPE_MAP: Record<string, JsonSchemaObject> = {
   String: { type: 'string' },
-  Character: { type: 'string' },
   Uuid: { type: 'string', format: 'uuid' },
   Integer: { type: 'integer' },
-  Long: { type: 'integer' },
-  Short: { type: 'integer' },
-  Byte: { type: 'integer' },
-  Float: { type: 'number' },
-  Double: { type: 'number' },
+  Number: { type: 'number' },
   Boolean: { type: 'boolean' },
-  Date: { type: 'string', format: 'date-time' },
-  void: { type: 'null' },
+  Date: { type: 'string', format: 'date' },
+  DateTime: { type: 'string', format: 'date-time' },
 }
 
 const GEOMETRY_TYPES = new Set([
@@ -221,11 +216,7 @@ const buildClassSchema = (
 
     const partElement = (diagram.nodes ?? []).find(node => node.data?.element?.id === containment.partId)?.data?.element
     const propName =
-      containment.role ||
-      rel.name ||
-      (partElement ? lowerFirst(partElement.name) : '') ||
-      sanitizeName(partDefKey) ||
-      partDefKey
+      containment.role || (partElement ? lowerFirst(partElement.name) : '') || sanitizeName(partDefKey) || partDefKey
     const { lower, upper } = parseMultiplicity(containment.multiplicity)
     const ref: JsonSchemaObject = { $ref: `#/$defs/${partDefKey}` }
 
@@ -285,8 +276,8 @@ export const assignDefKeys = (elements: UMLElement[]): Map<string, string> => {
 }
 
 /**
- * The diagram cannot be exported as a schema: it has no unique root class or leaves elements
- * unreachable from it. Carries the typed {@link RootResolutionFailure} so callers can render a
+ * The diagram cannot be exported as a schema: it has no unique root class, or a relation points
+ * away from that root. Carries the typed {@link RootResolutionFailure} so callers can render a
  * precise, actionable message.
  */
 export class SchemaExportError extends Error {
@@ -299,7 +290,7 @@ export class SchemaExportError extends Error {
 /**
  * Main export function - converts a UMLDiagram into a JSON Schema document.
  *
- * @throws SchemaExportError when the diagram has no unique root class or elements are unreachable
+ * @throws SchemaExportError when the diagram has no unique root class, or a relation points away
  *   from it — callers surface this as a validation message instead of persisting a guessed schema
  */
 export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): JsonSchemaObject => {

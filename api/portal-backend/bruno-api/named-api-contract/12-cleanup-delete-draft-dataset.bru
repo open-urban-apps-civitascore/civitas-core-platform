@@ -1,0 +1,48 @@
+meta {
+  name: 12. Cleanup - Delete the contract DataSet
+  type: http
+  seq: 12
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{napiContractDataSetId}}
+}
+
+
+tests {
+  test("DataSet deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone, 400=not deletable in its current status
+    expect(status === 204 || status === 404 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Contract step 12** — Delete the contract fixture (cleanup).
+
+  Removes the DRAFT dataset created in step 1 together with its two cascaded named-API rows. The
+  dataset never left `DRAFT`, so no saga teardown is involved and the delete is synchronous.
+
+  The rejection steps (4-10) create nothing, so this is the folder's only cleanup.
+
+  **Precondition:** `napiContractDataSetId` is set (step 1).
+
+  **Expected Response:** 204 No Content. 404 if already deleted; 400 if the dataset is not in a
+  deletable status.
+
+  **Post-condition:** none — the suite leaves no residue behind.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet + its NamedApi rows removed from `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

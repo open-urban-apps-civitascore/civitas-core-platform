@@ -1,7 +1,7 @@
 meta {
   name: 10. Verify DataSet (SQL-source saga complete)
   type: http
-  seq: 17
+  seq: 18
 }
 
 get {
@@ -41,17 +41,20 @@ script:pre-request {
   const token = tokenResp.data.access_token;
 
   for (let i = 0; i < 30; i++) {
-    const resp = await axios.get(
-      `${baseUrl}/datasets/${datasetId}`,
-      {
-        headers: { 'Authorization': `Bearer ${token}` },
-        validateStatus: () => true,
-      }
-    );
+    // The QuickJS sandbox does not honour validateStatus across the VM boundary, so a
+    // transient 401/403 while OPA data propagates rejects the promise. Guard each attempt
+    // separately so one such response does not abort the whole poll.
+    let resp;
+    try {
+      resp = await axios.get(
+        `${baseUrl}/datasets/${datasetId}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+    } catch (e) { /* transient; retry */ }
     // Settled = saga no longer pending. Either it succeeded (AVAILABLE) or it failed and
     // compensated (back to READY). Break on EITHER so a red run fails fast with a clear status
     // instead of burning the full 60s timeout.
-    if (resp.status === 200 && resp.data && resp.data.pendingSagaType === null) {
+    if (resp && resp.status === 200 && resp.data && resp.data.pendingSagaType === null) {
       if (resp.data.publicUrl) {
         bru.setVar('sqlPublicUrl', resp.data.publicUrl);
       }

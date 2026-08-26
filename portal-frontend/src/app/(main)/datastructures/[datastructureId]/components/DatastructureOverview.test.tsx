@@ -155,6 +155,7 @@ const datastructure = {
   name: 'Test Datastructure',
   description: 'A test datastructure',
   dataStructureStatus: 'DRAFT' as const,
+  createdFromDataSource: false,
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
   dataStructureVersions: [],
@@ -163,8 +164,6 @@ const datastructure = {
 const defaultProps = {
   datastructure,
   initialAssignments: [],
-  groups: [],
-  roles: [],
 }
 
 const mockCurrentUser = (permissions: PermissionName[]) => {
@@ -242,6 +241,20 @@ describe('DatastructureOverview', () => {
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
       expect(mockReplace).toHaveBeenCalledWith('/datastructures/test-id?mode=edit', { scroll: false })
+    })
+
+    it('starts in edit mode when mode=edit param is present', () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      render(<DatastructureOverview {...defaultProps} />)
+      expect(screen.getByTestId('basicInfoTab')).toHaveAttribute('data-readonly', 'false')
+    })
+
+    it('stays in read-only mode when mode=edit param is present but the user lacks DATASTRUCTURE_UPDATE', () => {
+      mockCurrentUser([])
+      mockSearchParams = new URLSearchParams('mode=edit')
+      render(<DatastructureOverview {...defaultProps} />)
+      expect(screen.getByTestId('basicInfoTab')).toHaveAttribute('data-readonly', 'true')
+      expect(screen.queryByTestId('cancelButton')).not.toBeInTheDocument()
     })
   })
 })

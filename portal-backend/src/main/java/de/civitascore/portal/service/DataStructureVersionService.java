@@ -67,11 +67,16 @@ public class DataStructureVersionService
   @Override
   protected DataStructureVersion postConvertToEntity(
       DataStructureVersion entity, DataStructureVersionInputDTO input) {
-    // Set dataStructure
+    // Set dataStructure — both sides: callers composing create and release inside one
+    // transaction (the bundle import) read the parent's in-memory collection in
+    // validateRelease, and Hibernate never refreshes it for an already-managed entity.
     Optional.ofNullable(input.getDataStructureId())
         .map(dataStructureService::findByIdOrThrow)
         .ifPresentOrElse(
-            entity::setDataStructure,
+            structure -> {
+              entity.setDataStructure(structure);
+              structure.getDataStructureVersions().add(entity);
+            },
             () -> {
               throw new InvalidInputException(
                   "dataStructureId", entity.getId(), "dataStructureId cannot be null or blank");
@@ -83,7 +88,70 @@ public class DataStructureVersionService
     validateModelSchema(entity, input);
     storeModelInRegistry(entity, input);
 
+    // The registry mints the real version string only when a model is stored. A version created
+    // without a model (the UI's two-step flow) must still never carry a null version — the portal
+    // frontend sorts versions with versionNumber.localeCompare and dies on null. The provisional
+    // is recognizably a draft and gets overwritten by the registry pin on the first model store.
+    if (entity.getVersion() == null) {
+      entity.setVersion(provisionalVersion(entity.getDataStructure()));
+    }
+
     return super.postConvertToEntity(entity, input);
+  }
+
+  private static final String PROVISIONAL_SUFFIX = "-draft";
+
+  /**
+   * The next plausible version string for a model-less draft: highest parseable sibling version
+   * (provisional siblings count too, so two parallel drafts do not collide) with the patch bumped,
+   * or {@code 1.0.0} for the first version — always with the {@code -draft} suffix, so it cannot be
+   * mistaken for a registry-minted number.
+   */
+  private String provisionalVersion(DataStructure parent) {
+    int[] max = null;
+    if (parent != null && parent.getDataStructureVersions() != null) {
+      for (DataStructureVersion sibling : parent.getDataStructureVersions()) {
+        int[] parsed = parseSemver(sibling.getVersion());
+        if (parsed != null && (max == null || compareSemver(parsed, max) > 0)) {
+          max = parsed;
+        }
+      }
+    }
+    if (max == null) {
+      return "1.0.0" + PROVISIONAL_SUFFIX;
+    }
+    return max[0] + "." + max[1] + "." + (max[2] + 1) + PROVISIONAL_SUFFIX;
+  }
+
+  private static int compareSemver(int[] a, int[] b) {
+    for (int i = 0; i < 3; i++) {
+      if (a[i] != b[i]) {
+        return Integer.compare(a[i], b[i]);
+      }
+    }
+    return 0;
+  }
+
+  /** Parses {@code major.minor.patch} (a {@code -draft} suffix is tolerated); null if no match. */
+  private static int[] parseSemver(String version) {
+    if (version == null) {
+      return null;
+    }
+    String bare =
+        version.endsWith(PROVISIONAL_SUFFIX)
+            ? version.substring(0, version.length() - PROVISIONAL_SUFFIX.length())
+            : version;
+    String[] parts = bare.split("\\.");
+    if (parts.length != 3) {
+      return null;
+    }
+    try {
+      return new int[] {
+        Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2])
+      };
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   /**

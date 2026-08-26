@@ -17,10 +17,11 @@ interface VersionInfoTabProps {
   form: UseFormReturn<DatastructureVersionFormData>
   isReadOnly?: boolean
   versionAlreadyExistsError?: string
+  isAvailable: boolean
 }
 
 export const VersionInfoTab = (props: VersionInfoTabProps) => {
-  const { form, isReadOnly = false, versionAlreadyExistsError } = props
+  const { form, isReadOnly = false, isAvailable, versionAlreadyExistsError } = props
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
 
@@ -44,7 +45,7 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
               label={t('versionInfo.versionNumber')}
               name="version"
               placeholder={t('versionInfo.versionNumberPlaceholder')}
-              disabled={isReadOnly}
+              disabled={isReadOnly || isAvailable}
               required
               manualError={versionAlreadyExistsError}
             />
@@ -59,7 +60,7 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
               hint={tCommon('info.descriptionHint')}
               maxLength={150}
               hasCharacterCount
-              disabled={isReadOnly}
+              disabled={isReadOnly || isAvailable}
               required
               className="min-h-[100px] resize-none"
             />

@@ -12,9 +12,20 @@ import { AttributeManager } from './AttributeManager'
 
 interface NodePropertyEditorProps {
   node: UMLNode
+  /** Off until the stereotype field is supported end to end. */
+  isStereotypeVisible?: boolean
+  /** Off until the static modifier is supported end to end. */
+  isStaticVisible?: boolean
+  /** Off until attribute default values are supported end to end. */
+  isDefaultValueVisible?: boolean
 }
 
-export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) => {
+export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({
+  node,
+  isStereotypeVisible = false,
+  isStaticVisible = false,
+  isDefaultValueVisible = false,
+}) => {
   const { updateNode, setRootNode } = useActiveDiagram()
   const { isReadOnly } = useReadOnly()
   const [activeSection, setActiveSection] = useState<'basic' | 'attributes' | 'literals'>('basic')
@@ -158,7 +169,7 @@ export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) 
             )}
 
             {/* Stereotype */}
-            {availableStereotypes.length > 0 && (
+            {isStereotypeVisible && availableStereotypes.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Stereotype</label>
                 <select
@@ -180,7 +191,12 @@ export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) 
         )}
 
         {activeSection === 'attributes' && hasAttributes(element) && (
-          <AttributeManager nodeId={node.id} element={element} />
+          <AttributeManager
+            nodeId={node.id}
+            element={element}
+            isStaticVisible={isStaticVisible}
+            isDefaultValueVisible={isDefaultValueVisible}
+          />
         )}
 
         {activeSection === 'literals' && element.type === 'enumeration' && 'literals' in element && (

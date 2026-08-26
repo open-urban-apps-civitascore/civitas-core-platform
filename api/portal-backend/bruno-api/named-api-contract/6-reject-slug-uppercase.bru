@@ -1,0 +1,50 @@
+meta {
+  name: 6. Reject slug with uppercase characters
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "Named API Contract Uppercase Slug",
+    "description": "Negative fixture — the slug shape must be the only reason this create fails.",
+    "openDataAccess": false,
+    "namedApis": [
+      { "name": "Uppercase Slug", "slug": "Traffic", "standard": "STA", "version": "1.1" }
+    ]
+  }
+}
+
+tests {
+  const body = res.body || {};
+
+  test("Status code is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Response is a problem document", function() {
+    expect(body.detail !== undefined || body.title !== undefined).to.be.true;
+  });
+}
+
+docs {
+  **Contract step 6** — Reject an uppercase slug.
+
+  Slugs are lowercase-only (`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`). The slug becomes a public path
+  segment, and path matching is case-sensitive at the gateway while hostnames are not — allowing
+  `Traffic` alongside `traffic` would produce two routes that read as one to a consumer.
+
+  Everything else in the body is valid, so a 400 here can only come from the slug.
+
+  **Precondition:** none.
+
+  **Expected Response:** 400 Bad Request, `application/problem+json`.
+
+  **Post-condition:** none — no dataset is created, so nothing to clean up.
+}

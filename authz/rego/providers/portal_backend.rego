@@ -41,7 +41,8 @@ path_pattern := restmapper.match_pattern(input.request.path, endpoints)
 # for scope enforcement on resource endpoints.
 #
 # Scope model (with TENANT inheritance per ADM spec):
-#   - TENANT resources: users, groups, roles, permissions, assignments
+#   - TENANT resources: users, groups, roles, permissions, assignments,
+#     installations (bundle-install provenance is tenant administration)
 #   - DATASET resources: datasets (TENANT scope inherits down)
 #   - DATASOURCE resources: datasources (TENANT scope inherits down)
 #   - DATASTRUCTURE resources: datastructures (TENANT scope inherits down)
@@ -58,6 +59,10 @@ resource_scope_type := {
 	"roles": "TENANT",
 	"permissions": "TENANT",
 	"assignments": "TENANT",
+	# Without this entry, expected_scope_type is undefined for
+	# /v1/installations/{id} and EVERY resource-endpoint permission rule
+	# fails silently — DELETE was denied even for INSTALLATION_DELETE holders.
+	"installations": "TENANT",
 	"datasets": "DATASET",
 	"datasources": "DATASOURCE",
 	"datastructures": "DATASTRUCTURE",

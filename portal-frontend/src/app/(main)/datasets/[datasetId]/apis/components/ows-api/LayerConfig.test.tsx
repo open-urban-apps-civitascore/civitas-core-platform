@@ -1,14 +1,16 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 
 import { STATUS_TYPES } from '@/types/common'
 import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
 import { LayerFormData } from '@/types/layers'
-import { API_TYPE_QUERY, OwsApiFormData } from '@/types/namedApis'
+import { API_TYPE_QUERY, OwsApiFormData, OwsApiFormSchema } from '@/types/namedApis'
 import { Style } from '@/types/styles'
 
-import { LayerConfig } from './LayerConfig'
+import { getUmlClass, LayerConfig } from './LayerConfig'
 
 const mockStyleList: Style[] = [
   {
@@ -136,10 +138,88 @@ const Wrapper = ({
   )
 }
 
+const WrapperWithSchema = ({ layers, initialIndex }: { layers: LayerFormData[]; initialIndex: number }) => {
+  const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(initialIndex)
+  const form = useForm<OwsApiFormData>({
+    resolver: zodResolver(OwsApiFormSchema({ existingSlugs: [] })),
+    mode: 'onChange',
+    defaultValues: {
+      type: API_TYPE_QUERY.OWS,
+      baseInfo: { name: 'Test API', slug: 'test-api', description: '', persistence: 'postgis' },
+      layers,
+      styles: [],
+    },
+  })
+  return (
+    <FormProvider {...form}>
+      <LayerConfig
+        form={form}
+        styles={mockStyleList}
+        postgisDataSinks={[mockDataSink]}
+        postGisDatastructures={[mockDatastructureVersion]}
+        selectedLayerIndex={selectedLayerIndex}
+        isReadOnly={false}
+        onSelectLayer={setSelectedLayerIndex}
+        onAddLayer={vi.fn()}
+        onTableChange={vi.fn()}
+      />
+    </FormProvider>
+  )
+}
+
 describe('LayerConfig', () => {
   beforeEach(() => {
     layerIdCounter = 0
     vi.clearAllMocks()
+  })
+
+  describe('Duplicate layer name', () => {
+    const twoLayers = () => [
+      makeLayer({ title: 'Layer A', layerName: 'layer_a' }),
+      makeLayer({ title: 'Layer B', layerName: 'layer_b' }),
+    ]
+
+    it('shows an error on the edited layer when the name is already used by another layer', async () => {
+      render(<WrapperWithSchema layers={twoLayers()} initialIndex={1} />)
+
+      fireEvent.change(screen.getByTestId('layers.1.layerNameTextField'), { target: { value: 'layer_a' } })
+
+      expect(await screen.findByTestId('layers.1.layerNameFormMessage')).toHaveTextContent('common.errors.nameExists')
+    })
+
+    it('shows no error on the first layer holding the name', async () => {
+      render(<WrapperWithSchema layers={twoLayers()} initialIndex={1} />)
+      fireEvent.change(screen.getByTestId('layers.1.layerNameTextField'), { target: { value: 'layer_a' } })
+      await screen.findByTestId('layers.1.layerNameFormMessage')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Layer A' }))
+
+      expect(screen.queryByTestId('layers.0.layerNameFormMessage')).not.toBeInTheDocument()
+    })
+
+    it('shows no error on a third layer with a unique name', async () => {
+      const layers = [...twoLayers(), makeLayer({ title: 'Layer C', layerName: 'layer_c' })]
+      render(<WrapperWithSchema layers={layers} initialIndex={1} />)
+      fireEvent.change(screen.getByTestId('layers.1.layerNameTextField'), { target: { value: 'layer_a' } })
+      await screen.findByTestId('layers.1.layerNameFormMessage')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Layer C' }))
+
+      expect(screen.queryByTestId('layers.2.layerNameFormMessage')).not.toBeInTheDocument()
+    })
+
+    it('clears the error once the duplicate name is changed again', async () => {
+      render(<WrapperWithSchema layers={twoLayers()} initialIndex={1} />)
+      const layerNameField = screen.getByTestId('layers.1.layerNameTextField')
+      fireEvent.change(layerNameField, { target: { value: 'layer_a' } })
+      await screen.findByTestId('layers.1.layerNameFormMessage')
+
+      fireEvent.change(layerNameField, { target: { value: 'layer_b' } })
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('layers.1.layerNameFormMessage')).not.toBeInTheDocument()
+      })
+    })
   })
 
   describe('Rendering', () => {
@@ -292,5 +372,55 @@ describe('LayerConfig', () => {
       render(<Wrapper layers={[makeLayer({ crs: 'EPSG:4326' })]} selectedLayerIndex={0} isReadOnly />)
       expect(screen.getByRole('button', { name: /geometry.calculateFromCrs/i })).toBeDisabled()
     })
+  })
+})
+
+describe('getUmlClass', () => {
+  const structureModel = {
+    $id: 'urn:core:standard:openurbanapps:datastructure:environment:kiezbaum:f1i2sjhgvq',
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    title: 'Kiez-Baum (Zielformat)',
+    $ref: '#/$defs/KiezBaum',
+    $defs: {
+      KiezBaum: {
+        type: 'object',
+        title: 'KiezBaum',
+        properties: {
+          baumId: { type: 'string', 'x-core-primaryKey': true },
+          standort: { type: 'string' },
+          position: { $ref: 'https://geojson.org/schema/Point.json', crs: 'EPSG:4326' },
+        },
+        required: ['baumId', 'position'],
+      },
+    },
+  }
+
+  it('hydrates the class from the model when no drawn diagram exists (bundle-imported structures)', () => {
+    const version = { ...mockDatastructureVersion, model: structureModel, styles: null }
+    const umlClass = getUmlClass([version], version.id)
+    expect(umlClass?.attributes.map(attr => attr.name)).toEqual(['baumId', 'standort', 'position'])
+  })
+
+  it('prefers the isRoot-flagged node over the arbitrary first node', () => {
+    const node = (id: string, name: string, isRoot?: boolean) => ({
+      id,
+      type: 'class',
+      position: { x: 0, y: 0 },
+      data: { element: { id, name, type: 'class', isRoot, attributes: [], operations: [] }, label: name },
+    })
+    const styles = {
+      id: 'diagram-1',
+      name: 'Zwei Klassen',
+      nodes: [node('a', 'Nebenklasse'), node('b', 'Wurzelklasse', true)],
+      edges: [],
+      lastModified: new Date('2026-01-01'),
+      isDirty: false,
+    }
+    const version = { ...mockDatastructureVersion, styles } as unknown as DatastructureVersion
+    expect(getUmlClass([version], version.id)?.name).toBe('Wurzelklasse')
+  })
+
+  it('returns undefined when the version has neither styles nor a model', () => {
+    expect(getUmlClass([mockDatastructureVersion], mockDatastructureVersion.id)).toBeUndefined()
   })
 })

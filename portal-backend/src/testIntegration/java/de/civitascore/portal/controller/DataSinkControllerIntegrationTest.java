@@ -257,6 +257,79 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("POST returns 409 when a sibling POSTGIS sink already uses the tableName")
+    void postRejectsDuplicatePostgisTableName() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO first = new DataSinkInputDTO();
+      first.setDataSinkType(DataSinkType.POSTGIS);
+      first.setConfiguration(
+          Map.of("tableName", "shared_table", "dataStructureVersionId", dsv.getId().toString()));
+      assertThat(performCreate(first).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+      DataSinkInputDTO duplicate = new DataSinkInputDTO();
+      duplicate.setDataSinkType(DataSinkType.POSTGIS);
+      duplicate.setConfiguration(
+          Map.of("tableName", "shared_table", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), duplicate);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("POST returns 409 when the tableName differs from a sibling only in case")
+    void postRejectsCaseOnlyDuplicatePostgisTableName() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO first = new DataSinkInputDTO();
+      first.setDataSinkType(DataSinkType.POSTGIS);
+      first.setConfiguration(
+          Map.of("tableName", "case_table", "dataStructureVersionId", dsv.getId().toString()));
+      assertThat(performCreate(first).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+      DataSinkInputDTO duplicate = new DataSinkInputDTO();
+      duplicate.setDataSinkType(DataSinkType.POSTGIS);
+      duplicate.setConfiguration(
+          Map.of("tableName", "CASE_TABLE", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), duplicate);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("POST returns 400 when the POSTGIS tableName is not a plain identifier")
+    void postRejectsNonIdentifierPostgisTableName() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.POSTGIS);
+      input.setConfiguration(
+          Map.of(
+              "tableName", "  padded_table  ", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     @DisplayName("POST returns 400 when FROST configuration carries an unknown key")
     void postRejectsFrostWithUnknownConfigurationKey() {
       DataSinkInputDTO input = new DataSinkInputDTO();
@@ -515,6 +588,75 @@ class DataSinkControllerIntegrationTest
       assertThat(response.getBody().getDataSetId())
           .as("dataSetId should remain the parent dataset")
           .isEqualTo(testDataSetId);
+    }
+
+    /**
+     * The data-loss guard answers 409 on this path too, so a status-only assertion could not tell
+     * the two rejections apart.
+     */
+    @Test
+    @DisplayName("PATCH returns 409 when renaming a sink onto a sibling POSTGIS tableName")
+    void patchRejectsDuplicatePostgisTableName() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO first = new DataSinkInputDTO();
+      first.setDataSinkType(DataSinkType.POSTGIS);
+      first.setConfiguration(
+          Map.of("tableName", "t_one", "dataStructureVersionId", dsv.getId().toString()));
+      ResponseEntity<DataSinkOutputDTO> existing = performCreate(first);
+      assertThat(existing.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(existing.getBody()).isNotNull();
+
+      DataSinkInputDTO second = new DataSinkInputDTO();
+      second.setDataSinkType(DataSinkType.POSTGIS);
+      second.setConfiguration(
+          Map.of("tableName", "t_two", "dataStructureVersionId", dsv.getId().toString()));
+      ResponseEntity<DataSinkOutputDTO> created = performCreate(second);
+      assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(created.getBody()).isNotNull();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put(
+          "configuration",
+          Map.of("tableName", "T_ONE", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + created.getBody().getId(),
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail())
+          .contains("tableName")
+          .contains("T_ONE")
+          .doesNotContain("confirmDataLoss");
+      // The configuration lives in the registry, pinned by the sink's URN — the API projection is
+      // the readable form, so the unchanged names are asserted through it.
+      assertThat(fetchSinkTableName(existing.getBody().getId())).isEqualTo("t_one");
+      assertThat(fetchSinkTableName(created.getBody().getId())).isEqualTo("t_two");
+    }
+
+    /** Reads a sink through the API and returns its registry-served POSTGIS tableName. */
+    private String fetchSinkTableName(UUID sinkId) {
+      ResponseEntity<DataSinkOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + sinkId,
+              HttpMethod.GET,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getConfiguration())
+          .isInstanceOf(PostgisConfigurationOutput.class);
+      return ((PostgisConfigurationOutput) response.getBody().getConfiguration()).getTableName();
     }
 
     @Test

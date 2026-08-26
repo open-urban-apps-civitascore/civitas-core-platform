@@ -66,6 +66,24 @@ tests {
   test("Per-slug route has plugin_config_id (auth enabled while protected)", function() {
     expect(route && String(route.plugin_config_id)).to.equal('1');
   });
+
+  test("Per-slug route covers the named API's sub-tree", function() {
+    // The saga writes both the exact path and a "/*" sibling; without the sibling every
+    // sub-resource (e.g. /{slug}/Things) would 404 at the gateway.
+    const uris = (route && (route.uris || [route.uri])) || [];
+    expect(uris).to.include(`${wanted}/*`);
+  });
+
+  test("OWS slug route resolves to its own upstream", function() {
+    // Each standard has its own upstream (STA → the dataset's FROST project, OWS → the map server).
+    // A shared upstream would silently serve SensorThings data on the map path.
+    const owsWanted = `/v1/datasets/${datasetId}/${bru.getVar('sagaOwsSlug') || 'map'}`;
+    const owsRoute = items
+      .map(n => n.value || n)
+      .find(r => (r.uris || [r.uri]).some(u => u && u.indexOf(owsWanted) === 0));
+    expect(owsRoute, `route for ${owsWanted}`).to.be.an('object');
+    expect(owsRoute.upstream_id).to.not.equal(route && route.upstream_id);
+  });
 }
 
 docs {

@@ -265,6 +265,44 @@ test_user_has_permission_tenant_cascades_to_dataset if {
 }
 
 # =============================================================================
+# INSTALLATION RESOURCE-ENDPOINT TESTS
+# =============================================================================
+# Regression: DELETE /v1/installations/{id} was denied for INSTALLATION_DELETE
+# holders because "installations" was missing from the provider's
+# resource_scope_type map — an undefined expected_scope_type fails every
+# resource-endpoint rule. These tests exercise the full decision, not just the
+# endpoint mapping.
+
+mock_send_tenant_installation_delete(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["INSTALLATION_DELETE"], "TENANT", "tenant-1")}
+
+mock_send_unscoped_installation_delete(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["INSTALLATION_DELETE"], null, null)}
+
+# TENANT-scoped assignment may uninstall (installations are TENANT resources)
+test_installation_delete_tenant_scoped_allowed if {
+	result := permission_eval.has_permission with http.send as mock_send_tenant_installation_delete
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/some-installation-id")
+	result == true
+}
+
+# Unscoped assignment (scopeType=null — the shape the dev group seed creates)
+# may uninstall too
+test_installation_delete_unscoped_allowed if {
+	result := permission_eval.has_permission with http.send as mock_send_unscoped_installation_delete
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/some-installation-id")
+	result == true
+}
+
+# Without the permission the delete stays denied
+test_installation_delete_without_permission_denied if {
+	result := permission_eval.has_permission with http.send as mock_send_read_only
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/some-installation-id")
+	result == false
+}
+
+# =============================================================================
 # DATAPOOL SCOPE ENFORCEMENT TESTS
 # =============================================================================
 

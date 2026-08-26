@@ -12,6 +12,8 @@ package de.civitascore.configadapter.nifi.flow.stage;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.flow.SourceType;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * A self-describing pipeline source. One implementation per {@link SourceType}, owning both halves
@@ -53,9 +55,20 @@ public interface SourceStage {
   /** Build-time half, phase A: registers source-side controller services (before processors). */
   default void registerControllerServices(BuildContext ctx) throws FatalAdapterException {}
 
+  /** Optional deployment-owned Parameter Context required by this source configuration. */
+  default Optional<ParameterContextSpec> parameterContext(BuildContext ctx) {
+    return Optional.empty();
+  }
+
   /**
    * Build-time half, phase B: loads and configures the entry processor(s). Returns without
    * appending — the orchestrator owns array order.
    */
   StageResult build(BuildContext ctx) throws FatalAdapterException;
+
+  /** Secret-free declaration of a Parameter Context that must be populated outside the flow. */
+  record ParameterContextSpec(String name, List<ParameterSpec> parameters) {}
+
+  /** One parameter declaration; values are deliberately not part of the flow build model. */
+  record ParameterSpec(String name, String description, boolean sensitive) {}
 }

@@ -16,11 +16,13 @@ import { AlertBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
 import { FormItem, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { importDiagramFromJsonSchema } from '@/components/uml-modeler/services/jsonSchemaImportService'
 import { UMLAttribute, UMLClass } from '@/components/uml-modeler/types/uml'
 import { crsOptions } from '@/const/crs'
 import { cn } from '@/lib/utils'
 import { DataSink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
+import { LAYER_TITLE_MAX_LENGTH } from '@/types/layers'
 import { OwsApiFormData } from '@/types/namedApis'
 import { Style } from '@/types/styles'
 import { getEmptyLabelIndex, isNewItem } from '@/utils/common'
@@ -41,11 +43,26 @@ interface LayerConfigProps {
   onTableChange: (dataSinkId: string) => void
 }
 
-const getUmlClass = (
+/**
+ * The class whose attributes the layer form offers: the sink structure's ROOT class. Bundle-
+ * imported structures carry only the JSON-Schema model, no drawn diagram — the same gap the
+ * structure editor hydrates, so the same importer fills it here. The root is the isRoot-flagged
+ * node (hydration restores the flag from the model's top-level $ref); the first node stays as
+ * the fallback for drawn diagrams without a flag, which is the previous behaviour.
+ */
+export const getUmlClass = (
   datastructures: DatastructureVersion[],
   datastructureVersionId: string | undefined,
-): UMLClass | undefined =>
-  datastructures.find(d => d.id === datastructureVersionId)?.styles?.nodes[0].data.element as UMLClass | undefined
+): UMLClass | undefined => {
+  const version = datastructures.find(d => d.id === datastructureVersionId)
+  if (!version) return undefined
+  const diagram =
+    version.styles ??
+    (version.model ? importDiagramFromJsonSchema(version.model, version.modelName ?? undefined) : null)
+  const nodes = diagram?.nodes ?? []
+  const rootNode = nodes.find(node => node.data.element.isRoot === true) ?? nodes[0]
+  return rootNode?.data.element as UMLClass | undefined
+}
 
 const toAttributeOptions = (umlClass: UMLClass | undefined) =>
   umlClass?.attributes?.map((attr: UMLAttribute) => ({ value: attr.name, label: attr.name })) ?? []
@@ -185,6 +202,8 @@ export const LayerConfig = (props: LayerConfigProps) => {
                     required
                     disabled={isReadOnly}
                     formItemProps={wideField}
+                    maxLength={LAYER_TITLE_MAX_LENGTH}
+                    hasCharacterCount
                   />
                 </DetailsFieldContainer>
                 <DetailsFieldContainer className="border-b-0 py-2">
@@ -196,6 +215,8 @@ export const LayerConfig = (props: LayerConfigProps) => {
                     required
                     disabled={isReadOnly}
                     formItemProps={wideField}
+                    maxLength={LAYER_TITLE_MAX_LENGTH}
+                    hasCharacterCount
                   />
                 </DetailsFieldContainer>
                 <DetailsFieldContainer className="border-b-0 py-2 pb-6">

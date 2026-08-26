@@ -1,175 +1,126 @@
-# Config Adapter Flowable Orchestrator
+# Flowable Saga Orchestrator
 
-Flowable-based saga orchestrator for multi-adapter provisioning workflows (Dataset lifecycle: FROST, APISIX, NiFi, GeoServer, PostGIS). Drop-in replacement for the custom `config-adapter-orchestrator`.
+Orchestrates the dataset lifecycle sagas across the FROST, APISIX, PostGIS, GeoServer and NiFi pipeline adapters. The
+Flowable engine runs embedded in the config-adapter JVM — no separate server — with the sagas defined as BPMN 2.0
+processes under `src/main/resources/processes/` and state persisted in a PostgreSQL database of its own. Sequencing,
+branching and compensation are in scope; the work of a step belongs to that adapter's saga command handler.
 
-## How it works
+## Saga processes
 
-Flowable Engine runs **embedded** in the config-adapter JVM — no extra server or container needed. Saga workflows are defined as BPMN processes. Each saga step calls an existing `SagaCommandHandler` (FROST, APISIX, NiFi, GeoServer, PostGIS) via a JavaDelegate bridge. State is persisted in PostgreSQL (Flowable's built-in tables with `ACT_` prefix).
+One BPMN process per saga type; the trigger's `sagaType` selects it.
 
-```text
-Kafka Trigger → FlowableTriggerConsumer → Flowable Engine (in-process)
-                                             ├─ FROST handler (REST)
-                                             ├─ APISIX handler (REST)
-                                             ├─ NiFi handler (REST)
-                                             ├─ GeoServer handler (REST)
-                                             └─ PostGIS handler (JDBC)
-                                          → FlowableResultPublisher → Kafka Result
-```
+| `sagaType` | Process | Step order | On step failure |
+|---|---|---|---|
+| `DATASET_CREATE` | `dataset-create` | FROST branch → APISIX `CREATE_ROUTE` → geo branch → pipeline branch | reverse-order compensation |
+| `DATASET_UPDATE` | `dataset-update` | FROST branch → APISIX `UPDATE_ROUTE` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` | reverse-order compensation; a failing prune is absorbed and the saga still succeeds |
+| `DATASET_DELETE` | `dataset-delete` | pipeline branch → APISIX `DELETE_ROUTE` → geo teardown → FROST `DELETE_PROJECT` | best-effort: the chain continues, no compensation |
+| `DATASET_UNRELEASE` | `dataset-unrelease` | pipeline branch → APISIX `DELETE_ROUTE` | best-effort: the chain continues, no compensation |
 
-The backend does not need any changes — same trigger topic, same result topic, same message format.
+| Saga | FROST branch (`hasFrostSink`) | Geo branch (`hasGeoSink`) | Pipeline branch (`hasPipelines`) |
+|---|---|---|---|
+| Create | FROST `CREATE_PROJECT` | PostGIS `PROVISION_SINK` → GeoServer `CREATE_WORKSPACE` → `CREATE_DATASTORE` → `PROVISION_LAYERS` when `hasLayers` | `DEPLOY_PIPELINES` |
+| Update | FROST `UPDATE_PROJECT` | GeoServer `UPDATE_WORKSPACE` | `UPDATE_PIPELINES` |
+| Delete | — | GeoServer `DELETE_WORKSPACE` → PostGIS `DEPROVISION_SINK` | `DELETE_PIPELINES` |
+| Unrelease | — | — | `DELETE_PIPELINES` |
+
+The update saga's prune sits behind its own `hasGeoSink` gateway after the pipeline branch: a pruned feature type
+cannot be restored, so it MUST follow the last failable step — see
+[../config-adapter-geoserver/README.md](../config-adapter-geoserver/README.md). `DATASET_UNRELEASE` tears down ingest
+and consumer access only; the data-holding sink — the PostGIS table and the FROST project — is kept so a later
+re-release reuses it.
+
+Compensation chains run in full reverse order:
+
+| Saga | Chain |
+|---|---|
+| Create | `DELETE_PIPELINES` → `DELETE_WORKSPACE` → `DEPROVISION_SINK` → `DELETE_ROUTE` → `DELETE_PROJECT` |
+| Update | `DELETE_PIPELINES` → `RESTORE_WORKSPACE` → `RESTORE_ROUTE` → `RESTORE_PROJECT` |
+
+The FROST and GeoServer links of each chain are gated on the same derived flag as the forward branch, so a saga
+attempts no compensation for a branch it never ran.
+
+## Branch flags
+
+Derived from the trigger payload by the consumer and never read from it. Gating the geo branch keeps a deployment
+without a GeoServer adapter from failing every delete, and avoids a recursive workspace delete on a dataset that has
+no geo data. Gating the FROST branch keeps a dataset that stores nothing in FROST from being given a project, and
+leaves the APISIX step without an `upstreamUrl` — which it requires only for an `STA` slug.
+
+The flags gate provisioning, not teardown: `DELETE_PROJECT` runs for every delete saga, keyed on the recorded
+`projectId` the trigger carries, so a FROST sink removed before the dataset cannot strand the project. The geo
+teardown is the exception, because the table it drops is named only in the sink entry a removal takes away.
+
+| Flag | True when |
+|---|---|
+| `hasFrostSink` | `datasinks` is a list holding an entry whose `type` is `FROST` |
+| `hasGeoSink` | `datasinks` is a list holding an entry whose `type` is `POSTGIS` |
+| `hasLayers` | `layers` is a non-empty list |
+| `hasPipelines` | `dataPipelines` or `pipelineIds` is a non-empty list |
+
+## Behaviour
+
+- **Steps execute in-process.** A step resolves the adapter's `SagaCommandHandler` from the registry by name and calls
+  it directly, so no Kafka round trip is paid per step and no step-level topics exist.
+- **`frost` and `apisix` MUST be registered** — the startup check demands both regardless of which sagas the
+  deployment runs, and their absence fails startup — every delete saga runs `DELETE_PROJECT`, whatever the dataset's
+  sinks are. `nifi`, `geoserver` and `postgis` resolve lazily per step, so a deployment without them boots; a
+  forward step reaching an absent handler raises a saga failure routed through the normal path rather than crashing.
+- **Compensation is best-effort.** A teardown that fails or finds no handler is recorded in `compensationErrors` and
+  the chain continues; the result then reports `FAILED` rather than `COMPENSATED`. Each step records what it created
+  under its own step id and its teardown acts on that record rather than on current configuration.
+- **Triggers are idempotent.** The Kafka record coordinate — topic, partition and offset — is the process business
+  key, checked against both running and finished instances, so a redelivered record starts no second saga.
+- **A malformed trigger is dropped, not retried.** A missing or non-string `sagaType`/`datasetId`, or an unknown saga
+  type, is logged and its offset committed. A transient failure instead seeks every partition of the batch back to
+  its last safe offset, so nothing is lost.
+- **Process deployment is idempotent.** Duplicate filtering means a restart adds a process version only when a BPMN
+  file's content changed.
+- **Schema creation and crash recovery are automatic.** Flowable creates and updates its own `ACT_`-prefixed tables
+  against the configured database and runs its async executor, which is what lets a saga resume after a crash.
+- **A success result carries only** `sagaId`, `datasetId` and the keys the step handlers produced, never the original
+  trigger payload fields.
+- **`DEPROVISION_SINK` drops the per-dataset schema.** It drops the read role, then the sink table, then the dataset's
+  own schema with `RESTRICT`, skipping `public`. A schema left non-empty fails the step and nothing is force-dropped;
+  in the best-effort delete saga the chain continues past that failure.
+
+The module defines no adapter error codes: a failing step raises a BPMN error routed to the compensation or
+best-effort path, and the codes a step produced belong to the adapter that ran it.
+
+## Kafka contract
+
+Only the saga boundary crosses Kafka. `sagaType` is a payload field, not a topic: one trigger topic carries
+every saga type, and steps are dispatched in-process from there.
+
+| Topic | Direction | Key | Payload |
+|---|---|---|---|
+| `de.civitascore.dataset.saga.trigger` | consumed | — | `sagaType`, `datasetId`, and the fields the steps consume: `datasinks`, `layers`, `styles`, pipelines |
+| `de.civitascore.saga.result` | published | `sagaId` | `SAGA_COMPLETED`, or `SAGA_FAILED` with `status` `FAILED` or `COMPENSATED` |
+| named by `pipeline.status-topic` | published | `datasetId/pipelineId` | pipeline runtime status |
+
+The result producer runs with `acks=all` and idempotence enabled.
 
 ## Configuration
 
-### Environment Variables
+The values that ship, env vars and database provisioning live in [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-All properties support automatic environment variable override (dots → underscores, uppercase):
+| Property | Role |
+|---|---|
+| `flowable.jdbc.url` / `.username` / `.password` | Saga state database |
+| `flowable.kafka.group.id` | Consumer group of the saga trigger consumer |
+| `kafka.bootstrap.servers` | Broker list, shared with the adapter consumers |
+| `pipeline.status-topic` | Topic carrying pipeline state transitions |
 
-| Property | Environment Variable | Required | Default | Description |
-|----------|---------------------|----------|---------|-------------|
-| `flowable.jdbc.url` | `FLOWABLE_JDBC_URL` | **Yes** | — | PostgreSQL JDBC URL |
-| `flowable.jdbc.username` | `FLOWABLE_JDBC_USERNAME` | **Yes** | — | Database username |
-| `flowable.jdbc.password` | `FLOWABLE_JDBC_PASSWORD` | **Yes** | — | Database password |
-| `flowable.kafka.group.id` | `FLOWABLE_KAFKA_GROUP_ID` | No | `config-adapter-flowable-group` | Kafka consumer group |
-| `kafka.bootstrap.servers` | `KAFKA_BOOTSTRAP_SERVERS` | No | `localhost:9092` | Shared with other adapters |
+All three JDBC properties MUST resolve or startup fails with an incomplete-configuration error. A url and a
+username ship with values, so only an unresolved password fails startup; an unset `FLOWABLE_JDBC_URL` connects to
+the development database instead. Flowable requires a database of its own, separate from any other component's.
 
-**Important:** The JDBC properties have **no defaults** — the application fails fast if the database is not configured. This prevents accidental connections to wrong databases.
-
-### Local Development Example
-
-The local `docker-compose.yml` provisions a dedicated `flowable` database and user via `docker/postgres/init-flowable.sql` on first start.
-
-```properties
-# application.properties (local dev — matches the docker-compose setup)
-flowable.jdbc.url=jdbc:postgresql://localhost:5433/flowable
-flowable.jdbc.username=flowable
-flowable.jdbc.password=flowable
-```
-
-Or via environment variables:
+## Testing
 
 ```bash
-export FLOWABLE_JDBC_URL=jdbc:postgresql://localhost:5433/flowable
-export FLOWABLE_JDBC_USERNAME=flowable
-export FLOWABLE_JDBC_PASSWORD=flowable
+mvn test -pl config-adapter-flowable          # unit and process tests on in-memory H2, no Docker
+mvn -pl config-adapter-flowable -am verify    # adds integration tests, requires Docker
 ```
 
-### Database
-
-Flowable runs against a dedicated `flowable` database, separate from the Keycloak database that shares the same PostgreSQL container. It creates ~36 tables with the `ACT_` prefix (e.g., `ACT_RE_DEPLOYMENT`, `ACT_RU_EXECUTION`, `ACT_HI_ACTINST`). Schema is auto-created on first startup. Duplicate process deployments are filtered — restarting the application does not create new versions unless the BPMN files changed.
-
-If the PostgreSQL volume already exists from before this split, recreate it: `docker compose down -v && docker compose up -d`.
-
-## Saga Workflows
-
-### Dataset Create (FROST → APISIX → conditional PostGIS+GeoServer → conditional NiFi)
-- Sequential execution
-- Conditional geo branch (`hasGeoSink`): `PROVISION_SINK` (PostGIS table/schema/read role) →
-  `CREATE_WORKSPACE` → `CREATE_DATASTORE` → conditional `PROVISION_LAYERS` (`hasLayers`)
-- Conditional NiFi step (`hasPipelines`)
-- On failure: reverse-order compensation (DELETE operations); the GeoServer part is undone by a
-  single idempotent `DELETE_WORKSPACE` (recursive), the sink by `DEPROVISION_SINK`
-  (compensate-geoserver → compensate-sink → compensate-apisix)
-
-### Dataset Update (FROST → APISIX → conditional GeoServer → conditional NiFi)
-- Same structure as Create; the GeoServer branch is a single `UPDATE_WORKSPACE` step, compensated by
-  `RESTORE_WORKSPACE`
-
-### Dataset Delete (NiFi → APISIX → conditional GeoServer+PostGIS → FROST)
-- Reverse order, best-effort: continues on failure, no compensation
-- Conditional geo teardown (`hasGeoSink`): `DELETE_WORKSPACE` (recursive) after the APISIX route is
-  removed, then `DEPROVISION_SINK` (drops the sink table and read role; the schema stays — it may
-  be shared)
-
-### GeoServer branch — conditional and currently dormant
-
-The GeoServer steps run only when the saga trigger carries geo data. Two flags are **derived** from
-the trigger payload by `FlowableTriggerConsumer` (never trusted from the payload):
-
-| Flag | Derived when |
-|------|--------------|
-| `hasGeoSink` | `datasinks` contains a sink with `type == "POSTGIS"` |
-| `hasLayers` | `layers` is a non-empty list |
-
-Trigger payload shape the GeoServer/PostGIS handlers consume (emitted by the backend's
-`DataSetSagaPublisher` for create, update, and delete triggers):
-
-```jsonc
-{
-  "datasinks": [
-    { "id": "...", "type": "POSTGIS",
-      "configuration": { "tableName": "...", "dataStructureVersionId": "..." } }
-  ],
-  "layers": [
-    { "layerName": "...", "nativeName": "...", "crs": "EPSG:4326" }
-  ]
-}
-```
-
-**Activation status:** the backend's saga trigger (`SagaTrigger` / `DataSetSagaPublisher` in
-`portal-backend`) emits `datasinks` on **create, update, and delete** triggers, so `hasGeoSink`
-derives from real payloads and the geo branch (PostGIS sink + GeoServer workspace) runs end-to-end.
-Only `layers` is **not yet emitted** — `hasLayers` always derives to `false` and `PROVISION_LAYERS`
-is skipped until a backend change serializes the `Layer` entities into the trigger.
-
-**Delete gating.** The teardown (`DELETE_WORKSPACE` + `DEPROVISION_SINK`) is gated on the same
-derived `hasGeoSink`; a delete trigger without `datasinks` (e.g. from a backend predating the
-field) skips the teardown. Gating it this way (rather than always deleting) keeps deployments
-**without** a GeoServer adapter from failing every delete and avoids a spurious
-`DELETE …?recurse=true` on non-geo datasets. The end-to-end derivation for delete is covered by
-`DatasetDeleteTriggerTest` (realistic trigger through `FlowableTriggerConsumer`).
-
-> Vocabulary note: the GeoServer concept doc uses a `GEO_PERSISTENCE` sink type, but the
-> config-adapter targets the `portal-model` vocabulary (`DataSinkType.POSTGIS` + a separate `Layer`
-> entity). The concept doc should be reconciled to the `POSTGIS` naming.
-
-### Adapter handlers: required vs optional
-
-The orchestrator only **requires** the handlers that every saga path uses unconditionally — `frost`
-and `apisix` — and fails fast at startup if either is missing. The **pipeline** adapter (`nifi`) is
-**conditional**: it runs only when a trigger carries pipelines (`hasPipelines == true`) and is
-resolved lazily per step. Therefore:
-
-- A deployment **without** the pipeline adapter still boots, and pipeline-free sagas complete normally.
-- A saga that *does* carry pipelines but finds no pipeline handler **fails gracefully** — the step
-  raises a saga failure routed through the normal compensation/failure path, not an opaque crash.
-
-This keeps the engine runnable in deployments where the pipeline adapter (`nifi`) is absent.
-
-The **geoserver** adapter is conditional in the same way: its steps run only when a trigger carries a
-`POSTGIS` data sink (`hasGeoSink`), so it is **not** in `REQUIRED_HANDLERS` and a deployment without
-it still boots. Its compensation (`DELETE_WORKSPACE`) is idempotent and 404-tolerant, so the
-reverse-compensation chain stays safe whether or not the GeoServer branch actually ran.
-
-## Architecture
-
-The module is organized into three top-level packages:
-
-- `common` — engine bootstrap, infrastructure factories, saga handler registry, JavaDelegate base classes, and the Kafka trigger/result bridge.
-- `bpmn` — deployment of the XML-based BPMN process definitions from `src/main/resources/processes/`.
-
-### Key Design Decisions
-
-- **No Spring Boot required** — Flowable runs standalone with programmatic `ProcessEngineConfiguration`
-- **Handlers reused** — Existing `SagaCommandHandler` implementations (FROST, APISIX, pipeline) called via JavaDelegate wrappers; only FROST and APISIX are required at startup (see *Adapter handlers: required vs optional*)
-- **In-process execution** — No Kafka round-trip per step (unlike custom orchestrator). Only trigger and result go through Kafka.
-- **Async disabled for tests** — Test engines run synchronously for deterministic testing. Production engines use async execution for crash recovery.
-
-## Running Tests
-
-```bash
-# Unit + process tests (H2 in-memory, no Docker needed)
-mvn test -pl config-adapter-flowable
-
-# Integration tests (requires Docker for Testcontainers)
-mvn verify -pl config-adapter-flowable
-
-# Single test class
-mvn test -pl config-adapter-flowable -Dtest=DatasetCreateBpmnTest
-```
-
-## Viewing BPMN Diagrams
-
-The `.bpmn` files in `src/main/resources/processes/` can be viewed with:
-
-- **Camunda Modeler** (Desktop, MIT) — best option, auto-generates layout. Download: https://camunda.com/download/modeler/
-- **bpmn.io** (Browser) — requires DI section in the XML (Camunda Modeler adds it on save)
+Test engines run synchronously so process assertions are deterministic; deployed engines run the async
+executor. Container image tags live in `TestContainerImages`. The process files carry BPMN DI layout, which a
+BPMN 2.0 modeler generates and bpmn.io needs to render them.

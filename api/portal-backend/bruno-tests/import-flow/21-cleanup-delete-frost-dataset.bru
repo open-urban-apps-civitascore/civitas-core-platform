@@ -1,0 +1,26 @@
+meta {
+  name: Cleanup — uninstall the FROST bundle
+  type: http
+  seq: 21
+}
+
+delete {
+  url: {{baseUrl}}/installations/{{frostInstallationId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("bundle uninstalled", function() {
+    expect(res.status).to.equal(204);
+  });
+}
+
+docs {
+  Same teardown as 15, for the FROST bundle 20 created: pipeline, sink, dataset,
+  source and structure go in reverse touch order, leaving no registry orphans.
+}

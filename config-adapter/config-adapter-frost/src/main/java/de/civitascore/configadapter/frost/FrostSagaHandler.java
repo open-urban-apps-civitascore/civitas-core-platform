@@ -28,13 +28,15 @@ import org.owasp.encoder.Encode;
  *
  * <ul>
  *   <li>{@code CREATE_PROJECT} — POST /Projects
- *   <li>{@code UPDATE_PROJECT} — PATCH /Projects({projectId})
+ *   <li>{@code UPDATE_PROJECT} — PATCH /Projects({projectId}), falling back to CREATE_PROJECT when
+ *       the dataset has no project yet (a FROST sink added after a release without one)
  *   <li>{@code DELETE_PROJECT} — DELETE all Things of the project (cascades to their Datastreams
  *       and Observations), then DELETE /Projects({projectId}). As a CREATE_PROJECT compensation it
  *       is a no-op when the create only reused a pre-existing project ({@code created=false}), so a
  *       later step's failure cannot destroy the data the unrelease flow preserves.
  *   <li>{@code RESTORE_PROJECT} — PATCH /Projects({projectId}) with previous state (update
- *       compensation)
+ *       compensation). Delegates to {@code DELETE_PROJECT} when the update provisioned the project
+ *       rather than patching one, since there is no previous state to restore.
  * </ul>
  *
  * <p>Compensation operations: {@code DELETE_PROJECT} to compensate a {@code CREATE_PROJECT}, {@code
@@ -128,7 +130,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     return createNewProject(command, projectName, description);
   }
 
-  /** POSTs a new private FROST project, with a 500-duplicate race guard. */
+  /** POSTs a new private FROST project, with a duplicate-name race guard (409 or 500). */
   private SagaCommandResult createNewProject(
       SagaCommandMessage command, String projectName, String description) {
     Map<String, Object> body = new HashMap<>();
@@ -146,8 +148,10 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
             .apply(client().target(serverUrl).path("Projects").request(MediaType.APPLICATION_JSON))
             .post(Entity.json(body))) {
 
-      if (response.getStatus() == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
-        return handleCreateProjectServerError(command, projectName, response);
+      int status = response.getStatus();
+      if (status == Response.Status.CONFLICT.getStatusCode()
+          || status == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
+        return handleCreateProjectConflict(command, projectName, response);
       }
 
       checkResponse(response, "CREATE_PROJECT");
@@ -170,18 +174,28 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Handles an HTTP 500 from the CREATE_PROJECT POST. FROST returns 500 "Failed to store data." on
-   * a UNIQUE constraint violation (duplicate project name) instead of 409 Conflict. This is a race
-   * guard: the up-front find-or-create lookup already ran, but a concurrent CREATE may have
-   * inserted the project in between — so re-run the name lookup and reuse the winner.
+   * Handles an HTTP 409 or 500 from the CREATE_PROJECT POST. This is a race guard: the up-front
+   * find-or-create lookup already ran, but a concurrent CREATE may have inserted the project in
+   * between — so re-run the name lookup and reuse the winner.
+   *
+   * <p>FROST-Server core &gt;= 2.7.0 answers a UNIQUE constraint violation (duplicate project name)
+   * with 409 Conflict; earlier cores answer 500 with a {@code "Failed to store data."} body, which
+   * is otherwise indistinguishable from a genuine server error and must be checked for before
+   * treating it as a duplicate.
    */
-  private SagaCommandResult handleCreateProjectServerError(
+  private SagaCommandResult handleCreateProjectConflict(
       SagaCommandMessage command, String projectName, Response response) {
+    int status = response.getStatus();
     String responseBody = response.readEntity(String.class);
-    if (responseBody != null && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA)) {
+    boolean isDuplicate =
+        status == Response.Status.CONFLICT.getStatusCode()
+            || (responseBody != null
+                && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA));
+    if (isDuplicate) {
       log.info(
-          "FROST returned 500 'Failed to store data.' for CREATE_PROJECT"
-              + " — re-checking for existing project with name '{}', saga={}",
+          "FROST returned {} for CREATE_PROJECT — re-checking for existing project with name"
+              + " '{}', saga={}",
+          status,
           Encode.forJava(projectName),
           Encode.forJava(command.sagaId()));
       SagaCommandResult recovered = findExistingProjectByName(command, projectName);
@@ -189,11 +203,12 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
         return recovered;
       }
       throw new SagaApiException(
-          "CREATE_PROJECT failed: HTTP 500 — Failed to store data."
-              + " (no existing project found with name '"
+          "CREATE_PROJECT failed: HTTP "
+              + status
+              + " — no existing project found with name '"
               + projectName
-              + "')",
-          500);
+              + "'",
+          status);
     }
     // An HTTP 500 that is NOT the known duplicate-name case is a genuine FROST-side failure.
     // Log the full body at WARN so operators see the real cause — the exception message is
@@ -256,7 +271,19 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleUpdateProject(SagaCommandMessage command) {
-    String projectId = requireString(command, KEY_PROJECT_ID);
+    // A FROST sink added to a dataset that was released without one has no project yet, and the
+    // update saga is gated on the sink rather than on the project. Provision it here instead of
+    // failing: the create path is find-or-create on a name carrying the dataset id, so it is
+    // idempotent and can only ever bind this dataset to its own project.
+    if (!(command.payload().get(KEY_PROJECT_ID) instanceof String projectId)
+        || projectId.isBlank()) {
+      log.info(
+          "UPDATE_PROJECT: dataset {} has no FROST project yet — provisioning it. saga={}",
+          Encode.forJava((String) command.payload().get("datasetId")),
+          Encode.forJava(command.sagaId()));
+      return handleCreateProject(command);
+    }
+
     String datasetName = requireString(command, "datasetName");
     String datasetId = requireString(command, "datasetId");
     String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
@@ -331,8 +358,20 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleDeleteProject(SagaCommandMessage command) {
-    String projectId = requireString(command, KEY_PROJECT_ID);
     boolean compensating = "COMPENSATE_STEP".equals(command.type());
+
+    // No project id is the same goal state as the 404 below: there is nothing to delete. A dataset
+    // that never reached a release has none, and this step is not gated on one — demanding it here
+    // would fail the teardown of a dataset that owns no FROST project at all.
+    if (!(command.payload().get(KEY_PROJECT_ID) instanceof String projectId)
+        || projectId.isBlank()) {
+      log.info(
+          "DELETE_PROJECT: no project provisioned for this dataset — nothing to delete. saga={}",
+          Encode.forJava(command.sagaId()));
+      return compensating
+          ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
+          : SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
+    }
 
     // created=false marks a reused, data-bearing project; deleting it as a CREATE_PROJECT
     // compensation would destroy the storage re-release reuses. Forward deletes omit the flag.
@@ -440,6 +479,15 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleRestoreProject(SagaCommandMessage command) {
+    // The created marker is only written by the create path, so its presence means UPDATE_PROJECT
+    // provisioned the project instead of patching an existing one. There is no previous state to
+    // restore then — the exact inverse is the delete, which itself preserves a project it merely
+    // reused (created=false). PATCHing here would instead blank the description of a project that
+    // should have been removed.
+    if (command.payload().containsKey(KEY_CREATED)) {
+      return handleDeleteProject(command);
+    }
+
     String projectId = requireString(command, KEY_PROJECT_ID);
     Object previousName = command.payload().get("previousName");
     String previousDescription = (String) command.payload().getOrDefault("previousDescription", "");
