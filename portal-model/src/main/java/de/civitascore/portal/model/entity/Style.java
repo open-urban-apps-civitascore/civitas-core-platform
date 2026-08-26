@@ -1,14 +1,10 @@
 package de.civitascore.portal.model.entity;
 
-import de.civitascore.portal.model.entity.base.BaseEntity;
+import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,11 +13,7 @@ import lombok.Setter;
 @Table(name = "styles")
 @Getter
 @Setter
-public class Style extends BaseEntity implements DataSetOwned {
-
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "dataset_id", nullable = false)
-  @NotNull private DataSet dataSet;
+public class Style extends DataSetOwnedEntity {
 
   @NotBlank @Column(name = "name", nullable = false)
   private String name;

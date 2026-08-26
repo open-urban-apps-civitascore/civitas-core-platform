@@ -1,7 +1,6 @@
 package de.civitascore.portal.controller;
 
-import de.civitascore.portal.model.entity.DataSetOwned;
-import de.civitascore.portal.model.entity.base.BaseEntity;
+import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
 import de.civitascore.portal.model.input.DataSetOwnedInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
 import de.civitascore.portal.repository.specification.base.BaseSpec;
@@ -30,7 +29,7 @@ import tools.jackson.databind.JsonNode;
 public abstract class DataSetSubEntityController<
         I extends DataSetOwnedInputDTO,
         O extends BaseOutputDTO,
-        E extends BaseEntity & DataSetOwned,
+        E extends DataSetOwnedEntity,
         S extends BaseSpec<E>>
     extends BaseController<I, O, E, S> {
 

@@ -8,9 +8,6 @@ import de.civitascore.portal.repository.specification.PipelineSpec;
 import de.civitascore.portal.service.PipelineService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -40,23 +37,6 @@ public class PipelineController
   private final PipelineService pipelineService;
   private final PipelineAssembler pipelineAssembler;
 
-  @Parameters({
-    @Parameter(
-        name = "name",
-        description = "Filter by name (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "traffic-pipeline")),
-    @Parameter(
-        name = "description",
-        description = "Filter by description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Processing traffic data")),
-    @Parameter(
-        name = "q",
-        description = "Search in name or description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "traffic"))
-  })
   @Operation(operationId = "listPipelines", summary = "List all pipelines")
   @Override
   public ResponseEntity<Page<PipelineOutputDTO>> getAll(

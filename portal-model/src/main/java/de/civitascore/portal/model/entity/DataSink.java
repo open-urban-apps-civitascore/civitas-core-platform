@@ -1,7 +1,7 @@
 package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.DataSinkType;
-import de.civitascore.portal.model.entity.base.BaseEntity;
+import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,11 +44,7 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "data_sinks")
 @Getter
 @Setter
-public class DataSink extends BaseEntity implements DataSetOwned {
-
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "dataset_id", nullable = false)
-  @NotNull private DataSet dataSet;
+public class DataSink extends DataSetOwnedEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "pipeline_id")

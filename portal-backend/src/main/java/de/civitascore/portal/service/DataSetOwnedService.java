@@ -1,6 +1,6 @@
 package de.civitascore.portal.service;
 
-import de.civitascore.portal.model.entity.DataSetOwned;
+import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
 import de.civitascore.portal.model.input.DataSetOwnedInputDTO;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.UUID;
@@ -11,7 +11,8 @@ import java.util.UUID;
  * @param <T> the JPA entity type
  * @param <I> the input DTO type
  */
-public abstract class DataSetOwnedService<T extends DataSetOwned, I extends DataSetOwnedInputDTO>
+public abstract class DataSetOwnedService<
+        T extends DataSetOwnedEntity, I extends DataSetOwnedInputDTO>
     extends BaseService<T, I> {
 
   /**
