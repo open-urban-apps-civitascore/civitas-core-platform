@@ -1,6 +1,5 @@
 package de.civitascore.portal.model.input;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -13,7 +12,7 @@ import lombok.EqualsAndHashCode;
 /** Input DTO for creating and updating Layer resources. */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class LayerInputDTO extends BaseInputDTO {
+public class LayerInputDTO extends DataSetOwnedInputDTO {
 
   @NotNull private UUID dataSinkId;
 
@@ -38,6 +37,4 @@ public class LayerInputDTO extends BaseInputDTO {
   private boolean bboxAutoCalculate = true;
   private Map<String, Object> nativeBoundingBox;
   private Map<String, Object> latLonBoundingBox;
-
-  @JsonIgnore private UUID dataSetId;
 }

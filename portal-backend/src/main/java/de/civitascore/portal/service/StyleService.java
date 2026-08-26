@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-public class StyleService extends BaseService<Style, StyleInputDTO> {
+public class StyleService extends DataSetOwnedService<Style, StyleInputDTO> {
 
   private final StyleRepository styleRepository;
   private final StyleMapper styleMapper;
@@ -59,19 +59,6 @@ public class StyleService extends BaseService<Style, StyleInputDTO> {
   }
 
   /**
-   * Finds a Style by ID and verifies that it belongs to the specified dataset.
-   *
-   * @throws ResourceNotFoundException if the Style does not exist or belongs to a different dataset
-   */
-  public Style findByIdAndDataSetOrThrow(UUID id, UUID dataSetId) {
-    Style style = findByIdOrThrow(id);
-    if (!dataSetId.equals(style.getDataSet().getId())) {
-      throw new ResourceNotFoundException(getEntityName(), id);
-    }
-    return style;
-  }
-
-  /**
    * Rejects saves that would create a duplicate name within the same dataset, or carry SLD content
    * GeoServer would refuse while publishing.
    *
@@ -98,17 +85,6 @@ public class StyleService extends BaseService<Style, StyleInputDTO> {
     return super.preSave(entity);
   }
 
-  /** Validates that an update does not attempt to move a Style to a different dataset. */
-  @Override
-  protected StyleInputDTO preProcessUpdateInput(StyleInputDTO input, Style existingEntity) {
-    if (input.getDataSetId() != null
-        && existingEntity.getDataSet() != null
-        && !input.getDataSetId().equals(existingEntity.getDataSet().getId())) {
-      throw new ResourceNotFoundException(getEntityName(), existingEntity.getId());
-    }
-    return super.preProcessUpdateInput(input, existingEntity);
-  }
-
   /** Resolves the parent dataset from the input DTO. */
   @Override
   protected Style postConvertToEntity(Style entity, StyleInputDTO input) {
@@ -125,21 +101,14 @@ public class StyleService extends BaseService<Style, StyleInputDTO> {
   }
 
   /**
-   * Guards DELETE against Layers that reference this Style as their default.
-   *
-   * @throws ResourceNotFoundException if the Style does not exist
-   * @throws ResourceInUseException (409) if a Layer references this Style as its default Style
+   * @throws ResourceInUseException (409) if a Layer references this Style
    */
   @Override
-  protected Style preProcessDelete(UUID id) {
-    Style style =
-        findById(id).orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
-
+  protected void onDelete(Style style) {
+    UUID id = style.getId();
     if (layerRepository.existsByDefaultStyleIdOrAlternativeStylesId(id, id)) {
       throw new ResourceInUseException(
           getEntityName(), id, "Style is referenced by one or more Layers");
     }
-
-    return style;
   }
 }

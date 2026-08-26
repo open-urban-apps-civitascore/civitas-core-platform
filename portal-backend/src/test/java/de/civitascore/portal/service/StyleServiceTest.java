@@ -53,41 +53,6 @@ class StyleServiceTest {
   }
 
   @Nested
-  @DisplayName("findByIdAndDataSetOrThrow()")
-  class FindByIdAndDataSetOrThrow {
-
-    @Test
-    @DisplayName("Should return Style when it belongs to the requested dataset")
-    void shouldReturnStyleForMatchingDataset() {
-      UUID dataSetId = UUID.randomUUID();
-      UUID styleId = UUID.randomUUID();
-
-      Style style = new Style();
-      style.setId(styleId);
-      style.setDataSet(dataSet(dataSetId));
-
-      when(styleRepository.findById(styleId)).thenReturn(Optional.of(style));
-
-      assertThat(styleService.findByIdAndDataSetOrThrow(styleId, dataSetId)).isSameAs(style);
-    }
-
-    @Test
-    @DisplayName("Should throw ResourceNotFoundException when Style belongs to a different dataset")
-    void shouldThrowWhenDatasetMismatch() {
-      UUID styleId = UUID.randomUUID();
-
-      Style style = new Style();
-      style.setId(styleId);
-      style.setDataSet(dataSet(UUID.randomUUID()));
-
-      when(styleRepository.findById(styleId)).thenReturn(Optional.of(style));
-
-      assertThatThrownBy(() -> styleService.findByIdAndDataSetOrThrow(styleId, UUID.randomUUID()))
-          .isInstanceOf(ResourceNotFoundException.class);
-    }
-  }
-
-  @Nested
   @DisplayName("postConvertToEntity()")
   class PostConvertToEntity {
 
@@ -130,30 +95,6 @@ class StyleServiceTest {
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> styleService.create(input))
-          .isInstanceOf(ResourceNotFoundException.class);
-    }
-  }
-
-  @Nested
-  @DisplayName("preProcessUpdateInput()")
-  class PreProcessUpdateInput {
-
-    @Test
-    @DisplayName("Should throw ResourceNotFoundException when trying to change the dataset")
-    void shouldThrowWhenDatasetChanges() {
-      UUID styleId = UUID.randomUUID();
-      DataSet original = dataSet(UUID.randomUUID());
-
-      Style existing = new Style();
-      existing.setId(styleId);
-      existing.setDataSet(original);
-
-      StyleInputDTO input = new StyleInputDTO();
-      input.setDataSetId(UUID.randomUUID());
-      input.setName("updated");
-      input.setSldContent("<sld/>");
-
-      assertThatThrownBy(() -> styleService.preProcessUpdateInput(input, existing))
           .isInstanceOf(ResourceNotFoundException.class);
     }
   }

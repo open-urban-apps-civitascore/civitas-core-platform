@@ -33,7 +33,7 @@ import tools.jackson.databind.JsonNode;
 @RequiredArgsConstructor
 @Tag(name = "Layers", description = "Layer management endpoints")
 public class LayerController
-    extends BaseController<LayerInputDTO, LayerOutputDTO, Layer, LayerSpec> {
+    extends DataSetSubEntityController<LayerInputDTO, LayerOutputDTO, Layer, LayerSpec> {
 
   private final LayerService layerService;
   private final LayerAssembler layerAssembler;
@@ -49,6 +49,11 @@ public class LayerController
   }
 
   @Override
+  protected Class<Layer> getEntityClass() {
+    return Layer.class;
+  }
+
+  @Override
   @Operation(operationId = "listLayers", summary = "List all Layers for a dataset")
   public ResponseEntity<Page<LayerOutputDTO>> getAll(
       @ParameterObject LayerSpec spec,
@@ -61,9 +66,7 @@ public class LayerController
   @Override
   @Operation(operationId = "getLayer", summary = "Get Layer by ID")
   public ResponseEntity<LayerOutputDTO> getById(@PathVariable UUID id) {
-    UUID dataSetId = extractDataSetId();
-    Layer layer = layerService.findByIdAndDataSetOrThrow(id, dataSetId);
-    return ResponseEntity.ok(layerAssembler.toOutput(layer));
+    return super.getById(id);
   }
 
   @Override
@@ -76,16 +79,12 @@ public class LayerController
   @Operation(operationId = "updateLayer", summary = "Replace a Layer")
   public ResponseEntity<LayerOutputDTO> update(
       @PathVariable UUID id, @Valid @RequestBody LayerInputDTO input) {
-    UUID dataSetId = extractDataSetId();
-    layerService.findByIdAndDataSetOrThrow(id, dataSetId);
     return super.update(id, input);
   }
 
   @Override
   @Operation(operationId = "deleteLayer", summary = "Delete a Layer")
   public void delete(@PathVariable UUID id) {
-    UUID dataSetId = extractDataSetId();
-    layerService.findByIdAndDataSetOrThrow(id, dataSetId);
     super.delete(id);
   }
 
@@ -94,15 +93,5 @@ public class LayerController
   public ResponseEntity<LayerOutputDTO> patch(@PathVariable UUID id, @RequestBody JsonNode updates)
       throws IOException {
     throw new MethodNotAllowedException(HttpMethod.PATCH, Collections.emptySet());
-  }
-
-  @Override
-  protected LayerInputDTO preProcessInput(LayerInputDTO input) {
-    input.setDataSetId(extractDataSetId());
-    return super.preProcessInput(input);
-  }
-
-  private UUID extractDataSetId() {
-    return extractUUIDFromPathVariable("dataSetId", Layer.class);
   }
 }
