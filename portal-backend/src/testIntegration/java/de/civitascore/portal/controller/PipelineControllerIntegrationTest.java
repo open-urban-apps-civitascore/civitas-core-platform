@@ -35,6 +35,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 @DisplayName("Pipeline Controller Integration Tests")
@@ -1022,6 +1023,41 @@ class PipelineControllerIntegrationTest
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND for PUT from wrong dataset")
           .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when patching pipeline from wrong dataset via PATCH")
+    void shouldReturn404WhenPatchingPipelineFromWrongDataset() {
+      UUID pipelineId = createTestEntity();
+      DataSet otherDataSet = createTestDataSet();
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/" + otherDataSet.getId() + "/pipelines/" + pipelineId,
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("name", "patched-from-elsewhere"));
+
+      assertThat(response.getStatusCode())
+          .as("Should return NOT_FOUND for PATCH from wrong dataset")
+          .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should reject a malformed dataSetId as invalid input, not a server error")
+    void shouldRejectMalformedDataSetId() {
+      UUID pipelineId = createTestEntity();
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/not-a-uuid/pipelines/" + pipelineId,
+              HttpMethod.GET,
+              createAuthHeaders(),
+              null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:INVALID_INPUT");
     }
 
     @Test
