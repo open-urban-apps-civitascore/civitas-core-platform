@@ -9,7 +9,9 @@ import javax.xml.stream.XMLResolver;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Component;
 
 /**
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Component;
  * here turns a late saga failure into a field-level error at submission.
  */
 @Component
+@Slf4j
 public class SldContentValidator {
 
   /** Field name reported to the client so it can highlight the offending input. */
@@ -45,6 +48,9 @@ public class SldContentValidator {
         }
       }
     } catch (XMLStreamException e) {
+      // The client message drops the parser's wording on purpose (it is locale-dependent), so the
+      // cause is only ever visible here — without it a rejected upload cannot be diagnosed at all.
+      log.warn("Rejected SLD upload as not well-formed: {}", Encode.forJava(e.getMessage()));
       throw notWellFormed(e);
     } finally {
       closeQuietly(reader);
