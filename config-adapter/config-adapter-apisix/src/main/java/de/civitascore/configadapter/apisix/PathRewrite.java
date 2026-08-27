@@ -62,7 +62,7 @@ final class PathRewrite {
    */
   static void normalize(
       Map<String, Object> route, Map<String, Object> proxyRewrite, RouteUpstreamKind kind) {
-    String routePath = firstUri(route);
+    String routePath = basePath(firstUri(route));
     List<String> regexUri = RouteAuthConfigurer.readStringList(proxyRewrite.get("regex_uri"));
     if (routePath == null || regexUri.size() < PAIR_SIZE) {
       return;
@@ -86,6 +86,20 @@ final class PathRewrite {
     }
     Object uri = route.get("uri");
     return uri instanceof String s && !s.isBlank() ? s : null;
+  }
+
+  /**
+   * The address a route matches, without the trailing-slash or sub-path suffix a matching entry
+   * carries, so the shape a rewrite is rebuilt from does not depend on which entry is read first.
+   */
+  private static String basePath(String uri) {
+    if (uri == null) {
+      return null;
+    }
+    if (uri.endsWith("/*")) {
+      return uri.substring(0, uri.length() - "/*".length());
+    }
+    return uri.endsWith("/") ? uri.substring(0, uri.length() - 1) : uri;
   }
 
   /** The upstream path a rewrite replacement targets, without any sub-path back-reference. */
