@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.0</version>
+        <version>4.1.1</version>
         <relativePath/>
     </parent>
 
@@ -45,7 +45,24 @@
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
         <config-adapter.version>1.0.2-MR-717-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
+        <at.yawk.lz4.version>1.11.2</at.yawk.lz4.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!--
+                Drop once the Spring Boot parent's kafka-clients ships lz4-java >= 1.11.2
+                itself: Boot 4.1.1 resolves kafka-clients 4.2.1, which pins 1.10.1 —
+                affected by CVE-2026-59949 (fixed 1.11.1) plus GHSA-6cx8-rjf8-pr8g and
+                GHSA-4v53-57pg-c464 (both fixed 1.11.2).
+            -->
+            <dependency>
+                <groupId>at.yawk.lz4</groupId>
+                <artifactId>lz4-java</artifactId>
+                <version>${at.yawk.lz4.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- Shared JPA entities -->
