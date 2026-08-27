@@ -85,7 +85,7 @@ create table artifact_reference (
     target_urn         text        not null,
     target_artifact_id uuid        references artifact(id) on delete set null,
     target_version_id  uuid        references artifact_version(id) on delete set null,
-    reference_type     text        not null,  -- schema-ref | association-ref | dataset-ref | pipeline-node | xsd-import | mapping-source | mapping-target | datasource-element | datasink-element | datastructure-ref
+    reference_type     text        not null,  -- schema-ref | association-ref | dataset-ref | pipeline-node | xsd-import | mapping-source | mapping-target | datasource-ref | datasink-ref | datastructure-ref
     reference_name     text,
     sort_order         int,
     created_at         timestamptz not null
