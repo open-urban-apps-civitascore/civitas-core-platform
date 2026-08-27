@@ -47,31 +47,30 @@
 		<argLine />
 
 		<kafka.version>4.1.2</kafka.version>
-		<keycloak.version>26.0.7</keycloak.version>
+		<keycloak.version>26.0.12</keycloak.version>
 		<cloudevents.version>3.0.0</cloudevents.version>
-		<slf4j.version>2.0.9</slf4j.version>
-		<jackson.version>2.16.1</jackson.version>
+		<slf4j.version>2.0.18</slf4j.version>
+		<jackson.version>2.21.6</jackson.version>
 		<jakarta.ws.rs.version>3.1.0</jakarta.ws.rs.version>
-		<jersey.version>3.1.5</jersey.version>
-		<commons.configuration2.version>2.11.0</commons.configuration2.version>
-		<junit.version>5.14.2</junit.version>
-		<mockito.version>5.21.0</mockito.version>
-		<testcontainers.version>2.0.4</testcontainers.version>
-		<awaitility.version>4.2.2</awaitility.version>
-		<jacoco.version>0.8.14</jacoco.version>
+		<jersey.version>3.1.12</jersey.version>
+		<commons.configuration2.version>2.15.1</commons.configuration2.version>
+		<junit.version>5.14.4</junit.version>
+		<mockito.version>5.23.0</mockito.version>
+		<testcontainers.version>2.0.5</testcontainers.version>
+		<awaitility.version>4.3.0</awaitility.version>
+		<jacoco.version>0.8.15</jacoco.version>
 		<spotless.version>3.4.0</spotless.version>
 		<commons.beanutils.version>1.11.0</commons.beanutils.version>
-		<commons.io.version>2.21.0</commons.io.version>
+		<commons.io.version>2.22.0</commons.io.version>
 		<commons.lang.version>3.20.0</commons.lang.version>
 		<commons.compress.version>1.28.0</commons.compress.version>
-		<lz4.version>1.8.1</lz4.version>
-		<at.yawk.lz4.version>1.10.1</at.yawk.lz4.version>
+		<at.yawk.lz4.version>1.11.2</at.yawk.lz4.version>
 		<owasp.encoder.version>1.4.0</owasp.encoder.version>
 		<flowable.version>7.1.0</flowable.version>
 		<hikaricp.version>6.2.1</hikaricp.version>
-		<postgresql.version>42.7.11</postgresql.version>
-		<h2.version>2.3.232</h2.version>
-		<cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
+		<postgresql.version>42.7.13</postgresql.version>
+		<h2.version>2.4.240</h2.version>
+		<cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
 	</properties>
 
 	<dependencyManagement>
@@ -107,21 +106,13 @@
 				<version>${keycloak.version}</version>
 			</dependency>
 
-			<!-- Jackson -->
+			<!-- Jackson: the BOM also pulls transitives (cloudevents, keycloak) onto one version -->
 			<dependency>
-				<groupId>com.fasterxml.jackson.core</groupId>
-				<artifactId>jackson-databind</artifactId>
+				<groupId>com.fasterxml.jackson</groupId>
+				<artifactId>jackson-bom</artifactId>
 				<version>${jackson.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>com.fasterxml.jackson.datatype</groupId>
-				<artifactId>jackson-datatype-jsr310</artifactId>
-				<version>${jackson.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>com.fasterxml.jackson.dataformat</groupId>
-				<artifactId>jackson-dataformat-yaml</artifactId>
-				<version>${jackson.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
 			</dependency>
 
 			<!-- JAX-RS / Jersey -->
@@ -178,12 +169,11 @@
 				<version>${commons.compress.version}</version>
 			</dependency>
 
-			<!-- lz4 -->
-			<dependency>
-				<groupId>org.lz4</groupId>
-				<artifactId>lz4-java</artifactId>
-				<version>${lz4.version}</version>
-			</dependency>
+			<!--
+				Drop once kafka-clients ships lz4-java >= 1.11.2 itself: kafka-clients 4.3.0
+				still pins 1.10.2, which is affected by CVE-2026-59949 (fixed 1.11.1) plus
+				GHSA-6cx8-rjf8-pr8g and GHSA-4v53-57pg-c464 (both fixed 1.11.2).
+			-->
 			<dependency>
 				<groupId>at.yawk.lz4</groupId>
 				<artifactId>lz4-java</artifactId>
