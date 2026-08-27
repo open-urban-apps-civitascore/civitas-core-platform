@@ -112,6 +112,31 @@ describe('buildDataSinkPayloads — FROST target structure reference', () => {
   })
 })
 
+describe('buildDataSinkPayloads — PostGIS configuration', () => {
+  const postgisNode: TestNode = {
+    id: 'postgis-1',
+    type: 'geoPersistence',
+    data: {
+      label: 'PostGIS',
+      configured: true,
+      entityType: 'persistence',
+      entityId: 'sink-guid-1',
+      dataStructureVersionId: 'dsv-1',
+      tableName: 'my_table',
+    },
+  }
+
+  const postgisPayload = (p: Pipeline) =>
+    buildDataSinkPayloads(p).find(entry => entry.payload.dataSinkType === DATASINK_TYPES.POSTGIS)?.payload
+
+  it('omits element for a passthrough pipeline (no upstream mapping)', () => {
+    // A passthrough DataSource → PostGIS pipeline is valid and must be saveable — element is only
+    // present once a mapping feeds the sink (mirrors the FROST passthrough case above).
+    const p = pipeline([postgisNode], [])
+    expect(postgisPayload(p)?.configuration).toEqual({ tableName: 'my_table' })
+  })
+})
+
 // ============================================================================
 // buildPipelinePayload — clean CORE Pipeline document
 // ============================================================================
@@ -286,6 +311,21 @@ describe('buildMappingArtifacts', () => {
     })
     expect(() => buildMappingArtifacts(pipeline([invalid], []))).toThrow(MappingDocumentValidationError)
     consoleError.mockRestore()
+  })
+
+  it('accepts toUuid and toDateTime field operations from the mapping editor transform palette', () => {
+    const node = configuredMappingNode({
+      mappingConfig: {
+        source: SRC_STRUCT_URN,
+        target: TGT_STRUCT_URN,
+        fields: {
+          '$.id': { op: 'toUuid', input: '$.sourceId' },
+          '$.ts': { op: 'toDateTime', input: '$.sourceTs', pattern: "yyyy-MM-dd'T'HH:mm:ssXXX" },
+        },
+        positions: {},
+      },
+    })
+    expect(() => buildMappingArtifacts(pipeline([node], []))).not.toThrow()
   })
 })
 

@@ -1,17 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-<<<<<<< ours
+import { DataStructureSchema } from '@/generated/core'
+import { elementModelUrnForMember } from '@/utils/urn'
+
 import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality, UML_PRIMITIVE_TYPES } from '../constants/umlTypes'
 import type { UMLDiagram, UMLNode } from '../types/diagram'
 import type { UMLPrimitiveType } from '../types/uml'
 import { hasAttributes } from '../types/uml'
-=======
-import { DataStructureSchema } from '@/generated/core'
-import { elementModelUrnForMember } from '@/utils/urn'
-
-import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality } from '../constants/umlTypes'
-import type { UMLDiagram } from '../types/diagram'
->>>>>>> theirs
 import {
   canMultiplicityBePrimaryKey,
   exportToJsonSchema,
@@ -1111,9 +1106,9 @@ describe('exportToJsonSchema', () => {
     const schema = exportToJsonSchema(diagram)
     const defs = schema.$defs as Record<string, Record<string, unknown>>
 
-    // Root is the single class; the enumeration is kept but nothing points at it, so it carries no
-    // data until the modeller wires it up.
-    expect(schema.properties).toEqual({ root: { $ref: '#/$defs/Root' } })
+    // Root is the single class, designated by the top-level $ref; the enumeration is kept but
+    // nothing points at it, so it carries no data until the modeller wires it up.
+    expect(schema.$ref).toBe('#/$defs/Root')
     expect(defs.Status.enum).toEqual(['ON'])
     expect(defs.Root.properties).not.toHaveProperty('Status')
   })

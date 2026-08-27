@@ -3,7 +3,13 @@ import { z } from 'zod'
 
 // ── $defs ──────────────────────────────────────────────────────────────────
 
-/** A single field mapping rule. */
+/**
+ * A single field mapping rule.
+ * MANUAL PATCH: `toUuid`/`toDateTime` are missing from the backend CORE JSON Schema
+ * (model-forge-runtime) even though the mapping editor's transform palette already offers both as
+ * live, selectable operations — added here so this override is lost on the next
+ * `npm run generate:core-types` until that source is fixed.
+ */
 export const MappingOperationSchema: z.ZodType = z.lazy(() =>
   z.discriminatedUnion('op', [
     CopyFieldOperationSchema,
@@ -12,7 +18,9 @@ export const MappingOperationSchema: z.ZodType = z.lazy(() =>
     ToStringFieldOperationSchema,
     ToIntFieldOperationSchema,
     ToFloatFieldOperationSchema,
+    ToUuidFieldOperationSchema,
     ToDateFieldOperationSchema,
+    ToDateTimeFieldOperationSchema,
     FormatFieldOperationSchema,
     GeoPointFieldOperationSchema,
   ]),
@@ -78,14 +86,40 @@ export const ToFloatFieldOperationSchema = z
   })
   .strict()
 
-/** Parses the input string into a date/time value using a date pattern. */
+/** Converts the input value to a UUID. No pattern: the value is passed through as-is. */
+export const ToUuidFieldOperationSchema = z
+  .object({
+    op: z.literal('toUuid'),
+    /** Value to convert — a JSONPath string or a nested operation. */
+    input: MappingFieldSchema,
+  })
+  .strict()
+
+/**
+ * Parses the input string into a date/time value using a date pattern.
+ * `pattern` is optional: the editor node has a default pattern but the user can clear it.
+ */
 export const ToDateFieldOperationSchema = z
   .object({
     op: z.literal('toDate'),
     /** String value to parse — a JSONPath string or a nested operation. */
     input: MappingFieldSchema,
     /** Date pattern used to parse the input, e.g. 'yyyy-MM-dd'. */
-    pattern: z.string(),
+    pattern: z.string().optional(),
+  })
+  .strict()
+
+/**
+ * Parses the input string into a date-time value using a date-time pattern.
+ * `pattern` is optional: the editor node has a default pattern but the user can clear it.
+ */
+export const ToDateTimeFieldOperationSchema = z
+  .object({
+    op: z.literal('toDateTime'),
+    /** String value to parse — a JSONPath string or a nested operation. */
+    input: MappingFieldSchema,
+    /** Date-time pattern used to parse the input, e.g. 'yyyy-MM-dd\'T\'HH:mm:ssXXX'. */
+    pattern: z.string().optional(),
   })
   .strict()
 
@@ -111,12 +145,16 @@ export const GeoPointFieldOperationSchema = z
   })
   .strict()
 
-/** Concatenates multiple input field values with an optional separator. */
+/**
+ * Concatenates multiple input field values with an optional separator.
+ * `inputs` may legitimately be empty: the editor's concat node is variadic and drops unconnected
+ * ports rather than padding them, so a node with nothing connected yet emits `inputs: []`.
+ */
 export const ConcatFieldOperationSchema = z
   .object({
     op: z.literal('concat'),
     /** Inputs concatenated in order — each a JSONPath string or a nested operation. */
-    inputs: z.array(MappingFieldSchema).min(1),
+    inputs: z.array(MappingFieldSchema),
     separator: z.string().optional(),
   })
   .strict()
@@ -160,7 +198,9 @@ export type ConstFieldOperation = z.infer<typeof ConstFieldOperationSchema>
 export type ToStringFieldOperation = z.infer<typeof ToStringFieldOperationSchema>
 export type ToIntFieldOperation = z.infer<typeof ToIntFieldOperationSchema>
 export type ToFloatFieldOperation = z.infer<typeof ToFloatFieldOperationSchema>
+export type ToUuidFieldOperation = z.infer<typeof ToUuidFieldOperationSchema>
 export type ToDateFieldOperation = z.infer<typeof ToDateFieldOperationSchema>
+export type ToDateTimeFieldOperation = z.infer<typeof ToDateTimeFieldOperationSchema>
 export type FormatFieldOperation = z.infer<typeof FormatFieldOperationSchema>
 export type GeoPointFieldOperation = z.infer<typeof GeoPointFieldOperationSchema>
 export type ConcatFieldOperation = z.infer<typeof ConcatFieldOperationSchema>

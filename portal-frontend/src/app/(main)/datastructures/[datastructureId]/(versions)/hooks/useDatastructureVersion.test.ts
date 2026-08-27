@@ -217,9 +217,13 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(saved).toBe(true)
     expect(toast.error).not.toHaveBeenCalled()
 
-    // Alpha is the document root; Beta stays in $defs, unreferenced but preserved.
-    const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
-    expect(payload.data.model).toMatchObject({ properties: { alpha: { $ref: '#/$defs/Alpha' } } })
+    // Saved under a DataStructure URN → the canonical $defs library: Alpha is the document root,
+    // designated by a top-level $ref equal to its own $defs member $id (no inline `properties`).
+    // Beta stays in $defs, unreferenced but preserved.
+    const payload = updateVersion.mutateAsync.mock.calls[0][0] as {
+      data: { model: { $ref?: string; $defs?: Record<string, { $id?: string }> } }
+    }
+    expect(payload.data.model.$ref).toBe(payload.data.model.$defs?.Alpha?.$id)
     expect(payload.data.model.$defs).toHaveProperty('Beta')
   })
 

@@ -21,33 +21,26 @@
  * - Composition maps to a `$ref` property on the container (an array `$ref`
  *   for many multiplicities).
  *
-<<<<<<< ours
- * Root: the document root is the data structure itself, titled after the
- * diagram. Every class is emitted under `$defs`; the single root class — the
- * `isRoot`-designated element or, absent a designation, the one class not
- * embedded by any structural or inheritance edge — is referenced from the
- * document root via a `$ref` property, so the structure's name — not an
- * arbitrary class — is always the top level. An element with no containment
- * edge is still emitted, just unreferenced; a diagram without a unique root,
- * or one whose relations point away from it, throws
- * {@link SchemaExportError} instead of guessing. An empty diagram exports an
- * empty object schema; a diagram consisting of a single enumeration keeps its
- * `enum` at the document root instead.
-=======
  * Output shape: a DataStructure — a JSON-Schema `$defs` library of its member
- * Elements with NO inline root shape. Every class is emitted under `$defs` with
- * local `#/$defs/<Name>` references between classes (no per-member `$id`, so those
- * local refs resolve during validation); Model Forge splits each `$defs` member
- * into its own Element, mints the Element URNs, and rewrites the local refs to
- * them. The single root class — the `isRoot`-designated element or, absent a
- * designation, the one class not embedded by any structural or inheritance edge —
- * is designated by a top-level `$ref` (a local `#/$defs/<Name>` pointer Model
- * Forge rewrites to the root member's URN), so a root-shaped schema can be derived
- * by clients that need one. Every other element must be reachable from the root;
- * otherwise (or when no unique root exists) the export throws
+ * Elements with NO inline root shape. Every class is emitted under `$defs`. The
+ * single root class — the `isRoot`-designated element or, absent a designation,
+ * the one class not embedded by any structural or inheritance edge — is
+ * designated by a top-level `$ref`; every other element must be reachable from
+ * the root, otherwise (or when no unique root exists) the export throws
  * {@link SchemaExportError} instead of guessing. An empty diagram exports a
  * library with no members and no root.
->>>>>>> theirs
+ *
+ * Two `$ref` forms, chosen by whether `modelUri` is a real DataStructure CORE URN:
+ * - Canonical (save path — `modelUri` is a `urn:core:...:datastructure:...` URN): each `$defs`
+ *   member is stamped with its own Element CORE URN as `$id`, cross-references between members
+ *   (and the top-level `$ref`) point at those URNs, and no local `#/$defs/` pointers survive.
+ *   The URNs are derived deterministically from the DataStructure's own URN — Model Forge does
+ *   NOT mint them; it splits each member into a stable, name-based Element artifact under the URN
+ *   already present in the document.
+ * - Local/preview (no `modelUri`, or a non-DataStructure-URN `modelUri`): `$defs` members carry no
+ *   `$id`, and cross-references (and the top-level `$ref`) use local `#/$defs/<Name>` pointers.
+ *   Model Forge, on ingest of such a document, mints the Element URNs itself and rewrites the local
+ *   refs to them.
  */
 
 import { elementModelUrnForMember } from '@/utils/urn'

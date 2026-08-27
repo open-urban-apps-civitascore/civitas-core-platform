@@ -1000,6 +1000,161 @@ describe('PipelineEditorProviderComponent', () => {
       })
     })
 
+    it('creates a mapping artifact via POST when the node has no prior logicalUrn', async () => {
+      const mockCreateMappingMutateAsync = vi
+        .fn()
+        .mockResolvedValue({ data: { logicalUrn: 'urn:logical-1', versionedUrn: 'urn:versioned-1' } })
+      vi.mocked(useCreateMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockCreateMappingMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useCreateMapping>)
+
+      const mappingBody = { source: 'urn:src', target: 'urn:tgt', fields: {}, title: 'Src-to-Tgt', positions: {} }
+      vi.mocked(buildMappingArtifacts).mockReturnValue([
+        { nodeId: 'map-1', logicalUrn: undefined, body: mappingBody as never },
+      ])
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1', nodes: [] },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(mockCreateMappingMutateAsync).toHaveBeenCalledOnce()
+      expect(mockCreateMappingMutateAsync).toHaveBeenCalledWith(mappingBody)
+    })
+
+    it('updates an existing mapping via PUT when the node has a prior logicalUrn', async () => {
+      const mockUpdateMappingMutateAsync = vi
+        .fn()
+        .mockResolvedValue({ data: { logicalUrn: 'urn:logical-1', versionedUrn: 'urn:versioned-2' } })
+      vi.mocked(useUpdateMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockUpdateMappingMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useUpdateMapping>)
+
+      const mappingBody = { source: 'urn:src', target: 'urn:tgt', fields: {}, title: 'Src-to-Tgt', positions: {} }
+      vi.mocked(buildMappingArtifacts).mockReturnValue([
+        { nodeId: 'map-1', logicalUrn: 'urn:logical-1', body: mappingBody as never },
+      ])
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1', nodes: [] },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(mockUpdateMappingMutateAsync).toHaveBeenCalledOnce()
+      expect(mockUpdateMappingMutateAsync).toHaveBeenCalledWith({ logicalUrn: 'urn:logical-1', ...mappingBody })
+    })
+
+    it('creates mapping artifacts before saving the pipeline, so the mappingRef makes it into the CORE model', async () => {
+      const callOrder: string[] = []
+
+      const mockCreateMappingMutateAsync = vi.fn().mockImplementation(async () => {
+        callOrder.push('createMapping')
+        return { data: { logicalUrn: 'urn:logical-1', versionedUrn: 'urn:versioned-1' } }
+      })
+      vi.mocked(useCreateMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockCreateMappingMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useCreateMapping>)
+
+      mockUpdatePipelineMutateAsync.mockImplementation(async () => {
+        callOrder.push('updatePipeline')
+        return {}
+      })
+
+      vi.mocked(buildMappingArtifacts).mockReturnValue([
+        {
+          nodeId: 'map-1',
+          logicalUrn: undefined,
+          body: { source: 'urn:src', target: 'urn:tgt', fields: {}, title: 'Src-to-Tgt', positions: {} } as never,
+        },
+      ])
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1', nodes: [] },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(callOrder).toEqual(['createMapping', 'updatePipeline'])
+      expect(updateNodeData).toHaveBeenCalledWith(expect.anything(), 'map-1', {
+        mappingRef: 'urn:versioned-1',
+        mappingLogicalUrn: 'urn:logical-1',
+      })
+    })
+
+    it('retains refs obtained before a later save step fails, so a retry does not re-POST', async () => {
+      const mockCreateDataSinkMutateAsync = vi
+        .fn()
+        .mockResolvedValue({ data: { id: 'new-dataSink-id', configurationUrn: 'urn:core:sink-config' } })
+      vi.mocked(useCreateDataSink).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockCreateDataSinkMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useCreateDataSink>)
+
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
+        { nodeId: 'persist-node-1', entityId: null, payload: { name: 'sink-1', type: 'postgres' } as never },
+      ])
+
+      // The sink create succeeds and stashes its entityId onto the node (mirrors updateNodeEntityId's
+      // real behavior, driven here via the mock since it is stubbed out for the whole file).
+      const pipelineWithStashedSink = {
+        ...createEmptyPipeline('Test'),
+        id: 'pipeline-1',
+        nodes: [makeGeoPersistenceNode('persist-node-1', 'new-dataSink-id')],
+      }
+      vi.mocked(updateNodeEntityId).mockReturnValue(pipelineWithStashedSink)
+      vi.mocked(updateNodeData).mockReturnValue(pipelineWithStashedSink)
+
+      // The pipeline save itself (after the sink was already created) fails.
+      vi.mocked(useUpdatePipeline).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockRejectedValue(new Error('Pipeline save failed')),
+        isPending: false,
+      } as unknown as ReturnType<typeof useUpdatePipeline>)
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: {
+          ...createEmptyPipeline('Test'),
+          id: 'pipeline-1',
+          nodes: [makeGeoPersistenceNode('persist-node-1')],
+        },
+      })
+      renderProvider(session)
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+      // The sink WAS created — the partial pipeline (with the new entityId stashed) must be
+      // persisted back into the session so a retry sees it and PUTs instead of re-POSTing.
+      expect(contextRef.current?.pipeline?.nodes.find(n => n.id === 'persist-node-1')).toMatchObject({
+        data: expect.objectContaining({ entityId: 'new-dataSink-id' }),
+      })
+    })
+
     it('does not call updateDataSink when dataSink has not changed', async () => {
       const mockUpdateDataSinkMutateAsync = vi.fn().mockResolvedValue({})
       vi.mocked(useUpdateDataSink).mockReturnValue({
