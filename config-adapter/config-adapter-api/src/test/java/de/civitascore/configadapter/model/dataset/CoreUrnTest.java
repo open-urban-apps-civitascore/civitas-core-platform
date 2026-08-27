@@ -123,7 +123,6 @@ class CoreUrnTest {
   }
 
   @Test
-<<<<<<< ours
   @DisplayName("sameStructureVersion ignores a renamed display-name segment")
   void sameStructureVersion_ignoresTheName() {
     // A rename leaves both the structure and its shape untouched, so a caller comparing identity
@@ -159,7 +158,9 @@ class CoreUrnTest {
     assertFalse(CoreUrn.sameStructureVersion(valid, "not-a-core-urn"));
     assertFalse(CoreUrn.sameStructureVersion(valid, null));
     assertFalse(CoreUrn.sameStructureVersion(null, null));
-=======
+  }
+
+  @Test
   @DisplayName("logicalUrn strips the trailing SemVer version segment")
   void logicalUrn_stripsVersion() {
     assertEquals(
@@ -190,6 +191,28 @@ class CoreUrnTest {
     assertFalse(CoreUrn.sameArtifact(v1, other));
     assertFalse(CoreUrn.sameArtifact(v1, null));
     assertFalse(CoreUrn.sameArtifact(null, v1));
->>>>>>> theirs
+  }
+
+  @Test
+  @DisplayName("accepts the dotted and underscored names the registry derives from schema titles")
+  void acceptsRegistryDerivedNames() {
+    // XOEV identifiers keep dots and underscores, and the registry preserves them in the name
+    // segment; rejecting them here would fail every mapping onto such a structure at deploy time.
+    assertTrue(
+        CoreUrn.isValid(
+            "urn:core:platform:civitas:element:common:Klaeranlage.0001:2dmtus8w40:1.0.0"));
+    assertTrue(
+        CoreUrn.isValid(
+            "urn:core:platform:civitas:element:common:Lokation.0002_Bundesland:2dmtus8w40:1.0.0"));
+    assertTrue(
+        CoreUrn.isValid("urn:core:platform:civitas:element:common:Reading-Set:2dmtus8w40:1.0.0"));
+  }
+
+  @Test
+  @DisplayName("still rejects a name segment carrying a separator or whitespace")
+  void rejectsNameWithSeparatorOrSpace() {
+    assertFalse(
+        CoreUrn.isValid("urn:core:platform:civitas:element:common:Bad Name:2dmtus8w40:1.0.0"));
+    assertFalse(CoreUrn.isValid("urn:core:platform:civitas:element:common::2dmtus8w40:1.0.0"));
   }
 }

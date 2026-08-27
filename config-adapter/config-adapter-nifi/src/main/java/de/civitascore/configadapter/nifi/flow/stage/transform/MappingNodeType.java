@@ -113,7 +113,6 @@ public final class MappingNodeType implements TransformNodeType {
   }
 
   /**
-<<<<<<< ours
    * Rejects a fan-out whose rows all carry the same primary key. With a key the sink writes UPSERT
    * keyed on it, and {@code PutDatabaseRecord} batches each record as its own {@code ON CONFLICT DO
    * UPDATE}: N elements sharing one key overwrite each other down to a single row, last element
@@ -210,9 +209,7 @@ public final class MappingNodeType implements TransformNodeType {
     return side + " structure '" + structure + "'";
   }
 
-  /** Parses each node's config, in flow order. */
-  private List<MappingConfig> parse(List<GraphNode> ownNodes) throws FatalAdapterException {
-=======
+  /**
    * Resolves each node's {@code mappingRef} against the shipped catalog and parses the mapping
    * document, in flow order. The config-adapter is callback-free, so the referenced Mapping's
    * content must have travelled in the pipeline's {@code mappings} catalog; a wired mapping node
@@ -221,7 +218,6 @@ public final class MappingNodeType implements TransformNodeType {
    */
   private List<MappingConfig> parse(List<GraphNode> ownNodes, Map<String, Object> mappings)
       throws FatalAdapterException {
->>>>>>> theirs
     List<MappingConfig> configs = new ArrayList<>();
     for (GraphNode node : ownNodes) {
       String ref = node.mappingRef();

@@ -275,21 +275,25 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.stationid": "$.stationid",
-                                "$.temperature": { "op": "toFloat", "input": "$.temp" },
-                                "$.pressure": { "op": "toFloat", "input": "$.press" },
-                                "$.samples": { "op": "toInt", "input": "$.n" },
-                                "$.sensor": { "op": "toUuid", "input": "$.sensor" } } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+    Map<String, Object> mappings =
+        map(
+            """
+            { "map-1": { "fields": { "$.stationid": "$.stationid",
+                                     "$.temperature": { "op": "toFloat", "input": "$.temp" },
+                                     "$.pressure": { "op": "toFloat", "input": "$.press" },
+                                     "$.samples": { "op": "toInt", "input": "$.n" },
+                                     "$.sensor": { "op": "toUuid", "input": "$.sensor" } } } }
             """);
 
     Datasource source = new Datasource();
@@ -307,7 +311,11 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "pg-numeric-it", graph, source, new PostgisSinkSpec("numeric_observation")));
+                "pg-numeric-it",
+                graph,
+                source,
+                new PostgisSinkSpec("numeric_observation"),
+                mappings));
 
     client.deployFlow(plan);
 
@@ -338,21 +346,25 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.stationid": "$.stationid",
-                                "$.day": { "op": "toDate", "input": "$.day",
-                                           "pattern": "dd.MM.yyyy" },
-                                "$.observed": { "op": "toDateTime", "input": "$.observed",
-                                                "pattern": "dd.MM.yyyy HH:mm:ss" } } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+    Map<String, Object> mappings =
+        map(
+            """
+            { "map-1": { "fields": { "$.stationid": "$.stationid",
+                                     "$.day": { "op": "toDate", "input": "$.day",
+                                                "pattern": "dd.MM.yyyy" },
+                                     "$.observed": { "op": "toDateTime", "input": "$.observed",
+                                                     "pattern": "dd.MM.yyyy HH:mm:ss" } } } }
             """);
 
     Datasource source = new Datasource();
@@ -370,7 +382,11 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "pg-converted-it", graph, source, new PostgisSinkSpec("converted_observation")));
+                "pg-converted-it",
+                graph,
+                source,
+                new PostgisSinkSpec("converted_observation"),
+                mappings));
 
     client.deployFlow(plan);
 
@@ -401,18 +417,22 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.stationid": "$.stationid", "$.id": "$.uid",
-                                "$.day": "$.day", "$.observed": "$.observed" } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+    Map<String, Object> mappings =
+        map(
+            """
+            { "map-1": { "fields": { "$.stationid": "$.stationid", "$.id": "$.uid",
+                                     "$.day": "$.day", "$.observed": "$.observed" } } }
             """);
 
     Datasource source = new Datasource();
@@ -430,7 +450,11 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "pg-temporal-it", graph, source, new PostgisSinkSpec("temporal_observation")));
+                "pg-temporal-it",
+                graph,
+                source,
+                new PostgisSinkSpec("temporal_observation"),
+                mappings));
 
     client.deployFlow(plan);
 
@@ -457,8 +481,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
   void deployedFlowWritesOneRowPerSourceArrayElement() throws Exception {
     // An array source mapped onto a flat target must fan out — one row per element — with the
     // parent-level fields repeated on every row.
-    Map<String, Object> graph =
-        fanoutGraph(
+    Map<String, Object> mappings =
+        fanoutMappings(
             """
             { "$.stationid": "$.stationid",
               "$.measured_at": "$.measurements[].ts",
@@ -469,7 +493,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         "ds-pg-fanout-it",
         "pg-fanout-it",
         FANOUT_TOPIC,
-        graph,
+        fanoutGraph(),
+        mappings,
         new PostgisSinkSpec("fanout_observation"),
         "{\"stationid\":\"S5\",\"measurements\":["
             + "{\"ts\":\"2026-01-01T00:00:00Z\",\"value\":1},"
@@ -486,20 +511,28 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
   }
 
   /** Builds a single-mapping-node graph; every fan-out scenario differs only in the field map. */
-  private Map<String, Object> fanoutGraph(String fields) throws Exception {
+  private Map<String, Object> fanoutGraph() throws Exception {
     return map(
         """
         { "nodes": [
-            { "id": "s", "type": "start", "data": {} },
-            { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-            { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": %s } } },
-            { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-            { "id": "e", "type": "end", "data": {} } ],
+            { "id": "s", "kind": "start" },
+            { "id": "src", "kind": "source", "sourceRef": "src-1" },
+            { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+            { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+            { "id": "e", "kind": "end" } ],
           "edges": [
             { "id": "e1", "source": "s", "target": "src" },
             { "id": "e2", "source": "src", "target": "m" },
             { "id": "e3", "source": "m", "target": "k" },
             { "id": "e4", "source": "k", "target": "e" } ] }
+        """);
+  }
+
+  /** Wraps a fan-out scenario's field map into the catalog entry the graph's node refers to. */
+  private Map<String, Object> fanoutMappings(String fields) throws Exception {
+    return map(
+        """
+        { "map-1": { "fields": %s } }
         """
             .formatted(fields));
   }
@@ -510,8 +543,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     // rows, so the primary key must include an element-level column. Keyed on (stationid,
     // measured_at) a redelivery must UPSERT the same 3 rows — not append 3 more (INSERT semantics),
     // and not collapse them into 1 (which a parent-only key would do, silently losing readings).
-    Map<String, Object> graph =
-        fanoutGraph(
+    Map<String, Object> mappings =
+        fanoutMappings(
             """
             { "$.stationid": "$.stationid",
               "$.measured_at": "$.measurements[].ts",
@@ -527,7 +560,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         "ds-pg-upsert-it",
         "pg-upsert-it",
         UPSERT_FANOUT_TOPIC,
-        graph,
+        fanoutGraph(),
+        mappings,
         new PostgisSinkSpec("upsert_fanout_observation", List.of("stationid", "measured_at")),
         payload,
         publisher -> {
@@ -553,8 +587,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     // ForkRecord's Include Parent Fields is documented to let the child win on a name clash. That
     // claim is load-bearing here: if the precedence were reversed, every row would silently carry
     // the parent's id instead of the element's.
-    Map<String, Object> graph =
-        fanoutGraph(
+    Map<String, Object> mappings =
+        fanoutMappings(
             """
             { "$.stationid": "$.stationid",
               "$.id": "$.measurements[].id" }
@@ -564,7 +598,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         "ds-pg-collision-it",
         "pg-collision-it",
         COLLISION_FANOUT_TOPIC,
-        graph,
+        fanoutGraph(),
+        mappings,
         new PostgisSinkSpec("collision_fanout_observation"),
         "{\"stationid\":\"S12\",\"id\":\"PARENT\",\"measurements\":["
             + "{\"id\":\"CHILD-A\"},{\"id\":\"CHILD-B\"}]}",
@@ -582,8 +617,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     // mapped field is the case most likely to break at runtime rather than at compile time. The
     // well-formed elements must still land and the flow must stay alive — proven by a later
     // payload.
-    Map<String, Object> graph =
-        fanoutGraph(
+    Map<String, Object> mappings =
+        fanoutMappings(
             """
             { "$.stationid": "$.stationid",
               "$.measured_at": "$.measurements[].ts" }
@@ -594,7 +629,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         "ds-pg-sparse-it",
         "pg-sparse-it",
         SPARSE_FANOUT_TOPIC,
-        graph,
+        fanoutGraph(),
+        mappings,
         new PostgisSinkSpec("sparse_fanout_observation"),
         "{\"stationid\":\"S13\",\"measurements\":["
             + "{\"ts\":\"2026-04-01T00:00:00Z\"},null,{\"other\":\"x\"}]}",
@@ -623,8 +659,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     // geoPoint renders a concat over two nested copies. A rewrite that handles a top-level CopyNode
     // but not the copies inside GeoPointNode would emit POINT(null null), or broadcast the first
     // element's coordinates onto every row — distinct per-row geometries prove neither happened.
-    Map<String, Object> graph =
-        fanoutGraph(
+    Map<String, Object> mappings =
+        fanoutMappings(
             """
             { "$.stationid": "$.stationid",
               "$.measured_at": "$.measurements[].ts",
@@ -636,7 +672,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         "ds-pg-geofan-it",
         "pg-geofan-it",
         GEO_FANOUT_TOPIC,
-        graph,
+        fanoutGraph(),
+        mappings,
         new PostgisSinkSpec("geo_fanout_observation"),
         "{\"stationid\":\"S17\",\"measurements\":["
             + "{\"ts\":\"2026-07-01T00:00:00Z\",\"lon\":8.1,\"lat\":49.1},"
@@ -667,15 +704,12 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         map(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m1", "type": "mapping", "data": { "mappingConfig": { "fields": {
-                    "$.stationid": "$.stationid",
-                    "$.measured_at": "$.measurements[].ts" } } } },
-                { "id": "m2", "type": "mapping", "data": { "mappingConfig": { "fields": {
-                    "$.stationid": "$.stationid" } } } },
-                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m1", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "m2", "kind": "mapping", "mappingRef": "map-2" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m1" },
@@ -683,12 +717,20 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e4", "source": "m2", "target": "k" },
                 { "id": "e5", "source": "k", "target": "e" } ] }
             """);
+    Map<String, Object> mappings =
+        map(
+            """
+            { "map-1": { "fields": { "$.stationid": "$.stationid",
+                                     "$.measured_at": "$.measurements[].ts" } },
+              "map-2": { "fields": { "$.stationid": "$.stationid" } } }
+            """);
 
     deployAndPublishOnce(
         "ds-pg-chained-it",
         "pg-chained-it",
         CHAINED_FANOUT_TOPIC,
         graph,
+        mappings,
         new PostgisSinkSpec("chained_fanout_observation"),
         "{\"stationid\":\"S18\",\"measurements\":["
             + "{\"ts\":\"2026-08-01T00:00:00Z\"},{\"ts\":\"2026-08-01T00:15:00Z\"}]}",
@@ -868,6 +910,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
       String pipelineId,
       String topic,
       Map<String, Object> graph,
+      Map<String, Object> mappings,
       PostgisSinkSpec sinkSpec,
       String payload,
       PollStep step)
@@ -881,7 +924,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
             new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
             null);
     DeploymentPlan plan =
-        planner.plan(new PipelineDeploymentRequest(pipelineId, graph, source, sinkSpec));
+        planner.plan(new PipelineDeploymentRequest(pipelineId, graph, source, sinkSpec, mappings));
 
     client.deployFlow(plan);
 

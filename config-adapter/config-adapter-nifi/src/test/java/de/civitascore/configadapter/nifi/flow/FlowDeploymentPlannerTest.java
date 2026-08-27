@@ -993,8 +993,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest("p-tls", graphWithMapping(), source, postgisSink()))
+              .plan(req("p-tls", graphWithMapping(), source, postgisSink()))
               .snapshotJson();
       JsonNode flow = mapper.readTree(snapshot).path("flowContents");
       JsonNode mqtt = processorOfType(snapshot, "ConsumeMQTT");
@@ -1028,9 +1027,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           NifiTestFixtures.planner(resolver, dedicated)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-tls-dedicated", graphWithMapping(), source, postgisSink()))
+              .plan(req("p-tls-dedicated", graphWithMapping(), source, postgisSink()))
               .snapshotJson();
       JsonNode root = mapper.readTree(snapshot);
       JsonNode sslContext =
@@ -1074,14 +1071,8 @@ class FlowDeploymentPlannerTest {
           assertThrows(
               FatalAdapterException.class,
               () ->
-<<<<<<< ours
                   NifiTestFixtures.planner(resolver, unset)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-tls-no-store", graphWithMapping(), source, postgisSink())));
-=======
-                  planner(resolver).plan(req("p-tls", graphWithMapping(), source, postgisSink())));
->>>>>>> theirs
+                      .plan(req("p-tls-no-store", graphWithMapping(), source, postgisSink())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       assertTrue(ex.getInternalMessage().contains("nifi.mqtt.truststore.path"));
     }
@@ -1096,9 +1087,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-mqtt-plain", graphWithMapping(), source, postgisSink()))
+              .plan(req("p-mqtt-plain", graphWithMapping(), source, postgisSink()))
               .snapshotJson();
       JsonNode mqtt = processorOfType(snapshot, "ConsumeMQTT");
       assertEquals(
@@ -1148,9 +1137,7 @@ class FlowDeploymentPlannerTest {
       source.handleUnknownProperty("urls", List.of(url));
       try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
         planner(resolver)
-            .plan(
-                new PipelineDeploymentRequest(
-                    "p-plain-" + url.substring(0, 2), graphWithMapping(), source, postgisSink()));
+            .plan(req("p-plain-" + url.substring(0, 2), graphWithMapping(), source, postgisSink()));
       }
     }
     for (String url : List.of("ssl://broker:8883", "mqtts://broker:8883", "wss://broker/mqtt")) {
@@ -1159,9 +1146,7 @@ class FlowDeploymentPlannerTest {
       source.handleUnknownProperty("urls", List.of(url));
       try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
         planner(resolver)
-            .plan(
-                new PipelineDeploymentRequest(
-                    "p-tls-" + url.substring(0, 2), graphWithMapping(), source, postgisSink()));
+            .plan(req("p-tls-" + url.substring(0, 2), graphWithMapping(), source, postgisSink()));
       }
     }
   }
@@ -1193,9 +1178,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-secure-list", graphWithMapping(), secure, postgisSink()))
+              .plan(req("p-secure-list", graphWithMapping(), secure, postgisSink()))
               .snapshotJson();
       assertEquals(
           "ssl://one:8883,ssl://two:8883",
@@ -1207,9 +1190,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-plain-list", graphWithMapping(), plain, postgisSink()))
+              .plan(req("p-plain-list", graphWithMapping(), plain, postgisSink()))
               .snapshotJson();
       assertEquals(
           "tcp://one:1883,tcp://two:1883",

@@ -6,10 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
-<<<<<<< ours
-=======
 import static org.mockito.Mockito.lenient;
->>>>>>> theirs
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,11 +41,8 @@ import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Collection;
 import java.util.Collections;
-<<<<<<< ours
-import java.util.HashSet;
-=======
 import java.util.HashMap;
->>>>>>> theirs
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

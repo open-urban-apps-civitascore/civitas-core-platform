@@ -4,11 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-<<<<<<< ours
-import static org.mockito.Mockito.doAnswer;
-=======
 import static org.mockito.ArgumentMatchers.isNull;
->>>>>>> theirs
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -35,13 +31,9 @@ import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
-<<<<<<< ours
 import de.civitascore.portal.util.UniqueConstraintViolationException;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-=======
->>>>>>> theirs
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -50,12 +42,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-<<<<<<< ours
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
-=======
->>>>>>> theirs
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -455,43 +443,66 @@ class DataSinkServiceTest {
   @DisplayName("POSTGIS tableName uniqueness within the dataset")
   class PostgisTableNameUniqueness {
 
-    private DataSink postgisSink(UUID id, UUID dataSetId, String tableName) {
+    /** Registry documents by pin, so a sink factory can be used inside a stubbed return value. */
+    private final Map<String, Map<String, Object>> storedDocuments = new HashMap<>();
+
+    @BeforeEach
+    void stubRegistryReads() {
+      lenient()
+          .when(modelRegistryGateway.fetchPayload(any()))
+          .thenAnswer(
+              inv ->
+                  Optional.ofNullable(storedDocuments.get(inv.<String>getArgument(0)))
+                      .map(doc -> new ModelRegistryGateway.RegistryDocument(doc, null)));
+    }
+
+    /**
+     * A stored sink as the guard sees it: the table name is reachable only through the sink's
+     * configuration pin, so each sibling gets its own pin and stored document.
+     */
+    private DataSink storedSink(UUID id, UUID dataSetId, DataSinkType type, String tableName) {
       DataSink sink = new DataSink();
       sink.setId(id);
       sink.setDataSet(dataSet(dataSetId));
-      sink.setDataSinkType(DataSinkType.POSTGIS);
-      sink.setConfiguration(new HashMap<>(Map.of("tableName", tableName)));
+      sink.setDataSinkType(type);
+      String urn = STORED_LOGICAL_URN + ":sibling-" + id + ":1.0.0";
+      sink.setConfigurationUrn(urn);
+      storedDocuments.put(urn, Map.of("tableName", tableName));
       return sink;
     }
 
-    private DataSinkInputDTO postgisInput(UUID dataSetId, String tableName, UUID dsvId) {
+    private DataSink postgisSink(UUID id, UUID dataSetId, String tableName) {
+      return storedSink(id, dataSetId, DataSinkType.POSTGIS, tableName);
+    }
+
+    /** The document the guard reads back for the sink currently being created or updated. */
+    private void stubStoredConfiguration(Map<String, Object> configuration) {
+      storedDocuments.put(STORED_VERSIONED_URN, configuration);
+    }
+
+    private DataSinkInputDTO postgisInput(UUID dataSetId, String tableName) {
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSetId(dataSetId);
       input.setDataSinkType(DataSinkType.POSTGIS);
-      input.setConfiguration(
-          new HashMap<>(
-              Map.of("tableName", tableName, "dataStructureVersionId", dsvId.toString())));
+      input.setConfiguration(new HashMap<>(Map.of("tableName", tableName, "element", ELEMENT_URN)));
       return input;
     }
 
-    private void stubCreate(UUID dataSetId, UUID dsvId, DataSinkInputDTO input) {
+    private void stubCreate(UUID dataSetId, DataSinkInputDTO input) {
       DataSink entity = new DataSink();
       entity.setDataSinkType(DataSinkType.POSTGIS);
-      entity.setConfiguration(input.getConfiguration());
       when(dataSinkMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
-      when(dataStructureVersionRepository.findById(dsvId))
-          .thenReturn(Optional.of(dataStructureVersion(dsvId)));
+      stubStoredConfiguration(input.getConfiguration());
     }
 
     @Test
     @DisplayName("Should reject a tableName already used by a sibling sink of the same dataset")
     void shouldRejectDuplicateTableName() {
       UUID dataSetId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
 
-      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
-      stubCreate(dataSetId, dsvId, input);
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte");
+      stubCreate(dataSetId, input);
       when(dataSinkRepository.findByDataSetId(dataSetId))
           .thenReturn(List.of(postgisSink(UUID.randomUUID(), dataSetId, "messwerte")));
 
@@ -505,10 +516,9 @@ class DataSinkServiceTest {
     @DisplayName("Should reject a tableName differing from a sibling only in case")
     void shouldRejectCaseOnlyDifference() {
       UUID dataSetId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
 
-      DataSinkInputDTO input = postgisInput(dataSetId, "MESSWERTE", dsvId);
-      stubCreate(dataSetId, dsvId, input);
+      DataSinkInputDTO input = postgisInput(dataSetId, "MESSWERTE");
+      stubCreate(dataSetId, input);
       when(dataSinkRepository.findByDataSetId(dataSetId))
           .thenReturn(List.of(postgisSink(UUID.randomUUID(), dataSetId, "messwerte")));
 
@@ -520,16 +530,12 @@ class DataSinkServiceTest {
     @DisplayName("Should accept a tableName only used by a FROST sibling's unrelated configuration")
     void shouldIgnoreFrostSiblings() {
       UUID dataSetId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
 
-      DataSink frostSibling = new DataSink();
-      frostSibling.setId(UUID.randomUUID());
-      frostSibling.setDataSet(dataSet(dataSetId));
-      frostSibling.setDataSinkType(DataSinkType.FROST);
-      frostSibling.setConfiguration(new HashMap<>(Map.of("tableName", "messwerte")));
+      DataSink frostSibling =
+          storedSink(UUID.randomUUID(), dataSetId, DataSinkType.FROST, "messwerte");
 
-      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
-      stubCreate(dataSetId, dsvId, input);
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte");
+      stubCreate(dataSetId, input);
       when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of(frostSibling));
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -540,10 +546,9 @@ class DataSinkServiceTest {
     @DisplayName("Should accept a distinct tableName alongside a sibling sink")
     void shouldAcceptDistinctTableName() {
       UUID dataSetId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
 
-      DataSinkInputDTO input = postgisInput(dataSetId, "andere_tabelle", dsvId);
-      stubCreate(dataSetId, dsvId, input);
+      DataSinkInputDTO input = postgisInput(dataSetId, "andere_tabelle");
+      stubCreate(dataSetId, input);
       when(dataSinkRepository.findByDataSetId(dataSetId))
           .thenReturn(List.of(postgisSink(UUID.randomUUID(), dataSetId, "messwerte")));
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -583,10 +588,9 @@ class DataSinkServiceTest {
     @DisplayName("Should accept a tableName at the maximum identifier length")
     void shouldAcceptTableNameAtMaximumLength() {
       UUID dataSetId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
 
-      DataSinkInputDTO input = postgisInput(dataSetId, "t".repeat(63), dsvId);
-      stubCreate(dataSetId, dsvId, input);
+      DataSinkInputDTO input = postgisInput(dataSetId, "t".repeat(63));
+      stubCreate(dataSetId, input);
       when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of());
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -595,7 +599,7 @@ class DataSinkServiceTest {
 
     private void createWithTableName(String tableName) {
       UUID dataSetId = UUID.randomUUID();
-      DataSinkInputDTO input = postgisInput(dataSetId, tableName, UUID.randomUUID());
+      DataSinkInputDTO input = postgisInput(dataSetId, tableName);
       when(dataSinkMapper.toEntity(any())).thenReturn(new DataSink());
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
       dataSinkService.create(input);
@@ -607,17 +611,13 @@ class DataSinkServiceTest {
     void shouldExcludeItselfOnUpdate() {
       UUID dataSetId = UUID.randomUUID();
       UUID sinkId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
 
       DataSink existing = postgisSink(sinkId, dataSetId, "messwerte");
-      existing.getConfiguration().put("dataStructureVersionId", dsvId.toString());
-
-      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte");
+      stubStoredConfiguration(input.getConfiguration());
 
       when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(existing));
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
-      when(dataStructureVersionRepository.findById(dsvId))
-          .thenReturn(Optional.of(dataStructureVersion(dsvId)));
       when(dataSinkRepository.findByDataSetId(dataSetId))
           .thenReturn(List.of(postgisSink(sinkId, dataSetId, "messwerte")));
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -635,24 +635,13 @@ class DataSinkServiceTest {
       UUID dataSetId = UUID.randomUUID();
       UUID sinkId = UUID.randomUUID();
       UUID siblingId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
 
       DataSink existing = postgisSink(sinkId, dataSetId, "andere_tabelle");
-      existing.getConfiguration().put("dataStructureVersionId", dsvId.toString());
-
-      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte");
+      stubStoredConfiguration(input.getConfiguration());
 
       when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(existing));
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
-      when(dataStructureVersionRepository.findById(dsvId))
-          .thenReturn(Optional.of(dataStructureVersion(dsvId)));
-      doAnswer(
-              inv -> {
-                inv.<DataSink>getArgument(0).setConfiguration(input.getConfiguration());
-                return null;
-              })
-          .when(dataSinkMapper)
-          .updateEntity(any(), any());
       when(dataSinkRepository.findByDataSetId(dataSetId))
           .thenReturn(
               List.of(
@@ -675,17 +664,13 @@ class DataSinkServiceTest {
       UUID dataSetId = UUID.randomUUID();
       UUID sinkId = UUID.randomUUID();
       UUID siblingId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
 
       DataSink existing = postgisSink(sinkId, dataSetId, "messwerte");
-      existing.getConfiguration().put("dataStructureVersionId", dsvId.toString());
-
-      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte", dsvId);
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte");
+      stubStoredConfiguration(input.getConfiguration());
 
       when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(existing));
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
-      when(dataStructureVersionRepository.findById(dsvId))
-          .thenReturn(Optional.of(dataStructureVersion(dsvId)));
       when(dataSinkRepository.findByDataSetId(dataSetId))
           .thenReturn(
               List.of(
@@ -709,10 +694,6 @@ class DataSinkServiceTest {
       sink.setId(UUID.randomUUID());
       sink.setDataSet(ds);
       sink.setDataSinkType(DataSinkType.POSTGIS);
-<<<<<<< ours
-      sink.setConfiguration(
-          new HashMap<>(Map.of("tableName", "old_table", "dataStructureVersionId", "v1")));
-=======
       sink.setConfigurationUrn(STORED_VERSIONED_URN);
       lenient()
           .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
@@ -720,7 +701,6 @@ class DataSinkServiceTest {
               Optional.of(
                   new ModelRegistryGateway.RegistryDocument(
                       Map.of("tableName", "old_table", "element", "v1"), null)));
->>>>>>> theirs
       return sink;
     }
 
@@ -740,16 +720,12 @@ class DataSinkServiceTest {
       sink.setId(UUID.randomUUID());
       sink.setDataSet(ds);
       sink.setDataSinkType(DataSinkType.FROST);
-<<<<<<< ours
-      sink.setConfiguration(new HashMap<>(Map.of("dataStructureVersionId", dsvId)));
-=======
       sink.setConfigurationUrn(STORED_VERSIONED_URN);
       lenient()
           .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
           .thenReturn(
               Optional.of(
                   new ModelRegistryGateway.RegistryDocument(Map.of("element", element), null)));
->>>>>>> theirs
       return sink;
     }
 

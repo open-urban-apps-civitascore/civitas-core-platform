@@ -13,9 +13,9 @@ alter table pipelines add column model_urn text;
 alter table pipelines drop column model;
 alter table pipelines drop column styles;
 
--- Data sinks: the type-specific configuration document (POSTGIS: tableName +
--- dataStructureVersionId soft reference, preserved verbatim inside the stored payload).
--- FROST sinks store nothing; their URN columns stay null.
+-- Data sinks: the type-specific configuration document (POSTGIS: tableName + element soft
+-- reference, preserved verbatim inside the stored payload). A FROST sink owns a configuration
+-- document as well, so its URN columns are populated too.
 alter table data_sinks add column configuration_logical_urn text;
 alter table data_sinks add column configuration_urn text;
 alter table data_sinks drop column configuration;

@@ -52,7 +52,10 @@ public final class CoreUrn {
 
   private static final String SLUG = "[a-z0-9]+(?:-[a-z0-9]+)*";
   private static final String DOMAIN = SLUG + "(?:\\." + SLUG + ")*";
-  private static final String NAME = "[A-Za-z0-9]+";
+  // The registry derives this segment from a schema title and keeps dots, underscores and
+  // hyphens (XOEV identifiers such as Lokation.0002_Bundesland rely on them), so the segment
+  // has to accept them here too; identity is carried by the disambiguator, not the name.
+  private static final String NAME = "[A-Za-z0-9._-]+";
   private static final String DISAMBIGUATOR = "[0-9a-z]{" + DISAMBIGUATOR_LENGTH + "}";
   private static final String VERSION = "\\d+\\.\\d+\\.\\d+";
 

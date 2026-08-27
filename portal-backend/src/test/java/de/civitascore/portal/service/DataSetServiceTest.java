@@ -25,6 +25,7 @@ import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -2043,6 +2044,59 @@ class DataSetServiceTest {
 
       verify(dataSetRepository).delete(ds);
       verify(sagaPublisher, never()).publishDeleteRequested(any());
+    }
+
+    @Test
+    @DisplayName("removing a dataset directly deletes its manifest and its sinks' configurations")
+    void directRemovalDeletesRegistryArtifacts() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setProvisioned(false);
+      ds.setManifestLogicalUrn("urn:core:platform:civitas:dataset:common:doomed:abcdefghij");
+
+      DataSink sink = new DataSink();
+      sink.setId(UUID.randomUUID());
+      sink.setConfigurationLogicalUrn(
+          "urn:core:platform:civitas:data-sink:common:doomed-sink:abcdefghij");
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(sink));
+
+      createService().deleteById(id);
+
+      verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
+      // The sink's configuration artifact is deliberately left: a surviving pipeline artifact
+      // references it, and the registry refuses to delete a referenced artifact.
+      verify(modelRegistryGateway, never()).deletePayload(any());
+    }
+
+    @Test
+    @DisplayName("completing the teardown saga deletes the manifest and the sinks' configurations")
+    void sagaCompletionDeletesRegistryArtifacts() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setProvisioned(true);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      ds.setManifestLogicalUrn("urn:core:platform:civitas:dataset:common:torn-down:abcdefghij");
+
+      DataSink sink = new DataSink();
+      sink.setId(UUID.randomUUID());
+      sink.setConfigurationLogicalUrn(
+          "urn:core:platform:civitas:data-sink:common:torn-down-sink:abcdefghij");
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(sink));
+
+      createService()
+          .handleSagaCompleted(
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
+
+      verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
+      // The sink's configuration artifact is deliberately left: a surviving pipeline artifact
+      // references it, and the registry refuses to delete a referenced artifact.
+      verify(modelRegistryGateway, never()).deletePayload(any());
     }
   }
 

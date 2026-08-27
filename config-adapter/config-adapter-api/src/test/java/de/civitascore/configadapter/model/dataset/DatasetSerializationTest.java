@@ -54,7 +54,9 @@ class DatasetSerializationTest {
   @Test
   void shouldDeserializePostgresqlDatasource() {
     Datasource pg = dataset.datasources().getFirst();
-    assertEquals("0a7b8c9d-1e2f-4a5b-9c0d-1e2f3a4b5c6d", pg.getId());
+    assertEquals(
+        "urn:core:platform:civitas:datasource:common:NeustadtMobilityDB:0a7b8c9d1e:1.0.0",
+        pg.getId());
     assertEquals("postgresql", pg.getType());
     assertEquals("Neustadt Mobility DB", pg.getName());
     assertEquals("pg-mobility.neustadt.de", pg.getHost());
@@ -79,7 +81,9 @@ class DatasetSerializationTest {
   @Test
   void shouldDeserializeMqttDatasource() {
     Datasource mqtt = dataset.datasources().get(1);
-    assertEquals("5f2a1c3e-7b8d-4c9e-a1b2-3c4d5e6f7a8b", mqtt.getId());
+    assertEquals(
+        "urn:core:platform:civitas:datasource:common:NeustadtTrafficSensors:5f2a1c3e7b:1.0.0",
+        mqtt.getId());
     assertEquals("mqtt", mqtt.getType());
     assertEquals("Neustadt IoT MQTT Broker", mqtt.getName());
     assertEquals("iot-broker.neustadt.de", mqtt.getHost());

@@ -827,31 +827,34 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     deploy("pipeline-frost-map-sql-it", graph, source, frostMapping(mappingFields()));
   }
 
-<<<<<<< ours
   /**
    * The reported structure: readings nested two array levels deep under a gateway. Each leaf
    * element must become its own observation, with the gateway-level reference carried along — so
    * the source array has to be exploded before the entity bodies are rendered.
    */
   private static void deployFanoutPipeline() throws Exception {
+    String fields =
+        """
+        {
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "Gateway with nested readings" },
+          "$.properties.reference": "$.ref",
+          "$.Datastreams[].properties.reference": "$.ref",
+          "$.Datastreams[].Observations[].result":
+              { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
+          "$.Datastreams[].Observations[].phenomenonTime":
+              "$.measurements[].measuredValues[].ts"
+        }
+        """;
     Map<String, Object> graph =
         json(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": {
-                    "$.name": "$.station",
-                    "$.description": { "op": "const", "value": "Gateway with nested readings" },
-                    "$.properties.reference": "$.ref",
-                    "$.Datastreams[].properties.reference": "$.ref",
-                    "$.Datastreams[].Observations[].result":
-                        { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
-                    "$.Datastreams[].Observations[].phenomenonTime":
-                        "$.measurements[].measuredValues[].ts"
-                  } } } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
@@ -867,7 +870,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.handleUnknownProperty("client_id", "civitas-frost-fanout");
     source.handleUnknownProperty("qos", 1);
 
-    deploy("pipeline-frost-fanout-it", graph, source);
+    deploy("pipeline-frost-fanout-it", graph, source, frostMapping(fields));
   }
 
   /**
@@ -875,25 +878,29 @@ class NifiFrostMappingIT extends AbstractNifiIT {
    * — so a single element with an empty key is unusable while its siblings stay resolvable.
    */
   private static void deployPartialPipeline() throws Exception {
+    String fields =
+        """
+        {
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "Partial delivery gateway" },
+          "$.properties.reference": "$.ref",
+          "$.Datastreams[].properties.reference":
+              "$.measurements[].measuredValues[].dsref",
+          "$.Datastreams[].Observations[].result":
+              { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
+          "$.Datastreams[].Observations[].phenomenonTime":
+              "$.measurements[].measuredValues[].ts"
+        }
+        """;
     Map<String, Object> graph =
         json(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": {
-                    "$.name": "$.station",
-                    "$.description": { "op": "const", "value": "Partial delivery gateway" },
-                    "$.properties.reference": "$.ref",
-                    "$.Datastreams[].properties.reference":
-                        "$.measurements[].measuredValues[].dsref",
-                    "$.Datastreams[].Observations[].result":
-                        { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
-                    "$.Datastreams[].Observations[].phenomenonTime":
-                        "$.measurements[].measuredValues[].ts"
-                  } } } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
@@ -909,14 +916,11 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.handleUnknownProperty("client_id", "civitas-frost-partial");
     source.handleUnknownProperty("qos", 1);
 
-    deploy("pipeline-frost-partial-it", graph, source);
+    deploy("pipeline-frost-partial-it", graph, source, frostMapping(fields));
   }
 
-  private static void deploy(String pipelineId, Map<String, Object> graph, Datasource source)
-=======
   private static void deploy(
       String pipelineId, Map<String, Object> graph, Datasource source, Map<String, Object> mappings)
->>>>>>> theirs
       throws Exception {
     byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
     try (CredentialResolver resolver = new CredentialResolver(key)) {

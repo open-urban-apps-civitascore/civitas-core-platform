@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,7 +39,7 @@ public class MappingController {
   @Operation(
       summary = "Create a Mapping artifact from a CORE mapping document; returns its URN pins")
   public ResponseEntity<Map<String, String>> create(@RequestBody Map<String, Object> doc) {
-    return ResponseEntity.ok(pins(mappingService.store(null, doc)));
+    return ResponseEntity.status(HttpStatus.CREATED).body(pins(mappingService.store(null, doc)));
   }
 
   @PutMapping

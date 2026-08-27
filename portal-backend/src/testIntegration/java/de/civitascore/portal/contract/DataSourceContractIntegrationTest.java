@@ -35,7 +35,7 @@ import org.springframework.http.ResponseEntity;
 /**
  * Pins the persisted connector-configuration shape for the SQL and MQTT connectors, and pins the
  * mutation semantics on PUT and PATCH (Phase 1 of #1391). The inline {@code
- * data_sources.configuration} JSONB column was dropped (V1_2_11); the configuration now lives as a
+ * data_sources.configuration} JSONB column was dropped (V1_2_17); the configuration now lives as a
  * CORE DataSource artifact in the Model Forge registry, read back here via its {@code
  * configurationUrn}.
  *
@@ -113,7 +113,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
 
   /**
    * Reads the persisted connector configuration back from the Model Forge registry. The inline
-   * {@code data_sources.configuration} JSONB column was dropped (V1_2_11); the configuration now
+   * {@code data_sources.configuration} JSONB column was dropped (V1_2_17); the configuration now
    * lives as a CORE DataSource artifact keyed by the shell's {@code configurationUrn}. The returned
    * JSON additionally carries the registry-stamped {@code $schema}/{@code id}/{@code
    * connectionType} (ignored by the lenient comparator).

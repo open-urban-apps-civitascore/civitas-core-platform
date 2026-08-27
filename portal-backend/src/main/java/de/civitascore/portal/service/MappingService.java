@@ -40,9 +40,22 @@ public class MappingService {
         PayloadKind.MAPPING, Optional.ofNullable(logicalUrn), deriveName(content), content, styles);
   }
 
-  /** The mapping's content (rules), read back from Model Forge, or empty when it does not exist. */
+  /**
+   * The mapping read back from Model Forge — its rules plus the editor's node layout, which is
+   * stored alongside the content and has to be served with it for the editor to restore a saved
+   * diagram. Empty when the mapping does not exist.
+   */
   public Optional<Map<String, Object>> get(String urn) {
-    return registry.fetchPayload(urn).map(ModelRegistryGateway.RegistryDocument::content);
+    return registry
+        .fetchPayload(urn)
+        .map(
+            document -> {
+              Map<String, Object> result = new LinkedHashMap<>(document.content());
+              if (document.styles() != null && document.styles().get("positions") != null) {
+                result.put("positions", document.styles().get("positions"));
+              }
+              return result;
+            });
   }
 
   /**

@@ -26,18 +26,19 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Parses the inline {@code mappingConfig} of a {@code mapping} graph node into a typed {@link
- * MappingConfig}. The grammar is closed: a field value is either a shorthand source-path string
- * (copy) or an object with a known {@code op}. Anything else — an unknown op, a malformed operand,
- * a bare literal — is rejected with {@link AdapterErrorCode#NIFI_MAPPING_ERROR}, so a tenant can
- * never smuggle an unsupported transform past this boundary.
+ * Parses a mapping document — resolved from the pipeline's shipped mappings catalog by the node's
+ * {@code mappingRef} — into a typed {@link MappingConfig}. The grammar is closed: a field value is
+ * either a shorthand source-path string (copy) or an object with a known {@code op}. Anything else
+ * — an unknown op, a malformed operand, a bare literal — is rejected with {@link
+ * AdapterErrorCode#NIFI_MAPPING_ERROR}, so a tenant can never smuggle an unsupported transform past
+ * this boundary.
  */
 public class MappingConfigParser {
 
   /**
-   * Parses a {@code mappingConfig} JSON object.
+   * Parses a mapping document.
    *
-   * @param root the {@code mappingConfig} node
+   * @param root the mapping document's root node
    * @return the parsed mapping
    * @throws FatalAdapterException if the structure is malformed or contains an unsupported
    *     operation

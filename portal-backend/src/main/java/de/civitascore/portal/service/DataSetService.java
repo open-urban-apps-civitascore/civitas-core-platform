@@ -859,6 +859,15 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    *
    * <p>Flushing here keeps a constraint violation inside this call instead of surfacing it at
    * commit, after a caller has already logged the removal as done.
+   *
+   * <p>This is the only place a dataset row is removed — a provisioned dataset keeps its row until
+   * its teardown saga reports back — so the manifest cleanup belongs here rather than in the {@code
+   * postDelete} hook, which a two-phase delete never reaches.
+   *
+   * <p>The sinks' own configuration artifacts are left in the registry: the dataset's pipelines are
+   * removed by a JPA cascade that does not run their service hook, so a pipeline artifact survives
+   * holding a reference onto each sink configuration, and the registry refuses to delete a
+   * referenced artifact. Removing them here would therefore fail the whole delete.
    */
   private void deleteWithSinks(DataSet dataSet) {
     dataSinkRepository
@@ -870,6 +879,11 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
             });
     dataSetRepository.delete(dataSet);
     dataSetRepository.flush();
+    // A DataSet groups its members, it does not own them: dropping the manifest removes the
+    // dataset-ref edges and leaves the members as orphans, which the orphan query still finds.
+    if (dataSet.getManifestLogicalUrn() != null) {
+      modelRegistryGateway.deleteDataSet(dataSet.getManifestLogicalUrn());
+    }
   }
 
   /**

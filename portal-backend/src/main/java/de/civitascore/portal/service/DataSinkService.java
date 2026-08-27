@@ -201,12 +201,15 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     if (entity.getDataSinkType() != DataSinkType.POSTGIS) {
       return;
     }
-    String tableName = (String) entity.getConfiguration().get("tableName");
+    String tableName = tableNameOf(entity);
+    if (tableName == null) {
+      return;
+    }
 
     dataSinkRepository.findByDataSetId(entity.getDataSet().getId()).stream()
         .filter(sibling -> !Objects.equals(sibling.getId(), entity.getId()))
         .filter(sibling -> sibling.getDataSinkType() == DataSinkType.POSTGIS)
-        .filter(sibling -> tableName.equalsIgnoreCase(siblingTableName(sibling)))
+        .filter(sibling -> tableName.equalsIgnoreCase(tableNameOf(sibling)))
         .findFirst()
         .ifPresent(
             _ -> {
@@ -231,9 +234,22 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
         + " dataset; rename it to change this sink";
   }
 
-  private static String siblingTableName(DataSink sink) {
-    Map<String, Object> config = sink.getConfiguration();
-    return config != null && config.get("tableName") instanceof String tableName ? tableName : null;
+  /**
+   * A sink's {@code tableName} lives in its registry-stored configuration document rather than on
+   * the row, so the uniqueness check resolves it through the sink's pin. Null when the sink has no
+   * stored configuration yet.
+   */
+  private String tableNameOf(DataSink sink) {
+    if (sink.getConfigurationUrn() == null) {
+      return null;
+    }
+    return modelRegistryGateway
+        .fetchPayload(sink.getConfigurationUrn())
+        .map(ModelRegistryGateway.RegistryDocument::content)
+        .map(content -> content.get("tableName"))
+        .filter(String.class::isInstance)
+        .map(String.class::cast)
+        .orElse(null);
   }
 
   /**

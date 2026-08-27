@@ -66,12 +66,11 @@ public final class NifiTestFixtures {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-<<<<<<< ours
   private static final PlatformSinkConfig DEFAULT_PLATFORM_SINK =
       new PlatformSinkConfig("jdbc:postgresql://db:5432/civitas", "nifi", "db-secret");
 
   private static final String DEFAULT_FROST_BASE_URL = "http://frost:8080/FROST-Server/v1.1";
-=======
+
   /**
    * The shipped mappings catalog every planner fixture request carries — the callback-free
    * adapter's source of a {@code mappingRef}'s {@code fields}. Keyed by the Mapping CORE URNs the
@@ -87,7 +86,7 @@ public final class NifiTestFixtures {
           MAP_BASIC,
           map(
               "{\"fields\": {\"$.station_id\":\"$.station_id\",\"$.temperature\":\"$.temperature\","
-                  + "\"$.observed_at\":{\"op\":\"toDate\",\"input\":\"$.ts\",\"pattern\":\"yyyy-MM-dd\"}}}"));
+                  + "\"$.observed_at\":{\"op\":\"toDateTime\",\"input\":\"$.ts\",\"pattern\":\"yyyy-MM-dd\"}}}"));
       m.put(
           MAP_GEO,
           map(
@@ -111,7 +110,6 @@ public final class NifiTestFixtures {
       throw new ExceptionInInitializerError(e);
     }
   }
->>>>>>> theirs
 
   private NifiTestFixtures() {}
 
@@ -205,24 +203,11 @@ public final class NifiTestFixtures {
         """
         {
           "nodes": [
-<<<<<<< ours
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
-            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": {
-                  "$.station_id": "$.station_id",
-                  "$.temperature": "$.temperature",
-                  "$.observed_at": { "op": "toDateTime", "input": "$.ts", "pattern": "yyyy-MM-dd" }
-                } } } },
-            { "id": "n-sink", "type": "%s", "data": { "entityId": "sink-1" } },
-            { "id": "n-end", "type": "end", "data": {} }
-=======
             { "id": "n-start", "kind": "start" },
             { "id": "n-src", "kind": "source", "sourceRef": "%s" },
             { "id": "n-map", "kind": "mapping", "mappingRef": "%s" },
             { "id": "n-sink", "kind": "sink", "sinkRef": "%s" },
             { "id": "n-end", "kind": "end" }
->>>>>>> theirs
           ],
           "edges": [
             { "id": "e1", "source": "n-start", "target": "n-src" },
