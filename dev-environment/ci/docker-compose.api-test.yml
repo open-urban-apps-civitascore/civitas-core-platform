@@ -222,7 +222,7 @@ services:
         RUN mkdir -p /staging/data/config && \
             printf '{"authz_repository_url":"http://authz-repository:8091/api/v1/user-context","dataset_pool_membership_url":"http://authz-repository:8091/api/v1/dataset-pool","authz_cache_duration_seconds":0}\n'\
             > /staging/data/config/config.json
-        FROM openpolicyagent/opa:1.14.0-static
+        FROM openpolicyagent/opa:1.19.1-static
         COPY --from=prep /staging/policies /policies
         COPY --from=prep /staging/helpers /helpers
         COPY --from=prep /staging/providers /providers

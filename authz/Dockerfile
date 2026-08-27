@@ -36,7 +36,7 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
 # Run the application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
 
-FROM alpine:3.23.3 AS fetcher
+FROM alpine:3.23.5 AS fetcher
 COPY authz/rego/bundle.tar.gz /bundle.tar.gz
 RUN mkdir /out && \
     tar -xzf /bundle.tar.gz -C /out && \
@@ -44,7 +44,7 @@ RUN mkdir /out && \
     printf '{\n  "authz_repository_url": "http://civitas-authz-repository:8091/api/v1/user-context",\n  "dataset_pool_membership_url": "http://civitas-authz-repository:8091/api/v1/dataset-pool",\n  "authz_cache_duration_seconds": 0\n}\n' > /out/config.json
 
 
-FROM openpolicyagent/opa:1.14.0-static AS opa
+FROM openpolicyagent/opa:1.19.1-static AS opa
 
 COPY --from=fetcher /out/config.json /data/config.json
 COPY --from=fetcher /out/bundle/policy /policies
