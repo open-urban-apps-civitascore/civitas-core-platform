@@ -1176,6 +1176,27 @@ describe('exportToJsonSchema', () => {
     expect((schema.$defs as Record<string, unknown>)['Road-Segment-Part']).toBeDefined()
   })
 
+  it('disambiguates member names that collide only after PascalCase normalization', () => {
+    // 'Road-Segment' and 'Road Segment' are distinct $defs keys, but both normalize to 'RoadSegment'
+    // — elementModelUrnForMember would stamp the same canonical Element URN on both members unless
+    // assignDefKeys itself treats the normalized collision as a collision.
+    const first = cls('a', 'Road-Segment', [{ id: 'a1', name: 'a1' }])
+    ;(first.data.element as { isRoot?: boolean }).isRoot = true
+    const diagram = baseDiagram({
+      name: 'S',
+      nodes: [first, cls('b', 'Road Segment', [{ id: 'a2', name: 'a2' }])] as unknown as UMLDiagram['nodes'],
+      edges: [],
+    } as Partial<UMLDiagram>)
+
+    const dsUrn = 'urn:core:platform:civitas:datastructure:common:S:abc1234567:1.0.0'
+    const schema = exportToJsonSchema(diagram, dsUrn)
+    const defs = schema.$defs as Record<string, Record<string, unknown>>
+
+    const ids = new Set(Object.values(defs).map(member => member.$id))
+    expect(ids.size).toBe(2)
+    expect(DataStructureSchema.safeParse(schema).success).toBe(true)
+  })
+
   it('exports the designated root (isRoot) when the derivation alone would be ambiguous', () => {
     // Beta is referenced only as an attribute type: reachable from Alpha, but not embedded by any
     // edge — without the designation both classes would be root candidates.

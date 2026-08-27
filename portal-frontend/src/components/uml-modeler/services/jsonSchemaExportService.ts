@@ -43,7 +43,7 @@
  *   refs to them.
  */
 
-import { elementModelUrnForMember } from '@/utils/urn'
+import { elementModelUrnForMember, toPascalCaseName } from '@/utils/urn'
 
 import type { UMLDiagram } from '../types/diagram'
 import type { UMLAttribute, UMLElement, UMLEnumeration, UMLRelationship, UMLType } from '../types/uml'
@@ -265,18 +265,26 @@ const buildClassSchema = (
  * prefix-stripping rather than JSON-Pointer evaluation — so instead of `~0`/`~1`-escaping the refs
  * (which those resolvers would not unescape), pointer-special characters are kept out of the keys
  * themselves, making every emitted ref a valid JSON Pointer for standard tooling too.
+ *
+ * Collision detection also covers the key's PascalCase-normalized form (the same normalization
+ * {@link elementModelUrnForMember} applies to derive a member's canonical Element URN): two keys
+ * that are textually distinct but normalize the same way (e.g. `Foo-Bar` and `Foo Bar`, both
+ * `FooBar`) would otherwise stamp the same canonical `$id` on two different `$defs` members —
+ * silently collapsing two distinct classes into one Element on Model Forge's split.
  */
 export const assignDefKeys = (elements: UMLElement[]): Map<string, string> => {
   const defKeyById = new Map<string, string>()
   const usedKeys = new Set<string>()
+  const usedNormalized = new Set<string>()
   for (const element of elements) {
     const key = (element.name || 'Type').replace(/[~/]/g, '-')
     let candidate = key
     let suffix = 1
-    while (usedKeys.has(candidate)) {
+    while (usedKeys.has(candidate) || usedNormalized.has(toPascalCaseName(candidate))) {
       candidate = `${key}_${suffix++}`
     }
     usedKeys.add(candidate)
+    usedNormalized.add(toPascalCaseName(candidate))
     defKeyById.set(element.id, candidate)
   }
   return defKeyById
