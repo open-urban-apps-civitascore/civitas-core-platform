@@ -38,6 +38,7 @@ public class SchemaImportService {
     private final ReferenceExistenceValidator refExistence;
     private final RemoteSchemaRepository   remoteFetcher;
     private final CoreSchemaValidator      coreSchemaValidator;
+    private final RemoteRefResolver        remoteRefResolver;
 
     public SchemaImportService(ModelValidator validator,
                                ObjectMapper mapper,
@@ -57,6 +58,7 @@ public class SchemaImportService {
         this.refExistence   = refExistence;
         this.remoteFetcher  = remoteFetcher;
         this.coreSchemaValidator = coreSchemaValidator;
+        this.remoteRefResolver = new RemoteRefResolver(remoteFetcher, mapper);
     }
 
     // ── Import ────────────────────────────────────────────────────────────────
@@ -234,7 +236,7 @@ public class SchemaImportService {
      *     unique across upstreams — include the source, e.g. {@code smart-data-models:Weather/…}
      */
     public SchemaImportResult importFromUrl(String url, String stableKey) {
-        JsonNode schema = remoteFetcher.fetchJson(url);
+        JsonNode schema = remoteRefResolver.inlineRemoteRefs(remoteFetcher.fetchJson(url));
         return importSchema(new SchemaImportRequest(stampDerivedId(schema, stableKey)));
     }
 
@@ -253,7 +255,7 @@ public class SchemaImportService {
     }
 
     public SchemaImportResult importFromUrl(String url) {
-        JsonNode schema = remoteFetcher.fetchJson(url);
+        JsonNode schema = remoteRefResolver.inlineRemoteRefs(remoteFetcher.fetchJson(url));
         return importSchema(new SchemaImportRequest(schema));
     }
 
