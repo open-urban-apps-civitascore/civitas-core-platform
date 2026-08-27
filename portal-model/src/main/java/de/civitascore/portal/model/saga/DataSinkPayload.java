@@ -12,6 +12,10 @@ import java.util.Map;
  * the trigger) and the config-adapter (which consumes it).
  *
  * <ul>
+ *   <li>{@code id} — the DataSink's configuration CORE URN: the correlation key a pipeline's sink
+ *       node carries as its {@code sinkRef}, so the callback-free config-adapter resolves the sink
+ *       on URNs rather than GUIDs. {@code null} for a passthrough sink that stores no configuration
+ *       (such a sink cannot be referenced by a pipeline node).
  *   <li>{@code configuration} — the type-specific settings stored on the {@code DataSink} entity
  *       (for {@code POSTGIS}: {@code tableName} and {@code dataStructureVersionId}; empty/absent
  *       for {@code FROST}).

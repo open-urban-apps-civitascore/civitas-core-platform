@@ -27,6 +27,9 @@ import de.civitascore.portal.model.entity.Resource;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.entity.User;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
+import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.ActivityRepository;
 import de.civitascore.portal.repository.AgentRepository;
 import de.civitascore.portal.repository.AssignmentRepository;
@@ -47,7 +50,10 @@ import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.repository.UserRepository;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -87,9 +93,116 @@ public class PortalTestDataFactory {
   @Autowired private AgentRepository agentRepository;
   @Autowired private ActivityRepository activityRepository;
   @Autowired private DataSetSeriesRepository dataSetSeriesRepository;
+  @Autowired private ModelRegistryGateway modelRegistryGateway;
 
   private static long nextSeq() {
     return SEQ.incrementAndGet();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Model Forge registry content (models and payloads live in the registry, not
+  // in host columns — the attach* helpers store the content and mirror the pin)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Stores the given JSON Schema as the version's model in the Model Forge registry and mirrors the
+   * assigned pin (URN + version) onto the persisted shell — what the service layer does on
+   * create/update.
+   */
+  public DataStructureVersion attachModel(DataStructureVersion version, Map<String, Object> model) {
+    return attachModel(version, model, null);
+  }
+
+  /** Variant of {@link #attachModel(DataStructureVersion, Map)} carrying UI styles. */
+  public DataStructureVersion attachModel(
+      DataStructureVersion version, Map<String, Object> model, Map<String, Object> styles) {
+    DataStructure parent = version.getDataStructure();
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storeModel(
+            Optional.ofNullable(parent.getModelLogicalUrn()),
+            parent.getName(),
+            model,
+            styles,
+            VersionBump.MINOR);
+    if (parent.getModelLogicalUrn() == null) {
+      parent.setModelLogicalUrn(pin.logicalUrn());
+      dataStructureRepository.save(parent);
+    }
+    version.setModelUrn(pin.versionedUrn());
+    version.setVersion(pin.version());
+    return dataStructureVersionRepository.save(version);
+  }
+
+  /**
+   * Stores the pipeline definition (plus optional React Flow layout) in the registry and mirrors
+   * the assigned pin onto the persisted shell.
+   */
+  public Pipeline attachPipelineDefinition(
+      Pipeline pipeline, Map<String, Object> model, Map<String, Object> styles) {
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storePayload(
+            PayloadKind.PIPELINE,
+            Optional.ofNullable(pipeline.getModelLogicalUrn()),
+            pipeline.getName(),
+            model,
+            styles);
+    if (pipeline.getModelLogicalUrn() == null) {
+      pipeline.setModelLogicalUrn(pin.logicalUrn());
+    }
+    pipeline.setModelUrn(pin.versionedUrn());
+    return pipelineRepository.save(pipeline);
+  }
+
+  /**
+   * Stores the sink configuration in the registry and mirrors the assigned pin onto the persisted
+   * shell.
+   */
+  public DataSink attachSinkConfiguration(DataSink sink, Map<String, Object> configuration) {
+    // Mirror DataSinkService: the stored CORE payload carries connectionType (derived from the sink
+    // type); Model Forge stamps $schema + id on write and validates against datasink.schema.json.
+    Map<String, Object> payload = new LinkedHashMap<>(configuration);
+    if (sink.getDataSinkType() != null) {
+      payload.put("connectionType", sink.getDataSinkType().name().toLowerCase(Locale.ROOT));
+    }
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storePayload(
+            PayloadKind.DATA_SINK,
+            Optional.ofNullable(sink.getConfigurationLogicalUrn()),
+            payload.get("tableName") instanceof String tableName ? tableName : "datasink",
+            payload,
+            null);
+    if (sink.getConfigurationLogicalUrn() == null) {
+      sink.setConfigurationLogicalUrn(pin.logicalUrn());
+    }
+    sink.setConfigurationUrn(pin.versionedUrn());
+    return dataSinkRepository.save(sink);
+  }
+
+  /**
+   * Stores the connector configuration in the registry and mirrors the assigned pin onto the
+   * persisted shell.
+   */
+  public DataSource attachSourceConfiguration(
+      DataSource dataSource, Map<String, Object> configuration) {
+    // Mirror DataSourceService: the stored CORE payload carries connectionType (derived from the
+    // connector type); Model Forge stamps $schema + id on write and validates against
+    // datasource.schema.json.
+    Map<String, Object> payload = new LinkedHashMap<>(configuration);
+    if (dataSource.getConnectorType() != null) {
+      payload.put("connectionType", dataSource.getConnectorType().name().toLowerCase(Locale.ROOT));
+    }
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storePayload(
+            PayloadKind.DATA_SOURCE,
+            Optional.ofNullable(dataSource.getConfigurationLogicalUrn()),
+            dataSource.getName() != null ? dataSource.getName() : "datasource",
+            payload,
+            null);
+    if (dataSource.getConfigurationLogicalUrn() == null) {
+      dataSource.setConfigurationLogicalUrn(pin.logicalUrn());
+    }
+    dataSource.setConfigurationUrn(pin.versionedUrn());
+    return dataSourceRepository.save(dataSource);
   }
 
   // ---------------------------------------------------------------------------
@@ -260,7 +373,12 @@ public class PortalTestDataFactory {
     return dataStructureVersionRepository.save(builder.build());
   }
 
-  /** A minimal, well-formed JSON Schema document suitable for a data structure version's model. */
+  /**
+   * A minimal, well-formed JSON Schema document suitable for a data structure version's model. No
+   * {@code $id} is set — Model Forge is the sole version authority and mints the CORE URN itself; a
+   * caller-supplied {@code $id} that isn't a full, well-formed CORE URN gets stored verbatim and
+   * breaks version extraction downstream.
+   */
   public Map<String, Object> dataStructureVersionModel(String title) {
     Map<String, Object> schema = new HashMap<>();
     schema.put("title", title);

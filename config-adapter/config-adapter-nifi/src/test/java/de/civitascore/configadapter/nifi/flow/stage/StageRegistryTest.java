@@ -37,7 +37,11 @@ class StageRegistryTest {
       }
 
       @Override
-      public Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink, SinkSpec sinkSpec) {
+      public Compilation compile(
+          List<GraphNode> ownNodes,
+          SinkStage<?> sink,
+          SinkSpec sinkSpec,
+          Map<String, Object> mappings) {
         throw new UnsupportedOperationException();
       }
     };

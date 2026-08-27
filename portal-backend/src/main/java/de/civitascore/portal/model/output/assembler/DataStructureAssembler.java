@@ -4,7 +4,7 @@ import de.civitascore.portal.mapper.DataStructureMapper;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
-import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import java.util.Set;
 import java.util.UUID;
@@ -23,7 +23,7 @@ public class DataStructureAssembler
 
   private final DataStructureMapper dataStructureMapper;
   private final DataSourceRepository dataSourceRepository;
-  private final DataSinkRepository dataSinkRepository;
+  private final ModelRegistryGateway modelRegistryGateway;
 
   /** {@inheritDoc} Delegates to the {@link DataStructureMapper} for basic field mapping. */
   @Override
@@ -37,14 +37,17 @@ public class DataStructureAssembler
    */
   @Override
   public DataStructureOutputDTO enrichDto(DataStructureOutputDTO dto, DataStructure entity) {
+    Set<DataStructureVersion> versions = entity.getDataStructureVersions();
     Set<UUID> versionIds =
-        entity.getDataStructureVersions().stream()
-            .map(DataStructureVersion::getId)
-            .collect(Collectors.toSet());
+        versions.stream().map(DataStructureVersion::getId).collect(Collectors.toSet());
     if (!versionIds.isEmpty()) {
+      // Sink references live in the registry (tracked by Model Forge via each version's model URN);
+      // the source dimension stays a host FK query.
       dto.setInUse(
           dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
-              || dataSinkRepository.existsByDataStructureVersionIdIn(versionIds));
+              || versions.stream()
+                  .map(DataStructureVersion::getModelUrn)
+                  .anyMatch(modelRegistryGateway::isReferencedBySink));
     }
     return dto;
   }

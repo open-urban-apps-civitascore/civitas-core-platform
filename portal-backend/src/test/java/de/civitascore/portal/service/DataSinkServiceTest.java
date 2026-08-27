@@ -4,8 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+<<<<<<< ours
 import static org.mockito.Mockito.doAnswer;
+=======
+import static org.mockito.ArgumentMatchers.isNull;
+>>>>>>> theirs
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,27 +25,37 @@ import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+<<<<<<< ours
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+=======
+>>>>>>> theirs
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+<<<<<<< ours
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+=======
+>>>>>>> theirs
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -52,11 +68,49 @@ class DataSinkServiceTest {
   @Mock private DataSinkMapper dataSinkMapper;
   @Mock private DataSetRepository dataSetRepository;
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
+  @Mock private LayerRepository layerRepository;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
 
   @Mock private DataSetMutationGuard dataSetMutationGuard;
 
   @InjectMocks private DataSinkService dataSinkService;
+
+  private static final String STORED_LOGICAL_URN =
+      "urn:core:platform:civitas:data-sink:common:test";
+  private static final String STORED_VERSIONED_URN = STORED_LOGICAL_URN + ":1.0.0";
+  private static final String ELEMENT_URN =
+      "urn:core:platform:civitas:element:common:observation:1.0.0";
+
+  @BeforeEach
+  void stubPayloadStore() {
+    // Storing a configuration returns the registry-assigned pin. Lenient so tests that never
+    // store one (validation-failure paths, FROST) don't trip strict stubbing.
+    lenient()
+        .when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any()))
+        .thenReturn(
+            new ModelRegistryGateway.ModelPin(STORED_LOGICAL_URN, STORED_VERSIONED_URN, "1.0.0"));
+    // The element soft reference resolves to an existing model by default; individual "not
+    // found" tests override this with an empty Optional. Lenient so tests that never reference
+    // an element (unknown-key / missing-element failure paths) don't trip strict stubbing.
+    lenient()
+        .when(modelRegistryGateway.fetchModel(ELEMENT_URN))
+        .thenReturn(Optional.of(new ModelRegistryGateway.RegistryDocument(Map.of(), null)));
+    // The element's owning DataStructure resolves (and the caller is authorized) by default;
+    // authorization-failure tests override this. Lenient so element-free paths (FROST empty,
+    // validation failures) don't trip strict stubbing. authorizeReferences is a void no-op on the
+    // mock, which is the authorized outcome.
+    lenient()
+        .when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(any()))
+        .thenReturn(Optional.of(dataStructureVersion(UUID.randomUUID())));
+  }
+
+  private DataSet dataSet(UUID id) {
+    DataSet ds = new DataSet();
+    ds.setId(id);
+    ds.setName("ds");
+    return ds;
+  }
 
   private DataStructureVersion dataStructureVersion(UUID id) {
     DataStructure structure = new DataStructure();
@@ -67,13 +121,6 @@ class DataSinkServiceTest {
     dsv.setDataStructure(structure);
     dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     return dsv;
-  }
-
-  private DataSet dataSet(UUID id) {
-    DataSet ds = new DataSet();
-    ds.setId(id);
-    ds.setName("ds");
-    return ds;
   }
 
   @Nested
@@ -123,6 +170,154 @@ class DataSinkServiceTest {
   }
 
   @Nested
+  @DisplayName("Configuration storage in the model registry (stage 4)")
+  class ConfigurationStorage {
+
+    @Test
+    @DisplayName("POSTGIS create stores the configuration and mirrors the assigned pin")
+    void postgisCreateStoresConfigurationAndMirrorsPin() {
+      UUID dataSetId = UUID.randomUUID();
+      Map<String, Object> configuration =
+          Map.of("tableName", "sensor_readings", "element", ELEMENT_URN);
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSinkType(DataSinkType.POSTGIS);
+      input.setConfiguration(configuration);
+
+      DataSink entity = new DataSink();
+      when(dataSinkMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSink result = dataSinkService.create(input);
+
+      // The element URN soft reference is preserved verbatim, and the host enriches the payload
+      // with
+      // connectionType (from the sink type). Model Forge owns self-description — it stamps $schema
+      // +
+      // id on write (EmbeddedModelForgeOperations.saveArtifact), so the host does NOT add them
+      // here.
+      // Map equality is order-independent.
+      verify(modelRegistryGateway)
+          .storePayload(
+              eq(PayloadKind.DATA_SINK),
+              eq(Optional.empty()),
+              eq("sensor_readings"),
+              eq(
+                  Map.of(
+                      "tableName", "sensor_readings",
+                      "element", ELEMENT_URN,
+                      "connectionType", "postgis")),
+              isNull());
+      assertThat(result.getConfigurationLogicalUrn()).isEqualTo(STORED_LOGICAL_URN);
+      assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);
+    }
+
+    @Test
+    @DisplayName("FROST create stores {connectionType:frost} and pins its configurationUrn")
+    void frostCreatePinsConnectionType() {
+      UUID dataSetId = UUID.randomUUID();
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSinkType(DataSinkType.FROST);
+      input.setConfiguration(Map.of());
+
+      DataSink entity = new DataSink();
+      when(dataSinkMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSink result = dataSinkService.create(input);
+
+      // A FROST sink is a first-class CORE DataSink artifact whose only content is its stamped
+      // connectionType (all a passthrough FROST sink needs), so it obtains a configurationUrn a
+      // pipeline can reference by sinkRef. Model Forge stamps $schema + id on write.
+      verify(modelRegistryGateway)
+          .storePayload(
+              eq(PayloadKind.DATA_SINK),
+              eq(Optional.empty()),
+              any(),
+              eq(Map.of("connectionType", "frost")),
+              isNull());
+      assertThat(result.getConfigurationLogicalUrn()).isEqualTo(STORED_LOGICAL_URN);
+      assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);
+    }
+
+    @Test
+    @DisplayName("Delete removes the backing configuration artifact from the registry")
+    void deleteRemovesConfigurationArtifact() {
+      UUID sinkId = UUID.randomUUID();
+      DataSink sink = new DataSink();
+      sink.setId(sinkId);
+      sink.setDataSet(dataSet(UUID.randomUUID()));
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      sink.setConfigurationLogicalUrn(STORED_LOGICAL_URN);
+      sink.setConfigurationUrn(STORED_VERSIONED_URN);
+
+      when(dataSinkRepository.existsById(sinkId)).thenReturn(true);
+      when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(sink));
+      when(layerRepository.existsByDataSinkId(sinkId)).thenReturn(false);
+
+      dataSinkService.deleteById(sinkId);
+
+      verify(dataSinkRepository).deleteById(sinkId);
+      verify(modelRegistryGateway).deletePayload(STORED_LOGICAL_URN);
+    }
+  }
+
+  @Nested
+  @DisplayName("Referenced DataStructure authorization")
+  class ReferenceAuthorization {
+
+    private DataSinkInputDTO postgisInput(UUID dataSetId) {
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSinkType(DataSinkType.POSTGIS);
+      input.setConfiguration(Map.of("tableName", "sensor_readings", "element", ELEMENT_URN));
+      return input;
+    }
+
+    @Test
+    @DisplayName("POSTGIS create is denied when the caller is not authorized for the structure")
+    void postgisCreateDeniedWhenUnauthorized() {
+      UUID dataSetId = UUID.randomUUID();
+      DataSinkInputDTO input = postgisInput(dataSetId);
+
+      when(dataSinkMapper.toEntity(any())).thenReturn(new DataSink());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      doThrow(new AccessDeniedException("denied"))
+          .when(scopeAccessAuthorizer)
+          .authorizeReferences(eq(ScopeType.DATASTRUCTURE), any());
+
+      // The denial is masked as the same "not available" 400 that a missing structure yields, so
+      // the 400-vs-403 difference cannot be used as an existence oracle over structure URNs.
+      assertThatThrownBy(() -> dataSinkService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Referenced DataStructure is not available");
+      verify(dataSinkRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("POSTGIS create is denied when the element resolves to no known DataStructure")
+    void postgisCreateDeniedWhenStructureUnresolvable() {
+      UUID dataSetId = UUID.randomUUID();
+      DataSinkInputDTO input = postgisInput(dataSetId);
+
+      when(dataSinkMapper.toEntity(any())).thenReturn(new DataSink());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(any()))
+          .thenReturn(Optional.empty());
+
+      assertThatThrownBy(() -> dataSinkService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Referenced DataStructure is not available");
+      verify(dataSinkRepository, never()).save(any());
+    }
+  }
+
+  @Nested
   @DisplayName("validateConfiguration() — FROST")
   class FrostValidation {
 
@@ -145,78 +340,37 @@ class DataSinkServiceTest {
     }
 
     @Test
-    @DisplayName("Should accept a FROST config referencing an existing DataStructureVersion")
-    void shouldAcceptFrostConfigWithExistingDataStructureVersion() {
+    @DisplayName("Should accept a FROST config referencing an existing element")
+    void shouldAcceptFrostConfigWithExistingElement() {
       UUID dataSetId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
 
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSetId(dataSetId);
       input.setDataSinkType(DataSinkType.FROST);
-      input.setConfiguration(Map.of("dataStructureVersionId", dsvId.toString()));
+      input.setConfiguration(Map.of("element", ELEMENT_URN));
 
       DataSink entity = new DataSink();
-      DataStructureVersion dsv = dataStructureVersion(dsvId);
       when(dataSinkMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
-      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(dsv));
       when(dataSinkRepository.save(any())).thenReturn(entity);
 
       assertThat(dataSinkService.create(input)).isSameAs(entity);
-
-      // The guard must authorize the parent DataStructure id, never the version id — assignments
-      // scope on the structure, so authorizing the version id would deny every legitimate caller.
-      ArgumentCaptor<Collection<UUID>> captor = ArgumentCaptor.forClass(Collection.class);
-      verify(scopeAccessAuthorizer)
-          .authorizeReferences(eq(ScopeType.DATASTRUCTURE), captor.capture());
-      assertThat(captor.getValue())
-          .containsExactly(dsv.getDataStructure().getId())
-          .doesNotContain(dsvId);
     }
 
     @Test
-    @DisplayName("Should deny an unauthorized structure indistinguishably from a missing one")
-    void shouldDenyWhenNotAuthorizedForStructure() {
+    @DisplayName("Should throw InvalidInputException when the referenced element does not exist")
+    void shouldThrowWhenFrostElementMissing() {
       UUID dataSetId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
 
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSetId(dataSetId);
       input.setDataSinkType(DataSinkType.FROST);
-      input.setConfiguration(Map.of("dataStructureVersionId", dsvId.toString()));
-
-      when(dataSinkMapper.toEntity(any())).thenReturn(new DataSink());
-      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
-      when(dataStructureVersionRepository.findById(dsvId))
-          .thenReturn(Optional.of(dataStructureVersion(dsvId)));
-      doThrow(new AccessDeniedException("denied"))
-          .when(scopeAccessAuthorizer)
-          .authorizeReferences(eq(ScopeType.DATASTRUCTURE), any());
-
-      // An unauthorized reference must surface as the SAME failure as a missing one (see the
-      // missing-version test below): same exception type, same message, no id — so a caller cannot
-      // tell an existing-but-forbidden version apart from a non-existent one (existence oracle).
-      assertThatThrownBy(() -> dataSinkService.create(input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("Referenced DataStructureVersion is not available")
-          .hasMessageNotContaining(dsvId.toString());
-    }
-
-    @Test
-    @DisplayName("Should throw InvalidInputException when the referenced version does not exist")
-    void shouldThrowWhenFrostDataStructureVersionMissing() {
-      UUID dataSetId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
-
-      DataSinkInputDTO input = new DataSinkInputDTO();
-      input.setDataSetId(dataSetId);
-      input.setDataSinkType(DataSinkType.FROST);
-      input.setConfiguration(Map.of("dataStructureVersionId", dsvId.toString()));
+      input.setConfiguration(Map.of("element", ELEMENT_URN));
 
       DataSink entity = new DataSink();
       when(dataSinkMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
-      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.empty());
+      when(modelRegistryGateway.fetchModel(ELEMENT_URN)).thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> dataSinkService.create(input))
           .isInstanceOf(InvalidInputException.class);
@@ -245,8 +399,7 @@ class DataSinkServiceTest {
       UUID dataSetId = UUID.randomUUID();
 
       DataSinkInputDTO input = basePostgisInput(dataSetId);
-      input.setConfiguration(
-          Map.of("tableName", 42, "dataStructureVersionId", UUID.randomUUID().toString()));
+      input.setConfiguration(Map.of("tableName", 42, "element", ELEMENT_URN));
 
       stubDataSet(dataSetId);
 
@@ -260,8 +413,7 @@ class DataSinkServiceTest {
       UUID dataSetId = UUID.randomUUID();
 
       DataSinkInputDTO input = basePostgisInput(dataSetId);
-      input.setConfiguration(
-          Map.of("tableName", "  ", "dataStructureVersionId", UUID.randomUUID().toString()));
+      input.setConfiguration(Map.of("tableName", "  ", "element", ELEMENT_URN));
 
       stubDataSet(dataSetId);
 
@@ -270,8 +422,8 @@ class DataSinkServiceTest {
     }
 
     @Test
-    @DisplayName("Should throw InvalidInputException when dataStructureVersionId is missing")
-    void shouldThrowWhenDsvIdMissing() {
+    @DisplayName("Should throw InvalidInputException when element is missing")
+    void shouldThrowWhenElementMissing() {
       UUID dataSetId = UUID.randomUUID();
 
       DataSinkInputDTO input = basePostgisInput(dataSetId);
@@ -284,41 +436,18 @@ class DataSinkServiceTest {
     }
 
     @Test
-    @DisplayName("Should throw InvalidInputException when DataStructureVersion is not found")
-    void shouldThrowWhenDsvNotFound() {
+    @DisplayName("Should throw InvalidInputException when the referenced element is not found")
+    void shouldThrowWhenElementNotFound() {
       UUID dataSetId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
 
       DataSinkInputDTO input = basePostgisInput(dataSetId);
-      input.setConfiguration(
-          Map.of("tableName", "sensor_readings", "dataStructureVersionId", dsvId.toString()));
+      input.setConfiguration(Map.of("tableName", "sensor_readings", "element", ELEMENT_URN));
 
       stubDataSet(dataSetId);
-      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.empty());
+      when(modelRegistryGateway.fetchModel(ELEMENT_URN)).thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> dataSinkService.create(input))
           .isInstanceOf(InvalidInputException.class);
-    }
-
-    @Test
-    @DisplayName("Should reject a DataStructureVersion that is not AVAILABLE")
-    void shouldRejectNonAvailableVersion() {
-      UUID dataSetId = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
-
-      DataSinkInputDTO input = basePostgisInput(dataSetId);
-      input.setConfiguration(
-          Map.of("tableName", "sensor_readings", "dataStructureVersionId", dsvId.toString()));
-
-      DataStructureVersion draft = dataStructureVersion(dsvId);
-      draft.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-
-      stubDataSet(dataSetId);
-      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(draft));
-
-      assertThatThrownBy(() -> dataSinkService.create(input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("AVAILABLE");
     }
   }
 
@@ -580,39 +709,59 @@ class DataSinkServiceTest {
       sink.setId(UUID.randomUUID());
       sink.setDataSet(ds);
       sink.setDataSinkType(DataSinkType.POSTGIS);
+<<<<<<< ours
       sink.setConfiguration(
           new HashMap<>(Map.of("tableName", "old_table", "dataStructureVersionId", "v1")));
+=======
+      sink.setConfigurationUrn(STORED_VERSIONED_URN);
+      lenient()
+          .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
+          .thenReturn(
+              Optional.of(
+                  new ModelRegistryGateway.RegistryDocument(
+                      Map.of("tableName", "old_table", "element", "v1"), null)));
+>>>>>>> theirs
       return sink;
     }
 
-    private DataSinkInputDTO updateInput(String tableName, String dsvId, boolean confirmDataLoss) {
+    private DataSinkInputDTO updateInput(
+        String tableName, String element, boolean confirmDataLoss) {
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.POSTGIS);
-      input.setConfiguration(Map.of("tableName", tableName, "dataStructureVersionId", dsvId));
+      input.setConfiguration(Map.of("tableName", tableName, "element", element));
       input.setConfirmDataLoss(confirmDataLoss);
       return input;
     }
 
-    private DataSink existingFrostSink(boolean provisioned, String dsvId) {
+    private DataSink existingFrostSink(boolean provisioned, String element) {
       DataSet ds = dataSet(UUID.randomUUID());
       ds.setProvisioned(provisioned);
       DataSink sink = new DataSink();
       sink.setId(UUID.randomUUID());
       sink.setDataSet(ds);
       sink.setDataSinkType(DataSinkType.FROST);
+<<<<<<< ours
       sink.setConfiguration(new HashMap<>(Map.of("dataStructureVersionId", dsvId)));
+=======
+      sink.setConfigurationUrn(STORED_VERSIONED_URN);
+      lenient()
+          .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
+          .thenReturn(
+              Optional.of(
+                  new ModelRegistryGateway.RegistryDocument(Map.of("element", element), null)));
+>>>>>>> theirs
       return sink;
     }
 
     @Test
-    @DisplayName("rejects a FROST dataStructureVersionId change on a provisioned dataset")
+    @DisplayName("rejects a FROST element change on a provisioned dataset")
     void rejectsFrostVersionChangeWithoutConfirmation() {
       DataSink sink = existingFrostSink(true, "v1");
       when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
 
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.FROST);
-      input.setConfiguration(Map.of("dataStructureVersionId", "v2"));
+      input.setConfiguration(Map.of("element", "v2"));
       input.setConfirmDataLoss(false);
 
       assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))

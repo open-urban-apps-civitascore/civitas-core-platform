@@ -81,7 +81,7 @@ public class FlowDeploymentPlanner {
     Optional<String> sourceCron = validatedTriggerCron(path);
     SinkSpec sink = request.sink();
     SinkStage<?> sinkStage = registry.sink(sink.type());
-    Compilation chain = compileTransforms(path, sinkStage, sink);
+    Compilation chain = compileTransforms(path, sinkStage, sink, request.mappings());
 
     Datasource source = request.source();
     if (source == null) {
@@ -145,7 +145,8 @@ public class FlowDeploymentPlanner {
    * one kind produces a sink pre-region plan — today the mapping kind's FROST entity plan for a
    * mapped FROST sink.
    */
-  private Compilation compileTransforms(FlowPath path, SinkStage<?> sinkStage, SinkSpec sinkSpec)
+  private Compilation compileTransforms(
+      FlowPath path, SinkStage<?> sinkStage, SinkSpec sinkSpec, Map<String, Object> mappings)
       throws FatalAdapterException {
     Map<NodeKind, List<GraphNode>> byKind = new LinkedHashMap<>();
     for (GraphNode node : path.transforms()) {
@@ -155,7 +156,7 @@ public class FlowDeploymentPlanner {
     SinkPreRegionPlan sinkPreRegion = null;
     for (Map.Entry<NodeKind, List<GraphNode>> entry : byKind.entrySet()) {
       TransformNodeType nodeType = registry.transformNodeType(entry.getKey());
-      Compilation compilation = nodeType.compile(entry.getValue(), sinkStage, sinkSpec);
+      Compilation compilation = nodeType.compile(entry.getValue(), sinkStage, sinkSpec, mappings);
       // The reassembly below consumes exactly one unit per node; a miscounting kind would
       // otherwise drop surplus units silently or exhaust the iterator with a bare
       // NoSuchElementException.
@@ -196,7 +197,7 @@ public class FlowDeploymentPlanner {
 
   /** The kind of an on-path transform node; the derivation already rejected unknown kinds. */
   private static NodeKind kindOf(GraphNode node) {
-    return NodeKind.fromTypeString(node.type()).orElseThrow();
+    return NodeKind.fromKind(node.kind()).orElseThrow();
   }
 
   private Optional<String> validatedTriggerCron(FlowPath path) throws FatalAdapterException {

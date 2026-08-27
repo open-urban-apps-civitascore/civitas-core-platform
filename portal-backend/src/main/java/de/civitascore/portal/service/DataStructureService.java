@@ -7,7 +7,7 @@ import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
-import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -37,7 +37,7 @@ public class DataStructureService
   private final DataStructureVersionRepository dataStructureVersionRepository;
   private final AssignmentFactory assignmentFactory;
   private final DataSourceRepository dataSourceRepository;
-  private final DataSinkRepository dataSinkRepository;
+  private final ModelRegistryGateway modelRegistryGateway;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -198,16 +198,34 @@ public class DataStructureService
     return dataStructure;
   }
 
+  /**
+   * After the data structure and its versions are deleted, delete the backing model artifact from
+   * Model Forge in the same transaction. No-op when no model was ever stored (logical URN null).
+   *
+   * @param entity the deleted data structure
+   */
+  @Override
+  protected void postDelete(DataStructure entity) {
+    if (entity != null && entity.getModelLogicalUrn() != null) {
+      modelRegistryGateway.deleteModel(entity.getModelLogicalUrn());
+    }
+  }
+
   private void validateNoVersionInUse(DataStructure dataStructure) {
+    Set<DataStructureVersion> versions = dataStructure.getDataStructureVersions();
     Set<UUID> versionIds =
-        dataStructure.getDataStructureVersions().stream()
-            .map(DataStructureVersion::getId)
-            .collect(Collectors.toSet());
+        versions.stream().map(DataStructureVersion::getId).collect(Collectors.toSet());
     if (versionIds.isEmpty()) {
       return;
     }
-    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
-        || dataSinkRepository.existsByDataStructureVersionIdIn(versionIds)) {
+    // Sink references live in the registry (a sink's config carries the version's model URN in its
+    // element field, tracked by Model Forge); the source dimension is a host FK.
+    boolean inUse =
+        dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
+            || versions.stream()
+                .map(DataStructureVersion::getModelUrn)
+                .anyMatch(modelRegistryGateway::isReferencedBySink);
+    if (inUse) {
       throw new ResourceInUseException(
           "DataStructure",
           dataStructure.getId(),

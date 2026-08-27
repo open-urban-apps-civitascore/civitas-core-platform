@@ -96,11 +96,11 @@ class NifiSagaHandlerTest {
               "dataPipelines": [
                 { "id": "p-1", "version": "1", "action": "ADD",
                   "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-1"],
+                  "mappings": { "map-1": { "fields": { "$.id": "$.id" } } },
                   "data": { "nodes": [
-                      { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
-                      { "id": "m", "type": "mapping",
-                        "data": { "mappingConfig": { "fields": { "$.id": "$.id" } } } },
-                      { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                      { "id": "src", "kind": "source", "sourceRef": "ds-1" },
+                      { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                      { "id": "sink", "kind": "sink", "sinkRef": "sk-1" } ],
                     "edges": [
                       { "id": "e1", "source": "src", "target": "m" },
                       { "id": "e2", "source": "m", "target": "sink" } ] } }
@@ -187,10 +187,12 @@ class NifiSagaHandlerTest {
               "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
               "datasinks": [ { "id": "sk-1", "type": "POSTGIS", "configuration": %s, "dataStructure": %s } ],
               "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
-                "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-1"], "data": {
-                  "nodes": [ { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
-                    { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": { "$.id": "$.id" } } } },
-                    { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-1"],
+                "mappings": { "map-1": { "fields": { "$.id": "$.id" } } },
+                "data": {
+                  "nodes": [ { "id": "src", "kind": "source", "sourceRef": "ds-1" },
+                    { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                    { "id": "sink", "kind": "sink", "sinkRef": "sk-1" } ],
                   "edges": [ { "id": "e1", "source": "src", "target": "m" },
                     { "id": "e2", "source": "m", "target": "sink" } ] } } ] }
             """
@@ -329,8 +331,8 @@ class NifiSagaHandlerTest {
               "dataPipelines": [ { "id": "p-1", "version": "1", "action": "%s",
                 "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-f"],
                 "data": { "nodes": [
-                    { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
-                    { "id": "sink", "type": "frost", "data": { "entityId": "sk-f" } } ],
+                    { "id": "src", "kind": "source", "sourceRef": "ds-1" },
+                    { "id": "sink", "kind": "sink", "sinkRef": "sk-f" } ],
                   "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } } ] }
             """
                 .formatted(operation, projectIdField, action)));
@@ -512,8 +514,8 @@ class NifiSagaHandlerTest {
               "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
                 "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-1"],
                 "data": { "nodes": [
-                    { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
-                    { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                    { "id": "src", "kind": "source", "sourceRef": "ds-1" },
+                    { "id": "sink", "kind": "sink", "sinkRef": "sk-1" } ],
                   "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } } ] }
             """);
 
@@ -545,14 +547,14 @@ class NifiSagaHandlerTest {
                 { "id": "p-1", "version": "1", "action": "ADD",
                   "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-1"],
                   "data": { "nodes": [
-                      { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
-                      { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                      { "id": "src", "kind": "source", "sourceRef": "ds-1" },
+                      { "id": "sink", "kind": "sink", "sinkRef": "sk-1" } ],
                     "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } },
                 { "id": "p-2", "version": "1", "action": "ADD",
                   "dataSourceIds": ["ds-2"], "dataSinkIds": ["sk-2"],
                   "data": { "nodes": [
-                      { "id": "src", "type": "dataSource", "data": { "entityId": "ds-2" } },
-                      { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-2" } } ],
+                      { "id": "src", "kind": "source", "sourceRef": "ds-2" },
+                      { "id": "sink", "kind": "sink", "sinkRef": "sk-2" } ],
                     "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } }
               ] }
             """);
@@ -578,7 +580,7 @@ class NifiSagaHandlerTest {
               "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
                 "dataSourceIds": ["ds-1"], "dataSinkIds": [],
                 "data": { "nodes": [
-                    { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } } ],
+                    { "id": "src", "kind": "source", "sourceRef": "ds-1" } ],
                   "edges": [] } } ] }
             """);
 
@@ -602,8 +604,8 @@ class NifiSagaHandlerTest {
               "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
                 "dataSourceIds": ["ds-other"], "dataSinkIds": ["sk-1"],
                 "data": { "nodes": [
-                    { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
-                    { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                    { "id": "src", "kind": "source", "sourceRef": "ds-1" },
+                    { "id": "sink", "kind": "sink", "sinkRef": "sk-1" } ],
                   "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } } ] }
             """);
 
@@ -627,8 +629,8 @@ class NifiSagaHandlerTest {
               "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
                 "dataSourceIds": "ds-1", "dataSinkIds": ["sk-1"],
                 "data": { "nodes": [
-                    { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
-                    { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                    { "id": "src", "kind": "source", "sourceRef": "ds-1" },
+                    { "id": "sink", "kind": "sink", "sinkRef": "sk-1" } ],
                   "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } } ] }
             """);
 
@@ -652,8 +654,8 @@ class NifiSagaHandlerTest {
               "datasinks": [ { "id": "sk-1", "type": "POSTGIS", "configuration": { "tableName": "obs" } } ],
               "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
                 "data": { "nodes": [
-                    { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
-                    { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                    { "id": "src", "kind": "source", "sourceRef": "ds-1" },
+                    { "id": "sink", "kind": "sink", "sinkRef": "sk-1" } ],
                   "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } } ] }
             """);
 

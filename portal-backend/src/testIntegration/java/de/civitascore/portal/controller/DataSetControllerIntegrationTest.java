@@ -98,10 +98,19 @@ class DataSetControllerIntegrationTest
     return styles;
   }
 
-  /** Helper method to create a sample model map for Pipeline. */
+  /**
+   * Helper method to create a sample CORE Pipeline model map. The stored model is validated against
+   * pipeline.schema.json (top-level {@code nodes}/{@code edges} required; Model Forge stamps {@code
+   * $schema}/{@code id}), so the fixture emits a clean, schema-valid document.
+   */
   private Map<String, Object> createSampleModel() {
     Map<String, Object> model = new HashMap<>();
-    model.put("input", Map.of("type", "kafka"));
+    model.put(
+        "nodes",
+        List.of(
+            Map.of("id", "start-1", "kind", "start", "label", "Start"),
+            Map.of("id", "end-1", "kind", "end", "label", "End")));
+    model.put("edges", List.of(Map.of("id", "edge-1", "source", "start-1", "target", "end-1")));
     return model;
   }
 
@@ -196,23 +205,23 @@ class DataSetControllerIntegrationTest
     pipeline1.setName("test_pipeline_1_" + System.currentTimeMillis());
     pipeline1.setDescription("Test pipeline 1");
     pipeline1.setDataSet(dataSet);
-    pipeline1.setStyles(createSampleStyles());
     pipeline1.getDataSources().add(dataSource1);
     pipeline1.getDataSources().add(dataSource2);
 
-    pipeline1.setModel(createSampleModel());
     pipeline1 = pipelineRepository.save(pipeline1);
+    pipeline1 =
+        portalData.attachPipelineDefinition(pipeline1, createSampleModel(), createSampleStyles());
 
     Pipeline pipeline2 = new Pipeline();
     pipeline2.setName("test_pipeline_2_" + System.currentTimeMillis());
     pipeline2.setDescription("Test pipeline 2");
     pipeline2.setDataSet(dataSet);
-    pipeline2.setStyles(createSampleStyles());
     pipeline2.getDataSources().add(dataSource3);
     pipeline2.getDataSources().add(dataSource4);
 
-    pipeline2.setModel(createSampleModel());
     pipeline2 = pipelineRepository.save(pipeline2);
+    pipeline2 =
+        portalData.attachPipelineDefinition(pipeline2, createSampleModel(), createSampleStyles());
 
     // Create distributions for the dataset
     Distribution distribution1 = new Distribution();
@@ -1763,19 +1772,19 @@ class DataSetControllerIntegrationTest
       pipeline1.setName("test_pipeline_api1_" + System.currentTimeMillis());
       pipeline1.setDescription("Pipeline 1");
       pipeline1.setDataSet(dataSet);
-      pipeline1.setStyles(createSampleStyles());
-      pipeline1.setModel(createSampleModel());
 
-      pipelineRepository.save(pipeline1);
+      pipeline1 = pipelineRepository.save(pipeline1);
+      pipeline1 =
+          portalData.attachPipelineDefinition(pipeline1, createSampleModel(), createSampleStyles());
 
       Pipeline pipeline2 = new Pipeline();
       pipeline2.setName("test_pipeline_api2_" + System.currentTimeMillis());
       pipeline2.setDescription("Pipeline 2");
       pipeline2.setDataSet(dataSet);
-      pipeline2.setStyles(createSampleStyles());
-      pipeline2.setModel(createSampleModel());
 
-      pipelineRepository.save(pipeline2);
+      pipeline2 = pipelineRepository.save(pipeline2);
+      pipeline2 =
+          portalData.attachPipelineDefinition(pipeline2, createSampleModel(), createSampleStyles());
 
       seedStageRequirements(pipeline1, pipeline2);
 

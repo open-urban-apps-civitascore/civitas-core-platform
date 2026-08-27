@@ -9,19 +9,22 @@ import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PipelineAction;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.saga.DataSinkPayload;
 import de.civitascore.portal.model.saga.LayerPayload;
 import de.civitascore.portal.model.saga.StylePayload;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -49,19 +52,19 @@ public class DataSetSagaPublisher {
   private final ObjectMapper objectMapper;
   private final SagaProperties sagaProperties;
   private final DataSinkRepository dataSinkRepository;
-  private final DataStructureVersionRepository dataStructureVersionRepository;
+  private final ModelRegistryGateway modelRegistryGateway;
 
   public DataSetSagaPublisher(
       KafkaTemplate<String, String> eventKafkaTemplate,
       ObjectMapper objectMapper,
       SagaProperties sagaProperties,
       DataSinkRepository dataSinkRepository,
-      DataStructureVersionRepository dataStructureVersionRepository) {
+      ModelRegistryGateway modelRegistryGateway) {
     this.eventKafkaTemplate = eventKafkaTemplate;
     this.objectMapper = objectMapper;
     this.sagaProperties = sagaProperties;
     this.dataSinkRepository = dataSinkRepository;
-    this.dataStructureVersionRepository = dataStructureVersionRepository;
+    this.modelRegistryGateway = modelRegistryGateway;
   }
 
   /**
@@ -161,16 +164,41 @@ public class DataSetSagaPublisher {
         .map(
             ds -> {
               var datasource = new Datasource();
-              datasource.setId(ds.getId().toString());
+              // Keyed by the DataSource's configuration CORE URN — the same URN a pipeline's
+              // source node carries as its sourceRef — so the callback-free config-adapter can
+              // correlate the two on URNs, not GUIDs.
+              datasource.setId(ds.getConfigurationUrn());
               datasource.setName(ds.getName());
               datasource.setType(
                   ds.getConnectorType() != null ? ds.getConnectorType().name() : null);
-              if (ds.getConfiguration() != null) {
-                ds.getConfiguration().forEach(datasource::handleUnknownProperty);
+              Map<String, Object> configuration =
+                  fetchConfiguration(ds.getConfigurationUrn(), "DataSource", ds.getId());
+              if (configuration != null) {
+                configuration.forEach(datasource::handleUnknownProperty);
               }
               return datasource;
             })
         .toList();
+  }
+
+  /**
+   * Reads a configuration payload from the registry by its versioned pin. Returns {@code null} when
+   * no configuration was ever stored ({@code urn} null — e.g. FROST sinks); fails the publish when
+   * a stored pin cannot be resolved (host/registry inconsistency).
+   */
+  private Map<String, Object> fetchConfiguration(String urn, String entityName, UUID entityId) {
+    if (urn == null) {
+      return null;
+    }
+    return modelRegistryGateway
+        .fetchPayload(urn)
+        .map(ModelRegistryGateway.RegistryDocument::content)
+        .orElseThrow(
+            () ->
+                new InvalidInputException(
+                    entityName,
+                    entityId,
+                    "Stored configuration not found in the model registry: " + urn));
   }
 
   /** All datasinks belonging to the dataset, regardless of pipeline attachment. */
@@ -181,11 +209,17 @@ public class DataSetSagaPublisher {
   }
 
   private DataSinkPayload toDataSinkPayload(DataSink sink) {
+    Map<String, Object> configuration =
+        fetchConfiguration(sink.getConfigurationUrn(), "DataSink", sink.getId());
+    // Keyed by the DataSink's configuration CORE URN — the same URN a pipeline's sink node carries
+    // as its sinkRef — so the config-adapter resolves the sink on URNs, not GUIDs. Every sink,
+    // including a passthrough FROST sink (whose config is just its stamped connectionType), owns a
+    // configurationUrn, so every sink node can carry a sinkRef.
     return new DataSinkPayload(
-        sink.getId().toString(),
+        sink.getConfigurationUrn(),
         sink.getDataSinkType() != null ? sink.getDataSinkType().name() : null,
-        sink.getConfiguration(),
-        resolveDataStructure(sink));
+        configuration,
+        resolveDataStructure(sink, configuration));
   }
 
   /**
@@ -284,63 +318,43 @@ public class DataSetSagaPublisher {
    */
   private String resolveNativeName(Layer layer) {
     DataSink sink = layer.getDataSink();
-    if (sink == null
-        || sink.getDataSinkType() != DataSinkType.POSTGIS
-        || sink.getConfiguration() == null) {
+    if (sink == null || sink.getDataSinkType() != DataSinkType.POSTGIS) {
       return null;
     }
-    return objectMapper
-        .convertValue(sink.getConfiguration(), PostgisConfiguration.class)
-        .getTableName();
+    Map<String, Object> configuration =
+        fetchConfiguration(sink.getConfigurationUrn(), "DataSink", sink.getId());
+    if (configuration == null) {
+      return null;
+    }
+    return objectMapper.convertValue(configuration, PostgisConfiguration.class).getTableName();
   }
 
   /**
-   * Resolves the sink's referenced data-structure model (JSON Schema) persisted on the {@code
-   * DataStructureVersion}: the table schema for PostGIS, the mapping's Thing-shaped target for a
-   * mapped FROST sink. {@code null} when no version is referenced (FROST passthrough); throws
-   * {@link InvalidInputException} if a referenced version is missing or carries no model, failing
-   * the publish. The id is already validated at sink save time.
+   * Resolves the sink's referenced data-structure model (JSON Schema) from the Model Forge registry
+   * directly via the configuration's {@code element} CORE URN. The inlined view (every CORE-URN
+   * {@code $ref} inlined, {@code x-ui-styles} stripped) keeps the CloudEvent contract a pure schema
+   * document — the config-adapter keeps reading {@code x-core-primaryKey} from {@code
+   * datasinks[].dataStructure} unchanged. {@code null} when no element is referenced (e.g. FROST
+   * passthrough); throws {@link InvalidInputException} if the referenced element is missing or
+   * carries no model, failing the publish. The URN is already validated at sink save time.
    */
-  private Map<String, Object> resolveDataStructure(DataSink sink) {
-    if (sink.getConfiguration() == null) {
+  private Map<String, Object> resolveDataStructure(DataSink sink, Map<String, Object> sinkConfig) {
+    if (sinkConfig == null) {
       return null;
     }
-    // Read the shared key from the raw map: every sink type that references a structure names it
-    // 'dataStructureVersionId', and a typed detour through one sink's config class would couple
-    // the others to its shape.
-    Object dsvIdRaw = sink.getConfiguration().get("dataStructureVersionId");
-    if (dsvIdRaw == null) {
-      return null; // e.g. FROST passthrough sink — no data-structure version
+    String element = objectMapper.convertValue(sinkConfig, PostgisConfiguration.class).getElement();
+    if (element == null) {
+      return null; // e.g. FROST passthrough sink — no referenced element
     }
-    UUID dsvId;
-    try {
-      dsvId = UUID.fromString(String.valueOf(dsvIdRaw));
-    } catch (IllegalArgumentException e) {
-      // Validated at sink save time, so this is unreachable in practice — but a corrupt raw value
-      // must still fail like its sibling checks (a controlled 400) rather than escaping as an
-      // unhandled 500 that echoes the malformed value.
-      throw new InvalidInputException(
-          "DataSink",
-          "configuration.dataStructureVersionId",
-          "dataStructureVersionId on sink " + sink.getId() + " is not a valid UUID");
-    }
-    var version =
-        dataStructureVersionRepository
-            .findById(dsvId)
-            .orElseThrow(
-                () ->
-                    new InvalidInputException(
-                        "DataSink",
-                        "configuration.dataStructureVersionId",
-                        "DataStructureVersion not found: " + dsvId));
-    Map<String, Object> model = version.getModel();
-    if (model == null || model.isEmpty()) {
-      throw new InvalidInputException(
-          "DataSink",
-          "configuration.dataStructureVersionId",
-          "DataStructureVersion " + dsvId + " has no model");
-    }
-    return model;
+    return modelRegistryGateway
+        .fetchInlinedModel(element)
+        .filter(model -> !model.isEmpty())
+        .orElseThrow(
+            () ->
+                new InvalidInputException(
+                    "DataSink",
+                    "configuration.element",
+                    "Referenced Element " + element + " not found or has no model"));
   }
 
   private List<DataPipeline> buildPipelines(Set<Pipeline> pipelines, PipelineAction action) {
@@ -367,7 +381,13 @@ public class DataSetSagaPublisher {
       if (!currentMap.containsKey(id)) {
         result.add(
             new DataPipeline(
-                id.toString(), "0", PipelineAction.DELETE.name(), null, List.of(), List.of()));
+                id.toString(),
+                "0",
+                PipelineAction.DELETE.name(),
+                null,
+                List.of(),
+                List.of(),
+                Map.of()));
       }
     }
 
@@ -440,23 +460,75 @@ public class DataSetSagaPublisher {
     if (pipeline.getDataSources() == null) {
       throw invariant("pipeline %s has a null dataSources relation", pipeline.getId());
     }
+    // Association carried as the referenced configuration CORE URNs (not GUIDs) — the same URNs the
+    // pipeline graph's source/sink nodes carry as sourceRef/sinkRef, and the keys of the
+    // datasource/datasink catalogs. Sorted so the payload is deterministic (relations are unordered
+    // sets). A source/sink without a stored configuration (null URN) is skipped.
     List<String> dataSourceIds =
-        pipeline.getDataSources().stream().map(ds -> ds.getId().toString()).sorted().toList();
+        pipeline.getDataSources().stream()
+            .map(DataSource::getConfigurationUrn)
+            .filter(Objects::nonNull)
+            .sorted()
+            .toList();
+    // The model holds the clean CORE Pipeline document (nodes/edges referencing source/sink/mapping
+    // by CORE URN), stored in the Model Forge registry and pinned by the pipeline's modelUrn. The
+    // gateway strips the x-ui-styles keyword (React Flow layout), which was never part of the saga
+    // payload. The config-adapter (NiFi) is the only place engine specifics appear.
+    Map<String, Object> model =
+        pipeline.getModelUrn() == null
+            ? null
+            : modelRegistryGateway
+                .fetchPayload(pipeline.getModelUrn())
+                .map(ModelRegistryGateway.RegistryDocument::content)
+                .orElseThrow(
+                    () ->
+                        new InvalidInputException(
+                            "Pipeline",
+                            pipeline.getId(),
+                            "Stored pipeline definition not found in the model registry: "
+                                + pipeline.getModelUrn()));
     return new DataPipeline(
         pipeline.getId().toString(),
         String.valueOf(pipeline.getVersion()),
         action.name(),
-        // `model` holds the editor-built, engine-neutral pipeline graph (React-Flow nodes/edges +
-        // inline mappingConfig) and is forwarded to the config-adapter as-is (the engine-neutral
-        // contract / intermediate representation). The config-adapter (NiFi) is the only place
-        // engine specifics appear.
-        pipeline.getModel(),
-        // Sorted so the payload is deterministic — the entity relations are unordered sets.
+        model,
         dataSourceIds,
         dataSinkRepository.findByPipelineId(pipeline.getId()).stream()
-            .map(sink -> sink.getId().toString())
+            .map(DataSink::getConfigurationUrn)
+            .filter(Objects::nonNull)
             .sorted()
-            .toList());
+            .toList(),
+        buildMappings(pipeline));
+  }
+
+  /**
+   * Ships the Mapping artifacts the pipeline depends on as {@code URN -> { fields, source, target
+   * }}. The config-adapter is callback-free, so a mapping's transform rules must travel in the saga
+   * payload rather than being fetched at deploy time.
+   *
+   * <p>The set of referenced Mappings is read from Model Forge's <b>dependency graph</b> (an
+   * envelope concern), never by parsing the pipeline document — the host must not interpret
+   * pipeline content ({@code nodes}/{@code mappingRef}); that is the frontend's / Model Forge's
+   * job. Fails the publish if a referenced Mapping cannot be resolved (host/registry
+   * inconsistency).
+   */
+  private Map<String, Object> buildMappings(Pipeline pipeline) {
+    Map<String, Object> mappings = new LinkedHashMap<>();
+    for (String ref :
+        modelRegistryGateway.dependencyUrnsOfType(pipeline.getModelUrn(), "mapping")) {
+      Map<String, Object> content =
+          modelRegistryGateway
+              .fetchPayload(ref)
+              .map(ModelRegistryGateway.RegistryDocument::content)
+              .orElseThrow(
+                  () ->
+                      new InvalidInputException(
+                          "Pipeline",
+                          pipeline.getId(),
+                          "Referenced Mapping not found in the model registry: " + ref));
+      mappings.put(ref, content);
+    }
+    return mappings;
   }
 
   /**

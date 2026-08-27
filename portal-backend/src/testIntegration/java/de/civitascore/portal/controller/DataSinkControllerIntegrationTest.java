@@ -13,6 +13,7 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.output.DataSinkOutputDTO;
+import de.civitascore.portal.model.output.PostgisConfigurationOutput;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.PipelineRepository;
@@ -155,14 +156,18 @@ class DataSinkControllerIntegrationTest
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      dsv = portalData.attachModel(dsv, portalData.dataStructureVersionModel("ReadTest"));
 
       DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
       DataSink sink = new DataSink();
       sink.setDataSet(dataSet);
       sink.setDataSinkType(DataSinkType.POSTGIS);
-      sink.setConfiguration(
-          Map.of("tableName", "sensor_data", "dataStructureVersionId", dsv.getId().toString()));
-      UUID id = dataSinkRepository.save(sink).getId();
+      sink = dataSinkRepository.save(sink);
+      UUID id =
+          portalData
+              .attachSinkConfiguration(
+                  sink, Map.of("tableName", "sensor_data", "element", dsv.getModelUrn()))
+              .getId();
 
       ResponseEntity<DataSinkOutputDTO> response = performGetById(id);
 
@@ -226,11 +231,11 @@ class DataSinkControllerIntegrationTest
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      dsv = portalData.attachModel(dsv, portalData.dataStructureVersionModel("PostgisCreate"));
 
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.POSTGIS);
-      input.setConfiguration(
-          Map.of("tableName", "sensor_data", "dataStructureVersionId", dsv.getId().toString()));
+      input.setConfiguration(Map.of("tableName", "sensor_data", "element", dsv.getModelUrn()));
 
       ResponseEntity<DataSinkOutputDTO> response = performCreate(input);
 
@@ -328,16 +333,17 @@ class DataSinkControllerIntegrationTest
 
     @Test
     @DisplayName("POST accepts a FROST DataSink referencing its mapping's target structure")
-    void postAcceptsFrostWithDataStructureVersionId() {
+    void postAcceptsFrostWithElement() {
       ensureTestData();
       var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      dsv = portalData.attachModel(dsv, portalData.dataStructureVersionModel("FrostAccept"));
 
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.FROST);
-      input.setConfiguration(Map.of("dataStructureVersionId", dsv.getId().toString()));
+      input.setConfiguration(Map.of("element", dsv.getModelUrn()));
 
       ResponseEntity<DataSinkOutputDTO> response =
           exchange(
@@ -351,11 +357,12 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("POST returns 400 when the FROST dataStructureVersionId does not exist")
-    void postRejectsFrostWithUnknownDataStructureVersion() {
+    @DisplayName("POST returns 400 when the FROST element does not exist")
+    void postRejectsFrostWithUnknownElement() {
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.FROST);
-      input.setConfiguration(Map.of("dataStructureVersionId", UUID.randomUUID().toString()));
+      input.setConfiguration(
+          Map.of("element", "urn:core:platform:civitas:element:common:missing:1.0.0"));
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
@@ -366,15 +373,10 @@ class DataSinkControllerIntegrationTest
     @Test
     @DisplayName("POST returns 400 when POSTGIS configuration is missing tableName")
     void postRejectsPostgisWithoutTableName() {
-      ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
-      DataStructureVersion dsv =
-          portalData.dataStructureVersion(
-              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
-
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.POSTGIS);
-      input.setConfiguration(Map.of("dataStructureVersionId", dsv.getId().toString()));
+      input.setConfiguration(
+          Map.of("element", "urn:core:platform:civitas:element:common:missing:1.0.0"));
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
@@ -383,13 +385,16 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("POST returns 400 when POSTGIS dataStructureVersionId does not resolve")
-    void postRejectsPostgisWithUnknownDsv() {
+    @DisplayName("POST returns 400 when POSTGIS element does not resolve")
+    void postRejectsPostgisWithUnknownElement() {
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.POSTGIS);
       input.setConfiguration(
           Map.of(
-              "tableName", "sensor_data", "dataStructureVersionId", UUID.randomUUID().toString()));
+              "tableName",
+              "sensor_data",
+              "element",
+              "urn:core:platform:civitas:element:common:missing:1.0.0"));
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
@@ -410,30 +415,34 @@ class DataSinkControllerIntegrationTest
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      dsv = portalData.attachModel(dsv, portalData.dataStructureVersionModel("PutReplace"));
 
       DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
       DataSink sink = new DataSink();
       sink.setDataSet(dataSet);
       sink.setDataSinkType(DataSinkType.POSTGIS);
-      sink.setConfiguration(
-          Map.of("tableName", "original_table", "dataStructureVersionId", dsv.getId().toString()));
-      UUID id = dataSinkRepository.save(sink).getId();
+      sink = dataSinkRepository.save(sink);
+      UUID id =
+          portalData
+              .attachSinkConfiguration(
+                  sink, Map.of("tableName", "original_table", "element", dsv.getModelUrn()))
+              .getId();
 
       DataSinkInputDTO updateInput = new DataSinkInputDTO();
       updateInput.setDataSinkType(DataSinkType.POSTGIS);
       updateInput.setConfiguration(
-          Map.of("tableName", "updated_table", "dataStructureVersionId", dsv.getId().toString()));
+          Map.of("tableName", "updated_table", "element", dsv.getModelUrn()));
 
       ResponseEntity<DataSinkOutputDTO> response = performUpdate(id, updateInput);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
-      assertThat(dataSinkRepository.findById(id))
-          .isPresent()
-          .get()
-          .satisfies(
-              s -> assertThat(s.getConfiguration()).containsEntry("tableName", "updated_table"));
+      // The configuration lives in the Model Forge registry; the API response serves it from there.
+      assertThat(response.getBody().getConfiguration())
+          .isInstanceOfSatisfying(
+              PostgisConfigurationOutput.class,
+              c -> assertThat(c.getTableName()).isEqualTo("updated_table"));
     }
 
     @Test
@@ -444,7 +453,7 @@ class DataSinkControllerIntegrationTest
       DataSinkInputDTO updateInput = new DataSinkInputDTO();
       updateInput.setDataSinkType(DataSinkType.POSTGIS);
       updateInput.setConfiguration(
-          Map.of("tableName", "any_table", "dataStructureVersionId", UUID.randomUUID().toString()));
+          Map.of("tableName", "any_table", "element", UUID.randomUUID().toString()));
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(
@@ -488,30 +497,33 @@ class DataSinkControllerIntegrationTest
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      dsv = portalData.attachModel(dsv, portalData.dataStructureVersionModel("PatchUpdate"));
 
       DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
       DataSink sink = new DataSink();
       sink.setDataSet(dataSet);
       sink.setDataSinkType(DataSinkType.POSTGIS);
-      sink.setConfiguration(
-          Map.of("tableName", "original_table", "dataStructureVersionId", dsv.getId().toString()));
-      UUID id = dataSinkRepository.save(sink).getId();
+      sink = dataSinkRepository.save(sink);
+      UUID id =
+          portalData
+              .attachSinkConfiguration(
+                  sink, Map.of("tableName", "original_table", "element", dsv.getModelUrn()))
+              .getId();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put(
-          "configuration",
-          Map.of("tableName", "renamed_table", "dataStructureVersionId", dsv.getId().toString()));
+          "configuration", Map.of("tableName", "renamed_table", "element", dsv.getModelUrn()));
 
       ResponseEntity<DataSinkOutputDTO> response = performPatch(id, patchMap);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
-      assertThat(dataSinkRepository.findById(id))
-          .isPresent()
-          .get()
-          .satisfies(
-              s -> assertThat(s.getConfiguration()).containsEntry("tableName", "renamed_table"));
+      // The configuration lives in the Model Forge registry; the API response serves it from there.
+      assertThat(response.getBody().getConfiguration())
+          .isInstanceOfSatisfying(
+              PostgisConfigurationOutput.class,
+              c -> assertThat(c.getTableName()).isEqualTo("renamed_table"));
     }
 
     @Test
@@ -522,19 +534,22 @@ class DataSinkControllerIntegrationTest
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      dsv = portalData.attachModel(dsv, portalData.dataStructureVersionModel("PatchOmitted"));
 
       DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
       DataSink sink = new DataSink();
       sink.setDataSet(dataSet);
       sink.setDataSinkType(DataSinkType.POSTGIS);
-      sink.setConfiguration(
-          Map.of("tableName", "sensor_data", "dataStructureVersionId", dsv.getId().toString()));
-      UUID id = dataSinkRepository.save(sink).getId();
+      sink = dataSinkRepository.save(sink);
+      UUID id =
+          portalData
+              .attachSinkConfiguration(
+                  sink, Map.of("tableName", "sensor_data", "element", dsv.getModelUrn()))
+              .getId();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put(
-          "configuration",
-          Map.of("tableName", "renamed_table", "dataStructureVersionId", dsv.getId().toString()));
+          "configuration", Map.of("tableName", "renamed_table", "element", dsv.getModelUrn()));
 
       ResponseEntity<DataSinkOutputDTO> response = performPatch(id, patchMap);
 
@@ -619,8 +634,7 @@ class DataSinkControllerIntegrationTest
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("dataSinkType", DataSinkType.POSTGIS.name());
       patchMap.put(
-          "configuration",
-          Map.of("tableName", "patched_table", "dataStructureVersionId", dsv.getId().toString()));
+          "configuration", Map.of("tableName", "patched_table", "element", dsv.getId().toString()));
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(

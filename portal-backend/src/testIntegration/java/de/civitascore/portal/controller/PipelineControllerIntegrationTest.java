@@ -79,12 +79,20 @@ class PipelineControllerIntegrationTest
     return styles;
   }
 
-  /** Helper method to create a sample model map for Pipeline. */
+  /**
+   * Helper method to create a sample CORE Pipeline model map. The backend validates the stored
+   * model against pipeline.schema.json (which requires top-level {@code nodes}/{@code edges}; Model
+   * Forge stamps {@code $schema}/{@code id} on write), so the fixture emits a clean, schema-valid
+   * document.
+   */
   private Map<String, Object> createSampleModel() {
     Map<String, Object> model = new HashMap<>();
-    model.put("input", Map.of("type", "kafka", "brokers", List.of("localhost:9092")));
-    model.put("pipeline", List.of(Map.of("processor", "transform")));
-    model.put("output", Map.of("type", "frost"));
+    model.put(
+        "nodes",
+        List.of(
+            Map.of("id", "start-1", "kind", "start", "label", "Start"),
+            Map.of("id", "end-1", "kind", "end", "label", "End")));
+    model.put("edges", List.of(Map.of("id", "edge-1", "source", "start-1", "target", "end-1")));
     return model;
   }
 
@@ -410,8 +418,12 @@ class PipelineControllerIntegrationTest
       UUID pipelineId = createTestEntity();
 
       Map<String, Object> newModel = new HashMap<>();
-      newModel.put("input", Map.of("type", "mqtt"));
-      newModel.put("output", Map.of("type", "postgres"));
+      newModel.put(
+          "nodes",
+          List.of(
+              Map.of("id", "source-1", "kind", "source"), Map.of("id", "sink-1", "kind", "sink")));
+      newModel.put(
+          "edges", List.of(Map.of("id", "edge-1", "source", "source-1", "target", "sink-1")));
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("model", newModel);
@@ -737,19 +749,32 @@ class PipelineControllerIntegrationTest
     @DisplayName("Should handle complex nested JSON in model")
     void shouldHandleComplexNestedJsonInModel() {
       PipelineInputDTO input = createValidInput();
+      // A deliberately rich, deeply-nested CORE Pipeline document (multiple node kinds, cron
+      // fields,
+      // labelled/typed edges) to exercise verbatim JSON round-tripping. String-only values so the
+      // stored-then-read model compares equal (no numeric-widening on the JSON round-trip).
       Map<String, Object> complexModel = new HashMap<>();
       complexModel.put(
-          "input",
-          Map.of(
-              "type",
-              "kafka",
-              "brokers",
-              List.of("broker1:9092", "broker2:9092"),
-              "topics",
-              List.of("topic1", "topic2")));
+          "nodes",
+          List.of(
+              Map.of("id", "start-1", "kind", "start", "label", "Start", "description", "entry"),
+              Map.of(
+                  "id",
+                  "cron-1",
+                  "kind",
+                  "cron",
+                  "cronExpression",
+                  "0 0/5 * * * ?",
+                  "cronPreview",
+                  "every 5 minutes"),
+              Map.of("id", "map-1", "kind", "mapping", "label", "Transform"),
+              Map.of("id", "end-1", "kind", "end", "label", "End")));
       complexModel.put(
-          "pipeline",
-          List.of(Map.of("processor", "transform", "config", Map.of("field", "value"))));
+          "edges",
+          List.of(
+              Map.of("id", "e1", "source", "start-1", "target", "cron-1", "label", "trigger"),
+              Map.of("id", "e2", "source", "cron-1", "target", "map-1", "kind", "data"),
+              Map.of("id", "e3", "source", "map-1", "target", "end-1", "kind", "control")));
       input.setModel(complexModel);
 
       ResponseEntity<PipelineOutputDTO> response = performCreate(input);

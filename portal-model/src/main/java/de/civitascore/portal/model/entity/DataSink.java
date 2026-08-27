@@ -13,26 +13,28 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
+<<<<<<< ours
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import lombok.AccessLevel;
+=======
+>>>>>>> theirs
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 /**
  * Represents the output destination of a {@link Pipeline}. A DataSink describes where the pipeline
  * writes its processed data.
  *
- * <p>The {@code configuration} column stores a type-specific JSON object whose required shape
- * depends on {@code dataSinkType}:
+ * <p>The type-specific configuration document lives in the Model Forge registry, pinned by {@link
+ * #configurationUrn}. Its required shape depends on {@code dataSinkType}:
  *
  * <ul>
  *   <li>{@link DataSinkType#POSTGIS}: {@code tableName} and {@code dataStructureVersionId} are
  *       required.
- *   <li>{@link DataSinkType#FROST}: the object must be absent or empty.
+ *   <li>{@link DataSinkType#FROST}: the configuration must be absent or empty — nothing is stored
+ *       in the registry and both URN columns stay null.
  * </ul>
  *
  * <p>A DataSink belongs directly to a {@link DataSet}. Its association with a {@link Pipeline} is
@@ -54,6 +56,7 @@ public class DataSink extends DataSetOwnedEntity {
   @Column(name = "data_sink_type", nullable = false, length = 20)
   @NotNull private DataSinkType dataSinkType;
 
+<<<<<<< ours
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "configuration", columnDefinition = "jsonb")
   private Map<String, Object> configuration;
@@ -66,4 +69,20 @@ public class DataSink extends DataSetOwnedEntity {
       orphanRemoval = true)
   @Setter(AccessLevel.NONE)
   private Set<Layer> layers = new HashSet<>();
+=======
+  /**
+   * Stable logical CORE URN of this sink's configuration artifact in Model Forge, minted once on
+   * the first store and reused for every following version. Null until a configuration is stored
+   * (always null for FROST sinks).
+   */
+  @Column(name = "configuration_logical_urn")
+  private String configurationLogicalUrn;
+
+  /**
+   * Versioned CORE URN pinning the current configuration document in Model Forge. Null while no
+   * configuration is stored (always null for FROST sinks).
+   */
+  @Column(name = "configuration_urn")
+  private String configurationUrn;
+>>>>>>> theirs
 }

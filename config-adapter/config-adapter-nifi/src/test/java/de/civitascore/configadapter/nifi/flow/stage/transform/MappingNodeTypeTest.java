@@ -35,6 +35,7 @@ class MappingNodeTypeTest {
   private final FrostSinkStage envelopeSink =
       new FrostSinkStage("https://frost.example/FROST", FrostSinkAuth.basicAuth("frost", "secret"));
 
+<<<<<<< ours
   private static final String STRUCTURE_A =
       "urn:core:platform:civitas:datastructure:common:StructureA:0000000001:1.0.0";
   private static final String STRUCTURE_B =
@@ -46,6 +47,18 @@ class MappingNodeTypeTest {
 
   private static GraphNode mappingNode(String id, Map<String, Object> fields) {
     return new GraphNode(id, "mapping", Map.of("mappingConfig", Map.of("fields", fields)));
+=======
+  private static final String REF_1 = "urn:core:dataset:d:mapping:c:M1:0000000001:1.0.0";
+  private static final String REF_2 = "urn:core:dataset:d:mapping:c:M2:0000000002:1.0.0";
+
+  private static GraphNode mappingNode(String id, String mappingRef) {
+    return new GraphNode(id, "mapping", null, null, mappingRef, null);
+  }
+
+  /** A shipped mapping document ({@code fields} only) for the catalog. */
+  private static Map<String, Object> mappingDoc(Map<String, Object> fields) {
+    return Map.of("fields", fields);
+>>>>>>> theirs
   }
 
   private static GraphNode mappingNode(
@@ -60,14 +73,16 @@ class MappingNodeTypeTest {
   void mappedFrostSinkWithoutTargetStructureIsRejected() {
     // The FROST compiler derives match keys from the mapping's target structure — a datasink
     // without it cannot deploy a mapped flow, only a passthrough.
-    GraphNode mapping = mappingNode("m1", Map.of("$.properties.reference", "$.ref"));
+    GraphNode mapping = mappingNode("m1", REF_1);
+    Map<String, Object> mappings =
+        Map.of(REF_1, mappingDoc(Map.of("$.properties.reference", "$.ref")));
 
     FatalAdapterException ex =
         assertThrows(
             FatalAdapterException.class,
             () ->
                 mappingNodeType.compile(
-                    List.of(mapping), envelopeSink, new FrostSinkSpec("1", null)));
+                    List.of(mapping), envelopeSink, new FrostSinkSpec("1", null), mappings));
     assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 
@@ -75,19 +90,25 @@ class MappingNodeTypeTest {
   void mappingChainBeforeAFrostSinkCompilesIntermediatesAsRecordTransforms() throws Exception {
     // Earlier mappings of a chain are ordinary record transformations; only the last one compiles
     // against the FROST catalog.
-    GraphNode first = mappingNode("m1", Map.of("$.stationName", "$.raw"));
-    GraphNode last = mappingNode("m2", Map.of("$.properties.reference", "$.stationName"));
+    GraphNode first = mappingNode("m1", REF_1);
+    GraphNode last = mappingNode("m2", REF_2);
+    Map<String, Object> mappings =
+        Map.of(
+            REF_1, mappingDoc(Map.of("$.stationName", "$.raw")),
+            REF_2, mappingDoc(Map.of("$.properties.reference", "$.stationName")));
 
     var compilation =
         mappingNodeType.compile(
             List.of(first, last),
             envelopeSink,
-            new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())));
+            new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())),
+            mappings);
 
     assertEquals(2, compilation.units().size());
   }
 
   @Test
+<<<<<<< ours
   void renamingTheStructureBetweenTwoNodesDeploysUnchanged() throws Exception {
     // The name segment is a display name; renaming a structure changes neither its identity nor its
     // shape. Comparing the URNs verbatim would fail a deploy that was correct before the rename,
@@ -114,6 +135,12 @@ class MappingNodeTypeTest {
     GraphNode mapping =
         mappingNode(
             "m1", Map.of("$.stationid", "$.stationid", "$.value", "$.measurements[].value"));
+=======
+  void mappingNodeWithoutRefIsRejected() {
+    // A wired mapping node that carries no mappingRef is a corrupted payload — it must not deploy
+    // untransformed.
+    GraphNode mapping = mappingNode("m1", null);
+>>>>>>> theirs
 
     FatalAdapterException ex =
         assertThrows(
@@ -121,6 +148,7 @@ class MappingNodeTypeTest {
             () ->
                 mappingNodeType.compile(
                     List.of(mapping),
+<<<<<<< ours
                     new PostgisSinkStage(null),
                     new PostgisSinkSpec("readings", List.of("stationid"))));
 
@@ -255,5 +283,29 @@ class MappingNodeTypeTest {
             new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())));
 
     assertEquals(2, compilation.units().size());
+=======
+                    envelopeSink,
+                    new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())),
+                    Map.of()));
+    assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void mappingRefNotShippedInCatalogIsRejected() {
+    // The config-adapter is callback-free — a mappingRef whose document did not travel in the
+    // pipeline's mappings catalog cannot be resolved and must fail the deploy.
+    GraphNode mapping = mappingNode("m1", REF_1);
+
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                mappingNodeType.compile(
+                    List.of(mapping),
+                    envelopeSink,
+                    new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())),
+                    Map.of()));
+    assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+>>>>>>> theirs
   }
 }

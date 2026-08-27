@@ -15,6 +15,7 @@ import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
@@ -74,6 +75,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
+  private final ModelRegistryGateway modelRegistryGateway;
 
   private final DataSetMutationGuard dataSetMutationGuard;
 
@@ -88,6 +90,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       PipelineRuntimeStatusService pipelineRuntimeStatusService,
       ObjectProvider<AllowedScopes> allowedScopesProvider,
       DataSourceDatapoolScopeValidator datapoolScopeValidator,
+      ModelRegistryGateway modelRegistryGateway,
       DataSetMutationGuard dataSetMutationGuard) {
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
@@ -99,6 +102,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     this.pipelineRuntimeStatusService = pipelineRuntimeStatusService;
     this.allowedScopesProvider = allowedScopesProvider;
     this.datapoolScopeValidator = datapoolScopeValidator;
+    this.modelRegistryGateway = modelRegistryGateway;
     this.dataSetMutationGuard = dataSetMutationGuard;
   }
 
@@ -270,6 +274,18 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       }
       entity.getNamedApis().removeIf(api -> !incomingSlugs.contains(api.getSlug()));
       cleanUpOrphanedOwsLayers(entity);
+    }
+
+    // A DataSet is backed by a Model Forge manifest artifact its members are linked into
+    // (pipelines,
+    // and transitively their sources/sinks/mappings/structures). Create it once, on first persist
+    // (when no manifest is pinned yet); its title mirrors the dataset name. Model Forge validates
+    // it.
+    if (entity.getManifestLogicalUrn() == null) {
+      ModelRegistryGateway.ModelPin pin =
+          modelRegistryGateway.createDataSetManifest(entity.getName());
+      entity.setManifestLogicalUrn(pin.logicalUrn());
+      entity.setManifestUrn(pin.versionedUrn());
     }
     return super.postConvertToEntity(entity, input);
   }
@@ -594,6 +610,42 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     sagaPublisher.publishUnreleaseRequested(saved);
 
     return saved;
+  }
+
+  /**
+   * Explicitly adds a reusable artifact (by CORE URN) to this dataset's manifest — the "Beides"
+   * explicit-assignment path, independent of any Pipeline that uses it. Model Forge maintains the
+   * manifest (a {@code dataset-ref} membership edge).
+   */
+  @Transactional
+  public void linkMember(UUID datasetId, String memberUrn) {
+    DataSet dataSet = findByIdOrThrow(datasetId);
+    if (dataSet.getManifestLogicalUrn() == null) {
+      throw new InvalidInputException(
+          "DataSet", datasetId, "DataSet has no manifest to link members into");
+    }
+    if (memberUrn == null || memberUrn.isBlank()) {
+      throw new InvalidInputException("member", datasetId, "member artifact URN is required");
+    }
+    modelRegistryGateway.linkToDataSet(dataSet.getManifestLogicalUrn(), memberUrn);
+  }
+
+  /** Explicitly removes an artifact (by CORE URN) from this dataset's manifest. */
+  @Transactional
+  public void unlinkMember(UUID datasetId, String memberUrn) {
+    DataSet dataSet = findByIdOrThrow(datasetId);
+    if (dataSet.getManifestLogicalUrn() != null && memberUrn != null && !memberUrn.isBlank()) {
+      modelRegistryGateway.unlinkFromDataSet(dataSet.getManifestLogicalUrn(), memberUrn);
+    }
+  }
+
+  /**
+   * CORE URNs of artifacts of the given type ({@code mapping}/{@code pipeline}/{@code datasource}/
+   * {@code datasink}/{@code datastructure}) that belong to no dataset — the "orphans by type"
+   * query.
+   */
+  public List<String> orphans(String type) {
+    return modelRegistryGateway.orphanUrns(type);
   }
 
   /**
