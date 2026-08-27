@@ -4,6 +4,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
+import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.Diagnostic;
 import de.civitascore.modelforge.contract.DiagnosticSeverity;
 import de.civitascore.modelforge.core.port.RemoteSchemaRepository;
@@ -114,12 +115,16 @@ public class SchemaImportService {
         }
 
         // Validate the DataStructure against datastructure.schema.json BEFORE storing anything: its
-        // elementRefs `pattern` enforces that every member is an Element URN, and (for a folded
-        // datastructure-root) that its own `id` is a :datastructure: URN. Failing here, up front,
+        // `$defs` member pattern enforces that every member is an Element URN, and (for a folded
+        // datastructure-root) that its own `$id` is a :datastructure: URN. Failing here, up front,
         // keeps a malformed grouping from persisting any half-imported Elements.
+        //
+        // Selected by kind, not by `$schema`: a DataStructure declares the JSON-Schema meta-schema,
+        // which the `$schema`-driven overload cannot map to a CORE schema.
         ObjectNode dataStructure = built.dataStructure();
         if (dataStructure != null) {
-            List<Diagnostic> dataStructureDiags = coreSchemaValidator.validate(dataStructure);
+            List<Diagnostic> dataStructureDiags =
+                coreSchemaValidator.validate(ArtifactKind.DATA_STRUCTURE, dataStructure);
             if (!dataStructureDiags.isEmpty()) {
                 return new SchemaImportResult(null, dataStructureDiags);
             }

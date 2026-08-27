@@ -562,6 +562,52 @@ class SchemaImportServiceTest {
             .contains(urnOf(stored, "Alpha"), urnOf(stored, "Beta"));
     }
 
+    // ── DataStructure contract enforcement ──────────────────────────────────────
+
+    private static final String DS_ROOT_URN =
+        "urn:core:platform:civitas:datastructure:sta:AirQuality:abcdefghij:1.0.0";
+
+    @Test
+    void dataStructureRoot_withARootRefThatIsNotAnElementUrn_isRejectedAndStoresNothing() {
+        // A root $ref that is neither a resolvable "#/$defs/<Name>" pointer nor an Element URN is
+        // carried into the stored document verbatim, so the CORE schema's Element-URN pattern is
+        // the only thing standing between a caller and a DataStructure whose entry point does not
+        // exist. That pattern only applies when the DataStructure is validated by kind.
+        JsonNode schema = mapper.readTree("""
+            { "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "%s",
+              "title": "AirQuality",
+              "$ref": "http://169.254.169.254/creds",
+              "$defs": {
+                "Reading": { "type": "object", "properties": { "no2": { "type": "number" } } }
+              } }
+            """.formatted(DS_ROOT_URN));
+
+        SchemaImportResult result = svc.importSchema(new SchemaImportRequest(schema));
+
+        assertThat(result.diagnostics()).isNotEmpty();
+        verify(registry, never()).storeDataStructure(anyString(), any());
+        verify(registry, never()).storeElement(
+            anyString(), any(), anySet(), anySet(), nullable(String.class));
+    }
+
+    @Test
+    void dataStructureRoot_withALocalRootRef_isAccepted() {
+        // The shape the platform produces must keep importing: the root $ref is a local pointer,
+        // resolved to the member's minted Element URN.
+        JsonNode schema = mapper.readTree("""
+            { "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "%s",
+              "title": "AirQuality",
+              "$ref": "#/$defs/Reading",
+              "$defs": {
+                "Reading": { "type": "object", "properties": { "no2": { "type": "number" } } }
+              } }
+            """.formatted(DS_ROOT_URN));
+
+        assertThat(svc.importSchema(new SchemaImportRequest(schema)).diagnostics()).isEmpty();
+    }
+
     // ── Derived identity for externally-identified imports ──────────────────────
 
     @Test

@@ -35,7 +35,12 @@
           },
           {
             "type": "object",
-            "description": "An inline member Element schema (an ordinary JSON Schema). When it carries a '$id' it MUST be the member's Element CORE URN; Model Forge then splits it into a separate Element artifact under that URN.",
+            "description": "An inline member Element schema (an ordinary JSON Schema). When it carries a '$id' it MUST be the member's Element CORE URN; Model Forge then splits it into a separate Element artifact under that URN. A member carrying '$ref' is not an inline schema and must satisfy the reference branch instead, so that branch's Element-URN pattern cannot be bypassed through this one.",
+            "not": {
+              "required": [
+                "$ref"
+              ]
+            },
             "properties": {
               "$id": {
                 "type": "string",
