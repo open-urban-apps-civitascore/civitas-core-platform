@@ -205,8 +205,9 @@ test-model-forge:
 
 # Publish the Maven artifacts to this project's GitLab Maven registry so consumers can
 # resolve core-model-forge-*:0.1.0-SNAPSHOT. Skips tests/quality (already run in test-model-forge).
-# Runs on main/develop (and the nightly schedule) only — not on MRs, to avoid overwriting the
-# shared SNAPSHOT with unmerged code.
+# The admin UI sets maven.deploy.skip, so the console is not published.
+# The coordinate is fixed rather than per-merge-request, so two Model Forge merge requests open at
+# once overwrite each other's snapshot.
 publish-model-forge:
   image: maven:3.9-eclipse-temurin-25-alpine
   stage: deploy-package
@@ -214,6 +215,11 @@ publish-model-forge:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "develop"
+    # Publish from a merge request that changes Model Forge, so portal-backend can resolve the
+    # snapshot before the module reaches develop.
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - model-forge/**/*
   needs:
     - job: test-model-forge
       artifacts: false
