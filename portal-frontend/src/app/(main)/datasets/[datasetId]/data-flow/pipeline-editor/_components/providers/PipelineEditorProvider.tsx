@@ -21,6 +21,7 @@ import {
   useDeleteDataSink,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
@@ -36,12 +37,14 @@ import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import { tableNameOwnerOutsideNode, tableNameOwnersOutsideSession } from '../../_services/dataSinkNameService'
 import {
   buildDataSinkPayloads,
+  buildMappingArtifacts,
   buildPipelinePayload,
   createDataSinkSnapshot,
   type DataSinkSnapshot,
   getRemovedDataSinkIds,
   hasDataSinkChanged,
   isDestructiveDataSinkChange,
+  updateNodeData,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
 import {
@@ -109,12 +112,14 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const createDataSinkMutation = useCreateDataSink()
   const deleteDataSinkMutation = useDeleteDataSink()
   const updateDataSinkMutation = useUpdateDataSink()
+  const createMappingMutation = useCreateMapping()
+  const updateMappingMutation = useUpdateMapping()
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
 
   // ===== Data-loss confirmation dialog =====
-  // A destructive sink change (tableName / dataStructureVersionId) on an already-provisioned
+  // A destructive sink change (tableName / referenced element) on an already-provisioned
   // dataset discards its stored data (the sink's storage is rebuilt on the next release).
   // Save-All pauses on such a change and awaits an explicit confirmation via this promise before
   // sending confirmDataLoss to the backend.
@@ -500,12 +505,16 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             await deleteDataSinkMutation.mutateAsync({ datasetId, dataSinkId: dataSinkId })
           }
 
-          // Step 2: Save data sinks (create new / update changed)
+          // Step 2: Save data sinks (create new / update changed). Stash the sink's CORE
+          // configurationUrn back onto the node so it is emitted as the CORE model's `sinkRef`.
           const dataSinkPayloads = buildDataSinkPayloads(currentPipeline)
           for (const { nodeId, entityId, payload } of dataSinkPayloads) {
             if (!entityId) {
               const response = await createDataSinkMutation.mutateAsync({ datasetId, data: payload })
               currentPipeline = updateNodeEntityId(currentPipeline, nodeId, response.data.id)
+              currentPipeline = updateNodeData(currentPipeline, nodeId, {
+                configurationUrn: response.data?.configurationUrn,
+              })
             } else if (hasDataSinkChanged(nodeId, payload, snapshot)) {
               // The destructive-change confirmation was obtained up front; flag the payload so the
               // backend permits the table rebuild. Only the sinks that are actually destructive
@@ -514,11 +523,34 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
                 hasDestructiveChange && isDestructiveDataSinkChange(nodeId, payload, snapshot)
                   ? { ...payload, confirmDataLoss: true }
                   : payload
-              await updateDataSinkMutation.mutateAsync({ datasetId, dataSinkId: entityId, data })
+              const response = await updateDataSinkMutation.mutateAsync({
+                datasetId,
+                dataSinkId: entityId,
+                data,
+              })
+              currentPipeline = updateNodeData(currentPipeline, nodeId, {
+                configurationUrn: response?.data?.configurationUrn,
+              })
             }
           }
 
-          // Step 3: Save pipeline (with updated entityIds from step 1)
+          // Step 2.5: Create/version mapping artifacts for configured mapping nodes (POST/PUT
+          // /v1/mappings). Stash the returned versioned URN (→ CORE model `mappingRef`) and logical
+          // URN (→ future PUT-versioning) back onto the node. Validation happens inside
+          // buildMappingArtifacts, which throws on a schema-invalid mapping document.
+          const mappingArtifacts = buildMappingArtifacts(currentPipeline)
+          for (const { nodeId, logicalUrn, body } of mappingArtifacts) {
+            const response = logicalUrn
+              ? await updateMappingMutation.mutateAsync({ logicalUrn, ...body })
+              : await createMappingMutation.mutateAsync(body)
+            currentPipeline = updateNodeData(currentPipeline, nodeId, {
+              mappingRef: response.data.versionedUrn,
+              mappingLogicalUrn: response.data.logicalUrn,
+            })
+          }
+
+          // Step 3: Save pipeline (with updated entityIds/URNs from the steps above). The CORE
+          // `model` is validated against the generated schema inside buildPipelinePayload.
           const pipelinePayload = buildPipelinePayload(currentPipeline)
           const pipelineId = currentPipeline.id
 
@@ -570,6 +602,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     createDataSinkMutation,
     deleteDataSinkMutation,
     updateDataSinkMutation,
+    createMappingMutation,
+    updateMappingMutation,
     datasetId,
     datasetQuery.data,
     confirmDataLoss,

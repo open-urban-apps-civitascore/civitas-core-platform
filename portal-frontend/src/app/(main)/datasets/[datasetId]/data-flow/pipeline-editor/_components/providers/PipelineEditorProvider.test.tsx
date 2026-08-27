@@ -9,6 +9,7 @@ import {
   useDeleteDataSink,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
@@ -20,9 +21,11 @@ import { useActivePipeline } from '../../_hooks/use-active-pipeline'
 import { usePipelineSession } from '../../_hooks/use-pipeline-session'
 import {
   buildDataSinkPayloads,
+  buildMappingArtifacts,
   getRemovedDataSinkIds,
   hasDataSinkChanged,
   isDestructiveDataSinkChange,
+  updateNodeData,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
 import { createEmptyPipeline } from '../../_services/pipelineService'
@@ -67,6 +70,11 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useUpdateDataSink: vi.fn(),
 }))
 
+vi.mock('@/app/services/api/mappings/clientRequests', () => ({
+  useCreateMapping: vi.fn(),
+  useUpdateMapping: vi.fn(),
+}))
+
 // Capture the latest WarningModal props so tests can drive the data-loss dialog (confirm/discard).
 const warningModalRef = vi.hoisted(() => ({
   current: null as { open?: boolean; onConfirm?: () => void; onDiscard?: () => void } | null,
@@ -95,10 +103,12 @@ vi.mock('../../_services/payloadBuilderService', () => ({
     model: {},
   }),
   buildDataSinkPayloads: vi.fn().mockReturnValue([]),
+  buildMappingArtifacts: vi.fn().mockReturnValue([]),
   createDataSinkSnapshot: vi.fn().mockReturnValue({}),
   getRemovedDataSinkIds: vi.fn().mockReturnValue([]),
   hasDataSinkChanged: vi.fn().mockReturnValue(false),
   isDestructiveDataSinkChange: vi.fn().mockReturnValue(false),
+  updateNodeData: vi.fn().mockImplementation((pipeline: unknown) => pipeline),
   updateNodeEntityId: vi.fn().mockImplementation((pipeline: unknown) => pipeline),
 }))
 
@@ -181,8 +191,10 @@ beforeEach(() => {
   contextRef.current = null
 
   vi.mocked(buildDataSinkPayloads).mockReturnValue([])
+  vi.mocked(buildMappingArtifacts).mockReturnValue([])
   vi.mocked(getRemovedDataSinkIds).mockReturnValue([])
   vi.mocked(hasDataSinkChanged).mockReturnValue(false)
+  vi.mocked(updateNodeData).mockImplementation((pipeline: unknown) => pipeline as never)
   vi.mocked(updateNodeEntityId).mockImplementation((pipeline: unknown) => pipeline as never)
 
   mockCreatePipelineMutateAsync = vi.fn().mockResolvedValue({ data: { id: 'created-id' } })
@@ -234,6 +246,18 @@ beforeEach(() => {
     mutateAsync: vi.fn().mockResolvedValue({}),
     isPending: false,
   } as unknown as ReturnType<typeof useUpdateDataSink>)
+
+  vi.mocked(useCreateMapping).mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ data: { logicalUrn: 'urn:logical', versionedUrn: 'urn:versioned' } }),
+    isPending: false,
+  } as unknown as ReturnType<typeof useCreateMapping>)
+
+  vi.mocked(useUpdateMapping).mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ data: { logicalUrn: 'urn:logical', versionedUrn: 'urn:versioned-2' } }),
+    isPending: false,
+  } as unknown as ReturnType<typeof useUpdateMapping>)
 
   vi.mocked(validatePipelineWithNodeStatus).mockReturnValue({
     isValid: true,

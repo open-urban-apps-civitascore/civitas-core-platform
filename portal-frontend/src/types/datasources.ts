@@ -67,6 +67,9 @@ export const DatasourceApiResponseSchema = z.object({
   dataStructureVersion: DatastructureVersionSummaryApiResponseSchema.nullable(),
   inUse: z.boolean(),
   datapoolScope: DatapoolScopeSchema,
+  // Versioned CORE URN of this DataSource's configuration artifact in Model Forge; used as the
+  // pipeline node's `sourceRef`. Absent on drafts that have no configuration yet.
+  configurationUrn: z.string().nullable().optional(),
 })
 
 export type Datasource = z.infer<typeof DatasourceApiResponseSchema>

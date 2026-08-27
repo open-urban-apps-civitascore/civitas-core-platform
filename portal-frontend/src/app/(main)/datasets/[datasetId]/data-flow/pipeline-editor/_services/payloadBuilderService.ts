@@ -1,29 +1,136 @@
 /**
  * Payload Builder Service
  *
- * Assembles the complete PipelinePayload from a Pipeline graph
- * for backend API submission.
+ * Assembles the complete PipelinePayload from a Pipeline graph for backend API submission.
  *
- * Extracts:
- * - Entity IDs from configured nodes
- * - React Flow styles (viewport + positions) for frontend reload
- * - The engine-neutral pipeline graph (React-Flow nodes/edges) forwarded to the config-adapter as-is
+ * The backend is a thin shell that stores the pipeline `model` verbatim and never parses it;
+ * Model Forge validates it against `pipeline.schema.json`. So the FRONTEND emits a clean, URN-native
+ * CORE Pipeline document (nodes keyed by `kind` with `*Ref` URNs — no React-Flow `type`/`data`) and
+ * validates its own payload with the generated zod schema before sending. `styles` still carries the
+ * full React-Flow graph for editor round-tripping (the LOAD path hydrates from `styles`).
  */
 
+import type { MappingArtifactBody } from '@/app/services/api/mappings/clientRequests'
+import { DataSinkDraftSchema, MappingDraftSchema, PipelineDraftSchema } from '@/generated/core'
 import { DATASINK_TYPES, type DataSinkPayload } from '@/types/datasinks'
 
-import type { DataSourceNodeData } from '../_types/nodes'
-import { isDataSourceNodeData, isFrostNodeData, isGeoPersistenceNodeData, isMappingNodeData } from '../_types/nodes'
-import type { Pipeline, PipelinePayload, PipelineStylesPayload } from '../_types/pipeline'
+import type { DataSourceNodeData, PipelineNodeData } from '../_types/nodes'
+import {
+  isCronNodeData,
+  isDataSourceNodeData,
+  isFrostNodeData,
+  isGeoPersistenceNodeData,
+  isMappingNodeData,
+} from '../_types/nodes'
+import type {
+  CorePipelineEdge,
+  CorePipelineModel,
+  CorePipelineNode,
+  CorePipelineNodeKind,
+  Pipeline,
+  PipelineNode,
+  PipelineNodeType,
+  PipelinePayload,
+  PipelineStylesPayload,
+} from '../_types/pipeline'
+
+/** Maps the React-Flow node `type` to the CORE document `kind`. */
+const KIND_BY_NODE_TYPE: Record<PipelineNodeType, CorePipelineNodeKind> = {
+  dataSource: 'source',
+  frost: 'sink',
+  geoPersistence: 'sink',
+  mapping: 'mapping',
+  cron: 'cron',
+  start: 'start',
+  end: 'end',
+}
 
 /**
- * Builds the complete PipelinePayload for backend API submission.
+ * Thrown when the assembled CORE Pipeline document fails the generated schema. Carries the zod
+ * issues (already logged to the console) so the caller can block the save and surface a toast.
+ */
+export class PipelineModelValidationError extends Error {
+  constructor(public readonly issues: unknown) {
+    super('Pipeline model failed CORE schema validation')
+    this.name = 'PipelineModelValidationError'
+  }
+}
+
+/**
+ * Thrown when a mapping document (for the given node) fails the generated schema. Carries the zod
+ * issues (already logged to the console) so the caller can block the save and surface a toast.
+ */
+export class MappingDocumentValidationError extends Error {
+  constructor(
+    public readonly nodeId: string,
+    public readonly issues: unknown,
+  ) {
+    super('Mapping document failed CORE schema validation')
+    this.name = 'MappingDocumentValidationError'
+  }
+}
+
+/**
+ * Thrown when a data sink's CORE document (for the given node) fails the generated schema. Carries
+ * the zod issues (already logged to the console) so the caller can block the save and surface a toast.
+ */
+export class DataSinkDocumentValidationError extends Error {
+  constructor(
+    public readonly nodeId: string,
+    public readonly issues: unknown,
+  ) {
+    super('DataSink document failed CORE schema validation')
+    this.name = 'DataSinkDocumentValidationError'
+  }
+}
+
+/**
+ * Builds the clean, URN-native CORE Pipeline document (the payload `model`). References are read from
+ * node data (resolved from the pickers / stashed after datasink & mapping saves) and omitted when a
+ * node is not yet configured — draft pipelines are valid, refs are optional in the schema.
+ * `$schema`/`id` are intentionally left out (Model Forge stamps those on ingest).
+ */
+export const buildPipelineModel = (pipeline: Pipeline): CorePipelineModel => {
+  const nodes: CorePipelineNode[] = pipeline.nodes.map(node => {
+    const coreNode: CorePipelineNode = {
+      id: node.id,
+      kind: KIND_BY_NODE_TYPE[node.type],
+      'x-ui-position': { x: node.position.x, y: node.position.y },
+    }
+    if (node.data.label) coreNode.label = node.data.label
+
+    if (isDataSourceNodeData(node.data)) {
+      if (node.data.configurationUrn) coreNode.sourceRef = node.data.configurationUrn
+    } else if (isFrostNodeData(node.data) || isGeoPersistenceNodeData(node.data)) {
+      if (node.data.configurationUrn) coreNode.sinkRef = node.data.configurationUrn
+    } else if (isMappingNodeData(node.data)) {
+      if (node.data.mappingRef) coreNode.mappingRef = node.data.mappingRef
+    } else if (isCronNodeData(node.data)) {
+      if (node.data.cronExpression) coreNode.cronExpression = node.data.cronExpression
+    }
+
+    return coreNode
+  })
+
+  const edges: CorePipelineEdge[] = pipeline.edges.map(edge => {
+    const coreEdge: CorePipelineEdge = { id: edge.id, source: edge.source, target: edge.target }
+    if (edge.data?.label) coreEdge.label = edge.data.label
+    return coreEdge
+  })
+
+  return { nodes, edges }
+}
+
+/**
+ * Builds the complete PipelinePayload for backend API submission and validates the CORE `model`
+ * against the generated schema before returning.
  *
- * @param pipeline - The pipeline with nodes and edges
+ * @param pipeline - The pipeline with nodes and edges (with URNs already stashed onto node data)
  * @returns The payload ready to be sent to `POST /pipeline`
+ * @throws PipelineModelValidationError when the assembled CORE document is not schema-valid
  */
 export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
-  // 1. Extract styles (viewport + node positions + full graph for round-tripping)
+  // 1. styles — the full React-Flow graph for editor round-tripping (LOAD path hydrates from this).
   const styles: PipelineStylesPayload = {
     viewport: pipeline.viewport,
     nodePositions: Object.fromEntries(pipeline.nodes.map(node => [node.id, node.position])),
@@ -31,31 +138,88 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
     edges: pipeline.edges,
   }
 
-  // 2. Extract entity data by node type
+  // 2. model — the clean, URN-native CORE Pipeline document; validate it before sending so the
+  //    frontend guarantees a schema-valid payload to the (schema-agnostic) backend.
+  const model = buildPipelineModel(pipeline)
+  const parsed = PipelineDraftSchema.safeParse(model)
+  if (!parsed.success) {
+    console.error('Pipeline model failed CORE schema validation:', parsed.error.issues, model)
+    throw new PipelineModelValidationError(parsed.error.issues)
+  }
 
-  // DataSources: entity IDs from configured DataSource nodes
+  // 3. FK wiring ids (portal GUIDs) — the backend uses these for foreign-key wiring.
   const dataSourceIds: string[] = pipeline.nodes
     .filter(n => isDataSourceNodeData(n.data) && n.data.entityId != null)
     .map(n => (n.data as DataSourceNodeData).entityId as string)
 
-  // DataSinks: only IDs (config is saved separately via data sink API)
   const dataSinkIds: string[] = pipeline.nodes
     .filter(n => (isGeoPersistenceNodeData(n.data) || isFrostNodeData(n.data)) && n.data.entityId != null)
     .map(n => n.data.entityId as string)
 
-  // 3. Assemble payload. `model` is the engine-neutral pipeline graph (React-Flow nodes/edges +
-  //    inline mappingConfig) that the backend forwards to the config-adapter as-is; the
-  //    config-adapter (NiFi) is the only place engine specifics appear. `styles` carries the same
-  //    React-Flow layout for editor round-tripping. No engine-specific (RedPanda) model is built
-  //    on the frontend anymore.
   return {
     name: pipeline.name,
     description: pipeline.description || '-',
-    styles: styles,
-    model: styles,
+    styles,
+    model,
     dataSourceIds,
     dataSinkIds,
   }
+}
+
+// ============================================================================
+// Mapping artifact extraction (POST/PUT /v1/mappings)
+// ============================================================================
+
+/**
+ * A mapping artifact to create/version for a single mapping node, extracted on save (before the
+ * pipeline itself is saved). `logicalUrn` is present when the node was saved before — the caller then
+ * PUT-versions that logical mapping instead of POSTing a new one.
+ */
+export interface MappingArtifactRequest {
+  /** The pipeline node this mapping belongs to. */
+  nodeId: string
+  /** Prior logical URN (PUT-version) or undefined (POST a new mapping). */
+  logicalUrn?: string
+  /** The validated CORE Mapping document body to send. */
+  body: MappingArtifactBody
+}
+
+/** A readable mapping title, e.g. `Source-to-Target`. */
+const mappingTitle = (data: PipelineNodeData): string => {
+  const source = (isMappingNodeData(data) && data.sourceName) || 'source'
+  const target = (isMappingNodeData(data) && data.targetName) || 'target'
+  return `${source}-to-${target}`
+}
+
+/**
+ * Extracts the mapping artifacts to create/version from all configured mapping nodes and validates
+ * each document against the generated schema before it is sent. A mapping node is "configured" once
+ * it has both a source and target DataStructure URN; unconfigured nodes are skipped (no `mappingRef`).
+ *
+ * @throws MappingDocumentValidationError when a mapping document is not schema-valid
+ */
+export const buildMappingArtifacts = (pipeline: Pipeline): MappingArtifactRequest[] => {
+  return pipeline.nodes.flatMap<MappingArtifactRequest>(node => {
+    if (!isMappingNodeData(node.data)) return []
+    const config = node.data.mappingConfig
+    if (!config?.source || !config?.target) return []
+
+    const body: MappingArtifactBody = {
+      source: config.source,
+      target: config.target,
+      fields: config.fields,
+      title: mappingTitle(node.data),
+      positions: config.positions,
+    }
+
+    const parsed = MappingDraftSchema.safeParse(body)
+    if (!parsed.success) {
+      console.error('Mapping document failed CORE schema validation:', node.id, parsed.error.issues, body)
+      throw new MappingDocumentValidationError(node.id, parsed.error.issues)
+    }
+
+    return [{ nodeId: node.id, logicalUrn: node.data.mappingLogicalUrn, body }]
+  })
 }
 
 // ============================================================================
@@ -80,49 +244,53 @@ export interface DataSinkNodePayload {
  */
 export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[] => {
   return pipeline.nodes.flatMap<DataSinkNodePayload>(node => {
+    // The deploy engine derives a sink's target structure from the mapping's Thing-shaped target,
+    // referenced by versioned CORE URN (the backend's *Configuration.element, a Model-Forge soft
+    // reference — not a raw version id). A passthrough pipeline (no mapping) has no element.
+    const elementUrn = mappingTargetElementBefore(pipeline, node.id)
+
+    let payload: DataSinkPayload | null = null
     if (isGeoPersistenceNodeData(node.data) && node.data.dataStructureVersionId != null) {
-      return [
-        {
-          nodeId: node.id,
-          entityId: node.data.entityId ?? null,
-          payload: {
-            id: node.data.entityId ?? null,
-            dataSinkType: DATASINK_TYPES.POSTGIS,
-            configuration: {
-              tableName: node.data.tableName,
-              dataStructureVersionId: node.data.dataStructureVersionId.split('/')[1],
-            },
-          },
-        },
-      ]
+      payload = {
+        id: node.data.entityId ?? null,
+        dataSinkType: DATASINK_TYPES.POSTGIS,
+        configuration: elementUrn
+          ? { tableName: node.data.tableName, element: elementUrn }
+          : { tableName: node.data.tableName },
+      }
+    } else if (isFrostNodeData(node.data)) {
+      payload = {
+        id: node.data.entityId ?? null,
+        dataSinkType: DATASINK_TYPES.FROST,
+        configuration: elementUrn ? { element: elementUrn } : {},
+      }
     }
-    if (isFrostNodeData(node.data)) {
-      // The deploy engine derives the FROST match keys from the mapping's Thing-shaped target
-      // structure, so the sink references it; a passthrough pipeline (no mapping) sends none.
-      const targetVersionId = mappingTargetVersionBefore(pipeline, node.id)
-      return [
-        {
-          nodeId: node.id,
-          entityId: node.data.entityId ?? null,
-          payload: {
-            id: node.data.entityId ?? null,
-            dataSinkType: DATASINK_TYPES.FROST,
-            configuration: targetVersionId ? { dataStructureVersionId: targetVersionId } : {},
-          },
-        },
-      ]
+
+    if (payload == null) return []
+
+    // Validate the outbound CORE DataSink document (envelope + connector fields) against the generated
+    // schema before sending — mirroring pipeline/mapping. `$schema`/`id` are stamped by Model Forge;
+    // the backend adds `connectionType` from `dataSinkType`, so validate that projection here.
+    const coreDoc = { connectionType: payload.dataSinkType.toLowerCase(), ...payload.configuration }
+    const parsed = DataSinkDraftSchema.safeParse(coreDoc)
+    if (!parsed.success) {
+      console.error('DataSink document failed CORE schema validation:', node.id, parsed.error.issues, coreDoc)
+      throw new DataSinkDocumentValidationError(node.id, parsed.error.issues)
     }
-    return []
+
+    return [{ nodeId: node.id, entityId: payload.id, payload }]
   })
 }
 
 /**
- * The target datastructure version of the last mapping feeding the given sink node: a backward
- * walk stopping at the first mapping it reaches. The flow-shape validation only lets a single
- * linear path deploy, so on a valid graph exactly one final mapping exists; on an invalid
- * multi-branch canvas the pick is arbitrary but the deploy is blocked anyway.
+ * The versioned CORE URN of the target DataStructure of the last mapping feeding the given sink
+ * node — a backward walk stopping at the first mapping it reaches. The URN comes from the mapping's
+ * saved config (`mappingConfig.target`, built via buildDataStructureUrn), which is exactly the
+ * soft reference the backend sink stores (FrostConfiguration.element). The flow-shape validation
+ * only lets a single linear path deploy, so on a valid graph exactly one final mapping exists; on
+ * an invalid multi-branch canvas the pick is arbitrary but the deploy is blocked anyway.
  */
-const mappingTargetVersionBefore = (pipeline: Pipeline, sinkNodeId: string): string | null => {
+const mappingTargetElementBefore = (pipeline: Pipeline, sinkNodeId: string): string | null => {
   const incoming = new Map<string, string[]>()
   pipeline.edges.forEach(edge => {
     incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source])
@@ -137,7 +305,7 @@ const mappingTargetVersionBefore = (pipeline: Pipeline, sinkNodeId: string): str
       visited.add(previous)
       const node = nodesById.get(previous)
       if (node && isMappingNodeData(node.data)) {
-        return node.data.targetVersionId ?? null
+        return node.data.mappingConfig?.target ?? null
       }
       queue.push(previous)
     }
@@ -191,10 +359,10 @@ export const hasDataSinkChanged = (nodeId: string, payload: DataSinkPayload, sna
 
 /**
  * Whether saving this sink would rebuild its backing storage, discarding stored data. For a POSTGIS
- * sink any change to `tableName` or `dataStructureVersionId` is destructive (PostGIS has no ALTER
- * TABLE — a column change is drop+recreate); for a FROST sink only `dataStructureVersionId` applies
- * (there is no `tableName`). Only an UPDATE of an existing sink (present in the snapshot) can lose
- * data — a brand-new sink has no storage yet, so it never triggers the warning.
+ * sink any change to `tableName` or the referenced `element` is destructive (PostGIS has no ALTER
+ * TABLE — a column change is drop+recreate); for a FROST sink only `element` applies (there is no
+ * `tableName`). Only an UPDATE of an existing sink (present in the snapshot) can lose data — a
+ * brand-new sink has no storage yet, so it never triggers the warning.
  */
 export const isDestructiveDataSinkChange = (
   nodeId: string,
@@ -205,17 +373,13 @@ export const isDestructiveDataSinkChange = (
   if (!entry || entry.entityId == null) return false // new sink, no table to lose
 
   const previous = JSON.parse(entry.configJson) as Omit<DataSinkPayload, 'id'>
-  return (
-    dataStructureVersionOf(payload) !== dataStructureVersionOf(previous) ||
-    tableNameOf(payload) !== tableNameOf(previous)
-  )
+  return elementOf(payload) !== elementOf(previous) || tableNameOf(payload) !== tableNameOf(previous)
 }
 
 const tableNameOf = (payload: Pick<DataSinkPayload, 'configuration'>): string | undefined =>
   'tableName' in payload.configuration ? payload.configuration.tableName : undefined
 
-const dataStructureVersionOf = (payload: Pick<DataSinkPayload, 'configuration'>): string | undefined =>
-  payload.configuration.dataStructureVersionId
+const elementOf = (payload: Pick<DataSinkPayload, 'configuration'>): string | undefined => payload.configuration.element
 
 /**
  * Finds data sink IDs that were in the snapshot but no longer exist in the current pipeline.
@@ -228,11 +392,22 @@ export const getRemovedDataSinkIds = (pipeline: Pipeline, snapshot: DataSinkSnap
 }
 
 /**
+ * Merges a partial data patch into a single node's data. Returns the updated pipeline. Used to stash
+ * server-assigned URNs (datasink `configurationUrn`, mapping `mappingRef`/`mappingLogicalUrn`) back
+ * onto the node so they are emitted in the CORE `model` and round-trip via `styles`.
+ */
+export const updateNodeData = (pipeline: Pipeline, nodeId: string, patch: Partial<PipelineNodeData>): Pipeline => {
+  return {
+    ...pipeline,
+    nodes: pipeline.nodes.map(node =>
+      node.id === nodeId ? ({ ...node, data: { ...node.data, ...patch } } as PipelineNode) : node,
+    ),
+  }
+}
+
+/**
  * Updates a single node's entityId in the pipeline. Returns the updated pipeline.
  */
 export const updateNodeEntityId = (pipeline: Pipeline, nodeId: string, entityId: string): Pipeline => {
-  return {
-    ...pipeline,
-    nodes: pipeline.nodes.map(node => (node.id === nodeId ? { ...node, data: { ...node.data, entityId } } : node)),
-  }
+  return updateNodeData(pipeline, nodeId, { entityId } as Partial<PipelineNodeData>)
 }

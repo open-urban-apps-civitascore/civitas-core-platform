@@ -42,6 +42,8 @@ export const DatastructureVersionApiResponseSchema = z.object({
   dataStructureVersionStatus: DatastructureStatusEnum,
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   modelName: z.string().nullable(),
+  // Versioned CORE URN of this version's model (DataStructure) artifact in Model Forge.
+  modelUrn: z.string().nullable().optional(),
   model: z.record(z.string(), z.unknown()).nullable(),
   styles: z.custom<UMLDiagram>().nullable(),
   inUse: z.boolean().optional(),
