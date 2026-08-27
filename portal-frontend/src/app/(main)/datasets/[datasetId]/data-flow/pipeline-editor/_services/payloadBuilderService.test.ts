@@ -7,7 +7,9 @@ import {
   buildDataSinkPayloads,
   buildMappingArtifacts,
   buildPipelinePayload,
+  createMappingSnapshot,
   type DataSinkSnapshot,
+  hasMappingChanged,
   isDestructiveDataSinkChange,
   MappingDocumentValidationError,
   PipelineModelValidationError,
@@ -326,6 +328,40 @@ describe('buildMappingArtifacts', () => {
       },
     })
     expect(() => buildMappingArtifacts(pipeline([node], []))).not.toThrow()
+  })
+})
+
+describe('createMappingSnapshot / hasMappingChanged', () => {
+  const mappingBody = {
+    source: SRC_STRUCT_URN,
+    target: TGT_STRUCT_URN,
+    fields: { '$.name': '$.n' },
+    title: 'Src-to-Tgt',
+    positions: { a: { x: 1, y: 2 } },
+  }
+
+  it('flags a mapping as changed when its body differs from the snapshot', () => {
+    const snapshot = createMappingSnapshot(pipeline([configuredMappingNode()], []))
+    const changedBody = { ...mappingBody, fields: { '$.name': '$.other' } }
+    expect(hasMappingChanged('map-1', changedBody, snapshot)).toBe(true)
+  })
+
+  it('does not flag an unchanged mapping', () => {
+    const snapshot = createMappingSnapshot(pipeline([configuredMappingNode()], []))
+    expect(hasMappingChanged('map-1', mappingBody, snapshot)).toBe(false)
+  })
+
+  it('flags a mapping not present in the snapshot as changed (new node)', () => {
+    expect(hasMappingChanged('map-1', mappingBody, {})).toBe(true)
+  })
+
+  it('omits unconfigured mapping nodes from the snapshot', () => {
+    const unconfigured: TestNode = {
+      id: 'map-2',
+      type: 'mapping',
+      data: { label: 'Mapping', configured: false, mappingConfig: { fields: {}, positions: {} } },
+    }
+    expect(createMappingSnapshot(pipeline([unconfigured], []))).toEqual({})
   })
 })
 

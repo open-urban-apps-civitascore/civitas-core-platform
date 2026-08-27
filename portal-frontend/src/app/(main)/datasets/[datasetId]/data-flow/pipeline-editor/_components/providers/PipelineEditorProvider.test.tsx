@@ -22,8 +22,10 @@ import { usePipelineSession } from '../../_hooks/use-pipeline-session'
 import {
   buildDataSinkPayloads,
   buildMappingArtifacts,
+  createMappingSnapshot,
   getRemovedDataSinkIds,
   hasDataSinkChanged,
+  hasMappingChanged,
   isDestructiveDataSinkChange,
   updateNodeData,
   updateNodeEntityId,
@@ -105,8 +107,10 @@ vi.mock('../../_services/payloadBuilderService', () => ({
   buildDataSinkPayloads: vi.fn().mockReturnValue([]),
   buildMappingArtifacts: vi.fn().mockReturnValue([]),
   createDataSinkSnapshot: vi.fn().mockReturnValue({}),
+  createMappingSnapshot: vi.fn().mockReturnValue({}),
   getRemovedDataSinkIds: vi.fn().mockReturnValue([]),
   hasDataSinkChanged: vi.fn().mockReturnValue(false),
+  hasMappingChanged: vi.fn().mockReturnValue(true),
   isDestructiveDataSinkChange: vi.fn().mockReturnValue(false),
   updateNodeData: vi.fn().mockImplementation((pipeline: unknown) => pipeline),
   updateNodeEntityId: vi.fn().mockImplementation((pipeline: unknown) => pipeline),
@@ -192,8 +196,10 @@ beforeEach(() => {
 
   vi.mocked(buildDataSinkPayloads).mockReturnValue([])
   vi.mocked(buildMappingArtifacts).mockReturnValue([])
+  vi.mocked(createMappingSnapshot).mockReturnValue({})
   vi.mocked(getRemovedDataSinkIds).mockReturnValue([])
   vi.mocked(hasDataSinkChanged).mockReturnValue(false)
+  vi.mocked(hasMappingChanged).mockReturnValue(true)
   vi.mocked(updateNodeData).mockImplementation((pipeline: unknown) => pipeline as never)
   vi.mocked(updateNodeEntityId).mockImplementation((pipeline: unknown) => pipeline as never)
 
@@ -1056,6 +1062,33 @@ describe('PipelineEditorProviderComponent', () => {
 
       expect(mockUpdateMappingMutateAsync).toHaveBeenCalledOnce()
       expect(mockUpdateMappingMutateAsync).toHaveBeenCalledWith({ logicalUrn: 'urn:logical-1', ...mappingBody })
+    })
+
+    it('does not call updateMapping when an already-created mapping has not changed', async () => {
+      const mockUpdateMappingMutateAsync = vi.fn().mockResolvedValue({})
+      vi.mocked(useUpdateMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockUpdateMappingMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useUpdateMapping>)
+
+      const mappingBody = { source: 'urn:src', target: 'urn:tgt', fields: {}, title: 'Src-to-Tgt', positions: {} }
+      vi.mocked(buildMappingArtifacts).mockReturnValue([
+        { nodeId: 'map-1', logicalUrn: 'urn:logical-1', body: mappingBody as never },
+      ])
+      vi.mocked(hasMappingChanged).mockReturnValue(false)
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1', nodes: [] },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(mockUpdateMappingMutateAsync).not.toHaveBeenCalled()
     })
 
     it('creates mapping artifacts before saving the pipeline, so the mappingRef makes it into the CORE model', async () => {

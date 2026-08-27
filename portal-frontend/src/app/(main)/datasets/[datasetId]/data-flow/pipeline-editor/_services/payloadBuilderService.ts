@@ -222,6 +222,32 @@ export const buildMappingArtifacts = (pipeline: Pipeline): MappingArtifactReques
   })
 }
 
+/**
+ * Snapshot type for mapping change detection: maps nodeId → JSON-stringified artifact body.
+ */
+export type MappingSnapshot = Record<string, string>
+
+/**
+ * Creates a snapshot of the current mapping artifact bodies for later change detection.
+ */
+export const createMappingSnapshot = (pipeline: Pipeline): MappingSnapshot => {
+  const snapshot: MappingSnapshot = {}
+  for (const { nodeId, body } of buildMappingArtifacts(pipeline)) {
+    snapshot[nodeId] = JSON.stringify(body)
+  }
+  return snapshot
+}
+
+/**
+ * Checks whether a single mapping artifact body has changed compared to the saved snapshot.
+ * Returns true if the mapping is new (not in snapshot) or its body differs.
+ */
+export const hasMappingChanged = (nodeId: string, body: MappingArtifactBody, snapshot: MappingSnapshot): boolean => {
+  const entry = snapshot[nodeId]
+  if (!entry) return true // new node, not in snapshot
+  return JSON.stringify(body) !== entry
+}
+
 // ============================================================================
 // Data sink Payload Extraction & Change Detection
 // ============================================================================

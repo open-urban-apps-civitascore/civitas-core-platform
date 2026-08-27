@@ -40,10 +40,13 @@ import {
   buildMappingArtifacts,
   buildPipelinePayload,
   createDataSinkSnapshot,
+  createMappingSnapshot,
   type DataSinkSnapshot,
   getRemovedDataSinkIds,
   hasDataSinkChanged,
+  hasMappingChanged,
   isDestructiveDataSinkChange,
+  type MappingSnapshot,
   updateNodeData,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
@@ -118,6 +121,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
 
+  // ===== Mapping snapshot for change detection =====
+  const mappingSnapshotsRef = useRef<Record<string, MappingSnapshot>>({})
+
   // ===== Data-loss confirmation dialog =====
   // A destructive sink change (tableName / referenced element) on an already-provisioned
   // dataset discards its stored data (the sink's storage is rebuilt on the next release).
@@ -162,15 +168,22 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     // Load all sessions into the session manager
     sessionManager.loadSessions(sessions, activeSessionId)
 
-    // Create initial data sink snapshots for change detection. A schema-invalid sink document here
-    // (e.g. stale data predating a schema change) must not crash the whole editor on load — fall
-    // back to an empty snapshot, which change detection already treats as "everything is new".
+    // Create initial data sink and mapping snapshots for change detection. A schema-invalid
+    // document here (e.g. stale data predating a schema change) must not crash the whole editor on
+    // load — fall back to an empty snapshot, which change detection already treats as "everything
+    // is new".
     for (const session of sessions) {
       try {
         dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(session.pipeline)
       } catch (error) {
         console.error('Failed to build data sink snapshot for session:', session.name, error)
         dataSinkSnapshotsRef.current[session.id] = {}
+      }
+      try {
+        mappingSnapshotsRef.current[session.id] = createMappingSnapshot(session.pipeline)
+      } catch (error) {
+        console.error('Failed to build mapping snapshot for session:', session.name, error)
+        mappingSnapshotsRef.current[session.id] = {}
       }
     }
   }, [pipelinesQuery.data, sessionManager, requestedPipelineId])
@@ -552,11 +565,17 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           }
 
           // Step 2.5: Create/version mapping artifacts for configured mapping nodes (POST/PUT
-          // /v1/mappings). Stash the returned versioned URN (→ CORE model `mappingRef`) and logical
-          // URN (→ future PUT-versioning) back onto the node. Validation happens inside
-          // buildMappingArtifacts, which throws on a schema-invalid mapping document.
+          // /v1/mappings). An already-created mapping (has logicalUrn) whose body is unchanged since
+          // the last save is skipped — the mapping API creates a new version per request, so sending
+          // it on every save (e.g. for an unrelated node edit) would churn versions for nothing.
+          // Stash the returned versioned URN (→ CORE model `mappingRef`) and logical URN (→ future
+          // PUT-versioning) back onto the node. Validation happens inside buildMappingArtifacts,
+          // which throws on a schema-invalid mapping document.
           const mappingArtifacts = buildMappingArtifacts(currentPipeline)
+          const mappingSnapshot = mappingSnapshotsRef.current[session.id] ?? {}
           for (const { nodeId, logicalUrn, body } of mappingArtifacts) {
+            if (logicalUrn && !hasMappingChanged(nodeId, body, mappingSnapshot)) continue
+
             const response = logicalUrn
               ? await updateMappingMutation.mutateAsync({ logicalUrn, ...body })
               : await createMappingMutation.mutateAsync(body)
@@ -582,6 +601,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           sessionManager.updateSessionPipeline(session.id, { ...currentPipeline, isDirty: false })
           sessionManager.markSessionClean(session.id)
           dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(currentPipeline)
+          mappingSnapshotsRef.current[session.id] = createMappingSnapshot(currentPipeline)
           toast.success(t('header.saveSuccess', { name: currentPipeline.name }))
         } catch (error) {
           // A later step (mapping/pipeline validation or save) may fail after an earlier step
