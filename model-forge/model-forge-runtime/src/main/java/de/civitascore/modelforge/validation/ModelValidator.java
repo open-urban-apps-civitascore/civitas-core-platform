@@ -87,10 +87,9 @@ public class ModelValidator {
      * @return empty list if valid; a single error diagnostic if parsing fails
      */
     public List<Diagnostic> validateSchema(JsonNode schema) {
-        // Check local pointers ourselves first. The library reports a dangling $ref only through a
-        // thrown fault, which the catch below has to reduce to a generic message so no third-party
-        // detail escapes — leaving the author with no idea which pointer is wrong. This check is
-        // first-party, so it can name the pointer and its location safely.
+        // Local pointers are checked first-party so the diagnostic can name the offending pointer:
+        // the library signals a dangling $ref only by throwing, and that message must stay generic
+        // to keep third-party detail out of the response.
         List<Diagnostic> dangling = danglingLocalRefs(schema);
         if (!dangling.isEmpty()) return dangling;
         try {

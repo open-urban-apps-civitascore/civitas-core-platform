@@ -123,10 +123,9 @@ public class SeedImporter {
     }
 
     private void apply(String name, JsonNode schema, Accumulator acc) {
-        // Probe EVERY identity the bundle declares, not just one. A pure $defs container (no shape
-        // of its own) declares one per member, and each member is imported in its own transaction —
-        // so probing a single id reports "already present" while the rest are missing, and no re-run
-        // can ever repair the set.
+        // A bundle counts as present only when every identity it declares resolves. A $defs
+        // container declares one per member, and members are imported independently, so a single
+        // resolving id does not mean the set is complete.
         List<String> ids = declaredLogicalUrns(schema);
         if (!ids.isEmpty()
             && ids.stream().allMatch(urn -> modelForge.getArtifact(new ArtifactId(urn)).isPresent())) {

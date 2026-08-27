@@ -49,10 +49,8 @@ public final class UrnParser {
      * operation downstream (segment-index extraction, version parsing, logical/versioned
      * round-tripping).
      *
-     * <p>Every segment must be non-empty. The limit of {@code -1} is what enforces this at the end
-     * of the string: the default {@code split(":")} discards trailing empty segments, so a URN with
-     * a trailing colon would otherwise report the full count and be trusted — after which
-     * {@code withVersion} emits a double colon.
+     * <p>Every segment must be non-empty, including the last: the {@code -1} limit keeps trailing
+     * empty segments, which the default {@code split(":")} discards.
      */
     public static boolean isUrn(String id) {
         if (id == null || !id.startsWith("urn:core:")) return false;

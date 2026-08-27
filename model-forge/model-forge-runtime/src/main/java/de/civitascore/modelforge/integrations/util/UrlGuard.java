@@ -155,7 +155,7 @@ public final class UrlGuard {
             }
             // Any other address in 64:ff9b::/32 is a NAT64 translation prefix (IANA
             // "IPv4-IPv6 Translat.", incl. the RFC 8215 local-use 64:ff9b:1::/48) whose embedding
-            // format we cannot read here, so the embedded IPv4 cannot be checked: fail closed.
+            // format is operator-defined, so the embedded IPv4 is not readable here: fail closed.
             return isNat64Prefix(b);
         }
         return false;

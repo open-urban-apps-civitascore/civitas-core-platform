@@ -209,11 +209,9 @@ public class GraphPage extends BasePage {
         ObjectMapper mapper = new ObjectMapper();
         for (var node : graph.nodes()) {
             String nodeUrn = UrnParser.logicalUrn(node.artifactId().value());
-            // Every registered artifact was seeded into nodeGroups before this loop ran, so a URN
-            // still missing here is a reference target the registry does not hold — deleted, or
-            // never imported. The edge is real (artifact_reference keeps it deliberately), but the
-            // node must be distinguishable from an artifact that exists, which is what made a
-            // deleted target render as an ordinary one.
+            // Registered artifacts are seeded into nodeGroups above, so a URN still absent here is
+            // a reference target the registry does not hold — deleted, or never imported. The edge
+            // is kept deliberately; the node is grouped so it does not read as an existing artifact.
             nodeGroups.putIfAbsent(nodeUrn, GROUP_UNRESOLVED);
             nodeLabels.putIfAbsent(nodeUrn, node.label());
         }
