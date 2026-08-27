@@ -28,10 +28,10 @@ import java.util.Set;
  */
 public class RemoteRefResolver {
 
-    /** Distinct upstream documents one import may fetch. Each is separately size- and time-capped. */
+    /** Distinct upstream documents one import may fetch; each fetch is separately size- and time-capped. */
     private static final int MAX_DOCUMENTS = 10;
 
-    /** Nesting of reference-inside-reference an import may follow. */
+    /** Levels of reference-inside-reference an import may follow. */
     private static final int MAX_DEPTH = 6;
 
     private final RemoteSchemaRepository fetcher;
@@ -50,8 +50,7 @@ public class RemoteRefResolver {
      * fragment is inlined here, a pointer into its own {@code $defs} would otherwise dangle.
      *
      * @throws IllegalArgumentException when a reference cannot be resolved, is circular, or the
-     *     document exceeds the fetch or nesting caps (→ 400: the document cannot be imported as
-     *     authored)
+     *     document exceeds the fetch or nesting caps (→ 400)
      */
     public JsonNode inlineRemoteRefs(JsonNode document) {
         if (document == null) return null;
