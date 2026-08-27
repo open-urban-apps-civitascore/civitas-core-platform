@@ -1,7 +1,6 @@
 package de.civitascore.portal.modelregistry;
 
 import de.civitascore.modelforge.contract.ArtifactId;
-import de.civitascore.modelforge.contract.ArtifactInUseException;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
@@ -13,21 +12,16 @@ import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
 import de.civitascore.modelforge.contract.SchemaViewQuery;
 import de.civitascore.modelforge.contract.ValidateSchemaCommand;
-import de.civitascore.modelforge.contract.ValidationFailedException;
 import de.civitascore.modelforge.contract.ValidationResult;
 import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceInUseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -58,15 +52,6 @@ public class ModelRegistryGateway {
   public static final String X_UI_STYLES = "x-ui-styles";
 
   private final ModelForge modelForge;
-
-  @Value("${model-forge.urn.scope:}")
-  private String urnScope;
-
-  @Value("${model-forge.urn.owner:}")
-  private String urnOwner;
-
-  @Value("${model-forge.urn.domain:}")
-  private String urnDomain;
 
   private final ObjectMapper objectMapper;
 
@@ -217,7 +202,7 @@ public class ModelRegistryGateway {
     // are removed together, leaving no dangling grouping edge. When the pin is already the grouping
     // (a multi-$defs model), the replace is a no-op and the same cascade delete applies.
     String groupingUrn = logicalUrn.replace(":element:", ":datastructure:");
-    translating(() -> modelForge.deleteArtifact(new ArtifactId(groupingUrn), true, false));
+    modelForge.deleteArtifact(new ArtifactId(groupingUrn), true, false);
   }
 
   /**
@@ -321,7 +306,6 @@ public class ModelRegistryGateway {
       Map<String, Object> payload,
       Map<String, Object> styles,
       String dataSet) {
-    existingLogicalUrn.ifPresent(this::requireConfiguredNamespace);
     JsonNode content = mergeStyles(payload, styles);
     ArtifactKind artifactKind = toArtifactKind(kind);
     ArtifactId root =
@@ -332,10 +316,8 @@ public class ModelRegistryGateway {
             .orElseGet(
                 () -> {
                   ArtifactWriteResult result =
-                      translating(
-                          () ->
-                              modelForge.createArtifact(
-                                  new CreateArtifactCommand(artifactKind, name, content, dataSet)));
+                      modelForge.createArtifact(
+                          new CreateArtifactCommand(artifactKind, name, content, dataSet));
                   logDependencies(result.artifactId(), result.dependencies());
                   return result.artifactId();
                 });
@@ -352,10 +334,8 @@ public class ModelRegistryGateway {
     String safeName = name == null || name.isBlank() ? "dataset" : name;
     JsonNode content = mergeStyles(Map.of("title", safeName), null);
     ArtifactWriteResult result =
-        translating(
-            () ->
-                modelForge.createArtifact(
-                    new CreateArtifactCommand(ArtifactKind.DATA_SET, safeName, content)));
+        modelForge.createArtifact(
+            new CreateArtifactCommand(ArtifactKind.DATA_SET, safeName, content));
     return toPin(result.artifactId());
   }
 
@@ -366,7 +346,7 @@ public class ModelRegistryGateway {
    */
   public void deleteDataSet(String logicalUrn) {
     if (logicalUrn != null && !logicalUrn.isBlank()) {
-      translating(() -> modelForge.deleteArtifact(new ArtifactId(logicalUrn)));
+      modelForge.deleteArtifact(new ArtifactId(logicalUrn));
     }
   }
 
@@ -408,7 +388,7 @@ public class ModelRegistryGateway {
    */
   public void deleteArtifact(String logicalUrn, boolean cascade, boolean force) {
     if (logicalUrn != null && !logicalUrn.isBlank()) {
-      translating(() -> modelForge.deleteArtifact(new ArtifactId(logicalUrn), cascade, force));
+      modelForge.deleteArtifact(new ArtifactId(logicalUrn), cascade, force);
     }
   }
 
@@ -464,13 +444,12 @@ public class ModelRegistryGateway {
    * Forge's.
    */
   public void deletePayload(String logicalUrn) {
-    translating(() -> modelForge.deleteArtifact(new ArtifactId(logicalUrn)));
+    modelForge.deleteArtifact(new ArtifactId(logicalUrn));
   }
 
   /** Imports a new Element; the root pin is returned, dependency edges are logged. */
   private ArtifactId importRoot(JsonNode content) {
-    ImportResult result =
-        translating(() -> modelForge.importSchema(new ImportSchemaCommand(content)));
+    ImportResult result = modelForge.importSchema(new ImportSchemaCommand(content));
     logDependencies(result.rootArtifactId(), result.dependencies());
     return result.rootArtifactId();
   }
@@ -484,15 +463,9 @@ public class ModelRegistryGateway {
   private ArtifactId saveVersion(
       String logicalUrn, ArtifactKind kind, JsonNode content, VersionBump bump, String dataSet) {
     ArtifactWriteResult result =
-        translating(
-            () ->
-                modelForge.saveArtifact(
-                    new SaveArtifactCommand(
-                        new ArtifactId(logicalUrn),
-                        kind,
-                        content,
-                        toModelForgeBump(bump),
-                        dataSet)));
+        modelForge.saveArtifact(
+            new SaveArtifactCommand(
+                new ArtifactId(logicalUrn), kind, content, toModelForgeBump(bump), dataSet));
     logDependencies(result.artifactId(), result.dependencies());
     return result.artifactId();
   }
@@ -601,71 +574,5 @@ public class ModelRegistryGateway {
    */
   private static InvalidInputException rejectedMembership(IllegalArgumentException cause) {
     return new InvalidInputException("DataSet", "member", cause.getMessage());
-  }
-
-  /**
-   * Runs a registry write and translates the registry's own failure types into host exceptions, so
-   * a rejected document is reported as invalid input and a blocked delete as a conflict instead of
-   * escaping unmapped. Keeping this at the boundary is what lets the rest of the host stay free of
-   * registry types.
-   */
-  private <T> T translating(Supplier<T> call) {
-    try {
-      return call.get();
-    } catch (ValidationFailedException e) {
-      throw new InvalidInputException("artifact", "document", describe(e));
-    } catch (ArtifactInUseException e) {
-      throw new ResourceInUseException("artifact", null, e.getMessage());
-    }
-  }
-
-  private void translating(Runnable call) {
-    translating(
-        () -> {
-          call.run();
-          return null;
-        });
-  }
-
-  /**
-   * Flattens the registry's per-path diagnostics onto the message, so a caller can tell which field
-   * of the submitted document was rejected rather than only that validation failed.
-   */
-  private static String describe(ValidationFailedException e) {
-    String detail =
-        e.diagnostics().stream()
-            .map(d -> (d.path() == null || d.path().isBlank() ? "" : d.path() + ": ") + d.message())
-            .collect(Collectors.joining("; "));
-    return detail.isBlank() ? e.getMessage() : e.getMessage() + " — " + detail;
-  }
-
-  /**
-   * Rejects a caller-supplied logical URN that names a namespace this registry does not mint into.
-   * A URN reaching the registry from a request body would otherwise create an artifact outside the
-   * configured scope, owner and domain. Skipped when the namespace is not configured.
-   */
-  private void requireConfiguredNamespace(String logicalUrn) {
-    if (logicalUrn == null
-        || urnScope == null
-        || urnScope.isBlank()
-        || urnOwner == null
-        || urnOwner.isBlank()
-        || urnDomain == null
-        || urnDomain.isBlank()) {
-      return;
-    }
-    String[] parts = logicalUrn.split(":");
-    boolean inNamespace =
-        parts.length > 5
-            && urnScope.equals(parts[2])
-            && urnOwner.equals(parts[3])
-            && urnDomain.equals(parts[5]);
-    if (!inNamespace) {
-      throw new InvalidInputException(
-          "artifact",
-          "logicalUrn",
-          "URN is outside this registry's namespace (%s:%s / %s): %s"
-              .formatted(urnScope, urnOwner, urnDomain, logicalUrn));
-    }
   }
 }

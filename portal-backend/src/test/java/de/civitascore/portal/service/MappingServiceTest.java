@@ -1,25 +1,29 @@
 package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelPin;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.RegistryDocument;
 import de.civitascore.portal.modelregistry.PayloadKind;
+import de.civitascore.portal.util.InvalidInputException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -37,7 +41,14 @@ class MappingServiceTest {
   private static final String VERSIONED_URN = LOGICAL_URN + ":1.0.0";
 
   @Mock private ModelRegistryGateway registry;
-  @InjectMocks private MappingService mappingService;
+
+  private MappingService mappingService;
+
+  @BeforeEach
+  void createService() {
+    // The namespace the registry mints into; a body-supplied URN is checked against it.
+    mappingService = new MappingService(registry, "platform", "civitas", "common");
+  }
 
   @Captor private ArgumentCaptor<Optional<String>> logicalUrnCaptor;
   @Captor private ArgumentCaptor<String> nameCaptor;
@@ -163,5 +174,35 @@ class MappingServiceTest {
     // force delete: no cascade, force=true (unlinks the mapping from any DataSets, ignores refs).
     verify(registry).deleteArtifact(VERSIONED_URN, false, true);
     verify(registry, never()).deletePayload(any());
+  }
+
+  @Test
+  @DisplayName("a URN naming another namespace is refused before anything is stored")
+  void foreignNamespaceUrnIsRefused() {
+    assertThatThrownBy(
+            () ->
+                mappingService.store(
+                    "urn:core:evil:attacker:mapping:hijack:Injected:0000000000", Map.of()))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("own namespace");
+
+    verifyNoInteractions(registry);
+  }
+
+  @Test
+  @DisplayName("a URN of this registry's own namespace is accepted")
+  void ownNamespaceUrnIsAccepted() {
+    when(registry.storePayload(any(), any(), any(), any(), any())).thenReturn(pin());
+
+    assertThat(mappingService.store(LOGICAL_URN, Map.of("fields", Map.of())).version())
+        .isEqualTo("1.0.0");
+  }
+
+  @Test
+  @DisplayName("a create carries no URN, so the namespace rule does not apply")
+  void createNeedsNoUrn() {
+    when(registry.storePayload(any(), any(), any(), any(), any())).thenReturn(pin());
+
+    assertThat(mappingService.store(null, Map.of("fields", Map.of()))).isNotNull();
   }
 }

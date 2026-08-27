@@ -2,9 +2,11 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.PayloadKind;
+import de.civitascore.portal.util.InvalidInputException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,8 +22,24 @@ public class MappingService {
 
   private final ModelRegistryGateway registry;
 
-  public MappingService(ModelRegistryGateway registry) {
+  /**
+   * The namespace the registry mints into, read from the registry's own configuration so the two
+   * cannot drift apart.
+   */
+  private final String urnScope;
+
+  private final String urnOwner;
+  private final String urnDomain;
+
+  public MappingService(
+      ModelRegistryGateway registry,
+      @Value("${model-forge.urn.scope:}") String urnScope,
+      @Value("${model-forge.urn.owner:}") String urnOwner,
+      @Value("${model-forge.urn.domain:}") String urnDomain) {
     this.registry = registry;
+    this.urnScope = urnScope;
+    this.urnOwner = urnOwner;
+    this.urnDomain = urnDomain;
   }
 
   /**
@@ -31,6 +49,7 @@ public class MappingService {
    * passed through opaquely to Model Forge.
    */
   public ModelRegistryGateway.ModelPin store(String logicalUrn, Map<String, Object> doc) {
+    requireOwnNamespace(logicalUrn);
     Map<String, Object> content = new LinkedHashMap<>(doc == null ? Map.of() : doc);
     content.remove("logicalUrn");
     Object positions = content.remove("positions");
@@ -76,5 +95,30 @@ public class MappingService {
   private static String deriveName(Map<String, Object> doc) {
     Object title = doc.get("title");
     return title instanceof String s && !s.isBlank() ? s : "mapping";
+  }
+
+  /**
+   * A mapping has no host row to pin it to, so the URN of the artifact to version arrives in the
+   * request body. It is therefore caller input and has to name this registry's own namespace —
+   * otherwise a request could create an artifact anywhere in the registry, or silently create a
+   * second mapping from a mistyped URN. Rejected when the namespace is unknown, since an unchecked
+   * body-supplied URN is what this guards against.
+   */
+  private void requireOwnNamespace(String logicalUrn) {
+    if (logicalUrn == null) {
+      return;
+    }
+    if (urnScope.isBlank() || urnOwner.isBlank() || urnDomain.isBlank()) {
+      throw new InvalidInputException(
+          "Mapping", "logicalUrn", "Cannot accept a mapping URN: the registry namespace is unset");
+    }
+    String ownPrefix = "urn:core:%s:%s:mapping:%s:".formatted(urnScope, urnOwner, urnDomain);
+    if (!logicalUrn.startsWith(ownPrefix)) {
+      throw new InvalidInputException(
+          "Mapping",
+          "logicalUrn",
+          "Mapping URN must name this registry's own namespace (%s...): %s"
+              .formatted(ownPrefix, logicalUrn));
+    }
   }
 }
