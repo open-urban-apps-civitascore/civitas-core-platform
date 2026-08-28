@@ -2209,7 +2209,7 @@ class DataSetServiceTest {
   }
 
   @Nested
-  @DisplayName("Membership and orphans")
+  @DisplayName("Membership")
   class MembershipAndOrphans {
 
     private static final String MANIFEST_URN =
@@ -2221,13 +2221,6 @@ class DataSetServiceTest {
       DataSet ds = draftDataSet(id);
       ds.setManifestLogicalUrn(MANIFEST_URN);
       return ds;
-    }
-
-    @Test
-    void orphans_returnsUrnsFromRegistry() {
-      when(modelRegistryGateway.orphanUrns("datastructure")).thenReturn(List.of(MEMBER_URN));
-
-      assertThat(createService().orphans("datastructure")).containsExactly(MEMBER_URN);
     }
 
     @Test

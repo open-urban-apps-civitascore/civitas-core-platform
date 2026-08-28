@@ -150,10 +150,6 @@
       "PUT": "DATASTRUCTURE_UPDATE",
       "DELETE": "DATASTRUCTURE_DELETE"
     },
-    "/v1/orphans": {
-      "_collection": true,
-      "GET": "DATASET_READ"
-    },
     "/v1/datasets/{id}/members": {
       "POST": "DATASET_UPDATE",
       "DELETE": "DATASET_UPDATE"

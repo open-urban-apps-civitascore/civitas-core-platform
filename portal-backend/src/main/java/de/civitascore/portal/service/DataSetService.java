@@ -640,15 +640,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * CORE URNs of artifacts of the given type ({@code mapping}/{@code pipeline}/{@code datasource}/
-   * {@code datasink}/{@code datastructure}) that belong to no dataset — the "orphans by type"
-   * query.
-   */
-  public List<String> orphans(String type) {
-    return modelRegistryGateway.orphanUrns(type);
-  }
-
-  /**
    * Handles a completed saga result. Updates infrastructure fields and transitions state based on
    * the saga type that was pending.
    */
@@ -880,7 +871,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     dataSetRepository.delete(dataSet);
     dataSetRepository.flush();
     // A DataSet groups its members, it does not own them: dropping the manifest removes the
-    // dataset-ref edges and leaves the members as orphans, which the orphan query still finds.
+    // dataset-ref edges and leaves the members in place, unattached.
     if (dataSet.getManifestLogicalUrn() != null) {
       modelRegistryGateway.deleteDataSet(dataSet.getManifestLogicalUrn());
     }

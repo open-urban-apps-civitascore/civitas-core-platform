@@ -350,19 +350,6 @@ public class ModelRegistryGateway {
     }
   }
 
-  /**
-   * CORE URNs of artifacts of the given type ({@code mapping}/{@code pipeline}/{@code datasource}/
-   * {@code datasink}/{@code datastructure}) that belong to no DataSet — the "orphans by type"
-   * query.
-   */
-  public List<String> orphanUrns(String artifactType) {
-    ArtifactKind kind = artifactKindForType(artifactType);
-    if (kind == null) {
-      return List.of();
-    }
-    return modelForge.orphans(kind).stream().map(summary -> summary.artifactId().value()).toList();
-  }
-
   /** Explicitly adds a member artifact to a DataSet's manifest ({@code dataset-ref} membership). */
   public void linkToDataSet(String dataSetUrn, String memberUrn) {
     try {
@@ -390,22 +377,6 @@ public class ModelRegistryGateway {
     if (logicalUrn != null && !logicalUrn.isBlank()) {
       modelForge.deleteArtifact(new ArtifactId(logicalUrn), cascade, force);
     }
-  }
-
-  private static ArtifactKind artifactKindForType(String type) {
-    if (type == null) {
-      return null;
-    }
-    return switch (type.toLowerCase(java.util.Locale.ROOT)) {
-      case "mapping" -> ArtifactKind.MAPPING;
-      case "pipeline" -> ArtifactKind.PIPELINE;
-      case "datasource" -> ArtifactKind.DATA_SOURCE;
-      case "datasink" -> ArtifactKind.DATA_SINK;
-      case "datastructure" -> ArtifactKind.DATA_STRUCTURE;
-      case "dataset" -> ArtifactKind.DATA_SET;
-      case "element" -> ArtifactKind.ELEMENT;
-      default -> null;
-    };
   }
 
   /**
