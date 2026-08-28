@@ -327,13 +327,21 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
    * independent legs:
    *
    * <ul>
-   *   <li><b>Things</b> ({@code $.things}): look up by {@code properties/reference}; PATCH the
-   *       resolved {@code @iot.id} when present, otherwise POST a new Thing.
-   *   <li><b>Observations</b> ({@code $.observations}): look up the Datastream by {@code
+   *   <li><b>Things</b> ({@code $.things}): read {@code $.properties.reference} from the message
+   *       and look the Thing up by {@code properties/reference}; PATCH the resolved {@code @iot.id}
+   *       when present, otherwise POST a new Thing.
+   *   <li><b>Observations</b> ({@code $.observations}): read {@code $.parameters.reference} and
+   *       {@code $.parameters.name} from the message and look the Datastream up by {@code
    *       properties/reference} + {@code name}; if found, merge its {@code @iot.id} into the
    *       observation and POST {@code /Observations}; if not found, route to the error sink (the
    *       Datastream must exist — the passthrough flow does not create it).
    * </ul>
+   *
+   * <p>The two legs read different keys because SensorThings gives a Thing a {@code properties} bag
+   * and an Observation a {@code parameters} bag, and rejects either on the other entity. Both are
+   * matched against the registered entity's {@code properties/reference}, so a message that carries
+   * the wrong key yields an empty filter, matches nothing, and sends every record to the error sink
+   * while the flow still looks healthy.
    *
    * <p>Each passthrough leg captures the body into an attribute before the lookup GET (which
    * overwrites the content) and restores it before the write. In both modes <b>every</b> failure
