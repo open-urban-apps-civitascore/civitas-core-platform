@@ -321,6 +321,24 @@ class StyleControllerIntegrationTest
 
       assertThat(performCreate(input).getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
+
+    @Test
+    @DisplayName(
+        "Should return 400 locating the fault when creating a Style whose SLD is malformed")
+    void shouldReturn400OnMalformedSldCreate() {
+      StyleInputDTO input = createValidInput();
+      input.setSldContent("<?xml version=\"1.0\"?><StyledLayerDescriptor version=\"1.0.0\">");
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail())
+          .contains("sldContent", "not well-formed")
+          .containsPattern("line \\d+, column \\d+");
+      assertThat(styleRepository.findAll()).isEmpty();
+    }
   }
 
   @Nested

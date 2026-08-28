@@ -188,6 +188,23 @@ class SldContentValidatorTest {
           .extracting(Throwable::getMessage)
           .satisfies(message -> assertThat(message).doesNotContain("root:"));
     }
+
+    @Test
+    @DisplayName("Should not resolve an external parameter entity referenced in the subset")
+    void shouldNotResolveExternalParameterEntities() {
+      // The one shape the parser reaches out for before reporting the declaration.
+      String content =
+          sld(
+              XML_DECL
+                  + "<!DOCTYPE StyledLayerDescriptor"
+                  + " [ <!ENTITY % p SYSTEM \"file:///etc/passwd\"> %p; ]>");
+
+      assertThatThrownBy(() -> validator.validate(content))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DOCTYPE")
+          .extracting(Throwable::getMessage)
+          .satisfies(message -> assertThat(message).doesNotContain("root:"));
+    }
   }
 
   @Nested

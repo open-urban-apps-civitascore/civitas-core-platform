@@ -48,8 +48,8 @@ public class SldContentValidator {
         }
       }
     } catch (XMLStreamException e) {
-      // The client message drops the parser's wording on purpose (it is locale-dependent), so the
-      // cause is only ever visible here — without it a rejected upload cannot be diagnosed at all.
+      // The 400 handler already logs the position; this adds the parser's own wording, which the
+      // client message drops as locale-dependent.
       log.warn("Rejected SLD upload as not well-formed: {}", Encode.forJava(e.getMessage()));
       throw notWellFormed(e);
     } finally {
@@ -64,6 +64,9 @@ public class SldContentValidator {
    * resolving entity references only ever applies to the five XML defines itself — which is what
    * makes an undeclared reference a fault the user hears about here rather than from GeoServer
    * later.
+   *
+   * <p>Refusing external entities is not redundant: without it an external parameter entity
+   * referenced in an internal subset reaches the resolver before the DTD event fires.
    */
   private static XMLInputFactory secureFactory() {
     XMLInputFactory factory = XMLInputFactory.newFactory();
