@@ -836,4 +836,83 @@ class ViewServiceTest {
         assertThat(ids).doesNotContain(lineLogical + ":1.0.1");
     }
 
+
+    /**
+     * Only a DataStructure manifest pins its members. An ordinary Element may alias a versioned URN
+     * under its own {@code $defs} — a plain JSON-Schema idiom — and that must not decide how the rest
+     * of the document's references resolve.
+     */
+    @Test
+    void bundle_doesNotPinFromAnOrdinaryElementsOwnDefs() {
+        String targetLogical = "urn:core:platform:civitas:element:common:Target:tt00000001";
+        String elementUrn    = "urn:core:platform:civitas:element:common:Holder:hd00000001:1.0.0";
+
+        ObjectNode element = MAPPER.createObjectNode();
+        element.put("$id", elementUrn);
+        element.put("type", "object");
+        element.putObject("properties").putObject("uses").put("$ref", targetLogical);
+        // A local alias that happens to name a concrete version.
+        element.putObject("$defs").putObject("Alias").put("$ref", targetLogical + ":1.0.0");
+
+        ObjectNode target = MAPPER.createObjectNode();
+        target.put("$id", targetLogical);
+        target.putObject("properties").putObject("a").put("type", "string");
+
+        when(mockRegistry.fetchElementOrXsd(elementUrn)).thenReturn(Optional.of(element));
+        when(mockRegistry.fetchElementOrXsd(targetLogical)).thenReturn(Optional.of(target));
+        when(mockRegistry.fetchElementOrXsd(targetLogical + ":2.0.0")).thenReturn(Optional.of(target));
+        when(mockRegistry.resolveReference(targetLogical)).thenReturn(Optional.of(targetLogical + ":2.0.0"));
+        graph.register(elementUrn, Set.of(targetLogical));
+
+        JsonNode bundled = viewService.bundle(elementUrn, 5).orElseThrow();
+
+        // The alias keeps the version it authored, but does not govern the unrelated reference:
+        // that one still resolves to the target's current version.
+        assertThat(bundled.path("properties").path("uses").path("$ref").asText())
+            .isEqualTo(targetLogical + ":2.0.0");
+        assertThat(bundled.path("$defs").path("Alias").path("$ref").asText())
+            .isEqualTo(targetLogical + ":1.0.0");
+    }
+
+    /**
+     * A member reference written as {@code :latest} asks for the current version explicitly, so the
+     * manifest's pin does not override it. Only a version-free reference defers to the pin.
+     */
+    @Test
+    void bundle_leavesAnExplicitLatestReferenceResolvingToCurrent() {
+        String headLogical = "urn:core:platform:civitas:element:common:Head:hh00000001";
+        String lineLogical = "urn:core:platform:civitas:element:common:Line:ll00000001";
+        String dsUrn       = "urn:core:platform:civitas:datastructure:common:Order:ds00000001:1.0.0";
+
+        ObjectNode head = MAPPER.createObjectNode();
+        head.put("$id", headLogical);
+        head.put("type", "object");
+        head.putObject("properties").putObject("line").put("$ref", lineLogical + ":latest");
+
+        ObjectNode line = MAPPER.createObjectNode();
+        line.put("$id", lineLogical);
+        line.putObject("properties").putObject("a").put("type", "string");
+
+        ObjectNode manifest = MAPPER.createObjectNode();
+        manifest.put("$id", "urn:core:platform:civitas:datastructure:common:Order:ds00000001");
+        ObjectNode defs = manifest.putObject("$defs");
+        defs.putObject("Head").put("$ref", headLogical + ":1.0.0");
+        defs.putObject("Line").put("$ref", lineLogical + ":1.0.0");
+
+        when(mockRegistry.fetchElementOrXsd(dsUrn)).thenReturn(Optional.of(manifest));
+        when(mockRegistry.fetchElementOrXsd(headLogical + ":1.0.0")).thenReturn(Optional.of(head));
+        when(mockRegistry.fetchElementOrXsd(lineLogical + ":1.0.0")).thenReturn(Optional.of(line));
+        when(mockRegistry.fetchElementOrXsd(lineLogical + ":2.0.0")).thenReturn(Optional.of(line));
+        when(mockRegistry.resolveReference(lineLogical + ":latest"))
+            .thenReturn(Optional.of(lineLogical + ":2.0.0"));
+
+        graph.register(dsUrn, Set.of(headLogical + ":1.0.0", lineLogical + ":1.0.0"));
+        graph.register(headLogical + ":1.0.0", Set.of(lineLogical + ":latest"));
+
+        JsonNode bundled = viewService.bundle(dsUrn, 5).orElseThrow();
+
+        Set<String> refs = new java.util.LinkedHashSet<>();
+        collectCoreUrnRefs(bundled, refs);
+        assertThat(refs).contains(lineLogical + ":2.0.0");
+    }
 }

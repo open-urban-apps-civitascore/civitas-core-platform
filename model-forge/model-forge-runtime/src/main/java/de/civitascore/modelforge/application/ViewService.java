@@ -258,8 +258,10 @@ public class ViewService {
     }
 
     /**
-     * The concrete versioned URN a view should emit for a reference: a {@code :latest} or logical
-     * CORE URN resolves to the target's current version; a pinned URN (or non-URN ref) is unchanged.
+     * The concrete versioned URN a view should emit for a reference: a logical CORE URN resolves to
+     * the version {@code memberPins} names, or to the target's current version when it names none; a
+     * {@code :latest} URN always resolves to current, being an explicit request for it; a pinned URN
+     * (or non-URN ref) is unchanged.
      */
     private String concreteRef(String ref, Map<String, String> memberPins) {
         if (ref != null && UrnParser.isUrn(ref)
@@ -279,9 +281,15 @@ public class ViewService {
      * The member versions a DataStructure manifest pins, keyed by logical URN. A member's reference to
      * a sibling is logical — two members referencing each other could not each carry the other's
      * assigned version — so these pins, not the target's current version, decide what a view embeds.
-     * Empty for any root that is not a manifest of bare URN {@code $ref}s.
+     *
+     * <p>Only a DataStructure pins anything. An ordinary Element may alias a versioned URN under its
+     * own {@code $defs}, which is a plain JSON-Schema idiom and must not govern how the rest of that
+     * document resolves, so the root's artifact type decides rather than its shape.
      */
     private static Map<String, String> memberPins(JsonNode root) {
+        if (!"datastructure".equals(UrnParser.artifactTypeFromUrn(root.path("$id").asText(null)))) {
+            return Map.of();
+        }
         JsonNode defs = root.path("$defs");
         if (!defs.isObject()) return Map.of();
         Map<String, String> pins = new LinkedHashMap<>();
