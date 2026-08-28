@@ -38,8 +38,10 @@ class StyleServiceTest {
   @Mock private DataSetRepository dataSetRepository;
   @Mock private LayerRepository layerRepository;
 
-  // Real instance, not a mock: these tests assert on the rejection it produces.
-  @Spy private SldContentValidator sldContentValidator = new SldContentValidator();
+  // These tests assert on the rejection the validator produces, so it has to be the real one.
+  // @Spy is how a real collaborator reaches @InjectMocks; nothing here stubs or verifies it.
+  @Spy
+  private SldContentValidator sldContentValidator = new SldContentValidator(new SldParserFactory());
 
   @InjectMocks private StyleService styleService;
 
