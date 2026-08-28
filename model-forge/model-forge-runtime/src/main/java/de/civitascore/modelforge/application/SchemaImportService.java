@@ -7,6 +7,7 @@ import tools.jackson.databind.node.ObjectNode;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.Diagnostic;
 import de.civitascore.modelforge.contract.DiagnosticSeverity;
+import de.civitascore.modelforge.contract.VersionBump;
 import de.civitascore.modelforge.core.port.RemoteSchemaRepository;
 import de.civitascore.modelforge.graph.DependencyGraphService;
 import de.civitascore.modelforge.graph.SchemaRefExtractor;
@@ -142,8 +143,9 @@ public class SchemaImportService {
         List<String> pins = new ArrayList<>();
         List<PendingGraphNode> pendingNodes = new ArrayList<>();
         String dataStructurePin = registry.inTransaction(() -> {
-            pins.addAll(storeElementsInRegistry(elements, explicitVersion, pendingNodes));
-            return dataStructure != null ? storeDataStructureManifest(dataStructure, pendingNodes) : null;
+            pins.addAll(storeElementsInRegistry(elements, explicitVersion, req.bump(), pendingNodes));
+            return dataStructure != null
+                ? storeDataStructureManifest(dataStructure, req.bump(), pendingNodes) : null;
         });
         // The dependency graph is in-memory and is not rolled back, so it is published only once the
         // durable write has committed — otherwise a rolled-back import leaves phantom nodes behind.
@@ -566,8 +568,8 @@ public class SchemaImportService {
      *     {@link ArtifactRegistry#storeElement}'s equivalent parameter. Applied uniformly to every
      *     Element this import produces, matching the "one document, one version" mental model.
      */
-    private List<String> storeElementsInRegistry(
-            ObjectNode elements, String explicitVersion, List<PendingGraphNode> pendingNodes) {
+    private List<String> storeElementsInRegistry(ObjectNode elements, String explicitVersion,
+            VersionBump bump, List<PendingGraphNode> pendingNodes) {
         List<String> pins = new ArrayList<>();
         elements.properties().forEach(e -> {
             JsonNode schema  = e.getValue();
@@ -583,7 +585,7 @@ public class SchemaImportService {
             // mints 1.0.0 for a brand-new artifact regardless of the incoming URN's version segment,
             // unless explicitVersion opts into adopting it verbatim), which would otherwise orphan
             // the graph node once a rebuild re-syncs from the registry.
-            String pin = registry.storeElement(e.getKey(), schema, refs, associations, explicitVersion);
+            String pin = registry.storeElement(e.getKey(), schema, refs, associations, explicitVersion, bump);
             String resolvedPin = pin != null ? pin : urn;
             pins.add(resolvedPin);
             Set<String> allEdges = new LinkedHashSet<>(refs);
@@ -644,14 +646,15 @@ public class SchemaImportService {
         return manifest;
     }
 
-    private String storeDataStructureManifest(ObjectNode manifest, List<PendingGraphNode> pendingNodes) {
+    private String storeDataStructureManifest(
+            ObjectNode manifest, VersionBump bump, List<PendingGraphNode> pendingNodes) {
         // The $defs-library DataStructure identifies itself with the JSON-Schema `$id`; a legacy
         // grouping manifest used `id`. Accept either.
         String idField = manifest.has("$id")
             ? manifest.path("$id").asText(null)
             : manifest.path("id").asText(null);
         String dataStructureLogicalUrn = UrnParser.logicalUrn(idField);
-        String pin = registry.storeDataStructure(dataStructureLogicalUrn, manifest);
+        String pin = registry.storeDataStructure(dataStructureLogicalUrn, manifest, bump);
         // Mirror the just-persisted elementRefs edges into the in-memory dependency graph. The
         // registry write alone does not touch the graph, so without this the grouping shows no
         // relations and no graph edges until the next full rebuild() — unlike the createArtifact

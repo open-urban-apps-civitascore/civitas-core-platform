@@ -1,5 +1,6 @@
 package de.civitascore.modelforge.application;
 
+import de.civitascore.modelforge.contract.VersionBump;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -18,9 +19,29 @@ import tools.jackson.databind.JsonNode;
  * @param preserveVersion when {@code true}, {@code version} is adopted verbatim as every produced
  *     Element's stored version instead of Model Forge's usual version authority — the opt-in
  *     escape hatch for imports (e.g. XÖV) that must preserve an upstream version identity
+ * @param bump the change class to apply to the grouping and to every member whose content changed.
+ *     A member that is byte-identical mints no version at all, so the bump never inflates history.
+ *     Ignored when {@code preserveVersion} adopts an upstream version instead. Defaults to
+ *     {@code PATCH}, matching the write path's own default.
  */
-public record SchemaImportRequest(JsonNode schema, String version, boolean preserveVersion) {
+public record SchemaImportRequest(
+        JsonNode schema, String version, boolean preserveVersion, VersionBump bump) {
+
+    public SchemaImportRequest {
+        if (bump == null) {
+            bump = VersionBump.PATCH;
+        }
+    }
+
     public SchemaImportRequest(JsonNode schema) {
-        this(schema, null, false);
+        this(schema, null, false, VersionBump.PATCH);
+    }
+
+    public SchemaImportRequest(JsonNode schema, VersionBump bump) {
+        this(schema, null, false, bump);
+    }
+
+    public SchemaImportRequest(JsonNode schema, String version, boolean preserveVersion) {
+        this(schema, version, preserveVersion, VersionBump.PATCH);
     }
 }
