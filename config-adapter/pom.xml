@@ -67,6 +67,7 @@
 		<at.yawk.lz4.version>1.11.2</at.yawk.lz4.version>
 		<owasp.encoder.version>1.4.0</owasp.encoder.version>
 		<flowable.version>7.1.0</flowable.version>
+		<spring.version>6.2.19</spring.version>
 		<hikaricp.version>6.2.1</hikaricp.version>
 		<postgresql.version>42.7.13</postgresql.version>
 		<h2.version>2.4.240</h2.version>
@@ -104,6 +105,18 @@
 				<groupId>org.keycloak</groupId>
 				<artifactId>keycloak-admin-client</artifactId>
 				<version>${keycloak.version}</version>
+			</dependency>
+
+			<!--
+				Flowable 7.1.0 drags in Spring Framework 6.1.13 transitively; the BOM lifts the
+				whole family to a line that carries no advisory.
+			-->
+			<dependency>
+				<groupId>org.springframework</groupId>
+				<artifactId>spring-framework-bom</artifactId>
+				<version>${spring.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
 			</dependency>
 
 			<!-- Jackson: the BOM also pulls transitives (cloudevents, keycloak) onto one version -->
