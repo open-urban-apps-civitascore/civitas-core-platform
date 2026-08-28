@@ -13,6 +13,30 @@
 #   <run Bruno tests>
 # ============================================================
 
+x-variables:
+  # Shared by every GeoServer Cloud service — a per-service copy lets one edit point two services
+  # at different catalogs, which surfaces as a saga error in a test rather than a startup failure
+  geoserver-environment: &gs_common_env
+    SPRING_PROFILES_ACTIVE: standalone,pgconfig
+    GEOWEBCACHE_CACHE_DIR: /data/geowebcache
+    PGCONFIG_HOST: geoserverdb
+    PGCONFIG_PORT: 5432
+    PGCONFIG_DATABASE: geoserver
+    PGCONFIG_USERNAME: geoserver
+    PGCONFIG_PASSWORD: geoserver
+    PGCONFIG_SCHEMA: pgconfig
+    PGCONFIG_INITIALIZE: "true"
+    SPRING_RABBITMQ_HOST: rabbitmq
+    SPRING_RABBITMQ_PORT: 5672
+    SPRING_RABBITMQ_USERNAME: guest
+    SPRING_RABBITMQ_PASSWORD: guest
+
+x-gs-dependencies: &gs_dependencies
+  rabbitmq:
+    condition: service_healthy
+  geoserverdb:
+    condition: service_healthy
+
 services:
   # ── Databases ──────────────────────────────────────────────
 
@@ -418,23 +442,9 @@ services:
   gateway:
     image: geoservercloud/geoserver-cloud-gateway:3.0.1.1
     environment:
-      SPRING_PROFILES_ACTIVE: standalone,pgconfig
+      <<: *gs_common_env
       GEOSERVER_BASE_PATH: /geoserver
-      PGCONFIG_HOST: geoserverdb
-      PGCONFIG_PORT: 5432
-      PGCONFIG_DATABASE: geoserver
-      PGCONFIG_USERNAME: geoserver
-      PGCONFIG_PASSWORD: geoserver
-      PGCONFIG_SCHEMA: pgconfig
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: guest
-      SPRING_RABBITMQ_PASSWORD: guest
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      geoserverdb:
-        condition: service_healthy
+    depends_on: *gs_dependencies
     networks:
       default:
         aliases:
@@ -442,25 +452,8 @@ services:
 
   restconfig:
     image: geoservercloud/geoserver-cloud-rest:3.0.1.1
-    environment:
-      SPRING_PROFILES_ACTIVE: standalone,pgconfig
-      GEOWEBCACHE_CACHE_DIR: /data/geowebcache
-      PGCONFIG_HOST: geoserverdb
-      PGCONFIG_PORT: 5432
-      PGCONFIG_DATABASE: geoserver
-      PGCONFIG_USERNAME: geoserver
-      PGCONFIG_PASSWORD: geoserver
-      PGCONFIG_SCHEMA: pgconfig
-      PGCONFIG_INITIALIZE: "true"
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: guest
-      SPRING_RABBITMQ_PASSWORD: guest
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      geoserverdb:
-        condition: service_healthy
+    environment: *gs_common_env
+    depends_on: *gs_dependencies
 
   # ── Application ──────────────────────────────────────────
 

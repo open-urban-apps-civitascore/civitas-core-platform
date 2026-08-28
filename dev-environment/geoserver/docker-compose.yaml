@@ -14,20 +14,19 @@ x-variables:
     PGCONFIG_SCHEMA: pgconfig
     PGCONFIG_INITIALIZE: true
     # RabbitMQ — Spring Cloud Bus for catalog-change event propagation between
-    # microservices (restconfig → wfs/wms/etc. cache invalidation)
+    # microservices (restconfig → wfs/wms/etc. cache invalidation). RABBITMQ_HOST/USER/PASSWORD
+    # feed the same settings one level up and would be redundant beside these
     SPRING_RABBITMQ_HOST: rabbitmq
     SPRING_RABBITMQ_PORT: 5672
     SPRING_RABBITMQ_USERNAME: guest
     SPRING_RABBITMQ_PASSWORD: guest
-    RABBITMQ_HOST: rabbitmq
-    RABBITMQ_USER: guest
-    RABBITMQ_PASSWORD: guest
 
 x-gs-dependencies: &gs-dependencies
   rabbitmq:
     condition: service_healthy
   geoserverdb:
-    condition: service_started
+    # Healthy, not started — every service opens its catalog connection during startup
+    condition: service_healthy
 
 volumes:
   geowebcache_data:
