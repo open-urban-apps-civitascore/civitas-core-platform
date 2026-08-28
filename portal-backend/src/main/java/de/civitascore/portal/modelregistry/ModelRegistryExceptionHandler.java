@@ -73,11 +73,18 @@ public class ModelRegistryExceptionHandler {
     return paths.isBlank() ? ex.getMessage() : ex.getMessage() + " — " + paths;
   }
 
+  /**
+   * A diagnostic as one clause: its path, then its message. The registry derives both from the same
+   * validation error and the message already opens with the path, so prefixing unconditionally
+   * would print it twice.
+   */
   private static String describe(Diagnostic diagnostic) {
     String path = diagnostic.path();
-    return path == null || path.isBlank()
-        ? diagnostic.message()
-        : path + ": " + diagnostic.message();
+    String message = diagnostic.message();
+    if (path == null || path.isBlank() || message == null) {
+      return message;
+    }
+    return message.startsWith(path) ? message : path + ": " + message;
   }
 
   private static ProblemDetail problem(

@@ -86,4 +86,23 @@ class ModelRegistryExceptionHandlerTest {
     assertThat(problem.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
     assertThat(problem.getType()).hasToString("urn:civitas:error:REGISTRY_UNAVAILABLE");
   }
+
+  @Test
+  @DisplayName("a diagnostic whose message already opens with its path is not prefixed twice")
+  void doesNotRepeatThePathTheMessageAlreadyCarries() {
+    ValidationFailedException failure =
+        new ValidationFailedException(
+            "Schema import validation failed",
+            List.of(
+                new Diagnostic(
+                    DiagnosticSeverity.ERROR,
+                    "$.fields: array found, object expected",
+                    "validation",
+                    "$.fields")));
+
+    ProblemDetail problem = handler.handleValidationFailed(failure, request());
+
+    assertThat(problem.getDetail()).contains("$.fields: array found, object expected");
+    assertThat(problem.getDetail()).doesNotContain("$.fields: $.fields");
+  }
 }
