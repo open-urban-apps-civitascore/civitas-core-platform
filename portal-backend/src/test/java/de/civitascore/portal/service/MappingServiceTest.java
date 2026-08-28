@@ -294,6 +294,83 @@ class MappingServiceTest {
     verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any());
   }
 
+  private static final String SOURCE_URN =
+      "urn:core:platform:civitas:element:common:MaplSource:src1234567:1.0.0";
+  private static final String TARGET_URN =
+      "urn:core:platform:civitas:element:common:MaplTarget:tgt1234567:1.0.0";
+
+  private void stubResolvable(String... urns) {
+    for (String urn : urns) {
+      lenient()
+          .when(registry.fetchModel(urn))
+          .thenReturn(Optional.of(new RegistryDocument(Map.of("type", "object"), null)));
+    }
+  }
+
+  @Test
+  @DisplayName("a mapping whose endpoints resolve is stored")
+  void store_whenEndpointsResolve_isAccepted() {
+    stubResolvable(SOURCE_URN, TARGET_URN);
+    stubStore();
+
+    mappingService.store(
+        DATA_SET_ID, null, Map.of("source", SOURCE_URN, "target", TARGET_URN, "fields", Map.of()));
+
+    verify(registry).storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("a source that does not resolve is refused before anything is stored")
+  void store_whenSourceDoesNotResolve_isRefused() {
+    when(registry.fetchModel("urn:core:platform:civitas:element:common:Ghost:zzz9999999:1.0.0"))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                mappingService.store(
+                    DATA_SET_ID,
+                    null,
+                    Map.of(
+                        "source",
+                        "urn:core:platform:civitas:element:common:Ghost:zzz9999999:1.0.0",
+                        "fields",
+                        Map.of())))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("not available");
+
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("a target pinning a version that does not exist is refused")
+  void store_whenTargetVersionDoesNotResolve_isRefused() {
+    stubResolvable(SOURCE_URN);
+    String missingVersion = "urn:core:platform:civitas:element:common:MaplTarget:tgt1234567:9.9.9";
+    when(registry.fetchModel(missingVersion)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                mappingService.store(
+                    DATA_SET_ID,
+                    null,
+                    Map.of("source", SOURCE_URN, "target", missingVersion, "fields", Map.of())))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("not available");
+
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("a draft that has not picked its structures yet is still storable")
+  void store_whenEndpointsAbsent_isAccepted() {
+    stubStore();
+
+    mappingService.store(DATA_SET_ID, null, Map.of("fields", Map.of()));
+
+    verify(registry).storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), any());
+    verify(registry, never()).fetchModel(any());
+  }
+
   @Test
   @DisplayName("a URN naming another namespace is refused before anything is stored")
   void foreignNamespaceUrnIsRefused() {

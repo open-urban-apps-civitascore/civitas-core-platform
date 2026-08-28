@@ -80,6 +80,8 @@ public class MappingService {
     Object positions = content.remove("positions");
     Map<String, Object> styles =
         positions instanceof Map<?, ?> ? Map.of("positions", positions) : null;
+    requireResolvableEndpoint(content, "source");
+    requireResolvableEndpoint(content, "target");
     return registry.storePayload(
         PayloadKind.MAPPING,
         Optional.ofNullable(logicalUrn),
@@ -128,6 +130,28 @@ public class MappingService {
       registry.deleteArtifact(urn, false, true);
     } else {
       registry.deletePayload(urn);
+    }
+  }
+
+  /**
+   * A mapping's {@code source} and {@code target} name the DataStructures it maps between. Both are
+   * optional — a draft need not have picked them yet — but one that is present has to resolve:
+   * otherwise the mapping pins a structure, or a version of one, that does not exist, and the
+   * reference is only discovered when the dataset is released and the deployment engine tries to
+   * read the schema. A URN that does not resolve and one the caller may not see are reported
+   * identically, so the difference is not an existence oracle over structure URNs.
+   */
+  private void requireResolvableEndpoint(Map<String, Object> content, String field) {
+    Object raw = content.get(field);
+    if (raw == null) {
+      return;
+    }
+    if (!(raw instanceof String urn) || urn.isBlank()) {
+      throw new InvalidInputException(ENTITY_NAME, field, field + " must be a CORE URN");
+    }
+    if (registry.fetchModel(urn).isEmpty()) {
+      throw new InvalidInputException(
+          ENTITY_NAME, field, "Referenced model is not available: " + urn);
     }
   }
 
