@@ -1,4 +1,5 @@
-FROM eclipse-temurin:25-jre-alpine
+# Pinned: eclipse-temurin:25-jre-alpine (2026-08-21). Update digest on base image updates.
+FROM eclipse-temurin:25-jre-alpine@sha256:3137541deb3cac6626b5d9a4a2187bc0d6a34312f858bd2c67dd01e732e6b682
 
 LABEL maintainer="CIVITAS/Interfaces Team"
 LABEL description="CIVITAS/CORE Configuration Adapter"
