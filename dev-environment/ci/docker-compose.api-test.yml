@@ -30,6 +30,12 @@ x-variables:
     SPRING_RABBITMQ_PORT: 5672
     SPRING_RABBITMQ_USERNAME: guest
     SPRING_RABBITMQ_PASSWORD: guest
+    # The images ship every diagnostics endpoint exposed with values unmasked, which publishes the
+    # catalogue and broker passwords to anything that can reach the service
+    MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus"
+    MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_EXCLUDE: "env,configprops,shutdown,heapdump"
+    MANAGEMENT_ENDPOINT_ENV_SHOW_VALUES: NEVER
+    MANAGEMENT_ENDPOINT_CONFIGPROPS_SHOW_VALUES: NEVER
 
 x-gs-dependencies: &gs_dependencies
   rabbitmq:

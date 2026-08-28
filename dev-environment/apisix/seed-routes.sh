@@ -108,7 +108,10 @@ curl -sf -X PUT "$ADMIN_URL/apisix/admin/plugin_configs/1" \
     \"plugins\": {
       \"serverless-pre-function\": {
         \"phase\": \"rewrite\",
-        \"functions\": [\"return function(conf, ctx) ngx.req.clear_header('X-Userinfo'); ngx.req.clear_header('X-Access-Token'); ngx.req.clear_header('X-Id-Token') end\"]
+        \"functions\": [
+          \"return function(conf, ctx) ngx.req.clear_header('X-Userinfo'); ngx.req.clear_header('X-Access-Token'); ngx.req.clear_header('X-Id-Token') end\",
+          \"return function() local uri = ngx.var.uri; if uri and ngx.re.find(uri, '^/v1/datasets/[^/]+/[^/]+/\$', 'jo') then ngx.req.set_uri(string.sub(uri, 1, -2), false) end end\"
+        ]
       },
       \"openid-connect\": {
         \"client_id\": \"apisix-validator\",

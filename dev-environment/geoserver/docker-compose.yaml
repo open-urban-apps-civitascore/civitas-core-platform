@@ -20,6 +20,16 @@ x-variables:
     SPRING_RABBITMQ_PORT: 5672
     SPRING_RABBITMQ_USERNAME: guest
     SPRING_RABBITMQ_PASSWORD: guest
+    # Diagnostics — the images ship every endpoint exposed and their values unmasked, which
+    # publishes the catalog and broker passwords to anything that can reach the service
+    MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus"
+    MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_EXCLUDE: "env,configprops,shutdown,heapdump"
+    MANAGEMENT_ENDPOINT_ENV_SHOW_VALUES: NEVER
+    MANAGEMENT_ENDPOINT_CONFIGPROPS_SHOW_VALUES: NEVER
+    # Concurrent-request caps, matching what the wms service applies to itself by default. The
+    # doubled $$ keeps the placeholder for the image to resolve instead of compose consuming it
+    GEOSERVER_EXTENSION_CONTROLFLOW_PROPERTIES_OWS_WMS: "$${cpu.cores} * 8"
+    GEOSERVER_EXTENSION_CONTROLFLOW_PROPERTIES_OWS_WMS_GETMAP: "$${cpu.cores} * 4"
 
 x-gs-dependencies: &gs-dependencies
   rabbitmq:
@@ -151,6 +161,12 @@ services:
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
+    environment:
+      <<: *common_env
+      # The image switches request throttling off on this service, on the assumption that it
+      # serves no map requests — it does answer them, so the caps above need it back on. Setting
+      # the caps alone does not re-enable it.
+      GEOSERVER_EXTENSION_CONTROLFLOW_ENABLED: true
     deploy:
       replicas: 1
 
