@@ -140,7 +140,7 @@ class SchemaImportServiceTest {
         for (String base : List.of("DefCatalog", "DefProduct", "DefCategory")) {
             String urn = urnOf(stored, base);
             assertThat(UrnParser.nameFromUrn(urn)).isEqualTo(base);
-            assertThat(UrnParser.versionFromUrn(urn)).isEqualTo("1.0.0");
+            assertThat(UrnParser.versionFromUrn(urn)).isNull();
             assertThat(UrnParser.disambiguatorFromUrn(urn)).isNotBlank();
         }
     }
@@ -249,6 +249,83 @@ class SchemaImportServiceTest {
     }
 
     /**
+     * A member's authored {@code $id} version is a request, not an assignment — the registry decides
+     * the version inside the write. The manifest must therefore reference the pin the write returned:
+     * a ref carrying the authored version points at a version that may never exist, and the read then
+     * resolves to an empty shell with a dangling {@code $ref}.
+     */
+    @Test
+    void manifestReferencesTheVersionTheMemberWriteAssigned() {
+        JsonNode schema = versionedDataStructureRootSchema();
+        // The caller authored 2.0.0 throughout; the write assigns 1.0.1.
+        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
+            .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class)))
+            .thenAnswer(inv -> inv.getArgument(0) + ":1.0.1");
+
+        svc.importSchema(new SchemaImportRequest(schema));
+
+        ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class));
+        JsonNode content = ds.getValue();
+        assertThat(content.path("$defs").path("Person").path("$ref").asText())
+            .isEqualTo("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+        // The root $ref designating one member as the root shape resolves to that same pin.
+        assertThat(content.path("$ref").asText())
+            .isEqualTo("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+    }
+
+    /**
+     * A member's stored content keeps a version-free {@code $id}. Stamping the assigned version into
+     * it would change the document on every write, so every member would mint a version even when its
+     * fields did not — defeating the registry's byte-identical short-circuit.
+     */
+    @Test
+    void memberContentKeepsAVersionFreeId() {
+        JsonNode schema = versionedDataStructureRootSchema();
+        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
+            .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class)))
+            .thenAnswer(inv -> inv.getArgument(0) + ":1.0.1");
+
+        svc.importSchema(new SchemaImportRequest(schema));
+
+        ArgumentCaptor<JsonNode> member = ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry).storeElement(anyString(), member.capture(), anySet(), anySet(),
+            nullable(String.class), any(VersionBump.class));
+        assertThat(member.getValue().path("$id").asText())
+            .isEqualTo("urn:core:platform:civitas:element:common:Person:pp11abcd12");
+
+        ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class));
+        assertThat(ds.getValue().path("$id").asText())
+            .isEqualTo("urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b");
+    }
+
+    /** A datastructure root whose members carry an authored version, and a root $ref to one of them. */
+    private JsonNode versionedDataStructureRootSchema() {
+        try {
+            return mapper.readTree("""
+                {
+                  "$schema":"https://json-schema.org/draft/2020-12/schema",
+                  "$id":"urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b:2.0.0",
+                  "title":"People",
+                  "$ref":"#/$defs/Person",
+                  "$defs":{
+                    "Person":{
+                      "$id":"urn:core:platform:civitas:element:common:Person:pp11abcd12:2.0.0",
+                      "type":"object",
+                      "properties":{"name":{"type":"string"}}
+                    }
+                  }
+                }
+                """);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    /**
      * The change class a caller requests must reach the registry, for the grouping and for its
      * member Elements alike: an Element is individually addressable, so a breaking change to one
      * must not be published as a patch just because it arrived inside a grouping. Members whose
@@ -354,7 +431,7 @@ class SchemaImportServiceTest {
         // The def brings its own CORE-URN $id → it is kept verbatim (name "CustomSupplier",
         // not the def key "DefSupplier"), not re-minted.
         String supplierUrn = urnOf(stored, "CustomSupplier");
-        assertThat(UrnParser.versionFromUrn(supplierUrn)).isEqualTo("1.0.0");
+        assertThat(UrnParser.versionFromUrn(supplierUrn)).isNull();
         assertThat(stored.keySet())
             .noneMatch(urn -> "DefSupplier".equals(UrnParser.nameFromUrn(urn)));
         // and its sibling ref is also rewritten to the Category URN
@@ -447,7 +524,7 @@ class SchemaImportServiceTest {
         assertThat(urn.getValue()).isEqualTo(dsLogical);
         JsonNode m = manifest.getValue();
         assertThat(m.path("$schema").asText()).isEqualTo("https://json-schema.org/draft/2020-12/schema");
-        assertThat(m.path("$id").asText()).isEqualTo(dsLogical + ":1.0.0");
+        assertThat(m.path("$id").asText()).isEqualTo(dsLogical);
         // $defs IS the member list: every Element produced by the import (root + extracted $defs),
         // each as a $ref to its Element URN.
         assertThat(m.path("$defs").toString()).contains(
@@ -513,8 +590,8 @@ class SchemaImportServiceTest {
         // Root keeps its own URN; the colliding def did NOT overwrite or duplicate the root's logical
         // model_forge.artifact — it received a distinct, minted URN derived from its def key ("Twin").
         String rootUrn = urnOf(stored, "Root");
-        assertThat(UrnParser.versionFromUrn(rootUrn)).isEqualTo("1.0.0");
-        assertThat(stored.keySet()).noneMatch(u -> "9.9.9".equals(UrnParser.versionFromUrn(u)));
+        assertThat(UrnParser.versionFromUrn(rootUrn)).isNull();
+        assertThat(urnOf(stored, "Twin")).isNotEqualTo(rootUrn);
         assertThat(UrnParser.nameFromUrn(urnOf(stored, "Twin"))).isEqualTo("Twin");
     }
 
@@ -580,6 +657,10 @@ class SchemaImportServiceTest {
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
+
+        // Graph nodes are keyed by the pin the write assigns, so the write has to report one.
+        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
+            .thenAnswer(inv -> inv.getArgument(1, JsonNode.class).path("$id").asText() + ":1.0.0");
 
         svc.importSchema(new SchemaImportRequest(schema));
 
@@ -709,11 +790,12 @@ class SchemaImportServiceTest {
     void keyedImport_leavesAnExistingCoreUrnIdentityAlone() {
         String url = "https://raw.githubusercontent.com/x/schema.json";
         String ownId = "urn:core:platform:civitas:element:common:Given:abcdefghij:1.0.0";
+        String ownLogical = "urn:core:platform:civitas:element:common:Given:abcdefghij";
         when(remoteFetcher.fetchJson(url)).thenReturn(mapper.readTree("""
             { "$id": "%s", "title": "Given", "type": "object" }
             """.formatted(ownId)));
 
-        assertThat(importedRootUrn(url, "smart-data-models:Weather/Given")).isEqualTo(ownId);
+        assertThat(importedRootUrn(url, "smart-data-models:Weather/Given")).isEqualTo(ownLogical);
     }
 
     /** The $id of the first Element the keyed import stored. */

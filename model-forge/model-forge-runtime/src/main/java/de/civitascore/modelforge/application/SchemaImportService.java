@@ -142,10 +142,12 @@ public class SchemaImportService {
         // ungrouped — an orphan set no re-run could repair, because the write is idempotent per URN.
         List<String> pins = new ArrayList<>();
         List<PendingGraphNode> pendingNodes = new ArrayList<>();
+        Map<String, String> pinByLogical = new LinkedHashMap<>();
         String dataStructurePin = registry.inTransaction(() -> {
-            pins.addAll(storeElementsInRegistry(elements, explicitVersion, req.bump(), pendingNodes));
-            return dataStructure != null
-                ? storeDataStructureManifest(dataStructure, req.bump(), pendingNodes) : null;
+            pins.addAll(storeElementsInRegistry(elements, explicitVersion, req.bump(), pendingNodes, pinByLogical));
+            if (dataStructure == null) return null;
+            repinMemberRefs(dataStructure, pinByLogical);
+            return storeDataStructureManifest(dataStructure, req.bump(), pendingNodes);
         });
         // The dependency graph is in-memory and is not rolled back, so it is published only once the
         // durable write has committed — otherwise a rolled-back import leaves phantom nodes behind.
@@ -281,7 +283,8 @@ public class SchemaImportService {
      */
     private static String dataStructureRootUrn(JsonNode schema) {
         String id = schema.path("$id").asText(null);
-        return UrnParser.isUrn(id) && "datastructure".equals(UrnParser.artifactTypeFromUrn(id)) ? id : null;
+        return UrnParser.isUrn(id) && "datastructure".equals(UrnParser.artifactTypeFromUrn(id))
+            ? UrnParser.logicalUrn(id) : null;
     }
 
     private ImportModel buildElements(JsonNode schema, String safeTitle, String schemaTitle, String dsRootUrn) {
@@ -303,9 +306,9 @@ public class SchemaImportService {
         // The root's URN is resolved up front (used to seed de-dup / re-import-matching for the
         // defs below) so a $defs entry named like the schema title can never be assigned it.
         boolean rootIsExplicit = UrnParser.isUrn(schema.path("$id").asText(null));
-        String rootUrn = rootIsExplicit
+        String rootUrn = UrnParser.logicalUrn(rootIsExplicit
             ? schema.path("$id").asText()
-            : urns.mintElement(safeTitle);
+            : urns.mintElement(safeTitle));
         Map<String, String> defUrns = mapDefUrns(defs, rootUrn, rootIsExplicit);
 
         // A document with no shape of its own (no type/properties/$ref/composition keyword — just
@@ -383,8 +386,9 @@ public class SchemaImportService {
     /** Flat schema → a single Element, with $id/title backfilled when absent. */
     private ObjectNode buildFlatElement(JsonNode schema, String safeTitle, String schemaTitle) {
         ObjectNode s = (ObjectNode) schema.deepCopy();
-        if (!UrnParser.isUrn(s.path("$id").asText(null)))
-            s.put("$id", urns.mintElement(safeTitle));
+        String authored = s.path("$id").asText(null);
+        s.put("$id", UrnParser.logicalUrn(
+            UrnParser.isUrn(authored) ? authored : urns.mintElement(safeTitle)));
         if (!s.has("title") && schemaTitle != null)
             s.put("title", schemaTitle);
         return s;
@@ -400,8 +404,8 @@ public class SchemaImportService {
     private ObjectNode buildRootElement(JsonNode schema, Map<String, String> defUrns,
                                           String rootUrn, String schemaTitle) {
         ObjectNode root = dropRedundantDefs((ObjectNode) rewriteLocalDefRefs(schema, defUrns));
-        if (!UrnParser.isUrn(root.path("$id").asText(null)))
-            root.put("$id", rootUrn);
+        String authored = root.path("$id").asText(null);
+        root.put("$id", UrnParser.isUrn(authored) ? UrnParser.logicalUrn(authored) : rootUrn);
         if (!root.has("title") && schemaTitle != null)
             root.put("title", schemaTitle);
         return root;
@@ -437,7 +441,7 @@ public class SchemaImportService {
         defs.properties().forEach(e -> {
             String ownId = e.getValue().path("$id").asText(null);
             if (UrnParser.isUrn(ownId) && !usedLogical.contains(UrnParser.logicalUrn(ownId))) {
-                defUrns.put(e.getKey(), ownId);
+                defUrns.put(e.getKey(), UrnParser.logicalUrn(ownId));
                 usedLogical.add(UrnParser.logicalUrn(ownId));
             }
         });
@@ -454,7 +458,7 @@ public class SchemaImportService {
                 String urn = predecessor != null && !usedLogical.contains(UrnParser.logicalUrn(predecessor))
                     ? predecessor
                     : mintedElementUrn(usedLogical, e.getKey());
-                defUrns.put(e.getKey(), urn);
+                defUrns.put(e.getKey(), UrnParser.logicalUrn(urn));
                 usedLogical.add(UrnParser.logicalUrn(urn));
             }
         });
@@ -567,9 +571,11 @@ public class SchemaImportService {
      *     instead of Model Forge's usual version authority — see
      *     {@link ArtifactRegistry#storeElement}'s equivalent parameter. Applied uniformly to every
      *     Element this import produces, matching the "one document, one version" mental model.
+     * @param pinByLogical receives each member's assigned pin under its logical URN, so the manifest
+     *     can reference the versions actually written rather than the ones the caller authored.
      */
     private List<String> storeElementsInRegistry(ObjectNode elements, String explicitVersion,
-            VersionBump bump, List<PendingGraphNode> pendingNodes) {
+            VersionBump bump, List<PendingGraphNode> pendingNodes, Map<String, String> pinByLogical) {
         List<String> pins = new ArrayList<>();
         elements.properties().forEach(e -> {
             JsonNode schema  = e.getValue();
@@ -588,6 +594,7 @@ public class SchemaImportService {
             String pin = registry.storeElement(e.getKey(), schema, refs, associations, explicitVersion, bump);
             String resolvedPin = pin != null ? pin : urn;
             pins.add(resolvedPin);
+            pinByLogical.put(UrnParser.logicalUrn(urn), resolvedPin);
             Set<String> allEdges = new LinkedHashSet<>(refs);
             allEdges.addAll(associations);
             pendingNodes.add(PendingGraphNode.edges(resolvedPin, allEdges));
@@ -638,12 +645,34 @@ public class SchemaImportService {
         if (members.isEmpty()) return null;
         ObjectNode manifest = mapper.createObjectNode();
         manifest.put("$schema", "https://json-schema.org/draft/2020-12/schema");
-        manifest.put("$id", dataStructureUrnForMembers(members));
+        manifest.put("$id", UrnParser.logicalUrn(dataStructureUrnForMembers(members)));
         manifest.put("title", schemaTitle != null ? schemaTitle : safeTitle);
         ObjectNode defs = manifest.putObject("$defs");
         int[] i = {0};
         elements.properties().forEach(e -> defs.putObject(e.getKey()).put("$ref", members.get(i[0]++)));
         return manifest;
+    }
+
+    /**
+     * Rewrites the manifest's member references to the versions the member writes assigned. The refs
+     * are built version-free, before anything is stored, but the registry — not the caller — decides
+     * each member's version inside the write: a manifest keeping the authored version would reference
+     * a version that may never exist, and the read then resolves to an empty shell with a dangling
+     * {@code $ref}. Only the version segment changes, so the document still satisfies the member
+     * pattern it was validated against.
+     */
+    private static void repinMemberRefs(ObjectNode manifest, Map<String, String> pinByLogical) {
+        if (manifest.get("$defs") instanceof ObjectNode defs) {
+            defs.properties().forEach(e -> {
+                if (e.getValue() instanceof ObjectNode member) {
+                    String pin = pinByLogical.get(member.path("$ref").asText(null));
+                    if (pin != null) member.put("$ref", pin);
+                }
+            });
+        }
+        // The optional root $ref designates one member as the root shape; it pins to the same version.
+        String rootPin = pinByLogical.get(manifest.path("$ref").asText(null));
+        if (rootPin != null) manifest.put("$ref", rootPin);
     }
 
     private String storeDataStructureManifest(
