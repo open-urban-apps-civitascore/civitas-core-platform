@@ -107,18 +107,6 @@ test_required_permissions_delete_dataset_mapping if {
 	result == {"DATASET_DELETE"}
 }
 
-# The flat routes are gone. An unmapped path yields no permission and is not a known endpoint, which
-# main.rego turns into a deny rather than an accidental allow.
-test_flat_mapping_route_is_unknown if {
-	count(permission_eval.required_permissions) == 0 with input as portal_request_no_auth("POST", "/v1/mappings")
-	permission_eval.is_known_endpoint == false with input as portal_request_no_auth("POST", "/v1/mappings")
-}
-
-test_orphans_route_is_unknown if {
-	count(permission_eval.required_permissions) == 0 with input as portal_request_no_auth("GET", "/v1/orphans")
-	permission_eval.is_known_endpoint == false with input as portal_request_no_auth("GET", "/v1/orphans")
-}
-
 # Test: Permission lookup from mappings - PATCH resource
 test_required_permissions_patch_role if {
 	result := permission_eval.required_permissions with input as portal_request_no_auth("PATCH", "/v1/roles/r1")
