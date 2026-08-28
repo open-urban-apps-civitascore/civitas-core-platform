@@ -81,8 +81,8 @@ docs {
   whether to:
   - Reject unknown configuration fields with a 400, or
   - Continue silently dropping them and document the canonical schema in
-    the OpenAPI spec (`api/portal-backend/openapi.yaml`) so callers have a
-    single source of truth.
+    the OpenAPI description the backend serves so callers have a single
+    source of truth.
 
   When the decision lands, this test will need to be inverted (expect 400)
   or updated (assert the dropped-but-warned behaviour).
