@@ -10,6 +10,7 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -861,19 +862,67 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * referenced artifact. Removing them here would therefore fail the whole delete.
    */
   private void deleteWithSinks(DataSet dataSet) {
-    dataSinkRepository
-        .findByDataSetId(dataSet.getId())
-        .forEach(
-            sink -> {
-              sink.setPipeline(null);
-              dataSinkRepository.delete(sink);
-            });
+    // The registry artifacts this DataSet owns, read while its rows still exist. A pipeline is
+    // removed by a JPA cascade that does not run its service hook, so its artifact would otherwise
+    // survive holding pipeline-node edges onto the DataSource, sink configuration and Mapping it
+    // wires — leaving those referenced, and a referenced artifact cannot be deleted.
+    List<String> pipelineUrns =
+        dataSet.getPipelines().stream()
+            .map(Pipeline::getModelLogicalUrn)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+    List<String> mappingUrns =
+        pipelineUrns.stream()
+            .flatMap(urn -> modelRegistryGateway.dependencyUrnsOfType(urn, "mapping").stream())
+            .map(modelRegistryGateway::logicalUrn)
+            .distinct()
+            .toList();
+    List<DataSink> sinks = dataSinkRepository.findByDataSetId(dataSet.getId());
+    List<String> sinkConfigurationUrns =
+        sinks.stream()
+            .map(DataSink::getConfigurationLogicalUrn)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+
+    sinks.forEach(
+        sink -> {
+          sink.setPipeline(null);
+          dataSinkRepository.delete(sink);
+        });
     dataSetRepository.delete(dataSet);
     dataSetRepository.flush();
-    // A DataSet groups its members, it does not own them: dropping the manifest removes the
-    // dataset-ref edges and leaves the members in place, unattached.
+
+    // The manifest goes first: it holds the dataset-ref edges onto the members, which is what keeps
+    // them referenced. Then the pipeline artifacts, whose edges keep the rest referenced, and only
+    // then the members those edges pointed at.
     if (dataSet.getManifestLogicalUrn() != null) {
       modelRegistryGateway.deleteDataSet(dataSet.getManifestLogicalUrn());
+    }
+    removeOwnedArtifacts("pipeline", pipelineUrns);
+    removeOwnedArtifacts("mapping", mappingUrns);
+    removeOwnedArtifacts("datasink configuration", sinkConfigurationUrns);
+  }
+
+  /**
+   * Removes registry artifacts a deleted DataSet owned. A refusal is logged, not thrown: the rows
+   * are already gone and the teardown saga has completed, so failing here would leave the platform
+   * inconsistent and have the delete redelivered forever. An artifact another DataSet still
+   * references is refused by the registry and stays, which is the outcome that keeps a shared
+   * member intact.
+   */
+  private void removeOwnedArtifacts(String kind, List<String> logicalUrns) {
+    for (String logicalUrn : logicalUrns) {
+      try {
+        modelRegistryGateway.deletePayload(logicalUrn);
+      } catch (RuntimeException e) {
+        log.warn(
+            "Could not remove {} artifact {} of a deleted DataSet: {}",
+            kind,
+            Encode.forJava(logicalUrn),
+            Encode.forJava(e.getMessage()));
+      }
     }
   }
 

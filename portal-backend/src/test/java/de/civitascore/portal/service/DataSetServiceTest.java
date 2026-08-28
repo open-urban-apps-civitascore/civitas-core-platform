@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -56,6 +58,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -2046,28 +2049,102 @@ class DataSetServiceTest {
       verify(sagaPublisher, never()).publishDeleteRequested(any());
     }
 
-    @Test
-    @DisplayName("removing a dataset directly deletes its manifest and its sinks' configurations")
-    void directRemovalDeletesRegistryArtifacts() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = readyDataSet(id);
-      ds.setProvisioned(false);
-      ds.setManifestLogicalUrn("urn:core:platform:civitas:dataset:common:doomed:abcdefghij");
+    private static final String PIPELINE_URN =
+        "urn:core:platform:civitas:pipeline:common:doomed-pipeline:abcdefghij";
+    private static final String MAPPING_URN =
+        "urn:core:platform:civitas:mapping:common:doomed-mapping:abcdefghij";
+    private static final String SINK_URN =
+        "urn:core:platform:civitas:data-sink:common:doomed-sink:abcdefghij";
 
+    /** A dataset carrying one pipeline that wires one mapping and one sink. */
+    private DataSet datasetWithOwnedArtifacts(UUID id, String manifestUrn) {
+      DataSet ds = readyDataSet(id);
+      ds.setManifestLogicalUrn(manifestUrn);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setId(UUID.randomUUID());
+      pipeline.setModelLogicalUrn(PIPELINE_URN);
+      ds.setPipelines(new java.util.HashSet<>(Set.of(pipeline)));
+      return ds;
+    }
+
+    private DataSink ownedSink() {
       DataSink sink = new DataSink();
       sink.setId(UUID.randomUUID());
-      sink.setConfigurationLogicalUrn(
-          "urn:core:platform:civitas:data-sink:common:doomed-sink:abcdefghij");
+      sink.setConfigurationLogicalUrn(SINK_URN);
+      return sink;
+    }
 
+    private void stubOwnedArtifacts(UUID id, DataSet ds) {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
-      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(sink));
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(ownedSink()));
+      lenient()
+          .when(modelRegistryGateway.dependencyUrnsOfType(PIPELINE_URN, "mapping"))
+          .thenReturn(List.of(MAPPING_URN + ":1.0.0"));
+      lenient()
+          .when(modelRegistryGateway.logicalUrn(MAPPING_URN + ":1.0.0"))
+          .thenReturn(MAPPING_URN);
+    }
+
+    @Test
+    @DisplayName("removing a dataset directly deletes the artifacts it owned")
+    void directRemovalDeletesRegistryArtifacts() {
+      UUID id = UUID.randomUUID();
+      DataSet ds =
+          datasetWithOwnedArtifacts(
+              id, "urn:core:platform:civitas:dataset:common:doomed:abcdefghij");
+      ds.setProvisioned(false);
+      stubOwnedArtifacts(id, ds);
 
       createService().deleteById(id);
 
       verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
-      // The sink's configuration artifact is deliberately left: a surviving pipeline artifact
-      // references it, and the registry refuses to delete a referenced artifact.
-      verify(modelRegistryGateway, never()).deletePayload(any());
+      // The pipeline artifact holds the edges that keep the mapping, the sink configuration and the
+      // DataSource referenced, so all three go — otherwise those stay undeletable for good.
+      verify(modelRegistryGateway).deletePayload(PIPELINE_URN);
+      verify(modelRegistryGateway).deletePayload(MAPPING_URN);
+      verify(modelRegistryGateway).deletePayload(SINK_URN);
+    }
+
+    @Test
+    @DisplayName("the manifest goes before the pipeline, and the pipeline before what it wires")
+    void deletesArtifactsInReferenceOrder() {
+      UUID id = UUID.randomUUID();
+      DataSet ds =
+          datasetWithOwnedArtifacts(
+              id, "urn:core:platform:civitas:dataset:common:ordered:abcdefghij");
+      ds.setProvisioned(false);
+      stubOwnedArtifacts(id, ds);
+
+      createService().deleteById(id);
+
+      // Order is the whole point: a referenced artifact cannot be deleted, so each step has to
+      // remove the edges that keep the next one referenced.
+      InOrder order = inOrder(modelRegistryGateway);
+      order.verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
+      order.verify(modelRegistryGateway).deletePayload(PIPELINE_URN);
+      order.verify(modelRegistryGateway).deletePayload(MAPPING_URN);
+      order.verify(modelRegistryGateway).deletePayload(SINK_URN);
+    }
+
+    @Test
+    @DisplayName("a member the registry refuses to remove does not fail the delete")
+    void refusedMemberDoesNotFailTheDelete() {
+      UUID id = UUID.randomUUID();
+      DataSet ds =
+          datasetWithOwnedArtifacts(
+              id, "urn:core:platform:civitas:dataset:common:shared:abcdefghij");
+      ds.setProvisioned(false);
+      stubOwnedArtifacts(id, ds);
+      // A mapping another DataSet still references is refused, which must leave it intact rather
+      // than abort a delete whose rows are already gone.
+      doThrow(new IllegalStateException("still referenced"))
+          .when(modelRegistryGateway)
+          .deletePayload(MAPPING_URN);
+
+      createService().deleteById(id);
+
+      verify(dataSetRepository).delete(ds);
+      verify(modelRegistryGateway).deletePayload(SINK_URN);
     }
 
     @Test
@@ -2094,9 +2171,7 @@ class DataSetServiceTest {
                   id.toString(), null, null, null, null, null, null, null, null, null));
 
       verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
-      // The sink's configuration artifact is deliberately left: a surviving pipeline artifact
-      // references it, and the registry refuses to delete a referenced artifact.
-      verify(modelRegistryGateway, never()).deletePayload(any());
+      verify(modelRegistryGateway).deletePayload(sink.getConfigurationLogicalUrn());
     }
   }
 
