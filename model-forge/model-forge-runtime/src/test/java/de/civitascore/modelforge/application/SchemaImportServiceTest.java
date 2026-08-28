@@ -856,4 +856,68 @@ class SchemaImportServiceTest {
         when(validator.validateSchema(any())).thenReturn(List.of());
         return validator;
     }
+
+    /**
+     * A root {@code $ref} may name its member by CORE URN rather than by a local {@code #/$defs/}
+     * pointer, and the schema allows that URN to carry a version. It is repinned like any other
+     * member reference — the version a caller writes there is no more authoritative than one in an
+     * {@code $id}.
+     */
+    @Test
+    void rootRefGivenAsAUrn_isRepinnedToTheAssignedVersion() {
+        JsonNode schema;
+        try {
+            schema = mapper.readTree("""
+                {
+                  "$schema":"https://json-schema.org/draft/2020-12/schema",
+                  "$id":"urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b",
+                  "title":"People",
+                  "$ref":"urn:core:platform:civitas:element:common:Person:pp11abcd12:2.0.0",
+                  "$defs":{
+                    "Person":{
+                      "$id":"urn:core:platform:civitas:element:common:Person:pp11abcd12",
+                      "type":"object",
+                      "properties":{"name":{"type":"string"}}
+                    }
+                  }
+                }
+                """);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
+            .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class)))
+            .thenAnswer(inv -> inv.getArgument(0) + ":1.0.1");
+
+        svc.importSchema(new SchemaImportRequest(schema));
+
+        ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class));
+        assertThat(ds.getValue().path("$ref").asText())
+            .isEqualTo("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+    }
+
+    /**
+     * The grouping a plain {@code $defs} schema gets automatically references the versions its member
+     * writes assigned, exactly as a datastructure-rooted import does — the two manifests are built by
+     * different code but carry the same guarantee.
+     */
+    @Test
+    void automaticGroupingReferencesTheVersionsTheMemberWritesAssigned() {
+        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
+            .thenAnswer(inv -> inv.getArgument(1, JsonNode.class).path("$id").asText() + ":3.1.4");
+        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class)))
+            .thenAnswer(inv -> inv.getArgument(0) + ":3.1.4");
+
+        svc.importSchema(new SchemaImportRequest(catalog()));
+
+        ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class));
+        JsonNode defs = ds.getValue().path("$defs");
+        assertThat(defs.isObject()).isTrue();
+        assertThat(defs.properties()).isNotEmpty();
+        defs.properties().forEach(e ->
+            assertThat(UrnParser.versionFromUrn(e.getValue().path("$ref").asText())).isEqualTo("3.1.4"));
+    }
 }

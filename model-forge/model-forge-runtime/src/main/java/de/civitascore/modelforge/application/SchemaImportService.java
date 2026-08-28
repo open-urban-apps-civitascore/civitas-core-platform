@@ -665,14 +665,23 @@ public class SchemaImportService {
         if (manifest.get("$defs") instanceof ObjectNode defs) {
             defs.properties().forEach(e -> {
                 if (e.getValue() instanceof ObjectNode member) {
-                    String pin = pinByLogical.get(member.path("$ref").asText(null));
+                    String pin = assignedPin(pinByLogical, member.path("$ref").asText(null));
                     if (pin != null) member.put("$ref", pin);
                 }
             });
         }
         // The optional root $ref designates one member as the root shape; it pins to the same version.
-        String rootPin = pinByLogical.get(manifest.path("$ref").asText(null));
+        String rootPin = assignedPin(pinByLogical, manifest.path("$ref").asText(null));
         if (rootPin != null) manifest.put("$ref", rootPin);
+    }
+
+    /**
+     * The pin assigned to the member a reference names, or {@code null} when it names none. The
+     * reference is matched on its logical form: a root {@code $ref} may name its member by CORE URN
+     * rather than by a local pointer, and that URN is allowed to carry a version the caller chose.
+     */
+    private static String assignedPin(Map<String, String> pinByLogical, String ref) {
+        return ref == null ? null : pinByLogical.get(UrnParser.logicalUrn(ref));
     }
 
     private String storeDataStructureManifest(
