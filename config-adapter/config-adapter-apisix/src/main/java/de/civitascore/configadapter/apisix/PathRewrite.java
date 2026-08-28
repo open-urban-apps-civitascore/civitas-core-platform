@@ -11,6 +11,7 @@ package de.civitascore.configadapter.apisix;
 
 import java.util.List;
 import java.util.Map;
+import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,10 +70,11 @@ final class PathRewrite {
     String routePath = routePathOf(route);
     String upstreamPath = upstreamPathOf(proxyRewrite);
     if (routePath == null || upstreamPath == null) {
-      // A skipped correction leaves the route forwarding a trailing slash and any sub-path
-      // verbatim, so it must not pass silently.
+      // The skip leaves this route forwarding a trailing slash and any sub-path verbatim, and a
+      // dataset has several, so the line has to name which one.
       LOG.warn(
-          "Left a named-API route's rewrite unchanged: {}",
+          "Left named-API route {} unchanged: {}",
+          Encode.forJava(routeIdOf(route)),
           routePath == null ? "it carries no address" : "its rewrite carries no complete pair");
       return;
     }
@@ -82,6 +84,16 @@ final class PathRewrite {
     if (route.get("uris") != null) {
       route.put("uris", matchedUris(routePath, kind));
     }
+  }
+
+  /** The id APISIX returns a route under, falling back to its address. Never null. */
+  private static String routeIdOf(Map<String, Object> route) {
+    Object id = route.get("id");
+    if (id instanceof String s && !s.isBlank()) {
+      return s;
+    }
+    String routePath = routePathOf(route);
+    return routePath != null ? routePath : "<unidentified>";
   }
 
   /**

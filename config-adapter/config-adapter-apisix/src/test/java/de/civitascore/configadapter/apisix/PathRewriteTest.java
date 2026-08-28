@@ -10,6 +10,8 @@
 package de.civitascore.configadapter.apisix;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.HashMap;
 import java.util.List;
@@ -81,5 +83,34 @@ class PathRewriteTest {
     PathRewrite.normalize(
         staRoute, singlePairRewrite(staPath, STA_UPSTREAM), RouteUpstreamKind.STA);
     assertArrayEquals(new String[] {staPath, staPath + "/*"}, (String[]) staRoute.get("uris"));
+  }
+
+  @Test
+  @DisplayName("a route carrying no address is left exactly as it came back")
+  void leavesARouteWithoutAnAddressAlone() {
+    String routePath = "/v1/datasets/ds-1/map";
+    Map<String, Object> route = new HashMap<>();
+    route.put("id", "route-1");
+    Map<String, Object> proxyRewrite = singlePairRewrite(routePath, OWS_UPSTREAM);
+
+    PathRewrite.normalize(route, proxyRewrite, RouteUpstreamKind.OWS);
+
+    assertEquals(
+        List.of("^" + routePath + "(/.*)?$", OWS_UPSTREAM + "$1"), proxyRewrite.get("regex_uri"));
+    assertNull(route.get("uris"));
+  }
+
+  @Test
+  @DisplayName("a route whose rewrite carries no complete pair is left exactly as it came back")
+  void leavesAnIncompleteRewriteAlone() {
+    String routePath = "/v1/datasets/ds-1/map";
+    Map<String, Object> route = routeMatching(List.of(routePath));
+    Map<String, Object> proxyRewrite = new HashMap<>();
+    proxyRewrite.put("regex_uri", List.of("^" + routePath + "$"));
+
+    PathRewrite.normalize(route, proxyRewrite, RouteUpstreamKind.OWS);
+
+    assertEquals(List.of("^" + routePath + "$"), proxyRewrite.get("regex_uri"));
+    assertEquals(List.of(routePath), route.get("uris"));
   }
 }
