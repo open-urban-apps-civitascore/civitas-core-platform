@@ -1,7 +1,7 @@
 meta {
   name: 7. Create Pipeline (geoPoint mapping)
   type: http
-  seq: 15
+  seq: 16
 }
 
 post {
@@ -18,36 +18,87 @@ body:json {
   {
     "name": "PostGIS Saga Pipeline",
     "description": "Pipeline mapping lon/lat scalars to a PostGIS Point via the geoPoint op",
-    "dataSourceIds": ["{{pgDataSourceId}}"],
-    "dataSinkIds": ["{{pgDataSinkId}}"],
-    "model": {
-      "viewport": { "x": 0, "y": 0, "zoom": 1 },
+    "dataSourceIds": [
+      "{{pgDataSourceId}}"
+    ],
+    "dataSinkIds": [
+      "{{pgDataSinkId}}"
+    ],
+    "styles": {
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+      },
       "nodePositions": {
-        "33333333-3333-4000-8000-000000000001": { "x": 360, "y": -40 },
-        "33333333-3333-4000-8000-000000000005": { "x": 140, "y": 100 },
-        "33333333-3333-4000-8000-000000000002": { "x": 320, "y": 100 },
-        "33333333-3333-4000-8000-000000000006": { "x": 520, "y": 100 },
-        "33333333-3333-4000-8000-000000000003": { "x": 740, "y": 80 }
+        "33333333-3333-4000-8000-000000000001": {
+          "x": 360,
+          "y": -40
+        },
+        "33333333-3333-4000-8000-000000000005": {
+          "x": 140,
+          "y": 100
+        },
+        "33333333-3333-4000-8000-000000000002": {
+          "x": 320,
+          "y": 100
+        },
+        "33333333-3333-4000-8000-000000000006": {
+          "x": 520,
+          "y": 100
+        },
+        "33333333-3333-4000-8000-000000000003": {
+          "x": 740,
+          "y": 80
+        }
       },
       "nodes": [
         {
           "id": "33333333-3333-4000-8000-000000000001",
           "type": "start",
-          "position": { "x": 360, "y": -40 },
-          "data": { "nodeType": "start", "label": "Start", "configured": true, "description": "Entry point of the pipeline. Execution begins here." },
-          "measured": { "width": 32, "height": 32 }
+          "position": {
+            "x": 360,
+            "y": -40
+          },
+          "data": {
+            "nodeType": "start",
+            "label": "Start",
+            "configured": true,
+            "description": "Entry point of the pipeline. Execution begins here."
+          },
+          "measured": {
+            "width": 32,
+            "height": 32
+          }
         },
         {
           "id": "33333333-3333-4000-8000-000000000005",
           "type": "dataSource",
-          "position": { "x": 140, "y": 100 },
-          "data": { "label": "MQTT Source", "configured": true, "entityType": "datasource", "entityId": "{{pgDataSourceId}}", "entityMetadata": { "connector": "MQTT" } },
-          "measured": { "width": 160, "height": 48 }
+          "position": {
+            "x": 140,
+            "y": 100
+          },
+          "data": {
+            "label": "MQTT Source",
+            "configured": true,
+            "entityType": "datasource",
+            "entityId": "{{pgDataSourceId}}",
+            "entityMetadata": {
+              "connector": "MQTT"
+            }
+          },
+          "measured": {
+            "width": 160,
+            "height": 48
+          }
         },
         {
           "id": "33333333-3333-4000-8000-000000000002",
           "type": "mapping",
-          "position": { "x": 320, "y": 100 },
+          "position": {
+            "x": 320,
+            "y": 100
+          },
           "data": {
             "label": "Mapping",
             "configured": true,
@@ -57,7 +108,11 @@ body:json {
               "target": "urn:core:tenant:civitas:datastructure:demo:GeoSensorTarget:0000000002:1.0.0",
               "fields": {
                 "$.stationid": "$.stationid",
-                "$.geo": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }
+                "$.geo": {
+                  "op": "geoPoint",
+                  "lon": "$.lon",
+                  "lat": "$.lat"
+                }
               },
               "positions": {}
             },
@@ -68,30 +123,164 @@ body:json {
             "targetVersionId": "{{pgTargetVersionId}}",
             "targetName": "GeoSensorTarget"
           },
-          "measured": { "width": 160, "height": 66 },
+          "measured": {
+            "width": 160,
+            "height": 66
+          },
           "selected": false,
           "dragging": false
         },
         {
           "id": "33333333-3333-4000-8000-000000000006",
           "type": "geoPersistence",
-          "position": { "x": 520, "y": 100 },
-          "data": { "label": "Geospatial Data Storage", "configured": true, "entityType": "persistence", "entityId": "{{pgDataSinkId}}", "tableName": "saga_geo_observations", "dataStructureVersionId": "{{pgTargetDataStructureId}}/{{pgTargetVersionId}}", "dataStructureName": "GeoSensorTarget" },
-          "measured": { "width": 160, "height": 48 }
+          "position": {
+            "x": 520,
+            "y": 100
+          },
+          "data": {
+            "label": "Geospatial Data Storage",
+            "configured": true,
+            "entityType": "persistence",
+            "entityId": "{{pgDataSinkId}}",
+            "tableName": "saga_geo_observations",
+            "dataStructureVersionId": "{{pgTargetDataStructureId}}/{{pgTargetVersionId}}",
+            "dataStructureName": "GeoSensorTarget"
+          },
+          "measured": {
+            "width": 160,
+            "height": 48
+          }
         },
         {
           "id": "33333333-3333-4000-8000-000000000003",
           "type": "end",
-          "position": { "x": 740, "y": 80 },
-          "data": { "nodeType": "end", "label": "End", "configured": true, "description": "Exit point of the pipeline. Execution completes here." },
-          "measured": { "width": 32, "height": 32 }
+          "position": {
+            "x": 740,
+            "y": 80
+          },
+          "data": {
+            "nodeType": "end",
+            "label": "End",
+            "configured": true,
+            "description": "Exit point of the pipeline. Execution completes here."
+          },
+          "measured": {
+            "width": 32,
+            "height": 32
+          }
         }
       ],
       "edges": [
-        { "id": "33333333-3333-4000-8000-0000000000e1", "source": "33333333-3333-4000-8000-000000000001", "target": "33333333-3333-4000-8000-000000000005", "type": "smoothstep", "data": { "label": "" } },
-        { "id": "33333333-3333-4000-8000-0000000000e3", "source": "33333333-3333-4000-8000-000000000005", "target": "33333333-3333-4000-8000-000000000002", "type": "smoothstep", "data": { "label": "" } },
-        { "id": "33333333-3333-4000-8000-0000000000e4", "source": "33333333-3333-4000-8000-000000000002", "target": "33333333-3333-4000-8000-000000000006", "type": "smoothstep", "data": { "label": "" } },
-        { "id": "33333333-3333-4000-8000-0000000000e2", "source": "33333333-3333-4000-8000-000000000006", "target": "33333333-3333-4000-8000-000000000003", "type": "smoothstep", "data": { "label": "" } }
+        {
+          "id": "33333333-3333-4000-8000-0000000000e1",
+          "source": "33333333-3333-4000-8000-000000000001",
+          "target": "33333333-3333-4000-8000-000000000005",
+          "type": "smoothstep",
+          "data": {
+            "label": ""
+          }
+        },
+        {
+          "id": "33333333-3333-4000-8000-0000000000e3",
+          "source": "33333333-3333-4000-8000-000000000005",
+          "target": "33333333-3333-4000-8000-000000000002",
+          "type": "smoothstep",
+          "data": {
+            "label": ""
+          }
+        },
+        {
+          "id": "33333333-3333-4000-8000-0000000000e4",
+          "source": "33333333-3333-4000-8000-000000000002",
+          "target": "33333333-3333-4000-8000-000000000006",
+          "type": "smoothstep",
+          "data": {
+            "label": ""
+          }
+        },
+        {
+          "id": "33333333-3333-4000-8000-0000000000e2",
+          "source": "33333333-3333-4000-8000-000000000006",
+          "target": "33333333-3333-4000-8000-000000000003",
+          "type": "smoothstep",
+          "data": {
+            "label": ""
+          }
+        }
+      ]
+    },
+    "model": {
+      "nodes": [
+        {
+          "id": "33333333-3333-4000-8000-000000000001",
+          "kind": "start",
+          "label": "Start",
+          "x-ui-position": {
+            "x": 360,
+            "y": -40
+          }
+        },
+        {
+          "id": "33333333-3333-4000-8000-000000000005",
+          "kind": "source",
+          "label": "MQTT Source",
+          "x-ui-position": {
+            "x": 140,
+            "y": 100
+          },
+          "sourceRef": "{{pgDataSourceConfigurationUrn}}"
+        },
+        {
+          "id": "33333333-3333-4000-8000-000000000002",
+          "kind": "mapping",
+          "label": "Mapping",
+          "x-ui-position": {
+            "x": 320,
+            "y": 100
+          },
+          "mappingRef": "{{pgMappingUrn}}"
+        },
+        {
+          "id": "33333333-3333-4000-8000-000000000006",
+          "kind": "sink",
+          "label": "Geospatial Data Storage",
+          "x-ui-position": {
+            "x": 520,
+            "y": 100
+          },
+          "sinkRef": "{{pgDataSinkConfigurationUrn}}"
+        },
+        {
+          "id": "33333333-3333-4000-8000-000000000003",
+          "kind": "end",
+          "label": "End",
+          "x-ui-position": {
+            "x": 740,
+            "y": 80
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "33333333-3333-4000-8000-0000000000e1",
+          "source": "33333333-3333-4000-8000-000000000001",
+          "target": "33333333-3333-4000-8000-000000000005"
+        },
+        {
+          "id": "33333333-3333-4000-8000-0000000000e3",
+          "source": "33333333-3333-4000-8000-000000000005",
+          "target": "33333333-3333-4000-8000-000000000002"
+        },
+        {
+          "id": "33333333-3333-4000-8000-0000000000e4",
+          "source": "33333333-3333-4000-8000-000000000002",
+          "target": "33333333-3333-4000-8000-000000000006"
+        },
+        {
+          "id": "33333333-3333-4000-8000-0000000000e2",
+          "source": "33333333-3333-4000-8000-000000000006",
+          "target": "33333333-3333-4000-8000-000000000003"
+        }
       ]
     }
   }

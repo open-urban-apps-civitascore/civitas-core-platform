@@ -1,0 +1,58 @@
+meta {
+  name: 00b. Create Mapping for the pipeline
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/mappings
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "title": "ApiTestObservation-passthrough",
+    "source": "{{setupModelUrn}}",
+    "target": "{{setupModelUrn}}",
+    "fields": {
+      "$.station_id": "$.station_id",
+      "$.value": "$.value"
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.versionedUrn) {
+    bru.setVar('pipelinesMappingUrn', res.body.versionedUrn);
+    bru.setVar('pipelinesMappingLogicalUrn', res.body.logicalUrn);
+  }
+}
+
+tests {
+  test("Mapping created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Carries the URN the pipeline references as mappingRef", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.versionedUrn).to.contain(':mapping:');
+    }
+  });
+}
+
+docs {
+  **Pipelines setup 00b** — the mapping the pipeline references by `mappingRef`.
+
+  A Mapping is a first-class registry artifact addressed under the dataset that holds it, so a
+  pipeline no longer carries its rules inline. Source and target are the same structure here: these
+  fixtures exercise pipeline CRUD, not a transform, and both sides only have to resolve.
+
+  **Expected Response:** 201 Created with `logicalUrn` and `versionedUrn`.
+
+  **Post-condition:** Saves `pipelinesMappingUrn`.
+}

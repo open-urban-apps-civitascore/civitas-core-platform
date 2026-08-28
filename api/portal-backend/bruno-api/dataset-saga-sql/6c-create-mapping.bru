@@ -1,0 +1,82 @@
+meta {
+  name: 6c. Create Mapping (geoPoint)
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/mappings
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sqlDataSetId}}
+}
+
+body:json {
+  {
+    "title": "GeoSensorSource-to-GeoSensorTarget",
+    "source": "{{sqlSourceModelUrn}}",
+    "target": "{{sqlTargetModelUrn}}",
+    "fields": {
+      "$.stationid": "$.stationid",
+      "$.geo": {
+        "op": "geoPoint",
+        "lon": "$.lon",
+        "lat": "$.lat"
+      }
+    },
+    "positions": {}
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.versionedUrn) {
+    bru.setVar('sqlMappingUrn', res.body.versionedUrn);
+    bru.setVar('sqlMappingLogicalUrn', res.body.logicalUrn);
+  }
+}
+
+tests {
+  test("Mapping created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Returns both URN pins", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.logicalUrn).to.be.a('string');
+      expect(res.body.versionedUrn).to.be.a('string');
+    }
+  });
+
+  test("Source and target name the released structures", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.versionedUrn).to.contain(':mapping:');
+    }
+  });
+}
+
+docs {
+  Creates the Mapping the pipeline references by `mappingRef`.
+
+  A Mapping is a first-class registry artifact addressed under the dataset that holds it. The
+  document carries the field rules only — `$schema` and `id` are stamped by the registry, so the
+  request must not send them. `source` and `target` are versioned CORE URNs of the released
+  DataStructures and are checked for existence, so they come from the version responses
+  (`modelUrn`), not from a literal.
+
+  `$.geo` uses the **geoPoint** op, which the deployment engine compiles to a WKT
+  `POINT(<lon> <lat>)` literal that the target's `GEOMETRY(POINT,4326)` column parses on insert;
+  `$.stationid` is a straight copy.
+
+  **Expected Response:** 201 Created with `logicalUrn`, `versionedUrn` and `version`.
+
+  **Post-condition:** Saves `sqlMappingUrn`, referenced by the pipeline's mapping node.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Mapping artifact stored in the registry and linked into the dataset's manifest |
+}

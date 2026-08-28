@@ -28,6 +28,10 @@ script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('sqlDataSinkId', res.body.id);
   }
+
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('sqlDataSinkConfigurationUrn', res.body.configurationUrn);
+  }
 }
 
 tests {

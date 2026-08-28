@@ -39,6 +39,10 @@ script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('pgSourceVersionId', res.body.id);
   }
+
+  if (res.body && res.body.modelUrn) {
+    bru.setVar('pgSourceModelUrn', res.body.modelUrn);
+  }
 }
 
 tests {

@@ -1,0 +1,78 @@
+meta {
+  name: Setup - Create DataStructure Version
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{setupDataStructureId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "1.0.0",
+    "description": "Base version for API testing",
+    "modelName": "ApiTestObservation",
+    "model": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ApiTestObservation",
+      "type": "object",
+      "properties": {
+        "station_id": { "type": "string" },
+        "value": { "type": "number" }
+      },
+      "required": ["station_id"]
+    },
+    "styles": {}
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataStructureVersionId', res.body.id);
+    bru.setVar('setupDataStructureVersionId', res.body.id);
+  }
+  if (res.body && res.body.modelUrn) {
+    bru.setVar('setupModelUrn', res.body.modelUrn);
+  }
+}
+
+tests {
+  test("Version created", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from a previous run (idempotent setup).
+    expect(status === 201 || status === 409).to.be.true;
+  });
+
+  test("Carries the registry URN a DataSink references", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.modelUrn).to.be.a('string');
+      expect(res.body.modelUrn).to.contain('urn:core:');
+    }
+  });
+}
+
+docs {
+  **Setup step 04b** — Precondition: `setupDataStructureId` is set (step 04).
+
+  Creates the base version the DataSink fixtures reference. A DataSink names the model it writes by
+  its CORE URN, which the registry assigns on store and returns as `modelUrn` — so this step is what
+  makes the `datasinks/` and `pipelines/` folders able to build a valid configuration.
+
+  **Expected Response:** 201 Created with `id` and `modelUrn`. 409 if it already existed.
+
+  **Post-condition:** Saves `dataStructureVersionId`, `setupDataStructureVersionId` and `setupModelUrn`.
+
+  **System Impact**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Version row created; its model stored as a registry artifact |
+}

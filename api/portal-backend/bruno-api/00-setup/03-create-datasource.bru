@@ -38,6 +38,9 @@ script:post-response {
     bru.setVar('scopeType', 'DATASOURCE');
     bru.setVar('scopeId', res.body.id);
   }
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('setupDataSourceConfigurationUrn', res.body.configurationUrn);
+  }
 }
 
 tests {

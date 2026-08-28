@@ -14,6 +14,12 @@ params:path {
   id: {{pgDataSourceId}}
 }
 
+script:post-response {
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('pgDataSourceConfigurationUrn', res.body.configurationUrn);
+  }
+}
+
 tests {
   test("Released", function() {
     const status = res.getStatus();

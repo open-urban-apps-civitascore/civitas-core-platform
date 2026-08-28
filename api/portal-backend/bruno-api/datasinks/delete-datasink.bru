@@ -15,6 +15,14 @@ params:path {
   id: {{dataSinkId}}
 }
 
+tests {
+  test("DataSink deleted", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone from a previous run.
+    expect(status === 204 || status === 404).to.be.true;
+  });
+}
+
 docs {
   **Precondition:** `dataSetId` and `dataSinkId` are set. The DataSink must not be in use by a Layer (delete dependent Layers first).
 

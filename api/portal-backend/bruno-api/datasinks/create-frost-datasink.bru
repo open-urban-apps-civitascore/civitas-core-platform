@@ -28,6 +28,24 @@ script:post-response {
   }
 }
 
+tests {
+  test("DataSink created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Has FROST type", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.dataSinkType).to.equal('FROST');
+    }
+  });
+
+  test("An empty configuration still yields a referencable artifact", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.configurationUrn).to.contain('urn:core:');
+    }
+  });
+}
+
 docs {
   **Precondition:** `dataSetId` is set.
 
