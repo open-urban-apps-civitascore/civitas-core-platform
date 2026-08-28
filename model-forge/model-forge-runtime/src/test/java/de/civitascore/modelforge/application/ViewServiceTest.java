@@ -783,4 +783,57 @@ class ViewServiceTest {
         }
     }
 
+
+    /**
+     * A DataStructure manifest pins its members, and those pins decide what a view embeds. A member's
+     * reference to a sibling is logical, so resolving it against the registry would return the
+     * sibling's current version — a released structure's view would then change whenever a sibling
+     * was edited.
+     */
+    @Test
+    void bundle_resolvesSiblingRefsAgainstTheManifestPins() {
+        String headLogical = "urn:core:platform:civitas:element:common:Head:hh00000001";
+        String lineLogical = "urn:core:platform:civitas:element:common:Line:ll00000001";
+        String dsUrn       = "urn:core:platform:civitas:datastructure:common:Order:ds00000001:1.0.0";
+
+        // Head references its sibling logically.
+        ObjectNode head = MAPPER.createObjectNode();
+        head.put("$id", headLogical);
+        head.put("type", "object");
+        head.putObject("properties").putObject("line").put("$ref", lineLogical);
+
+        // The version the manifest pins, and the newer one the member has since reached.
+        ObjectNode linePinned = MAPPER.createObjectNode();
+        linePinned.put("$id", lineLogical);
+        linePinned.putObject("properties").putObject("a").put("type", "string");
+        ObjectNode lineCurrent = (ObjectNode) linePinned.deepCopy();
+        lineCurrent.path("properties").require().withObject("b").put("type", "string");
+
+        ObjectNode manifest = MAPPER.createObjectNode();
+        manifest.put("$id", "urn:core:platform:civitas:datastructure:common:Order:ds00000001");
+        ObjectNode defs = manifest.putObject("$defs");
+        defs.putObject("Head").put("$ref", headLogical + ":1.0.0");
+        defs.putObject("Line").put("$ref", lineLogical + ":1.0.0");
+
+        when(mockRegistry.fetchElementOrXsd(dsUrn)).thenReturn(Optional.of(manifest));
+        when(mockRegistry.fetchElementOrXsd(headLogical + ":1.0.0")).thenReturn(Optional.of(head));
+        when(mockRegistry.fetchElementOrXsd(lineLogical + ":1.0.0")).thenReturn(Optional.of(linePinned));
+        when(mockRegistry.fetchElementOrXsd(lineLogical)).thenReturn(Optional.of(lineCurrent));
+        when(mockRegistry.resolveReference(lineLogical)).thenReturn(Optional.of(lineLogical + ":1.0.1"));
+
+        graph.register(dsUrn, Set.of(headLogical + ":1.0.0", lineLogical + ":1.0.0"));
+        graph.register(headLogical + ":1.0.0", Set.of(lineLogical));
+
+        JsonNode bundled = viewService.bundle(dsUrn, 5).orElseThrow();
+
+        Set<String> refs = new java.util.LinkedHashSet<>();
+        collectCoreUrnRefs(bundled, refs);
+        assertThat(refs).contains(lineLogical + ":1.0.0")
+            .doesNotContain(lineLogical + ":1.0.1");
+
+        Set<String> ids = new java.util.LinkedHashSet<>();
+        collectIds(bundled, ids);
+        assertThat(ids).doesNotContain(lineLogical + ":1.0.1");
+    }
+
 }

@@ -73,7 +73,11 @@ public class ViewService {
         return registry.fetchElementOrXsd(urn)
                 // Inlined refs disappear; any ref left intact (depth/cycle/latest) is rewritten to
                 // its concrete resolved version so the output carries no unresolved :latest pointer.
-                .map(root -> rewriteRefsToConcrete(inlineNode(root, new LinkedHashSet<>(), depth)));
+                .map(root -> {
+                    Map<String, String> memberPins = memberPins(root);
+                    return rewriteRefsToConcrete(
+                        inlineNode(root, new LinkedHashSet<>(), depth, memberPins), memberPins);
+                });
     }
 
     /**
@@ -83,20 +87,26 @@ public class ViewService {
      * @param resolving set of URNs currently being resolved (cycle guard)
      * @param depth     remaining cross-document inlining hops; a URN ref is only inlined when {@code > 0}
      */
-    private JsonNode inlineNode(JsonNode node, Set<String> resolving, int depth) {
+    private JsonNode inlineNode(JsonNode node, Set<String> resolving, int depth,
+                                Map<String, String> memberPins) {
         if (node == null || node.isNull() || node.isMissingNode()) return node;
 
         // If this node IS a $ref to a CORE URN, replace it with the inlined schema.
         // Uses fetchElementOrXsd so XSD URNs are transparently converted.
         if (node.isObject() && node.has("$ref")) {
-            String ref = node.get("$ref").asText();
+            String authored = node.get("$ref").asText();
+            // A logical sibling reference expands to the version the root pins, not the target's
+            // current one. An explicit version (or :latest) is the caller's choice and stands.
+            String ref = UrnParser.versionFromUrn(authored) == null
+                ? memberPins.getOrDefault(UrnParser.logicalUrn(authored), authored)
+                : authored;
             if (depth > 0 && UrnParser.isUrn(ref) && !resolving.contains(ref)) {
                 Optional<JsonNode> fetched = registry.fetchElementOrXsd(ref);
                 if (fetched.isPresent()) {
                     Set<String> next = new LinkedHashSet<>(resolving);
                     next.add(ref);
                     // Crossing one cross-document boundary consumes one depth level.
-                    JsonNode inlined = inlineNode(fetched.get(), next, depth - 1);
+                    JsonNode inlined = inlineNode(fetched.get(), next, depth - 1, memberPins);
 
                     // No sibling keywords besides $ref → inline the target directly.
                     if (node.size() == 1) return inlined;
@@ -114,7 +124,7 @@ public class ViewService {
                     // Siblings live in the same document level → keep the current depth.
                     node.properties().forEach(e -> {
                         if (!"$ref".equals(e.getKey()))
-                            merged.set(e.getKey(), inlineNode(e.getValue(), resolving, depth));
+                            merged.set(e.getKey(), inlineNode(e.getValue(), resolving, depth, memberPins));
                     });
                     return merged;
                 }
@@ -126,13 +136,13 @@ public class ViewService {
         if (node.isObject()) {
             ObjectNode copy = mapper.createObjectNode();
             node.properties().forEach(entry ->
-                copy.set(entry.getKey(), inlineNode(entry.getValue(), resolving, depth)));
+                copy.set(entry.getKey(), inlineNode(entry.getValue(), resolving, depth, memberPins)));
             return copy;
         }
 
         if (node.isArray()) {
             ArrayNode arr = mapper.createArrayNode();
-            node.forEach(child -> arr.add(inlineNode(child, resolving, depth)));
+            node.forEach(child -> arr.add(inlineNode(child, resolving, depth, memberPins)));
             return arr;
         }
 
@@ -185,6 +195,7 @@ public class ViewService {
         // (a cycle back to the root would otherwise create a duplicate $id in the document).
         String rootId      = root.has("$id") ? root.get("$id").asText() : urn;
         String rootLogical = UrnParser.logicalUrn(rootId);
+        Map<String, String> memberPins = memberPins(root);
 
         ObjectNode defsNode = mapper.createObjectNode();
 
@@ -200,16 +211,22 @@ public class ViewService {
         //    disambiguate rather than overwrite — every embedded $id must survive,
         //    otherwise refs to the dropped resource would dangle.
         //    Uses fetchElementOrXsd so XSD deps are resolved transparently.
+        Set<String> embedded = new LinkedHashSet<>();
         for (String depUrn : allDeps) {
             if (UrnParser.logicalUrn(depUrn).equals(rootLogical)) continue; // root self-cycle
-            Optional<JsonNode> depSchema = registry.fetchElementOrXsd(depUrn);
+            // Resolved before the fetch, so a sibling reached logically embeds at the version the
+            // root pins. The same target can be reached both ways (pinned as a member, logical from a
+            // sibling), so it is embedded once — two copies would give the document duplicate $ids.
+            String concreteDepUrn = concreteRef(depUrn, memberPins);
+            if (embedded.contains(concreteDepUrn)) continue;
+            Optional<JsonNode> depSchema = registry.fetchElementOrXsd(concreteDepUrn);
             if (depSchema.isEmpty()) continue;
+            embedded.add(concreteDepUrn);
             // The root's $ref to this dependency is rewritten to its concrete versioned URN
             // (see concreteRef/rewriteRefsToConcrete). The embedded resource's $id must equal
             // that exact URN, otherwise the $ref dangles. For an XSD-authored Element the
             // converted $id is type-/bundle-level (one segment longer than the artifact URN) and
             // would never match — so we stamp the concrete dep URN as the embedded $id.
-            String concreteDepUrn = registry.resolveReference(depUrn).orElse(depUrn);
             String key = uniqueDefKey(defsNode, UrnParser.nameFromUrn(depUrn), depUrn);
             defsNode.set(key, ensureEmbeddedId(depSchema.get(), concreteDepUrn));
         }
@@ -237,19 +254,44 @@ public class ViewService {
 
         // Embedded resources carry concrete versioned $ids; rewrite any :latest/logical $ref to the
         // concrete resolved version so refs resolve against those embedded $ids (pinned refs unchanged).
-        return Optional.of(rewriteRefsToConcrete(bundled));
+        return Optional.of(rewriteRefsToConcrete(bundled, memberPins));
     }
 
     /**
      * The concrete versioned URN a view should emit for a reference: a {@code :latest} or logical
      * CORE URN resolves to the target's current version; a pinned URN (or non-URN ref) is unchanged.
      */
-    private String concreteRef(String ref) {
+    private String concreteRef(String ref, Map<String, String> memberPins) {
         if (ref != null && UrnParser.isUrn(ref)
                 && (UrnParser.isLatest(ref) || UrnParser.versionFromUrn(ref) == null)) {
+            // A pin the root declares wins over the target's current version. An explicit :latest is
+            // a request for current and is left to resolve normally.
+            if (!UrnParser.isLatest(ref)) {
+                String pinned = memberPins.get(UrnParser.logicalUrn(ref));
+                if (pinned != null) return pinned;
+            }
             return registry.resolveReference(ref).orElse(ref);
         }
         return ref;
+    }
+
+    /**
+     * The member versions a DataStructure manifest pins, keyed by logical URN. A member's reference to
+     * a sibling is logical — two members referencing each other could not each carry the other's
+     * assigned version — so these pins, not the target's current version, decide what a view embeds.
+     * Empty for any root that is not a manifest of bare URN {@code $ref}s.
+     */
+    private static Map<String, String> memberPins(JsonNode root) {
+        JsonNode defs = root.path("$defs");
+        if (!defs.isObject()) return Map.of();
+        Map<String, String> pins = new LinkedHashMap<>();
+        defs.properties().forEach(e -> {
+            String ref = e.getValue().path("$ref").asText(null);
+            if (UrnParser.isUrn(ref) && UrnParser.versionFromUrn(ref) != null) {
+                pins.put(UrnParser.logicalUrn(ref), ref);
+            }
+        });
+        return pins;
     }
 
     /**
@@ -257,22 +299,22 @@ public class ViewService {
      * concrete resolved version. Pinned refs and non-URN (JSON-pointer) refs are left untouched, so
      * no extra registry lookups happen for them.
      */
-    private JsonNode rewriteRefsToConcrete(JsonNode node) {
+    private JsonNode rewriteRefsToConcrete(JsonNode node, Map<String, String> memberPins) {
         if (node == null) return node;
         if (node.isObject()) {
             ObjectNode copy = mapper.createObjectNode();
             node.properties().forEach(e -> {
                 if ("$ref".equals(e.getKey()) && e.getValue().isTextual()) {
-                    copy.put("$ref", concreteRef(e.getValue().asText()));
+                    copy.put("$ref", concreteRef(e.getValue().asText(), memberPins));
                 } else {
-                    copy.set(e.getKey(), rewriteRefsToConcrete(e.getValue()));
+                    copy.set(e.getKey(), rewriteRefsToConcrete(e.getValue(), memberPins));
                 }
             });
             return copy;
         }
         if (node.isArray()) {
             ArrayNode arr = mapper.createArrayNode();
-            node.forEach(child -> arr.add(rewriteRefsToConcrete(child)));
+            node.forEach(child -> arr.add(rewriteRefsToConcrete(child, memberPins)));
             return arr;
         }
         return node;
