@@ -31,11 +31,13 @@ public final class CoreJsonSchemaFactory {
         return JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012, builder ->
             builder.metaSchema(metaSchema)
                 .defaultMetaSchemaIri(metaSchema.getIri())
-                // Resolution is limited to local pointers and classpath meta-schemas, which is all
-                // a CORE artifact uses. Refs resolve eagerly, so an http or file reference in a
-                // submitted document is otherwise fetched by the server — outside UrlGuard, untimed
-                // and following redirects. Accepting URL-referenced schemas requires a SchemaLoader
-                // routed through UrlGuard and the capped fetcher.
-                .schemaLoaders(loaders -> loaders.add(DisallowSchemaLoader.getInstance())));
+                // Resolution is limited to local pointers, the vendored schemas and classpath
+                // meta-schemas. Refs resolve eagerly, so any other http or file reference in a
+                // submitted document would otherwise be fetched by the server — outside UrlGuard,
+                // untimed and following redirects. Accepting further URL-referenced schemas requires
+                // either another vendored copy or a SchemaLoader routed through UrlGuard and the
+                // capped fetcher.
+                .schemaLoaders(loaders -> loaders.add(new VendoredSchemaLoader())
+                    .add(DisallowSchemaLoader.getInstance())));
     }
 }
