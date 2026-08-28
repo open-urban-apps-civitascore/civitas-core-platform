@@ -2,6 +2,7 @@ package de.civitascore.modelforge.persistence.postgres;
 
 import de.civitascore.modelforge.core.port.ArtifactSearchCriteria;
 import de.civitascore.modelforge.contract.RegistryUnavailableException;
+import de.civitascore.modelforge.contract.VersionBump;
 import de.civitascore.modelforge.core.port.XsdSchemaConverter;
 import de.civitascore.modelforge.urn.UrnService;
 import org.junit.jupiter.api.Test;
@@ -123,5 +124,29 @@ class PostgresArtifactRegistryClientTest {
 
         assertThatThrownBy(() -> client.storeElement("Grammar", schema, Set.of()))
             .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void versionBumpDuringStorageOutage_surfacesAsRegistryUnavailableException() {
+        // bumpVersion opens its own transaction rather than going through writeArtifact, so it needs
+        // the same translation: a transient storage failure inside it must become a 502, not escape raw.
+        var client = clientWithFailingDb(new QueryTimeoutException("statement timed out"));
+        assertThatThrownBy(() -> client.bumpVersion(
+                "urn:core:platform:civitas:datastructure:common:Outage:kmbccayu3w", VersionBump.MINOR))
+            .isInstanceOf(RegistryUnavailableException.class);
+    }
+
+    @Test
+    void versionBumpViolatingIntegrity_surfacesAsIllegalArgumentWithoutLeakingDbText() {
+        // Two bumps racing onto the same (artifact_id, version) is the caller's fault → 400, with the
+        // safe generic message rather than the raw constraint text.
+        String rawDbDetail = "duplicate key value violates unique constraint \"artifact_version_artifact_id_version_key\"";
+        var client = clientWithFailingDb(new DataIntegrityViolationException(rawDbDetail));
+
+        assertThatThrownBy(() -> client.bumpVersion(
+                "urn:core:platform:civitas:datastructure:common:Dup:sj4jrj0ynz", VersionBump.MAJOR))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("conflicts with existing registry data")
+            .hasMessageNotContaining(rawDbDetail);
     }
 }

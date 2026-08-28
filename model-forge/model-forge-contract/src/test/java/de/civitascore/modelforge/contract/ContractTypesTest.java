@@ -49,4 +49,22 @@ class ContractTypesTest {
         assertThat(importCommand.schema()).isSameAs(schema);
         assertThat(validateCommand.instance()).isSameAs(instance);
     }
+
+    @Test
+    void bumpVersionCommandDefaultsToPatchAndRequiresAnIdentity() {
+        var artifactId = new ArtifactId("urn:core:platform:civitas:datastructure:common:Order:ds00000001");
+
+        assertThat(new BumpVersionCommand(artifactId, null).bump()).isEqualTo(VersionBump.PATCH);
+        assertThat(new BumpVersionCommand(artifactId).bump()).isEqualTo(VersionBump.PATCH);
+        assertThatExceptionOfType(NullPointerException.class)
+            .isThrownBy(() -> new BumpVersionCommand(null, VersionBump.MAJOR));
+    }
+
+    @Test
+    void importSchemaCommandDefaultsItsChangeClass() throws Exception {
+        var schema = objectMapper.readTree("{\"type\":\"object\"}");
+
+        assertThat(new ImportSchemaCommand(schema, null, null, false).bump()).isEqualTo(VersionBump.PATCH);
+        assertThat(new ImportSchemaCommand(schema).preserveVersion()).isFalse();
+    }
 }

@@ -172,44 +172,51 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
      */
     @Override
     public String bumpVersion(String logicalUrn, VersionBump bump) {
+        // Reject control characters before the URN reaches an exception message a caller may log.
+        UrnParser.requireNoControlChars(logicalUrn);
         String logical = UrnParser.logicalUrn(logicalUrn);
-        return inTxResult(() -> {
-            // Same lock the store methods take, so a concurrent save cannot read this current_version
-            // and collide with the version assigned here.
-            lockArtifactWrite(logical);
-            ArtifactRow artifact = artifacts.findByLogicalUrn(logical)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown artifact: " + logical));
-            if (artifact.currentVersion() == null) {
-                throw new IllegalArgumentException("Artifact has no version to carry forward: " + logical);
-            }
-            ArtifactVersionRow source = versions.find(artifact.id(), artifact.currentVersion())
-                .orElseThrow(() -> new IllegalStateException(
-                    "Current version " + artifact.currentVersion() + " is missing for " + logical));
+        try {
+            return inTxResult(() -> {
+                // Same lock the store methods take, so a concurrent save cannot read this current_version
+                // and collide with the version assigned here.
+                lockArtifactWrite(logical);
+                ArtifactRow artifact = artifacts.findByLogicalUrn(logical)
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown artifact: " + logical));
+                if (artifact.currentVersion() == null) {
+                    throw new IllegalArgumentException("Artifact has no version to carry forward: " + logical);
+                }
+                ArtifactVersionRow source = versions.find(artifact.id(), artifact.currentVersion())
+                    .orElseThrow(() -> new IllegalStateException(
+                        "Current version " + artifact.currentVersion() + " is missing for " + logical));
 
-            Instant now = Instant.now();
-            String newVersion = SemVer.next(artifact.currentVersion(), bump);
-            UUID versionId = UUID.randomUUID();
-            versions.insert(new ArtifactVersionRow(versionId, artifact.id(), newVersion,
-                source.primaryFormat(), source.title(), source.description(), now, source.createdBy()));
-            for (String format : representations.listFormats(source.id())) {
-                representations.find(source.id(), format).ifPresent(rep ->
-                    representations.insert(new ArtifactRepresentationRow(UUID.randomUUID(), versionId,
-                        rep.format(), rep.contentType(), rep.contentJson(), rep.contentText(),
-                        rep.contentHash(), rep.generation(), now)));
-            }
-            references.replaceForVersion(versionId, references.rowsForVersion(source.id()));
-            artifacts.updateCurrentVersion(artifact.id(), newVersion, now);
-            // Back-fill pinned references that named this exact (logical, version) before it existed.
-            String pin = UrnParser.withVersion(logical, newVersion);
-            references.linkDanglingVersions(pin, versionId);
-            // The namespace index addresses a version, so leaving it on the superseded one would make
-            // a namespace lookup resolve to an artifact version that is no longer current.
-            if (RegistryMapping.FORMAT_XSD.equals(source.primaryFormat())) {
-                namespaces.repointVersion(artifact.id(), versionId, now);
-                xsd.evict(logical);
-            }
-            return pin;
-        });
+                Instant now = Instant.now();
+                String newVersion = SemVer.next(artifact.currentVersion(), bump);
+                UUID versionId = UUID.randomUUID();
+                versions.insert(new ArtifactVersionRow(versionId, artifact.id(), newVersion,
+                    source.primaryFormat(), source.title(), source.description(), now, source.createdBy()));
+                for (String format : representations.listFormats(source.id())) {
+                    representations.find(source.id(), format).ifPresent(rep ->
+                        representations.insert(new ArtifactRepresentationRow(UUID.randomUUID(), versionId,
+                            rep.format(), rep.contentType(), rep.contentJson(), rep.contentText(),
+                            rep.contentHash(), rep.generation(), now)));
+                }
+                references.replaceForVersion(versionId, references.rowsForVersion(source.id()));
+                artifacts.updateCurrentVersion(artifact.id(), newVersion, now);
+                // Back-fill pinned references that named this exact (logical, version) before it existed.
+                String pin = UrnParser.withVersion(logical, newVersion);
+                references.linkDanglingVersions(pin, versionId);
+                // The namespace index addresses a version, so leaving it on the superseded one would
+                // make a namespace lookup resolve to a stale version of the artifact.
+                if (RegistryMapping.FORMAT_XSD.equals(source.primaryFormat())) {
+                    namespaces.repointVersion(artifact.id(), versionId, now);
+                    xsd.evict(logical);
+                }
+                log.info("Bumped {} to v{} ({})", logical, newVersion, bump);
+                return pin;
+            });
+        } catch (DataAccessException e) {
+            throw translate(e, "Registry version bump failed for " + logical);
+        }
     }
 
     @Override
