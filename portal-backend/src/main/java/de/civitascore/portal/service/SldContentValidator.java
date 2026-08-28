@@ -1,11 +1,7 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.util.InvalidInputException;
-import java.io.InputStream;
 import java.io.StringReader;
-import javax.xml.XMLConstants;
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLResolver;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
@@ -28,6 +24,12 @@ public class SldContentValidator {
 
   private static final String RESOURCE_TYPE = "Style";
 
+  private final SldParserFactory parserFactory;
+
+  public SldContentValidator(SldParserFactory parserFactory) {
+    this.parserFactory = parserFactory;
+  }
+
   /**
    * Verifies that GeoServer would accept this SLD document. Blank content is left to {@code
    * NotBlank} on the input DTO.
@@ -41,7 +43,7 @@ public class SldContentValidator {
 
     XMLStreamReader reader = null;
     try {
-      reader = secureFactory().createXMLStreamReader(new StringReader(sldContent));
+      reader = parserFactory.newInputFactory().createXMLStreamReader(new StringReader(sldContent));
       while (reader.hasNext()) {
         if (reader.next() == XMLStreamConstants.DTD) {
           throw doctypeDeclared();
@@ -55,29 +57,6 @@ public class SldContentValidator {
     } finally {
       closeQuietly(reader);
     }
-  }
-
-  /**
-   * A parser that reports a DTD as an event so a declared one is named in the error, while opening
-   * nothing a document points at: an empty external subset stands in for whatever the declaration
-   * references. A document declaring a DTD is refused before anything in it is expanded, so
-   * resolving entity references only ever applies to the five XML defines itself — which is what
-   * makes an undeclared reference a fault the user hears about here rather than from GeoServer
-   * later.
-   *
-   * <p>Refusing external entities is not redundant: without it an external parameter entity
-   * referenced in an internal subset reaches the resolver before the DTD event fires.
-   */
-  private static XMLInputFactory secureFactory() {
-    XMLInputFactory factory = XMLInputFactory.newFactory();
-    factory.setProperty(XMLInputFactory.SUPPORT_DTD, true);
-    factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
-    factory.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, true);
-    factory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-    factory.setProperty(
-        XMLInputFactory.RESOLVER,
-        (XMLResolver) (publicId, systemId, baseUri, namespace) -> InputStream.nullInputStream());
-    return factory;
   }
 
   private static InvalidInputException doctypeDeclared() {

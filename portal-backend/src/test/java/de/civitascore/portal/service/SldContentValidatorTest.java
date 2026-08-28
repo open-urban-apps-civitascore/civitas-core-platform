@@ -23,7 +23,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 class SldContentValidatorTest {
 
-  private final SldContentValidator validator = new SldContentValidator();
+  private final SldContentValidator validator = new SldContentValidator(new SldParserFactory());
 
   private static final String XML_DECL = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
 
@@ -175,36 +175,8 @@ class SldContentValidatorTest {
           .getMessage();
     }
 
-    @Test
-    @DisplayName("Should not resolve an external entity into the reported message")
-    void shouldNotResolveExternalEntities() {
-      String content =
-          sld(
-              XML_DECL
-                  + "<!DOCTYPE StyledLayerDescriptor [ <!ENTITY x SYSTEM \"file:///etc/passwd\"> ]>");
-
-      assertThatThrownBy(() -> validator.validate(content))
-          .isInstanceOf(InvalidInputException.class)
-          .extracting(Throwable::getMessage)
-          .satisfies(message -> assertThat(message).doesNotContain("root:"));
-    }
-
-    @Test
-    @DisplayName("Should not resolve an external parameter entity referenced in the subset")
-    void shouldNotResolveExternalParameterEntities() {
-      // The one shape the parser reaches out for before reporting the declaration.
-      String content =
-          sld(
-              XML_DECL
-                  + "<!DOCTYPE StyledLayerDescriptor"
-                  + " [ <!ENTITY % p SYSTEM \"file:///etc/passwd\"> %p; ]>");
-
-      assertThatThrownBy(() -> validator.validate(content))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("DOCTYPE")
-          .extracting(Throwable::getMessage)
-          .satisfies(message -> assertThat(message).doesNotContain("root:"));
-    }
+    // That the parser opens no address a document names is asserted in SldParserFactoryTest: these
+    // messages are built from constants, so they cannot show it either way.
   }
 
   @Nested
