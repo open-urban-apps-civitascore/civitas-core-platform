@@ -1,7 +1,7 @@
 meta {
   name: 12b. Cleanup - Delete DataSink
   type: http
-  seq: 35
+  seq: 37
 }
 
 delete {
@@ -26,7 +26,7 @@ tests {
 docs {
   **Saga step 12b** — Delete the FROST DataSink (cleanup).
 
-  Removes the DataSink created in step 4c. This must run **before** deleting the dataset (step 13): `data_sinks.dataset_id` is `NOT NULL` with no `ON DELETE CASCADE` — deleting the parent first would violate the FK.
+  Removes the DataSink created in step 4c. Ordering is constrained from both sides: it must run **after** the pipeline is deleted, because a pipeline references its sink's configuration by CORE URN and the registry refuses to delete a referenced artifact (409); and **before** the dataset is deleted, because `data_sinks.dataset_id` is `NOT NULL` with no `ON DELETE CASCADE`.
 
   **Expected Response:** 204 No Content. 404 if already deleted. 400 if `sagaDataSinkId` is not set (first run / aborted earlier).
 

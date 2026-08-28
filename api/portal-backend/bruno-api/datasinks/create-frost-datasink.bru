@@ -23,7 +23,8 @@ body:json {
 
 script:post-response {
   if (res.body && res.body.id) {
-    bru.setVar('dataSinkId', res.body.id);
+    // Deliberately not dataSinkId: that names the POSTGIS sink the mutation steps below act on,
+    // and overwriting it pointed them at this FROST sink, whose type they then tried to change.
     bru.setVar('frostDataSinkId', res.body.id);
   }
 }
