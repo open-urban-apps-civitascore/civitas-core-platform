@@ -36,6 +36,9 @@ script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('sagaDataStructureVersionId', res.body.id);
   }
+  if (res.body && res.body.modelUrn) {
+    bru.setVar('sagaDataStructureModelUrn', res.body.modelUrn);
+  }
 }
 
 tests {

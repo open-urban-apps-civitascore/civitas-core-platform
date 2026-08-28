@@ -38,6 +38,9 @@ script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('pgTargetVersionId', res.body.id);
   }
+  if (res.body && res.body.modelUrn) {
+    bru.setVar('pgTargetModelUrn', res.body.modelUrn);
+  }
 }
 
 tests {
