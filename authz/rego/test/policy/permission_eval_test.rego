@@ -84,6 +84,41 @@ test_required_permissions_delete_group if {
 	result == {"GROUP_DELETE"}
 }
 
+# Test: a Mapping is addressed under its dataset, so its permissions are the dataset's. Each verb
+# must require exactly the permission its effect implies — PUT versions an existing artifact and
+# POST creates one, so PUT must not carry create rights.
+test_required_permissions_read_dataset_mapping if {
+	result := permission_eval.required_permissions with input as portal_request_no_auth("GET", "/v1/datasets/dataset-1/mappings")
+	result == {"DATASET_READ"}
+}
+
+test_required_permissions_create_dataset_mapping if {
+	result := permission_eval.required_permissions with input as portal_request_no_auth("POST", "/v1/datasets/dataset-1/mappings")
+	result == {"DATASET_CREATE"}
+}
+
+test_required_permissions_version_dataset_mapping if {
+	result := permission_eval.required_permissions with input as portal_request_no_auth("PUT", "/v1/datasets/dataset-1/mappings")
+	result == {"DATASET_UPDATE"}
+}
+
+test_required_permissions_delete_dataset_mapping if {
+	result := permission_eval.required_permissions with input as portal_request_no_auth("DELETE", "/v1/datasets/dataset-1/mappings")
+	result == {"DATASET_DELETE"}
+}
+
+# The flat routes are gone. An unmapped path yields no permission and is not a known endpoint, which
+# main.rego turns into a deny rather than an accidental allow.
+test_flat_mapping_route_is_unknown if {
+	count(permission_eval.required_permissions) == 0 with input as portal_request_no_auth("POST", "/v1/mappings")
+	permission_eval.is_known_endpoint == false with input as portal_request_no_auth("POST", "/v1/mappings")
+}
+
+test_orphans_route_is_unknown if {
+	count(permission_eval.required_permissions) == 0 with input as portal_request_no_auth("GET", "/v1/orphans")
+	permission_eval.is_known_endpoint == false with input as portal_request_no_auth("GET", "/v1/orphans")
+}
+
 # Test: Permission lookup from mappings - PATCH resource
 test_required_permissions_patch_role if {
 	result := permission_eval.required_permissions with input as portal_request_no_auth("PATCH", "/v1/roles/r1")
