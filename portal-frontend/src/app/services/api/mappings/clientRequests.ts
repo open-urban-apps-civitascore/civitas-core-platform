@@ -6,8 +6,9 @@ import type { MappingField } from '@/generated/core'
 /**
  * API client for CORE Mapping artifacts.
  *
- * The `/api` proxy prepends the backend's `/v1` base, so the endpoint here is `/mappings`
- * (the backend route is `POST|PUT /v1/mappings`).
+ * Mappings are nested under the dataset that holds them. The `/api` proxy prepends the backend's
+ * `/v1` base, so the endpoint here is `/datasets/{datasetId}/mappings` (the backend route is
+ * `POST|PUT /v1/datasets/{dataSetId}/mappings`).
  *
  * - POST creates a brand-new logical Mapping (first version).
  * - PUT versions an existing logical Mapping (identified by its `logicalUrn`).
@@ -16,7 +17,7 @@ import type { MappingField } from '@/generated/core'
  * mapping by its `versionedUrn`.
  */
 
-const MAPPINGS_ENDPOINT = '/mappings'
+const mappingsEndpoint = (datasetId: string) => `/datasets/${datasetId}/mappings`
 const API_REQUEST_HEADER = 'x-api-request'
 
 /** The CORE Mapping document body sent to the backend (no `$schema`/`id` — Model Forge stamps those). */
@@ -40,22 +41,22 @@ export interface UpdateMappingInput extends MappingArtifactBody {
   logicalUrn: string
 }
 
-/** Response of `POST|PUT /v1/mappings`. */
+/** Response of `POST|PUT /v1/datasets/{dataSetId}/mappings`. */
 export interface MappingArtifactResponse {
   logicalUrn: string
   versionedUrn: string
 }
 
 /**
- * Creates a new Mapping artifact.
- * POST /v1/mappings
+ * Creates a new Mapping artifact under a dataset.
+ * POST /v1/datasets/{datasetId}/mappings
  */
-export const useCreateMapping = () =>
+export const useCreateMapping = (datasetId: string) =>
   useMutation<ApiServiceResponse<MappingArtifactResponse>, unknown, CreateMappingInput>({
     mutationFn: (data: CreateMappingInput) =>
       apiRequest<MappingArtifactResponse>({
         method: 'POST',
-        endpoint: MAPPINGS_ENDPOINT,
+        endpoint: mappingsEndpoint(datasetId),
         headers: { [API_REQUEST_HEADER]: 'true' },
         data,
         errorMessage: 'An error occurred while creating the mapping.',
@@ -63,15 +64,15 @@ export const useCreateMapping = () =>
   })
 
 /**
- * Versions an existing Mapping artifact.
- * PUT /v1/mappings
+ * Versions an existing Mapping artifact of a dataset.
+ * PUT /v1/datasets/{datasetId}/mappings
  */
-export const useUpdateMapping = () =>
+export const useUpdateMapping = (datasetId: string) =>
   useMutation<ApiServiceResponse<MappingArtifactResponse>, unknown, UpdateMappingInput>({
     mutationFn: (data: UpdateMappingInput) =>
       apiRequest<MappingArtifactResponse>({
         method: 'PUT',
-        endpoint: MAPPINGS_ENDPOINT,
+        endpoint: mappingsEndpoint(datasetId),
         headers: { [API_REQUEST_HEADER]: 'true' },
         data,
         errorMessage: 'An error occurred while updating the mapping.',

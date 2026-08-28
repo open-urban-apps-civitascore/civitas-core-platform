@@ -115,8 +115,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const createDataSinkMutation = useCreateDataSink()
   const deleteDataSinkMutation = useDeleteDataSink()
   const updateDataSinkMutation = useUpdateDataSink()
-  const createMappingMutation = useCreateMapping()
-  const updateMappingMutation = useUpdateMapping()
+  const createMappingMutation = useCreateMapping(datasetId)
+  const updateMappingMutation = useUpdateMapping(datasetId)
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
