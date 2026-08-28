@@ -663,8 +663,14 @@ class ApisixSagaHandlerTest {
         // id "ds-001" normalizes to the workspace "ds_001".
         assertEquals("ds-001-ows", routeBody.get("upstream_id"));
         assertArrayEquals(
-            new String[] {"^/v1/datasets/ds-001/map(/.*)?$", "/geoserver/ds_001/ows$1"},
+            new String[] {"^/v1/datasets/ds-001/map/?$", "/geoserver/ds_001/ows"},
             (String[]) proxyRewriteOf(routeBody).get("regex_uri"));
+        // An OWS endpoint takes its parameters in the query string, so the route matches the bare
+        // address and the trailing-slash form only — a sub-path would reach the unthrottled
+        // service.
+        assertArrayEquals(
+            new String[] {"/v1/datasets/ds-001/map", "/v1/datasets/ds-001/map/"},
+            (String[]) routeBody.get("uris"));
         // Protected → gateway gate present.
         assertEquals("auth-plugin-1", routeBody.get("plugin_config_id"));
         // The route self-describes its standard but carries NO FROST upstream credential.
@@ -779,11 +785,13 @@ class ApisixSagaHandlerTest {
         Map<String, Object> staRoute = entityCaptor.getAllValues().get(2).getEntity();
         Map<String, Object> owsRoute = entityCaptor.getAllValues().get(3).getEntity();
 
+        // The two standards match differently: STA addresses entities by sub-path, while an OWS
+        // endpoint takes its parameters in the query string and matches its address exactly.
         assertArrayEquals(
             new String[] {"/v1/datasets/ds-001/data", "/v1/datasets/ds-001/data/*"},
             (String[]) staRoute.get("uris"));
         assertArrayEquals(
-            new String[] {"/v1/datasets/ds-001/map", "/v1/datasets/ds-001/map/*"},
+            new String[] {"/v1/datasets/ds-001/map", "/v1/datasets/ds-001/map/"},
             (String[]) owsRoute.get("uris"));
         assertEquals("ds-001", staRoute.get("upstream_id"));
         assertEquals("ds-001-ows", owsRoute.get("upstream_id"));
@@ -1743,7 +1751,8 @@ class ApisixSagaHandlerTest {
                     Arrays.toString((String[]) routeBody.get("uris"))),
             () ->
                 assertEquals(
-                    "[^/v1/datasets/ds-001/data(/.*)?$, /FROST-Server/v1.1/Projects(1)$1]",
+                    "[^/v1/datasets/ds-001/data/?$, /FROST-Server/v1.1/Projects(1),"
+                        + " ^/v1/datasets/ds-001/data(/.+)$, /FROST-Server/v1.1/Projects(1)$1]",
                     Arrays.toString((String[]) proxyRewrite.get("regex_uri"))),
             () ->
                 assertEquals(
@@ -1940,6 +1949,45 @@ class ApisixSagaHandlerTest {
         Map<String, Object> body = capturePutBody();
         assertFalse(body.containsKey("create_time"));
         assertFalse(body.containsKey("update_time"));
+      }
+    }
+
+    @Test
+    @DisplayName("normalizes a route whose rewrite still passes a lone trailing slash upstream")
+    void shouldNormalizeTrailingSlashOnExistingRoute() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        // A route provisioned before the rewrite was split into pairs forwards "<path>/" as
+        // "<upstream>/", which reaches a different service than "<path>" does.
+        stubGetReturning(existingRoute(false));
+        stubPutOk();
+
+        handler.handle(
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_ROUTE",
+                Map.of(
+                    "routeIds",
+                    Map.of("data", "ds-001"),
+                    "serviceId",
+                    "ds-001",
+                    "openDataAccess",
+                    false)));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> proxyRewrite =
+            (Map<String, Object>)
+                ((Map<String, Object>) capturePutBody().get("plugins")).get("proxy-rewrite");
+        assertEquals(
+            List.of(
+                "^/v1/datasets/ds-001/?$",
+                "/FROST-Server/v1.1/Projects(1)",
+                "^/v1/datasets/ds-001(/.+)$",
+                "/FROST-Server/v1.1/Projects(1)$1"),
+            RouteAuthConfigurer.readStringList(proxyRewrite.get("regex_uri")));
+        // An STA endpoint addresses entities by sub-path, so the wildcard stays.
+        assertEquals(
+            List.of("/v1/datasets/ds-001", "/v1/datasets/ds-001/*"),
+            RouteAuthConfigurer.readStringList(capturePutBody().get("uris")));
       }
     }
 
@@ -2327,24 +2375,26 @@ class ApisixSagaHandlerTest {
   }
 
   @Nested
-  @DisplayName("Proxy-rewrite regex pattern (documents the expected regex SHAPE)")
+  @DisplayName("Proxy-rewrite regex pattern (applies the production rewrite pairs)")
   class ProxyRewriteRegex {
 
     /**
-     * Documents/pins the SHAPE of the path-rewrite regex the handler is expected to emit — it
-     * re-implements the pattern locally and is NOT wired to {@code buildRouteBody}'s actual output.
-     * Treat it as executable documentation of the rewrite contract; the genuine end-to-end coverage
-     * that the produced route really rewrites correctly lives in {@code ApisixSagaHandlerRoutingIT}
-     * (real APISIX via Testcontainers). If the production regex changes, update both.
+     * Applies the production rewrite pairs the way APISIX does — pairs are tried in order and the
+     * first match wins. Expected values below state what each upstream requires of the path it
+     * receives, so they hold the pattern to an external contract rather than restating it. The
+     * genuine end-to-end coverage that a real gateway rewrites this way lives in {@code
+     * ApisixSagaHandlerRoutingIT}.
      */
-    private String applyRewrite(String datasetId, String upstreamPath, String requestPath) {
-      String regex = "^/v1/datasets/" + datasetId + "(/.*)?$";
-      String replacement = upstreamPath + "$1";
-      Matcher matcher = Pattern.compile(regex).matcher(requestPath);
-      if (!matcher.matches()) {
-        return null;
+    private String applyRewrite(
+        String routePath, String upstreamPath, RouteUpstreamKind kind, String requestPath) {
+      String[] pairs = PathRewrite.pairs(routePath, upstreamPath, kind);
+      for (int i = 0; i < pairs.length; i += 2) {
+        Matcher matcher = Pattern.compile(pairs[i]).matcher(requestPath);
+        if (matcher.matches()) {
+          return matcher.replaceFirst(pairs[i + 1]);
+        }
       }
-      return matcher.replaceFirst(replacement);
+      return null;
     }
 
     @ParameterizedTest(name = "{0}")
@@ -2352,17 +2402,26 @@ class ApisixSagaHandlerTest {
         delimiter = '|',
         nullValues = "NULL",
         value = {
-          "rewrites sub-path to upstream path | /v1/datasets/ds-001/Things | /FROST-Server/v1.1/Projects(1)/Things",
-          "rewrites nested sub-path | /v1/datasets/ds-001/Things(42)/Datastreams | /FROST-Server/v1.1/Projects(1)/Things(42)/Datastreams",
-          "rewrites base path without trailing slash | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1)",
-          "rewrites base path with trailing slash | /v1/datasets/ds-001/ | /FROST-Server/v1.1/Projects(1)/",
-          "rewrites with query string in path | /v1/datasets/ds-001/Things?$top=10&$skip=0 | /FROST-Server/v1.1/Projects(1)/Things?$top=10&$skip=0",
-          "does not match different dataset ID | /v1/datasets/ds-002/Things | NULL",
-          "does not match unrelated path | /api/v1/users | NULL",
-          "does not match legacy /datasets path without /v1 prefix | /datasets/ds-001/Things | NULL",
+          "rewrites sub-path to upstream path | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001/Things | /FROST-Server/v1.1/Projects(1)/Things",
+          "rewrites nested sub-path | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001/Things(42)/Datastreams | /FROST-Server/v1.1/Projects(1)/Things(42)/Datastreams",
+          "rewrites base path without trailing slash | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1)",
+          "drops a lone trailing slash, which FROST answers with 404 | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001/ | /FROST-Server/v1.1/Projects(1)",
+          "rewrites with query string in path | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-001/Things?$top=10&$skip=0 | /FROST-Server/v1.1/Projects(1)/Things?$top=10&$skip=0",
+          "keeps an OWS request on the throttled map service | OWS | /v1/datasets/ds-001/map | /geoserver/ds_001/ows | /v1/datasets/ds-001/map | /geoserver/ds_001/ows",
+          "drops a lone trailing slash, which GeoServer routes to the unthrottled admin service | OWS | /v1/datasets/ds-001/map | /geoserver/ds_001/ows | /v1/datasets/ds-001/map/ | /geoserver/ds_001/ows",
+          "does not rewrite an OWS sub-path, which the route no longer matches | OWS | /v1/datasets/ds-001/map | /geoserver/ds_001/ows | /v1/datasets/ds-001/map/wfs | NULL",
+          "does not match different dataset ID | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /v1/datasets/ds-002/Things | NULL",
+          "does not match unrelated path | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /api/v1/users | NULL",
+          "does not match legacy /datasets path without /v1 prefix | STA | /v1/datasets/ds-001 | /FROST-Server/v1.1/Projects(1) | /datasets/ds-001/Things | NULL",
         })
-    void shouldApplyRewriteRegex(String description, String requestPath, String expected) {
-      String result = applyRewrite("ds-001", "/FROST-Server/v1.1/Projects(1)", requestPath);
+    void shouldApplyRewriteRegex(
+        String description,
+        RouteUpstreamKind kind,
+        String routePath,
+        String upstreamPath,
+        String requestPath,
+        String expected) {
+      String result = applyRewrite(routePath, upstreamPath, kind, requestPath);
       assertEquals(expected, result);
     }
   }

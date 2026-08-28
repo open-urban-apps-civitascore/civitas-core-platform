@@ -142,7 +142,7 @@ mvn test -pl config-adapter-geoserver          # unit tests, no Docker
 mvn -pl config-adapter-geoserver -am verify    # adds integration tests, requires Docker
 ```
 
-Integration tests run against a GeoServer Cloud stack — PostGIS, RabbitMQ, discovery, config and REST
-containers — started once per JVM by Testcontainers; image tags are pinned in the test sources, the shared ones
-in `TestContainerImages`. Failsafe supplies `--add-opens java.base/java.net=ALL-UNNAMED`, which Jersey's PATCH
+Integration tests run against a GeoServer Cloud stack — PostGIS, RabbitMQ and REST containers — started once
+per JVM by Testcontainers under the `standalone` profile, which needs neither service discovery nor a config
+server. Every image tag is pinned in `TestContainerImages`. Failsafe supplies `--add-opens java.base/java.net=ALL-UNNAMED`, which Jersey's PATCH
 support needs.

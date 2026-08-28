@@ -2,10 +2,10 @@ name: geoserver
 
 x-variables:
   environment: &common_env
-    SPRING_PROFILES_ACTIVE: "pgconfig"
+    SPRING_PROFILES_ACTIVE: "standalone,pgconfig"
     GEOWEBCACHE_CACHE_DIR: /data/geowebcache
-    # pgconfig catalog backend — set directly so services don't depend on
-    # config-server bootstrap succeeding before they can share catalog state
+    # pgconfig catalog backend — every service reads it directly, which is what the
+    # standalone profile means: no service discovery and no config server
     PGCONFIG_HOST: geoserverdb
     PGCONFIG_PORT: 5432
     PGCONFIG_DATABASE: geoserver
@@ -14,30 +14,28 @@ x-variables:
     PGCONFIG_SCHEMA: pgconfig
     PGCONFIG_INITIALIZE: true
     # RabbitMQ — Spring Cloud Bus for catalog-change event propagation between
-    # microservices (restconfig → wfs/wms/etc. cache invalidation)
+    # microservices (restconfig → wfs/wms/etc. cache invalidation). RABBITMQ_HOST/USER/PASSWORD
+    # feed the same settings one level up and would be redundant beside these
     SPRING_RABBITMQ_HOST: rabbitmq
     SPRING_RABBITMQ_PORT: 5672
     SPRING_RABBITMQ_USERNAME: guest
     SPRING_RABBITMQ_PASSWORD: guest
-
-x-config-server-overrides:
-  environment: &config-server-overrides
-    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_HOST: geoserverdb
-    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_PORT: 5432
-    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_DATABASE: geoserver
-    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_USERNAME: geoserver
-    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
-    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_SCHEMA: pgconfig
-    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_INITIALIZE: true
+    # Diagnostics — the images ship every endpoint exposed and their values unmasked, which
+    # publishes the catalog and broker passwords to anything that can reach the service
+    MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus"
+    MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_EXCLUDE: "env,configprops,shutdown,heapdump"
+    MANAGEMENT_ENDPOINT_ENV_SHOW_VALUES: NEVER
+    MANAGEMENT_ENDPOINT_CONFIGPROPS_SHOW_VALUES: NEVER
+    # Concurrent-request caps, matching what the wms service applies to itself by default. The
+    # doubled $$ keeps the placeholder for the image to resolve instead of compose consuming it
+    GEOSERVER_EXTENSION_CONTROLFLOW_PROPERTIES_OWS_WMS: "$${cpu.cores} * 8"
+    GEOSERVER_EXTENSION_CONTROLFLOW_PROPERTIES_OWS_WMS_GETMAP: "$${cpu.cores} * 4"
 
 x-gs-dependencies: &gs-dependencies
   rabbitmq:
     condition: service_healthy
-  discovery:
-    condition: service_healthy
   geoserverdb:
-    condition: service_started
-  config:
+    # Healthy, not started — every service opens its catalog connection during startup
     condition: service_healthy
 
 volumes:
@@ -85,38 +83,18 @@ services:
     networks:
       - geoserver-internal
 
-  config:
-    image: geoservercloud/geoserver-cloud-config:2.28.4.0
-    user: "1000:1000"
-    environment:
-      <<: *config-server-overrides
-      SPRING_PROFILES_ACTIVE: native
-      SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL: v2.28.4.0
-    networks:
-      - geoserver-internal
-
-  discovery:
-    image: geoservercloud/geoserver-cloud-discovery:2.28.4.0
-    user: "1000:1000"
-    depends_on:
-      - config
-    ports:
-      - "8500:8500"
-    networks:
-      - geoserver-internal
-
   # Single entry point routing to all GeoServer microservices.
   # Named civitas-geoserver so APISIX can reach it via Docker network
   # at civitas-geoserver:8080 (see setup-apisix-route.sh).
   gateway:
-    image: geoservercloud/geoserver-cloud-gateway:2.28.4.0
+    image: geoservercloud/geoserver-cloud-gateway:3.0.1.1
     user: "1000:1000"
     container_name: civitas-geoserver
     hostname: civitas-geoserver
-    depends_on:
-      discovery:
-        condition: service_healthy
+    # Carries the shared configuration, so it waits for the same services every other one does.
+    depends_on: *gs-dependencies
     environment:
+      <<: *common_env
       GEOSERVER_BASE_PATH: /geoserver
     ports:
       - "8082:8080"
@@ -126,7 +104,7 @@ services:
 
   # Base template for all GeoServer microservices (replicas: 0 = not started directly)
   geoserver_template:
-    image: geoservercloud/geoserver-cloud-webui:2.28.4.0
+    image: geoservercloud/geoserver-cloud-webui:3.0.1.1
     user: "1000:1000"
     environment:
       <<: *common_env
@@ -139,7 +117,7 @@ services:
       - geoserver-internal
 
   wfs:
-    image: geoservercloud/geoserver-cloud-wfs:2.28.4.0
+    image: geoservercloud/geoserver-cloud-wfs:3.0.1.1
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
@@ -147,7 +125,7 @@ services:
       replicas: 1
 
   wms:
-    image: geoservercloud/geoserver-cloud-wms:2.28.4.0
+    image: geoservercloud/geoserver-cloud-wms:3.0.1.1
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
@@ -155,7 +133,7 @@ services:
       replicas: 1
 
   wcs:
-    image: geoservercloud/geoserver-cloud-wcs:2.28.4.0
+    image: geoservercloud/geoserver-cloud-wcs:3.0.1.1
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
@@ -163,7 +141,7 @@ services:
       replicas: 1
 
   wps:
-    image: geoservercloud/geoserver-cloud-wps:2.28.4.0
+    image: geoservercloud/geoserver-cloud-wps:3.0.1.1
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
@@ -171,7 +149,7 @@ services:
       replicas: 1
 
   restconfig:
-    image: geoservercloud/geoserver-cloud-rest:2.28.4.0
+    image: geoservercloud/geoserver-cloud-rest:3.0.1.1
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
@@ -179,15 +157,21 @@ services:
       replicas: 1
 
   webui:
-    image: geoservercloud/geoserver-cloud-webui:2.28.4.0
+    image: geoservercloud/geoserver-cloud-webui:3.0.1.1
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
+    environment:
+      <<: *common_env
+      # The image switches request throttling off on this service, on the assumption that it
+      # serves no map requests — it does answer them, so the caps above need it back on. Setting
+      # the caps alone does not re-enable it.
+      GEOSERVER_EXTENSION_CONTROLFLOW_ENABLED: true
     deploy:
       replicas: 1
 
   gwc:
-    image: geoservercloud/geoserver-cloud-gwc:2.28.4.0
+    image: geoservercloud/geoserver-cloud-gwc:3.0.1.1
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies

@@ -13,6 +13,36 @@
 #   <run Bruno tests>
 # ============================================================
 
+x-variables:
+  # Shared by every GeoServer Cloud service — a per-service copy lets one edit point two services
+  # at different catalogs, which surfaces as a saga error in a test rather than a startup failure
+  geoserver-environment: &gs_common_env
+    SPRING_PROFILES_ACTIVE: standalone,pgconfig
+    GEOWEBCACHE_CACHE_DIR: /data/geowebcache
+    PGCONFIG_HOST: geoserverdb
+    PGCONFIG_PORT: 5432
+    PGCONFIG_DATABASE: geoserver
+    PGCONFIG_USERNAME: geoserver
+    PGCONFIG_PASSWORD: geoserver
+    PGCONFIG_SCHEMA: pgconfig
+    PGCONFIG_INITIALIZE: "true"
+    SPRING_RABBITMQ_HOST: rabbitmq
+    SPRING_RABBITMQ_PORT: 5672
+    SPRING_RABBITMQ_USERNAME: guest
+    SPRING_RABBITMQ_PASSWORD: guest
+    # The images ship every diagnostics endpoint exposed with values unmasked, which publishes the
+    # catalogue and broker passwords to anything that can reach the service
+    MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus"
+    MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_EXCLUDE: "env,configprops,shutdown,heapdump"
+    MANAGEMENT_ENDPOINT_ENV_SHOW_VALUES: NEVER
+    MANAGEMENT_ENDPOINT_CONFIGPROPS_SHOW_VALUES: NEVER
+
+x-gs-dependencies: &gs_dependencies
+  rabbitmq:
+    condition: service_healthy
+  geoserverdb:
+    condition: service_healthy
+
 services:
   # ── Databases ──────────────────────────────────────────────
 
@@ -383,10 +413,11 @@ services:
 
   # ── GeoServer Cloud (minimal: catalog REST for the PostGIS-sink saga) ─────
   # A POSTGIS sink triggers the saga's CREATE_WORKSPACE/CREATE_DATASTORE (GeoServer REST). Minimal
-  # set for those catalog ops (rest needs no wfs/wms): geoserverdb (pgconfig) + rabbitmq + config +
-  # discovery + gateway + restconfig. Mirrors dev-environment/geoserver/docker-compose.yaml,
-  # single-network/ephemeral. Service names config/discovery/rabbitmq are load-bearing (images
-  # resolve them by bare hostname); each image has a built-in :8081 healthcheck for `up --wait`.
+  # set for those catalog ops (rest needs no wfs/wms): geoserverdb (pgconfig) + rabbitmq + gateway +
+  # restconfig. Mirrors dev-environment/geoserver/docker-compose.yaml, single-network/ephemeral.
+  # The standalone profile removes service discovery and the config server, so every service reads
+  # the catalog backend directly. The service name rabbitmq is load-bearing (images resolve it by
+  # bare hostname); each image has a built-in :8081 healthcheck for `up --wait`.
 
   # pgconfig catalog DB for GeoServer Cloud — separate from postgres-sink (the DATA db the
   # datastore reads). The postgis image auto-creates the PostGIS extension.
@@ -414,61 +445,21 @@ services:
       timeout: 30s
       retries: 3
 
-  config:
-    image: geoservercloud/geoserver-cloud-config:2.28.4.0
-    environment:
-      SPRING_PROFILES_ACTIVE: native
-      SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL: v2.28.4.0
-      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_HOST: geoserverdb
-      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_PORT: 5432
-      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_DATABASE: geoserver
-      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_USERNAME: geoserver
-      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_PASSWORD: geoserver
-      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_SCHEMA: pgconfig
-      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_INITIALIZE: "true"
-
-  discovery:
-    image: geoservercloud/geoserver-cloud-discovery:2.28.4.0
-    depends_on:
-      - config
-
   gateway:
-    image: geoservercloud/geoserver-cloud-gateway:2.28.4.0
+    image: geoservercloud/geoserver-cloud-gateway:3.0.1.1
     environment:
+      <<: *gs_common_env
       GEOSERVER_BASE_PATH: /geoserver
-    depends_on:
-      discovery:
-        condition: service_healthy
+    depends_on: *gs_dependencies
     networks:
       default:
         aliases:
           - civitas-geoserver
 
   restconfig:
-    image: geoservercloud/geoserver-cloud-rest:2.28.4.0
-    environment:
-      SPRING_PROFILES_ACTIVE: pgconfig
-      GEOWEBCACHE_CACHE_DIR: /data/geowebcache
-      PGCONFIG_HOST: geoserverdb
-      PGCONFIG_PORT: 5432
-      PGCONFIG_DATABASE: geoserver
-      PGCONFIG_USERNAME: geoserver
-      PGCONFIG_PASSWORD: geoserver
-      PGCONFIG_SCHEMA: pgconfig
-      PGCONFIG_INITIALIZE: "true"
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: guest
-      SPRING_RABBITMQ_PASSWORD: guest
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      discovery:
-        condition: service_healthy
-      config:
-        condition: service_healthy
-      geoserverdb:
-        condition: service_healthy
+    image: geoservercloud/geoserver-cloud-rest:3.0.1.1
+    environment: *gs_common_env
+    depends_on: *gs_dependencies
 
   # ── Application ──────────────────────────────────────────
 
