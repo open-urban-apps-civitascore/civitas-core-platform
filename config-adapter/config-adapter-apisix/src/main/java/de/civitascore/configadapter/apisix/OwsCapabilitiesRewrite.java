@@ -40,9 +40,6 @@ final class OwsCapabilitiesRewrite {
   private static final String HEADERS_KEY = "headers";
   private static final String REMOVE_KEY = "remove";
 
-  /** {@code regex_uri} is a {@code [match, replacement]} pair; the replacement is at index 1. */
-  private static final int REGEX_URI_PAIR_SIZE = 2;
-
   private static final String OWS_PATH_SUFFIX = "/ows";
 
   private OwsCapabilitiesRewrite() {}
@@ -57,7 +54,7 @@ final class OwsCapabilitiesRewrite {
       Map<String, Object> plugins,
       Map<String, Object> proxyRewrite,
       String apiHost) {
-    String externalPath = PathRewrite.firstUri(route);
+    String externalPath = PathRewrite.routePathOf(route);
     String workspacePath = upstreamWorkspacePath(proxyRewrite);
     if (externalPath == null || workspacePath == null) {
       return;
@@ -78,21 +75,12 @@ final class OwsCapabilitiesRewrite {
   }
 
   /**
-   * The workspace OWS path without the trailing {@code /ows}, read from the route's {@code
-   * proxy-rewrite.regex_uri} replacement (e.g. {@code /geoserver-cloud/{ws}/ows$1} → {@code
-   * /geoserver-cloud/{ws}}). Null when the route carries no such OWS mapping.
+   * The workspace path behind the route's OWS mapping (e.g. {@code /geoserver-cloud/{ws}/ows} →
+   * {@code /geoserver-cloud/{ws}}). Null when the route carries no such mapping.
    */
   private static String upstreamWorkspacePath(Map<String, Object> proxyRewrite) {
-    List<String> regexUri = RouteAuthConfigurer.readStringList(proxyRewrite.get("regex_uri"));
-    if (regexUri.size() < REGEX_URI_PAIR_SIZE) {
-      return null;
-    }
-    String upstreamPath = regexUri.get(1);
-    int marker = upstreamPath.indexOf('$');
-    if (marker >= 0) {
-      upstreamPath = upstreamPath.substring(0, marker);
-    }
-    if (!upstreamPath.endsWith(OWS_PATH_SUFFIX)) {
+    String upstreamPath = PathRewrite.upstreamPathOf(proxyRewrite);
+    if (upstreamPath == null || !upstreamPath.endsWith(OWS_PATH_SUFFIX)) {
       return null;
     }
     return upstreamPath.substring(0, upstreamPath.length() - OWS_PATH_SUFFIX.length());

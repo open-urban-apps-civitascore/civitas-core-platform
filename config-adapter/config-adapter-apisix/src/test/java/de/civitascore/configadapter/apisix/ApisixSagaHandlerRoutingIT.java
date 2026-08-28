@@ -12,7 +12,6 @@ package de.civitascore.configadapter.apisix;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -484,28 +483,8 @@ class ApisixSagaHandlerRoutingIT extends AbstractApisixIT {
           objectMapper.readTree(trailingSlash.body()).get("path").asText(),
           "a trailing slash must resolve to the same upstream path as the bare OWS endpoint");
 
-      // An OWS endpoint takes its parameters in the query string, so a sub-path is not part of its
-      // address. GeoServer answers such a path from its admin service, where the map-rendering
-      // limit
-      // is switched off, so the gateway must not forward it at all.
-      // Routes provisioned by sibling tests outlive them in this shared gateway, so one of those
-      // may
-      // answer instead of nothing at all. What matters is that the workspace OWS path is not
-      // reached.
-      for (String subPath : List.of("/wfs", "/x", "/a/b", "/wfs/")) {
-        HttpResponse<String> belowEndpoint =
-            sendGatewayRequest("/v1/datasets/" + datasetId + "/" + owsSlug + subPath, API_HOST);
-        boolean reachedOws =
-            belowEndpoint.statusCode() != 404
-                && objectMapper
-                    .readTree(belowEndpoint.body())
-                    .get("path")
-                    .asText()
-                    .startsWith("/geoserver/");
-
-        assertFalse(
-            reachedOws, "a sub-path below the OWS endpoint must not reach GeoServer — " + subPath);
-      }
+      // That nothing below the endpoint is forwarded is pinned on the route's matched addresses
+      // in ApisixSagaHandlerTest — a gateway probe here has no failing case to detect.
     }
   }
 

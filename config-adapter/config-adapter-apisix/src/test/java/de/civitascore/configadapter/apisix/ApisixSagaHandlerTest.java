@@ -2375,7 +2375,7 @@ class ApisixSagaHandlerTest {
   }
 
   @Nested
-  @DisplayName("Proxy-rewrite regex pattern (documents the expected regex SHAPE)")
+  @DisplayName("Proxy-rewrite regex pattern (applies the production rewrite pairs)")
   class ProxyRewriteRegex {
 
     /**
