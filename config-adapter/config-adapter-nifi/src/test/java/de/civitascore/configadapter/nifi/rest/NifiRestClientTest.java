@@ -750,6 +750,65 @@ class NifiRestClientTest {
     server.verify(1, deleteRequestedFor(urlPathEqualTo("/nifi-api/process-groups/pg-1")));
   }
 
+  /** One VALID, Running processor so the inspection reports nothing and the bulletin decides. */
+  private void stubHealthyProcessorsForBulletinTests() {
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/processors"))
+            .willReturn(
+                json(
+                    "{ \"processors\": [ { \"id\": \"proc-1\", \"component\": { \"name\":"
+                        + " \"LogMessage\", \"validationStatus\": \"VALID\" },"
+                        + " \"status\": { \"runStatus\": \"Running\" },"
+                        + " \"revision\": { \"version\": 1 } } ] }")));
+  }
+
+  private static com.fasterxml.jackson.databind.JsonNode bulletin(String level, String message)
+      throws Exception {
+    return new com.fasterxml.jackson.databind.ObjectMapper()
+        .readTree(
+            "[ { \"bulletin\": { \"groupId\": \"pg-1\", \"sourceId\": \"proc-1\","
+                + " \"sourceName\": \"LogMessage\", \"level\": \""
+                + level
+                + "\", \"message\": \""
+                + message
+                + "\", \"timestamp\": \"\" } } ]");
+  }
+
+  @Test
+  void recordsReachingTheErrorSinkMakeThePipelineUnhealthy() throws Exception {
+    // NiFi raises the error-sink bulletin at its warn level, which it spells WARNING. Reporting the
+    // pipeline healthy here is what let a flow discard every record while looking fine.
+    stubHealthyProcessorsForBulletinTests();
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus(
+            "pg-1", bulletin("WARNING", "Pipeline record dropped: httpStatus=400 exception="));
+
+    assertEquals(false, status.healthy());
+    assertTrue(status.message().contains("Pipeline record dropped"));
+  }
+
+  @Test
+  void theShortWarnSpellingIsStillTreatedAsAFailure() throws Exception {
+    stubHealthyProcessorsForBulletinTests();
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus("pg-1", bulletin("WARN", "connection refused"));
+
+    assertEquals(false, status.healthy());
+  }
+
+  @Test
+  void aWarningThatNamesNoFailureLeavesThePipelineHealthy() throws Exception {
+    // The level alone must not condemn a pipeline — NiFi warns about plenty of benign things.
+    stubHealthyProcessorsForBulletinTests();
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus("pg-1", bulletin("WARNING", "queue is 80 percent full"));
+
+    assertEquals(true, status.healthy());
+  }
+
   private static com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder json(
       String body) {
     return aResponse()

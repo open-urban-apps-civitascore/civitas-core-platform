@@ -253,11 +253,22 @@ public class NifiRestClient implements AutoCloseable {
         || processorIds.contains(bulletin.path("sourceId").asText());
   }
 
+  /**
+   * Whether a bulletin means the pipeline is failing rather than merely noisy. NiFi reports the
+   * warn level as {@code WARNING}, not {@code WARN}, so matching the short spelling alone never
+   * fired — and a record reaching the error sink is the only thing this branch can catch, because
+   * NiFi raises that bulletin at warn level. Both spellings are accepted so the check does not
+   * depend on which one a NiFi version reports.
+   */
   private static boolean isRuntimeFailure(String level, String message) {
     return "ERROR".equalsIgnoreCase(level)
-        || ("WARN".equalsIgnoreCase(level)
+        || (isWarnLevel(level)
             && message.matches(
                 "(?is).*\\b(error|failed|exception|connection refused|unable to connect|yielding)\\b.*"));
+  }
+
+  private static boolean isWarnLevel(String level) {
+    return "WARN".equalsIgnoreCase(level) || "WARNING".equalsIgnoreCase(level);
   }
 
   /** A reference to a controller service with its type and revision. */
