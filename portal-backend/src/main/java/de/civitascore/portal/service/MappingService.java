@@ -115,9 +115,9 @@ public class MappingService {
   /**
    * Deletes a Mapping artifact of this DataSet by its (logical or versioned) CORE URN. Without
    * {@code force} the delete is rejected by Model Forge while another artifact still references the
-   * mapping (e.g. a pipeline's {@code mappingRef}); with {@code force} it is unlinked from any
-   * DataSets and deleted regardless. Deleting a mapping that a pipeline still references leaves a
-   * dangling reference, so callers should delete referencing pipelines first (or pass {@code
+   * mapping (e.g. a pipeline's {@code mappingRef}); with {@code force} it is deleted regardless of
+   * who references it. Deleting a mapping that a pipeline still references leaves that pipeline
+   * pointing at nothing, so callers should delete referencing pipelines first (or pass {@code
    * force}).
    *
    * @throws ResourceNotFoundException when the mapping is not a member of this DataSet

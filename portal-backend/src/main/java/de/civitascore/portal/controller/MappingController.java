@@ -2,6 +2,7 @@ package de.civitascore.portal.controller;
 
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.service.MappingService;
+import de.civitascore.portal.util.InvalidInputException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.LinkedHashMap;
@@ -54,9 +55,13 @@ public class MappingController {
   @Operation(summary = "Version an existing Mapping artifact (body carries its logicalUrn)")
   public ResponseEntity<Map<String, String>> update(
       @PathVariable UUID dataSetId, @RequestBody Map<String, Object> body) {
-    Object logicalUrn = body.get("logicalUrn");
-    return ResponseEntity.ok(
-        pins(mappingService.store(dataSetId, logicalUrn instanceof String s ? s : null, body)));
+    // This verb versions an existing artifact, so the URN naming it is required: without it the
+    // store would mint a second mapping from the same document instead.
+    if (!(body.get("logicalUrn") instanceof String logicalUrn) || logicalUrn.isBlank()) {
+      throw new InvalidInputException(
+          "Mapping", "logicalUrn", "logicalUrn is required to version a Mapping");
+    }
+    return ResponseEntity.ok(pins(mappingService.store(dataSetId, logicalUrn, body)));
   }
 
   @GetMapping

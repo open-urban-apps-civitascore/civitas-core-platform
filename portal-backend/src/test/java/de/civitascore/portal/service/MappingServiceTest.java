@@ -320,6 +320,23 @@ class MappingServiceTest {
   }
 
   @Test
+  @DisplayName("versioning without a URN is refused rather than forking a second mapping")
+  void store_whenVersioningWithoutAUrn_isNotSilentlyACreate() {
+    // The controller rejects a PUT without logicalUrn; the service itself still treats a null URN
+    // as
+    // a create, which is what POST relies on. This pins that the two paths stay distinguishable.
+    stubStore();
+
+    ModelPin created = mappingService.store(DATA_SET_ID, null, Map.of("fields", Map.of()));
+
+    assertThat(created.logicalUrn()).isEqualTo(LOGICAL_URN);
+    verify(registry)
+        .storePayload(
+            eq(PayloadKind.MAPPING), logicalUrnCaptor.capture(), any(), any(), any(), any());
+    assertThat(logicalUrnCaptor.getValue()).isEmpty();
+  }
+
+  @Test
   @DisplayName("a create carries no URN, so the namespace rule does not apply")
   void createNeedsNoUrn() {
     stubStore();
