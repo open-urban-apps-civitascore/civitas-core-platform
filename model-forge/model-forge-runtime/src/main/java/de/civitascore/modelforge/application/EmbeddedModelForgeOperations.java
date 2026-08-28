@@ -87,7 +87,8 @@ public class EmbeddedModelForgeOperations implements ModelForge {
 
     @Override
     public ImportResult importSchema(ImportSchemaCommand command) {
-        var response = schemaImportService.importSchema(new SchemaImportRequest(command.schema()));
+        var response = schemaImportService.importSchema(new SchemaImportRequest(
+            command.schema(), command.version(), command.preserveVersion(), command.bump()));
         return toImportResult(response, "Schema import validation failed");
     }
 

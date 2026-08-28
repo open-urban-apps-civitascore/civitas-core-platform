@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -418,5 +419,42 @@ class EmbeddedModelForgeOperationsTest {
                 operations.createArtifact(new CreateArtifactCommand(ArtifactKind.ELEMENT, "Sensor", schema)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("importSchema");
+    }
+
+    /**
+     * The change class an import requests, and the version it may claim for a brand-new artifact,
+     * both reach the import service. Without them on the command there is nowhere to carry either, so
+     * every import is a patch and a host cannot open a draft lane below the registry's first version.
+     */
+    @Test
+    void importCommand_carriesTheChangeClassAndAnInitialVersion() {
+        JsonNode schema = mapper.createObjectNode().put("title", "Thing");
+        when(schemaImportService.importSchema(any(SchemaImportRequest.class)))
+            .thenReturn(new SchemaImportResult(
+                "urn:core:platform:civitas:element:common:Thing:aaaaaaaaaa:0.1.0", List.of(), List.of()));
+
+        operations.importSchema(new ImportSchemaCommand(schema, VersionBump.MAJOR, "0.1.0", true));
+
+        ArgumentCaptor<SchemaImportRequest> request = ArgumentCaptor.forClass(SchemaImportRequest.class);
+        verify(schemaImportService).importSchema(request.capture());
+        assertThat(request.getValue().bump()).isEqualTo(VersionBump.MAJOR);
+        assertThat(request.getValue().version()).isEqualTo("0.1.0");
+        assertThat(request.getValue().preserveVersion()).isTrue();
+    }
+
+    /** An import that asks for nothing keeps the registry's own defaults. */
+    @Test
+    void importCommand_defaultsToPatchAndNoClaimedVersion() {
+        JsonNode schema = mapper.createObjectNode().put("title", "Thing");
+        when(schemaImportService.importSchema(any(SchemaImportRequest.class)))
+            .thenReturn(new SchemaImportResult(
+                "urn:core:platform:civitas:element:common:Thing:aaaaaaaaaa:1.0.0", List.of(), List.of()));
+
+        operations.importSchema(new ImportSchemaCommand(schema));
+
+        ArgumentCaptor<SchemaImportRequest> request = ArgumentCaptor.forClass(SchemaImportRequest.class);
+        verify(schemaImportService).importSchema(request.capture());
+        assertThat(request.getValue().bump()).isEqualTo(VersionBump.PATCH);
+        assertThat(request.getValue().preserveVersion()).isFalse();
     }
 }
