@@ -6,6 +6,7 @@ import tools.jackson.databind.node.StringNode;
 import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactSearchQuery;
+import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
@@ -17,6 +18,7 @@ import de.civitascore.modelforge.graph.SchemaRefExtractor;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.modelforge.validation.ModelValidator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -456,5 +458,50 @@ class EmbeddedModelForgeOperationsTest {
         verify(schemaImportService).importSchema(request.capture());
         assertThat(request.getValue().bump()).isEqualTo(VersionBump.PATCH);
         assertThat(request.getValue().preserveVersion()).isFalse();
+    }
+
+    /**
+     * A release carries the current version forward at the class the caller chose, and the pin it
+     * returns is the one the registry assigned.
+     */
+    @Test
+    void bumpVersion_carriesTheCurrentVersionForwardAtTheRequestedClass() {
+        String logical = "urn:core:platform:civitas:datastructure:common:Order:ds00000001";
+        when(registry.bumpVersion(logical, VersionBump.MAJOR)).thenReturn(logical + ":2.0.0");
+        when(registry.referencesByType(logical + ":2.0.0")).thenReturn(Map.of());
+
+        var result = operations.bumpVersion(
+            new BumpVersionCommand(new ArtifactId(logical), VersionBump.MAJOR));
+
+        assertThat(result.artifactId().value()).isEqualTo(logical + ":2.0.0");
+        verify(registry).bumpVersion(logical, VersionBump.MAJOR);
+    }
+
+    /** {@code :latest} names the current version, so it is a usable identity for a bump. */
+    @Test
+    void bumpVersion_acceptsLatest() {
+        String logical = "urn:core:platform:civitas:datastructure:common:Order:ds00000001";
+        when(registry.bumpVersion(logical, VersionBump.MINOR)).thenReturn(logical + ":1.1.0");
+        when(registry.referencesByType(logical + ":1.1.0")).thenReturn(Map.of());
+
+        operations.bumpVersion(
+            new BumpVersionCommand(new ArtifactId(logical + ":latest"), VersionBump.MINOR));
+
+        verify(registry).bumpVersion(logical, VersionBump.MINOR);
+    }
+
+    /**
+     * Bumping from a version that is not current has no sound answer, and bumping from the current
+     * one instead would ignore the version the caller named, so a pinned identity is refused.
+     */
+    @Test
+    void bumpVersion_refusesAPinnedIdentity() {
+        var command = new BumpVersionCommand(
+            new ArtifactId("urn:core:platform:civitas:datastructure:common:Order:ds00000001:1.0.0"),
+            VersionBump.MINOR);
+
+        assertThatThrownBy(() -> operations.bumpVersion(command))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("pins a version");
     }
 }

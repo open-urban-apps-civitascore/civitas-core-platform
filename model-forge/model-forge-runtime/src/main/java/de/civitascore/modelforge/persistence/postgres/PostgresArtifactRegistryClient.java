@@ -161,6 +161,57 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
             null, false);
     }
 
+    /**
+     * Copies the current version's rows to a new version and advances the artifact to it. Every
+     * representation is copied, not only the primary one, and the reference edges are copied as rows
+     * rather than re-extracted from content — an edge the content does not spell out survives that way
+     * by construction.
+     *
+     * <p>No content-identical short-circuit: the content is unchanged by definition, so the check the
+     * store methods share would turn every call into a no-op.
+     */
+    @Override
+    public String bumpVersion(String logicalUrn, VersionBump bump) {
+        String logical = UrnParser.logicalUrn(logicalUrn);
+        return inTxResult(() -> {
+            // Same lock the store methods take, so a concurrent save cannot read this current_version
+            // and collide with the version assigned here.
+            lockArtifactWrite(logical);
+            ArtifactRow artifact = artifacts.findByLogicalUrn(logical)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown artifact: " + logical));
+            if (artifact.currentVersion() == null) {
+                throw new IllegalArgumentException("Artifact has no version to carry forward: " + logical);
+            }
+            ArtifactVersionRow source = versions.find(artifact.id(), artifact.currentVersion())
+                .orElseThrow(() -> new IllegalStateException(
+                    "Current version " + artifact.currentVersion() + " is missing for " + logical));
+
+            Instant now = Instant.now();
+            String newVersion = SemVer.next(artifact.currentVersion(), bump);
+            UUID versionId = UUID.randomUUID();
+            versions.insert(new ArtifactVersionRow(versionId, artifact.id(), newVersion,
+                source.primaryFormat(), source.title(), source.description(), now, source.createdBy()));
+            for (String format : representations.listFormats(source.id())) {
+                representations.find(source.id(), format).ifPresent(rep ->
+                    representations.insert(new ArtifactRepresentationRow(UUID.randomUUID(), versionId,
+                        rep.format(), rep.contentType(), rep.contentJson(), rep.contentText(),
+                        rep.contentHash(), rep.generation(), now)));
+            }
+            references.replaceForVersion(versionId, references.rowsForVersion(source.id()));
+            artifacts.updateCurrentVersion(artifact.id(), newVersion, now);
+            // Back-fill pinned references that named this exact (logical, version) before it existed.
+            String pin = UrnParser.withVersion(logical, newVersion);
+            references.linkDanglingVersions(pin, versionId);
+            // The namespace index addresses a version, so leaving it on the superseded one would make
+            // a namespace lookup resolve to an artifact version that is no longer current.
+            if (RegistryMapping.FORMAT_XSD.equals(source.primaryFormat())) {
+                namespaces.repointVersion(artifact.id(), versionId, now);
+                xsd.evict(logical);
+            }
+            return pin;
+        });
+    }
+
     @Override
     public void deleteArtifact(String urn) {
         UrnParser.requireNoControlChars(urn);

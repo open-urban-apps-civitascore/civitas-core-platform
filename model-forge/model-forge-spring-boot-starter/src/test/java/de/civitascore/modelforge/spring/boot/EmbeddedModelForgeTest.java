@@ -104,6 +104,13 @@ class EmbeddedModelForgeTest {
                 }
 
                 @Override
+                public de.civitascore.modelforge.contract.ArtifactWriteResult bumpVersion(
+                        de.civitascore.modelforge.contract.BumpVersionCommand command) {
+                    return new de.civitascore.modelforge.contract.ArtifactWriteResult(
+                        command.artifactId(), java.util.Map.of());
+                }
+
+                @Override
                 public void deleteArtifact(ArtifactId artifactId, boolean cascade, boolean force) {
                     // no-op fake
                 }

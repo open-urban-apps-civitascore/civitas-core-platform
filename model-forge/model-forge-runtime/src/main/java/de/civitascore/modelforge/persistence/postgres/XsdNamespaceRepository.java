@@ -31,6 +31,19 @@ class XsdNamespaceRepository {
             .update();
     }
 
+    /** Points this artifact's indexed namespaces at another of its versions. */
+    void repointVersion(UUID artifactId, UUID versionId, Instant updatedAt) {
+        jdbc.sql("""
+                update model_forge.xsd_namespace
+                   set version_id = :vid, updated_at = :updatedAt
+                 where artifact_id = :aid
+                """)
+            .param("vid", versionId)
+            .param("updatedAt", RegistryTime.toOffset(updatedAt))
+            .param("aid", artifactId)
+            .update();
+    }
+
     /**
      * Removes every namespace row owned by {@code artifactId}. Called before re-upserting an
      * model_forge.artifact's current namespace so a changed/removed {@code targetNamespace} cannot leave a

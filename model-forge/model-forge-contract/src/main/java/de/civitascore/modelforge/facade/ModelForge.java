@@ -6,6 +6,7 @@ import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
+import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
@@ -156,6 +157,20 @@ public interface ModelForge {
      *     unresolved {@code x-core-ref} foreign key
      */
     ArtifactWriteResult saveArtifact(SaveArtifactCommand command);
+
+    /**
+     * Carries an artifact's current version forward as a new version numbered at the requested change
+     * class, with its content, every stored format and its reference edges unchanged, and makes it
+     * current. The new version is built from the stored rows, so a caller never reads content out and
+     * writes it back — a round trip that would drop the edges the content does not spell out.
+     *
+     * <p>This <em>always</em> mints a version, unlike every other write, which returns the existing
+     * pin when the content is byte-identical. Carrying unchanged content forward is the whole point.
+     *
+     * @throws IllegalArgumentException when the command's id pins a version, or the artifact is
+     *     unknown, or it holds no version to carry forward
+     */
+    ArtifactWriteResult bumpVersion(BumpVersionCommand command);
 
     // ── Delete ───────────────────────────────────────────────────────────────
 

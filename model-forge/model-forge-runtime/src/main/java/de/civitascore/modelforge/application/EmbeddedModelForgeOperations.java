@@ -8,6 +8,7 @@ import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
+import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
@@ -504,6 +505,24 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         registry.referencesByType(pin.value()).forEach((rel, targets) ->
             byType.put(rel, targets.stream().map(ArtifactId::new).toList()));
         return byType;
+    }
+
+    @Override
+    public ArtifactWriteResult bumpVersion(BumpVersionCommand command) {
+        String urn = command.artifactId().value();
+        // A pinned identity is refused rather than reinterpreted: bumping from a version that is not
+        // current has no sound answer, and bumping from the current one instead would quietly ignore
+        // the version the caller named. :latest names the current version and is accepted.
+        if (!UrnParser.isLatest(urn) && UrnParser.versionFromUrn(urn) != null) {
+            throw new IllegalArgumentException(
+                "bumpVersion needs a logical URN; " + urn + " pins a version. "
+                + "Bump the artifact, then store the pin the bump returns.");
+        }
+        String logical = UrnParser.logicalUrn(urn);
+        String assigned = registry.bumpVersion(logical, command.bump());
+        dependencyGraph.registerFromRegistry(logical);
+        var pin = new ArtifactId(assigned != null && !assigned.isBlank() ? assigned : logical);
+        return new ArtifactWriteResult(pin, dependenciesOf(pin));
     }
 
     @Override

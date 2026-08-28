@@ -107,6 +107,16 @@ public interface ArtifactRegistry {
     /** @return the concrete versioned URN (pin) the write resolved to */
     String storeDataStructure(String urn, JsonNode manifest, VersionBump bump);
 
+    /**
+     * Copies the artifact's current version to a new version numbered at {@code bump} — content,
+     * every stored representation and every reference edge — and makes it current. Always writes a
+     * version: the content is unchanged by definition, so the byte-identical short-circuit the store
+     * methods rely on would otherwise make this a no-op.
+     *
+     * @return the versioned URN the new version was written under
+     */
+    String bumpVersion(String logicalUrn, VersionBump bump);
+
     void deleteArtifact(String urn);
 
     /**
