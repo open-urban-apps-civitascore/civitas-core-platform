@@ -193,10 +193,13 @@ public class DataStructureVersionController
       operationId = "updateDataStructureVersionReleasedMeta",
       summary = "Update metadata of a released data structure version",
       description =
-          "Updates a released data structure version (AVAILABLE status). If the version is"
-              + " not in use by any DataSource, all fields including model, version, and styles"
-              + " can be updated. If the version is in use, only description and modelName can be"
-              + " changed. For DRAFT versions, use PUT"
+          "Updates a released data structure version (AVAILABLE status). If the version is not in"
+              + " use by a DataSource or a DataSink, the model and styles can be replaced and the"
+              + " request must carry a model — it cannot be cleared. If the version is in use, only"
+              + " description and modelName can be changed. The version number is never a client"
+              + " input: replacing the model is an edit, so it stores a new registry version one"
+              + " minor above the current one, and the assigned number is returned. For DRAFT"
+              + " versions, use PUT"
               + " /datastructures/{dataStructureId}/versions/{versionId} instead.")
   @ApiResponse(responseCode = "200", description = "Released version metadata updated successfully")
   @ApiResponse(

@@ -33,6 +33,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 @DisplayName("DataStructureVersion Controller Integration Tests")
@@ -114,6 +115,44 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   class CreateDataStructureVersionTests {
 
     @Test
+    @DisplayName("A version whose content already exists is refused")
+    void shouldRefuseAVersionWithContentThatAlreadyExists() {
+      // The registry returns the version already stored for a byte-identical write, so a second
+      // version cannot be given a number of its own. Refusing says so instead of yielding a
+      // version that shares another's number while claiming to be a new one.
+      DataStructureVersionInputDTO first = new DataStructureVersionInputDTO();
+      first.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      first.setDescription("first");
+      first.setModelName("SharedShape");
+      first.setModel(portalData.dataStructureVersionModel("SharedShape"));
+
+      ResponseEntity<DataStructureVersionOutputDTO> firstResponse =
+          restTemplate.exchange(
+              getEndpoint(),
+              HttpMethod.POST,
+              new HttpEntity<>(first, createAuthHeaders()),
+              getOutputTypeReference());
+      assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+      DataStructureVersionInputDTO second = new DataStructureVersionInputDTO();
+      second.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      second.setDescription("second, same content");
+      second.setModelName("SharedShape");
+      second.setModel(portalData.dataStructureVersionModel("SharedShape"));
+
+      ResponseEntity<ProblemDetail> secondResponse =
+          restTemplate.exchange(
+              getEndpoint(),
+              HttpMethod.POST,
+              new HttpEntity<>(second, createAuthHeaders()),
+              new ParameterizedTypeReference<ProblemDetail>() {});
+
+      assertThat(secondResponse.getStatusCode())
+          .as("The number is already taken by the version holding this content")
+          .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
     @DisplayName("Should create data structure version successfully with valid data")
     void shouldCreateDataStructureVersionSuccessfully() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
@@ -142,8 +181,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
       assertThat(output.getVersion())
-          .as("Model Forge assigns the next MINOR after the seeded 1.0.0/1.1.0")
-          .isEqualTo("1.2.0");
+          .as("A new version is a new contract, so its model starts a new major after 1.0.0/1.1.0")
+          .isEqualTo("2.0.0");
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo("Third version with new features");
@@ -385,7 +424,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output.getId()).isEqualTo(versionId1);
       assertThat(output.getVersion())
-          .as("Replacing the model stores a new registry version: next MINOR after 1.0.0/1.1.0")
+          .as("Editing an existing version advances its minor, above the seeded 1.0.0/1.1.0")
           .isEqualTo("1.2.0");
       assertThat(output.getDescription()).isEqualTo("Updated description with a replaced model");
       assertThat(output.getDataStructureVersionStatus())
@@ -978,7 +1017,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .as("Model name should be updated")
           .isEqualTo("UpdatedReleasedModel");
       assertThat(output.getVersion())
-          .as("Replacing the model stores a new registry version: next MINOR after 1.0.0/1.1.0")
+          .as("Replacing the model is an edit, so it advances the minor after 1.0.0/1.1.0")
           .isEqualTo("1.2.0");
       assertThat(output.getStyles().get("color")).as("Styles should be updated").isEqualTo("red");
       assertThat(output.getDataStructureVersionStatus())

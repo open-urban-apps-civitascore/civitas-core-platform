@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
@@ -373,6 +374,10 @@ class DataStructureVersionServiceTest {
       assertThat(result.getDataStructureVersionStatus())
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
       verify(dataStructureVersionRepository).save(version);
+
+      // Releasing changes status only. Asserted rather than assumed, so adding a registry call here
+      // fails the test instead of silently changing what a release does.
+      verifyNoInteractions(modelRegistryGateway);
     }
 
     @Test
@@ -437,8 +442,8 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("The input's version bump reaches the gateway; absent bump defaults to MINOR")
-    void versionBumpFromInputReachesGateway() {
+    @DisplayName("A version's first model starts a new major")
+    void createStartsANewMajor() {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
@@ -452,15 +457,12 @@ class DataStructureVersionServiceTest {
 
       DataStructureVersion newEntity = new DataStructureVersion();
       newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      newEntity.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
 
       when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
       when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      // The DTO defaults to MINOR when the client sends no bump.
-      assertThat(input.getVersionBump()).isEqualTo(VersionBump.MINOR);
-
-      input.setVersionBump(VersionBump.MAJOR);
       dataStructureVersionService.create(input);
 
       verify(modelRegistryGateway)
@@ -470,6 +472,68 @@ class DataStructureVersionServiceTest {
               any(),
               any(),
               eq(VersionBump.MAJOR));
+    }
+
+    @Test
+    @DisplayName("A model that arrives on a later save still starts a new major")
+    void lateModelStillStartsANewMajor() {
+      UUID versionId = UUID.randomUUID();
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(dataStructureId);
+      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
+      dataStructure.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
+
+      // Created without a diagram, so it holds no model yet — the save below is its first.
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      version.setDataStructure(dataStructure);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setDataStructureId(dataStructureId);
+      input.setModel(new HashMap<>(Map.of("title", "Arrived late")));
+
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
+
+      dataStructureVersionService.update(versionId, input);
+
+      verify(modelRegistryGateway).storeModel(any(), any(), any(), any(), eq(VersionBump.MAJOR));
+    }
+
+    @Test
+    @DisplayName("Changing a model a version already has advances its minor")
+    void editAdvancesTheMinor() {
+      UUID versionId = UUID.randomUUID();
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(dataStructureId);
+      dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      dataStructure.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setVersion("2.4.0");
+      version.setModelUrn("urn:core:platform:civitas:element:common:test:2.4.0");
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructure(dataStructure);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setDataStructureId(dataStructureId);
+      input.setModel(new HashMap<>(Map.of("title", "Replaced")));
+
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
+      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
+      when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
+
+      dataStructureVersionService.updateReleasedMeta(versionId, input);
+
+      verify(modelRegistryGateway).storeModel(any(), any(), any(), any(), eq(VersionBump.MINOR));
     }
 
     @Test

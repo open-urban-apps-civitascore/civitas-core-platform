@@ -7,6 +7,7 @@ import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -96,7 +97,6 @@ public class DataStructureVersionService
   protected DataStructureVersionInputDTO preProcessCreateInput(DataStructureVersionInputDTO input) {
     // Set DRAFT status for newly created data structure versions
     input.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-
     return super.preProcessCreateInput(input);
   }
 
@@ -165,7 +165,7 @@ public class DataStructureVersionService
    * is minted on the first store and reused for every later version.
    *
    * @param entity the data structure version entity
-   * @param input the input DTO carrying model, styles and the requested version bump
+   * @param input the input DTO carrying the model and its styles
    */
   private void storeModelInRegistry(
       DataStructureVersion entity, DataStructureVersionInputDTO input) {
@@ -175,8 +175,8 @@ public class DataStructureVersionService
     if (entity.getModelUrn() != null
         && modelRegistryGateway.isUnchanged(
             entity.getModelUrn(), input.getModel(), input.getStyles())) {
-      // Unchanged content keeps the existing pin — a metadata-only update (description,
-      // modelName, PATCH round-trip) must not mint a new registry version.
+      // Unchanged content keeps the existing pin — an update that only touches metadata
+      // (description, modelName) must not mint a new registry version.
       return;
     }
     DataStructure parent = entity.getDataStructure();
@@ -186,7 +186,11 @@ public class DataStructureVersionService
             parent.getName(),
             input.getModel(),
             input.getStyles(),
-            input.getVersionBump());
+            // A version's first model starts a new major; changing a model it already has
+            // advances the minor. Keyed on the version's own state rather than on whether this
+            // request created it, so a version whose model arrives on a later save still starts
+            // a major.
+            entity.getModelUrn() == null ? VersionBump.MAJOR : VersionBump.MINOR);
     if (parent.getModelLogicalUrn() == null) {
       parent.setModelLogicalUrn(pin.logicalUrn());
     }

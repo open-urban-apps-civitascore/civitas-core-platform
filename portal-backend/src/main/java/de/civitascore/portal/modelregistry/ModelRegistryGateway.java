@@ -111,7 +111,7 @@ public class ModelRegistryGateway {
    * @param model the JSON Schema document to store (must be non-empty)
    * @param styles the host's UI styles, merged into the document as {@value #X_UI_STYLES}; null or
    *     empty means the stored document carries no styles
-   * @param bump the requested version bump for a follow-up version (ignored on first store)
+   * @param bump the change class for a follow-up version (ignored on first store)
    * @return the pin (logical URN, versioned URN, version) the caller persists on the shell
    */
   public ModelPin storeModel(
@@ -126,13 +126,13 @@ public class ModelRegistryGateway {
       // A datastructure model is folded into a single DataStructure artifact by importSchema (which
       // also splits + versions its member Elements), whether new OR re-versioned. It must NOT go
       // through saveArtifact(ELEMENT) — that would store an Element under a :datastructure: URN.
-      // importSchema versions the existing logical URN idempotently; the requested bump is not yet
-      // threaded through the datastructure import path, so a re-version lands as a registry PATCH.
-      root = importRoot(withTitle(content, name));
+      // importSchema versions the existing logical URN idempotently, applying the change class to
+      // the grouping and to every member whose content changed.
+      root = importRoot(withTitle(content, name), bump);
     } else if (existingLogicalUrn.isPresent()) {
       root = saveVersion(existingLogicalUrn.get(), ArtifactKind.ELEMENT, content, bump);
     } else {
-      root = importRoot(withTitle(content, name));
+      root = importRoot(withTitle(content, name), bump);
     }
     return toPin(root);
   }
@@ -418,9 +418,16 @@ public class ModelRegistryGateway {
     modelForge.deleteArtifact(new ArtifactId(logicalUrn));
   }
 
-  /** Imports a new Element; the root pin is returned, dependency edges are logged. */
-  private ArtifactId importRoot(JsonNode content) {
-    ImportResult result = modelForge.importSchema(new ImportSchemaCommand(content));
+  /**
+   * Stores a document through the import path, which splits its members and builds the grouping
+   * that references them. The root pin is returned, dependency edges are logged.
+   *
+   * @param bump the change class to apply; it reaches the grouping and every member whose content
+   *     changed, and a member that is byte-identical still mints nothing
+   */
+  private ArtifactId importRoot(JsonNode content, VersionBump bump) {
+    ImportResult result =
+        modelForge.importSchema(new ImportSchemaCommand(content, toModelForgeBump(bump)));
     logDependencies(result.rootArtifactId(), result.dependencies());
     return result.rootArtifactId();
   }
@@ -472,12 +479,15 @@ public class ModelRegistryGateway {
     };
   }
 
-  /** Maps the host bump onto the Model Forge bump; a missing bump defaults to {@code MINOR}. */
+  /**
+   * Maps the host change class onto the Model Forge one. The host only ever asks for a major (a new
+   * version) or a minor (an edit of one); a missing class defaults to the minor, the narrower of
+   * the two.
+   */
   private static de.civitascore.modelforge.contract.VersionBump toModelForgeBump(VersionBump bump) {
     return switch (bump == null ? VersionBump.MINOR : bump) {
       case MAJOR -> de.civitascore.modelforge.contract.VersionBump.MAJOR;
       case MINOR -> de.civitascore.modelforge.contract.VersionBump.MINOR;
-      case PATCH -> de.civitascore.modelforge.contract.VersionBump.PATCH;
     };
   }
 

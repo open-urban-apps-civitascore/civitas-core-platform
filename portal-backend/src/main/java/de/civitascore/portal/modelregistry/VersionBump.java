@@ -1,13 +1,11 @@
 package de.civitascore.portal.modelregistry;
 
 /**
- * Host-side change classification chosen by the client for a new model version. It is mapped to the
- * Model Forge bump inside {@link ModelRegistryGateway}; Model Forge remains the version authority
- * and assigns the concrete SemVer version. Only applies when a new version of an existing model is
- * stored — the very first version is always the initial version regardless of the bump.
+ * Change class the host asks Model Forge to number a new model version at. It is decided by the
+ * lifecycle, never by a client: creating a data structure version starts a new major, and editing
+ * one advances the minor.
  */
 public enum VersionBump {
   MAJOR,
-  MINOR,
-  PATCH
+  MINOR
 }
