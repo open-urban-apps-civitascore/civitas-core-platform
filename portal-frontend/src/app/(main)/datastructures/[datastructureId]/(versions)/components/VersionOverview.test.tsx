@@ -6,12 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
-import {
-  Datastructure,
-  DATASTRUCTURE_STATUS_TYPES,
-  DATASTRUCTURE_VERSION_SOURCE,
-  DatastructureVersion,
-} from '@/types/datastructures'
+import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureVersion } from '@/types/datastructures'
 
 import { VersionOverview } from './VersionOverview'
 
@@ -302,10 +297,11 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(screen.getByTestId('versionTextField')).toBeDisabled()
     })
 
-    it('version field is enabled in edit mode', () => {
+    it('version field stays read-only in edit mode', () => {
       renderComponent()
 
-      expect(screen.getByTestId('versionTextField')).not.toBeDisabled()
+      // The registry assigns the version on store, so the field only ever displays it.
+      expect(screen.getByTestId('versionTextField')).toBeDisabled()
     })
   })
 
@@ -321,9 +317,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       const user = userEvent.setup()
       renderComponent({ version: null, isCreateMode: true })
 
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
       const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
-      await user.type(versionInput, '1.0.0')
       await user.type(descriptionInput, 'A description')
 
       await waitFor(() => {
@@ -479,9 +473,9 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       const user = userEvent.setup()
       renderComponent()
 
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      await user.clear(versionInput)
-      await user.type(versionInput, '2.0.0')
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      await user.clear(descriptionInput)
+      await user.type(descriptionInput, 'An edited description')
 
       await waitFor(() => {
         expect(screen.getAllByTestId('confirmButton')[0]).not.toBeDisabled()
@@ -492,9 +486,9 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       const user = userEvent.setup()
       renderComponent()
 
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      await user.clear(versionInput)
-      await user.type(versionInput, '2.0.0')
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      await user.clear(descriptionInput)
+      await user.type(descriptionInput, 'An edited description')
 
       const confirmButtons = screen.getAllByTestId('confirmButton')
       await user.click(confirmButtons[0])
@@ -538,9 +532,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       const user = userEvent.setup()
       renderComponent({ version: null, isCreateMode: true })
 
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
       const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
-      await user.type(versionInput, '1.0.0')
       await user.type(descriptionInput, 'Some description')
 
       const confirmButtons = screen.getAllByTestId('confirmButton')
@@ -617,9 +609,9 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
       renderComponent()
 
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      await user.clear(versionInput)
-      await user.type(versionInput, '2.0.0')
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      await user.clear(descriptionInput)
+      await user.type(descriptionInput, 'An edited description')
 
       const cancelButtons = screen.getAllByTestId('cancelButton')
       const exitButton = cancelButtons[0]
@@ -652,9 +644,9 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
       renderComponent()
 
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      await user.clear(versionInput)
-      await user.type(versionInput, '2.0.0')
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      await user.clear(descriptionInput)
+      await user.type(descriptionInput, 'An edited description')
 
       const cancelButtons = screen.getAllByTestId('cancelButton')
       const exitButton = cancelButtons[0]
@@ -675,9 +667,9 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
       renderComponent()
 
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      await user.clear(versionInput)
-      await user.type(versionInput, '2.0.0')
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      await user.clear(descriptionInput)
+      await user.type(descriptionInput, 'An edited description')
 
       const cancelButtons = screen.getAllByTestId('cancelButton')
       await user.click(cancelButtons[0])
@@ -703,9 +695,9 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
       renderComponent()
 
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      await user.clear(versionInput)
-      await user.type(versionInput, '2.0.0')
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      await user.clear(descriptionInput)
+      await user.type(descriptionInput, 'An edited description')
 
       const cancelButtons = screen.getAllByTestId('cancelButton')
       await user.click(cancelButtons[0])
@@ -726,57 +718,8 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     })
   })
 
-  describe('versionAlreadyExistsError', () => {
-    const otherVersionSummary = {
-      id: 'v-2',
-      version: '2.0.0',
-      description: 'Other version',
-      dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
-      dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
-      createdAt: '2024-01-01',
-      modifiedAt: '2024-01-01',
-      dataStructureId: 'ds-1',
-    }
-
-    it('shows an error when the entered version already exists', async () => {
-      const user = userEvent.setup()
-
-      const datastructureWithOtherVersion: Datastructure = {
-        ...mockDatastructure,
-        dataStructureVersions: [otherVersionSummary],
-      }
-      renderComponent({ datastructure: datastructureWithOtherVersion })
-
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      await user.clear(versionInput)
-      await user.type(versionInput, '2.0.0')
-
-      await waitFor(() => {
-        expect(screen.getByTestId('versionManualFormMessage')).toBeInTheDocument()
-      })
-    })
-
-    it('shows no error when the entered version is unique', async () => {
-      const user = userEvent.setup()
-
-      const datastructureWithOtherVersion: Datastructure = {
-        ...mockDatastructure,
-        dataStructureVersions: [otherVersionSummary],
-      }
-      renderComponent({ datastructure: datastructureWithOtherVersion })
-
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      await user.clear(versionInput)
-      await user.type(versionInput, '3.0.0')
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('versionManualFormMessage')).not.toBeInTheDocument()
-      })
-    })
-  })
-
   describe('exit behavior - create mode', () => {
-    it('shows ExitWarningModal when version field is filled in create mode', async () => {
+    it('shows ExitWarningModal when a field is filled in create mode', async () => {
       const user = userEvent.setup()
 
       renderComponent({
@@ -784,8 +727,8 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         isCreateMode: true,
       })
 
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      await user.type(versionInput, '1.0.0')
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      await user.type(descriptionInput, 'A description')
 
       const cancelButtons = screen.getAllByTestId('cancelButton')
       const exitButton = cancelButtons[0]
@@ -820,8 +763,8 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         isCreateMode: true,
       })
 
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      await user.type(versionInput, '1.0.0')
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      await user.type(descriptionInput, 'A description')
 
       const cancelButtons = screen.getAllByTestId('cancelButton')
       await user.click(cancelButtons[0])
@@ -841,9 +784,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
       renderComponent({ version: null, isCreateMode: true })
 
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
       const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
-      await user.type(versionInput, '1.0.0')
       await user.type(descriptionInput, 'Some description')
 
       const cancelButtons = screen.getAllByTestId('cancelButton')

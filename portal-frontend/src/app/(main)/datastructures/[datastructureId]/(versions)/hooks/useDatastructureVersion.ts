@@ -38,7 +38,7 @@ import {
   parseDatastructureVersionFormData,
 } from '@/utils/datastructures'
 import { pickDirtyValues } from '@/utils/form'
-import { buildDataStructureUrn } from '@/utils/urn'
+import { buildDataStructureLogicalUrn } from '@/utils/urn'
 
 const draftResolver: Resolver<DatastructureVersionFormData> = zodResolver(DatastructureVersionFormDraftSchema)
 // The available schema narrows modelName to a non-null string, the form values stay the draft shape.
@@ -279,11 +279,9 @@ export const useDatastructureVersion = ({
       // The model document IS the DataStructure: its $id is the DataStructure URN. Model Forge folds
       // the wrapper into a single DataStructure artifact (carrying the shape + styles) that CONTAINS
       // its member Elements (the $defs classes) — with no separate root Element. Mappings and sinks
-      // bind to this DataStructure URN (also built via buildDataStructureUrn), so it is the one
-      // identity the model, its grouping, and every reference to it all share.
-      const modelUri = sessionDiagram
-        ? buildDataStructureUrn(dataStructureName, datastructureId, parsed.data.version)
-        : undefined
+      // pin a version of this same identity, so the model carries the logical form: the registry
+      // assigns the version on store, and one authored here would only be a guess.
+      const modelUri = sessionDiagram ? buildDataStructureLogicalUrn(dataStructureName, datastructureId) : undefined
       let model: Record<string, unknown> | null = null
       if (sessionDiagram) {
         try {
@@ -331,10 +329,7 @@ export const useDatastructureVersion = ({
 
   const dirtyFields = form.formState.dirtyFields
   const hasMetadataChanges =
-    dirtyFields.version ||
-    dirtyFields.description ||
-    dirtyFields.dataStructureVersionSource ||
-    dirtyFields.dataStructureVersionStatus
+    dirtyFields.description || dirtyFields.dataStructureVersionSource || dirtyFields.dataStructureVersionStatus
   const hasModelChanges =
     activeSession?.isDirty === true || (!!initialSession?.id && activeSessionId !== initialSession?.id)
   const hasUserChanges = hasMetadataChanges || hasModelChanges

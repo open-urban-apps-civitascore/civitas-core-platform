@@ -37,7 +37,9 @@ export type DatastructureVersionSource =
 
 export const DatastructureVersionApiResponseSchema = z.object({
   id: z.string(),
-  version: z.string(),
+  // Assigned by the registry when the model is stored, so a version that carries no model yet
+  // — a draft whose diagram is still empty — has no number.
+  version: z.string().nullable(),
   description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
   dataStructureVersionSource: DatastructureVersionSourceEnum,
@@ -54,7 +56,7 @@ export const DatastructureVersionApiResponseSchema = z.object({
 
 export const DatastructureVersionSummaryApiResponseSchema = z.object({
   id: z.string(),
-  version: z.string(),
+  version: z.string().nullable(),
   description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
   dataStructureVersionSource: DatastructureVersionSourceEnum,
@@ -63,15 +65,9 @@ export const DatastructureVersionSummaryApiResponseSchema = z.object({
   dataStructureId: z.string(),
 })
 
-// Three-segment SemVer, mirroring the URN grammar: the version becomes the trailing
-// segment of the model's $id URN, whose validation rejects any other shape at release.
-export const VERSION_PATTERN = /^\d+\.\d+\.\d+$/
-
-const versionSchema = z
-  .string()
-  .trim()
-  .min(1, 'common.errors.required')
-  .regex(VERSION_PATTERN, 'datastructureVersions.errors.versionFormat')
+// The version is assigned by the registry on store, never authored: the form carries it only to
+// display the assigned value, so it has no shape to enforce and is empty until the first store.
+const versionSchema = z.string()
 
 export const DatastructureVersionFormDraftSchema = z.object({
   id: z.string(),
@@ -93,7 +89,6 @@ export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormD
 })
 
 export const DatastructureVersionCreateSchema = z.object({
-  version: versionSchema,
   description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum.optional(),
@@ -116,7 +111,7 @@ export type DatastructureVersionsListData = {
   description: string
   status: DatastructureStatusType
   source: DatastructureVersionSource
-  versionNumber: string
+  versionNumber: string | null
 }
 
 // DATASTRUCTURE TYPES

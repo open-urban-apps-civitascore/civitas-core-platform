@@ -80,21 +80,39 @@ const toDisambiguator = (datastructureId: string): string => {
  *   contain at least one alphanumeric character after normalization
  * @param datastructureId - the DataStructure id (UUID); source of the
  *   disambiguator that keeps equal names apart
- * @param version - the SemVer version string (e.g. `1.0.0`); the form schemas
- *   enforce this shape (`VERSION_PATTERN`), the URN grammar rejects any other
+ * @param version - the SemVer version string a pin needs (e.g. `1.0.0`), taken from the version
+ *   the registry assigned. Omitted for a logical (version-free) identity
  */
-const buildCoreUrn = (artifactType: string, name: string, datastructureId: string, version: string): string => {
+const buildCoreUrn = (artifactType: string, name: string, datastructureId: string, version?: string): string => {
   const normalizedName = toPascalCaseName(name)
   if (!normalizedName) throw new Error(`buildCoreUrn: name yields no URN segment (got ${JSON.stringify(name)})`)
   if (!datastructureId) throw new Error('buildCoreUrn: datastructureId is required')
-  if (!version) throw new Error('buildCoreUrn: version is required')
 
   const disambiguator = toDisambiguator(datastructureId)
-  return `urn:core:${URN_SCOPE}:${URN_OWNER}:${artifactType}:${URN_DOMAIN}:${normalizedName}:${disambiguator}:${version}`
+  const identity = `urn:core:${URN_SCOPE}:${URN_OWNER}:${artifactType}:${URN_DOMAIN}:${normalizedName}:${disambiguator}`
+  return version ? `${identity}:${version}` : identity
 }
 
-export const buildDataStructureUrn = (name: string, datastructureId: string, version: string): string =>
-  buildCoreUrn(URN_TYPE_DATASTRUCTURE, name, datastructureId, version)
+/**
+ * Builds the versioned CORE URN of one DataStructure version — a pin. Use it wherever a reference
+ * must keep resolving to the same content, such as a mapping's source and target. The version must
+ * be the one the registry assigned (read it off the version resource); it is never authored.
+ *
+ * Throws when a segment would be empty, including the version: a pin without one would silently
+ * become a floating reference.
+ */
+export const buildDataStructureUrn = (name: string, datastructureId: string, version: string): string => {
+  if (!version) throw new Error('buildDataStructureUrn: version is required for a pin')
+  return buildCoreUrn(URN_TYPE_DATASTRUCTURE, name, datastructureId, version)
+}
+
+/**
+ * Builds the logical (version-free) CORE URN of a DataStructure — its identity across all versions.
+ * This is the form a saved model carries as its `$id`: the registry is the version authority and
+ * assigns the version on store, so a client that authored one would only be stating a guess.
+ */
+export const buildDataStructureLogicalUrn = (name: string, datastructureId: string): string =>
+  buildCoreUrn(URN_TYPE_DATASTRUCTURE, name, datastructureId)
 
 /**
  * Builds the versioned CORE URN for an Element that shares a DataStructure's disambiguator + version
@@ -103,8 +121,10 @@ export const buildDataStructureUrn = (name: string, datastructureId: string, ver
  * `$id` is now the DataStructure URN ({@link buildDataStructureUrn}), and its member Elements are
  * addressed with {@link elementModelUrnForMember}.
  */
-export const buildElementModelUrn = (name: string, datastructureId: string, version: string): string =>
-  buildCoreUrn(URN_TYPE_ELEMENT, name, datastructureId, version)
+export const buildElementModelUrn = (name: string, datastructureId: string, version: string): string => {
+  if (!version) throw new Error('buildElementModelUrn: version is required for a pin')
+  return buildCoreUrn(URN_TYPE_ELEMENT, name, datastructureId, version)
+}
 
 /**
  * Builds the Element URN for a member of a DataStructure from the DataStructure's own (versioned) URN.

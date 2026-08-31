@@ -189,6 +189,32 @@ describe('mapDatastructuresApiToListData', () => {
   })
 })
 
+describe('a version with no stored model', () => {
+  it('has no number to list, and is labelled rather than named after one', () => {
+    const noModel = createVersionSummary({ version: null })
+
+    const [row] = mapDatastructureVersionsApiToListData([noModel])
+
+    expect(row.versionNumber).toBeNull()
+    expect(row.name).toBe('-')
+  })
+
+  it('is skipped when picking the number a datastructure shows', () => {
+    const structure = createDatastructure(['1.0.0'])
+    structure.dataStructureVersions.push(createVersionSummary({ id: 'no-model', version: null }))
+
+    const [row] = mapDatastructuresApiToListData([structure])
+
+    expect(row.versionNumber).toBe('1.0.0')
+  })
+
+  it('maps to an empty version on the form, so the placeholder shows', () => {
+    const form = mapDatastructureVersionApiToFormData(createVersionDetail({ version: null }))
+
+    expect(form.version).toBe('')
+  })
+})
+
 describe('mapDatastructureVersionsApiToListData', () => {
   it('maps version summaries to list rows', () => {
     const versions = [createVersionSummary()]
@@ -253,9 +279,9 @@ describe('mapDatastructureVersionFormToApiData', () => {
 
     const result = mapDatastructureVersionFormToApiData(formData, diagram, model)
 
+    // The registry owns the version, so the client does not send one.
     expect(result).toEqual({
       id: formData.id,
-      version: formData.version,
       description: formData.description,
       dataStructureVersionSource: formData.dataStructureVersionSource,
       dataStructureVersionStatus: formData.dataStructureVersionStatus,
