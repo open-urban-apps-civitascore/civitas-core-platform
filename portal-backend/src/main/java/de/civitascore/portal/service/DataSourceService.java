@@ -221,6 +221,10 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
    * @param entity the data source entity
    * @return the stored configuration or null
    */
+  /**
+   * The stored configuration, or null when none is pinned. A pin that cannot be read fails instead
+   * of reading as absent, because callers take absence as "no secret to preserve".
+   */
   private Map<String, Object> fetchConfiguration(DataSource entity) {
     if (entity.getConfigurationUrn() == null) {
       return null;
@@ -229,7 +233,12 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
         .fetchPayload(entity.getConfigurationUrn())
         .map(ModelRegistryGateway.RegistryDocument::content)
         .map(HashMap::new)
-        .orElse(null);
+        .orElseThrow(
+            () ->
+                new InvalidInputException(
+                    getEntityName(),
+                    entity.getId(),
+                    "Stored configuration cannot be read: " + entity.getConfigurationUrn()));
   }
 
   /**

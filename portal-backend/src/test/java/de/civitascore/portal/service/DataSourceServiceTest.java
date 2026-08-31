@@ -1256,6 +1256,33 @@ class DataSourceServiceTest {
     }
 
     @Test
+    @DisplayName("An unreadable stored configuration fails the update instead of losing the secret")
+    void shouldFailWhenStoredConfigurationCannotBeRead() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.DRAFT);
+      entity.setConnectorType(ConnectorType.SQL);
+      entity.setConfigurationUrn("urn:core:platform:civitas:datasource:common:gone:kx1:1.0.0");
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("updated");
+      input.setConnectorType(ConnectorType.SQL);
+      input.setConfiguration(
+          new java.util.HashMap<>(Map.of("password", ConnectorHandler.MASKED_VALUE)));
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      // A pin is set but the artifact is gone: without the masked value to restore against, the
+      // encrypted placeholder would be stored as the credential.
+      when(modelRegistryGateway.fetchPayload(entity.getConfigurationUrn()))
+          .thenReturn(Optional.empty());
+
+      assertThatThrownBy(() -> dataSourceService.update(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("cannot be read");
+    }
+
+    @Test
     @DisplayName("Should not restore when new value is not masked")
     void shouldNotRestoreNonMaskedValues() {
       UUID id = UUID.randomUUID();
