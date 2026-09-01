@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.exception.FatalAdapterException;
@@ -37,8 +38,10 @@ import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.Test;
 
 class FlowDeploymentPlannerTest {
@@ -48,10 +51,8 @@ class FlowDeploymentPlannerTest {
   private final ObjectMapper mapper = new ObjectMapper();
 
   /** The first processor of the given type in a flow snapshot. */
-  private com.fasterxml.jackson.databind.JsonNode processorOfType(
-      String snapshot, String typeSuffix) throws Exception {
-    for (com.fasterxml.jackson.databind.JsonNode p :
-        mapper.readTree(snapshot).get("flowContents").get("processors")) {
+  private JsonNode processorOfType(String snapshot, String typeSuffix) throws Exception {
+    for (JsonNode p : mapper.readTree(snapshot).get("flowContents").get("processors")) {
       if (p.path("type").asText().endsWith(typeSuffix)) {
         return p;
       }
@@ -640,9 +641,11 @@ class FlowDeploymentPlannerTest {
       assertTrue(snapshot.contains("tcp://mosquitto:1883"));
       assertTrue(snapshot.contains("sensors/+/temp"));
       assertTrue(snapshot.contains("sensor_observations"));
-      // compiled RecordPath mapping is present (copied field + a toDate conversion)
+      // compiled RecordPath mapping is present (copied field + a toDateTime conversion). The
+      // date-only op renders the same call wrapped in format(), so a substring match would accept
+      // either — the full property value is what tells the two apart.
       assertTrue(snapshot.contains("station_id"));
-      assertTrue(snapshot.contains("toDate(/ts, 'yyyy-MM-dd')"));
+      assertTrue(snapshot.contains("\"toDate(/ts, 'yyyy-MM-dd')\""));
 
       // SECURITY INVARIANT: the plaintext secret never appears in the uploaded snapshot
       assertFalse(snapshot.contains(SECRET));
@@ -983,18 +986,112 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
-  void mqttTlsEnabledIsRejected() throws Exception {
-    // TLS needs a NiFi SSL Context Service the adapter does not provision — reject, don't silently
-    // deploy a plaintext connection
+  void mqttTlsEnabledBuildsSslContextServiceAndNormalizesMqtts() throws Exception {
     Datasource source = mqttSource(null);
     source.handleUnknownProperty("tls", Map.of("enabled", true));
+    source.handleUnknownProperty("urls", List.of("MQTTS://Broker.Example:8883"));
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(req("p-tls", graphWithMapping(), source, postgisSink()))
+              .snapshotJson();
+      JsonNode flow = mapper.readTree(snapshot).path("flowContents");
+      JsonNode mqtt = processorOfType(snapshot, "ConsumeMQTT");
+      assertEquals(
+          "ssl://Broker.Example:8883", mqtt.path("properties").path("Broker URI").asText());
+      String sslContextId = mqtt.path("properties").path("SSL Context Service").asText();
+      long matchingServices =
+          StreamSupport.stream(flow.path("controllerServices").spliterator(), false)
+              .filter(
+                  service ->
+                      "org.apache.nifi.ssl.StandardSSLContextService"
+                          .equals(service.path("type").asText()))
+              .peek(service -> assertEquals(sslContextId, service.path("identifier").asText()))
+              .count();
+      assertEquals(1, matchingServices);
+    }
+  }
+
+  @Test
+  void mqttTlsBindsTheConfiguredTruststoreInsteadOfTheNodeOne() throws Exception {
+    Datasource source = mqttSource(null);
+    source.handleUnknownProperty("tls", Map.of("enabled", true));
+    source.handleUnknownProperty("urls", List.of("ssl://broker.example:8883"));
+    MqttTruststoreConfig dedicated =
+        new MqttTruststoreConfig(
+            "/opt/mqtt-tls/truststore.p12",
+            "PKCS12",
+            "MQTT_TRUSTSTORE_PASSWORD",
+            "MQTT Broker CAs");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          NifiTestFixtures.planner(resolver, dedicated)
+              .plan(req("p-tls-dedicated", graphWithMapping(), source, postgisSink()))
+              .snapshotJson();
+      JsonNode root = mapper.readTree(snapshot);
+      JsonNode sslContext =
+          StreamSupport.stream(
+                  root.path("flowContents").path("controllerServices").spliterator(), false)
+              .filter(
+                  service ->
+                      "org.apache.nifi.ssl.StandardSSLContextService"
+                          .equals(service.path("type").asText()))
+              .findFirst()
+              .orElseThrow();
+      assertEquals(
+          "/opt/mqtt-tls/truststore.p12",
+          sslContext.path("properties").path("Truststore Filename").asText());
+      assertEquals(
+          "#{MQTT_TRUSTSTORE_PASSWORD}",
+          sslContext.path("properties").path("Truststore Password").asText());
+      assertEquals(
+          "MQTT Broker CAs", root.path("flowContents").path("parameterContextName").asText());
+      assertEquals(
+          "MQTT_TRUSTSTORE_PASSWORD",
+          root.path("parameterContexts")
+              .path("MQTT Broker CAs")
+              .path("parameters")
+              .path(0)
+              .path("name")
+              .asText());
+    }
+  }
+
+  @Test
+  void mqttTlsWithoutAConfiguredTruststoreIsRejected() throws Exception {
+    // Deploying a TLS source with no trust anchor would either leave the service invalid or fall
+    // back to a plaintext connection; neither may pass silently.
+    Datasource source = mqttSource(null);
+    source.handleUnknownProperty("tls", Map.of("enabled", true));
+    source.handleUnknownProperty("urls", List.of("ssl://broker.example:8883"));
+    MqttTruststoreConfig unset = new MqttTruststoreConfig("", "PKCS12", "", "");
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FatalAdapterException ex =
           assertThrows(
               FatalAdapterException.class,
               () ->
-                  planner(resolver).plan(req("p-tls", graphWithMapping(), source, postgisSink())));
+                  NifiTestFixtures.planner(resolver, unset)
+                      .plan(req("p-tls-no-store", graphWithMapping(), source, postgisSink())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+      assertTrue(ex.getInternalMessage().contains("nifi.mqtt.truststore.path"));
+    }
+  }
+
+  @Test
+  void mqttPlaintextSchemeIsNormalizedToTcp() throws Exception {
+    // brokers advertise mqtt://, but NiFi's ConsumeMQTT (Paho) only accepts tcp://; no SSL Context
+    // Service is built for a plaintext source
+    Datasource source = mqttSource(null);
+    source.handleUnknownProperty("urls", List.of("MQTT://Broker.Example:1883?q=1"));
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(req("p-mqtt-plain", graphWithMapping(), source, postgisSink()))
+              .snapshotJson();
+      JsonNode mqtt = processorOfType(snapshot, "ConsumeMQTT");
+      assertEquals(
+          "tcp://Broker.Example:1883?q=1", mqtt.path("properties").path("Broker URI").asText());
+      assertTrue(mqtt.path("properties").path("SSL Context Service").isNull());
     }
   }
 
@@ -1033,12 +1130,104 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
-  void tlsBrokerSchemeIsRejected() throws Exception {
-    // an ssl:// broker would need a NiFi SSL Context Service we do not provision — reject even when
-    // the tls flag is absent
-    Datasource source = mqttSource(null);
-    source.handleUnknownProperty("urls", List.of("ssl://broker:8883"));
-    assertPlanRejected(source, "p-ssl");
+  void validMqttSchemeCombinationsAreAccepted() throws Exception {
+    for (String url : List.of("tcp://broker:1883", "ws://broker:8080/mqtt", "mqtt://broker:1883")) {
+      Datasource source = mqttSource(null);
+      source.handleUnknownProperty("urls", List.of(url));
+      try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+        planner(resolver)
+            .plan(req("p-plain-" + url.substring(0, 2), graphWithMapping(), source, postgisSink()));
+      }
+    }
+    for (String url : List.of("ssl://broker:8883", "mqtts://broker:8883", "wss://broker/mqtt")) {
+      Datasource source = mqttSource(null);
+      source.handleUnknownProperty("tls", Map.of("enabled", true));
+      source.handleUnknownProperty("urls", List.of(url));
+      try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+        planner(resolver)
+            .plan(req("p-tls-" + url.substring(0, 2), graphWithMapping(), source, postgisSink()));
+      }
+    }
+  }
+
+  @Test
+  void invalidMqttSchemeCombinationsAreRejected() throws Exception {
+    for (Map.Entry<String, Boolean> combination :
+        Map.of(
+                "tcp://broker:1883", true,
+                "ws://broker/mqtt", true,
+                "mqtt://broker:1883", true,
+                "ssl://broker:8883", false,
+                "mqtts://broker:8883", false,
+                "wss://broker/mqtt", false,
+                "https://broker/mqtt", true)
+            .entrySet()) {
+      Datasource source = mqttSource(null);
+      source.handleUnknownProperty("tls", Map.of("enabled", combination.getValue()));
+      source.handleUnknownProperty("urls", List.of(combination.getKey()));
+      assertPlanRejected(source, "p-invalid-scheme");
+    }
+  }
+
+  @Test
+  void everyMqttBrokerInAListIsValidated() throws Exception {
+    Datasource secure = mqttSource(null);
+    secure.handleUnknownProperty("tls", Map.of("enabled", true));
+    secure.handleUnknownProperty("urls", List.of("ssl://one:8883", "mqtts://two:8883"));
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(req("p-secure-list", graphWithMapping(), secure, postgisSink()))
+              .snapshotJson();
+      assertEquals(
+          "ssl://one:8883,ssl://two:8883",
+          processorOfType(snapshot, "ConsumeMQTT").path("properties").path("Broker URI").asText());
+    }
+
+    Datasource plain = mqttSource(null);
+    plain.handleUnknownProperty("urls", List.of("tcp://one:1883", "mqtt://two:1883"));
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(req("p-plain-list", graphWithMapping(), plain, postgisSink()))
+              .snapshotJson();
+      assertEquals(
+          "tcp://one:1883,tcp://two:1883",
+          processorOfType(snapshot, "ConsumeMQTT").path("properties").path("Broker URI").asText());
+    }
+
+    Datasource mixed = mqttSource(null);
+    mixed.handleUnknownProperty("urls", List.of("tcp://one:1883", "ssl://two:8883"));
+    assertPlanRejected(mixed, "p-mixed-schemes");
+  }
+
+  @Test
+  void mqttBrokerListMixingTransportsIsRejected() throws Exception {
+    // ConsumeMQTT's customValidate compares every URI's scheme to the first, so a websocket entry
+    // alongside a TCP one deploys an INVALID processor that never runs
+    Datasource secure = mqttSource(null);
+    secure.handleUnknownProperty("tls", Map.of("enabled", true));
+    secure.handleUnknownProperty("urls", List.of("ssl://one:8883", "wss://two:8884/mqtt"));
+    assertPlanRejected(secure, "p-tls-mixed-transport");
+
+    // the mqtt/mqtts aliases normalize onto tcp/ssl, so the check must run after normalization
+    Datasource aliased = mqttSource(null);
+    aliased.handleUnknownProperty("urls", List.of("mqtt://one:1883", "ws://two:8080/mqtt"));
+    assertPlanRejected(aliased, "p-plain-mixed-transport");
+  }
+
+  @Test
+  void mqttTcpTransportRejectsAPath() throws Exception {
+    // Paho's TCP/SSL network modules require an empty URI path; NiFi does not validate it, so such
+    // a broker deploys clean and silently never ingests
+    Datasource secure = mqttSource(null);
+    secure.handleUnknownProperty("tls", Map.of("enabled", true));
+    secure.handleUnknownProperty("urls", List.of("ssl://broker:8883/mqtt"));
+    assertPlanRejected(secure, "p-tls-path");
+
+    Datasource plain = mqttSource(null);
+    plain.handleUnknownProperty("urls", List.of("mqtt://broker:1883/mqtt"));
+    assertPlanRejected(plain, "p-plain-path");
   }
 
   @Test

@@ -1,0 +1,91 @@
+{
+  "name": "MQTT SSL Context Service",
+  "comments": "Server authentication for an MQTT broker. The truststore is supplied by the adapter configuration; no keystore, so the broker is not offered a client certificate. TLS Protocol stays at the JVM-negotiated default so the highest version both ends support is used.",
+  "type": "org.apache.nifi.ssl.StandardSSLContextService",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-ssl-context-service-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "Keystore Filename": null,
+    "Keystore Password": null,
+    "key-password": null,
+    "Keystore Type": null,
+    "Truststore Filename": null,
+    "Truststore Password": null,
+    "Truststore Type": null,
+    "TLS Protocol": "TLS"
+  },
+  "propertyDescriptors": {
+    "Keystore Filename": {
+      "name": "Keystore Filename",
+      "displayName": "Keystore Filename",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Keystore Password": {
+      "name": "Keystore Password",
+      "displayName": "Keystore Password",
+      "identifiesControllerService": false,
+      "sensitive": true,
+      "dynamic": false
+    },
+    "key-password": {
+      "name": "key-password",
+      "displayName": "Key Password",
+      "identifiesControllerService": false,
+      "sensitive": true,
+      "dynamic": false
+    },
+    "Keystore Type": {
+      "name": "Keystore Type",
+      "displayName": "Keystore Type",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Truststore Filename": {
+      "name": "Truststore Filename",
+      "displayName": "Truststore Filename",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Truststore Password": {
+      "name": "Truststore Password",
+      "displayName": "Truststore Password",
+      "identifiesControllerService": false,
+      "sensitive": true,
+      "dynamic": false
+    },
+    "Truststore Type": {
+      "name": "Truststore Type",
+      "displayName": "Truststore Type",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "TLS Protocol": {
+      "name": "TLS Protocol",
+      "displayName": "TLS Protocol",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "controllerServiceApis": [
+    {
+      "type": "org.apache.nifi.ssl.SSLContextService",
+      "bundle": {
+        "group": "org.apache.nifi",
+        "artifact": "nifi-ssl-context-service-api-nar",
+        "version": "2.9.0"
+      }
+    }
+  ],
+  "scheduledState": "DISABLED",
+  "bulletinLevel": "WARN",
+  "componentType": "CONTROLLER_SERVICE"
+}

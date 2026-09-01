@@ -147,6 +147,62 @@ else
     exit 1
 fi
 
+# Check 5: Bundle config contract
+# Every data.config.<key> read must be declared in policy/config_contract.rego, and
+# every REQUIRED key must exist in the config.json baked into the published OPA image
+# (../Dockerfile). A required key that only reaches the dev/CI configs ships a policy
+# the released image cannot activate — fail-secure, but silently inert.
+echo -n "  Checking bundle config contract... "
+
+USED_CONFIG=$(grep -rhoE 'data\.config\.[a-z_][a-z0-9_]*' \
+  "${SCRIPT_DIR}/policy" "${SCRIPT_DIR}/lib" "${SCRIPT_DIR}/providers" 2>/dev/null \
+  | sed -E 's/.*\.config\.//' | sort -u)
+
+eval_config_set() {
+    docker run --rm \
+      -v "${SCRIPT_DIR}/policy:/rego/policy:ro" \
+      -v "${SCRIPT_DIR}/lib:/rego/lib:ro" \
+      -v "${SCRIPT_DIR}/providers:/rego/providers:ro" \
+      ${OPA_IMAGE} \
+      eval -f raw -d /rego/policy -d /rego/lib -d /rego/providers \
+      "data.civitas.authz.config_contract.$1[_]" 2>/dev/null | sort -u
+}
+
+if [ -z "${USED_CONFIG}" ]; then
+    echo "FAILED"
+    echo ""
+    echo "No data.config.* reads found at all — the contract scan matched nothing."
+    echo "Either the read idiom changed or a policy directory moved; the check cannot verify anything."
+    exit 1
+fi
+
+REQUIRED_CONFIG=$(eval_config_set required_config)
+OPTIONAL_CONFIG=$(eval_config_set optional_config)
+
+CONFIG_ERRORS=""
+for key in ${USED_CONFIG}; do
+    if printf '%s\n' "${REQUIRED_CONFIG}" | grep -qx "${key}"; then
+        if ! grep -q "\"${key}\"" "${SCRIPT_DIR}/../Dockerfile"; then
+            CONFIG_ERRORS="${CONFIG_ERRORS}\n  ${key}: required, but missing from the image-baked config.json (authz/Dockerfile)"
+        fi
+    elif ! printf '%s\n' "${OPTIONAL_CONFIG}" | grep -qx "${key}"; then
+        CONFIG_ERRORS="${CONFIG_ERRORS}\n  ${key}: read by a policy, but declared in neither required_config nor optional_config"
+    fi
+done
+
+if [ -z "${CONFIG_ERRORS}" ]; then
+    echo "OK"
+else
+    echo "FAILED"
+    echo ""
+    echo "Bundle config contract violations (policy/config_contract.rego):"
+    printf '%b\n' "${CONFIG_ERRORS}"
+    echo ""
+    echo "A new required key also belongs in dev-environment/apisix/opa-config/data.json"
+    echo "and dev-environment/ci/docker-compose.api-test.yml."
+    exit 1
+fi
+
 echo ""
 
 # =============================================================================

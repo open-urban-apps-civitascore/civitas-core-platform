@@ -11,6 +11,7 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.util.TestContainerImages;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -74,7 +75,7 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
   @SuppressWarnings("resource")
   static final PostgreSQLContainer sinkDb =
       new PostgreSQLContainer(
-              DockerImageName.parse("postgis/postgis:16-3.4-alpine")
+              DockerImageName.parse(TestContainerImages.POSTGIS)
                   .asCompatibleSubstituteFor("postgres"))
           .withDatabaseName("geosink")
           .withUsername("geo")
@@ -116,7 +117,7 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
 
   @BeforeEach
   void initHelpers() {
-    verifier = new SagaInfraVerifier(dataSetRepository, frostExternalUrl, redpandaExternalUrl);
+    verifier = new SagaInfraVerifier(dataSetRepository, frostExternalUrl);
   }
 
   @AfterEach

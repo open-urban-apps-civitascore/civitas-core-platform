@@ -6,8 +6,9 @@
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
-    # Always run on main and develop branch
+    # Always run on main, staging and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     # Run on MR only when backend files change
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -46,8 +47,9 @@ generate-graph-backend:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
-    # Always run on main and develop branch
+    # Always run on main, staging and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     # Always run on MR pipelines
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -230,6 +232,7 @@ saga-e2e-test-backend:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -288,6 +291,7 @@ api-test-backend:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -348,6 +352,8 @@ api-test-backend:
       }
     # Seed APISIX routes (services, plugin config, portal-backend route)
     - docker compose -p api-test $COMPOSE_FILES run --rm apisix-seed
+    # Provision the NiFi parameter context the MQTT-TLS flows resolve their truststore password from
+    - docker compose -p api-test $COMPOSE_FILES run --rm nifi-parameter-contexts
     # Run Bruno API tests from a container on the same Compose network
     - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
     - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/

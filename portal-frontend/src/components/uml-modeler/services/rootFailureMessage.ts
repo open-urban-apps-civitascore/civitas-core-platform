@@ -12,11 +12,8 @@ export const rootFailureMessage = (t: Translate, failure: RootResolutionFailure)
       return t('rootValidation.noRoot')
     case 'ambiguousRoot':
       return t('rootValidation.ambiguousRoot', { names: failure.candidateNames.join(', ') })
-    case 'unreachable':
-      return t('rootValidation.unreachable', {
-        root: failure.rootName,
-        names: failure.unreachableNames.join(', '),
-      })
+    case 'misdirected':
+      return t('rootValidation.misdirected', { name1: failure.name1, name2: failure.name2 })
     default: {
       // A new RootResolutionFailure variant must fail the build here, not silently return undefined.
       const exhaustive: never = failure

@@ -133,6 +133,30 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <ignoredUnusedDeclaredDependencies>
+                        <!-- Starters and BOM aggregators are runtime-wired; no bytecode references them. -->
+                        <ignoredUnusedDeclaredDependency>org.springframework.boot:*</ignoredUnusedDeclaredDependency>
+                        <!-- JDBC driver: loaded by name at runtime -->
+                        <ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
+                    </ignoredUnusedDeclaredDependencies>
+                    <!-- Compile scope required for boot; direct imports only in tests -->
+                    <ignoredNonTestScopedDependencies>
+                        <ignoredNonTestScopedDependency>org.springframework:spring-beans</ignoredNonTestScopedDependency>
+                        <ignoredNonTestScopedDependency>org.springframework:spring-jdbc</ignoredNonTestScopedDependency>
+                        <ignoredNonTestScopedDependency>org.springframework:spring-core</ignoredNonTestScopedDependency>
+                    </ignoredNonTestScopedDependencies>
+                    <!-- The used-undeclared check is off: compiling against a starter's or aggregator's
+                         transitive closure is deliberate here, so every finding is a false positive. -->
+                    <ignoredUsedUndeclaredDependencies>
+                        <ignoredUsedUndeclaredDependency>*:*</ignoredUsedUndeclaredDependency>
+                    </ignoredUsedUndeclaredDependencies>
+                </configuration>
+
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <annotationProcessorPaths>

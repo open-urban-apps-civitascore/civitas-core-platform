@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -43,7 +44,7 @@ class JdbcSqlSourceProbeIT {
         "Docker not available — skipping SQL probe IT");
     postgres =
         new PostgreSQLContainer<>(
-                DockerImageName.parse("postgis/postgis:16-3.4-alpine")
+                DockerImageName.parse(TestContainerImages.POSTGIS)
                     .asCompatibleSubstituteFor("postgres"))
             .withDatabaseName(DB)
             .withUsername(DB_USER)

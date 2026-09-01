@@ -120,6 +120,26 @@ export const useUnstageDataset = () => useDatasetTransition('unstage')
 export const useReleaseDataset = () => useDatasetTransition('release')
 export const useUnreleaseDataset = () => useDatasetTransition('unrelease')
 
+export const useUpdateReadyDatasetMeta = () => {
+  const queryClient = useQueryClient()
+  return useMutation<ApiServiceResponse<Dataset>, unknown, DatasetUpdateApiData>({
+    mutationFn: (data: DatasetUpdateApiData) =>
+      apiRequest<Dataset>({
+        method: 'PUT',
+        endpoint: `/datasets/${data.id}/ready/meta`,
+        headers: { 'x-api-request': 'true' },
+        data,
+        errorMessage: 'An error occurred while updating ready dataset metadata',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [key] })
+    },
+    onError: error => {
+      console.error('Error updating ready dataset metadata:', (error as Error).message)
+    },
+  })
+}
+
 export const useUpdateReleasedDatasetMeta = () => {
   const queryClient = useQueryClient()
   return useMutation<ApiServiceResponse<Dataset>, unknown, DatasetUpdateApiData>({

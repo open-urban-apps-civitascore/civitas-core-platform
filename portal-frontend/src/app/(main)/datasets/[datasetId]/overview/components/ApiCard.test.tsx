@@ -10,6 +10,19 @@ import { ApiCard } from './ApiCard'
 const mockPatchDataset = vi.fn().mockResolvedValue(undefined)
 const mockPush = vi.fn()
 const mockRefresh = vi.fn()
+const mockRequestNavigation = vi.fn()
+
+let mockHasUnsavedChanges = false
+
+vi.mock('@/contexts/unsaved-changes/UnsavedChangesContext', () => ({
+  useUnsavedChanges: () => ({
+    hasUnsavedChanges: mockHasUnsavedChanges,
+    requestNavigation: mockRequestNavigation,
+    requestBack: vi.fn(),
+    setHasUnsavedChanges: vi.fn(),
+    setSaveHandler: vi.fn(),
+  }),
+}))
 
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   usePatchDataset: () => ({ mutateAsync: mockPatchDataset, isPending: false }),
@@ -51,7 +64,10 @@ const renderComponent = (props: Partial<typeof defaultProps> = {}) => render(<Ap
 describe('ApiCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockHasUnsavedChanges = false
   })
+
+  const openMenu = () => userEvent.click(screen.getByTestId('apiCardMenu-my-api'))
 
   describe('Rendering', () => {
     it('displays the api name and description', () => {
@@ -114,18 +130,48 @@ describe('ApiCard', () => {
   })
 
   describe('Navigation', () => {
-    it('pushes to the view route when "view" is clicked', async () => {
+    it('links the card to the view route', () => {
       renderComponent()
-      await userEvent.click(screen.getByTestId('apiCardMenu-my-api'))
-      await userEvent.click(screen.getByTestId('apiCardMenuView-my-api'))
-      expect(mockPush).toHaveBeenCalledWith('/datasets/dataset-123/apis/my-api')
+      expect(screen.getByTestId('apiCard-my-api')).toHaveAttribute('href', '/datasets/dataset-123/apis/my-api')
     })
 
-    it('pushes to the edit route when "edit" is clicked', async () => {
+    it('links the "view" menu item to the view route', async () => {
       renderComponent()
-      await userEvent.click(screen.getByTestId('apiCardMenu-my-api'))
+      await openMenu()
+      expect(screen.getByTestId('apiCardMenuView-my-api')).toHaveAttribute('href', '/datasets/dataset-123/apis/my-api')
+    })
+
+    it('links the "edit" menu item to the edit route', async () => {
+      renderComponent()
+      await openMenu()
+      expect(screen.getByTestId('apiCardMenuEdit-my-api')).toHaveAttribute(
+        'href',
+        '/datasets/dataset-123/apis/my-api?mode=edit',
+      )
+    })
+  })
+
+  describe('Unsaved-changes guard', () => {
+    it('navigates directly when there are no unsaved changes', async () => {
+      renderComponent()
+      await openMenu()
       await userEvent.click(screen.getByTestId('apiCardMenuEdit-my-api'))
-      expect(mockPush).toHaveBeenCalledWith('/datasets/dataset-123/apis/my-api?mode=edit')
+      expect(mockRequestNavigation).not.toHaveBeenCalled()
+    })
+
+    it('requests navigation instead of following the "edit" link when there are unsaved changes', async () => {
+      mockHasUnsavedChanges = true
+      renderComponent()
+      await openMenu()
+      await userEvent.click(screen.getByTestId('apiCardMenuEdit-my-api'))
+      expect(mockRequestNavigation).toHaveBeenCalledWith('/datasets/dataset-123/apis/my-api?mode=edit')
+    })
+
+    it('requests navigation instead of following the card link when there are unsaved changes', async () => {
+      mockHasUnsavedChanges = true
+      renderComponent()
+      await userEvent.click(screen.getByTestId('apiCard-my-api'))
+      expect(mockRequestNavigation).toHaveBeenCalledWith('/datasets/dataset-123/apis/my-api')
     })
   })
 

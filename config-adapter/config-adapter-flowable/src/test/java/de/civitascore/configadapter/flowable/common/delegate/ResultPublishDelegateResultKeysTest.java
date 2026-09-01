@@ -92,6 +92,7 @@ class ResultPublishDelegateResultKeysTest {
     vars.put("datasetName", "Test");
     vars.put("description", "A test dataset");
     vars.put("hasPipelines", false);
+    vars.put("hasFrostSink", true);
     vars.put("datasources", java.util.List.of());
     vars.put("dataPipelines", java.util.List.of());
 

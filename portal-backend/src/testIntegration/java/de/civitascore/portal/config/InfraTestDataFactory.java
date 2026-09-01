@@ -61,8 +61,9 @@ public class InfraTestDataFactory {
 
   /**
    * Creates a saga-test dataset with a single seeded {@link NamedApi} (slug {@code traffic},
-   * standard {@code STA}). Required so saga publisher / result handler logic touching the per-slug
-   * {@code routeIds} map has at least one entry to project.
+   * standard {@code STA}) and the FROST sink that backs it. Required so saga publisher / result
+   * handler logic touching the per-slug {@code routeIds} map has at least one entry to project, and
+   * so the release passes the check that an STA named API has a FROST sink behind it.
    */
   public DataSet createDataSet(String name) {
     DataSet dataSet =
@@ -77,7 +78,9 @@ public class InfraTestDataFactory {
     defaultApi.setStandard(ApiStandard.STA);
     defaultApi.setVersion("1.1");
     dataSet.setNamedApis(Set.of(defaultApi));
-    return portalData.saveDataSet(dataSet);
+    DataSet saved = portalData.saveDataSet(dataSet);
+    portalData.dataSink(saved);
+    return saved;
   }
 
   public DataSource createMqttDataSource() {

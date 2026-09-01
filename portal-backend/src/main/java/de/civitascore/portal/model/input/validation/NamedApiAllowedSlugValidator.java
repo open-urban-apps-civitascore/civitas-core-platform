@@ -16,6 +16,8 @@ import java.util.regex.Pattern;
  * <ul>
  *   <li>{@code apis} — collides with the {@code GET /v1/datasets/{id}/apis} discovery endpoint
  *       (implemented per #1596)
+ *   <li>{@code usable-datasources} — collides with the {@code GET
+ *       /v1/datasets/{id}/usable-datasources} picker endpoint
  *   <li>{@code api}, {@code v1}, {@code admin} — conservative reserves for future platform
  *       endpoints; refine with the team before lifting
  * </ul>
@@ -30,7 +32,8 @@ public class NamedApiAllowedSlugValidator
    * Reserved slug blocklist. Insertion order is preserved for deterministic error-message
    * rendering.
    */
-  public static final List<String> RESERVED = List.of("apis", "api", "v1", "admin");
+  public static final List<String> RESERVED =
+      List.of("apis", "usable-datasources", "api", "v1", "admin");
 
   /**
    * URL-safe slug shape regex: lowercase alphanumeric with optional internal hyphens, no leading or

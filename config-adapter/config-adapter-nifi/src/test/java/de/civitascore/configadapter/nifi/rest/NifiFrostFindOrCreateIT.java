@@ -20,6 +20,7 @@ import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import jakarta.ws.rs.core.Response;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -113,7 +114,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     network = Network.newNetwork();
 
     mosquitto =
-        new GenericContainer<>(DockerImageName.parse("eclipse-mosquitto:2.0"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.MOSQUITTO))
             .withNetwork(network)
             .withNetworkAliases("mqtt")
             .withExposedPorts(1883)
@@ -122,7 +123,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     mosquitto.start();
 
     postgis =
-        new GenericContainer<>(DockerImageName.parse("postgis/postgis:16-3.4-alpine"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.POSTGIS))
             .withNetwork(network)
             .withNetworkAliases("database")
             .withEnv("POSTGRES_DB", "sensorthings")
@@ -133,11 +134,13 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     postgis.start();
 
     frost =
-        new GenericContainer<>(DockerImageName.parse("hylkevds/frost-http-projects:latest"))
+        new GenericContainer<>(DockerImageName.parse(TestContainerImages.FROST))
             .withNetwork(network)
             .withNetworkAliases("frost")
             .withExposedPorts(8080)
             .withEnv("serviceRootUrl", "http://frost:8080" + FROST_PATH + "/")
+            .withEnv("plugins_projects_enable", "true")
+            .withEnv("plugins_projects_enableDefaultRules", "false")
             .withEnv("plugins_modelLoader_enable", "true")
             .withEnv("plugins_multiDatastream_enable", "false")
             .withEnv("plugins_actuation_enable", "false")
@@ -146,8 +149,6 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
             .withEnv("persistence_db_username", "sensorthings")
             .withEnv("persistence_db_password", "ChangeMe")
             .withEnv("persistence_autoUpdateDatabase", "true")
-            .withEnv("plugins_modelLoader_securityPath", "")
-            .withEnv("plugins_modelLoader_securityFiles", "")
             .waitingFor(
                 Wait.forHttp(FROST_PATH + "/Things")
                     .forStatusCode(200)
@@ -233,7 +234,9 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
               });
 
       // A changed record with the same reference must PATCH the existing Thing, never create a
-      // duplicate.
+      // duplicate. Deliberate pacing dwell: the no-duplicate assertion is negative, so it only
+      // means something once every delivery has been processed. The sleep spaces the five
+      // deliveries out to guarantee that; an await here would return on the first success.
       for (int i = 0; i < 5; i++) {
         publisher.publish(TOPIC, UPDATED_ENVELOPE);
         Thread.sleep(Duration.ofSeconds(2).toMillis());
@@ -340,6 +343,8 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     // create one, so an unmatched reference is dropped to the error sink, not written.
     String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
     try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-frost-nods")) {
+      // Deliberate dwell: this proves an absence, so there is no condition that can complete early
+      // and shortening the window would only narrow the chance to observe the Datastream appearing.
       for (int i = 0; i < 10; i++) {
         publisher.publish(NO_DS_TOPIC, OBS_ENVELOPE_UNKNOWN_DS);
         Thread.sleep(3000);

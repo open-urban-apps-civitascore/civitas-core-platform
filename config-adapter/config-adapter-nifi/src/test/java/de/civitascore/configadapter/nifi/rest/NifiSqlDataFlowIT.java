@@ -26,6 +26,7 @@ import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
+import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -79,7 +80,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
 
     postgres =
         new PostgreSQLContainer<>(
-                DockerImageName.parse("postgis/postgis:16-3.4-alpine")
+                DockerImageName.parse(TestContainerImages.POSTGIS)
                     .asCompatibleSubstituteFor("postgres"))
             .withNetwork(network)
             .withNetworkAliases("postgres")
@@ -237,7 +238,9 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
         .ignoreExceptions()
         .until(() -> count("SELECT count(*) FROM dedup_observation WHERE stationid = 'S1'") >= 1);
 
-    // …and stays a single row across several more cron ticks (UPSERT, not duplicate INSERTs)
+    // …and stays a single row across several more cron ticks (UPSERT, not duplicate INSERTs).
+    // Deliberate dwell: the condition already holds, so an Awaitility poll would return at once and
+    // prove nothing — the elapsed ticks are what makes the assertion meaningful.
     Thread.sleep(Duration.ofSeconds(8).toMillis());
     assertEquals(
         1,
@@ -286,6 +289,8 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
             () ->
                 count("SELECT count(*) FROM \"mixedObservation\" WHERE \"stationId\" = 'M1'") >= 1);
 
+    // Deliberate dwell: the condition already holds, so an Awaitility poll would return at once and
+    // prove nothing — the elapsed cron ticks are what makes the assertion meaningful.
     Thread.sleep(Duration.ofSeconds(8).toMillis());
     assertEquals(
         1,

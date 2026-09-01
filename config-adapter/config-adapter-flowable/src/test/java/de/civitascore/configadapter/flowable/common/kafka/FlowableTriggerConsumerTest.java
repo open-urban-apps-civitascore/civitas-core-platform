@@ -30,6 +30,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
+import org.awaitility.Awaitility;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.runtime.ProcessInstance;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class FlowableTriggerConsumerTest {
+
+  static {
+    // Awaitility's poll delay defaults to the poll interval, delaying the first condition check.
+    // Zeroing it lets conditions that already hold return immediately.
+    Awaitility.setDefaultPollDelay(Duration.ZERO);
+  }
 
   @Mock private RuntimeService runtimeService;
   @Mock private ProcessInstance processInstance;

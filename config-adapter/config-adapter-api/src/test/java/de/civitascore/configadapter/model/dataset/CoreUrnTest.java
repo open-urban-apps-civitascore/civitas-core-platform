@@ -154,4 +154,42 @@ class CoreUrnTest {
     assertFalse(CoreUrn.sameArtifact(v1, null));
     assertFalse(CoreUrn.sameArtifact(null, v1));
   }
+
+  @Test
+  @DisplayName("sameStructureVersion ignores a renamed display-name segment")
+  void sameStructureVersion_ignoresTheName() {
+    // A rename leaves both the structure and its shape untouched, so a caller comparing identity
+    // must not see a difference — otherwise a rename fails deploys that were correct.
+    assertTrue(
+        CoreUrn.sameStructureVersion(
+            "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0",
+            "urn:core:platform:civitas:datastructure:common:Renamed:2dmtus8w40:1.0.0"));
+  }
+
+  @Test
+  @DisplayName("sameStructureVersion separates two versions of one structure")
+  void sameStructureVersion_separatesVersions() {
+    assertFalse(
+        CoreUrn.sameStructureVersion(
+            "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0",
+            "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:2.0.0"));
+  }
+
+  @Test
+  @DisplayName("sameStructureVersion separates two structures sharing a name and version")
+  void sameStructureVersion_separatesStructures() {
+    assertFalse(
+        CoreUrn.sameStructureVersion(
+            "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0",
+            "urn:core:platform:civitas:datastructure:common:WeatherModel:0000000001:1.0.0"));
+  }
+
+  @Test
+  @DisplayName("sameStructureVersion rejects a malformed or absent URN")
+  void sameStructureVersion_rejectsUnverifiable() {
+    String valid = "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0";
+    assertFalse(CoreUrn.sameStructureVersion(valid, "not-a-core-urn"));
+    assertFalse(CoreUrn.sameStructureVersion(valid, null));
+    assertFalse(CoreUrn.sameStructureVersion(null, null));
+  }
 }

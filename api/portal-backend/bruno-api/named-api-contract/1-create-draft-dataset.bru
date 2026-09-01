@@ -1,0 +1,72 @@
+meta {
+  name: 1. Create DRAFT DataSet with two named APIs
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "Named API Contract DataSet",
+    "description": "Contract fixture for named-API validation and discovery checks. Stays in DRAFT — no saga is ever triggered for it.",
+    "openDataAccess": false,
+    "namedApis": [
+      { "name": "Things", "slug": "things", "standard": "STA", "version": "1.1" },
+      { "name": "Map", "slug": "map", "standard": "OWS" }
+    ]
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('napiContractDataSetId', res.body.id);
+  }
+}
+
+tests {
+  const status = res.getStatus();
+
+  test("DataSet created or already exists", function() {
+    // 201=created, 409=already exists from a previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+  test("Created dataset carries an id and a lifecycle status", function() {
+    if (status !== 201) return;
+    expect(res.body.id).to.be.a('string');
+    expect(res.body.dataSetStatus).to.be.a('string');
+  });
+  test("Both named APIs are persisted on create", function() {
+    if (status !== 201) return;
+    expect(res.body.namedApis).to.be.an('array');
+    expect(res.body.namedApis).to.have.lengthOf(2);
+  });
+}
+
+docs {
+  **Contract step 1** — Create the DRAFT dataset the rest of this folder asserts against.
+
+  Two named APIs cover both routable standards (concept #1379): an `STA` API (FROST) and an `OWS`
+  API (GeoServer). The dataset is deliberately left in `DRAFT` — this folder is saga-free and only
+  exercises the portal-backend request/response contract on `{{baseUrl}}`.
+
+  **Precondition:** none — the request carries its own body and needs no datapool.
+
+  **Expected Response:** 201 Created with `id`, `dataSetStatus` and the two named APIs echoed back.
+  409 if a previous run left the dataset behind.
+
+  **Post-condition:** Save `napiContractDataSetId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet + 2 NamedApi rows created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

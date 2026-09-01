@@ -2,6 +2,7 @@ package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.base.BaseEntity;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -9,8 +10,12 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
+import java.util.HashSet;
+import java.util.Set;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -65,4 +70,13 @@ public class DataSink extends BaseEntity {
    */
   @Column(name = "configuration_urn")
   private String configurationUrn;
+
+  /** A Layer's {@code datasink_id} is non-null, so layers cannot outlive their sink. */
+  @OneToMany(
+      mappedBy = "dataSink",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
+  private Set<Layer> layers = new HashSet<>();
 }

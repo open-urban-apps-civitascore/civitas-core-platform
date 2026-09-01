@@ -237,6 +237,65 @@ class FrostSagaHandlerTest {
 
     @Test
     @DisplayName(
+        "recovers via the 409 race guard when a concurrent create won and the second lookup finds"
+            + " the project")
+    void shouldReturnSuccessWhenFrostReturns409AndProjectExists() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response postResponse = mock(Response.class);
+        when(postResponse.getStatus()).thenReturn(409);
+        when(postResponse.readEntity(String.class))
+            .thenReturn(
+                "{\"code\":409,\"type\":\"error\",\"message\":\"Data violates constraints.\"}");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
+
+        // First lookup: empty (POST is attempted). After the POST's 409, the recovery lookup finds
+        // the project a concurrent create inserted in between.
+        Response emptyLookup = mock(Response.class);
+        when(emptyLookup.getStatus()).thenReturn(200);
+        when(emptyLookup.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
+        Response foundLookup = mock(Response.class);
+        when(foundLookup.getStatus()).thenReturn(200);
+        when(foundLookup.readEntity(Map.class))
+            .thenReturn(Map.of("value", List.of(Map.of("@iot.id", 42))));
+        when(mockBuilder.get()).thenReturn(emptyLookup, foundLookup);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Existing Dataset"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("42", result.resultData().get("projectId"));
+        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
+        assertEquals("42", result.compensationData().get("projectId"));
+      }
+    }
+
+    @Test
+    @DisplayName("returns failure when the POST fails with 409 but no project is found by name")
+    void shouldReturnFailureWhenFrostReturns409ButProjectNotFound() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response postResponse = mock(Response.class);
+        when(postResponse.getStatus()).thenReturn(409);
+        when(postResponse.readEntity(String.class))
+            .thenReturn(
+                "{\"code\":409,\"type\":\"error\",\"message\":\"Data violates constraints.\"}");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
+
+        // Both the up-front and the recovery lookup return empty (default from setup).
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Ghost Dataset"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+      }
+    }
+
+    @Test
+    @DisplayName(
         "returns failure when the POST fails with 500 'Failed to store data.' but no project is"
             + " found by name")
     void shouldReturnFailureWhenFrostSignalsDuplicateButProjectNotFound() {
@@ -368,6 +427,35 @@ class FrostSagaHandlerTest {
   @Nested
   @DisplayName("UPDATE_PROJECT")
   class UpdateProject {
+
+    @Test
+    @DisplayName("provisions the project when the dataset has none yet")
+    void shouldCreateProjectWhenNoneWasProvisionedYet() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(created.getHeaderString("Location")).thenReturn("http://frost:8080/v1.1/Projects(42)");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        // A FROST sink added after a release that provisioned no project: the update carries no
+        // projectId, so the step must provision instead of failing the whole saga.
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_PROJECT",
+                Map.of("datasetName", "Updated Dataset", "description", "Updated"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("42", result.resultData().get("projectId"));
+        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
+        // created=true marks this as a provisioning step, so its compensation deletes rather than
+        // restores.
+        assertEquals(true, result.compensationData().get("created"));
+        verify(mockBuilder, never()).method(eq("PATCH"), any(Entity.class));
+      }
+    }
 
     @Test
     @DisplayName("returns success with projectId, baseUrl and previous state in compensationData")
@@ -527,6 +615,23 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertNull(result.error());
+      }
+    }
+
+    @Test
+    @DisplayName("succeeds without touching FROST when the dataset has no project")
+    void shouldSucceedWhenNoProjectWasProvisioned() {
+      try (FrostSagaHandler handler = createHandler()) {
+        // Without this, the delete saga strands the dataset row and every retry repeats the
+        // failure.
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("datasetId", "ds-1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertNull(result.error());
+        verify(mockBuilder, never()).delete();
       }
     }
 
@@ -1041,6 +1146,50 @@ class FrostSagaHandlerTest {
   @Nested
   @DisplayName("RESTORE_PROJECT")
   class RestoreProject {
+
+    @Test
+    @DisplayName("deletes instead of restoring when the update provisioned the project")
+    void shouldDeleteProjectWhenTheUpdateCreatedIt() {
+      try (FrostSagaHandler handler = createHandler()) {
+        // The project has no Things, so the teardown enumeration returns a single empty page.
+        Response emptyThingsPage = mock(Response.class);
+        when(emptyThingsPage.getStatus()).thenReturn(200);
+        when(emptyThingsPage.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
+        when(mockBuilder.get()).thenReturn(emptyThingsPage);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(ok);
+
+        // There is no previous state to restore: the forward step created the project, so the exact
+        // inverse is the delete. Patching would blank the description of a project meant to go
+        // away.
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP", "RESTORE_PROJECT", Map.of("projectId", "42", "created", true));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        verify(mockBuilder).delete();
+        verify(mockBuilder, never()).method(eq("PATCH"), any(Entity.class));
+      }
+    }
+
+    @Test
+    @DisplayName("preserves a project the update merely adopted (created=false)")
+    void shouldPreserveProjectWhenTheUpdateReusedIt() {
+      try (FrostSagaHandler handler = createHandler()) {
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP", "RESTORE_PROJECT", Map.of("projectId", "42", "created", false));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        verify(mockBuilder, never()).delete();
+        verify(mockBuilder, never()).method(eq("PATCH"), any(Entity.class));
+      }
+    }
 
     @Test
     @DisplayName("returns COMPENSATION_COMPLETED on successful restore")

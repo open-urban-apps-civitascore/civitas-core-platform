@@ -63,6 +63,7 @@ bruno-api/
 ├── datasources/                 # DataSource CRUD + lifecycle
 ├── datastructures/              # DataStructure + Version CRUD + lifecycle
 ├── groups/                      # Group CRUD
+├── named-api-contract/          # Named-API slug validation + discovery contract (no saga)
 ├── permissions/                 # Permission read endpoints
 ├── pipelines/                   # Pipeline CRUD
 ├── roles/                       # Role CRUD
@@ -71,7 +72,7 @@ bruno-api/
 │   ├── 0a..0f-find-saga-*.bru   # Find existing entities from prior runs
 │   ├── 1..6-create-*.bru        # Create datasource/group/role/dataset/pipeline/assignment
 │   ├── 7-stage / 8-release      # Lifecycle transitions (triggers async saga)
-│   ├── 9..10-verify-*.bru       # Verify state after saga
+│   ├── 9..10-verify-*.bru       # Verify state after saga (incl. named-API gateway behaviour)
 │   ├── 11-unrelease / 12-unstage # Reverse lifecycle
 │   └── 13..17-cleanup-*.bru     # Delete all created entities
 ├── zz-teardown/                 # Delete setup entities

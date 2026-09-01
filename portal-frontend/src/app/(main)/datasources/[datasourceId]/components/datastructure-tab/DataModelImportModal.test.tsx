@@ -122,14 +122,28 @@ describe('DataModelImportModal', () => {
   })
 
   it('calls onSelectVersion with current selection on confirm', () => {
-    render(<DataModelImportModal {...defaultProps} selectedVersion="ds-1/v-1" />)
+    mockUseGetDatastructures.mockReturnValue({
+      data: { data: [mixedDatastructures[0]], totalElements: 1 },
+      isFetching: false,
+    })
+    render(<DataModelImportModal {...defaultProps} />)
+
+    fireEvent.click(screen.getByTestId('expanderCell').querySelector('button')!)
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select datastructure Version 1.0' }))
     fireEvent.click(screen.getByTestId('confirmButton'))
 
     expect(mockOnSelectVersion).toHaveBeenCalledWith({ 'ds-1/v-1': true })
   })
 
-  it('calls onSelectVersion with empty selection when no version is selected', () => {
-    render(<DataModelImportModal {...defaultProps} />)
+  it('calls onSelectVersion with empty selection when a saved version is removed', () => {
+    mockUseGetDatastructures.mockReturnValue({
+      data: { data: [mixedDatastructures[0]], totalElements: 1 },
+      isFetching: false,
+    })
+    render(<DataModelImportModal {...defaultProps} selectedVersion="ds-1/v-1" />)
+
+    fireEvent.click(screen.getByTestId('expanderCell').querySelector('button')!)
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select datastructure Version 1.0' }))
     fireEvent.click(screen.getByTestId('confirmButton'))
 
     expect(mockOnSelectVersion).toHaveBeenCalledWith({})
@@ -153,6 +167,33 @@ describe('DataModelImportModal', () => {
       isFetching: true,
     })
     render(<DataModelImportModal {...defaultProps} />)
+    expect(screen.getByTestId('confirmButton')).toBeDisabled()
+  })
+
+  it('disables confirm button when selection is unchanged from the saved version', () => {
+    mockUseGetDatastructures.mockReturnValue({
+      data: { data: [mixedDatastructures[0]], totalElements: 1 },
+      isFetching: false,
+    })
+    render(<DataModelImportModal {...defaultProps} selectedVersion="ds-1/v-1" />)
+    expect(screen.getByTestId('confirmButton')).toBeDisabled()
+  })
+
+  it('disables confirm button when nothing is selected and no version is saved', () => {
+    render(<DataModelImportModal {...defaultProps} />)
+    expect(screen.getByTestId('confirmButton')).toBeDisabled()
+  })
+
+  it('disables confirm button when selection is empty and canRemoveSelection is false', () => {
+    mockUseGetDatastructures.mockReturnValue({
+      data: { data: [mixedDatastructures[0]], totalElements: 1 },
+      isFetching: false,
+    })
+    render(<DataModelImportModal {...defaultProps} selectedVersion="ds-1/v-1" canRemoveSelection={false} />)
+
+    fireEvent.click(screen.getByTestId('expanderCell').querySelector('button')!)
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select datastructure Version 1.0' }))
+
     expect(screen.getByTestId('confirmButton')).toBeDisabled()
   })
 

@@ -25,11 +25,15 @@ import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * MQTT push source: ConsumeMQTT subscribing to a single topic filter. Delivers the SensorThings
@@ -41,14 +45,47 @@ public final class MqttSourceStage implements SourceStage {
   /** Friendly name the REST client matches for the post-upload sensitive-property push. */
   private static final String MQTT_PROCESSOR = "ConsumeMQTT";
 
+  /** Stable friendly name used for the deterministic controller-service id and processor token. */
+  public static final String MQTT_SSL_CONTEXT_SERVICE = "MQTT SSL Context Service";
+
+  private static final String MQTT_SSL_CONTEXT_REFERENCE = "${CS:" + MQTT_SSL_CONTEXT_SERVICE + "}";
+
+  private static final Set<String> PLAINTEXT_SCHEMES = Set.of("tcp", "ws", "mqtt");
+  private static final Set<String> TLS_SCHEMES = Set.of("ssl", "mqtts", "wss");
+
+  /**
+   * Paho's {@code TCPNetworkModuleFactory}/{@code SSLNetworkModuleFactory} reject a broker URI with
+   * a non-empty path ({@code URI path must be empty}), while the WebSocket factories carry the path
+   * as the handshake endpoint. NiFi's {@code customValidate} does not check paths, so a path on a
+   * TCP-transport URI deploys clean and only fails when the processor connects.
+   */
+  private static final Set<String> PATHLESS_SCHEMES = Set.of("tcp", "ssl", "mqtt", "mqtts");
+
+  /**
+   * NiFi's ConsumeMQTT (Eclipse Paho) only accepts {@code tcp}/{@code ssl}/{@code ws}/{@code wss}
+   * and rejects the {@code mqtt}/{@code mqtts} forms that most brokers and MQTT tooling advertise,
+   * so those aliases are mapped to the transport scheme Paho understands. Once Paho registers a
+   * native network module for {@code mqtt}/{@code mqtts} this mapping becomes redundant — tracked
+   * upstream at https://github.com/eclipse-paho/paho.mqtt.java/issues/464.
+   */
+  private static final Map<String, String> SCHEME_ALIASES = Map.of("mqtt", "tcp", "mqtts", "ssl");
+
+  private static final Pattern BROKER_SCHEME =
+      Pattern.compile("^([a-z][a-z0-9+.-]*)://", Pattern.CASE_INSENSITIVE);
+
+  /** The path of a scheme-stripped broker URL: after host[:port], before any query/fragment. */
+  private static final Pattern BROKER_PATH = Pattern.compile("^[^/?#]*([^?#]*)");
+
   /** A plain seconds value, optionally with a seconds unit suffix (e.g. {@code 5}, {@code 5s}). */
   private static final Pattern SECONDS =
       Pattern.compile("(\\d+)\\s*(?:s|sec|secs|second|seconds)?", Pattern.CASE_INSENSITIVE);
 
   private final CredentialResolver credentials;
+  private final MqttTruststoreConfig truststore;
 
-  public MqttSourceStage(CredentialResolver credentials) {
+  public MqttSourceStage(CredentialResolver credentials, MqttTruststoreConfig truststore) {
     this.credentials = credentials;
+    this.truststore = truststore;
   }
 
   @Override
@@ -87,7 +124,8 @@ public final class MqttSourceStage implements SourceStage {
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           "MQTT source requires non-empty 'urls' and 'topics'");
     }
-    rejectTlsSource(decrypted.get("tls"), brokers);
+    boolean tlsEnabled = tlsEnabled(decrypted.get("tls"));
+    brokers = validateAndNormalizeBrokers(brokers, tlsEnabled);
     if (topics.size() > 1) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
@@ -97,6 +135,10 @@ public final class MqttSourceStage implements SourceStage {
     }
     out.putSourceProperty("Broker URI", String.join(",", brokers));
     out.putSourceProperty("Topic Filter", topics.get(0));
+    if (tlsEnabled) {
+      bindTruststore(out);
+      out.putSourceProperty("SSL Context Service", MQTT_SSL_CONTEXT_REFERENCE);
+    }
     putIfPresent(out::putSourceProperty, "Username", decrypted.get("user"));
     putIfPresent(out::putSourceProperty, "Client ID", decrypted.get("client_id"));
     putIfPresent(out::putSourceProperty, "Quality of Service", decrypted.get("qos"));
@@ -116,33 +158,137 @@ public final class MqttSourceStage implements SourceStage {
     }
   }
 
+  /**
+   * Only the password <em>parameter name</em> reaches the SSL Context Service; the value lives in
+   * NiFi, supplied by the deployment, so no truststore secret passes through the adapter. A missing
+   * anchor fails the deploy instead of falling back to plaintext or to NiFi's node truststore.
+   */
+  private void bindTruststore(PlanContext out) throws FatalAdapterException {
+    if (truststore.path().isEmpty() || truststore.type().isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "MQTT TLS needs a truststore: set nifi.mqtt.truststore.path and"
+              + " nifi.mqtt.truststore.type");
+    }
+    if (truststore.hasPasswordParameter() && truststore.parameterContext().isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "MQTT truststore password parameter '"
+              + truststore.passwordParameter()
+              + "' needs nifi.mqtt.truststore.parameter-context");
+    }
+    truststore
+        .sslContextProperties()
+        .forEach(
+            (key, value) -> out.putControllerServiceProperty(MQTT_SSL_CONTEXT_SERVICE, key, value));
+  }
+
+  @Override
+  public void registerControllerServices(BuildContext ctx) throws FatalAdapterException {
+    if (tlsRequested(ctx)) {
+      ctx.addControllerService(Fragment.MQTT_SSL_CONTEXT_SERVICE, MQTT_SSL_CONTEXT_SERVICE);
+    }
+  }
+
+  /**
+   * Binds the flow to the Parameter Context holding the truststore password; a store that opens
+   * without one needs no context at all. The declaration carries no value — the deployment
+   * populates the sensitive parameter in NiFi.
+   */
+  @Override
+  public Optional<ParameterContextSpec> parameterContext(BuildContext ctx) {
+    if (!tlsRequested(ctx) || !truststore.hasPasswordParameter()) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        new ParameterContextSpec(
+            truststore.parameterContext(),
+            List.of(
+                new ParameterSpec(
+                    truststore.passwordParameter(), "Password of the MQTT truststore", true))));
+  }
+
+  private static boolean tlsRequested(BuildContext ctx) {
+    return MQTT_SSL_CONTEXT_REFERENCE.equals(
+        ctx.spec().sourceProperties().get("SSL Context Service"));
+  }
+
   @Override
   public StageResult build(BuildContext ctx) throws FatalAdapterException {
     Processor source = ctx.loadProcessor(Fragment.CONSUME_MQTT, "Message");
     BuildContext.applySchedule(source, ctx.spec().sourceCron());
-    ctx.spec().sourceProperties().forEach((key, value) -> BuildContext.setProp(source, key, value));
+    for (Map.Entry<String, String> property : ctx.spec().sourceProperties().entrySet()) {
+      if ("SSL Context Service".equals(property.getKey())
+          && MQTT_SSL_CONTEXT_REFERENCE.equals(property.getValue())) {
+        ctx.setControllerServiceProp(source, property.getKey(), MQTT_SSL_CONTEXT_SERVICE);
+      } else {
+        BuildContext.setProp(source, property.getKey(), property.getValue());
+      }
+    }
     return new StageResult(List.of(source), List.of());
   }
 
+  private static boolean tlsEnabled(Object tls) {
+    return tls instanceof Map<?, ?> map
+        && "true".equalsIgnoreCase(String.valueOf(map.get("enabled")));
+  }
+
   /**
-   * Rejects a TLS MQTT source: NiFi requires an SSL Context Service for a TLS broker, which this
-   * adapter does not provision, so deploying would silently fall back to a plaintext connection.
-   * Both an explicit {@code tls.enabled=true} and a TLS broker scheme ({@code ssl://}/{@code
-   * mqtts://}/{@code wss://}) are rejected.
+   * Validates every broker against the TLS switch, normalizes the {@code mqtt}/{@code mqtts}
+   * aliases to the transport schemes NiFi accepts, and rejects a list whose entries do not all end
+   * up on one transport — {@code AbstractMQTTProcessor.customValidate} compares every URI's scheme
+   * to the first and fails the processor with {@code all URIs should use the same scheme}.
    */
-  private void rejectTlsSource(Object tls, List<String> brokers) throws FatalAdapterException {
-    boolean tlsEnabled =
-        tls instanceof Map<?, ?> map && "true".equalsIgnoreCase(String.valueOf(map.get("enabled")));
-    boolean tlsScheme =
-        brokers.stream()
-            .map(b -> b.toLowerCase(Locale.ROOT))
-            .anyMatch(
-                b -> b.startsWith("ssl://") || b.startsWith("mqtts://") || b.startsWith("wss://"));
-    if (tlsEnabled || tlsScheme) {
+  private static List<String> validateAndNormalizeBrokers(List<String> brokers, boolean tlsEnabled)
+      throws FatalAdapterException {
+    List<String> normalized = new ArrayList<>(brokers.size());
+    Set<String> expected = tlsEnabled ? TLS_SCHEMES : PLAINTEXT_SCHEMES;
+    for (String broker : brokers) {
+      Matcher matcher = BROKER_SCHEME.matcher(broker);
+      String scheme = matcher.find() ? matcher.group(1).toLowerCase(Locale.ROOT) : "";
+      if (!PLAINTEXT_SCHEMES.contains(scheme) && !TLS_SCHEMES.contains(scheme)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            "unsupported MQTT broker scheme in URL: " + broker);
+      }
+      if (!expected.contains(scheme)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            "MQTT broker scheme '" + scheme + "' is inconsistent with tls.enabled=" + tlsEnabled);
+      }
+      String remainder = broker.substring(matcher.end());
+      if (PATHLESS_SCHEMES.contains(scheme) && hasPath(remainder)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            "MQTT broker scheme '"
+                + scheme
+                + "' does not accept a path, use a 'ws'/'wss' URL for a path-addressed broker: "
+                + broker);
+      }
+      normalized.add(SCHEME_ALIASES.getOrDefault(scheme, scheme) + "://" + remainder);
+    }
+    Set<String> transports =
+        normalized.stream()
+            .map(BROKER_SCHEME::matcher)
+            .filter(Matcher::find)
+            .map(matcher -> matcher.group(1))
+            .collect(Collectors.toUnmodifiableSet());
+    if (transports.size() > 1) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          "MQTT TLS is not supported yet (needs a NiFi SSL Context Service)");
+          "all MQTT brokers must use the same transport, got " + transports + ": " + normalized);
     }
+    return List.copyOf(normalized);
+  }
+
+  /** A bare {@code /} is what Paho itself produces for an empty path, so it does not count. */
+  private static boolean hasPath(String authorityAndPath) {
+    Matcher matcher = BROKER_PATH.matcher(authorityAndPath);
+    if (!matcher.find()) {
+      return false;
+    }
+    String path = matcher.group(1);
+    return !path.isEmpty() && !"/".equals(path);
   }
 
   /**

@@ -1,293 +1,176 @@
 # PostGIS Config Adapter
 
-Adapter for managing PostgreSQL/PostGIS **tables**, **schemas**, and **roles** (including schema-level grants) via DDL, driven by CloudEvents on Kafka.
+Adapter for PostgreSQL/PostGIS **tables**, **schemas** and **roles** (including schema-level grants). It
+applies DDL over JDBC in response to CloudEvents on Kafka, and registers a saga command handler so the same
+DDL participates as a compensable step in the dataset sagas. It does not install the PostGIS extension, does
+not alter existing tables, and never touches table data. PostGIS specifics (geometry columns, SRID, GIST
+indexes) and all flavour-specific SQL are confined to the `SqlDialect` seam. The choice of plain JDBC over a
+schema-migration tool is recorded in [../docs/adr-plain-jdbc-ddl.md](../docs/adr-plain-jdbc-ddl.md).
 
-## Overview
+## Operations
 
-`PostgisAdapter` applies DDL changes to a target Postgres database. The payload type selects the resource family; the operation (CREATE / UPDATE / DELETE) selects the action within it:
+The payload's `resourceType` selects the resource family and the event's operation selects the action; a
+payload that is none of the three is rejected.
 
-- **Tables** (`TableConfig`) — relational + PostGIS geometry columns, primary keys, indexes.
-- **Schemas** (`SchemaConfig`) — create with optional owner, change owner (UPDATE), drop with `RESTRICT` (default) or `CASCADE`.
-- **Roles** (`DbRoleConfig`) — database roles/users (a user is a role with `LOGIN`), optional password, and embedded schema-level grants.
+| Resource | `resourceType` | CREATE | UPDATE | DELETE |
+|---|---|---|---|---|
+| Table | `sql-table` | yes — schema, table, indexes | no — `UNSUPPORTED_OPERATION` | yes |
+| Schema | `sql-schema` | yes — optional `AUTHORIZATION` owner | yes — owner change | yes — `RESTRICT`, or `CASCADE` when `cascade` is set |
+| Role | `sql-role` | yes — attributes, password, grants | yes — attributes, password, grant reconciliation | yes |
 
-PostGIS-specific concepts (geometry columns, SRID, GIST indexes) and all flavor-specific SQL are isolated behind a small `SqlDialect` seam, so a second SQL flavor (MySQL, Oracle, …) can be added later without touching the adapter.
+`postgis.topics` selects from `de.civitascore.data.sql.table.{created,deleted}`,
+`de.civitascore.data.sql.schema.{created,updated,deleted}` and
+`de.civitascore.data.sql.role.{created,updated,deleted}`. A table UPDATE has no in-place equivalent, so
+`de.civitascore.data.sql.table.updated` MUST NOT be subscribed. Result events go to the `resultTopic` from
+the incoming metadata, with CloudEvent type `de.civitascore.data.sql.processing.result`.
 
-**Status:** Tables — CREATE/DELETE; Schemas — CREATE/UPDATE/DELETE; Roles — CREATE/UPDATE/DELETE. All covered by unit, integration, and end-to-end tests. Table UPDATE returns `UNSUPPORTED_OPERATION` (deferred).
+| Forward | Payload field | Compensation | Compensation payload |
+|---|---|---|---|
+| `CREATE_TABLE` | `tableConfig` | `DROP_TABLE` | `{schema?, table}` |
+| `CREATE_SCHEMA` | `schemaConfig` | `DROP_SCHEMA` | `{schema, cascade?}` |
+| `CREATE_ROLE` | `roleConfig` | `DROP_ROLE` | `{role}` |
+| `PROVISION_SINK` | `datasinks`, `datasetId` | `DEPROVISION_SINK` | `datasinks`, `datasetId` |
 
-For the full design rationale (idempotency policy, why no migration tool, future two-module split), see [docs/postgis-adapter-design.md](../docs/postgis-adapter-design.md).
+Each nested config map carries its `resourceType` discriminator, exactly as the config travels inside
+CloudEvents. Every `CREATE_*` returns its identifiers as compensation data, which the orchestrator flattens
+into the payload of the compensating `DROP_*`; a `DROP_*` also serves as a forward step. A failed saga
+command returns a command failure carrying the redacted database message, and the orchestrator drives
+compensation.
 
-## Architecture
+## Behaviour
 
-```text
-┌──────────────────────────────────────────────┐
-│   Kafka Topics                               │
-│   - de.civitascore.data.sql.table.*              │
-│   - de.civitascore.data.sql.schema.*             │
-│   - de.civitascore.data.sql.role.*               │
-└──────────────┬───────────────────────────────┘
-               │ CloudEvent → ConfigEvent (Table/Schema/DbRole payload)
-               ↓
-┌──────────────────────────────────────────────┐
-│   PostgisAdapter (routes by payload type)    │
-│   - SqlDialect renders DDL                    │
-│   - GrantReconciler diffs role grants         │
-│   - CredentialDecryptor for ENC(...) passwords│
-│   - HikariCP pool, JDBC transaction per event │
-│   - SQLState-based idempotency                │
-└──────────────┬───────────────────────────────┘
-               │ JDBC
-               ↓
-┌──────────────────────────────────────────────┐
-│   PostgreSQL / PostGIS                       │
-└──────────────────────────────────────────────┘
-```
+- **One transaction per event or command**, rolled back before the exception propagates. Each statement is
+  wrapped in a savepoint, because PostgreSQL aborts the whole transaction on any statement error — the
+  savepoint lets an absorbed duplicate or missing object be skipped while the remaining statements of a
+  multi-statement plan (schema → table → index, or role → grants) commit.
+- **Idempotency without pre-checks.** No existence check and no `IF NOT EXISTS`: the database fails naturally
+  and the adapter absorbs the conflict, so idempotency is a property of the adapter, not of external state.
+- **Grant reconciliation.** On a role UPDATE the payload's grants are the desired state: the adapter reads the
+  role's current schema privileges and grant-option state from the database, `GRANT`s those newly present and
+  `REVOKE`s those the payload omits. A held privilege is re-granted `WITH GRANT OPTION` when the payload asks
+  for it, and downgraded through `REVOKE GRANT OPTION FOR …` when it does not.
+- **Role passwords.** A `password` may be an encrypted `ENC(...)` value, decrypted with the
+  `CIVITAS_MASTER_KEY` master key under the credential context `portal-backend:sql-role`; plaintext passes
+  through unchanged, and an encrypted password without the master key fails the event fatally.
+  `PASSWORD '…'` literals are redacted from logs and error messages, JDBC URL credentials are masked, and the
+  stretched key is zeroed on shutdown.
+- **Startup does not depend on the database.** The pool starts eagerly but skips the fail-fast initial
+  connection, so an unreachable database does not prevent startup; the failure surfaces as a retryable error
+  when an event arrives. `CREATE EXTENSION postgis` is an operator-provisioned prerequisite.
 
-## Supported Operations
+| SQLState | Meaning | Outcome |
+|---|---|---|
+| `42P07` | duplicate table or index | success on a CREATE |
+| `42P06` | duplicate schema | success on a CREATE |
+| `42710` | duplicate role | success on a CREATE |
+| `42P01` | undefined table | success on a DROP |
+| `3F000` | invalid schema name | success on a DROP |
+| `42704` | undefined object | success on a DROP |
+| `08xxx` | connection failure | retryable |
+| other | data, integrity, syntax and privilege errors | fatal, transaction rolled back |
 
-| Resource | CREATE | UPDATE | DELETE |
-|----------|--------|--------|--------|
-| Table  | ✅ | ❌ `UNSUPPORTED_OPERATION` (deferred) | ✅ |
-| Schema | ✅ (optional `AUTHORIZATION` owner) | ✅ (owner change) | ✅ (`RESTRICT`, or `CASCADE` when `cascade=true`) |
-| Role   | ✅ (attributes, password, grants) | ✅ (attributes, password, **grant reconcile**) | ✅ |
+A table payload carries `schema`, `name`, `columns`, `geometryColumns`, `primaryKey` and `indexes`; a CREATE
+renders `CREATE SCHEMA`, then `CREATE TABLE` with the columns, geometry columns as `GEOMETRY(<type>, <srid>)`
+and the `PRIMARY KEY`, then one `CREATE INDEX … USING <method>` per index. A role attribute clause carries
+`LOGIN`/`NOLOGIN` and, where the payload sets them, `SUPERUSER`, `CREATEDB`, `CREATEROLE` and `INHERIT`, with
+a password appended last; a database user is a role with `LOGIN`, so one payload models both. A role DELETE
+renders `DROP OWNED BY` before `DROP ROLE`, since PostgreSQL refuses to drop a role holding privileges. A
+schema UPDATE renders `ALTER SCHEMA … OWNER TO …`, and no statement at all when the payload gives no owner.
 
-Idempotency on conflict (absorbed as success):
+| Field | Accepted values |
+|---|---|
+| Column `type` | `SMALLINT`, `INTEGER`, `BIGINT`, `NUMERIC` (optional `precision`/`scale`), `REAL`, `DOUBLE_PRECISION`, `BOOLEAN`, `VARCHAR` (optional `length`), `TEXT`, `UUID`, `DATE`, `TIME`, `TIMESTAMP`, `TIMESTAMPTZ`, `JSONB`, `BYTEA` |
+| `geometryType` | `POINT`, `LINESTRING`, `POLYGON`, `MULTIPOINT`, `MULTILINESTRING`, `MULTIPOLYGON`, `GEOMETRYCOLLECTION`, `GEOMETRY`. An optional `dimension` of `3` appends `Z` and `4` appends `ZM` to the rendered type |
+| Index `method` | `BTREE` (default), `GIST` (required for geometry columns), `GIN` |
+| Grant `privileges` | `USAGE`, `CREATE`, `ALL` (expands to `USAGE` + `CREATE`) |
 
-| Operation | SQLState | Meaning |
-|-----------|----------|---------|
-| CREATE | `42P07` / `42P06` / `42710` | duplicate table / schema / role |
-| DELETE | `42P01` / `3F000` / `42704` | undefined table / invalid schema / undefined role |
+## Dataset sink provisioning
 
-**Grant reconciliation (role UPDATE):** the payload is the desired state. The adapter reads the role's current schema privileges (including their grant-option state) from the database, `GRANT`s those newly present, and `REVOKE`s those no longer listed. The grant option is reconciled too: a held privilege is re-granted `WITH GRANT OPTION` when the payload requests it, and downgraded via `REVOKE GRANT OPTION FOR …` when it no longer does. `ALL` expands to `USAGE` + `CREATE` for comparison.
+`PROVISION_SINK` creates the PostGIS objects a GeoServer datastore publishes from, which is why the dataset
+CREATE saga runs it before GeoServer registers that datastore. For every `POSTGIS` entry in the trigger's
+`datasinks`, one transaction creates the schema, the table and an optional read role with its grants, from
+that entry's `configuration` (`tableName`, `columns`, `geometryColumns`, `primaryKey`, `readRole`) and its
+`dataStructure` JSON Schema.
 
-## Subscribed Topics
+- **Schema** — always derived from the trigger's `datasetId`, by the same rule that produces the GeoServer
+  workspace name, so the table lands in the schema GeoServer reads from. `configuration` carries no schema and
+  no owner. A trigger without a `datasetId` fails the step rather than falling back to `public`.
+- **Columns** — explicit `configuration.columns` win; otherwise columns are derived from `dataStructure`,
+  excluding explicitly configured `geometryColumns`. At least one column or geometry column MUST result, and a
+  schema with no usable properties fails the step.
+- **Primary key** — explicit `configuration.primaryKey` wins; otherwise the `x-core-primaryKey` markers in
+  `dataStructure` supply it, through the same resolver the NiFi adapter uses, so the table primary key and the
+  pipeline's UPSERT keys cannot diverge. Primary-key columns are `NOT NULL` even when `required` omits them,
+  and a primary key naming a column absent from the table fails the step rather than emitting broken DDL.
+- **Read role** — optional. It receives the listed schema privileges, defaulting to `USAGE`, plus `SELECT` on
+  the sink table. Its password follows the same `ENC(...)` handling as any role password.
+- **Teardown** — `DEPROVISION_SINK` drops the role, then the table, then the per-dataset schema with
+  `RESTRICT`, skipping `public`. A schema left non-empty fails the step; nothing is force-dropped. Forward
+  delete and compensation re-derive their targets from `datasinks` and `datasetId`, so both paths resolve
+  identical identifiers. A delete trigger may omit `columns` and `dataStructure`.
 
-| Topic Constant | Topic Value |
-|----------------|-------------|
-| `SQL_TABLE_CREATED` | `de.civitascore.data.sql.table.created` |
-| `SQL_TABLE_DELETED` | `de.civitascore.data.sql.table.deleted` |
-| `SQL_SCHEMA_CREATED` | `de.civitascore.data.sql.schema.created` |
-| `SQL_SCHEMA_UPDATED` | `de.civitascore.data.sql.schema.updated` |
-| `SQL_SCHEMA_DELETED` | `de.civitascore.data.sql.schema.deleted` |
-| `SQL_ROLE_CREATED` | `de.civitascore.data.sql.role.created` |
-| `SQL_ROLE_UPDATED` | `de.civitascore.data.sql.role.updated` |
-| `SQL_ROLE_DELETED` | `de.civitascore.data.sql.role.deleted` |
+Column derivation reads the root `properties`, or the property-carrying definition under
+`$defs`/`definitions`; `required` properties become `NOT NULL`.
 
-## Configuration
-
-```properties
-# Topics to subscribe to (comma-separated).
-# Table UPDATE is not supported (no in-place ALTER TABLE), so table.updated is not subscribed.
-postgis.topics=de.civitascore.data.sql.table.created,de.civitascore.data.sql.table.deleted,\
-  de.civitascore.data.sql.schema.created,de.civitascore.data.sql.schema.updated,de.civitascore.data.sql.schema.deleted,\
-  de.civitascore.data.sql.role.created,de.civitascore.data.sql.role.updated,de.civitascore.data.sql.role.deleted
-
-# JDBC connection (required)
-postgis.jdbc.url=jdbc:postgresql://localhost:5432/civitas
-postgis.jdbc.user=civitas
-postgis.jdbc.password=civitas
-
-# Optional pool tuning (defaults shown)
-postgis.jdbc.maxPoolSize=5
-postgis.jdbc.connectionTimeoutMs=5000
-```
-
-All properties are overridable via environment variables (`.` → `_`, uppercase): `postgis.jdbc.url` → `POSTGIS_JDBC_URL`.
-
-**Prerequisite:** the PostGIS extension must already be installed in the target database (`CREATE EXTENSION postgis`). The adapter does not install it.
-
-**Role passwords:** the `password` field may be an encrypted `ENC(...)` value following the project credential convention. The adapter decrypts it with the `CIVITAS_MASTER_KEY` master key (see [`CredentialDecryptor`](../config-adapter-api/src/main/java/de/civitascore/configadapter/crypto/CredentialDecryptor.java), credential context `portal-backend:sql-role`). If `CIVITAS_MASTER_KEY` is unset and an encrypted password arrives, the event fails fatally. Plaintext passwords are accepted as-is. Passwords are never written to logs or error messages (`PASSWORD '…'` literals are redacted).
-
-**Startup behaviour:** the HikariCP pool starts eagerly but skips the fail-fast initial connection attempt (`initializationFailTimeout = -1`) — an unreachable database never fails adapter startup. If the DB is unreachable when an event arrives, the failure is reported as a `RetryableAdapterException` rather than crashing the adapter at boot.
-
-## Event Payload
-
-The payload uses the sealed `PostgisConfigValue` hierarchy with three variants — `TableConfig` (`"resourceType": "sql-table"`), `SchemaConfig` (`"sql-schema"`), and `DbRoleConfig` (`"sql-role"`). The example below shows a table payload.
-
-```json
-{
-  "metadata": { "messageId": "msg-1", "correlationId": "corr-1", "resultTopic": "result-topic", "..." : "..." },
-  "payload": {
-    "targetComponent": "postgis",
-    "targetResource": "iot/sensor_readings",
-    "operation": "CREATE",
-    "config": {
-      "path": "iot/sensor_readings",
-      "value": {
-        "resourceType": "sql-table",
-        "schema": "iot",
-        "name": "sensor_readings",
-        "columns": [
-          { "name": "id",          "type": "BIGINT",      "nullable": false },
-          { "name": "recorded_at", "type": "TIMESTAMPTZ", "nullable": false },
-          { "name": "temperature", "type": "NUMERIC", "precision": 6, "scale": 2, "nullable": true }
-        ],
-        "geometryColumns": [
-          { "name": "location", "geometryType": "POINT", "srid": 4326, "nullable": false }
-        ],
-        "primaryKey": ["id"],
-        "indexes": [
-          { "name": "idx_sensor_readings_location", "columns": ["location"], "method": "GIST" }
-        ]
-      }
-    }
-  }
-}
-```
-
-Generated DDL for the example above:
-
-```sql
-CREATE SCHEMA "iot";
-CREATE TABLE "iot"."sensor_readings" (
-  "id" BIGINT NOT NULL,
-  "recorded_at" TIMESTAMPTZ NOT NULL,
-  "temperature" NUMERIC(6, 2),
-  "location" GEOMETRY(POINT, 4326) NOT NULL,
-  PRIMARY KEY ("id")
-);
-CREATE INDEX "idx_sensor_readings_location" ON "iot"."sensor_readings" USING GIST ("location");
-```
-
-### Schema payload (`resourceType: sql-schema`)
-
-```json
-{
-  "resourceType": "sql-schema",
-  "name": "iot",
-  "owner": "iot_admin",
-  "cascade": false
-}
-```
-
-`CREATE` → `CREATE SCHEMA "iot" AUTHORIZATION "iot_admin"`; `UPDATE` → `ALTER SCHEMA "iot" OWNER TO "iot_admin"`; `DELETE` → `DROP SCHEMA "iot" RESTRICT` (or `CASCADE` when `cascade=true`).
-
-### Role payload (`resourceType: sql-role`)
-
-```json
-{
-  "resourceType": "sql-role",
-  "name": "analyst",
-  "canLogin": true,
-  "password": "ENC(BASE64-AES-GCM-PAYLOAD)",
-  "inherit": true,
-  "grants": [
-    { "schema": "iot", "privileges": ["USAGE", "CREATE"], "withGrantOption": false }
-  ]
-}
-```
-
-`CREATE` generates `CREATE ROLE "analyst" WITH LOGIN PASSWORD '…' INHERIT` followed by `GRANT USAGE, CREATE ON SCHEMA "iot" TO "analyst"`. On `UPDATE`, the grants are reconciled against the live database (see *Grant reconciliation* above). `DELETE` → `DROP OWNED BY "analyst"` + `DROP ROLE "analyst"` (the `DROP OWNED BY` revokes the role's remaining privileges first — PostgreSQL refuses to drop a role that still holds grants).
-
-## Supported Column Types
-
-Generic (`ColumnType` enum): `SMALLINT`, `INTEGER`, `BIGINT`, `NUMERIC` (with optional `precision`/`scale`), `REAL`, `DOUBLE_PRECISION`, `BOOLEAN`, `VARCHAR` (with optional `length`), `TEXT`, `UUID`, `DATE`, `TIME`, `TIMESTAMP`, `TIMESTAMPTZ`, `JSONB`, `BYTEA`.
-
-Geometry (`GeometryType` enum): `POINT`, `LINESTRING`, `POLYGON`, `MULTIPOINT`, `MULTILINESTRING`, `MULTIPOLYGON`, `GEOMETRYCOLLECTION`, `GEOMETRY`. Optional `dimension` of `3` appends `Z`, `4` appends `ZM` to the rendered type (e.g. `GEOMETRY(POINTZ, 4326)`).
-
-Index methods (`IndexConfig.IndexMethod`): `BTREE` (default), `GIST` (for geometry), `GIN`.
-
-Schema privileges (`SchemaPrivilege` enum): `USAGE`, `CREATE`, `ALL` (`ALL` expands to `USAGE` + `CREATE`).
-
-## Error Handling
-
-| Condition | Outcome |
-|-----------|---------|
-| CREATE with `42P07` / `42P06` / `42710` (duplicate table / schema / role) | success (idempotent) |
-| DELETE with `42P01` / `3F000` / `42704` (undefined table / invalid schema / undefined role) | success (idempotent) |
-| `SQLState 08*` (connection failure) | `RetryableAdapterException` (`POSTGIS_CONNECTION_ERROR`) |
-| Other `SQLException` | `FatalAdapterException` (`POSTGIS_DDL_ERROR`) — rolled back |
-| Encrypted password but `CIVITAS_MASTER_KEY` unset / decryption fails | `FatalAdapterException` (`POSTGIS_ERROR`) |
-| Table `UPDATE` operation | `FatalAdapterException` (`UNSUPPORTED_OPERATION`) — deferred |
-| Payload not a table / schema / role | `FatalAdapterException` (`INVALID_PAYLOAD`) |
-
-All DDL for a single event runs in one JDBC transaction; on failure the transaction is rolled back before the exception propagates.
-
-## Saga Participation
-
-Besides the event-driven `PostgisAdapter`, the module ships a `PostgisSagaHandler` — a `SagaCommandHandler` (ServiceLoader-registered under `META-INF/services/de.civitascore.configadapter.adapter.SagaCommandHandler`) discovered by the application and registered in the saga orchestrator (Flowable or custom). It lets PostGIS participate as a compensable step in any saga, mirroring the FROST / APISIX / NiFi handlers but executing DDL over JDBC instead of HTTP.
-
-Forward operations and their compensations:
-
-| Forward (`EXECUTE_STEP`) | Payload field (with `resourceType`) | Compensation (`COMPENSATE_STEP`) | Compensation payload |
-|--------------------------|--------------------------------------|----------------------------------|----------------------|
-| `CREATE_TABLE`  | `tableConfig` (`TableConfig`)   | `DROP_TABLE`  | `{schema?, table}` |
-| `CREATE_SCHEMA` | `schemaConfig` (`SchemaConfig`) | `DROP_SCHEMA` | `{schema, cascade?}` |
-| `CREATE_ROLE`   | `roleConfig` (`DbRoleConfig`)   | `DROP_ROLE`   | `{role}` |
-
-- The nested config map must carry its `resourceType` discriminator (`sql-table` / `sql-schema` / `sql-role`), exactly as the config travels inside CloudEvents.
-- Each `CREATE_*` returns its identifiers as `compensationData`; the orchestrator flattens them into the payload of the compensating `DROP_*`.
-- `CREATE_*` absorbs duplicate-object SQLStates and `DROP_*` absorbs missing-object SQLStates, so steps and compensations are safe to retry.
-- `DROP_*` can also be used as a forward step; encrypted role passwords are decrypted exactly as in the event path.
-
-The handler reuses the same `ConnectionProvider`, `PostgisDialect`, and `GrantReconciler` as the adapter (shared via the package-private `SqlDdlSupport`).
-
-### Dataset-saga sink provisioning (`PROVISION_SINK` / `DEPROVISION_SINK`)
-
-Beyond the generic resource ops, the handler is a **step in the dataset sagas**. When the dataset trigger carries a `POSTGIS` data sink (`hasGeoSink`), the CREATE saga runs `PROVISION_SINK` **before** GeoServer registers its datastore — GeoServer publishes feature types from a PostGIS table, and that table must exist first. `PROVISION_SINK` reads each `datasinks[POSTGIS].configuration` and creates the schema (optional), table, and a GeoServer read role + grant, all in one transaction (idempotent). `DEPROVISION_SINK` (DELETE saga / CREATE compensation) drops the table and role; the schema is left (it may be shared).
-
-`datasinks[POSTGIS]` shape — `configuration.columns` is an optional explicit override; when absent, columns are derived from the sink's `dataStructure` (the JSON Schema the backend stores on the data-structure version and ships at publish time):
-
-```json
-{ "type": "POSTGIS",
-  "configuration": {
-    "schema": "ds_42", "owner": "ds_42_admin",
-    "tableName": "sensor_readings",
-    "columns": [ {"name": "id", "type": "BIGINT", "nullable": false} ],
-    "geometryColumns": [ {"name": "geom", "geometryType": "POINT", "srid": 4326} ],
-    "primaryKey": ["id"],
-    "readRole": {"name": "ds_42_geo", "privileges": ["USAGE"]} },
-  "dataStructure": { "$id": "http://civitas.org/model/observation/1.0.0",
-    "$schema": "https://json-schema.org/draft/2020-12/schema", "title": "Observation",
-    "type": "object",
-    "properties": { "station_id": {"type": "string"},
-      "location": {"$ref": "https://geojson.org/schema/Point.json"} },
-    "required": ["station_id"] } }
-```
-
-#### Column derivation from `dataStructure`
-
-`DataStructureTableMapper` reads the root `properties`, or the schema's property-carrying `$defs`/`definitions` entry (inlined referenced types have no properties and are skipped); `required` properties become `NOT NULL`.
-
-| JSON Schema type | Column type |
+| JSON Schema type | Column |
 |---|---|
 | `integer` | `BIGINT` |
 | `number` | `DOUBLE_PRECISION` |
 | `boolean` | `BOOLEAN` |
-| `string(date-time)` | `TIMESTAMPTZ` |
-| `string(date)` / `string(time)` / `string(uuid)` | `DATE` / `TIME` / `UUID` |
+| `string` with format `date-time` / `date` / `time` / `uuid` | `TIMESTAMPTZ` / `DATE` / `TIME` / `UUID` |
 | `object`, `array` | `JSONB` |
-| `$ref` to a GeoJSON schema (`https://geojson.org/schema/<Type>.json`) | geometry column, SRID from the property's `crs` (default 4326) |
-| other `$ref` (e.g. `#/$defs/<Type>`, nested object) | `JSONB` |
+| `$ref` to a GeoJSON schema (`https://geojson.org/schema/<Type>.json`) | geometry column; SRID from the property's `crs` in EPSG form, default `4326` |
+| any other `$ref`, including a local `#/$defs/<Type>` | `JSONB` |
 | `string`, unknown | `TEXT` |
 
-Geometry is recognized only by the GeoJSON-host `$ref` — a local `#/$defs/Point` is a nested object, not geometry. The geometry column's CRS comes from an optional `crs` in EPSG form on the property (`{ "$ref": "https://geojson.org/schema/Point.json", "crs": "EPSG:25832" }`), which the adapter maps to the column's SRID, defaulting to EPSG:4326 (matching the GeoServer handler) when absent. Explicit `configuration.geometryColumns` are excluded from derivation. A schema without usable properties fails the step with an actionable error.
+Geometry is recognized by the GeoJSON-hosted `$ref` alone, so a local `#/$defs/Point` is a nested object, not
+a geometry column. A definition's columns are gathered by following its `allOf` branches and node-level local
+`$ref` parents, so a subclass carrying its fields under `allOf` yields the full column set: inherited columns
+come first, a subclass wins the column type on a name collision while the column keeps its first-seen
+position, and each definition's `required` entries are unioned. A node-level parent `$ref` resolving to no
+definition is rejected, since it would drop inherited columns into a partial table; a property-level `$ref`
+stays `JSONB` and is never followed as a parent.
 
-Inheritance (`allOf` / parent `$ref`): a definition's columns are gathered by following its `allOf` branches and any node-level local `$ref` (`#/$defs/<Type>`, `#/definitions/<Type>`) to parent definitions, not just the node's own `properties` — so a subclass that carries its fields under `allOf` still yields the full column set. The root is the entry point when it has `properties` or `allOf`; otherwise the single (or title-matching) named definition is resolved the same way. Inherited columns come first; on a name collision the most specific (subclass) definition wins the column type while the column keeps its first-seen position, and each definition's `required` entries are unioned into the `NOT NULL` set. A node-level parent `$ref` that resolves to no definition is rejected (it would otherwise drop inherited columns and create a partial table); a property-level `$ref` stays `JSONB` and is never followed as a parent.
+## Configuration
 
-Saga placement — CREATE: `… APISIX → [hasGeoSink] PROVISION_SINK → GeoServer workspace → datastore → layers → …`; DELETE: `… GeoServer DELETE_WORKSPACE → DEPROVISION_SINK → FROST`. UPDATE does not re-provision the sink.
+Keys carry the `postgis.` prefix. The values that ship, env-var names and secret handling live in
+[../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-## Tests
+| Property | Role |
+|---|---|
+| `postgis.topics` | Topics subscribed on the config-event path |
+| `postgis.jdbc.url` | Target database |
+| `postgis.jdbc.user` | Connecting role; needs the privileges for the DDL it issues |
+| `postgis.jdbc.password` | Passed through verbatim; `ENC(…)` is not supported here |
+| `postgis.jdbc.maxPoolSize` | Connection pool size |
+| `postgis.jdbc.connectionTimeoutMs` | Pool connection timeout |
+| `CIVITAS_MASTER_KEY` (env var only) | Decrypts `ENC(…)` role passwords carried in event payloads |
+
+An unresolved `postgis.jdbc.url` or `postgis.jdbc.user` fails initialization with a message naming the key, but both
+ship with a value — so an unset `POSTGIS_JDBC_URL` connects to the development database rather than failing. A
+non-numeric `postgis.jdbc.maxPoolSize` or `postgis.jdbc.connectionTimeoutMs` fails initialization with a
+number-format error naming only the offending value, not the key. A missing `CIVITAS_MASTER_KEY` is logged at
+startup and fails any event carrying an encrypted password.
+
+## Error codes
+
+| Code | Meaning | Retryable |
+|---|---|---|
+| `INVALID_PAYLOAD(1001)` | Payload is neither a table, schema nor role config | no |
+| `UNSUPPORTED_OPERATION(1004)` | Table UPDATE | no |
+| `POSTGIS_ERROR(3501)` | Encrypted role password without a master key, or decryption failure | no |
+| `POSTGIS_DDL_ERROR(3502)` | DDL rejected by the database; transaction rolled back | no |
+| `POSTGIS_CONNECTION_ERROR(3503)` | SQLState class `08` — database unreachable | yes |
+
+## Testing
 
 ```bash
-# Unit tests for this module
-mvn test -pl config-adapter-postgis
-
-# Single class
-mvn test -pl config-adapter-postgis -Dtest=PostgisDialectTest
-
-# Single method
-mvn test -pl config-adapter-postgis -Dtest=PostgisAdapterTest#duplicateTableSqlStateIsAbsorbedAsSuccess
-
-# Unit + integration + end-to-end tests (requires Docker)
-mvn -pl config-adapter-postgis -am verify
+mvn test -pl config-adapter-postgis                           # unit tests, no Docker
+mvn test -pl config-adapter-postgis -Dtest=PostgisDialectTest # a single class or method
+mvn -pl config-adapter-postgis -am verify                     # adds integration and E2E, needs Docker
 ```
 
-**Coverage:**
-
-- **93 unit tests** — dialect DDL rendering (tables, schemas, roles, grants), SQLState classification, grant-reconcile diffing (`GrantReconcilerTest`), adapter behaviour with mocked JDBC (`PostgisAdapterTest`, incl. credential handling and grant reconciliation), and the saga handler with mocked JDBC (`PostgisSagaHandlerTest` — forward ops, compensations, idempotency, credential failure).
-- **22 integration tests** against a real `postgis/postgis:16-3.4-alpine` container:
-  - `PostgisAdapterIT` (16) — generated DDL accepted by Postgres and objects physically exist: table create (geometry + SRID + GIST index), schema create/drop (owner, `CASCADE` vs `RESTRICT`), role create with login + password + grants, role UPDATE grant reconciliation, role delete, idempotency, invalid DDL → fatal, unreachable JDBC → retryable.
-  - `PostgisSagaHandlerIT` (4) — saga forward op then compensation against the DB (table, schema, role+grant), and idempotent compensation of a missing object.
-  - `PostgisEndToEndIT` (2) — full pipeline through Kafka + `KafkaEventHandler` + adapter + PostGIS, verifying both the result event and the database state.
-
-The PostGIS container is shared across IT classes via the singleton pattern in `AbstractPostgisIT`; Kafka is per-class.
+Integration tests run against a real PostGIS container, whose image version lives in the shared
+`TestContainerImages` constants. They assert that the generated DDL is accepted by PostgreSQL and the objects
+physically exist, that saga forward steps and their compensations converge, and that a CloudEvent travels
+through Kafka to a committed database change and a result event.
