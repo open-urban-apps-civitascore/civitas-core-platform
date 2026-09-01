@@ -325,7 +325,7 @@ export const MappingEditorModal = ({
   }
 
   const status = useMemo(
-    () => computeStatus(edges, sourceFields, targetFields, endpointInfo),
+    () => computeStatus(nodes, edges, sourceFields, targetFields, endpointInfo),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [edges, nodes, sourceFields, targetFields],
   )

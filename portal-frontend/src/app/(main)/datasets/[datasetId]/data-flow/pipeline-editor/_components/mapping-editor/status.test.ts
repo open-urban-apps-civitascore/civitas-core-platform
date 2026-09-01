@@ -159,12 +159,20 @@ describe('computeStatus', () => {
     'concat.in0': { type: 'scalar', sub: 'str' },
     'concat.out': { type: 'scalar', sub: 'str' },
   })
+  const transform = (id: string, defType: string): Node => ({
+    id,
+    type: 'transform',
+    position: { x: 0, y: 0 },
+    data: { defType, config: {} },
+  })
+  const nodes = [transform('literal', 'const'), transform('concat', 'concat')]
 
-  it('counts a broken edge into a transform input and reddens both ends', () => {
+  it('reddens a broken edge into a transform input without counting it as an error', () => {
     const edges = [edge('e1', 'literal', 'out', 'concat', 'in0')]
-    const status = computeStatus(edges, sourceFields, targetFields, endpointInfo)
+    const status = computeStatus(nodes, edges, sourceFields, targetFields, endpointInfo)
 
-    expect(status.counts.errors).toBe(1)
+    // concat never reaches the target, so compileCanvas drops the chain — red, but not blocking.
+    expect(status.counts.errors).toBe(0)
     expect(status.invalidEdgeIds).toEqual(['e1'])
     expect(status.transformPortStatus).toEqual({
       literal: { out: 'mismatch' },
@@ -172,9 +180,20 @@ describe('computeStatus', () => {
     })
   })
 
+  it('counts the same broken edge once its chain reaches the target', () => {
+    const edges = [
+      edge('e1', 'literal', 'out', 'concat', 'in0'),
+      edge('e2', 'concat', 'out', TARGET_NODE_ID, '$.title'),
+    ]
+    const status = computeStatus(nodes, edges, sourceFields, targetFields, endpointInfo)
+
+    expect(status.counts.errors).toBe(1)
+    expect(status.invalidEdgeIds).toEqual(['e1'])
+  })
+
   it('counts a broken edge into the target and keeps mega ports out of transformPortStatus', () => {
     const edges = [edge('e1', 'literal', 'out', TARGET_NODE_ID, '$.title')]
-    const status = computeStatus(edges, sourceFields, targetFields, endpointInfo)
+    const status = computeStatus(nodes, edges, sourceFields, targetFields, endpointInfo)
 
     expect(status.counts.errors).toBe(1)
     expect(status.targetPortStatus['$.title']).toBe('mismatch')
@@ -184,7 +203,7 @@ describe('computeStatus', () => {
 
   it('reports no errors for a matching mapping', () => {
     const edges = [edge('e1', SOURCE_NODE_ID, '$.name', TARGET_NODE_ID, '$.title')]
-    const status = computeStatus(edges, sourceFields, targetFields, endpointInfo)
+    const status = computeStatus(nodes, edges, sourceFields, targetFields, endpointInfo)
 
     expect(status.counts).toEqual({ mapped: 1, unmapped: 2, errors: 0 })
     expect(status.invalidEdgeIds).toEqual([])

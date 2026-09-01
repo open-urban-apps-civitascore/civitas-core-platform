@@ -56,6 +56,10 @@ export const findInvalidEdges = (edges: Edge[], endpointInfo: EndpointInfo): Edg
     return !!from && !!to && !portsCompatible(from, to)
   })
 
+/** Transform nodes that don't reach the target — compileCanvas drops these on save. */
+const droppedNodeIds = (nodes: Node[], edges: Edge[]): Set<string> =>
+  new Set(findUnconnectedTransformNodes(nodes, edges).map(n => n.id))
+
 export interface NodeConfigErrors {
   /** nodeId → fieldKey → i18n key, for every wired transform node. */
   byNode: Record<string, Record<string, string>>
@@ -71,7 +75,7 @@ export interface NodeConfigErrors {
  */
 export const findNodeConfigErrors = (nodes: Node[], edges: Edge[]): NodeConfigErrors => {
   const wired = new Set(edges.map(e => e.source))
-  const dropped = new Set(findUnconnectedTransformNodes(nodes, edges).map(n => n.id))
+  const dropped = droppedNodeIds(nodes, edges)
   const byNode: Record<string, Record<string, string>> = {}
   let blockingCount = 0
 
@@ -116,8 +120,9 @@ const relativeNameChain = (ancestorPath: string, leafPath: string, targetFields:
   return names
 }
 
-/** Per-port state (§12) plus toolbar counts derived from the current edges. */
+/** Per-port state (§12) plus toolbar counts derived from the current nodes and edges. */
 export const computeStatus = (
+  nodes: Node[],
   edges: Edge[],
   sourceFields: Map<string, FieldNode>,
   targetFields: Map<string, FieldNode>,
@@ -153,8 +158,10 @@ export const computeStatus = (
 
   let mapped = 0
   let unmapped = 0
-  // Broken edges are counted here; the direct-edge branch below must not count them again.
-  let errors = invalidEdges.length
+  // Only edges that end up in the compiled mapping block saving; the rest are dropped on save
+  // and merely show red. The direct-edge branch below must not count them again.
+  const dropped = droppedNodeIds(nodes, edges)
+  let errors = invalidEdges.filter(e => !dropped.has(e.target)).length
 
   targetFields.forEach((field, path) => {
     const edge = targetEdges.find(e => (e.targetHandle ?? '') === path)
