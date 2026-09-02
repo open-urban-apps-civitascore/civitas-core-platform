@@ -75,14 +75,17 @@ const getTitle = (
   breadcrumb: Breadcrumb,
   data: BreadcrumbApiResponse | undefined,
   t: ReturnType<typeof useTranslations>,
+  tCommon: ReturnType<typeof useTranslations>,
   isDatastructureVersion: boolean,
 ) => {
   if (!breadcrumb.isDynamic) {
     return t(breadcrumb.title)
   }
 
-  if (isDatastructureVersion && data?.version) {
-    return `Version ${data.version}`
+  if (isDatastructureVersion) {
+    // A version carries no number until its model is stored. The version resource has no name to
+    // fall back on, so the crumb would otherwise show the raw id from the path.
+    return data?.version ? `Version ${data.version}` : tCommon('status.DRAFT')
   }
 
   return data?.name || getName(data?.firstName, data?.lastName) || data?.title || breadcrumb.title
@@ -114,7 +117,7 @@ export const BreadcrumbNavigation = () => {
   const updatedBreadcrumbs = breadcrumbs
     .map((crumb, index) => {
       const data = results[index]?.data?.data
-      const title = getTitle(crumb, data, t, isDatastructureVersionBreadcrumb(segments, index))
+      const title = getTitle(crumb, data, t, tCommon, isDatastructureVersionBreadcrumb(segments, index))
       return { ...crumb, title }
     })
     .filter((crumb, index) => {
