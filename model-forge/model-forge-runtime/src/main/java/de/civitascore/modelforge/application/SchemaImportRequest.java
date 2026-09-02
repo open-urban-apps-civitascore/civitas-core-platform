@@ -23,9 +23,14 @@ import tools.jackson.databind.JsonNode;
  *     A member that is byte-identical mints no version at all, so the bump never inflates history.
  *     Ignored when {@code preserveVersion} adopts an upstream version instead. Defaults to
  *     {@code PATCH}, matching the write path's own default.
+ * @param bumpFromVersion the existing grouping version {@code bump} counts from, for a caller that
+ *     revises one particular version rather than the newest. Applies to the DataStructure grouping
+ *     only — a member Element records a content history, so its bump always counts from its own
+ *     newest version. {@code null} counts from the grouping's newest version.
  */
 public record SchemaImportRequest(
-        JsonNode schema, String version, boolean preserveVersion, VersionBump bump) {
+        JsonNode schema, String version, boolean preserveVersion, VersionBump bump,
+        String bumpFromVersion) {
 
     public SchemaImportRequest {
         if (bump == null) {
@@ -34,14 +39,19 @@ public record SchemaImportRequest(
     }
 
     public SchemaImportRequest(JsonNode schema) {
-        this(schema, null, false, VersionBump.PATCH);
+        this(schema, null, false, VersionBump.PATCH, null);
     }
 
     public SchemaImportRequest(JsonNode schema, VersionBump bump) {
-        this(schema, null, false, bump);
+        this(schema, null, false, bump, null);
     }
 
     public SchemaImportRequest(JsonNode schema, String version, boolean preserveVersion) {
-        this(schema, version, preserveVersion, VersionBump.PATCH);
+        this(schema, version, preserveVersion, VersionBump.PATCH, null);
+    }
+
+    public SchemaImportRequest(JsonNode schema, String version, boolean preserveVersion,
+                               VersionBump bump) {
+        this(schema, version, preserveVersion, bump, null);
     }
 }

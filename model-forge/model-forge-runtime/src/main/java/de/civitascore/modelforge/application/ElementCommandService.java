@@ -43,10 +43,12 @@ public class ElementCommandService {
      * backfilled with {@code urn} when it does not already carry a CORE URN.
      *
      * @param bump how the registry should bump the version (ignored for a brand-new artifact)
+     * @param bumpFromVersion the existing version {@code bump} counts from; {@code null} counts from
+     *     the artifact's newest version
      * @return the concrete versioned URN (pin) the write resolved to — assigned by the write
      *     itself, so no read-back is needed
      */
-    public String storeJsonSchema(String urn, JsonNode schema, VersionBump bump) {
+    public String storeJsonSchema(String urn, JsonNode schema, VersionBump bump, String bumpFromVersion) {
         // A JSON Schema document is an object. Nothing upstream enforces that — saveArtifact routes
         // ELEMENT on isTextual() alone and the CORE validator has no ELEMENT schema — so an array or
         // scalar would otherwise reach the cast below and surface as a 500 instead of a rejection.
@@ -59,7 +61,8 @@ public class ElementCommandService {
         if (!UrnParser.isUrn(existingId)) updated.put("$id", urn);
         Set<String> refs         = refExtractor.extractRefs(updated);
         Set<String> associations = refExtractor.extractCoreRefTargets(updated);
-        String pin = registry.storeElement(UrnParser.nameFromUrn(urn), updated, refs, associations, bump);
+        String pin = registry.storeElement(
+            UrnParser.nameFromUrn(urn), updated, refs, associations, null, bump, bumpFromVersion);
         // Register the graph node under the pin the write itself assigned (the current version),
         // so the node key matches what read-time lookups resolve a logical/:latest URN to.
         Set<String> allEdges = new LinkedHashSet<>(refs);

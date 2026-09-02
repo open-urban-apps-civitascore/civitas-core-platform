@@ -89,7 +89,8 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     @Override
     public ImportResult importSchema(ImportSchemaCommand command) {
         var response = schemaImportService.importSchema(new SchemaImportRequest(
-            command.schema(), command.version(), command.preserveVersion(), command.bump()));
+            command.schema(), command.version(), command.preserveVersion(), command.bump(),
+            command.bumpFromVersion()));
         return toImportResult(response, "Schema import validation failed");
     }
 
@@ -355,7 +356,8 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             // urn is the authoritative target identity, so always re-point $id at it (withoutId).
             case ELEMENT -> content.isTextual()
                 ? elementCommandService.storeXsd(urn, content.asText(), bump)
-                : elementCommandService.storeJsonSchema(urn, withoutId(content), bump);
+                : elementCommandService.storeJsonSchema(urn, withoutId(content), bump,
+                    command.bumpFromVersion());
             // The non-Element kinds store straight through the registry, which extracts and
             // persists their per-type reference edges (Mapping source/target, Pipeline nodes,
             // DataStructure/DataSet *Refs). registerFromRegistry() then mirrors those durable

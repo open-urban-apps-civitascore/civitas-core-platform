@@ -11,13 +11,17 @@ import java.util.Objects;
  * @param dataSet optional CORE URN of a DataSet to link the saved artifact into as a member; when
  *                non-null, Model Forge adds it to that DataSet's manifest. {@code null} means no
  *                DataSet membership (the default).
+ * @param bumpFromVersion the artifact's existing version that {@code versionBump} counts from, for
+ *                a caller that revises one particular version rather than the newest. {@code null}
+ *                counts from the artifact's newest version (the default).
  */
 public record SaveArtifactCommand(
     ArtifactId artifactId,
     ArtifactKind kind,
     JsonNode content,
     VersionBump versionBump,
-    String dataSet
+    String dataSet,
+    String bumpFromVersion
 ) {
 
     public SaveArtifactCommand {
@@ -29,6 +33,12 @@ public record SaveArtifactCommand(
 
     /** Backward-compatible: save without linking the artifact into any DataSet. */
     public SaveArtifactCommand(ArtifactId artifactId, ArtifactKind kind, JsonNode content, VersionBump versionBump) {
-        this(artifactId, kind, content, versionBump, null);
+        this(artifactId, kind, content, versionBump, null, null);
+    }
+
+    /** Save with DataSet membership, numbering from the artifact's newest version. */
+    public SaveArtifactCommand(ArtifactId artifactId, ArtifactKind kind, JsonNode content,
+                               VersionBump versionBump, String dataSet) {
+        this(artifactId, kind, content, versionBump, dataSet, null);
     }
 }

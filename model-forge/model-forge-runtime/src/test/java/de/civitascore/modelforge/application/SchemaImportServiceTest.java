@@ -220,7 +220,7 @@ class SchemaImportServiceTest {
         }
         when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
             .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.0");
-        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class)))
+        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":1.0.0");
 
         SchemaImportResult result = svc.importSchema(new SchemaImportRequest(schema));
@@ -236,7 +236,7 @@ class SchemaImportServiceTest {
 
         // The stored DataStructure is a $defs library of URN-$refs — no root shape.
         ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
-        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class));
+        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class), nullable(String.class));
         JsonNode content = ds.getValue();
         assertThat(content.path("$schema").asText())
             .isEqualTo("https://json-schema.org/draft/2020-12/schema");
@@ -260,13 +260,13 @@ class SchemaImportServiceTest {
         // The caller authored 2.0.0 throughout; the write assigns 1.0.1.
         when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
             .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
-        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class)))
+        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":1.0.1");
 
         svc.importSchema(new SchemaImportRequest(schema));
 
         ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
-        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class));
+        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class), nullable(String.class));
         JsonNode content = ds.getValue();
         assertThat(content.path("$defs").path("Person").path("$ref").asText())
             .isEqualTo("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
@@ -285,7 +285,7 @@ class SchemaImportServiceTest {
         JsonNode schema = versionedDataStructureRootSchema();
         when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
             .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
-        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class)))
+        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":1.0.1");
 
         svc.importSchema(new SchemaImportRequest(schema));
@@ -297,7 +297,7 @@ class SchemaImportServiceTest {
             .isEqualTo("urn:core:platform:civitas:element:common:Person:pp11abcd12");
 
         ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
-        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class));
+        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class), nullable(String.class));
         assertThat(ds.getValue().path("$id").asText())
             .isEqualTo("urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b");
     }
@@ -338,14 +338,14 @@ class SchemaImportServiceTest {
         when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class),
             any(VersionBump.class)))
             .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:2.0.0");
-        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class)))
+        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":2.0.0");
 
         svc.importSchema(new SchemaImportRequest(schema, VersionBump.MAJOR));
 
         verify(registry).storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class),
             eq(VersionBump.MAJOR));
-        verify(registry).storeDataStructure(anyString(), any(), eq(VersionBump.MAJOR));
+        verify(registry).storeDataStructure(anyString(), any(), eq(VersionBump.MAJOR), nullable(String.class));
     }
 
     /** An import that asks for nothing keeps Model Forge's existing default. */
@@ -355,14 +355,14 @@ class SchemaImportServiceTest {
         when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class),
             any(VersionBump.class)))
             .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
-        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class)))
+        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":1.0.1");
 
         svc.importSchema(new SchemaImportRequest(schema));
 
         verify(registry).storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class),
             eq(VersionBump.PATCH));
-        verify(registry).storeDataStructure(anyString(), any(), eq(VersionBump.PATCH));
+        verify(registry).storeDataStructure(anyString(), any(), eq(VersionBump.PATCH), nullable(String.class));
     }
 
     /** A datastructure-rooted model with one member class. */
@@ -517,7 +517,7 @@ class SchemaImportServiceTest {
 
         ArgumentCaptor<String> urn = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<JsonNode> manifest = ArgumentCaptor.forClass(JsonNode.class);
-        verify(registry).storeDataStructure(urn.capture(), manifest.capture(), any(VersionBump.class));
+        verify(registry).storeDataStructure(urn.capture(), manifest.capture(), any(VersionBump.class), nullable(String.class));
 
         // Stored under the logical datastructure URN that reuses the root Element's name AND
         // disambiguator segments (so re-imports version the same grouping).
@@ -702,7 +702,7 @@ class SchemaImportServiceTest {
 
         // The DataStructure still groups every def (as $defs member $refs), borrowing the first def's identity.
         ArgumentCaptor<JsonNode> manifest = ArgumentCaptor.forClass(JsonNode.class);
-        verify(registry).storeDataStructure(anyString(), manifest.capture(), any(VersionBump.class));
+        verify(registry).storeDataStructure(anyString(), manifest.capture(), any(VersionBump.class), nullable(String.class));
         assertThat(manifest.getValue().path("$defs").toString())
             .contains(urnOf(stored, "Alpha"), urnOf(stored, "Beta"));
     }
@@ -731,7 +731,7 @@ class SchemaImportServiceTest {
         SchemaImportResult result = svc.importSchema(new SchemaImportRequest(schema));
 
         assertThat(result.diagnostics()).isNotEmpty();
-        verify(registry, never()).storeDataStructure(anyString(), any(), any(VersionBump.class));
+        verify(registry, never()).storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class));
         verify(registry, never()).storeElement(
             anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class));
     }
@@ -887,13 +887,13 @@ class SchemaImportServiceTest {
         }
         when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
             .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
-        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class)))
+        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":1.0.1");
 
         svc.importSchema(new SchemaImportRequest(schema));
 
         ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
-        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class));
+        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class), nullable(String.class));
         assertThat(ds.getValue().path("$ref").asText())
             .isEqualTo("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
     }
@@ -907,13 +907,13 @@ class SchemaImportServiceTest {
     void automaticGroupingReferencesTheVersionsTheMemberWritesAssigned() {
         when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
             .thenAnswer(inv -> inv.getArgument(1, JsonNode.class).path("$id").asText() + ":3.1.4");
-        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class)))
+        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":3.1.4");
 
         svc.importSchema(new SchemaImportRequest(catalog()));
 
         ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
-        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class));
+        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class), nullable(String.class));
         JsonNode defs = ds.getValue().path("$defs");
         assertThat(defs.isObject()).isTrue();
         assertThat(defs.properties()).isNotEmpty();

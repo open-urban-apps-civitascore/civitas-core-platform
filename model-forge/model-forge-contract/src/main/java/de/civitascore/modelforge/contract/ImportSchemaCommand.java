@@ -11,6 +11,8 @@ import java.util.Objects;
  *
  * <p>Model Forge owns version assignment. A version segment inside the document's {@code $id}s is
  * advisory; {@link #version} together with {@link #preserveVersion} is the only way to claim one.
+ * {@link #bumpFromVersion} does not claim a version — it only names which existing one the bump
+ * counts from.
  *
  * @param schema the JSON Schema document (required)
  * @param bump the change class to apply to the grouping and to every member whose content changed.
@@ -20,9 +22,14 @@ import java.util.Objects;
  * @param preserveVersion when {@code true}, {@code version} is adopted verbatim instead of Model
  *     Forge's version authority. Intended for the first write of an artifact — one that claims a
  *     version an artifact already holds fails as a version collision rather than being coerced.
+ * @param bumpFromVersion the existing version of the grouping that {@code bump} counts from, for a
+ *     caller that revises one particular version rather than the newest. Applies to the
+ *     DataStructure grouping only: a member Element records a content history, so its bump always
+ *     counts from its own newest version. {@code null} counts from the grouping's newest version.
  */
 public record ImportSchemaCommand(
-    JsonNode schema, VersionBump bump, String version, boolean preserveVersion) {
+    JsonNode schema, VersionBump bump, String version, boolean preserveVersion,
+    String bumpFromVersion) {
 
     public ImportSchemaCommand {
         Objects.requireNonNull(schema, "schema");
@@ -32,10 +39,14 @@ public record ImportSchemaCommand(
     }
 
     public ImportSchemaCommand(JsonNode schema) {
-        this(schema, VersionBump.PATCH, null, false);
+        this(schema, VersionBump.PATCH, null, false, null);
     }
 
     public ImportSchemaCommand(JsonNode schema, VersionBump bump) {
-        this(schema, bump, null, false);
+        this(schema, bump, null, false, null);
+    }
+
+    public ImportSchemaCommand(JsonNode schema, VersionBump bump, String bumpFromVersion) {
+        this(schema, bump, null, false, bumpFromVersion);
     }
 }

@@ -47,8 +47,9 @@ import java.util.function.Supplier;
  * content lives in {@code model_forge.artifact_representation}. Whether an model_forge.artifact is JSON Schema or XSD
  * is therefore a property of its stored representations, read from the DB — never inferred
  * from the URN. Versioning is backend-owned: the first version of a new model_forge.artifact is
- * {@code 1.0.0}; every update bumps from {@code model_forge.artifact.current_version} by the supplied
- * {@link VersionBump}. Identical authored content in the same format is idempotent
+ * {@code 1.0.0}; every update bumps by the supplied {@link VersionBump} from the version the caller
+ * named as its base, or from {@code model_forge.artifact.current_version} — the highest version —
+ * when it named none. Identical authored content in the same format is idempotent
  * (matched by {@code content_hash}). The COMPLETE reference graph — including cycles — is persisted.
  *
  * <p>Every write runs in a single transaction (model_forge.artifact upsert → version insert →
@@ -92,13 +93,13 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
 
     @Override
     public String storeElement(String name, JsonNode schema, Set<String> refs, Set<String> associationTargets,
-                                String explicitVersion, VersionBump bump) {
+                                String explicitVersion, VersionBump bump, String bumpFromVersion) {
         String urn = schemaUrn(name, schema);
         List<ReferenceRow> rows = new ArrayList<>(ReferenceExtraction.schemaRefs(refs));
         rows.addAll(ReferenceExtraction.associationRefs(associationTargets));
         return writeArtifact(urn, RegistryMapping.TYPE_ELEMENT, RegistryMapping.FORMAT_JSONSCHEMA,
             RegistryMapping.CONTENT_TYPE_JSON,
-            writeJson(schema), null, rows, bump, explicitVersion, null, null, false);
+            writeJson(schema), null, rows, bump, explicitVersion, bumpFromVersion, null, null, false);
     }
 
     @Override
@@ -106,7 +107,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         JsonNode payload = m;
         return writeArtifact(urns.mappingUrn(id), RegistryMapping.TYPE_MAPPING, RegistryMapping.FORMAT_CORE_JSON,
             RegistryMapping.CONTENT_TYPE_JSON,
-            writeJson(payload), null, ReferenceExtraction.mappingRefs(payload), bump, null, null, null, false);
+            writeJson(payload), null, ReferenceExtraction.mappingRefs(payload), bump, null, null, null, null, false);
     }
 
     @Override
@@ -114,33 +115,34 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         JsonNode payload = p;
         return writeArtifact(urns.pipelineUrn(id), RegistryMapping.TYPE_PIPELINE, RegistryMapping.FORMAT_CORE_JSON,
             RegistryMapping.CONTENT_TYPE_JSON,
-            writeJson(payload), null, ReferenceExtraction.pipelineRefs(payload), bump, null, null, null, false);
+            writeJson(payload), null, ReferenceExtraction.pipelineRefs(payload), bump, null, null, null, null, false);
     }
 
     @Override
     public String storeDataSource(String id, JsonNode s, VersionBump bump) {
         JsonNode payload = s;
         return writeArtifact(urns.dataSourceUrn(id), RegistryMapping.TYPE_DATASOURCE, RegistryMapping.FORMAT_CORE_JSON,
-            RegistryMapping.CONTENT_TYPE_JSON, writeJson(payload), null, ReferenceExtraction.dataSourceRefs(payload), bump, null, null, null, false);
+            RegistryMapping.CONTENT_TYPE_JSON, writeJson(payload), null, ReferenceExtraction.dataSourceRefs(payload), bump, null, null, null, null, false);
     }
 
     @Override
     public String storeDataSink(String id, JsonNode s, VersionBump bump) {
         JsonNode payload = s;
         return writeArtifact(urns.dataSinkUrn(id), RegistryMapping.TYPE_DATASINK, RegistryMapping.FORMAT_CORE_JSON,
-            RegistryMapping.CONTENT_TYPE_JSON, writeJson(payload), null, ReferenceExtraction.dataSinkRefs(payload), bump, null, null, null, false);
+            RegistryMapping.CONTENT_TYPE_JSON, writeJson(payload), null, ReferenceExtraction.dataSinkRefs(payload), bump, null, null, null, null, false);
     }
 
     @Override
     public String storeDataSet(String urn, JsonNode manifest, VersionBump bump) {
         return writeArtifact(UrnParser.logicalUrn(urn), RegistryMapping.TYPE_DATASET, RegistryMapping.FORMAT_CORE_JSON,
-            RegistryMapping.CONTENT_TYPE_JSON, writeJson(manifest), null, ReferenceExtraction.dataSetRefs(manifest), bump, null, null, null, false);
+            RegistryMapping.CONTENT_TYPE_JSON, writeJson(manifest), null, ReferenceExtraction.dataSetRefs(manifest), bump, null, null, null, null, false);
     }
 
     @Override
-    public String storeDataStructure(String urn, JsonNode manifest, VersionBump bump) {
+    public String storeDataStructure(String urn, JsonNode manifest, VersionBump bump, String bumpFromVersion) {
         return writeArtifact(UrnParser.logicalUrn(urn), RegistryMapping.TYPE_DATASTRUCTURE, RegistryMapping.FORMAT_CORE_JSON,
-            RegistryMapping.CONTENT_TYPE_JSON, writeJson(manifest), null, ReferenceExtraction.dataStructureRefs(manifest), bump, null, null, null, false);
+            RegistryMapping.CONTENT_TYPE_JSON, writeJson(manifest), null, ReferenceExtraction.dataStructureRefs(manifest), bump,
+            null, bumpFromVersion, null, null, false);
     }
 
     @Override
@@ -150,7 +152,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         xsd.evict(urn);
         return writeArtifact(UrnParser.logicalUrn(urn), RegistryMapping.TYPE_ELEMENT, RegistryMapping.FORMAT_XSD,
             RegistryMapping.CONTENT_TYPE_XML, null, xsdContent, ReferenceExtraction.xsdImportRefs(refs), bump,
-            explicitVersion,
+            explicitVersion, null,
             (artifactId, versionId, now) -> {
                 // Drop this model_forge.artifact's previously-indexed namespace(s) first so an in-place
                 // targetNamespace change/removal cannot leave a stale namespace → model_forge.artifact row.
@@ -556,8 +558,8 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
      */
     private String writeArtifact(String urn, String artifactType, String format, String contentType,
                                  String contentJson, String contentText, List<ReferenceRow> refs,
-                                 VersionBump bump, String explicitVersion, PostInsert postInsert,
-                                 String titleOverride, boolean forceNewVersion) {
+                                 VersionBump bump, String explicitVersion, String bumpFromVersion,
+                                 PostInsert postInsert, String titleOverride, boolean forceNewVersion) {
         // Reject control characters (CR/LF, etc.) in the client-supplied URN before it is persisted
         // or written to a plain-text log line — closes a CWE-117 log-forging/injection vector.
         UrnParser.requireNoControlChars(urn);
@@ -618,8 +620,15 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                     }
                     // An explicit version is adopted verbatim, with no ordering check against the
                     // current version — a version that collides with an existing one for this
-                    // artifact surfaces as the usual integrity-violation error on insert below.
-                    newVersion = hasExplicitVersion ? explicitVersion : SemVer.next(row.currentVersion(), bump);
+                    // artifact surfaces as the usual integrity-violation error on insert below. It
+                    // takes precedence over a named base, which only chooses what the bump counts
+                    // from; no caller supplies both.
+                    // A named base is the version the caller is revising, so an artifact whose
+                    // versions form independent lines keeps the bump inside the revised line
+                    // instead of jumping to the newest.
+                    String base = bumpFromVersion != null && !bumpFromVersion.isBlank()
+                        ? bumpFromVersion : row.currentVersion();
+                    newVersion = hasExplicitVersion ? explicitVersion : SemVer.next(base, bump);
                 }
                 UUID versionId = UUID.randomUUID();
                 versions.insert(new ArtifactVersionRow(versionId, artifactId, newVersion, format,
@@ -627,7 +636,12 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                 representations.insert(new ArtifactRepresentationRow(UUID.randomUUID(), versionId, format,
                     contentType, contentJson, contentText, hash, "stored", now));
                 references.replaceForVersion(versionId, refs);
-                artifacts.updateCurrentVersion(artifactId, newVersion, now);
+                // current_version is the HIGHEST version, not the last written: logical and
+                // ':latest' reads resolve through it, and a bump with no named base counts from it.
+                // Revising an older version must therefore not pull it back.
+                if (existing.isEmpty() || SemVer.compare(newVersion, existing.get().currentVersion()) > 0) {
+                    artifacts.updateCurrentVersion(artifactId, newVersion, now);
+                }
                 // Back-fill pinned references that targeted this exact (logical, version) before it existed.
                 references.linkDanglingVersions(UrnParser.withVersion(logical, newVersion), versionId);
                 if (postInsert != null) postInsert.run(artifactId, versionId, now);

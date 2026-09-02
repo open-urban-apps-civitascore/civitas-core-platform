@@ -69,6 +69,11 @@ public interface ArtifactRegistry {
         return storeElement(name, schema, refs, associationTargets, explicitVersion, VersionBump.PATCH);
     }
 
+    default String storeElement(String name, JsonNode schema, Set<String> refs, Set<String> associationTargets,
+                                 String explicitVersion, VersionBump bump) {
+        return storeElement(name, schema, refs, associationTargets, explicitVersion, bump, null);
+    }
+
     /**
      * @param refs               {@code $ref} composition edges (schema-ref)
      * @param associationTargets concrete {@code x-core-ref} association (foreign-key) edges
@@ -76,10 +81,13 @@ public interface ArtifactRegistry {
      *     version authority (1.0.0 for a new artifact, otherwise the next SemVer from
      *     {@code bump}) — the escape hatch for imports (e.g. XÖV) that must preserve an upstream
      *     version identity. Accepted as given, with no ordering check against the current version.
+     * @param bumpFromVersion    the existing version {@code bump} counts from; {@code null} counts
+     *     from the artifact's newest version. A caller whose versions of this artifact form
+     *     independent lines names the version it revises here, so the bump stays inside that line.
      * @return the concrete versioned URN (pin) the write resolved to
      */
     String storeElement(String name, JsonNode schema, Set<String> refs, Set<String> associationTargets,
-                         String explicitVersion, VersionBump bump);
+                         String explicitVersion, VersionBump bump, String bumpFromVersion);
 
     /** @return the concrete versioned URN (pin) the write resolved to */
     String storeMapping(String id, JsonNode mapping, VersionBump bump);
@@ -101,11 +109,20 @@ public interface ArtifactRegistry {
     String storeDataSet(String urn, JsonNode manifest, VersionBump bump);
 
     default String storeDataStructure(String urn, JsonNode manifest) {
-        return storeDataStructure(urn, manifest, VersionBump.PATCH);
+        return storeDataStructure(urn, manifest, VersionBump.PATCH, null);
     }
 
-    /** @return the concrete versioned URN (pin) the write resolved to */
-    String storeDataStructure(String urn, JsonNode manifest, VersionBump bump);
+    default String storeDataStructure(String urn, JsonNode manifest, VersionBump bump) {
+        return storeDataStructure(urn, manifest, bump, null);
+    }
+
+    /**
+     * @param bumpFromVersion the existing version {@code bump} counts from; {@code null} counts from
+     *     the artifact's newest version. A caller whose grouping versions form independent lines
+     *     names the version it revises here, so the bump stays inside that line.
+     * @return the concrete versioned URN (pin) the write resolved to
+     */
+    String storeDataStructure(String urn, JsonNode manifest, VersionBump bump, String bumpFromVersion);
 
     /**
      * Copies the artifact's current version to a new version numbered at {@code bump} — content,

@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -137,14 +138,14 @@ class EmbeddedModelForgeOperationsTest {
         var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0");
         // Model Forge assigns the version INSIDE the write and returns the pin with it — the
         // facade uses that returned pin directly, without any resolveReference read-back.
-        when(registry.storeElement(eq("Sensor"), any(), anySet(), anySet(), eq(de.civitascore.modelforge.contract.VersionBump.PATCH)))
+        when(registry.storeElement(eq("Sensor"), any(), anySet(), anySet(), isNull(), eq(de.civitascore.modelforge.contract.VersionBump.PATCH), isNull()))
             .thenReturn("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0");
 
         var result = operations.saveArtifact(
             new SaveArtifactCommand(artifactId, ArtifactKind.ELEMENT, schema, VersionBump.PATCH));
 
         assertThat(result.artifactId()).isEqualTo(artifactId);
-        verify(registry).storeElement(eq("Sensor"), any(), anySet(), anySet(), eq(de.civitascore.modelforge.contract.VersionBump.PATCH));
+        verify(registry).storeElement(eq("Sensor"), any(), anySet(), anySet(), isNull(), eq(de.civitascore.modelforge.contract.VersionBump.PATCH), isNull());
         verify(registry, org.mockito.Mockito.never()).resolveReference(anyString());
     }
 
@@ -165,7 +166,7 @@ class EmbeddedModelForgeOperationsTest {
         assertThat(result.artifactId()).isEqualTo(artifactId);
         verify(registry).storeXsdElement(anyString(), eq("<xs:schema/>"), anySet(), any(de.civitascore.modelforge.contract.VersionBump.class));
         verify(registry, org.mockito.Mockito.never())
-            .storeElement(anyString(), any(), anySet(), anySet(), any(de.civitascore.modelforge.contract.VersionBump.class));
+            .storeElement(anyString(), any(), anySet(), anySet(), isNull(), any(de.civitascore.modelforge.contract.VersionBump.class), isNull());
     }
 
     @Test
@@ -176,7 +177,7 @@ class EmbeddedModelForgeOperationsTest {
         // read-back could not see the write and returned an unversioned URN.
         JsonNode schema = mapper.createObjectNode().put("type", "object");
         var logicalId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56");
-        when(registry.storeElement(eq("Sensor"), any(), anySet(), anySet(), any(de.civitascore.modelforge.contract.VersionBump.class)))
+        when(registry.storeElement(eq("Sensor"), any(), anySet(), anySet(), isNull(), any(de.civitascore.modelforge.contract.VersionBump.class), isNull()))
             .thenReturn("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.3.0");
 
         var result = operations.saveArtifact(
@@ -203,7 +204,7 @@ class EmbeddedModelForgeOperationsTest {
 
         assertThat(result.artifactId()).isEqualTo(logicalArtifactId);
         var contentCaptor = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
-        verify(registry).storeElement(eq("Sensor"), contentCaptor.capture(), anySet(), anySet(), eq(de.civitascore.modelforge.contract.VersionBump.PATCH));
+        verify(registry).storeElement(eq("Sensor"), contentCaptor.capture(), anySet(), anySet(), isNull(), eq(de.civitascore.modelforge.contract.VersionBump.PATCH), isNull());
         assertThat(contentCaptor.getValue().path("$id").asText()).isEqualTo(logicalArtifactId.value());
     }
 
@@ -435,7 +436,7 @@ class EmbeddedModelForgeOperationsTest {
             .thenReturn(new SchemaImportResult(
                 "urn:core:platform:civitas:element:common:Thing:aaaaaaaaaa:0.1.0", List.of(), List.of()));
 
-        operations.importSchema(new ImportSchemaCommand(schema, VersionBump.MAJOR, "0.1.0", true));
+        operations.importSchema(new ImportSchemaCommand(schema, VersionBump.MAJOR, "0.1.0", true, null));
 
         ArgumentCaptor<SchemaImportRequest> request = ArgumentCaptor.forClass(SchemaImportRequest.class);
         verify(schemaImportService).importSchema(request.capture());

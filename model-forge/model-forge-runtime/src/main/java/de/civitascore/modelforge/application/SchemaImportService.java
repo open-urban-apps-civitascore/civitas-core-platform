@@ -147,7 +147,7 @@ public class SchemaImportService {
             pins.addAll(storeElementsInRegistry(elements, explicitVersion, req.bump(), pendingNodes, pinByLogical));
             if (dataStructure == null) return null;
             repinMemberRefs(dataStructure, pinByLogical);
-            return storeDataStructureManifest(dataStructure, req.bump(), pendingNodes);
+            return storeDataStructureManifest(dataStructure, req.bump(), req.bumpFromVersion(), pendingNodes);
         });
         // The dependency graph is in-memory and is not rolled back, so it is published only once the
         // durable write has committed — otherwise a rolled-back import leaves phantom nodes behind.
@@ -685,14 +685,15 @@ public class SchemaImportService {
     }
 
     private String storeDataStructureManifest(
-            ObjectNode manifest, VersionBump bump, List<PendingGraphNode> pendingNodes) {
+            ObjectNode manifest, VersionBump bump, String bumpFromVersion,
+            List<PendingGraphNode> pendingNodes) {
         // The $defs-library DataStructure identifies itself with the JSON-Schema `$id`; a legacy
         // grouping manifest used `id`. Accept either.
         String idField = manifest.has("$id")
             ? manifest.path("$id").asText(null)
             : manifest.path("id").asText(null);
         String dataStructureLogicalUrn = UrnParser.logicalUrn(idField);
-        String pin = registry.storeDataStructure(dataStructureLogicalUrn, manifest, bump);
+        String pin = registry.storeDataStructure(dataStructureLogicalUrn, manifest, bump, bumpFromVersion);
         // Mirror the just-persisted elementRefs edges into the in-memory dependency graph. The
         // registry write alone does not touch the graph, so without this the grouping shows no
         // relations and no graph edges until the next full rebuild() — unlike the createArtifact

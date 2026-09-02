@@ -64,7 +64,8 @@ class ContractTypesTest {
     void importSchemaCommandDefaultsItsChangeClass() throws Exception {
         var schema = objectMapper.readTree("{\"type\":\"object\"}");
 
-        assertThat(new ImportSchemaCommand(schema, null, null, false).bump()).isEqualTo(VersionBump.PATCH);
+        assertThat(new ImportSchemaCommand(schema, null, null, false, null).bump())
+            .isEqualTo(VersionBump.PATCH);
         assertThat(new ImportSchemaCommand(schema).preserveVersion()).isFalse();
     }
 }
