@@ -46,7 +46,9 @@ public record ImportSchemaCommand(
         this(schema, bump, null, false, null);
     }
 
-    public ImportSchemaCommand(JsonNode schema, VersionBump bump, String bumpFromVersion) {
-        this(schema, bump, null, false, bumpFromVersion);
+    /** Numbering from the artifact's newest version, as before {@code bumpFromVersion} existed. */
+    public ImportSchemaCommand(
+        JsonNode schema, VersionBump bump, String version, boolean preserveVersion) {
+        this(schema, bump, version, preserveVersion, null);
     }
 }

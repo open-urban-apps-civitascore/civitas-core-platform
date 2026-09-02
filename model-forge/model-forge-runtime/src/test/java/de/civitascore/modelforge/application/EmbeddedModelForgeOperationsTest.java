@@ -436,7 +436,7 @@ class EmbeddedModelForgeOperationsTest {
             .thenReturn(new SchemaImportResult(
                 "urn:core:platform:civitas:element:common:Thing:aaaaaaaaaa:0.1.0", List.of(), List.of()));
 
-        operations.importSchema(new ImportSchemaCommand(schema, VersionBump.MAJOR, "0.1.0", true, null));
+        operations.importSchema(new ImportSchemaCommand(schema, VersionBump.MAJOR, "0.1.0", true));
 
         ArgumentCaptor<SchemaImportRequest> request = ArgumentCaptor.forClass(SchemaImportRequest.class);
         verify(schemaImportService).importSchema(request.capture());

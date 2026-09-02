@@ -435,7 +435,7 @@ public class ModelRegistryGateway {
   private ArtifactId importRoot(JsonNode content, VersionBump bump, String bumpFromVersion) {
     ImportResult result =
         modelForge.importSchema(
-            new ImportSchemaCommand(content, toModelForgeBump(bump), bumpFromVersion));
+            new ImportSchemaCommand(content, toModelForgeBump(bump), null, false, bumpFromVersion));
     logDependencies(result.rootArtifactId(), result.dependencies());
     return result.rootArtifactId();
   }
