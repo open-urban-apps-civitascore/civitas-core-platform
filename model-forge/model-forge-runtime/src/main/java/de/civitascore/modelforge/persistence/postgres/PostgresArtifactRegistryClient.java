@@ -620,12 +620,10 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                     }
                     // An explicit version is adopted verbatim, with no ordering check against the
                     // current version — a version that collides with an existing one for this
-                    // artifact surfaces as the usual integrity-violation error on insert below. It
-                    // takes precedence over a named base, which only chooses what the bump counts
-                    // from; no caller supplies both.
-                    // A named base is the version the caller is revising, so an artifact whose
-                    // versions form independent lines keeps the bump inside the revised line
-                    // instead of jumping to the newest.
+                    // artifact surfaces as the usual integrity-violation error on insert below,
+                    // and takes precedence over a named base.
+                    // A named base is the version being revised, so an artifact whose versions form
+                    // independent lines keeps the bump inside the revised line.
                     String base = bumpFromVersion != null && !bumpFromVersion.isBlank()
                         ? bumpFromVersion : row.currentVersion();
                     newVersion = hasExplicitVersion ? explicitVersion : SemVer.next(base, bump);

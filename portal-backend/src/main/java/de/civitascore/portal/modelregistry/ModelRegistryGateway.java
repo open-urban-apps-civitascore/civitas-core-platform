@@ -319,7 +319,8 @@ public class ModelRegistryGateway {
         existingLogicalUrn
             .map(
                 logicalUrn ->
-                    saveVersion(logicalUrn, artifactKind, content, VersionBump.MINOR, dataSet))
+                    saveVersion(
+                        logicalUrn, artifactKind, content, VersionBump.MINOR, dataSet, null))
             .orElseGet(
                 () -> {
                   ArtifactWriteResult result =
@@ -441,16 +442,6 @@ public class ModelRegistryGateway {
   }
 
   /** Stores a follow-up version of an existing artifact; dependency edges are logged. */
-  private ArtifactId saveVersion(
-      String logicalUrn, ArtifactKind kind, JsonNode content, VersionBump bump) {
-    return saveVersion(logicalUrn, kind, content, bump, null, null);
-  }
-
-  private ArtifactId saveVersion(
-      String logicalUrn, ArtifactKind kind, JsonNode content, VersionBump bump, String dataSet) {
-    return saveVersion(logicalUrn, kind, content, bump, dataSet, null);
-  }
-
   private ArtifactId saveVersion(
       String logicalUrn,
       ArtifactKind kind,

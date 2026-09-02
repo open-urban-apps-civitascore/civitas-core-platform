@@ -186,15 +186,11 @@ public class DataStructureVersionService
             parent.getName(),
             input.getModel(),
             input.getStyles(),
-            // A version's first model starts a new major; changing a model it already has
-            // advances the minor. Keyed on the version's own state rather than on whether this
-            // request created it, so a version whose model arrives on a later save still starts
-            // a major.
+            // A version's first model starts a new major and has no number to count from;
+            // changing a model it already has advances the minor from the version's own number, so
+            // the revision stays inside its major. Keyed on the stored pin rather than on how the
+            // version was saved, so a model arriving on a later save still starts a major.
             entity.getModelUrn() == null ? VersionBump.MAJOR : VersionBump.MINOR,
-            // The minor counts from this version's own number, so a revision stays inside the
-            // major it was created on instead of following whichever version is newest. Only a
-            // stored pin makes that number a version the registry holds, so a version without one
-            // names no base and starts from the newest major.
             entity.getModelUrn() == null ? null : entity.getVersion());
     if (parent.getModelLogicalUrn() == null) {
       parent.setModelLogicalUrn(pin.logicalUrn());
