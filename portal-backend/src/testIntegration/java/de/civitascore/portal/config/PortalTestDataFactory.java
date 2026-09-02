@@ -127,7 +127,9 @@ public class PortalTestDataFactory {
             // replacement advances the minor inside it. Seeding every version as a MINOR would put
             // two versions on one major line, a state the service itself never produces.
             version.getModelUrn() == null ? VersionBump.MAJOR : VersionBump.MINOR,
-            version.getVersion());
+            // Only a stored pin makes the shell's version a real registry version; the builder's
+            // placeholder must not be offered as a base to count from.
+            version.getModelUrn() == null ? null : version.getVersion());
     if (parent.getModelLogicalUrn() == null) {
       parent.setModelLogicalUrn(pin.logicalUrn());
       dataStructureRepository.save(parent);
