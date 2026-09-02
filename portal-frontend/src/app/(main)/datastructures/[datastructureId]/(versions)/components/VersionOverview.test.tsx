@@ -1,4 +1,3 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent, { UserEvent } from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
@@ -169,14 +168,10 @@ describe('VersionOverview - hasUserChanges Modal', () => {
   })
 
   const renderComponent = (props = {}) => {
-    // Saving reloads the breadcrumb through the query cache, so the component needs a client the
-    // way the application provides one.
     return render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <VersionOverview {...defaultProps} {...props} />
-        </NextIntlClientProvider>
-      </QueryClientProvider>,
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <VersionOverview {...defaultProps} {...props} />
+      </NextIntlClientProvider>,
     )
   }
 

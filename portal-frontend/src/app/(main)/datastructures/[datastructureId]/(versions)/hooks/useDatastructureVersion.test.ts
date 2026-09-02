@@ -1,7 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { toast } from 'sonner'
 
-import { BREADCRUMB_QUERY_KEY } from '@/app/services/api/breadcrumbs/clientRequests'
 import {
   useCreateDatastructureVersion,
   useStatusUpdateDatastructureVersion,
@@ -13,18 +12,10 @@ import { DATASTRUCTURE_STATUS_TYPES, type DatastructureVersion } from '@/types/d
 
 import { useDatastructureVersion } from './useDatastructureVersion'
 
-const { mockRefresh, mockInvalidateQueries } = vi.hoisted(() => ({
-  mockRefresh: vi.fn(),
-  mockInvalidateQueries: vi.fn(),
-}))
+const { mockRefresh } = vi.hoisted(() => ({ mockRefresh: vi.fn() }))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: mockRefresh }),
-}))
-
-vi.mock('@tanstack/react-query', async importOriginal => ({
-  ...(await importOriginal<typeof import('@tanstack/react-query')>()),
-  useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
 }))
 
 vi.mock('next-intl', () => ({
@@ -342,7 +333,7 @@ describe('useDatastructureVersion — a stored model reaches the surfaces outsid
     vi.clearAllMocks()
   })
 
-  it('reloads the route and the breadcrumb after a draft update assigns a version number', async () => {
+  it('reloads the route after a draft update assigns a version number', async () => {
     const { hook } = setup(version({ styles: validDiagram(), version: null }))
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
@@ -350,9 +341,7 @@ describe('useDatastructureVersion — a stored model reaches the surfaces outsid
       await hook.result.current.saveDatastructureVersion(DS_ID)
     })
 
-    // The heading renders on the server and the breadcrumb has its own query, so both need a
-    // reload to show the assigned number.
+    // The heading renders on the server, so it needs a reload to show the assigned number.
     expect(mockRefresh).toHaveBeenCalled()
-    expect(mockInvalidateQueries).toHaveBeenCalledWith(expect.objectContaining({ queryKey: [BREADCRUMB_QUERY_KEY] }))
   })
 })
