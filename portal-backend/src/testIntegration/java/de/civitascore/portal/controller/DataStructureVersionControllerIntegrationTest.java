@@ -181,8 +181,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
       assertThat(output.getVersion())
-          .as("A new version is a new contract, so its model starts a new major after 1.0.0/1.1.0")
-          .isEqualTo("2.0.0");
+          .as("A new version is a new contract, so its model starts the next major line")
+          .isEqualTo("3.0.0");
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo("Third version with new features");
@@ -424,8 +424,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output.getId()).isEqualTo(versionId1);
       assertThat(output.getVersion())
-          .as("Editing an existing version advances its minor, above the seeded 1.0.0/1.1.0")
-          .isEqualTo("1.2.0");
+          .as("Editing a version advances the minor inside its own major, not from the newest")
+          .isEqualTo("1.1.0");
       assertThat(output.getDescription()).isEqualTo("Updated description with a replaced model");
       assertThat(output.getDataStructureVersionStatus())
           .as("Status should remain DRAFT (not changed by update)")
@@ -1017,8 +1017,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .as("Model name should be updated")
           .isEqualTo("UpdatedReleasedModel");
       assertThat(output.getVersion())
-          .as("Replacing the model is an edit, so it advances the minor after 1.0.0/1.1.0")
-          .isEqualTo("1.2.0");
+          .as("Replacing the model is an edit, so it advances the minor inside its own major")
+          .isEqualTo("1.1.0");
       assertThat(output.getStyles().get("color")).as("Styles should be updated").isEqualTo("red");
       assertThat(output.getDataStructureVersionStatus())
           .as("Status should remain AVAILABLE")

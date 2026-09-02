@@ -112,6 +112,10 @@ public class ModelRegistryGateway {
    * @param styles the host's UI styles, merged into the document as {@value #X_UI_STYLES}; null or
    *     empty means the stored document carries no styles
    * @param bump the change class for a follow-up version (ignored on first store)
+   * @param bumpFromVersion the version the caller is revising, which {@code bump} counts from; null
+   *     counts from the newest version. A data structure's versions are independent lines rather
+   *     than one history, so a revision must name its own version or the bump would jump to the
+   *     newest line.
    * @return the pin (logical URN, versioned URN, version) the caller persists on the shell
    */
   public ModelPin storeModel(
@@ -119,7 +123,8 @@ public class ModelRegistryGateway {
       String name,
       Map<String, Object> model,
       Map<String, Object> styles,
-      VersionBump bump) {
+      VersionBump bump,
+      String bumpFromVersion) {
     JsonNode content = mergeStyles(model, styles);
     ArtifactId root;
     if (isDataStructureModel(content, existingLogicalUrn)) {
@@ -128,11 +133,13 @@ public class ModelRegistryGateway {
       // through saveArtifact(ELEMENT) — that would store an Element under a :datastructure: URN.
       // importSchema versions the existing logical URN idempotently, applying the change class to
       // the grouping and to every member whose content changed.
-      root = importRoot(withTitle(content, name), bump);
+      root = importRoot(withTitle(content, name), bump, bumpFromVersion);
     } else if (existingLogicalUrn.isPresent()) {
-      root = saveVersion(existingLogicalUrn.get(), ArtifactKind.ELEMENT, content, bump);
+      root =
+          saveVersion(
+              existingLogicalUrn.get(), ArtifactKind.ELEMENT, content, bump, null, bumpFromVersion);
     } else {
-      root = importRoot(withTitle(content, name), bump);
+      root = importRoot(withTitle(content, name), bump, bumpFromVersion);
     }
     return toPin(root);
   }
@@ -425,9 +432,10 @@ public class ModelRegistryGateway {
    * @param bump the change class to apply; it reaches the grouping and every member whose content
    *     changed, and a member that is byte-identical still mints nothing
    */
-  private ArtifactId importRoot(JsonNode content, VersionBump bump) {
+  private ArtifactId importRoot(JsonNode content, VersionBump bump, String bumpFromVersion) {
     ImportResult result =
-        modelForge.importSchema(new ImportSchemaCommand(content, toModelForgeBump(bump)));
+        modelForge.importSchema(
+            new ImportSchemaCommand(content, toModelForgeBump(bump), bumpFromVersion));
     logDependencies(result.rootArtifactId(), result.dependencies());
     return result.rootArtifactId();
   }
@@ -435,15 +443,30 @@ public class ModelRegistryGateway {
   /** Stores a follow-up version of an existing artifact; dependency edges are logged. */
   private ArtifactId saveVersion(
       String logicalUrn, ArtifactKind kind, JsonNode content, VersionBump bump) {
-    return saveVersion(logicalUrn, kind, content, bump, null);
+    return saveVersion(logicalUrn, kind, content, bump, null, null);
   }
 
   private ArtifactId saveVersion(
       String logicalUrn, ArtifactKind kind, JsonNode content, VersionBump bump, String dataSet) {
+    return saveVersion(logicalUrn, kind, content, bump, dataSet, null);
+  }
+
+  private ArtifactId saveVersion(
+      String logicalUrn,
+      ArtifactKind kind,
+      JsonNode content,
+      VersionBump bump,
+      String dataSet,
+      String bumpFromVersion) {
     ArtifactWriteResult result =
         modelForge.saveArtifact(
             new SaveArtifactCommand(
-                new ArtifactId(logicalUrn), kind, content, toModelForgeBump(bump), dataSet));
+                new ArtifactId(logicalUrn),
+                kind,
+                content,
+                toModelForgeBump(bump),
+                dataSet,
+                bumpFromVersion));
     logDependencies(result.artifactId(), result.dependencies());
     return result.artifactId();
   }

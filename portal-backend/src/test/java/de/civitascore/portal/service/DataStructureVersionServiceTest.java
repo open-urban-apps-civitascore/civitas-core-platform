@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -54,7 +55,7 @@ class DataStructureVersionServiceTest {
     // Model Forge is the version authority: storing a model returns the assigned pin. Lenient so
     // tests that never store a model (early-throw / no-model paths) don't trip strict stubbing.
     lenient()
-        .when(modelRegistryGateway.storeModel(any(), any(), any(), any(), any()))
+        .when(modelRegistryGateway.storeModel(any(), any(), any(), any(), any(), any()))
         .thenReturn(
             new ModelRegistryGateway.ModelPin(
                 "urn:core:platform:civitas:element:common:test",
@@ -244,6 +245,7 @@ class DataStructureVersionServiceTest {
               any(),
               eq(Map.of("title", "New")),
               eq(Map.of("color", "red")),
+              any(),
               any());
     }
 
@@ -280,7 +282,7 @@ class DataStructureVersionServiceTest {
 
       // In-use: the structural payload is neutralized — no registry write, the pin is preserved.
       verify(modelRegistryGateway, org.mockito.Mockito.never())
-          .storeModel(any(), any(), any(), any(), any());
+          .storeModel(any(), any(), any(), any(), any(), any());
       assertThat(input.getModel()).as("In-use model change must be dropped").isNull();
       assertThat(input.getStyles()).as("In-use styles change must be dropped").isNull();
       assertThat(version.getModelUrn())
@@ -432,6 +434,7 @@ class DataStructureVersionServiceTest {
               any(),
               eq(Map.of("title", "Observation")),
               eq(Map.of("color", "blue")),
+              any(),
               any());
       assertThat(result.getVersion()).isEqualTo("1.0.0");
       assertThat(result.getModelUrn())
@@ -471,7 +474,8 @@ class DataStructureVersionServiceTest {
               any(),
               any(),
               any(),
-              eq(VersionBump.MAJOR));
+              eq(VersionBump.MAJOR),
+              any());
     }
 
     @Test
@@ -501,7 +505,8 @@ class DataStructureVersionServiceTest {
 
       dataStructureVersionService.update(versionId, input);
 
-      verify(modelRegistryGateway).storeModel(any(), any(), any(), any(), eq(VersionBump.MAJOR));
+      verify(modelRegistryGateway)
+          .storeModel(any(), any(), any(), any(), eq(VersionBump.MAJOR), isNull());
     }
 
     @Test
@@ -533,7 +538,8 @@ class DataStructureVersionServiceTest {
 
       dataStructureVersionService.updateReleasedMeta(versionId, input);
 
-      verify(modelRegistryGateway).storeModel(any(), any(), any(), any(), eq(VersionBump.MINOR));
+      verify(modelRegistryGateway)
+          .storeModel(any(), any(), any(), any(), eq(VersionBump.MINOR), eq("2.4.0"));
     }
 
     @Test
@@ -558,7 +564,7 @@ class DataStructureVersionServiceTest {
       DataStructureVersion result = dataStructureVersionService.create(input);
 
       verify(modelRegistryGateway, org.mockito.Mockito.never())
-          .storeModel(any(), any(), any(), any(), any());
+          .storeModel(any(), any(), any(), any(), any(), any());
       assertThat(result.getVersion()).isNull();
       assertThat(result.getModelUrn()).isNull();
     }

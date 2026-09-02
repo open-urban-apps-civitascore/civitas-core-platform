@@ -123,7 +123,11 @@ public class PortalTestDataFactory {
             parent.getName(),
             model,
             styles,
-            VersionBump.MINOR);
+            // Mirror the service rule: a version's first model starts its own major line, a
+            // replacement advances the minor inside it. Seeding every version as a MINOR would put
+            // two versions on one major line, a state the service itself never produces.
+            version.getModelUrn() == null ? VersionBump.MAJOR : VersionBump.MINOR,
+            version.getVersion());
     if (parent.getModelLogicalUrn() == null) {
       parent.setModelLogicalUrn(pin.logicalUrn());
       dataStructureRepository.save(parent);

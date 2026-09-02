@@ -190,7 +190,11 @@ public class DataStructureVersionService
             // advances the minor. Keyed on the version's own state rather than on whether this
             // request created it, so a version whose model arrives on a later save still starts
             // a major.
-            entity.getModelUrn() == null ? VersionBump.MAJOR : VersionBump.MINOR);
+            entity.getModelUrn() == null ? VersionBump.MAJOR : VersionBump.MINOR,
+            // The minor counts from this version's own number, so a revision stays inside the
+            // major it was created on instead of following whichever version is newest. Null on
+            // the first store, which numbers from the newest major.
+            entity.getVersion());
     if (parent.getModelLogicalUrn() == null) {
       parent.setModelLogicalUrn(pin.logicalUrn());
     }
