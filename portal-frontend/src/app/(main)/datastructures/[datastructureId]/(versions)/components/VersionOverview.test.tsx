@@ -33,10 +33,12 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/datastructures/test-id/versions/v-1',
 }))
 
+let mockSubTabValue = 'versionInfo'
+
 vi.mock('@/hooks/use-query-params', () => ({
   useQueryParams: () => ({
     setSubTabValueParam: vi.fn(),
-    subTabValue: 'versionInfo',
+    subTabValue: mockSubTabValue,
   }),
 }))
 
@@ -177,6 +179,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     mockCreateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockStatusUpdateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockSearchParams = new URLSearchParams('mode=edit')
+    mockSubTabValue = 'versionInfo'
     vi.mocked(useMultiSessionManager).mockReset()
     vi.mocked(useMultiSessionManager).mockImplementation(
       ({ initialSession }) =>
@@ -904,6 +907,53 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         )
         expect(mockPush).toHaveBeenCalled()
       })
+    })
+  })
+
+  /**
+   * These cases run the real session manager and the real modeler: a mocked manager cannot show
+   * whether a model change reaches the save button.
+   */
+  describe('save button after model changes', () => {
+    beforeEach(async () => {
+      const actual = await vi.importActual<typeof import('@/components/uml-modeler/hooks/use-multi-session-manager')>(
+        '@/components/uml-modeler/hooks/use-multi-session-manager',
+      )
+      vi.mocked(useMultiSessionManager).mockImplementation(actual.useMultiSessionManager)
+      mockSubTabValue = 'structure'
+    })
+
+    const versionWithSelectedNode: DatastructureVersion = {
+      ...mockVersionWithModel,
+      styles: {
+        ...mockVersionWithModel.styles!,
+        nodes: [{ ...mockVersionWithModel.styles!.nodes[0], selected: true }],
+      },
+    }
+
+    it('enables the save button after the diagram was renamed', async () => {
+      const user = userEvent.setup()
+      renderComponent({ version: mockVersionWithModel })
+
+      expect(screen.getByTestId('confirmButton')).toBeDisabled()
+
+      await user.dblClick(screen.getByText('Test Model'))
+      const diagramNameInput = screen.getByDisplayValue('Test Model')
+      await user.clear(diagramNameInput)
+      await user.type(diagramNameInput, 'Renamed Model{Enter}')
+
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).toBeEnabled())
+    })
+
+    it('enables the save button after a class was renamed in the inspector', async () => {
+      const user = userEvent.setup()
+      renderComponent({ version: versionWithSelectedNode })
+
+      expect(screen.getByTestId('confirmButton')).toBeDisabled()
+
+      await user.type(screen.getByPlaceholderText('Element name'), 'X')
+
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).toBeEnabled())
     })
   })
 })
