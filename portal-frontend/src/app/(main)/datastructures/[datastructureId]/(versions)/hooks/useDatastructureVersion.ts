@@ -1,12 +1,14 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { Resolver, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
+import { BREADCRUMB_QUERY_KEY } from '@/app/services/api/breadcrumbs/clientRequests'
 import {
   useCreateDatastructureVersion,
   useStatusUpdateDatastructureVersion,
@@ -82,6 +84,7 @@ export const useDatastructureVersion = ({
   const tCommon = useTranslations('common')
   const tUmlModeler = useTranslations('umlModeler')
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { handleFormValidationError } = useError()
   const [initialSession, setInitialSession] = useState(() => buildSessionFromVersion(version))
 
@@ -214,6 +217,11 @@ export const useDatastructureVersion = ({
         endpoint: `/datastructures/${datastructureId}/versions/${values.id}`,
       })
       toast.success(t('messages.updateSuccess'))
+      // Storing a model assigns the version its number. The heading is rendered on the server and
+      // the breadcrumb reads the version through its own query, so both keep the pre-save value
+      // unless they are reloaded here.
+      router.refresh()
+      void queryClient.invalidateQueries({ queryKey: [BREADCRUMB_QUERY_KEY] })
       return response.data
     } catch (error) {
       toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructureVersion') }))
