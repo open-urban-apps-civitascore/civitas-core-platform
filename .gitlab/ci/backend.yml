@@ -82,6 +82,8 @@ dependency-prune-backend:
     - job: setup-version-portal-model
       artifacts: true
     - job: publish-portal-model
+    - job: publish-model-forge
+      optional: true
       optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -110,6 +112,8 @@ test-backend:
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
+    - job: publish-model-forge
+      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -121,6 +125,9 @@ test-backend:
       - .m2/repository
   before_script:
     - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
+    # core-model-forge-* keeps a fixed 0.1.0-SNAPSHOT, so a cached copy would hide a snapshot
+    # this pipeline just published.
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitascore/core-model-forge-*
     - cd portal-backend
   script:
     # Compile test sources, then run unit tests
@@ -150,6 +157,8 @@ integration-test-backend:
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
+    - job: publish-model-forge
+      optional: true
   services:
     - name: docker:27-dind
   variables:
@@ -166,6 +175,9 @@ integration-test-backend:
       - .m2/repository
   before_script:
     - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
+    # core-model-forge-* keeps a fixed 0.1.0-SNAPSHOT, so a cached copy would hide a snapshot
+    # this pipeline just published.
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitascore/core-model-forge-*
     - cd portal-backend
   script:
     # Compile test sources, then run integration tests only. Saga-tagged tests are excluded via pom.xml (run in saga-e2e-test-backend)
@@ -197,6 +209,8 @@ saga-e2e-test-backend:
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
+    - job: publish-model-forge
+      optional: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_TAG
@@ -225,6 +239,9 @@ saga-e2e-test-backend:
       - .m2/repository
   before_script:
     - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
+    # core-model-forge-* keeps a fixed 0.1.0-SNAPSHOT, so a cached copy would hide a snapshot
+    # this pipeline just published.
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitascore/core-model-forge-*
     - cd portal-backend
   script:
     - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION -Psaga -Dfailsafe.rerunFailingTestsCount=1
@@ -398,6 +415,8 @@ build-backend:
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
+    - job: publish-model-forge
+      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -409,6 +428,9 @@ build-backend:
       - .m2/repository
   before_script:
     - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
+    # core-model-forge-* keeps a fixed 0.1.0-SNAPSHOT, so a cached copy would hide a snapshot
+    # this pipeline just published.
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitascore/core-model-forge-*
     - cd portal-backend
   script:
     # Use GitLab Maven repository for config-adapter and portal-model dependencies
