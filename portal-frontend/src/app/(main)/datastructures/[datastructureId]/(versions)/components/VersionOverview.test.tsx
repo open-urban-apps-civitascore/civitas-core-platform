@@ -4,7 +4,6 @@ import { NextIntlClientProvider } from 'next-intl'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
-import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import messages from '@/messages/de.json'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import {
@@ -40,15 +39,6 @@ vi.mock('@/hooks/use-query-params', () => ({
     setSubTabValueParam: vi.fn(),
     subTabValue: mockSubTabValue,
   }),
-}))
-
-vi.mock('@/components/uml-modeler/hooks/use-multi-session-manager', () => ({
-  useMultiSessionManager: vi.fn(({ initialSession }: { initialSession: { id: string } | null }) => ({
-    activeSession: null,
-    activeSessionId: initialSession?.id ?? null,
-    setSession: vi.fn(),
-    markSessionDirty: vi.fn(),
-  })),
 }))
 
 const mockUpdateMutateAsync = vi.fn()
@@ -125,22 +115,6 @@ const mockVersionWithModel: DatastructureVersion = {
   },
 }
 
-const createModelSessionManagerMock = (version: DatastructureVersion) =>
-  ({
-    activeSession: {
-      id: version.styles?.id ?? 'session-1',
-      isDirty: false,
-      diagram: version.styles!,
-      dirtyFields: new Set(),
-      lastModified: version.styles?.lastModified ?? new Date('2024-01-01'),
-      created: version.styles?.lastModified ?? new Date('2024-01-01'),
-      name: version.modelName ?? version.styles?.name ?? 'Test Model',
-    },
-    activeSessionId: version.styles?.id ?? 'session-1',
-    setSession: vi.fn(),
-    markSessionDirty: vi.fn(),
-  }) as unknown as ReturnType<typeof useMultiSessionManager>
-
 const setCurrentUserPermissions = (permissions: PermissionName[]) => {
   vi.mocked(useGetCurrentUser).mockReturnValue({
     data: {
@@ -180,16 +154,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     mockStatusUpdateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockSearchParams = new URLSearchParams('mode=edit')
     mockSubTabValue = 'versionInfo'
-    vi.mocked(useMultiSessionManager).mockReset()
-    vi.mocked(useMultiSessionManager).mockImplementation(
-      ({ initialSession }) =>
-        ({
-          activeSession: null,
-          activeSessionId: initialSession?.id ?? null,
-          setSession: vi.fn(),
-          markSessionDirty: vi.fn(),
-        }) as unknown as ReturnType<typeof useMultiSessionManager>,
-    )
     vi.mocked(useGetCurrentUser).mockReturnValue({
       data: {
         username: 'test',
@@ -376,7 +340,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     })
 
     it('marks structure tab as completed when version has a data structure', async () => {
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await waitFor(() => {
@@ -443,7 +406,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('enables AVAILABLE option when all tabs are completed', async () => {
       const user = userEvent.setup()
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await openStatusDropdown(user)
@@ -460,7 +422,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('marks the description as invalid when it is cleared while the status is AVAILABLE', async () => {
       const user = userEvent.setup()
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await selectAvailableStatus(user)
@@ -474,7 +435,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('keeps the description valid when it is cleared while the status is DRAFT', async () => {
       const user = userEvent.setup()
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await user.clear(screen.getByTestId('descriptionTextArea'))
@@ -485,7 +445,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('disables the save button while a required field is empty at status AVAILABLE', async () => {
       const user = userEvent.setup()
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await selectAvailableStatus(user)
@@ -500,7 +459,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('keeps the save button enabled with an empty description at status DRAFT', async () => {
       const user = userEvent.setup()
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await user.clear(screen.getByTestId('descriptionTextArea'))
@@ -556,7 +514,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         ...mockVersionWithModel,
         dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
       }
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(availableVersionWithModel))
       renderComponent({ version: availableVersionWithModel })
 
       expect(screen.getByTestId('versionTextField')).toBeDisabled()
@@ -600,7 +557,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('calls the publish API when status is set from DRAFT to AVAILABLE', async () => {
       const user = userEvent.setup()
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await openStatusDropdown(user)
@@ -624,7 +580,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         ...mockVersionWithModel,
         dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
       }
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(availableVersionWithModel))
       renderComponent({ version: availableVersionWithModel })
 
       await openStatusDropdown(user)
@@ -910,16 +865,8 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     })
   })
 
-  /**
-   * These cases run the real session manager and the real modeler: a mocked manager cannot show
-   * whether a model change reaches the save button.
-   */
   describe('save button after model changes', () => {
-    beforeEach(async () => {
-      const actual = await vi.importActual<typeof import('@/components/uml-modeler/hooks/use-multi-session-manager')>(
-        '@/components/uml-modeler/hooks/use-multi-session-manager',
-      )
-      vi.mocked(useMultiSessionManager).mockImplementation(actual.useMultiSessionManager)
+    beforeEach(() => {
       mockSubTabValue = 'structure'
     })
 
