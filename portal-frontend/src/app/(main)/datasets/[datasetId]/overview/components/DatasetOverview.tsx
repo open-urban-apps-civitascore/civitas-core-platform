@@ -27,13 +27,11 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { BasicTooltip } from '@/components/tooltip/Tooltip'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
+import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useError } from '@/hooks/use-error'
-import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
-import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { SelectOption } from '@/types/common'
-import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   CompletionStepData,
   Dataset,
@@ -71,46 +69,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const serverStatus = dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT
   const [dataSetStatus, setDataSetStatus] = useState<DatasetStatusTypes>(serverStatus)
-  const isDraftMode = dataSetStatus === DATASET_STATUS_TYPES.DRAFT
+  const isSelectedDraftState = dataSetStatus === DATASET_STATUS_TYPES.DRAFT
   const isServerDraftState = serverStatus === DATASET_STATUS_TYPES.DRAFT
   const isServerReadyState = serverStatus === DATASET_STATUS_TYPES.READY
-  const isServerAvailableState = serverStatus === DATASET_STATUS_TYPES.AVAILABLE
   const hasStatusChanged = dataSetStatus !== serverStatus
 
-  const { hasPermission, hasScopedPermission } = usePermissions()
-
-  const canRead = hasScopedPermission(
-    PERMISSION_NAMES.DATASET_READ,
-    ASSIGNMENT_SCOPE_TYPES.DATASET,
-    dataset.id,
-    dataset.datapool?.id,
-  )
-
-  const canRelease = hasScopedPermission(
-    PERMISSION_NAMES.DATASET_RELEASE,
-    ASSIGNMENT_SCOPE_TYPES.DATASET,
-    dataset.id,
-    dataset.datapool?.id,
-  )
-
-  const canUpdateDatasets = hasScopedPermission(
-    PERMISSION_NAMES.DATASET_UPDATE,
-    ASSIGNMENT_SCOPE_TYPES.DATASET,
-    dataset.id,
-    dataset.datapool?.id,
-  )
-
-  const canUpdate = isServerAvailableState ? canUpdateDatasets && canRelease : canUpdateDatasets
-
-  const canCreate = hasScopedPermission(
-    PERMISSION_NAMES.DATASET_CREATE,
-    ASSIGNMENT_SCOPE_TYPES.DATASET,
-    dataset.id,
-    dataset.datapool?.id,
-  )
-
-  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
-  const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
+  const { canEditMetadata, canRelease, canViewApis, canEditApis, canCreatePipeline } = useDatasetPermissions(dataset)
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
@@ -119,7 +83,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const pipelineList = pipelines ?? []
   const namedApiList = namedApis ?? []
 
-  const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit' || !canUpdate)
+  const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit' || !canEditMetadata)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const updateDataset = usePatchDataset()
@@ -153,15 +117,6 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset])
 
-  const canCreatePipeline =
-    canRead &&
-    canCreate &&
-    canUpdate &&
-    canReadDatasources &&
-    canReadDatastructures &&
-    isDraftMode &&
-    isServerDraftState
-
   const hasUnsavedChanges = form.formState.isDirty || hasStatusChanged
   const hasOnlyStatusChanges = !form.formState.isDirty && hasStatusChanged
 
@@ -183,13 +138,13 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   }
 
   useEffect(() => {
-    if (isDraftMode) {
+    if (isSelectedDraftState) {
       form.clearErrors()
     } else {
       void form.trigger()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDraftMode])
+  }, [isSelectedDraftState])
 
   useEffect(() => {
     revalidateDraftMode()
@@ -359,13 +314,17 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       buttons: [],
       content: (
         <>
-          <PipelineList datasetId={dataset.id} pipelines={pipelineList} canCreatePipeline={canCreatePipeline} />
+          <PipelineList
+            datasetId={dataset.id}
+            pipelines={pipelineList}
+            canCreatePipeline={canCreatePipeline && isSelectedDraftState}
+          />
           <div className="border-t" />
           <ApiList
             datasetId={dataset.id}
             apis={namedApiList}
-            canEdit={canRead && canUpdate && canReadDatastructures && isDraftMode && isServerDraftState}
-            canView={canRead && canReadDatastructures}
+            canEdit={canEditApis && isSelectedDraftState}
+            canView={canViewApis}
             isOpenDataAccess={dataset.openDataAccess}
           />
         </>
@@ -437,7 +396,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       hasCard={false}
       isReadOnly={isReadOnly}
       onEditClick={() => setIsReadOnly(false)}
-      canEdit={canUpdate}
+      canEdit={canEditMetadata}
       cancelButtonTitle={tCommon('actions.exit')}
     />
   )

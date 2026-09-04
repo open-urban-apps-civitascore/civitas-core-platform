@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { useCreateNamedApi, usePatchDataset } from '@/app/services/api/datasets/clientRequests'
 import { useCreateLayer, useUpdateLayer } from '@/app/services/api/datasets/layers/clientRequests'
 import { useCreateStyle, useUpdateStyle } from '@/app/services/api/datasets/styles/clientRequests'
+import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { Dataset } from '@/types/datasets'
@@ -52,7 +53,9 @@ export const useApiConfig = <TFormData extends FormData>({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const isCreate = !existingApi
-  const [isReadOnly, setIsReadOnly] = useState(isCreate ? false : searchParams.get('mode') !== 'edit')
+  const { canEditApis } = useDatasetPermissions(dataset)
+  const [isEditing, setIsEditing] = useState(isCreate || searchParams.get('mode') === 'edit')
+  const isReadOnly = !canEditApis || !isEditing
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [urlPreviewSlug, setUrlPreviewSlug] = useState(initialSlug)
 
@@ -77,7 +80,7 @@ export const useApiConfig = <TFormData extends FormData>({
 
   const updateMode = useCallback(
     (isEditing: boolean) => {
-      setIsReadOnly(!isEditing)
+      setIsEditing(isEditing)
       const params = new URLSearchParams(searchParams.toString())
       if (isEditing) {
         params.set('mode', 'edit')
@@ -193,6 +196,7 @@ export const useApiConfig = <TFormData extends FormData>({
   }
 
   const handleSave = async (): Promise<boolean> => {
+    if (isReadOnly) return false
     let isSaved = false
     await form.handleSubmit(
       async data => {
@@ -263,6 +267,7 @@ export const useApiConfig = <TFormData extends FormData>({
   return {
     isReadOnly,
     isLoading,
+    isCreate,
     isExitModalOpen,
     setIsExitModalOpen,
     urlPreviewSlug,

@@ -25,11 +25,11 @@ import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWar
 import { EditorLayout } from '@/components/node-editor/EditorLayout'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Button } from '@/components/ui/button'
+import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
 import { cn } from '@/lib/utils'
 
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
-import { usePipelinePermissions } from '../../_hooks/use-pipeline-permissions'
 import { ReadOnlyProvider } from '../../_hooks/use-pipeline-read-only'
 import { usePipelineSession } from '../../_hooks/use-pipeline-session'
 import type { UsePipelineSessionReturn } from '../../_types/session'
@@ -67,7 +67,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
 
   const router = useRouter()
   const params = useParams<{ datasetId: string }>()
-  const { canEditPipeline: canEdit, canCreatePipeline: canCreate } = usePipelinePermissions(params.datasetId)
+  const { canEditPipeline: canEdit, canCreatePipeline: canCreate } = useDatasetPermissionsById(params.datasetId)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const handleExit = useCallback(() => {

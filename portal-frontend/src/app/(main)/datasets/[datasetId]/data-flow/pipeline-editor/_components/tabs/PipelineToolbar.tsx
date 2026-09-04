@@ -17,10 +17,10 @@ import { useCallback, useState } from 'react'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
 
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
-import { usePipelinePermissions } from '../../_hooks/use-pipeline-permissions'
 
 // ============================================================================
 // Props
@@ -43,7 +43,7 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
   const t = useTranslations('pipelineEditor')
   const { pipeline, runValidation, deletePipeline, isDirty, isDeleting } = useActivePipeline()
   const { datasetId } = useParams<{ datasetId: string }>()
-  const { canDeletePipeline: canDelete, canEditPipeline: canEdit } = usePipelinePermissions(datasetId)
+  const { canDeletePipeline: canDelete, canEditPipeline: canEdit } = useDatasetPermissionsById(datasetId)
 
   const [shouldShowDeleteConfirm, setShouldShowDeleteConfirm] = useState(false)
 

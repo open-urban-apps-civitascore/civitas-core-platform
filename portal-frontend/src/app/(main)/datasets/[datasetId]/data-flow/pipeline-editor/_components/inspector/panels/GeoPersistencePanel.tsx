@@ -16,10 +16,10 @@ import { DataModelImportModal } from '@/app/(main)/datasources/[datasourceId]/co
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
 
 import { useActivePipeline } from '../../../_hooks/use-active-pipeline'
 import { parseCompositeKey, useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
-import { usePipelinePermissions } from '../../../_hooks/use-pipeline-permissions'
 import { isValidTableName, MAX_TABLE_NAME_LENGTH } from '../../../_services/dataSinkNameService'
 import type { GeoPersistenceNodeData } from '../../../_types/nodes'
 import { EntityMetadata } from '../components/EntityMetadata'
@@ -32,7 +32,7 @@ interface GeoPersistencePanelProps {
 export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, onUpdate }) => {
   const t = useTranslations('pipelineEditor')
   const { datasetId } = useParams<{ datasetId: string }>()
-  const { canReadDatastructures } = usePipelinePermissions(datasetId)
+  const { canReadDatastructures } = useDatasetPermissionsById(datasetId)
   const { selectedNode, pipelineUsingTableName } = useActivePipeline()
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
