@@ -179,16 +179,26 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Trust anchor for MQTT broker certificates. Defaults to NiFi's node truststore behind the
-   * deployment-owned parameter context; an environment that provisions a dedicated MQTT truststore
-   * points these at it instead, which keeps external-broker trust out of NiFi's node trust.
+   * Trust anchor for MQTT broker certificates. Defaults to the JVM's own trust store, which carries
+   * the public root CAs, so a broker with a publicly trusted certificate works with no
+   * configuration at all. Deliberately not NiFi's node truststore: that one holds no public roots
+   * and also backs cluster-internal TLS and the OIDC back-channel. An environment that provisions a
+   * dedicated truststore — the only way to trust a private CA — points these at it instead.
    */
   private MqttTruststoreConfig mqttTruststore() {
-    MqttTruststoreConfig defaults = MqttTruststoreConfig.nodeTruststore();
+    MqttTruststoreConfig defaults = MqttTruststoreConfig.jdkTruststore();
+    String path = getProperty("mqtt.truststore.path", defaults.path());
+    String passwordParameter = getProperty("mqtt.truststore.password-parameter", "");
+    // `changeit` belongs to the JDK store alone. A deployment that names its own store and says
+    // nothing about the password gets none, rather than a password its store never had — and a
+    // named password parameter, the `none` sentinel included, is the complete answer either way.
+    String passwordDefault =
+        passwordParameter.isEmpty() && path.equals(defaults.path()) ? defaults.password() : "";
     return new MqttTruststoreConfig(
-        getProperty("mqtt.truststore.path", defaults.path()),
+        path,
         getProperty("mqtt.truststore.type", defaults.type()),
-        getProperty("mqtt.truststore.password-parameter", defaults.passwordParameter()),
+        getProperty("mqtt.truststore.password", passwordDefault),
+        passwordParameter,
         getProperty("mqtt.truststore.parameter-context", defaults.parameterContext()));
   }
 
