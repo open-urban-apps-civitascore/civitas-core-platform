@@ -16,7 +16,7 @@ import {
   InspectorShell,
   PaletteShell,
 } from '@/components/node-editor'
-import type { PortDef, PortType, TransformNodeData } from '@/components/node-editor/types'
+import type { PortDef, TransformNodeData } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -38,6 +38,7 @@ import { TransformInspector } from './inspector/TransformInspector'
 import { MegaNode } from './nodes/MegaNode'
 import { flattenTree, objectFieldsCompatible, requiredFieldPaths } from './schema/fieldTree'
 import { versionToSchemaTree } from './schema/versionTree'
+import type { PortInfo } from './status'
 import { computeStatus, findNodeConfigErrors, portsCompatible } from './status'
 import type { MappingTransformDef } from './transforms'
 import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
@@ -172,7 +173,7 @@ export const MappingEditorModal = ({
     initialized.current = true
   }, [open, isReady, sourceTree, targetTree, config, setNodes, setEdges])
 
-  const endpointInfo = (nodeId: string, handleId: string): { type: PortType; sub?: string } | null => {
+  const endpointInfo = (nodeId: string, handleId: string): PortInfo | null => {
     if (nodeId === SOURCE_NODE_ID) {
       const field = sourceFields.get(handleId)
       if (!field) return null
@@ -192,7 +193,7 @@ export const MappingEditorModal = ({
     const def = mappingRegistry.byType[data.defType]
     const ports = [...(data.inputs ?? def?.inputs ?? []), ...(data.outputs ?? def?.outputs ?? [])]
     const port = ports.find(p => p.id === handleId)
-    return port ? { type: port.type, sub: port.dataType } : null
+    return port ? { type: port.type, sub: port.dataType, accepts: port.accepts } : null
   }
 
   const isValidConnection: IsValidConnection = useCallback(

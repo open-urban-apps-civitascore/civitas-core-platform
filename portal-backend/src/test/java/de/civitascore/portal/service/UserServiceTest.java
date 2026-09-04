@@ -39,16 +39,20 @@ class UserServiceTest {
   private static final String TARGET_REALM = "test-realm";
   private static final String AUTH_SERVER_URL = "http://keycloak:8080";
   private static final KeycloakProperties KEYCLOAK_PROPERTIES =
-      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM);
+      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, true);
   private static final int CONFIG_ADAPTER_TIMEOUT_SECONDS = 10;
 
   private UserService createService() {
+    return createService(KEYCLOAK_PROPERTIES);
+  }
+
+  private UserService createService(KeycloakProperties keycloakProperties) {
     return new UserService(
         configEventPublisher,
         userRepository,
         userMapper,
         groupRepository,
-        KEYCLOAK_PROPERTIES,
+        keycloakProperties,
         new EventProperties(CONFIG_ADAPTER_TIMEOUT_SECONDS));
   }
 
@@ -114,9 +118,27 @@ class UserServiceTest {
   class ToConfigValuePreSaveTests {
 
     @Test
-    @DisplayName("Should set VERIFY_EMAIL and UPDATE_PASSWORD for new user (no externalId)")
+    @DisplayName(
+        "Should set VERIFY_EMAIL, UPDATE_PASSWORD and CONFIGURE_TOTP for new user (no externalId)")
     void shouldSetRequiredActionsForNewUser() {
       UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+      user.setExternalId(null);
+      UserInputDTO input = new UserInputDTO();
+      input.setEmail(user.getEmail());
+
+      UserConfig config = (UserConfig) service.toConfigValuePreSave(user, input);
+
+      assertThat(config.getRequiredActions())
+          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
+      assertThat(config.getEmailVerified()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should omit CONFIGURE_TOTP for new user when OTP enforcement is disabled")
+    void shouldOmitConfigureTotpWhenEnforcementDisabled() {
+      UserService service =
+          createService(new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, false));
       User user = userWithId(UUID.randomUUID());
       user.setExternalId(null);
       UserInputDTO input = new UserInputDTO();
@@ -141,7 +163,7 @@ class UserServiceTest {
       UserConfig config = (UserConfig) service.toConfigValuePreSave(user, input);
 
       assertThat(config.getRequiredActions())
-          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
+          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
       assertThat(config.getEmailVerified()).isFalse();
     }
 
@@ -328,7 +350,7 @@ class UserServiceTest {
       UserConfig config = (UserConfig) service.toConfigValuePostSave(user, input, preSave);
 
       assertThat(config.getRequiredActions())
-          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
+          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
       assertThat(config.getEmailVerified()).isFalse();
     }
   }

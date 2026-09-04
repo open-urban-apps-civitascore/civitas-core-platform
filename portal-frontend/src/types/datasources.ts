@@ -71,16 +71,6 @@ export const DatasourceApiResponseSchema = z.object({
 
 export type Datasource = z.infer<typeof DatasourceApiResponseSchema>
 
-/** Mirrors `GET /datasets/{id}/usable-datasources`. */
-export const DatasourceSummaryApiResponseSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string().nullable(),
-  connectorType: ConnectorTypeSchema.nullable(),
-})
-
-export type DatasourceSummary = z.infer<typeof DatasourceSummaryApiResponseSchema>
-
 /* Form schemas for edit */
 export const DatasourceBaseFormSchema = z.object({
   id: z.string(),

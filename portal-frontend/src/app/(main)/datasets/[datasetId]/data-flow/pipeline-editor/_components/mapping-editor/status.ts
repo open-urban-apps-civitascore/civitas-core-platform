@@ -26,21 +26,27 @@ export interface MappingStatus {
 export interface PortInfo {
   type: PortType
   sub?: string
+  /** Input-only: accepted source subtypes; membership test instead of exact equality. */
+  accepts?: readonly string[]
 }
 
 export type EndpointInfo = (nodeId: string, handleId: string) => PortInfo | null
 
 /**
  * Two ports are compatible when:
- *  - both have the same portType category (scalar / geometry / array / object)
- *  - AND for scalar/geometry ports: the subtype matches exactly (int↔int, str↔str, Point↔Point, …)
- *    — type conversions must go through an explicit conversion node.
- * An absent `sub` on either side is a wildcard, which is how conversion nodes accept any scalar.
+ * Both must share the port category (scalar / geometry / array / object)
+ * For scalar and geometry the subtype decides, first matching rule wins:
+ *  1. `to.accepts` is set → `from.sub` must be one of them (numeric inputs take str/int/number).
+ *  2. both sides carry a `sub` → the two must be equal (int↔int, Point↔Point).
+ *  3. either has no `sub` → compatible (`toString`, `concat`); every output carries one.
  */
 export const portsCompatible = (from: PortInfo | null, to: PortInfo | null): boolean => {
   if (!from || !to) return false
   if (from.type !== to.type) return false
-  if ((from.type === 'scalar' || from.type === 'geometry') && from.sub && to.sub && from.sub !== to.sub) return false
+  if (from.type === 'scalar' || from.type === 'geometry') {
+    if (to.accepts) return !!from.sub && to.accepts.includes(from.sub)
+    if (from.sub && to.sub && from.sub !== to.sub) return false
+  }
   return true
 }
 

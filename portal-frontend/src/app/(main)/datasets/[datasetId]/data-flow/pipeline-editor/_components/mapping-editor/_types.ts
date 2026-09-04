@@ -24,7 +24,17 @@ export type GeometryType =
   | 'MultiPolygon'
   | 'GeometryCollection'
 
-export type FieldType = 'str' | 'int' | 'float' | 'bool' | 'date' | GeometryType | 'array' | 'object'
+export type FieldType =
+  | 'str'
+  | 'int'
+  | 'number'
+  | 'bool'
+  | 'date'
+  | 'datetime'
+  | 'uuid'
+  | GeometryType
+  | 'array'
+  | 'object'
 
 export const GEOMETRY: ReadonlySet<GeometryType> = new Set<GeometryType>([
   'Point',
@@ -51,6 +61,13 @@ export interface FieldNode {
   primaryKey?: boolean
   children?: FieldNode[]
 }
+
+/**
+ * Source subtypes a numeric conversion input (toInt/toNumber) accepts. Everything else — uuid, bool,
+ * date, datetime, geometry — has no meaningful numeric coercion and is rejected. Used as a port's
+ * `accepts` set.
+ */
+export const NUMERIC_SUBTYPES: readonly FieldType[] = ['str', 'int', 'number']
 
 /** The port category is a pure function of the field type. */
 export const portTypeFor = (type: FieldType): PortType => {
@@ -92,12 +109,14 @@ export interface SchemaTree {
 /**
  * Conversion ops aligned with Apache NiFi RecordPath functions:
  *  toString  → NiFi toString(field, charset)   — any scalar → string
- *  toInt     → NiFi type coercion to INT        — str/float → int
- *  toFloat   → NiFi type coercion to FLOAT      — str/int → float
- *  toDate    → NiFi toDate(field, format)       — str → date
- *  format    → NiFi format(field, format)       — date → str
+ *  toInt     → NiFi type coercion to INT        — str/number → int
+ *  toFloat   → NiFi type coercion to FLOAT      — str/int → number
+ *  toUuid    → no RecordPath call; the sink parses               — str → uuid
+ *  toDate    → NiFi format(toDate(field, format), 'yyyy-MM-dd')  — str / date → date
+ *  toDateTime→ NiFi toDate(field, format)                        — str / datetime → datetime
+ *  format    → NiFi format(field, format)                        — date / datetime → str
  */
-export type ConversionOp = 'toString' | 'toInt' | 'toFloat' | 'toDate' | 'format'
+export type ConversionOp = 'toString' | 'toInt' | 'toFloat' | 'toUuid' | 'toDate' | 'toDateTime' | 'format'
 
 export type OpNode =
   | { op: 'copy'; sourcePath: string }

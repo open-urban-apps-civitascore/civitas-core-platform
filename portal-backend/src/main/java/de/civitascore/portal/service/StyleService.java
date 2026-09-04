@@ -7,6 +7,7 @@ import de.civitascore.portal.model.input.StyleInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.StyleRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
@@ -27,16 +28,19 @@ public class StyleService extends BaseService<Style, StyleInputDTO> {
   private final StyleMapper styleMapper;
   private final DataSetRepository dataSetRepository;
   private final LayerRepository layerRepository;
+  private final SldContentValidator sldContentValidator;
 
   public StyleService(
       StyleRepository styleRepository,
       StyleMapper styleMapper,
       DataSetRepository dataSetRepository,
-      LayerRepository layerRepository) {
+      LayerRepository layerRepository,
+      SldContentValidator sldContentValidator) {
     this.styleRepository = styleRepository;
     this.styleMapper = styleMapper;
     this.dataSetRepository = dataSetRepository;
     this.layerRepository = layerRepository;
+    this.sldContentValidator = sldContentValidator;
   }
 
   @Override
@@ -68,13 +72,17 @@ public class StyleService extends BaseService<Style, StyleInputDTO> {
   }
 
   /**
-   * Rejects saves that would create a duplicate name within the same dataset.
+   * Rejects saves that would create a duplicate name within the same dataset, or carry SLD content
+   * GeoServer would refuse while publishing.
    *
+   * @throws InvalidInputException (400) if the SLD declares a DOCTYPE or is not well-formed XML
    * @throws UniqueConstraintViolationException (409) if another Style with the same name exists in
    *     the dataset
    */
   @Override
   protected Style preSave(Style entity) {
+    sldContentValidator.validate(entity.getSldContent());
+
     styleRepository
         .findByDataSetIdAndName(entity.getDataSet().getId(), entity.getName())
         .filter(existing -> !existing.getId().equals(entity.getId()))

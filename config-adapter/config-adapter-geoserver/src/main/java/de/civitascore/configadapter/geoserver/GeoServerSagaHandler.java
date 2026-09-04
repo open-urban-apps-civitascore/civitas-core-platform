@@ -929,8 +929,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   /**
    * Creates a style from its SLD, or updates it via PUT if one of that name already exists. An
-   * existing style returns 403 (not 409) on GeoServer Cloud 2.28.3.0, so the upsert branches on 403
-   * and refreshes the SLD; a genuine auth 403 falls through to the same PUT and surfaces via {@link
+   * existing style returns 403 (not 409) on GeoServer Cloud, so the upsert branches on 403 and
+   * refreshes the SLD; a genuine auth 403 falls through to the same PUT and surfaces via {@link
    * #checkResponse}.
    */
   private void upsertStyle(String workspaceName, String name, String sld) {

@@ -1233,9 +1233,11 @@
       "details": "Data source details",
       "connector": "Connector",
       "connection": "Connection",
+      "status": "Status",
       "description": "Description",
       "tags": "Tags",
       "showDataStructure": "Show Data Structure",
+      "noPermission": "No permission to read datasources",
       "anonymousName": "Anonymous Data Source"
     },
     "frostPanel": {
@@ -1428,21 +1430,32 @@
           "description": "any scalar → str"
         },
         "toInt": {
-          "description": "str / float → int"
+          "description": "str / number → int"
         },
         "toFloat": {
-          "description": "str / int → float"
+          "description": "str / int → number"
+        },
+        "toUuid": {
+          "description": "str → uuid"
         },
         "toDate": {
           "description": "str → date",
           "fields": {
             "pattern": {
-              "label": "Pattern"
+              "label": "Input format"
+            }
+          }
+        },
+        "toDateTime": {
+          "description": "str → datetime",
+          "fields": {
+            "pattern": {
+              "label": "Input format"
             }
           }
         },
         "format": {
-          "description": "date → str",
+          "description": "date / datetime → str",
           "fields": {
             "pattern": {
               "label": "Pattern"

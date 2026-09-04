@@ -50,17 +50,12 @@ type JsonSchemaObject = Record<string, unknown>
  */
 const PRIMITIVE_TYPE_MAP: Record<string, JsonSchemaObject> = {
   String: { type: 'string' },
-  Character: { type: 'string' },
   Uuid: { type: 'string', format: 'uuid' },
   Integer: { type: 'integer' },
-  Long: { type: 'integer' },
-  Short: { type: 'integer' },
-  Byte: { type: 'integer' },
-  Float: { type: 'number' },
-  Double: { type: 'number' },
+  Number: { type: 'number' },
   Boolean: { type: 'boolean' },
-  Date: { type: 'string', format: 'date-time' },
-  void: { type: 'null' },
+  Date: { type: 'string', format: 'date' },
+  DateTime: { type: 'string', format: 'date-time' },
 }
 
 const GEOMETRY_TYPES = new Set([

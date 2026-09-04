@@ -15,10 +15,12 @@ import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @ActiveProfiles({"test-integration", "init", "init-test"})
@@ -49,7 +51,7 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
   @BeforeEach
   void reseedAndRunInitializers() {
     txTemplate.executeWithoutResult(
-        status -> {
+        _ -> {
           permissionInitializer.initialize();
           roleInitializer.initialize();
         });
@@ -73,8 +75,8 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
 
     List<Assignment> assignments = assignmentRepository.findAllByGroupId(group.getId());
     assertThat(assignments).hasSize(1);
-    assertThat(assignments.get(0).getRole().getName()).isEqualTo("Tenant Admin");
-    assertThat(assignments.get(0).getScopeType()).isNull();
+    assertThat(assignments.getFirst().getRole().getName()).isEqualTo("Tenant Admin");
+    assertThat(assignments.getFirst().getScopeType()).isNull();
   }
 
   @Test
@@ -86,8 +88,8 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
 
     List<Assignment> assignments = assignmentRepository.findAllByGroupId(group.getId());
     assertThat(assignments).hasSize(1);
-    assertThat(assignments.get(0).getRole().getName()).isEqualTo("Data Architect");
-    assertThat(assignments.get(0).getScopeType()).isEqualTo(ScopeType.TENANT);
+    assertThat(assignments.getFirst().getRole().getName()).isEqualTo("Data Architect");
+    assertThat(assignments.getFirst().getScopeType()).isEqualTo(ScopeType.TENANT);
   }
 
   @Test
@@ -105,7 +107,8 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     UserRepresentation keycloakUser = findKeycloakUserByEmail(TEST_EMAIL);
     assertThat(keycloakUser).isNotNull();
     assertThat(keycloakUser.isEmailVerified()).isFalse();
-    assertThat(keycloakUser.getRequiredActions()).contains("VERIFY_EMAIL", "UPDATE_PASSWORD");
+    assertThat(keycloakUser.getRequiredActions())
+        .contains("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
 
     Group group = groupRepository.findByName(TEST_GROUP_NAME).orElseThrow();
     assertThat(group.getMembers()).extracting("email").containsExactly(TEST_EMAIL);
@@ -126,7 +129,8 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     UserRepresentation keycloakUser = findKeycloakUserByEmail(TEST_SYNC_EMAIL);
     assertThat(keycloakUser).isNotNull();
     assertThat(keycloakUser.isEmailVerified()).isFalse();
-    assertThat(keycloakUser.getRequiredActions()).contains("VERIFY_EMAIL", "UPDATE_PASSWORD");
+    assertThat(keycloakUser.getRequiredActions())
+        .contains("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
   }
 
   @Test
@@ -147,5 +151,23 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     assertThat(groupRepository.count()).isEqualTo(2);
     assertThat(userRepository.count()).isEqualTo(2);
     assertThat(assignmentRepository.count()).isEqualTo(2);
+  }
+
+  @Nested
+  @TestPropertySource(properties = "keycloak.enforce-otp=false")
+  @DisplayName("With OTP enforcement disabled (KEYCLOAK_ENFORCE_OTP=false)")
+  class OtpEnforcementDisabled {
+
+    @Test
+    @DisplayName("Should sync user without CONFIGURE_TOTP when OTP enforcement is disabled")
+    void shouldSyncUserWithoutConfigureTotpWhenEnforcementDisabled() {
+
+      UserRepresentation keycloakUser = findKeycloakUserByEmail(TEST_EMAIL);
+      assertThat(keycloakUser).isNotNull();
+      assertThat(keycloakUser.isEmailVerified()).isFalse();
+      assertThat(keycloakUser.getRequiredActions())
+          .contains("VERIFY_EMAIL", "UPDATE_PASSWORD")
+          .doesNotContain("CONFIGURE_TOTP");
+    }
   }
 }

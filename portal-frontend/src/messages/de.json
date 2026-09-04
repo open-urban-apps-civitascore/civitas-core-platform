@@ -1220,9 +1220,11 @@
       "details": "Datenquellen-Details",
       "connector": "Konnektor",
       "connection": "Verbindung",
+      "status": "Status",
       "description": "Beschreibung",
       "tags": "Tags",
       "showDataStructure": "Datenstruktur anzeigen",
+      "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
       "anonymousName": "Anonyme Datenquelle"
     },
     "frostPanel": {
@@ -1415,21 +1417,32 @@
           "description": "beliebiger Skalar → str"
         },
         "toInt": {
-          "description": "str / float → int"
+          "description": "str / number → int"
         },
         "toFloat": {
-          "description": "str / int → float"
+          "description": "str / int → number"
+        },
+        "toUuid": {
+          "description": "str → uuid"
         },
         "toDate": {
           "description": "str → date",
           "fields": {
             "pattern": {
-              "label": "Muster"
+              "label": "Eingabeformat"
+            }
+          }
+        },
+        "toDateTime": {
+          "description": "str → datetime",
+          "fields": {
+            "pattern": {
+              "label": "Eingabeformat"
             }
           }
         },
         "format": {
-          "description": "date → str",
+          "description": "date / datetime → str",
           "fields": {
             "pattern": {
               "label": "Muster"

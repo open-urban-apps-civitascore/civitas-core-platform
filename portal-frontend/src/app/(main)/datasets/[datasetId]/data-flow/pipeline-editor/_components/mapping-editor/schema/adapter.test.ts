@@ -343,4 +343,18 @@ describe('umlDiagramToSchemaTree', () => {
     // An enumeration is a scalar value at runtime — there is no record to map fields against.
     expect(treeOf(enumOnly, 'MyStructure')).toEqual({ name: 'Status', fields: [] })
   })
+
+  it('keeps Date and DateTime apart as distinct scalar subtypes', () => {
+    const diagram = {
+      nodes: [
+        classNode('thing', 'Thing', [
+          { name: 'day', type: 'Date' },
+          { name: 'ts', type: 'DateTime' },
+        ]),
+      ],
+      edges: [],
+    } as unknown as UMLDiagram
+
+    expect(treeOf(diagram, 'Thing').fields.map(f => f.type)).toEqual(['date', 'datetime'])
+  })
 })

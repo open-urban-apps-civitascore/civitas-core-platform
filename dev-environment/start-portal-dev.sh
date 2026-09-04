@@ -945,6 +945,8 @@ cd "$BACKEND_DIR"
 export SPRING_DATASOURCE_USERNAME=admin
 export SPRING_DATASOURCE_PASSWORD=admin
 export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable&gssEncMode=disable"
+# Disable enforced TOTP/OTP setup for local development
+export KEYCLOAK_ENFORCE_OTP=false
 mvn clean spring-boot:run -Dspring-boot.run.profiles=local,init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION
 exec bash
 SCRIPT_EOF
@@ -1039,6 +1041,7 @@ if [ "$backend_option" = "3" ]; then
     echo "  SPRING_DATASOURCE_USERNAME=admin"
     echo "  SPRING_DATASOURCE_PASSWORD=admin"
     echo "  SPRING_DATASOURCE_URL=\"jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable&gssEncMode=disable\""
+    echo "  KEYCLOAK_ENFORCE_OTP=false"
     echo
 fi
 
@@ -1247,7 +1250,6 @@ echo "  FROST MQTT:       mqtt://localhost:1883"
 echo "  GeoServer Admin:  http://localhost:8082/geoserver/web (admin / geoserver)"
 echo "  GeoServer OWS:    http://localhost:9080/geoserver/{workspace}/ows (via APISIX)"
 echo "  GeoServer PostGIS: localhost:5434  db=geoserver  user=geoserver  (see geoserver/.env)"
-echo "  GeoServer Consul: http://localhost:8500"
 echo "  APISIX Gateway:   http://localhost:9080"
 echo "  APISIX Admin API: http://localhost:9180"
 echo "  Apache NiFi:      https://localhost:8443/nifi (login via Keycloak / OIDC)"

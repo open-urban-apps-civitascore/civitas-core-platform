@@ -150,7 +150,7 @@ public final class NifiTestFixtures {
                 "fields": {
                   "$.station_id": "$.station_id",
                   "$.temperature": "$.temperature",
-                  "$.observed_at": { "op": "toDate", "input": "$.ts", "pattern": "yyyy-MM-dd" }
+                  "$.observed_at": { "op": "toDateTime", "input": "$.ts", "pattern": "yyyy-MM-dd" }
                 } } } },
             { "id": "n-sink", "type": "%s", "data": { "entityId": "sink-1" } },
             { "id": "n-end", "type": "end", "data": {} }
