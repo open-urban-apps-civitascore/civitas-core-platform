@@ -159,9 +159,11 @@ public final class MqttSourceStage implements SourceStage {
   }
 
   /**
-   * Only the password <em>parameter name</em> reaches the SSL Context Service; the value lives in
-   * NiFi, supplied by the deployment, so no truststore secret passes through the adapter. A missing
-   * anchor fails the deploy instead of falling back to plaintext or to NiFi's node truststore.
+   * Binds the trust anchor. A password parameter contributes only its <em>name</em> to the snapshot
+   * — the value lives in NiFi, supplied by the deployment, so no truststore secret passes through
+   * the adapter. A literal password (the JDK store's {@code changeit}) instead goes the post-upload
+   * sensitive route, never into the snapshot. A missing anchor fails the deploy instead of falling
+   * back to plaintext or to NiFi's node truststore.
    */
   private void bindTruststore(PlanContext out) throws FatalAdapterException {
     if (truststore.path().isEmpty() || truststore.type().isEmpty()) {
@@ -181,6 +183,9 @@ public final class MqttSourceStage implements SourceStage {
         .sslContextProperties()
         .forEach(
             (key, value) -> out.putControllerServiceProperty(MQTT_SSL_CONTEXT_SERVICE, key, value));
+    truststore
+        .sensitiveProperties()
+        .forEach((key, value) -> out.putSensitive(MQTT_SSL_CONTEXT_SERVICE, key, value));
   }
 
   @Override

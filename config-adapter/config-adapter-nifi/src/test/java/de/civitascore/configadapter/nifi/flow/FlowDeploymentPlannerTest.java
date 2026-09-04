@@ -1066,6 +1066,7 @@ class FlowDeploymentPlannerTest {
         new MqttTruststoreConfig(
             "/opt/mqtt-tls/truststore.p12",
             "PKCS12",
+            "",
             "MQTT_TRUSTSTORE_PASSWORD",
             "MQTT Broker CAs");
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
@@ -1111,7 +1112,7 @@ class FlowDeploymentPlannerTest {
     Datasource source = mqttSource(null);
     source.handleUnknownProperty("tls", Map.of("enabled", true));
     source.handleUnknownProperty("urls", List.of("ssl://broker.example:8883"));
-    MqttTruststoreConfig unset = new MqttTruststoreConfig("", "PKCS12", "", "");
+    MqttTruststoreConfig unset = new MqttTruststoreConfig("", "PKCS12", "", "", "");
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FatalAdapterException ex =
           assertThrows(

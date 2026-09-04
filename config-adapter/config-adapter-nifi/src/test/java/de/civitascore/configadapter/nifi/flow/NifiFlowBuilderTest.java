@@ -187,7 +187,7 @@ class NifiFlowBuilderTest {
   void passwordlessMqttTruststoreDeclaresNoParameterContext() throws Exception {
     MqttTruststoreConfig truststore =
         new MqttTruststoreConfig(
-            "/opt/mqtt-tls/truststore.p12", "PKCS12", MqttTruststoreConfig.NO_PASSWORD, "");
+            "/opt/mqtt-tls/truststore.p12", "PKCS12", "", MqttTruststoreConfig.NO_PASSWORD, "");
     NifiFlowBuilder passwordless = NifiTestFixtures.flowBuilder(truststore);
     FlowBuildSpec tls = mqttTlsSpec(truststore);
 

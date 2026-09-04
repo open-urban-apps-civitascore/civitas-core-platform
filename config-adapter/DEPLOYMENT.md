@@ -229,12 +229,23 @@ The PostGIS extension must already be installed in the target database; the adap
 | `nifi.postgis.url` / `.user` / `.password` | `NIFI_POSTGIS_URL` / `_USER` / `_PASSWORD` |
 | `nifi.master-key` | `NIFI_MASTER_KEY` |
 | `nifi.mqtt.truststore.path` / `.type` | `NIFI_MQTT_TRUSTSTORE_PATH` / `_TYPE` |
+| `nifi.mqtt.truststore.password` | `NIFI_MQTT_TRUSTSTORE_PASSWORD` |
 | `nifi.mqtt.truststore.password-parameter` | `NIFI_MQTT_TRUSTSTORE_PASSWORD_PARAMETER` |
 | `nifi.mqtt.truststore.parameter-context` | `NIFI_MQTT_TRUSTSTORE_PARAMETER_CONTEXT` |
 
 Most NiFi misconfiguration fails the first affected pipeline deployment rather than startup.
 
-> **A TLS MQTT source needs a truststore the deployment provides.** When a datasource sets `tls.enabled`, the generated flow adds an SSL context service that validates the broker against the truststore named by `nifi.mqtt.truststore.*`; the file and its password belong to the deployment, the adapter writes only names. The defaults describe NiFi's node truststore — the file resolved from `TRUSTSTORE_PATH` in the node's environment, unlocked by a sensitive parameter `TRUSTSTORE_PASSWORD` in a Parameter Context named `NiFi Node Truststore` that the deployment must provision, because a sensitive value never travels in a flow. That truststore also backs cluster-internal TLS and the OIDC back-channel, so a dedicated store keeps external-broker trust out of it. Setting the password parameter to `none` drops the Parameter Context, for a truststore that opens without one. Whichever store is used must carry the broker's CA, otherwise the pipeline deploys clean and fails at runtime when the processor connects. TLS without a configured path and type fails the deployment; there is no fallback to plaintext.
+> **A TLS MQTT source validates the broker against `nifi.mqtt.truststore.*`.** When a datasource sets `tls.enabled`, the generated flow adds an SSL context service pointed at that store. The defaults describe the **JVM's own trust store** — `${JAVA_HOME}/lib/security/cacerts`, type `PKCS12`, opened with its conventional password `changeit` — so a broker with a publicly trusted certificate works with no configuration at all. They deliberately do **not** describe NiFi's node truststore: that one carries no public roots and also backs cluster-internal TLS and the OIDC back-channel.
+>
+> A broker behind a **private CA** needs a dedicated store the deployment provisions and mounts, named by `path` and `type`, plus one of three ways for it to open:
+>
+> | Configuration | Behaviour |
+> |---|---|
+> | `password-parameter` (+ `parameter-context`) | The flow carries only the parameter *name*; the deployment writes the value into that NiFi Parameter Context, because a sensitive value never travels in a flow. Use this for a real password. |
+> | `password` | A literal, pushed onto the controller service over REST after upload — never written into the flow. Only for a well-known store password, as the JDK default is. |
+> | `password-parameter=none` | The store opens without a password. NiFi's *validation* path reads a blank password as an empty `char[]`, which a MAC-protected PKCS12 rejects, so this suits only a store written without a MAC. |
+>
+> Setting a password parameter, `none` included, discards any configured literal — it is the complete answer to how the store opens. Whichever store is used must carry the broker's CA, otherwise the pipeline deploys clean and fails at runtime when the processor connects. TLS without a configured path and type fails the deployment; there is no fallback to plaintext.
 
 **Flowable** — see [§1.3](#13-flowable-state-database).
 

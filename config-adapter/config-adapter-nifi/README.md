@@ -34,7 +34,7 @@ Any other operation, and any unknown per-pipeline `action`, fails naming the off
 | MQTT (push) | `mqtt` | `STA_ENVELOPE` | Rejected — the source self-triggers on broker messages | Broker URLs, exactly one topic filter |
 | SQL (pull) | `sql`, `postgresql`, `postgres`, `jdbc` | `RECORDS` | Accepted | Table, DSN |
 
-A TLS MQTT broker is supported: the flow mints an SSL context service over the truststore that `nifi.mqtt.truststore.*` names — NiFi's node truststore by default — and declares the deployment-owned Parameter Context that supplies its password, which the flow itself never carries a value for. A SQL source re-reads the whole table on every run and tracks no high-water column, on an explicit cron or the source fragment's built-in schedule.
+A TLS MQTT broker is supported: the flow mints an SSL context service over the truststore that `nifi.mqtt.truststore.*` names — the JVM's own trust store by default, which carries the public root CAs, so a publicly trusted broker certificate needs no configuration. A store with a real password is opened through a deployment-owned Parameter Context the flow declares but never carries a value for; a well-known one (the JDK's `changeit`) through a literal pushed onto the controller service after upload. A SQL source re-reads the whole table on every run and tracks no high-water column, on an explicit cron or the source fragment's built-in schedule.
 
 | Sink | Datasink types | Accepts | Mapping | Write behaviour |
 |---|---|---|---|---|
@@ -91,6 +91,7 @@ Keys are read under the `nifi.` prefix. The values that ship, environment variab
 | `nifi.frost.basic.auth.username` / `.password` | Credentials the generated flow uses for FROST; fall back to the unprefixed `frost.basic.auth.*`. Absent credentials leave the flow's FROST calls unauthenticated; the password is required once a username is set |
 | `nifi.postgis.url` / `.user` / `.password` | Required for PostGIS pipelines |
 | `nifi.mqtt.truststore.path` / `.type` | Trust anchor for MQTT broker certificates, resolved inside NiFi. Required once a datasource enables TLS |
+| `nifi.mqtt.truststore.password` | Literal store password, pushed after upload rather than written into the flow. For well-known passwords only; discarded when a password parameter is set |
 | `nifi.mqtt.truststore.password-parameter` / `.parameter-context` | Names of the sensitive parameter and its Parameter Context; `none` as the parameter declares a truststore without a password |
 | `nifi.runtime-monitor.interval-ms` | Poll interval of the runtime status thread |
 | `nifi.master-key` | Falls back to `CIVITAS_MASTER_KEY`; required once any datasource carries an `ENC(...)` value |
