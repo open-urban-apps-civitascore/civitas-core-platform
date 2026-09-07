@@ -6,10 +6,9 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { FormSelect } from '@/components/form/fields/FormSelect'
 import { FooterElement } from '@/components/form/FooterElement'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
-import { CONNECTOR_TYPES } from '@/const/connectors'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
-import { ConnectorType } from '@/types/connectors'
+import { CONNECTOR_FIELD_REVALIDATION_RULES, ConnectorType } from '@/types/connectors'
 import { DatasourceFormDraft } from '@/types/datasources'
 
 import { CONNECTOR_INPUTS } from './connectorSources'
@@ -31,19 +30,29 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
 
   const connectorConfig = useMemo(() => (connectorType ? CONNECTOR_INPUTS[connectorType] : []), [connectorType])
 
-  const tlsWatch = useWatch({ control: form.control, name: 'configuration.tls' as Path<DatasourceFormDraft> })
-  const isFirstTlsRender = useRef(true)
+  // Cross-field re-validation (e.g. MQTT's `tls` <-> `urls` scheme check) is declared once per
+  // connector type in CONNECTOR_FIELD_REVALIDATION_RULES, colocated with the schema that owns the
+  // relationship (see `validateMqttSchemes` in types/connectors.ts). This component stays generic
+  // over connector type: adding a new connector's rule never requires touching this file.
+  const revalidationRule = connectorType ? CONNECTOR_FIELD_REVALIDATION_RULES[connectorType] : null
+
+  const watchedFieldValue = useWatch({
+    control: form.control,
+    name: `configuration.${revalidationRule?.watch}` as Path<DatasourceFormDraft>,
+    disabled: !revalidationRule,
+  })
+  const isFirstRevalidationRender = useRef(true)
 
   useEffect(() => {
-    if (isFirstTlsRender.current) {
-      isFirstTlsRender.current = false
+    if (isFirstRevalidationRender.current) {
+      isFirstRevalidationRender.current = false
       return
     }
-    if (connectorType === CONNECTOR_TYPES.MQTT) {
-      void form.trigger('configuration.urls' as Path<DatasourceFormDraft>)
+    if (revalidationRule) {
+      void form.trigger(`configuration.${revalidationRule.revalidate}` as Path<DatasourceFormDraft>)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tlsWatch])
+  }, [watchedFieldValue])
 
   const getLabel = (label: { label: string; labelHint: string | null }) => {
     const labelHint = label.labelHint ? `(${tCommon(`info.${label.labelHint}`)})` : ''
