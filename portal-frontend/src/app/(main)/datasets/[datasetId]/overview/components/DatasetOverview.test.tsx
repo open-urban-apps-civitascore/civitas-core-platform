@@ -52,6 +52,20 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
   } as unknown as ReturnType<typeof useGetCurrentUser>)
 }
 
+// Only TENANT scope grants DATASOURCE_READ and DATASTRUCTURE_READ; DATASET scope filters them out.
+const mockTenantPermissions = (permissions: PermissionName[]) => {
+  vi.mocked(useGetCurrentUser).mockReturnValue({
+    data: {
+      username: 'current',
+      email: 'current@test.com',
+      title: 'MR' as const,
+      firstName: 'Current',
+      lastName: 'User',
+      assignments: [{ scopeType: 'TENANT', scopeId: null, permissions }],
+    },
+  } as unknown as ReturnType<typeof useGetCurrentUser>)
+}
+
 const mockCurrentUserWithDatapoolScope = (permissions: PermissionName[], datapoolId: string) => {
   vi.mocked(useGetCurrentUser).mockReturnValue({
     data: {
@@ -75,38 +89,31 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
+  useLocale: () => 'de',
 }))
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
-vi.mock('@/components/ui/input', () => ({
-  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
+vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
+  useGetPipelines: () => ({ data: { data: [] } }),
 }))
 
-vi.mock('@/components/ui/textarea', () => ({
-  Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...props} />,
+vi.mock('@/app/services/api/datasources/clientRequests', () => ({
+  useGetDatasources: () => ({ data: { data: [] } }),
 }))
 
-vi.mock('../../components/CompletionStep', () => ({
-  CompletionStep: (props: { step: { title: string } }) => <div data-testid={`completionStep-${props.step.title}`} />,
-}))
-
-vi.mock('../../../utils/mappers', () => ({
-  mapDatasetToFormData: (dataset: Dataset) => ({
-    id: dataset.id,
-    name: dataset.name,
-    description: dataset.description ?? '',
-    openDataAccess: dataset.openDataAccess,
-    datapoolId: dataset.datapool?.id ?? null,
-  }),
+vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
+  useGetDataSinks: () => ({ data: { data: [{ id: 'sink-1', dataSinkType: 'POSTGIS' }] } }),
 }))
 
 vi.mock('@/contexts/unsaved-changes/UnsavedChangesContext', () => ({
   useUnsavedChanges: () => ({
     setHasUnsavedChanges: vi.fn(),
     setSaveHandler: vi.fn(),
+    hasUnsavedChanges: false,
+    requestNavigation: vi.fn(),
   }),
 }))
 
@@ -196,7 +203,7 @@ describe('DatasetOverview', () => {
     it('always shows access management completion card', () => {
       mockCurrentUser([])
       renderComponent()
-      expect(screen.getByTestId('completionStep-overview.completion.accessManagement.title')).toBeInTheDocument()
+      expect(screen.getByText('overview.completion.accessManagement.title')).toBeInTheDocument()
     })
   })
 
@@ -679,12 +686,117 @@ describe('DatasetOverview', () => {
   describe('Completion steps', () => {
     it('renders data flow completion card', () => {
       renderComponent()
-      expect(screen.getByTestId('completionStep-overview.completion.dataFlow.title')).toBeInTheDocument()
+      expect(screen.getByText('overview.completion.dataFlow.title')).toBeInTheDocument()
     })
 
     it('renders access management completion card', () => {
       renderComponent()
-      expect(screen.getByTestId('completionStep-overview.completion.accessManagement.title')).toBeInTheDocument()
+      expect(screen.getByText('overview.completion.accessManagement.title')).toBeInTheDocument()
+    })
+  })
+
+  describe('Data flow gating: adding and editing apis and pipelines', () => {
+    const CONTENT_PERMISSIONS: PermissionName[] = [
+      PERMISSION_NAMES.DATASET_READ,
+      PERMISSION_NAMES.DATASET_CREATE,
+      PERMISSION_NAMES.DATASET_UPDATE,
+      PERMISSION_NAMES.DATASOURCE_READ,
+      PERMISSION_NAMES.DATASTRUCTURE_READ,
+    ]
+
+    const namedApi = { id: 'api-1', name: 'My API', slug: 'my-api', standard: 'STA' as const }
+
+    const addApiButton = () => screen.queryByRole('button', { name: 'addButton' })
+    const addPipelineLink = () => screen.queryByRole('link', { name: 'addButton' })
+
+    const openApiCardMenu = () => userEvent.click(screen.getByTestId('apiCardMenu-my-api'))
+
+    it('shows the add buttons for apis and pipelines on a DRAFT dataset for a user with all necessary permissions', () => {
+      mockTenantPermissions(CONTENT_PERMISSIONS)
+      renderComponent()
+      expect(addApiButton()).toBeInTheDocument()
+      expect(addPipelineLink()).toBeInTheDocument()
+    })
+
+    it.each([{ dataSetStatus: 'READY' as const }, { dataSetStatus: 'AVAILABLE' as const }])(
+      'hides the add buttons on a $dataSetStatus dataset, even with every permission',
+      ({ dataSetStatus }) => {
+        mockTenantPermissions(CONTENT_PERMISSIONS)
+        renderComponent({ dataset: makeDraftDataset({ dataSetStatus }) })
+        expect(addApiButton()).not.toBeInTheDocument()
+        expect(addPipelineLink()).not.toBeInTheDocument()
+      },
+    )
+
+    it('hides the add buttons as soon as a non-DRAFT status is selected but not yet saved', async () => {
+      mockTenantPermissions(CONTENT_PERMISSIONS)
+      renderComponent({ dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }) })
+      expect(addApiButton()).toBeInTheDocument()
+
+      clickEditButton()
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('READY'))
+
+      expect(addApiButton()).not.toBeInTheDocument()
+      expect(addPipelineLink()).not.toBeInTheDocument()
+    })
+
+    it('keeps the add buttons hidden on a READY dataset even when DRAFT is selected', async () => {
+      mockTenantPermissions(CONTENT_PERMISSIONS)
+      renderComponent({
+        dataset: makeDraftDataset({ dataSetStatus: 'READY', pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
+      })
+
+      clickEditButton()
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('DRAFT'))
+
+      expect(addApiButton()).not.toBeInTheDocument()
+      expect(addPipelineLink()).not.toBeInTheDocument()
+    })
+
+    it('shows the view, edit and delete actions on an api card', async () => {
+      mockTenantPermissions(CONTENT_PERMISSIONS)
+      renderComponent({ dataset: makeDraftDataset({ namedApis: [namedApi] }) })
+
+      await openApiCardMenu()
+
+      expect(screen.getByTestId('apiCardMenuView-my-api')).toBeInTheDocument()
+      expect(screen.getByTestId('apiCardMenuEdit-my-api')).toBeInTheDocument()
+      expect(screen.getByTestId('apiCardMenuDelete-my-api')).toBeInTheDocument()
+    })
+
+    it('hides the view, edit and delete actions on an api card without DATASET_READ', async () => {
+      mockTenantPermissions([PERMISSION_NAMES.DATASET_UPDATE, PERMISSION_NAMES.DATASTRUCTURE_READ])
+      renderComponent({ dataset: makeDraftDataset({ namedApis: [namedApi] }) })
+
+      await openApiCardMenu()
+
+      expect(screen.queryByTestId('apiCardMenuView-my-api')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('apiCardMenuEdit-my-api')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('apiCardMenuDelete-my-api')).not.toBeInTheDocument()
+    })
+
+    it('hides the view, edit and delete actions on an api card without DATASTRUCTURE_READ', async () => {
+      mockTenantPermissions([PERMISSION_NAMES.DATASET_READ, PERMISSION_NAMES.DATASET_UPDATE])
+      renderComponent({ dataset: makeDraftDataset({ namedApis: [namedApi] }) })
+
+      await openApiCardMenu()
+
+      expect(screen.queryByTestId('apiCardMenuView-my-api')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('apiCardMenuEdit-my-api')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('apiCardMenuDelete-my-api')).not.toBeInTheDocument()
+    })
+
+    it('hides the edit and delete actions but keeps view on an api card without DATASET_UPDATE', async () => {
+      mockTenantPermissions([PERMISSION_NAMES.DATASET_READ, PERMISSION_NAMES.DATASTRUCTURE_READ])
+      renderComponent({ dataset: makeDraftDataset({ namedApis: [namedApi] }) })
+
+      await openApiCardMenu()
+
+      expect(screen.getByTestId('apiCardMenuView-my-api')).toBeInTheDocument()
+      expect(screen.queryByTestId('apiCardMenuEdit-my-api')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('apiCardMenuDelete-my-api')).not.toBeInTheDocument()
     })
   })
 })
