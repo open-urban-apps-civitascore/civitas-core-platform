@@ -141,7 +141,7 @@ const concat: MappingTransformDef = {
   description: 'transforms.concat.description',
   icon: Combine,
   inputs: concatInputPorts(2),
-  outputs: [scalar('out', 'out', 'str')],
+  outputs: [scalar('out', 'str', 'str')],
   config: [
     {
       key: 'separator',

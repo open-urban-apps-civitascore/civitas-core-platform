@@ -1419,7 +1419,7 @@
           }
         },
         "concat": {
-          "description": "Concatenate two or more values.",
+          "description": "Concatenate two or more scalars into text.",
           "fields": {
             "separator": {
               "label": "Separator"

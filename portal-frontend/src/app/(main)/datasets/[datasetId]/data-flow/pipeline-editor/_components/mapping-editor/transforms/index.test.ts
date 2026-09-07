@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { literalOutputPort } from './index'
+import { literalOutputPort, mappingRegistry } from './index'
+
+describe('output ports', () => {
+  it('label every output port with the subtype it produces', () => {
+    for (const def of mappingRegistry.list) {
+      for (const port of def.outputs) {
+        expect(port.label, `output of ${def.type}`).toBe(port.dataType)
+      }
+    }
+  })
+})
 
 describe('literalOutputPort', () => {
   it('labels a primitive port with its engine subtype', () => {

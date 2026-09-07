@@ -1406,7 +1406,7 @@
           }
         },
         "concat": {
-          "description": "Zwei oder mehr Werte verketten.",
+          "description": "Zwei oder mehr Skalare zu Text verketten.",
           "fields": {
             "separator": {
               "label": "Trennzeichen"
