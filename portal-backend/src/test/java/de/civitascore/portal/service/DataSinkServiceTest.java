@@ -2,12 +2,14 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -302,6 +304,47 @@ class DataSinkServiceTest {
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Referenced DataStructure is not available");
       verify(dataSinkRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("An unauthorized structure and an unknown one fail identically, field for field")
+    void unauthorizedAndUnknownStructureAreIndistinguishable() {
+      // Substring checks on each path separately would still pass if the two responses differed.
+      // The property is that a caller cannot tell them apart, so the two are compared to each
+      // other across every outward-visible field.
+      InvalidInputException whenUnauthorized =
+          captureFailure(
+              () ->
+                  doThrow(new AccessDeniedException("denied"))
+                      .when(scopeAccessAuthorizer)
+                      .authorizeReferences(eq(ScopeType.DATASTRUCTURE), any()));
+
+      InvalidInputException whenUnknown =
+          captureFailure(
+              () ->
+                  when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(any()))
+                      .thenReturn(Optional.empty()));
+
+      assertThat(whenUnauthorized.getClass()).isEqualTo(whenUnknown.getClass());
+      assertThat(whenUnauthorized.getMessage()).isEqualTo(whenUnknown.getMessage());
+      assertThat(whenUnauthorized.getResourceType()).isEqualTo(whenUnknown.getResourceType());
+      assertThat(whenUnauthorized.getResourceId()).isEqualTo(whenUnknown.getResourceId());
+      assertThat(whenUnauthorized.getResourceInfo()).isEqualTo(whenUnknown.getResourceInfo());
+      // The URN is what a probing caller would vary, so it must not be echoed back.
+      assertThat(whenUnauthorized.getMessage()).doesNotContain(ELEMENT_URN);
+    }
+
+    /** Runs a create whose only difference is {@code arrangeFailure}, and returns what it threw. */
+    private InvalidInputException captureFailure(Runnable arrangeFailure) {
+      reset(
+          dataSinkMapper, dataSetRepository, dataStructureVersionRepository, scopeAccessAuthorizer);
+      UUID dataSetId = UUID.randomUUID();
+      DataSinkInputDTO input = postgisInput(dataSetId);
+      when(dataSinkMapper.toEntity(any())).thenReturn(new DataSink());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      arrangeFailure.run();
+
+      return catchThrowableOfType(InvalidInputException.class, () -> dataSinkService.create(input));
     }
   }
 

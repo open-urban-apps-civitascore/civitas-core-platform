@@ -610,8 +610,9 @@ class ViewServiceTest {
         // resolves an absolute CORE-URN $ref by finding an embedded resource whose $id
         // equals that URN. So for the bundle to be self-contained, the set of CORE-URN
         // $ref values must be a subset of the set of $id values present in the document.
-        // (Verified end-to-end against a real Draft 2020-12 validator in the integration
-        // run; here we assert the structural invariant deterministically.)
+        // Resolution itself is verified against a stock Draft 2020-12 validator that may load
+        // nothing, in BundledViewSelfContainmentDatabaseTest; here we assert the structural
+        // invariant deterministically.
 
         private void assertSelfContained(JsonNode bundle) {
             Set<String> ids  = new java.util.HashSet<>();
