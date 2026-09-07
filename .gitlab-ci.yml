@@ -25,6 +25,30 @@ include:
       stage: qa
   - template: Jobs/Secret-Detection.gitlab-ci.yml
 
+# The api test runs portal-backend, config-adapter and authz as one stack, and a component the
+# pipeline does not build is pulled from the registry instead. The build chains of all three
+# therefore share this trigger, so the stack is built from one commit rather than mixing a fresh
+# backend with previously published components that answer a contract they share at runtime.
+# The test, publish, scan and deploy jobs of each component keep their own narrower triggers.
+.api-test-stack-changes:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - portal-backend/**/*
+        - config-adapter/**/*
+        - authz/**/*
+        - api/portal-backend/bruno-api/**/*
+        - dev-environment/ci/**/*
+        - dev-environment/apisix/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/backend.yml
+        - .gitlab/ci/config-adapter.yml
+        - .gitlab/ci/authz.yml
+
 # Setup job to determine version from git for all jobs
 setup-version:
   image: alpine:latest
