@@ -116,6 +116,16 @@ describe('useDatasetPermissions', () => {
       },
     )
 
+    it.each([
+      [DATASET_STATUS_TYPES.DRAFT, { isDraft: true, isReady: false }],
+      [DATASET_STATUS_TYPES.READY, { isDraft: false, isReady: true }],
+      [DATASET_STATUS_TYPES.AVAILABLE, { isDraft: false, isReady: false }],
+    ])('reports the status flags of a %s dataset', (dataSetStatus, expected) => {
+      mockTenantPermissions(ALL_PERMISSIONS)
+      const { isDraft, isReady } = renderPermissions({ dataSetStatus })
+      expect({ isDraft, isReady }).toEqual(expected)
+    })
+
     it('keeps the data structure entry points open on a released dataset', () => {
       mockTenantPermissions(ALL_PERMISSIONS)
       expect(renderPermissions({ dataSetStatus: DATASET_STATUS_TYPES.AVAILABLE }).canReadDatastructures).toBe(true)
@@ -334,16 +344,24 @@ describe('useDatasetPermissions', () => {
   describe('loading', () => {
     it('denies everything while the current user is still loading', () => {
       mockPermissionsLoading()
-      const { isDraft, canReadDatastructures, ...scopedFlags } = renderPermissions()
+      const { isDraft, isReady, canReadDatastructures, ...scopedFlags } = renderPermissions()
       expect(scopedFlags).toEqual(scopedFlagsDenied)
-      expect({ isDraft, canReadDatastructures }).toEqual({ isDraft: true, canReadDatastructures: false })
+      expect({ isDraft, isReady, canReadDatastructures }).toEqual({
+        isDraft: true,
+        isReady: false,
+        canReadDatastructures: false,
+      })
     })
 
     it('denies every dataset-scoped flag without a dataset, even with every permission', () => {
       mockTenantPermissions(ALL_PERMISSIONS)
-      const { isDraft, canReadDatastructures, ...scopedFlags } = renderWithoutDataset()
+      const { isDraft, isReady, canReadDatastructures, ...scopedFlags } = renderWithoutDataset()
       expect(scopedFlags).toEqual(scopedFlagsDenied)
-      expect({ isDraft, canReadDatastructures }).toEqual({ isDraft: false, canReadDatastructures: true })
+      expect({ isDraft, isReady, canReadDatastructures }).toEqual({
+        isDraft: false,
+        isReady: false,
+        canReadDatastructures: true,
+      })
     })
   })
 })
@@ -386,11 +404,12 @@ describe('useDatasetPermissionsById', () => {
     mockTenantPermissions(ALL_PERMISSIONS)
     mockDatasetUnavailable()
     const { result } = renderHook(() => useDatasetPermissionsById(DATASET_ID))
-    const { isLoading, isDraft, canReadDatastructures, ...scopedFlags } = result.current
+    const { isLoading, isDraft, isReady, canReadDatastructures, ...scopedFlags } = result.current
     expect(scopedFlags).toEqual(scopedFlagsDenied)
-    expect({ isLoading, isDraft, canReadDatastructures }).toEqual({
+    expect({ isLoading, isDraft, isReady, canReadDatastructures }).toEqual({
       isLoading: false,
       isDraft: false,
+      isReady: false,
       canReadDatastructures: true,
     })
   })
@@ -447,6 +466,7 @@ describe('useDatasetPermissionsById', () => {
     const { result } = renderHook(() => useDatasetPermissionsById(DATASET_ID))
     expect(result.current).toEqual({
       isDraft: true,
+      isReady: false,
       canRead: true,
       canRelease: true,
       canReadDatastructures: true,

@@ -19,11 +19,9 @@ import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { usePermissions } from '@/hooks/use-permissions'
+import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
-import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
-import { PERMISSION_NAMES } from '@/types/currentUser'
-import { Dataset, DATASET_STATUS_TYPES } from '@/types/datasets'
+import { Dataset } from '@/types/datasets'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 
 type AssignmentsListProps = {
@@ -38,27 +36,8 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const isDraft = dataset.dataSetStatus === DATASET_STATUS_TYPES.DRAFT
-  const isReady = dataset.dataSetStatus === DATASET_STATUS_TYPES.READY
-  const isAvailable = dataset.dataSetStatus === DATASET_STATUS_TYPES.AVAILABLE
-
-  const { hasScopedPermission, hasPermission } = usePermissions()
-  const canUpdateDataset = hasScopedPermission(
-    PERMISSION_NAMES.DATASET_UPDATE,
-    ASSIGNMENT_SCOPE_TYPES.DATASET,
-    dataset.id,
-    dataset.datapool?.id,
-  )
-  const canReleaseDataset = hasScopedPermission(
-    PERMISSION_NAMES.DATASET_RELEASE,
-    ASSIGNMENT_SCOPE_TYPES.DATASET,
-    dataset.id,
-    dataset.datapool?.id,
-  )
-  const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
-  const canEdit = isAvailable
-    ? canUpdateDataset && canReadDatastructures && canReleaseDataset
-    : canUpdateDataset && canReadDatastructures
+  const { isDraft, isReady, canEditMetadata, canReadDatastructures } = useDatasetPermissions(dataset)
+  const canEdit = canEditMetadata && canReadDatastructures
 
   const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
   const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit' || !canEdit)

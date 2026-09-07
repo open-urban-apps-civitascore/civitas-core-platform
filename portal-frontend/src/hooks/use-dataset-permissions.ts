@@ -10,6 +10,7 @@ export type DatasetPermissionSubject = Pick<Dataset, 'id' | 'dataSetStatus' | 'd
 
 export interface DatasetPermissions {
   isDraft: boolean
+  isReady: boolean
   canRead: boolean
   canRelease: boolean
   canReadDatastructures: boolean
@@ -27,6 +28,7 @@ export const useDatasetPermissions = (dataset: DatasetPermissionSubject | undefi
   const { hasPermission, hasScopedPermission } = usePermissions()
 
   const isDraft = dataset?.dataSetStatus === DATASET_STATUS_TYPES.DRAFT
+  const isReady = dataset?.dataSetStatus === DATASET_STATUS_TYPES.READY
   const isAvailable = dataset?.dataSetStatus === DATASET_STATUS_TYPES.AVAILABLE
 
   const scoped = (permission: PermissionName) =>
@@ -55,6 +57,7 @@ export const useDatasetPermissions = (dataset: DatasetPermissionSubject | undefi
 
   return {
     isDraft,
+    isReady,
     canRead,
     canRelease,
     canReadDatastructures,
