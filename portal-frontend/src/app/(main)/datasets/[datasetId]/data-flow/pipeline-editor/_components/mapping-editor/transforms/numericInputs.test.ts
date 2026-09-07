@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import messages from '@/messages/de.json'
+
 import { NUMERIC_SUBTYPES } from '../_types'
 import { mappingRegistry } from './index'
 
@@ -36,6 +38,43 @@ describe('date conversion inputs', () => {
   it('format accepts both date and datetime sources', () => {
     expect(mappingRegistry.byType['format'].inputs[0].accepts).toEqual(['date', 'datetime'])
     expect(mappingRegistry.byType['format'].outputs[0].dataType).toBe('str')
+  })
+})
+
+describe('displayed input types match the accepted subtypes', () => {
+  const transformMessages = messages.pipelineEditor.mappingEditor.transforms
+  const restricted = mappingRegistry.list.flatMap(def =>
+    def.inputs.filter(port => port.accepts).map(port => ({ type: def.type, port })),
+  )
+
+  it('only toInt, toFloat, toDate, toDateTime and format restrict their input', () => {
+    expect(restricted.map(entry => entry.type)).toEqual(['toInt', 'toFloat', 'toDate', 'toDateTime', 'format'])
+  })
+
+  it('each port label lists exactly the accepted subtypes', () => {
+    for (const { type, port } of restricted) {
+      expect(port.label, `label of ${type}`).toBe(port.accepts?.join(' / '))
+    }
+  })
+
+  it('each palette description starts with the accepted subtypes', () => {
+    for (const { type, port } of restricted) {
+      const description = transformMessages[type as keyof typeof transformMessages].description
+      expect(description, `description of ${type}`).toMatch(`${port.accepts?.join(' / ')} →`)
+    }
+  })
+
+  it('toInt and toNumber show the same label, because both take the same subtypes', () => {
+    expect(mappingRegistry.byType['toInt'].inputs[0].label).toBe('str / int / number')
+    expect(mappingRegistry.byType['toFloat'].inputs[0].label).toBe('str / int / number')
+  })
+
+  it('toUuid has no accepts but one exact subtype, and shows that subtype', () => {
+    expect(mappingRegistry.byType['toUuid'].inputs[0].label).toBe('str')
+  })
+
+  it('toString has neither, and shows "any scalar"', () => {
+    expect(mappingRegistry.byType['toString'].inputs[0].label).toBe('any scalar')
   })
 })
 

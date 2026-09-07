@@ -23,6 +23,10 @@ export interface MappingTransformDef extends TransformDef {
 const scalar = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'scalar', dataType })
 const geometry = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'geometry', dataType })
 
+/** Port label for a conversion input, derived from what the port actually accepts. */
+const inputLabel = (inSubtype?: string, accepts?: readonly string[]): string =>
+  accepts?.join(' / ') ?? inSubtype ?? 'any scalar'
+
 /** stringConcat is variadic; ports are grown on demand and persisted on the node. */
 export const concatInputPorts = (count: number): PortDef[] =>
   Array.from({ length: Math.max(2, count) }, (_, i) => scalar(`in${i}`, `value ${i + 1}`))
@@ -36,7 +40,6 @@ const patternField: ConfigField = {
 
 /**
  * Build a conversion node definition.
- * @param inLabel  Human-readable label for the input port (e.g. "str/int")
  * @param inSubtype  The actual primitive subtype for type-matching (undefined = accepts any scalar)
  * @param outSubtype The actual primitive subtype produced
  * @param label  Display label for the node; defaults to the op name. Decoupled from `op` so the
@@ -46,7 +49,6 @@ const patternField: ConfigField = {
  */
 const conversion = (
   type: ConversionOp,
-  inLabel: string,
   inSubtype: string | undefined,
   outSubtype: string,
   icon: LucideIcon,
@@ -59,7 +61,7 @@ const conversion = (
   label,
   description: `transforms.${type}.description`,
   icon,
-  inputs: [{ ...scalar('in', inLabel, inSubtype), ...(accepts ? { accepts } : {}) }],
+  inputs: [{ ...scalar('in', inputLabel(inSubtype, accepts), inSubtype), ...(accepts ? { accepts } : {}) }],
   outputs: [scalar('out', outSubtype, outSubtype)],
   config,
   op: type,
@@ -182,23 +184,16 @@ const geoPoint: MappingTransformDef = {
  * Conversion nodes
  */
 const conversions: MappingTransformDef[] = [
-  // toString: accepts any scalar (no subtype restriction on input), produces str
-  conversion('toString', 'any scalar', undefined, 'str', Type),
-  // toInt: accepts only numerically-parseable scalars (str/int/number), produces int
-  conversion('toInt', 'str / number', undefined, 'int', Binary, [], 'toInt', NUMERIC_SUBTYPES),
-  // toFloat: accepts only numerically-parseable scalars (str/int/number), produces number. Wire op
-  // stays 'toFloat' (backend contract); only the display label is 'toNumber'.
-  conversion('toFloat', 'str / int', undefined, 'number', Binary, [], 'toNumber', NUMERIC_SUBTYPES),
-  // toUuid: accepts str, produces uuid. No RecordPath function backs it — the value is passed
-  // through and the sink parses it. A uuid source needs no transform; it matches a uuid target
-  // directly.
-  conversion('toUuid', 'str', 'str', 'uuid', Fingerprint),
-  // toDate: accepts str and date, produces date
-  conversion('toDate', 'str / date', undefined, 'date', Calendar, [patternField], 'toDate', ['str', 'date']),
-  // toDateTime: accepts str and datetime, produces datetime
+  conversion('toString', undefined, 'str', Type),
+  conversion('toInt', undefined, 'int', Binary, [], 'toInt', NUMERIC_SUBTYPES),
+  // Wire op stays 'toFloat' (backend contract); only the display label is 'toNumber'.
+  conversion('toFloat', undefined, 'number', Binary, [], 'toNumber', NUMERIC_SUBTYPES),
+  // No RecordPath function backs toUuid — the value is passed through and the sink parses it.
+  // A uuid source needs no transform; it matches a uuid target directly.
+  conversion('toUuid', 'str', 'uuid', Fingerprint),
+  conversion('toDate', undefined, 'date', Calendar, [patternField], 'toDate', ['str', 'date']),
   conversion(
     'toDateTime',
-    'str / datetime',
     undefined,
     'datetime',
     Clock,
@@ -212,11 +207,8 @@ const conversions: MappingTransformDef[] = [
     'toDateTime',
     ['str', 'datetime'],
   ),
-  // format: accepts date and datetime, produces str — reuse patternField but with the format-specific
-  // translation key
   conversion(
     'format',
-    'date / datetime',
     undefined,
     'str',
     CalendarClock,

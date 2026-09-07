@@ -1417,16 +1417,16 @@
           "description": "beliebiger Skalar → str"
         },
         "toInt": {
-          "description": "str / number → int"
+          "description": "str / int / number → int"
         },
         "toFloat": {
-          "description": "str / int → number"
+          "description": "str / int / number → number"
         },
         "toUuid": {
           "description": "str → uuid"
         },
         "toDate": {
-          "description": "str → date",
+          "description": "str / date → date",
           "fields": {
             "pattern": {
               "label": "Eingabeformat"
@@ -1434,7 +1434,7 @@
           }
         },
         "toDateTime": {
-          "description": "str → datetime",
+          "description": "str / datetime → datetime",
           "fields": {
             "pattern": {
               "label": "Eingabeformat"
