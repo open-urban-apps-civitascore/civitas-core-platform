@@ -1,0 +1,55 @@
+meta {
+  name: Bundle pipeline with unknown name ref → 400
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/imports/datasets
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Bruno Flow Kaputtes Bundle",
+    "description": "Pipeline references a source name the bundle does not ship",
+    "dataStructures": [],
+    "dataSources": [],
+    "pipelines": [
+      {
+        "name": "Verwaiste Pipeline",
+        "model": {
+          "nodes": [
+            { "id": "n1", "kind": "source", "sourceRef": "Quelle die es nicht gibt" }
+          ],
+          "edges": []
+        }
+      }
+    ]
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("rejects the unresolvable name reference", function() {
+    expect(res.status).to.equal(400);
+    expect(res.body.detail).to.include('not part of this bundle');
+  });
+}
+
+docs {
+  Historical note: until the pipeline increment this file asserted the explicit
+  400 for not-yet-supported bundle parts. Every part is supported now, so the
+  file keeps its slot and guards the new failure mode instead: a pipeline graph
+  may reference bundle members by name, and an unknown name must fail the whole
+  install with a message naming the reference — not install a dangling graph.
+
+  The transaction property matters here: the dataset shell IS created before
+  pipelines resolve, so a 400 from this guard must leave no dataset behind.
+  A stray "Bruno Flow Kaputtes Bundle" dataset appearing in the portal after
+  this test means the rollback is broken.
+}

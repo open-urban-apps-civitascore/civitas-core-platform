@@ -2,16 +2,21 @@ package de.civitascore.portal.model.output.assembler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
+import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
+import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +33,8 @@ class DataSinkAssemblerTest {
 
   @Mock private DataSinkMapper dataSinkMapper;
   @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private DataStructureVersionRepository dataStructureVersionRepository;
+  @Mock private DataStructureVersionMapper dataStructureVersionMapper;
 
   @InjectMocks private DataSinkAssembler assembler;
 
@@ -132,6 +139,44 @@ class DataSinkAssemblerTest {
       PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
       assertThat(config.getTableName()).isEqualTo("traffic_data");
       assertThat(config.getElement()).isEqualTo(elementUrn);
+    }
+
+    @Test
+    @DisplayName("Should resolve the element URN to a nested structure-version summary")
+    void shouldResolveStructureVersionSummary() {
+      String elementUrn =
+          "urn:core:standard:openurbanapps:datastructure:mobility:verkehrsmessung:70dn2lp8jo:1.0.0";
+      DataStructureVersion version = new DataStructureVersion();
+      DataStructureVersionSummaryDTO summary = new DataStructureVersionSummaryDTO();
+      summary.setId(UUID.randomUUID());
+      summary.setDataStructureId(UUID.randomUUID());
+      when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(elementUrn))
+          .thenReturn(Optional.of(version));
+      when(dataStructureVersionMapper.toSummary(version)).thenReturn(summary);
+      DataSink entity =
+          sinkWithPipeline(DataSinkType.POSTGIS, Map.of("tableName", "t", "element", elementUrn));
+
+      DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
+
+      PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
+      assertThat(config.getDataStructureVersion()).isSameAs(summary);
+    }
+
+    @Test
+    @DisplayName("Should leave the summary absent when the element URN resolves to no version")
+    void shouldLeaveSummaryAbsentOnDanglingElement() {
+      String elementUrn = "urn:core:platform:civitas:datastructure:common:gone:x:1.0.0";
+      when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(elementUrn))
+          .thenReturn(Optional.empty());
+      DataSink entity =
+          sinkWithPipeline(DataSinkType.POSTGIS, Map.of("tableName", "t", "element", elementUrn));
+
+      DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
+
+      // The listing must survive a dangling reference; only the summary is missing.
+      PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
+      assertThat(config.getElement()).isEqualTo(elementUrn);
+      assertThat(config.getDataStructureVersion()).isNull();
     }
 
     @Test

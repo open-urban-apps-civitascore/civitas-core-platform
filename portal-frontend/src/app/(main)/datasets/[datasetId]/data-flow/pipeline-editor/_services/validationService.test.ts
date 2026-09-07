@@ -144,6 +144,38 @@ describe('validateMappingCoversRequiredTargetFields', () => {
     const result = validatePipeline(pipelineWith([mappingNode({}, undefined, false)]))
     expect(result.errors.some(error => error.messageKey === MAPPING_NOT_SAVED_KEY)).toBe(false)
   })
+
+  it('does not report a mapping that references an installed artifact (bundle-import hydration)', () => {
+    // The hydrated shape: configured through the ref, empty editor config, no snapshot — the
+    // mapping's content lives behind mappingRef in the registry, so "never saved" would be wrong.
+    const installed: TestNode = {
+      id: 'map-1',
+      type: 'mapping',
+      data: {
+        label: 'Mapping',
+        configured: true,
+        mappingConfig: { fields: {}, positions: {} },
+        mappingRef: 'urn:core:standard:openurbanapps:mapping:environment:luftmessungzuobservation:uktwf8tdur:1.0.0',
+      },
+    }
+    const result = validatePipeline(pipelineWith([installed]))
+    expect(result.errors.some(error => error.messageKey === MAPPING_NOT_SAVED_KEY)).toBe(false)
+  })
+
+  it('still reports an unsaved mapping once editor fields exist despite the ref', () => {
+    const edited: TestNode = {
+      id: 'map-1',
+      type: 'mapping',
+      data: {
+        label: 'Mapping',
+        configured: true,
+        mappingConfig: { fields: { '$.result': '$.value' }, positions: {} },
+        mappingRef: 'urn:core:standard:openurbanapps:mapping:environment:luftmessungzuobservation:uktwf8tdur:1.0.0',
+      },
+    }
+    const result = validatePipeline(pipelineWith([edited]))
+    expect(result.errors.some(error => error.messageKey === MAPPING_NOT_SAVED_KEY)).toBe(true)
+  })
 })
 
 // Skipped while validateFrostMappingCoversStaGroups is commented out of VALIDATION_RULES.

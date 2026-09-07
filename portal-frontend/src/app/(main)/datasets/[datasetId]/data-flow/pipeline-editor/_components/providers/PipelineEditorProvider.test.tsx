@@ -7,6 +7,7 @@ import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
+  useGetDataSinks,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
@@ -67,6 +68,7 @@ vi.mock('@/app/services/api/datasets/clientRequests', () => ({
 vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useCreateDataSink: vi.fn(),
   useDeleteDataSink: vi.fn(),
+  useGetDataSinks: vi.fn(),
   useUpdateDataSink: vi.fn(),
 }))
 
@@ -228,6 +230,11 @@ beforeEach(() => {
     mutateAsync: vi.fn(),
     isPending: false,
   } as unknown as ReturnType<typeof useDeletePipeline>)
+
+  vi.mocked(useGetDataSinks).mockReturnValue({
+    data: { data: [] },
+    isPending: false,
+  } as unknown as ReturnType<typeof useGetDataSinks>)
 
   vi.mocked(useCreateDataSink).mockReturnValue({
     mutate: vi.fn(),

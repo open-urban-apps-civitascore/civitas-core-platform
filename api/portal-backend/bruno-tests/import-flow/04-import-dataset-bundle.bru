@@ -1,0 +1,86 @@
+meta {
+  name: Import Dataset Bundle (create + reuse)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/imports/datasets
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Bruno Flow Use Case",
+    "description": "Bundle: one reused structure (from 01), one new, one source",
+    "dataStructures": [
+      {
+        "name": "Bruno Flow Struktur",
+        "description": "Identical to 01 — must resolve to REUSED",
+        "model": {
+          "$id": "urn:core:standard:openurbanapps:datastructure:test:brunoflow:r{{runId}}",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "value": { "type": "number" },
+            "measuredAt": { "type": "string" }
+          }
+        }
+      },
+      {
+        "name": "Bruno Flow Bundle-Struktur",
+        "description": "New in this bundle — must be CREATED",
+        "model": {
+          "$id": "urn:core:standard:openurbanapps:datastructure:test:brunobundle:r{{runId}}",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "count": { "type": "integer" }
+          }
+        }
+      }
+    ],
+    "dataSources": [
+      {
+        "name": "Bruno Flow Quelle",
+        "description": "References the bundled structure by logical URN",
+        "dataStructureUrn": "urn:core:standard:openurbanapps:datastructure:test:brunobundle:r{{runId}}"
+      }
+    ]
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar('importedDataSetId', res.body.dataSetId);
+  }
+}
+
+tests {
+  test("creates the dataset shell", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.dataSetId).to.be.a('string');
+    expect(res.body.dataSetName).to.equal("Bruno Flow Use Case");
+  });
+  test("resolves structures as REUSED + CREATED", function() {
+    const actions = res.body.dataStructures.map(s => s.action);
+    expect(actions).to.include('REUSED');
+    expect(actions).to.include('CREATED');
+  });
+  test("wires the source to the bundled structure", function() {
+    expect(res.body.dataSources).to.have.length(1);
+  });
+}
+
+docs {
+  The bundle semantics in one call: a structure whose URN identity is already
+  installed with identical content is REUSED (two use cases sharing one
+  Fachmodell is the point of URN identity); an unknown URN is CREATED; the
+  source resolves its dataStructureUrn against the bundle map first.
+  Depends on 01 (the reused structure).
+}

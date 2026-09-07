@@ -1,6 +1,7 @@
 package de.civitascore.portal.model.output.assembler;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
+import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.datasink.DataSinkConfigurationOutput;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
@@ -8,6 +9,7 @@ import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -33,6 +35,8 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
 
   private final DataSinkMapper dataSinkMapper;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final DataStructureVersionRepository dataStructureVersionRepository;
+  private final DataStructureVersionMapper dataStructureVersionMapper;
 
   /** {@inheritDoc} Delegates to the {@link DataSinkMapper} for basic field mapping. */
   @Override
@@ -125,6 +129,13 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     output.setTableName((String) raw.get("tableName"));
     if (raw.get("element") instanceof String element) {
       output.setElement(element);
+      // The document stores the structure reference as a URN, but the OWS named-API editor
+      // needs the version's database ids to fetch it. A dangling URN leaves the summary
+      // absent rather than failing every sink listing over one unresolvable reference.
+      dataStructureVersionRepository
+          .findFirstByModelUrnStartingWith(element)
+          .map(dataStructureVersionMapper::toSummary)
+          .ifPresent(output::setDataStructureVersion);
     }
     return output;
   }

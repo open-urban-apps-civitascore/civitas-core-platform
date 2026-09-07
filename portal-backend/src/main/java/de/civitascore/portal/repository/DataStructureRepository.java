@@ -21,4 +21,14 @@ public interface DataStructureRepository extends NamedEntityRepository<DataStruc
   @EntityGraph(attributePaths = {"dataStructureVersions"})
   @Override
   @NonNull Optional<DataStructure> findById(@NonNull UUID id);
+
+  /**
+   * Whether any data structure shell already pins the given logical model URN. Used by the import
+   * endpoint to reject re-imports of an already installed model identity (names are not unique; the
+   * URN is the only identity shared between catalogue, registry and shell).
+   *
+   * @param modelLogicalUrn the logical (version-free) CORE URN
+   * @return true if a shell with this pin exists
+   */
+  boolean existsByModelLogicalUrn(String modelLogicalUrn);
 }

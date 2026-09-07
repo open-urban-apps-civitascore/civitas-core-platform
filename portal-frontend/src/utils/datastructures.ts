@@ -1,3 +1,4 @@
+import { importDiagramFromJsonSchema } from '@/components/uml-modeler/services/jsonSchemaImportService'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
 import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { DirtyField } from '@/components/uml-modeler/types/session'
@@ -28,6 +29,9 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
     const highestVersion: DatastructureVersionSummary | null =
       datastructure.dataStructureVersions.reduce<DatastructureVersionSummary | null>((highest, current) => {
         if (!highest) return current
+        // Drafts without a version number sort lowest.
+        if (current.version === null) return highest
+        if (highest.version === null) return current
         return current.version.localeCompare(highest.version, undefined, { numeric: true }) > 0 ? current : highest
       }, null)
     return {
@@ -43,7 +47,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       versions: datastructure.dataStructureVersions.map(version => ({
         id: version.id,
         versionNumber: version.version,
-        name: `Version ${version.version}`,
+        name: `Version ${version.version ?? '—'}`,
         description: version.description || '-',
         status: version.dataStructureVersionStatus,
         source: version.dataStructureVersionSource,
@@ -58,8 +62,9 @@ export const mapDatastructureVersionsApiToListData = (
 ): DatastructureVersionsListData[] =>
   versions.map(version => ({
     id: version.id,
-    versionNumber: version.version,
-    name: `Version ${version.version}`,
+    // A draft saved without a model has no version number yet — render a placeholder.
+    versionNumber: version.version ?? '—',
+    name: `Version ${version.version ?? '—'}`,
     description: version.description || '-',
     status: version.dataStructureVersionStatus,
     source: version.dataStructureVersionSource,
@@ -67,7 +72,8 @@ export const mapDatastructureVersionsApiToListData = (
 
 export const mapDatastructureVersionApiToFormData = (version: DatastructureVersion): DatastructureVersionFormData => ({
   id: version.id,
-  version: version.version,
+  // Empty string keeps the form schema's required/SemVer validation in charge for drafts.
+  version: version.version ?? '',
   description: version.description || '',
   dataStructureVersionStatus: version.dataStructureVersionStatus,
   dataStructureVersionSource: version.dataStructureVersionSource,
@@ -111,7 +117,14 @@ export const buildSessionFromVersion = (
   sessionId?: string,
   created?: Date,
 ) => {
-  const diagram = versionData?.styles || null
+  // Hydration, strictly as a gap-filler: bundle-imported versions carry only the JSON-Schema
+  // model, no drawn diagram — rebuild one from the model so the canvas is not empty. A version
+  // WITH styles is never touched. Viewing loses nothing (the stored model stays as-is); only
+  // saving a NEW version from a hydrated diagram re-exports the schema from UML and drops
+  // schema-only detail the diagram cannot carry (see jsonSchemaImportService).
+  const diagram =
+    versionData?.styles ||
+    (versionData?.model ? importDiagramFromJsonSchema(versionData.model, versionData.modelName || undefined) : null)
   const modelName = versionData?.modelName || null
   const fallbackSession = createEmptySession(modelName || undefined)
 

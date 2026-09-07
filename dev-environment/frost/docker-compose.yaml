@@ -44,6 +44,11 @@ services:
       - POSTGRES_DB=sensorthings
       - POSTGRES_USER=sensorthings
       - POSTGRES_PASSWORD=${FROST_DB_PASSWORD}
+    ports:
+      # Host 5435 for local DB tooling (DBeaver, psql from the host); inside the
+      # compose network FROST keeps using database:5432. 5432/5433/5434 belong to
+      # the portal, Keycloak and GeoServer databases, 5544 to the demo source DB.
+      - "5435:5432"
     volumes:
       - postgis_volume:/var/lib/postgresql/data
     healthcheck:

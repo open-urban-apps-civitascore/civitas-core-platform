@@ -1,0 +1,30 @@
+meta {
+  name: Cleanup — uninstall the pipeline bundle
+  type: http
+  seq: 15
+}
+
+delete {
+  url: {{baseUrl}}/installations/{{pipelineInstallationId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("bundle uninstalled", function() {
+    expect(res.status).to.equal(204);
+  });
+}
+
+docs {
+  Cleanup via the real feature: the bundle uninstall tears down everything 14
+  created, in reverse touch order — pipeline, sink, dataset (with the explicit
+  manifest repair for the upstream postDelete bypass), source (unreleased
+  first, mirroring the import's implicit release) and structure. Unlike the
+  old direct dataset delete this leaves NO registry orphans behind, so
+  repeated runs no longer accumulate artifacts.
+}

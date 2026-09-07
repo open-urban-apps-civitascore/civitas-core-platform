@@ -3,6 +3,7 @@ package de.civitascore.modelforge.persistence.postgres;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
+import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.RegistryUnavailableException;
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
 import de.civitascore.modelforge.core.port.ArtifactSearchCriteria;
@@ -141,6 +142,39 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     public String storeDataStructure(String urn, JsonNode manifest, VersionBump bump) {
         return writeArtifact(UrnParser.logicalUrn(urn), RegistryMapping.TYPE_DATASTRUCTURE, RegistryMapping.FORMAT_CORE_JSON,
             RegistryMapping.CONTENT_TYPE_JSON, writeJson(manifest), null, ReferenceExtraction.dataStructureRefs(manifest), bump, null, null, null, false);
+    }
+
+    @Override
+    public String storeAt(ArtifactKind kind, String urn, JsonNode content, VersionBump bump,
+                           String explicitVersion) {
+        // The envelope import's write: same per-kind routing as the plain store methods, plus the
+        // explicitVersion escape hatch writeArtifact already provides for the Element/XSD imports.
+        String logical = UrnParser.logicalUrn(urn);
+        return switch (kind) {
+            case MAPPING -> writeArtifact(urns.mappingUrn(logical), RegistryMapping.TYPE_MAPPING,
+                RegistryMapping.FORMAT_CORE_JSON, RegistryMapping.CONTENT_TYPE_JSON,
+                writeJson(content), null, ReferenceExtraction.mappingRefs(content), bump,
+                explicitVersion, null, null, false);
+            case PIPELINE -> writeArtifact(urns.pipelineUrn(logical), RegistryMapping.TYPE_PIPELINE,
+                RegistryMapping.FORMAT_CORE_JSON, RegistryMapping.CONTENT_TYPE_JSON,
+                writeJson(content), null, ReferenceExtraction.pipelineRefs(content), bump,
+                explicitVersion, null, null, false);
+            case DATA_SOURCE -> writeArtifact(urns.dataSourceUrn(logical), RegistryMapping.TYPE_DATASOURCE,
+                RegistryMapping.FORMAT_CORE_JSON, RegistryMapping.CONTENT_TYPE_JSON,
+                writeJson(content), null, ReferenceExtraction.dataSourceRefs(content), bump,
+                explicitVersion, null, null, false);
+            case DATA_SINK -> writeArtifact(urns.dataSinkUrn(logical), RegistryMapping.TYPE_DATASINK,
+                RegistryMapping.FORMAT_CORE_JSON, RegistryMapping.CONTENT_TYPE_JSON,
+                writeJson(content), null, ReferenceExtraction.dataSinkRefs(content), bump,
+                explicitVersion, null, null, false);
+            case DATA_SET -> writeArtifact(logical, RegistryMapping.TYPE_DATASET,
+                RegistryMapping.FORMAT_CORE_JSON, RegistryMapping.CONTENT_TYPE_JSON,
+                writeJson(content), null, ReferenceExtraction.dataSetRefs(content), bump,
+                explicitVersion, null, null, false);
+            case DATA_STRUCTURE, ELEMENT -> throw new IllegalArgumentException(
+                "storeAt covers the opaque CORE kinds; Elements and DataStructures are stored "
+                + "through the schema paths.");
+        };
     }
 
     @Override

@@ -130,7 +130,7 @@ export const getNativeCRSFromDataSink = (
   postgisDatastructures: DatastructureVersion[],
 ): string => {
   const dataSink = postgisDataSinks.find(d => d.id === dataSinkId)
-  const datastructure = postgisDatastructures.find(d => d.id === dataSink?.configuration.dataStructureVersion.id)
+  const datastructure = postgisDatastructures.find(d => d.id === dataSink?.configuration.dataStructureVersion?.id)
   return findNativeCRS(datastructure?.model as SchemaObject | undefined)
 }
 

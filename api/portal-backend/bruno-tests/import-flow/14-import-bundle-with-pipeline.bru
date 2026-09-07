@@ -1,0 +1,116 @@
+meta {
+  name: Import Bundle with Sink and Pipeline (create)
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/imports/datasets
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Bruno Flow Pipeline Use Case",
+    "description": "Full runnable shape: structure, source, sink and the pipeline wiring them",
+    "dataStructures": [
+      {
+        "name": "Bruno Flow Pipelinestruktur",
+        "description": "Target structure the sink persists",
+        "model": {
+          "$id": "urn:core:standard:openurbanapps:datastructure:test:brunopipeline:r{{runId}}",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "count": { "type": "integer" },
+            "measuredAt": { "type": "string" }
+          }
+        }
+      }
+    ],
+    "dataSources": [
+      {
+        "name": "Bruno Flow Pipelinequelle",
+        "description": "Feed the pipeline reads from",
+        "dataStructureUrn": "urn:core:standard:openurbanapps:datastructure:test:brunopipeline:r{{runId}}"
+      }
+    ],
+    "dataSinks": [
+      {
+        "name": "Bruno Flow Tabelle",
+        "dataSinkType": "POSTGIS",
+        "configuration": {
+          "tableName": "bruno_pipeline_r{{runId}}",
+          "element": "urn:core:standard:openurbanapps:datastructure:test:brunopipeline:r{{runId}}"
+        }
+      }
+    ],
+    "pipelines": [
+      {
+        "name": "Bruno Flow Pipeline",
+        "description": "Wires the bundle source into the bundle sink by name",
+        "model": {
+          "nodes": [
+            { "id": "n-source", "kind": "source", "label": "Quelle", "sourceRef": "Bruno Flow Pipelinequelle" },
+            { "id": "n-sink", "kind": "sink", "label": "Tabelle", "sinkRef": "Bruno Flow Tabelle" }
+          ],
+          "edges": [
+            { "id": "e1", "source": "n-source", "target": "n-sink" }
+          ]
+        }
+      }
+    ]
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar('pipelineDataSetId', res.body.dataSetId);
+    bru.setVar('pipelineInstallationId', res.body.installationId);
+  }
+}
+
+tests {
+  test("creates the dataset with sink and pipeline", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.dataSetId).to.be.a('string');
+  });
+  test("sink is created with a minted configuration urn", function() {
+    expect(res.body.dataSinks).to.have.length(1);
+    expect(res.body.dataSinks[0].action).to.equal('CREATED');
+    expect(res.body.dataSinks[0].id).to.be.a('string');
+    expect(res.body.dataSinks[0].urn).to.match(/^urn:core:/);
+  });
+  test("pipeline is created with a minted model urn", function() {
+    expect(res.body.pipelines).to.have.length(1);
+    expect(res.body.pipelines[0].action).to.equal('CREATED');
+    expect(res.body.pipelines[0].id).to.be.a('string');
+    expect(res.body.pipelines[0].urn).to.match(/^urn:core:/);
+  });
+}
+
+docs {
+  The pipeline increment's happy path — the first bundle whose install leaves
+  something runnable behind. Three things are proven here that nothing else
+  covers:
+
+  1. Name references resolve: sourceRef/sinkRef carry bundle-local names, not
+     URNs — the import rewrites them to the minted configuration URNs of the
+     artifacts it just created. Minted-ness is visible in the response: the
+     sink/pipeline urns are urn:core:platform:… (instance-minted), unlike the
+     authored urn:core:standard:openurbanapps:… identities of structure and
+     mapping flows.
+  2. The sink's element arrives as the structure's LOGICAL urn (a bundle cannot
+     know the receiving instance's version) and is accepted — meaning the
+     import resolved it to the versioned model urn before validation.
+  3. The bundle source ends up linked: PipelineService only links AVAILABLE
+     sources, so a 201 proves the import released the DRAFT source on the way.
+
+  Not covered here: releasing the dataset (stage/release stays a separate,
+  permission-gated step — no saga runs during import).
+}

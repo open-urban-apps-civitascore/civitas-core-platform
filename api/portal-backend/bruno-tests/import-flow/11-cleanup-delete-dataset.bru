@@ -1,0 +1,29 @@
+meta {
+  name: Cleanup — delete dataset shell
+  type: http
+  seq: 11
+}
+
+delete {
+  url: {{baseUrl}}/datasets/{{importedDataSetId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("dataset shell removed", function() {
+    expect([200, 204]).to.include(res.status);
+  });
+}
+
+docs {
+  Best-effort cleanup: the dataset shell from 04 is deleted via the regular
+  CRUD endpoint. The imported structures stay (DRAFT, run-unique URNs) —
+  deleting them safely involves the version/registry pin and is left to the
+  portal UI for now. Same for the mapping artifact from 07: deleting the
+  datasets only drops the manifest membership, not the mapping itself.
+}

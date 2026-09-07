@@ -10,7 +10,7 @@ import { LayerFormData } from '@/types/layers'
 import { API_TYPE_QUERY, OwsApiFormData, OwsApiFormSchema } from '@/types/namedApis'
 import { Style } from '@/types/styles'
 
-import { LayerConfig } from './LayerConfig'
+import { getUmlClass, LayerConfig } from './LayerConfig'
 
 const mockStyleList: Style[] = [
   {
@@ -372,5 +372,55 @@ describe('LayerConfig', () => {
       render(<Wrapper layers={[makeLayer({ crs: 'EPSG:4326' })]} selectedLayerIndex={0} isReadOnly />)
       expect(screen.getByRole('button', { name: /geometry.calculateFromCrs/i })).toBeDisabled()
     })
+  })
+})
+
+describe('getUmlClass', () => {
+  const structureModel = {
+    $id: 'urn:core:standard:openurbanapps:datastructure:environment:kiezbaum:f1i2sjhgvq',
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    title: 'Kiez-Baum (Zielformat)',
+    $ref: '#/$defs/KiezBaum',
+    $defs: {
+      KiezBaum: {
+        type: 'object',
+        title: 'KiezBaum',
+        properties: {
+          baumId: { type: 'string', 'x-core-primaryKey': true },
+          standort: { type: 'string' },
+          position: { $ref: 'https://geojson.org/schema/Point.json', crs: 'EPSG:4326' },
+        },
+        required: ['baumId', 'position'],
+      },
+    },
+  }
+
+  it('hydrates the class from the model when no drawn diagram exists (bundle-imported structures)', () => {
+    const version = { ...mockDatastructureVersion, model: structureModel, styles: null }
+    const umlClass = getUmlClass([version], version.id)
+    expect(umlClass?.attributes.map(attr => attr.name)).toEqual(['baumId', 'standort', 'position'])
+  })
+
+  it('prefers the isRoot-flagged node over the arbitrary first node', () => {
+    const node = (id: string, name: string, isRoot?: boolean) => ({
+      id,
+      type: 'class',
+      position: { x: 0, y: 0 },
+      data: { element: { id, name, type: 'class', isRoot, attributes: [], operations: [] }, label: name },
+    })
+    const styles = {
+      id: 'diagram-1',
+      name: 'Zwei Klassen',
+      nodes: [node('a', 'Nebenklasse'), node('b', 'Wurzelklasse', true)],
+      edges: [],
+      lastModified: new Date('2026-01-01'),
+      isDirty: false,
+    }
+    const version = { ...mockDatastructureVersion, styles } as unknown as DatastructureVersion
+    expect(getUmlClass([version], version.id)?.name).toBe('Wurzelklasse')
+  })
+
+  it('returns undefined when the version has neither styles nor a model', () => {
+    expect(getUmlClass([mockDatastructureVersion], mockDatastructureVersion.id)).toBeUndefined()
   })
 })

@@ -29,6 +29,9 @@ for backend_dir in "$BACKENDS_DIR"/*/; do
     dest_dir="$ALLOWALL_DIR/$backend"
     mkdir -p "$dest_dir"
 
+    # Null only the METHOD permissions. Keys starting with "_" are endpoint METADATA —
+    # notably `_open_data`, which policy/open_data.rego reads for the anonymous open-data
+    # grant — and must survive into allow-all mode, or open data silently breaks in dev.
     jq '{
         "_comment": "\(._backend_id) — ALLOW-ALL mode. All endpoints null-permission. DEV-ONLY.",
         "_version": ._version,
@@ -38,8 +41,7 @@ for backend_dir in "$BACKENDS_DIR"/*/; do
             | map({
                 key: .key,
                 value: (.value | to_entries
-                    | map(select(.key | startswith("_") | not))
-                    | map(.value = null)
+                    | map(if (.key | startswith("_")) then . else .value = null end)
                     | from_entries)
             }) | from_entries)
     }' "$src" > "$dest_dir/data.json"

@@ -637,14 +637,26 @@ class DataSinkControllerIntegrationTest
           .contains("tableName")
           .contains("T_ONE")
           .doesNotContain("confirmDataLoss");
-      assertThat(dataSinkRepository.findById(existing.getBody().getId()))
-          .isPresent()
-          .get()
-          .satisfies(s -> assertThat(s.getConfiguration()).containsEntry("tableName", "t_one"));
-      assertThat(dataSinkRepository.findById(created.getBody().getId()))
-          .isPresent()
-          .get()
-          .satisfies(s -> assertThat(s.getConfiguration()).containsEntry("tableName", "t_two"));
+      // The configuration lives in the registry, pinned by the sink's URN — the API projection is
+      // the readable form, so the unchanged names are asserted through it.
+      assertThat(fetchSinkTableName(existing.getBody().getId())).isEqualTo("t_one");
+      assertThat(fetchSinkTableName(created.getBody().getId())).isEqualTo("t_two");
+    }
+
+    /** Reads a sink through the API and returns its registry-served POSTGIS tableName. */
+    private String fetchSinkTableName(UUID sinkId) {
+      ResponseEntity<DataSinkOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + sinkId,
+              HttpMethod.GET,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getConfiguration())
+          .isInstanceOf(PostgisConfigurationOutput.class);
+      return ((PostgisConfigurationOutput) response.getBody().getConfiguration()).getTableName();
     }
 
     @Test

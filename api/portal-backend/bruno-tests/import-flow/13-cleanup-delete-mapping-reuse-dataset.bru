@@ -1,0 +1,25 @@
+meta {
+  name: Cleanup — delete mapping reuse dataset (08)
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{baseUrl}}/datasets/{{mappingReuseDataSetId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("reuse dataset shell removed", function() {
+    expect([200, 204]).to.include(res.status);
+  });
+}
+
+docs {
+  Counterpart to 12 for the second use case from 08.
+}

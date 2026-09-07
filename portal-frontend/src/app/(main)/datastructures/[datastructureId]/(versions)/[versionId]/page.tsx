@@ -25,7 +25,7 @@ const EditDatastructureVersionPage = async ({ params }: EditDatastructureVersion
 
   return (
     <VersionOverview
-      title={`Version ${parsedVersion.data.version}`}
+      title={`Version ${parsedVersion.data.version ?? '—'}`}
       datastructure={parsedDatastructure.data}
       version={parsedVersion.data}
       isCreateMode={false}

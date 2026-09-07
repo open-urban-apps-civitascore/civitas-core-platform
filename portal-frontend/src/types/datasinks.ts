@@ -18,7 +18,11 @@ export type DataSink = {
   dataSinkType: DataSinkType
   configuration: {
     tableName: string
-    dataStructureVersion: DatastructureVersionSummary
+    /**
+     * Resolved from the configuration document's element URN on read; absent when the URN does
+     * not resolve to a stored version (and always absent on FROST sinks) — guard every access.
+     */
+    dataStructureVersion?: DatastructureVersionSummary
   }
   /**
    * Versioned CORE URN of this DataSink's configuration artifact in Model Forge; used as the

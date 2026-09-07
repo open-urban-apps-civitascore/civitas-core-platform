@@ -131,6 +131,49 @@ class MappingServiceTest {
   }
 
   @Test
+  void exists_whenRegistryHasTheArtifact_isTrue() {
+    when(registry.fetchPayload(LOGICAL_URN))
+        .thenReturn(Optional.of(new RegistryDocument(Map.of("fields", Map.of()), null)));
+
+    assertThat(mappingService.exists(LOGICAL_URN)).isTrue();
+  }
+
+  @Test
+  void exists_whenRegistryHasNothing_isFalse() {
+    when(registry.fetchPayload(LOGICAL_URN)).thenReturn(Optional.empty());
+
+    assertThat(mappingService.exists(LOGICAL_URN)).isFalse();
+  }
+
+  /**
+   * The reuse decision must be made on exactly the document {@link MappingService#store} would
+   * write; a divergent split here would make every re-install of an unchanged bundle look like a
+   * conflict.
+   */
+  @Test
+  void isUnchanged_comparesTheSameContentAndStylesSplitThatStoreWrites() {
+    Map<String, Object> doc = new LinkedHashMap<>();
+    doc.put("logicalUrn", LOGICAL_URN);
+    doc.put("fields", Map.of("$.count", Map.of("op", "toInt", "input", "$.vehicleCount")));
+    doc.put("positions", Map.of("$.count", Map.of("x", 1, "y", 2)));
+    when(registry.isUnchanged(eq(LOGICAL_URN), any(), any())).thenReturn(true);
+
+    assertThat(mappingService.isUnchanged(LOGICAL_URN, doc)).isTrue();
+
+    verify(registry).isUnchanged(eq(LOGICAL_URN), contentCaptor.capture(), stylesCaptor.capture());
+    assertThat(contentCaptor.getValue()).doesNotContainKeys("logicalUrn", "positions");
+    assertThat(contentCaptor.getValue()).containsKey("fields");
+    assertThat(stylesCaptor.getValue()).containsKey("positions");
+  }
+
+  @Test
+  void isUnchanged_whenRegistryReportsADifference_isFalse() {
+    when(registry.isUnchanged(eq(LOGICAL_URN), any(), any())).thenReturn(false);
+
+    assertThat(mappingService.isUnchanged(LOGICAL_URN, Map.of("fields", Map.of()))).isFalse();
+  }
+
+  @Test
   void get_whenPresent_returnsContentFromRegistry() {
     Map<String, Object> content = Map.of("fields", Map.of("$.id", Map.of("op", "copy")));
     when(registry.fetchPayload(VERSIONED_URN))
