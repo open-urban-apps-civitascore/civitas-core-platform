@@ -267,7 +267,6 @@ export const useApiConfig = <TFormData extends FormData>({
   return {
     isReadOnly,
     isLoading,
-    isCreate,
     isExitModalOpen,
     setIsExitModalOpen,
     urlPreviewSlug,

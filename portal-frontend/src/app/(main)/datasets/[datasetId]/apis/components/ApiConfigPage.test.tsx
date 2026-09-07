@@ -90,6 +90,10 @@ vi.mock('@/components/content-card/ContentCard', () => ({
   ContentCard: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
+vi.mock('@/components/loading-spinner/LoadingSpinner', () => ({
+  LoadingSpinner: () => <div data-testid="loadingSpinner" />,
+}))
+
 // --- helpers ---
 
 const makeDataset = (overrides: Partial<Dataset> = {}): Dataset => ({
@@ -189,17 +193,10 @@ describe('ApiConfigPage', () => {
         expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       })
 
-      it('renders the form disabled in create mode', () => {
+      it('redirects to the dataset instead of rendering a form', () => {
         renderComponent({ dataset })
-        expect(screen.getByTestId('apiConfigForm')).toBeInTheDocument()
-        expect(screen.getByTestId('nameInput')).toBeDisabled()
-        expect(screen.queryByTestId('cancelButton')).not.toBeInTheDocument()
-      })
-
-      it('does not create an api on submit in create mode', async () => {
-        renderComponent({ dataset })
-        await submitForm()
-        expect(mockCreateNamedApi).not.toHaveBeenCalled()
+        expect(screen.queryByTestId('apiConfigForm')).not.toBeInTheDocument()
+        expect(mockReplace).toHaveBeenCalledWith('/datasets/test-id')
       })
 
       it('does not patch the dataset on submit with mode=edit in the url', async () => {
@@ -219,6 +216,21 @@ describe('ApiConfigPage', () => {
       expect(screen.getByTestId('nameInput')).toBeDisabled()
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       expect(screen.queryByTestId('cancelButton')).not.toBeInTheDocument()
+    })
+
+    it('sends create mode on a DRAFT dataset back to the dataset', () => {
+      mockHasPermission.mockReturnValue(false)
+      renderComponent()
+      expect(screen.queryByTestId('apiConfigForm')).not.toBeInTheDocument()
+      expect(screen.getByTestId('loadingSpinner')).toBeInTheDocument()
+      expect(mockReplace).toHaveBeenCalledWith('/datasets/test-id')
+    })
+
+    it('still renders an existing api read-only rather than redirecting', () => {
+      mockHasPermission.mockReturnValue(false)
+      renderComponent({ existingApi: makeExistingApi() })
+      expect(screen.getByTestId('apiConfigForm')).toBeInTheDocument()
+      expect(mockReplace).not.toHaveBeenCalled()
     })
   })
 
