@@ -1,6 +1,5 @@
 package de.civitascore.portal.model.input;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
@@ -12,7 +11,7 @@ import lombok.EqualsAndHashCode;
 /** Input DTO for creating and updating pipeline resources. */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class PipelineInputDTO extends BaseInputDTO {
+public class PipelineInputDTO extends DataSetOwnedInputDTO {
 
   @NotBlank(message = "Name is required") private String name;
 
@@ -24,6 +23,4 @@ public class PipelineInputDTO extends BaseInputDTO {
   private Set<@NotNull UUID> dataSourceIds;
 
   private Set<@NotNull UUID> dataSinkIds;
-
-  @JsonIgnore private UUID dataSetId;
 }

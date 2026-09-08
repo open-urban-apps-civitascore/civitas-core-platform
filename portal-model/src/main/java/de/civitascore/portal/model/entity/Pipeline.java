@@ -1,6 +1,6 @@
 package de.civitascore.portal.model.entity;
 
-import de.civitascore.portal.model.entity.base.NamedEntity;
+import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -9,10 +9,9 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -36,11 +35,13 @@ import org.hibernate.type.SqlTypes;
 @Setter
 @SuperBuilder
 @NoArgsConstructor
-public class Pipeline extends NamedEntity {
+public class Pipeline extends DataSetOwnedEntity {
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "dataset_id", nullable = false)
-  @NotNull private DataSet dataSet;
+  @NotBlank @Column(nullable = false)
+  private String name;
+
+  @Column(columnDefinition = "TEXT")
+  private String description;
 
   /** React Flow visual layout stored as JSON (nodes/edges/viewport). */
   @JdbcTypeCode(SqlTypes.JSON)

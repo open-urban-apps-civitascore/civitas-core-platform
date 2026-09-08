@@ -75,43 +75,6 @@ class DataSinkServiceTest {
   }
 
   @Nested
-  @DisplayName("findByIdAndDataSetOrThrow()")
-  class FindByIdAndDataSet {
-
-    @Test
-    @DisplayName("Should return sink when it belongs to the requested dataset")
-    void shouldReturnSinkForMatchingDataset() {
-      UUID dataSetId = UUID.randomUUID();
-      UUID sinkId = UUID.randomUUID();
-
-      DataSink sink = new DataSink();
-      sink.setId(sinkId);
-      sink.setDataSet(dataSet(dataSetId));
-
-      when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(sink));
-
-      DataSink result = dataSinkService.findByIdAndDataSetOrThrow(sinkId, dataSetId);
-
-      assertThat(result).isSameAs(sink);
-    }
-
-    @Test
-    @DisplayName("Should throw ResourceNotFoundException when the sink's dataset does not match")
-    void shouldThrowWhenDatasetMismatch() {
-      UUID sinkId = UUID.randomUUID();
-
-      DataSink sink = new DataSink();
-      sink.setId(sinkId);
-      sink.setDataSet(dataSet(UUID.randomUUID()));
-
-      when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(sink));
-
-      assertThatThrownBy(() -> dataSinkService.findByIdAndDataSetOrThrow(sinkId, UUID.randomUUID()))
-          .isInstanceOf(ResourceNotFoundException.class);
-    }
-  }
-
-  @Nested
   @DisplayName("postConvertToEntity()")
   class PostConvertToEntity {
 

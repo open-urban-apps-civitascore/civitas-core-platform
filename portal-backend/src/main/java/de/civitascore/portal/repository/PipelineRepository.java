@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 
 /** Spring Data JPA repository for {@link Pipeline} entities. */
 @Repository
-public interface PipelineRepository extends NamedEntityRepository<Pipeline, UUID> {
+public interface PipelineRepository extends BaseRepository<Pipeline, UUID> {
 
   /**
    * Find a pipeline by ID with related entities eagerly fetched. This prevents N+1 query problems

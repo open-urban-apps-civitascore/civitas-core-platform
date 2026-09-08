@@ -43,7 +43,7 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
+public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInputDTO> {
 
   private final PipelineRepository pipelineRepository;
   private final PipelineMapper pipelineMapper;
@@ -86,42 +86,6 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
   @Override
   protected String getEntityName() {
     return Pipeline.class.getSimpleName();
-  }
-
-  /**
-   * Finds a pipeline by ID and verifies that it belongs to the specified dataset.
-   *
-   * @param id the pipeline ID
-   * @param dataSetId the expected parent dataset ID
-   * @return the pipeline entity
-   * @throws ResourceNotFoundException if the pipeline does not exist or does not belong to the
-   *     given dataset
-   */
-  public Pipeline findByIdAndDataSetOrThrow(UUID id, UUID dataSetId) {
-    Pipeline pipeline = findByIdOrThrow(id);
-    if (!dataSetId.equals(pipeline.getDataSet().getId())) {
-      throw new ResourceNotFoundException(getEntityName(), id);
-    }
-    return pipeline;
-  }
-
-  /**
-   * Validates that an update does not attempt to move a pipeline to a different dataset.
-   *
-   * @param input the pipeline update input
-   * @param existingEntity the current pipeline entity
-   * @return the validated input
-   * @throws ResourceNotFoundException if the input specifies a different dataset ID
-   */
-  @Override
-  protected PipelineInputDTO preProcessUpdateInput(
-      PipelineInputDTO input, Pipeline existingEntity) {
-    if (input.getDataSetId() != null
-        && existingEntity.getDataSet() != null
-        && !input.getDataSetId().equals(existingEntity.getDataSet().getId())) {
-      throw new ResourceNotFoundException(getEntityName(), existingEntity.getId());
-    }
-    return super.preProcessUpdateInput(input, existingEntity);
   }
 
   /**
@@ -324,29 +288,20 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
   }
 
   /**
-   * Prevents deletion of pipelines that belong to a non-DRAFT dataset. Detaches associated
-   * DataSinks (they survive the pipeline deletion).
+   * Detaches the pipeline's DataSinks, which survive the deletion.
    *
-   * @param id the pipeline ID to delete
-   * @return the pipeline entity to be deleted
-   * @throws ResourceNotFoundException if the pipeline does not exist
-   * @throws InvalidInputException if the parent dataset is not in DRAFT status
+   * @throws InvalidInputException if the parent dataset is not in DRAFT
    */
   @Override
-  protected Pipeline preProcessDelete(UUID id) {
-    Pipeline pipeline =
-        findById(id).orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
-
+  protected void onDelete(Pipeline pipeline) {
     if (pipeline.getDataSet() != null
         && pipeline.getDataSet().getDataSetStatus() != DataSetStatus.DRAFT) {
       throw new InvalidInputException(
           "Pipeline",
-          id,
+          pipeline.getId(),
           "Cannot delete pipeline associated with a dataset that is not in DRAFT status.");
     }
 
-    dataSinkService.unlinkByPipelineId(id);
-
-    return pipeline;
+    dataSinkService.unlinkByPipelineId(pipeline.getId());
   }
 }

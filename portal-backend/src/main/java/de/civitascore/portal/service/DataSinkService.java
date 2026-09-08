@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
+public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInputDTO> {
 
   /**
    * ASCII-only keeps Java's {@code equalsIgnoreCase} in the uniqueness check from disagreeing with
@@ -92,23 +92,6 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   }
 
   /**
-   * Finds a DataSink by ID and verifies that it belongs to the specified dataset.
-   *
-   * @param id the DataSink ID
-   * @param dataSetId the expected parent dataset ID
-   * @return the DataSink entity
-   * @throws ResourceNotFoundException if the DataSink does not exist or belongs to a different
-   *     dataset
-   */
-  public DataSink findByIdAndDataSetOrThrow(UUID id, UUID dataSetId) {
-    DataSink sink = findByIdOrThrow(id);
-    if (!dataSetId.equals(sink.getDataSet().getId())) {
-      throw new ResourceNotFoundException(getEntityName(), id);
-    }
-    return sink;
-  }
-
-  /**
    * Rejects attempts to change the immutable {@code dataSinkType} of an existing DataSink. Runs for
    * both PUT and PATCH; a PATCH that omits {@code dataSinkType} carries the entity's current type
    * forward via the assembler and passes this check.
@@ -118,13 +101,14 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   @Override
   protected DataSinkInputDTO preProcessUpdateInput(
       DataSinkInputDTO input, DataSink existingEntity) {
-    if (input.getDataSinkType() != null
-        && input.getDataSinkType() != existingEntity.getDataSinkType()) {
+    DataSinkInputDTO guarded = super.preProcessUpdateInput(input, existingEntity);
+    if (guarded.getDataSinkType() != null
+        && guarded.getDataSinkType() != existingEntity.getDataSinkType()) {
       throw new InvalidInputException(
           getEntityName(), existingEntity.getId(), "dataSinkType cannot be changed after creation");
     }
-    requireDataLossConfirmation(input, existingEntity);
-    return input;
+    requireDataLossConfirmation(guarded, existingEntity);
+    return guarded;
   }
 
   /**
@@ -254,22 +238,14 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   }
 
   /**
-   * Guards DELETE against Layer references.
-   *
-   * @throws ResourceNotFoundException if the DataSink does not exist
    * @throws ResourceInUseException (409) if a Layer references this DataSink
    */
   @Override
-  protected DataSink preProcessDelete(UUID id) {
-    DataSink sink =
-        findById(id).orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
-
-    if (layerRepository.existsByDataSinkId(id)) {
+  protected void onDelete(DataSink sink) {
+    if (layerRepository.existsByDataSinkId(sink.getId())) {
       throw new ResourceInUseException(
-          getEntityName(), id, "DataSink is referenced by one or more Layers");
+          getEntityName(), sink.getId(), "DataSink is referenced by one or more Layers");
     }
-
-    return sink;
   }
 
   private void validateConfiguration(DataSinkType type, Map<String, Object> config) {

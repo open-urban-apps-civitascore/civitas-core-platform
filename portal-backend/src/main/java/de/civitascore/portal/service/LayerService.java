@@ -29,7 +29,7 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-public class LayerService extends BaseService<Layer, LayerInputDTO> {
+public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
 
   private final LayerRepository layerRepository;
   private final LayerMapper layerMapper;
@@ -66,19 +66,6 @@ public class LayerService extends BaseService<Layer, LayerInputDTO> {
   }
 
   /**
-   * Finds a Layer by ID and verifies that it belongs to the specified dataset.
-   *
-   * @throws ResourceNotFoundException if the Layer does not exist or belongs to a different dataset
-   */
-  public Layer findByIdAndDataSetOrThrow(UUID id, UUID dataSetId) {
-    Layer layer = findByIdOrThrow(id);
-    if (!dataSetId.equals(layer.getDataSet().getId())) {
-      throw new ResourceNotFoundException(getEntityName(), id);
-    }
-    return layer;
-  }
-
-  /**
    * Rejects saves that would create a duplicate layerName within the same dataset. The dataset is
    * the scope GeoServer publishes into — one workspace and one datastore per dataset, addressing
    * feature types by layer name alone — so two sinks of one dataset cannot carry the same layer
@@ -107,20 +94,16 @@ public class LayerService extends BaseService<Layer, LayerInputDTO> {
   /** Rejects bbox fields when bboxAutoCalculate is true. */
   @Override
   protected LayerInputDTO preProcessCreateInput(LayerInputDTO input) {
-    validateBboxConsistency(input);
-    return super.preProcessCreateInput(input);
+    LayerInputDTO guarded = super.preProcessCreateInput(input);
+    validateBboxConsistency(guarded);
+    return guarded;
   }
 
-  /** Validates that an update does not attempt to move a Layer to a different dataset. */
   @Override
   protected LayerInputDTO preProcessUpdateInput(LayerInputDTO input, Layer existingEntity) {
-    validateBboxConsistency(input);
-    if (input.getDataSetId() != null
-        && existingEntity.getDataSet() != null
-        && !input.getDataSetId().equals(existingEntity.getDataSet().getId())) {
-      throw new ResourceNotFoundException(getEntityName(), existingEntity.getId());
-    }
-    return super.preProcessUpdateInput(input, existingEntity);
+    LayerInputDTO guarded = super.preProcessUpdateInput(input, existingEntity);
+    validateBboxConsistency(guarded);
+    return guarded;
   }
 
   private void validateBboxConsistency(LayerInputDTO input) {

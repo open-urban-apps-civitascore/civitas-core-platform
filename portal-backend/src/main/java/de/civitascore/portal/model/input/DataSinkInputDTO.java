@@ -1,6 +1,5 @@
 package de.civitascore.portal.model.input;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.civitascore.portal.model.datasink.FrostConfiguration;
 import de.civitascore.portal.model.datasink.PostgisConfiguration;
 import de.civitascore.portal.model.embedded.DataSinkType;
@@ -14,7 +13,7 @@ import lombok.EqualsAndHashCode;
 /** Input DTO for creating and updating DataSink resources. */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class DataSinkInputDTO extends BaseInputDTO {
+public class DataSinkInputDTO extends DataSetOwnedInputDTO {
 
   private UUID id;
 
@@ -29,6 +28,4 @@ public class DataSinkInputDTO extends BaseInputDTO {
               + " Required (true) when tableName or dataStructureVersionId changes on a"
               + " provisioned dataset; ignored otherwise.")
   private boolean confirmDataLoss;
-
-  @JsonIgnore private UUID dataSetId;
 }
