@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -188,6 +188,67 @@ describe('ConnectorTab (integration)', () => {
     renderConnectorTab()
 
     expect(screen.getByLabelText(/URLs/)).toBeInTheDocument()
+  })
+
+  describe('MQTT TLS/broker validation refresh', () => {
+    it('surfaces a broker/TLS mismatch when toggling TLS creates one, and clears it when toggling back', async () => {
+      // Start from a valid combination: a TLS-scheme URL with TLS enabled — no mismatch yet.
+      renderConnectorTab({
+        configuration: {
+          ...defaultValues.configuration,
+          urls: 'mqtts://broker.local:8883',
+          tls: true,
+        },
+      })
+
+      const tlsCheckbox = screen.getByRole('checkbox')
+      expect(screen.queryByText('datasources.errors.brokerTlsMismatch')).not.toBeInTheDocument()
+
+      // Toggle TLS off — the broker still uses a TLS-only scheme, so this is now a real mismatch.
+      fireEvent.click(tlsCheckbox)
+      await waitFor(() => {
+        expect(screen.getByText('datasources.errors.brokerTlsMismatch')).toBeInTheDocument()
+      })
+
+      // Toggle TLS back on — the mismatch is resolved, so the now-visible error must clear.
+      fireEvent.click(tlsCheckbox)
+      await waitFor(() => {
+        expect(screen.queryByText('datasources.errors.brokerTlsMismatch')).not.toBeInTheDocument()
+      })
+    })
+
+    it('does not surface a stale mismatch on mount for an already-mismatched stored configuration', async () => {
+      // The loaded configuration is already mismatched (TLS-only scheme, TLS disabled). The
+      // `isFirstRevalidationRender` guard in ConnectorTab exists specifically to stop the watch
+      // effect from firing a validation trigger on the initial mount render, so the user isn't
+      // shown an error before they've touched anything. Without the guard, the effect would run
+      // once on mount and call `form.trigger('configuration.urls')`, surfacing this error
+      // unprompted.
+      renderConnectorTab({
+        configuration: {
+          ...defaultValues.configuration,
+          urls: 'mqtts://broker.local:8883',
+          tls: false,
+        },
+      })
+
+      // Flush pending effects/microtasks so a would-be mount-triggered validation has a chance
+      // to resolve and re-render before we assert on its absence.
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 0))
+      })
+      expect(screen.queryByText('datasources.errors.brokerTlsMismatch')).not.toBeInTheDocument()
+
+      // Canary: the guard must only suppress the very first run, not the whole mechanism. Toggle
+      // TLS on (resolves the mismatch) and back off (reintroduces it) to prove validation still
+      // refreshes normally after the guarded initial render.
+      const tlsCheckbox = screen.getByRole('checkbox')
+      fireEvent.click(tlsCheckbox)
+      fireEvent.click(tlsCheckbox)
+      await waitFor(() => {
+        expect(screen.getByText('datasources.errors.brokerTlsMismatch')).toBeInTheDocument()
+      })
+    })
   })
 
   describe('Read-only mode', () => {

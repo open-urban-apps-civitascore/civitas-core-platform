@@ -114,6 +114,20 @@ const validateMqttSchemes = (configuration: { urls?: unknown; tls?: boolean }, c
   }
 }
 
+export type FieldRevalidationRule = { watch: string; revalidate: string }
+
+/**
+ * For each connector type, declares a configuration field whose change should re-trigger
+ * validation of another field (e.g. toggling MQTT's `tls` must re-validate `urls`, since
+ * `validateMqttSchemes` above reads `configuration.tls` when validating `configuration.urls`).
+ * Colocating this with the schema that owns the cross-field relationship keeps it a single
+ * source of truth. `null` means the connector type has no such rule.
+ */
+export const CONNECTOR_FIELD_REVALIDATION_RULES: Record<ConnectorType, FieldRevalidationRule | null> = {
+  [CONNECTOR_TYPES.MQTT]: { watch: 'tls', revalidate: 'urls' },
+  [CONNECTOR_TYPES.SQL]: null,
+}
+
 export const MqttLooseSchema = MqttBaseSchema.partial()
   .extend({
     urls: brokerUrlArray(z.array(z.string()).optional()),
