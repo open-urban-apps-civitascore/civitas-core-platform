@@ -26,7 +26,10 @@ export interface MappingStatus {
 export interface PortInfo {
   type: PortType
   sub?: string
-  /** Input-only: accepted source subtypes; membership test instead of exact equality. */
+  /**
+   * Input-only: accepted source subtypes. If present, the from `sub` must be one of the accepted
+   * types instead of equal to the to `sub`.
+   */
   accepts?: readonly string[]
 }
 
@@ -51,9 +54,8 @@ export const portsCompatible = (from: PortInfo | null, to: PortInfo | null): boo
 }
 
 /**
- * Edges whose two endpoints resolve but whose types no longer match — e.g. after a literal's
- * type was changed while it was already connected. An endpoint that cannot be resolved is left
- * alone: a saved path the schema no longer carries is a different problem and must not block saving.
+ * Edges whose endpoints both resolve but whose types no longer match, e.g. a literal's type was
+ * changed after it was connected.
  */
 export const findInvalidEdges = (edges: Edge[], endpointInfo: EndpointInfo): Edge[] =>
   edges.filter(edge => {
@@ -140,7 +142,7 @@ export const computeStatus = (
 
   const invalidEdges = findInvalidEdges(edges, endpointInfo)
   // Both ends of a broken edge go red so the cause (e.g. the retyped literal) is visible too.
-  // Mega-node ports are covered by source/targetPortStatus instead.
+  // Mega-node source ports are the exception: they never go red.
   const markMismatch = (nodeId: string, handleId: string) => {
     if (nodeId === SOURCE_NODE_ID || nodeId === TARGET_NODE_ID) return
     transformPortStatus[nodeId] = { ...transformPortStatus[nodeId], [handleId]: 'mismatch' }
