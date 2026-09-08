@@ -50,6 +50,26 @@ npx @usebruno/cli run dataset-saga-workflow --env local-direct
 
 Open the collection in Bruno, select the `local-direct` environment, and send individual requests. For CRUD requests, run the `00-setup` folder first (right-click → "Run Folder") to populate variables.
 
+### Payload API examples
+
+The `payload-api` folder contains a complete external-consumer flow:
+
+1. `get-sta-payload` obtains a bearer token with `username` and `password` through Keycloak's public `api-access` client, then reads a SensorThings `Things` collection.
+2. `get-ows-wms-payload` performs the same OAuth2 flow, then sends a WMS `GetCapabilities` query.
+3. `get-ows-wfs-payload` performs the same OAuth2 flow, then sends a WFS 2.0.0 `GetCapabilities` query.
+
+`get-api-access-token` remains available when you need to inspect or reuse the token manually; the
+three payload requests do not depend on it.
+
+Set `payloadDataSetId` in the selected environment to a real AVAILABLE dataset ID. The default named-API slugs are `things` for STA and `map` for OWS; change `staSlug` or `owsSlug` when the dataset uses different slugs. The requests target `apisixApiUrl`, so the gateway and its routes must be running.
+
+The requests are tagged `payload-example`. The CI full-suite run excludes this tag because its
+database is rebuilt for every run and does not contain a stable published dataset ID. Run the
+`payload-api` folder explicitly after setting `payloadDataSetId` to exercise the examples.
+
+The CI saga also runs equivalent authenticated WMS and WFS checks (`9k` and `9l`) before its cleanup.
+Those checks use the saga's dynamically provisioned dataset ID, STA/OWS APIs, and APISIX routes.
+
 ## Folder Structure
 
 ```
@@ -130,6 +150,14 @@ Connects directly to the backend on the host machine (port 8089), bypassing the 
 | `realm`        | `civitas-core`                     |
 | `username`     | `dev@civitas.local`                |
 | `password`     | `dev123`                           |
+
+Payload examples additionally use:
+
+| Variable           | Value                                |
+|--------------------|--------------------------------------|
+| `payloadDataSetId` | A real AVAILABLE dataset ID           |
+| `staSlug`          | `things`                             |
+| `owsSlug`          | `map`                                |
 
 ### `ci` (GitLab CI)
 

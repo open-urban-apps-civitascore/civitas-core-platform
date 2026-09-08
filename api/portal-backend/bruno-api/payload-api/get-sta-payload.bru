@@ -1,0 +1,53 @@
+meta {
+  name: Get STA payload (SensorThings)
+  type: http
+  seq: 2
+  tags: [
+    payload-example
+  ]
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{payloadDataSetId}}/{{staSlug}}/Things?$top=10
+  body: none
+  auth: oauth2
+}
+
+auth:oauth2 {
+  grant_type: password
+  access_token_url: {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
+  refresh_token_url:
+  username: {{username}}
+  password: {{password}}
+  client_id: {{apiAccessClientId}}
+  client_secret:
+  scope:
+  credentials_placement: request_body
+  credentials_id: credentials
+  token_placement: header
+  token_header_prefix: Bearer
+  auto_fetch_token: true
+  auto_refresh_token: false
+}
+
+tests {
+  test("STA payload is reachable with the api-access bearer", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is a SensorThings collection", function() {
+    expect(res.body).to.be.an('object');
+    expect(res.body).to.have.property('value');
+  });
+}
+
+docs {
+  **Authenticated STA payload example.**
+
+  Bruno obtains a token automatically with the configured username and password through Keycloak's
+  public `api-access` client and sends it as a bearer token. The request then reads the first ten
+  SensorThings entities from the released STA named API.
+
+  **Precondition:** `payloadDataSetId` identifies an AVAILABLE dataset, `staSlug` is its STA named-API
+  slug, and the token user has read access to the dataset.
+}
