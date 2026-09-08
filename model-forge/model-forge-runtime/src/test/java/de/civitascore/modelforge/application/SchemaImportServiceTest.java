@@ -561,6 +561,42 @@ class SchemaImportServiceTest {
         verify(registry, never()).storeXsdElement(anyString(), anyString(), anySet());
     }
 
+    @Test
+    void importXsd_rejectsAnArtifactIdThatIsNotACoreUrn() {
+        SchemaImportResult r = svc.importXsd(new XsdImportRequest("station", null,
+            "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"/>", "StationXsd"));
+
+        assertThat(r.resourceId()).isNull();
+        assertThat(r.diagnostics()).extracting(d -> d.code()).contains("invalid-artifact-id");
+        assertThat(r.diagnostics().toString()).contains("StationXsd");
+        verify(registry, never())
+            .storeXsdElement(anyString(), anyString(), anySet(), nullable(String.class));
+    }
+
+    @Test
+    void importXsd_rejectsAnArtifactIdWithTooFewUrnSegments() {
+        // A prefix match is not enough: a truncated URN would corrupt every segment-index
+        // extraction downstream, so it must be refused rather than trusted verbatim.
+        SchemaImportResult r = svc.importXsd(new XsdImportRequest("station", null,
+            "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"/>", "urn:core:platform:civitas"));
+
+        assertThat(r.resourceId()).isNull();
+        assertThat(r.diagnostics()).extracting(d -> d.code()).contains("invalid-artifact-id");
+        verify(registry, never())
+            .storeXsdElement(anyString(), anyString(), anySet(), nullable(String.class));
+    }
+
+    @Test
+    void importXsd_keepsAWellFormedCallerSuppliedUrn() {
+        // The XRepository kennung-based URN is caller-owned and must still be respected as-is.
+        String urn = "urn:core:platform:civitas:element:common:Station:abc1234567";
+        SchemaImportResult r = svc.importXsd(new XsdImportRequest("station", null,
+            "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"/>", urn));
+
+        assertThat(r.diagnostics()).isEmpty();
+        verify(registry).storeXsdElement(eq(urn), anyString(), anySet(), nullable(String.class));
+    }
+
     // ── $defs $id that collides with the reserved root URN ────────────────────────
 
     @Test
