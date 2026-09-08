@@ -251,9 +251,8 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             .stream()
             .filter(urn -> !rootLogical.equals(UrnParser.logicalUrn(urn)))
             .toList();
-        // One probe for the whole closure. It is not redundant with the walk: the graph hands back a
-        // pinned target verbatim without looking it up, so a pin whose version was never stored
-        // arrives here unverified.
+        // The graph hands back a pinned target without looking it up, so a pin whose version was
+        // never stored reaches here unverified. One probe answers for the whole closure.
         Set<String> held = registry.heldUrns(members);
         return new DependencyClosureView(
             root,

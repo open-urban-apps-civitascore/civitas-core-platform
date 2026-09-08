@@ -1,6 +1,6 @@
 package de.civitascore.portal.util;
 
-import de.civitascore.portal.service.closure.ClosureFinding;
+import de.civitascore.portal.service.validation.ClosureFinding;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;

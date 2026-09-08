@@ -226,9 +226,8 @@ public class GraphPage extends BasePage {
         ObjectMapper mapper = new ObjectMapper();
         for (var node : graph.nodes()) {
             String nodeUrn = UrnParser.logicalUrn(node.artifactId().value());
-            // Only collected here. Whether the registry holds this URN is settled after the walk by
-            // one existence call (see buildGraphJson); inferring it from the search page instead
-            // marked every artifact past that page's row limit as a missing reference.
+            // Grouping is settled after the walk, once the registry has been asked which of these
+            // URNs it holds (see buildGraphJson).
             referenced.add(nodeUrn);
             nodeLabels.putIfAbsent(nodeUrn, node.label());
         }

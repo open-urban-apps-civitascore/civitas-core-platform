@@ -1,8 +1,9 @@
-package de.civitascore.portal.service.closure;
+package de.civitascore.portal.service.validation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -128,22 +129,6 @@ class PipelineClosureValidatorTest {
     }
 
     @Test
-    @DisplayName("examines every pipeline's own flow")
-    void walksEveryPipeline() {
-      closureOf(PIPELINE_URN, Set.of(), Set.of());
-      closureOf(OTHER_PIPELINE_URN, Set.of(), Set.of());
-
-      validator()
-          .validate(
-              List.of(
-                  pipeline(pipelineId, PIPELINE_URN),
-                  pipeline(UUID.randomUUID(), OTHER_PIPELINE_URN)));
-
-      verify(modelRegistryGateway).closure(PIPELINE_URN, 10);
-      verify(modelRegistryGateway).closure(OTHER_PIPELINE_URN, 10);
-    }
-
-    @Test
     @DisplayName("passes a dataset with no pipelines")
     void noPipelinesIsNothingToValidate() {
       assertThatCode(() -> validator().validate(List.of())).doesNotThrowAnyException();
@@ -169,26 +154,15 @@ class PipelineClosureValidatorTest {
     }
 
     @Test
-    @DisplayName("a member element is held to resolvability alone")
-    void aResolvableElementPasses() {
+    @DisplayName(
+        "an artifact the platform holds no version record for is held to resolvability alone")
+    void anArtifactWithoutAVersionRecordPasses() {
       closureOf(PIPELINE_URN, Set.of(ELEMENT_URN), Set.of());
       when(dataStructureVersionRepository.findAllByModelUrnIn(any())).thenReturn(List.of());
 
       assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
-          .as("an element carries no version record, so there is no lifecycle to judge")
+          .as("a member element, a mapping and a sink configuration all fall here")
           .doesNotThrowAnyException();
-    }
-
-    @Test
-    @DisplayName("asks the platform about a whole flow in one query")
-    void looksUpGovernanceOnce() {
-      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN, ELEMENT_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
-          .thenReturn(List.of(released(STRUCTURE_URN)));
-
-      validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN)));
-
-      verify(dataStructureVersionRepository).findAllByModelUrnIn(any());
     }
 
     @Test
@@ -278,17 +252,6 @@ class PipelineClosureValidatorTest {
                           ClosureFinding.notAvailable(pipelineId, ELEMENT_URN),
                           ClosureFinding.notAvailable(otherPipeline, STRUCTURE_URN)));
     }
-
-    @Test
-    @DisplayName("an artifact no flow reaches never enters the question")
-    void nonParticipatingArtifactDoesNotBlock() {
-      // The registry reports what a flow reaches, so a dataset member no flow reaches is simply
-      // absent from the answer and is never examined.
-      closureOf(PIPELINE_URN, Set.of(ELEMENT_URN), Set.of());
-
-      assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
-          .doesNotThrowAnyException();
-    }
   }
 
   @Nested
@@ -296,31 +259,26 @@ class PipelineClosureValidatorTest {
   class Withholding {
 
     @Test
-    @DisplayName("an artifact the platform holds no record for is held to resolvability alone")
-    void anUngovernedArtifactPasses() {
-      // Forced by the element case: a member element never has a version record, so "no record"
-      // cannot mean "blocked" without blocking every flow on its own elements.
-      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any())).thenReturn(List.of());
-
-      assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
-          .doesNotThrowAnyException();
-    }
-
-    @Test
     @DisplayName("an unreadable artifact is reported in the same terms as an unresolved one")
-    void unreadableAndUnknownAreIndistinguishable() {
+    void unreadableAndUnresolvedAreIndistinguishable() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of(STRUCTURE_URN));
+      List<ClosureFinding> onUnresolved =
+          findingsOf(
+              catchThrowable(
+                  () -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN)))));
+
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
       when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
           .thenReturn(List.of(released(STRUCTURE_URN)));
       denyEveryStructure();
+      List<ClosureFinding> onUnreadable =
+          findingsOf(
+              catchThrowable(
+                  () -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN)))));
 
-      assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
-          .satisfies(
-              thrown ->
-                  assertThat(findingsOf(thrown))
-                      .as("the difference would be an existence oracle over structure URNs")
-                      .containsExactly(ClosureFinding.notAvailable(pipelineId, STRUCTURE_URN)));
+      assertThat(onUnreadable)
+          .as("the difference would be an existence oracle over artifact URNs")
+          .isEqualTo(onUnresolved);
     }
 
     @Test

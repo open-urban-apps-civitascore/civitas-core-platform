@@ -1,4 +1,4 @@
-package de.civitascore.portal.service.closure;
+package de.civitascore.portal.service.validation;
 
 import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
@@ -36,8 +36,7 @@ import org.springframework.stereotype.Component;
  * Pipeline's own model and follows the references the registry recorded — a pipeline names a
  * mapping, a mapping names a source and a target structure, a structure names its member elements.
  * An artifact that belongs to the same Data Set but that no flow reaches is irrelevant here and
- * does not block it. The reference graph is the authority; pipeline content is never parsed,
- * matching how {@code DataSetSagaPublisher} learns the same thing.
+ * does not block it. The reference graph is the authority; pipeline content is never parsed.
  *
  * <p>Every artifact reached must resolve, which the registry answers for the whole closure at once.
  * An artifact the platform holds a Data Structure Version for is held to more, because that record
@@ -146,10 +145,10 @@ public class PipelineClosureValidator {
   }
 
   /**
-   * Whether the caller may read the structure carrying this version. OPA authorizes the transition
-   * itself but never sees a structure two hops away in the reference graph, and its scope header is
-   * typed to the route's own Data Set scope — so the decision is made here, against the same
-   * assignments, exactly as {@code DataSinkService} does for a directly referenced structure.
+   * Whether the caller may read the structure carrying this version.
+   *
+   * <p>Decided here because OPA never sees a structure two hops away in the reference graph, and
+   * the scope header it emits is typed to the route's own Data Set scope.
    */
   private boolean isReadable(DataStructureVersion version) {
     try {
@@ -162,9 +161,8 @@ public class PipelineClosureValidator {
   }
 
   /**
-   * Whether a version counts as released. Both the version and the structure carrying it must be,
-   * the same pair {@code DataSourceService} requires before a version may be linked — a released
-   * version of a structure that is still a draft is not something a flow may publish.
+   * Whether a version counts as released. Both it and the structure carrying it must be: a released
+   * version of a draft structure is not something a flow may publish.
    */
   private static boolean isReleased(DataStructureVersion version) {
     return version.getDataStructureVersionStatus() == DataStructureVersionStatus.AVAILABLE

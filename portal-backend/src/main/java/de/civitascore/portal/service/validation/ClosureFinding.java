@@ -1,4 +1,4 @@
-package de.civitascore.portal.service.closure;
+package de.civitascore.portal.service.validation;
 
 import java.util.UUID;
 

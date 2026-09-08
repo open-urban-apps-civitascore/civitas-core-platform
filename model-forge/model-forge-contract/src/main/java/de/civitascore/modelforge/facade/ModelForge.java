@@ -144,11 +144,9 @@ public interface ModelForge {
      * resolve — "is everything this model participates in actually there", answered in one call
      * rather than an existence probe per member.
      *
-     * <p>The query's {@link DependencyQuery#maxDepth()} is <b>required</b> here, unlike on
-     * {@link #dependencies}: a closure walks as far as it is told to, so the bound belongs to the
-     * caller that knows what it is willing to spend. Omitting it would leave the API either walking
-     * the whole graph on a caller's request or answering one hop while reading as complete — the
-     * first unbounded, the second silently wrong. A depth of zero or less yields an empty closure.
+     * <p>The query's {@link DependencyQuery#maxDepth()} is <b>required</b>: the bound belongs to the
+     * caller, which knows how much traversal it is willing to spend. A depth of zero or less yields
+     * an empty closure.
      *
      * <p>See {@link DependencyClosureView} for the members' URN form and the root's exclusion.
      * Traversal terminates on a cyclic graph.
