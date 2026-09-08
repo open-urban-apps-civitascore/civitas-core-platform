@@ -1,0 +1,42 @@
+meta {
+  name: 9k. Verify authenticated OWS WMS payload
+  type: http
+  seq: 32
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/{{sagaOwsSlug}}?service=WMS&request=GetCapabilities
+  body: none
+  auth: oauth2
+}
+
+auth:oauth2 {
+  grant_type: password
+  access_token_url: {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
+  refresh_token_url:
+  username: {{username}}
+  password: {{password}}
+  client_id: {{apiAccessClientId}}
+  client_secret:
+  scope:
+  credentials_placement: request_body
+  credentials_id: credentials
+  token_placement: header
+  token_header_prefix: Bearer
+  auto_fetch_token: true
+  auto_refresh_token: false
+}
+
+tests {
+  test("Authenticated WMS payload is reachable", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Saga payload check — authenticated OWS/WMS request.**
+
+  Uses the real dataset provisioned by this saga and obtains an `api-access` bearer through the
+  OAuth2 password grant. The request runs before the saga cleanup and verifies a WMS 1.3.0-style
+  `GetCapabilities` query against the OWS named API.
+}

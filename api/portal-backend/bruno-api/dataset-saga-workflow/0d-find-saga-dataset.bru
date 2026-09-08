@@ -17,6 +17,10 @@ script:post-response {
     if (match) {
       bru.setVar('sagaDataSetId', match.id);
       bru.setVar('sagaDataSetStatus', match.dataSetStatus);
+      // The saga dataset has stable named-API slugs. Set them on lookup as well as creation so
+      // later data-plane checks work on repeated runs where the POST response is not available.
+      bru.setVar('sagaSlug', 'things');
+      bru.setVar('sagaOwsSlug', 'map');
     }
   }
 }

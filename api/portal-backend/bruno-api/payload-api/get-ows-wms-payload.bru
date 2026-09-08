@@ -1,0 +1,49 @@
+meta {
+  name: Get OWS payload (WMS GetCapabilities)
+  type: http
+  seq: 3
+  tags: [
+    payload-example
+  ]
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{payloadDataSetId}}/{{owsSlug}}?service=WMS&request=GetCapabilities
+  body: none
+  auth: oauth2
+}
+
+auth:oauth2 {
+  grant_type: password
+  access_token_url: {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
+  refresh_token_url:
+  username: {{username}}
+  password: {{password}}
+  client_id: {{apiAccessClientId}}
+  client_secret:
+  scope:
+  credentials_placement: request_body
+  credentials_id: credentials
+  token_placement: header
+  token_header_prefix: Bearer
+  auto_fetch_token: true
+  auto_refresh_token: false
+}
+
+tests {
+  test("OWS payload is reachable with the api-access bearer", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Authenticated OWS payload example.**
+
+  Bruno obtains a token automatically with the configured username and password through Keycloak's
+  public `api-access` client and sends it as a bearer token. This request sends a standard WMS
+  `GetCapabilities` query to the released OWS named API.
+
+  **Precondition:** `payloadDataSetId` identifies an AVAILABLE dataset, `owsSlug` is its OWS named-API
+  slug, and the token user has read access to the dataset. Open datasets may omit the Authorization
+  header, but this example intentionally demonstrates the authenticated flow.
+}
