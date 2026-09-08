@@ -12,15 +12,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.modelforge.contract.ArtifactId;
-import de.civitascore.modelforge.contract.ArtifactView;
-import de.civitascore.modelforge.contract.DependencyGraphView;
+import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.portal.util.InvalidInputException;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -82,75 +78,47 @@ class ModelRegistryGatewayTest {
         "urn:core:platform:civitas:pipeline:common:Ingest:aaaaaaaaaa:1.0.0";
     private static final String STRUCTURE_URN =
         "urn:core:platform:civitas:datastructure:common:Sensor:bbbbbbbbbb:1.0.0";
-
-    private DependencyGraphView viewOf(String source, String... targets) {
-      List<DependencyGraphView.Node> nodes =
-          Stream.concat(Stream.of(source), Arrays.stream(targets))
-              .map(urn -> new DependencyGraphView.Node(new ArtifactId(urn), "label"))
-              .toList();
-      return new DependencyGraphView(nodes, List.of());
-    }
+    private static final String GHOST_URN =
+        "urn:core:platform:civitas:element:common:Ghost:cccccccccc:1.0.0";
 
     @Test
-    @DisplayName("asks for a bounded walk, which is the cycle-safe one")
+    @DisplayName("asks the registry for a bounded walk and passes the depth through")
     void asksForABoundedWalk() {
-      when(modelForge.dependencies(any())).thenReturn(viewOf(PIPELINE_URN));
+      when(modelForge.closure(any()))
+          .thenReturn(
+              new DependencyClosureView(new ArtifactId(PIPELINE_URN), List.of(), List.of()));
 
-      gateway.transitiveDependencyUrns(PIPELINE_URN, 6);
+      gateway.closure(PIPELINE_URN, 6);
 
-      // A DependencyQuery without a depth returns direct edges only and never reaches the
-      // cycle-guarded transitive walk, so the depth being carried is what makes the walk both
-      // transitive and terminating.
       ArgumentCaptor<DependencyQuery> query = ArgumentCaptor.forClass(DependencyQuery.class);
-      verify(modelForge).dependencies(query.capture());
+      verify(modelForge).closure(query.capture());
       assertThat(query.getValue().maxDepth()).isEqualTo(6);
       assertThat(query.getValue().artifactId().value()).isEqualTo(PIPELINE_URN);
     }
 
     @Test
-    @DisplayName("returns the reached artifacts without the flow's own entry artifact")
-    void excludesTheStartingArtifact() {
-      when(modelForge.dependencies(any())).thenReturn(viewOf(PIPELINE_URN, STRUCTURE_URN));
+    @DisplayName("reports what the flow reaches and what of it is missing")
+    void reportsReachedAndMissing() {
+      when(modelForge.closure(any()))
+          .thenReturn(
+              new DependencyClosureView(
+                  new ArtifactId(PIPELINE_URN),
+                  List.of(new ArtifactId(STRUCTURE_URN), new ArtifactId(GHOST_URN)),
+                  List.of(new ArtifactId(GHOST_URN))));
 
-      assertThat(gateway.transitiveDependencyUrns(PIPELINE_URN, 10)).containsExactly(STRUCTURE_URN);
+      ModelRegistryGateway.ArtifactClosure closure = gateway.closure(PIPELINE_URN, 10);
+
+      assertThat(closure.artifacts()).containsExactly(STRUCTURE_URN, GHOST_URN);
+      assertThat(closure.unresolved()).containsExactly(GHOST_URN);
     }
 
     @Test
     @DisplayName("walks nothing for a blank artifact or a non-positive depth")
     void nothingToWalk() {
-      assertThat(gateway.transitiveDependencyUrns(null, 10)).isEmpty();
-      assertThat(gateway.transitiveDependencyUrns("  ", 10)).isEmpty();
-      assertThat(gateway.transitiveDependencyUrns(PIPELINE_URN, 0)).isEmpty();
-      verify(modelForge, never()).dependencies(any());
-    }
-
-    @Test
-    @DisplayName("reports whether the registry holds an artifact")
-    void reportsExistence() {
-      when(modelForge.getArtifact(new ArtifactId(STRUCTURE_URN)))
-          .thenReturn(
-              Optional.of(
-                  new ArtifactView(
-                      new ArtifactId(STRUCTURE_URN), new ObjectMapper().createObjectNode())));
-
-      assertThat(gateway.exists(STRUCTURE_URN)).isTrue();
-      assertThat(gateway.exists(null)).isFalse();
-      assertThat(gateway.exists("")).isFalse();
-    }
-
-    @Test
-    @DisplayName("reports an artifact the registry does not hold as absent")
-    void reportsAbsence() {
-      when(modelForge.getArtifact(new ArtifactId(STRUCTURE_URN))).thenReturn(Optional.empty());
-
-      assertThat(gateway.exists(STRUCTURE_URN)).isFalse();
-    }
-
-    @Test
-    @DisplayName("names an artifact's kind from its URN")
-    void namesTheArtifactKind() {
-      assertThat(gateway.artifactType(STRUCTURE_URN)).isEqualTo("datastructure");
-      assertThat(gateway.artifactType(PIPELINE_URN)).isEqualTo("pipeline");
+      assertThat(gateway.closure(null, 10).artifacts()).isEmpty();
+      assertThat(gateway.closure("  ", 10).artifacts()).isEmpty();
+      assertThat(gateway.closure(PIPELINE_URN, 0).artifacts()).isEmpty();
+      verify(modelForge, never()).closure(any());
     }
   }
 }

@@ -10,6 +10,7 @@ import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
 import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
+import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.Diagnostic;
@@ -37,10 +38,12 @@ import de.civitascore.modelforge.validation.CoreSchemaValidator;
 import de.civitascore.modelforge.validation.ModelValidator;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -217,6 +220,45 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             .map(origin -> new DependencyGraphView.Edge(origin, source, "depends-on"))
             .toList();
         return new DependencyGraphView(nodes, edges);
+    }
+
+    @Override
+    public Set<ArtifactId> existing(Collection<ArtifactId> artifactIds) {
+        if (artifactIds == null || artifactIds.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> held = registry.heldUrns(artifactIds.stream()
+            .filter(Objects::nonNull)
+            .map(ArtifactId::value)
+            .toList());
+        return artifactIds.stream()
+            .filter(id -> id != null && held.contains(id.value()))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    @Override
+    public DependencyClosureView closure(DependencyQuery query) {
+        if (query.maxDepth() == null) {
+            throw new IllegalArgumentException("A closure query must state its maxDepth");
+        }
+        ArtifactId root = query.artifactId();
+        String rootLogical = UrnParser.logicalUrn(root.value());
+        // The walk surfaces the root itself when a cycle leads back to it, and a cycle may reach a
+        // different version of it. The closure is what the root participates in, so drop the whole
+        // root artifact by logical identity.
+        List<String> members = dependencyGraph
+            .getTransitiveDependencies(root.value(), query.maxDepth())
+            .stream()
+            .filter(urn -> !rootLogical.equals(UrnParser.logicalUrn(urn)))
+            .toList();
+        // One probe for the whole closure. It is not redundant with the walk: the graph hands back a
+        // pinned target verbatim without looking it up, so a pin whose version was never stored
+        // arrives here unverified.
+        Set<String> held = registry.heldUrns(members);
+        return new DependencyClosureView(
+            root,
+            members.stream().map(ArtifactId::new).toList(),
+            members.stream().filter(urn -> !held.contains(urn)).map(ArtifactId::new).toList());
     }
 
     @Override

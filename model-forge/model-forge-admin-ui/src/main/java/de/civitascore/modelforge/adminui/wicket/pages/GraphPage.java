@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 import de.civitascore.modelforge.adminui.wicket.BasePage;
+import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.DependencyGraphView;
@@ -15,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.wicket.markup.head.IHeaderResponse;
 import org.apache.wicket.markup.head.JavaScriptHeaderItem;
 import org.apache.wicket.markup.head.OnDomReadyHeaderItem;
@@ -170,6 +172,7 @@ public class GraphPage extends BasePage {
 
         Map<String, String> nodeGroups = new LinkedHashMap<>();
         Map<String, String> nodeLabels = new LinkedHashMap<>();
+        Set<String> referenced = new LinkedHashSet<>();
         Set<String> edgeKeys = new LinkedHashSet<>();
 
         var artifacts = modelForge.search(new ArtifactSearchQuery(null, null, null, 300, 0));
@@ -183,8 +186,22 @@ public class GraphPage extends BasePage {
 
         for (ArtifactSummary artifact : artifacts) {
             var query = new DependencyQuery(artifact.artifactId());
-            collectEdges(modelForge.dependencies(query), nodeGroups, nodeLabels, edgesArray, edgeKeys);
-            collectEdges(modelForge.mapsTo(query), nodeGroups, nodeLabels, edgesArray, edgeKeys);
+            collectEdges(modelForge.dependencies(query), referenced, nodeLabels, edgesArray, edgeKeys);
+            collectEdges(modelForge.mapsTo(query), referenced, nodeLabels, edgesArray, edgeKeys);
+        }
+
+        // Reference targets the listing above did not already cover. A listed artifact exists by
+        // construction, so only these need asking about — and the registry, not the listing, is what
+        // knows whether they are held.
+        referenced.removeAll(nodeGroups.keySet());
+        Set<String> held = modelForge.existing(referenced.stream().map(ArtifactId::new).toList())
+            .stream()
+            .map(ArtifactId::value)
+            .collect(Collectors.toSet());
+        for (String urn : referenced) {
+            // Nodes are logical — one per artifact, versions collapsed — so the question asked is
+            // whether the artifact exists at all; a per-version answer would have no node to sit on.
+            nodeGroups.put(urn, held.contains(urn) ? groupForUrn(urn, null) : GROUP_UNRESOLVED);
         }
 
         nodeGroups.forEach((urn, group) -> {
@@ -201,7 +218,7 @@ public class GraphPage extends BasePage {
 
     private void collectEdges(
         DependencyGraphView graph,
-        Map<String, String> nodeGroups,
+        Set<String> referenced,
         Map<String, String> nodeLabels,
         ArrayNode edgesArray,
         Set<String> edgeKeys
@@ -209,10 +226,10 @@ public class GraphPage extends BasePage {
         ObjectMapper mapper = new ObjectMapper();
         for (var node : graph.nodes()) {
             String nodeUrn = UrnParser.logicalUrn(node.artifactId().value());
-            // Registered artifacts are seeded into nodeGroups above, so a URN still absent here is
-            // a reference target the registry does not hold — deleted, or never imported. The edge
-            // is kept deliberately; the node is grouped so it does not read as an existing artifact.
-            nodeGroups.putIfAbsent(nodeUrn, GROUP_UNRESOLVED);
+            // Only collected here. Whether the registry holds this URN is settled after the walk by
+            // one existence call (see buildGraphJson); inferring it from the search page instead
+            // marked every artifact past that page's row limit as a missing reference.
+            referenced.add(nodeUrn);
             nodeLabels.putIfAbsent(nodeUrn, node.label());
         }
         for (var edge : graph.edges()) {

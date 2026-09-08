@@ -5,6 +5,7 @@ import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
+import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
@@ -71,6 +72,14 @@ public class ModelRegistryGateway {
    * keyword's value (or {@code null} when the document carries none).
    */
   public record RegistryDocument(Map<String, Object> content, Map<String, Object> styles) {}
+
+  /**
+   * The artifacts a flow participates in, and the subset of them the registry does not hold.
+   *
+   * @param artifacts every artifact the walk reached, entry artifact excluded
+   * @param unresolved those of {@code artifacts} the registry no longer holds
+   */
+  public record ArtifactClosure(Set<String> artifacts, Set<String> unresolved) {}
 
   /**
    * Stores a model (with its styles merged in as {@value #X_UI_STYLES}) in the registry and returns
@@ -247,60 +256,33 @@ public class ModelRegistryGateway {
   }
 
   /**
-   * The versioned CORE URNs of every artifact reachable from {@code urn} within {@code maxDepth}
-   * reference hops, excluding {@code urn} itself — the participating closure of a flow.
+   * A flow's participating closure: every artifact reachable from {@code urn} within {@code
+   * maxDepth} reference hops, and which of them the registry no longer holds.
    *
    * <p>Unlike {@link #dependencyUrnsOfType}, which reports direct edges of one type, this walks the
-   * graph transitively. Model Forge's walk is level-bounded and guards against a cyclic graph with
-   * a visited set, so a mutually referencing pair terminates rather than recursing. It applies no
-   * bound on how many artifacts it returns; a caller that needs one enforces it on the result.
+   * graph transitively. The walk is level-bounded and guards a cyclic graph with a visited set, so
+   * a mutually referencing pair terminates rather than recursing. The entry artifact is not a
+   * member of its own closure.
    *
-   * <p>A returned URN is not a promise that the artifact exists: an unresolved reference — one
-   * whose target the registry no longer holds — is deliberately kept as an edge, so it appears here
-   * and is only detected by {@link #exists}.
+   * <p>An unresolved reference — one whose target the registry no longer holds — is deliberately
+   * kept as an edge, so it is reached by the walk and reported in {@code unresolved} rather than
+   * silently missing. The registry answers that for the whole closure at once.
    *
-   * @param urn the flow's entry artifact, logical or versioned; null or blank yields an empty set
-   * @param maxDepth how many hops to walk; zero or negative yields an empty set
+   * @param urn the flow's entry artifact, logical or versioned; null or blank yields an empty
+   *     closure
+   * @param maxDepth how many hops to walk; zero or negative yields an empty closure
    */
-  public Set<String> transitiveDependencyUrns(String urn, int maxDepth) {
+  public ArtifactClosure closure(String urn, int maxDepth) {
     if (urn == null || urn.isBlank() || maxDepth <= 0) {
-      return Set.of();
+      return new ArtifactClosure(Set.of(), Set.of());
     }
-    return modelForge
-        .dependencies(new DependencyQuery(new ArtifactId(urn), maxDepth))
-        .nodes()
-        .stream()
-        .map(node -> node.artifactId().value())
-        .filter(candidate -> !candidate.equals(urn))
-        .collect(Collectors.toCollection(LinkedHashSet::new));
+    DependencyClosureView view =
+        modelForge.closure(new DependencyQuery(new ArtifactId(urn), maxDepth));
+    return new ArtifactClosure(urns(view.closure()), urns(view.unresolved()));
   }
 
-  /**
-   * Whether the registry holds the artifact behind {@code urn}, of any kind.
-   *
-   * <p>Reads the artifact's own content rather than a bundled view, so it does not resolve the
-   * references the artifact makes — the question is whether this one artifact is there.
-   *
-   * @param urn a logical or versioned CORE URN; null or blank is not held
-   */
-  public boolean exists(String urn) {
-    if (urn == null || urn.isBlank()) {
-      return false;
-    }
-    return modelForge.getArtifact(new ArtifactId(urn)).isPresent();
-  }
-
-  /**
-   * The CORE artifact-type segment of a URN — {@code element}, {@code datastructure}, {@code
-   * dataset}, {@code mapping}, {@code pipeline}, {@code datasource} or {@code datasink}. Exposed so
-   * host services can dispatch on artifact kind without importing Model Forge's {@code UrnParser},
-   * as {@link #logicalUrn} is.
-   *
-   * @param urn a logical or versioned CORE URN
-   * @return the type segment, or null when {@code urn} is not a well-formed CORE URN
-   */
-  public String artifactType(String urn) {
-    return UrnParser.artifactTypeFromUrn(urn);
+  private static Set<String> urns(List<ArtifactId> ids) {
+    return ids.stream().map(ArtifactId::value).collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**

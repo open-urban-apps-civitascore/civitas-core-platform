@@ -6,7 +6,6 @@ import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.PipelineClosureTooLargeException;
 import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -183,32 +182,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         createProblemDetail(
             HttpStatus.UNPROCESSABLE_ENTITY, "PIPELINE_CLOSURE_INVALID", ex.getMessage(), request);
     pd.setProperty("findings", ex.getFindings());
-    return pd;
-  }
-
-  /**
-   * Maps a refused, unexamined closure onto 422. Distinct from {@link
-   * #handlePipelineClosureValidation} because it names no offending artifact — the bound was hit
-   * before any was examined.
-   *
-   * @param ex the exception carrying the oversized flows
-   * @param request the current HTTP request
-   * @return a Problem Detail with HTTP 422 status and an {@code oversizedClosures} property
-   */
-  @ExceptionHandler(PipelineClosureTooLargeException.class)
-  @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
-  public ProblemDetail handlePipelineClosureTooLarge(
-      PipelineClosureTooLargeException ex, HttpServletRequest request) {
-    log.warn(
-        "Pipeline closure exceeds the configured bound for {} pipeline(s)",
-        ex.getOversizedClosures().size());
-    ProblemDetail pd =
-        createProblemDetail(
-            HttpStatus.UNPROCESSABLE_ENTITY,
-            "PIPELINE_CLOSURE_TOO_LARGE",
-            ex.getMessage(),
-            request);
-    pd.setProperty("oversizedClosures", ex.getOversizedClosures());
     return pd;
   }
 

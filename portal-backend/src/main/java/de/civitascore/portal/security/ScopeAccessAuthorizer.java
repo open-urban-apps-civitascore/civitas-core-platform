@@ -6,8 +6,6 @@ import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import de.civitascore.portal.service.AssignmentService;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -72,35 +70,8 @@ public class ScopeAccessAuthorizer {
    *     the caller is not authorized for one of the referenced entities
    */
   public void authorizeReferences(ScopeType scopeType, Collection<UUID> requestedIds) {
-    Set<UUID> unauthorized = unauthorizedReferences(scopeType, requestedIds);
-    if (!unauthorized.isEmpty()) {
-      throw new AccessDeniedException(
-          "Not authorized to reference " + scopeType + " " + unauthorized);
-    }
-  }
-
-  /**
-   * The same decision as {@link #authorizeReferences}, reporting which of the referenced entities
-   * the caller may not use instead of failing on them.
-   *
-   * <p>For a caller that must attribute a denial to individual entities — validating a whole set
-   * and reporting every offender at once — rather than stop at the first. Deciding once for the
-   * whole set also keeps the caller's assignments to a single lookup, however many entities are
-   * asked about.
-   *
-   * <p>The systemic denials still throw, because they are properties of the request rather than of
-   * any entity in it: an unauthenticated caller, an absent scope header, or a scope type with no
-   * read permission mapped.
-   *
-   * @param scopeType the scope type of the referenced entities
-   * @param requestedIds the referenced entity IDs; null or empty asks nothing and denies nothing
-   * @return the subset the caller is not authorized for, empty when all are granted
-   * @throws AccessDeniedException if the caller is unauthenticated, the scope header is absent, or
-   *     the scope type has no read permission mapping
-   */
-  public Set<UUID> unauthorizedReferences(ScopeType scopeType, Collection<UUID> requestedIds) {
     if (requestedIds == null || requestedIds.isEmpty()) {
-      return Set.of();
+      return;
     }
 
     AllowedScopes scopes = allowedScopesProvider.getObject();
@@ -120,7 +91,7 @@ public class ScopeAccessAuthorizer {
           scopeType,
           Encode.forJava(externalId),
           requestedIds);
-      return Set.of();
+      return;
     }
 
     PermissionName readPermission = READ_PERMISSIONS.get(scopeType);
@@ -140,7 +111,7 @@ public class ScopeAccessAuthorizer {
           scopeType,
           Encode.forJava(externalId),
           requestedIds);
-      return Set.of();
+      return;
     }
 
     Set<UUID> permittedIds = permittedScopeIds(assignments, scopeType, readPermission);
@@ -154,8 +125,8 @@ public class ScopeAccessAuthorizer {
           Encode.forJava(externalId),
           requestedIds,
           unauthorized);
-      // Insertion-ordered so the denial message reads in the order the caller asked.
-      return Collections.unmodifiableSet(new LinkedHashSet<>(unauthorized));
+      throw new AccessDeniedException(
+          "Not authorized to reference " + scopeType + " " + unauthorized);
     }
 
     log.info(
@@ -163,7 +134,6 @@ public class ScopeAccessAuthorizer {
         scopeType,
         Encode.forJava(externalId),
         requestedIds);
-    return Set.of();
   }
 
   private String currentUserExternalId() {

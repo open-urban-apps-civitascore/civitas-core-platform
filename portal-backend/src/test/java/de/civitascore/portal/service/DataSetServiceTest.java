@@ -44,7 +44,6 @@ import de.civitascore.portal.service.closure.ClosureFinding;
 import de.civitascore.portal.service.closure.PipelineClosureValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.PipelineClosureTooLargeException;
 import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.SagaInFlightException;
@@ -2458,27 +2457,6 @@ class DataSetServiceTest {
       assertThat(ds.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
       assertThat(ds.getPendingSagaType()).isNull();
       verify(dataSetRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("a flow too large to examine also publishes no saga")
-    void oversizedClosureBlocksTheRelease() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = releasable(id);
-      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
-      doThrow(
-              new PipelineClosureTooLargeException(
-                  List.of(
-                      new PipelineClosureTooLargeException.OversizedClosure(
-                          UUID.randomUUID(), 900, 500))))
-          .when(pipelineClosureValidator)
-          .validate(any());
-
-      assertThatThrownBy(() -> createService().release(id))
-          .isInstanceOf(PipelineClosureTooLargeException.class);
-
-      verify(sagaPublisher, never()).publishCreateRequested(any());
-      assertThat(ds.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     }
 
     @Test

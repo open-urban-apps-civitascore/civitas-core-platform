@@ -1,6 +1,7 @@
 package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -81,4 +82,17 @@ public interface DataStructureVersionRepository extends BaseRepository<DataStruc
    */
   @EntityGraph(attributePaths = {"dataStructure"})
   List<DataStructureVersion> findAllByModelUrn(String modelUrn);
+
+  /**
+   * Every version pinned by any of {@code modelUrns} — the bulk form of {@link #findAllByModelUrn},
+   * so validating a whole flow is one query rather than one per artifact.
+   *
+   * <p>A URN with no row here is one the platform holds no lifecycle record for, which is what
+   * distinguishes an artifact it governs from one it merely stores.
+   *
+   * @param modelUrns the versioned CORE URNs a flow pins
+   * @return every version pinning any of them, empty when none is known
+   */
+  @EntityGraph(attributePaths = {"dataStructure"})
+  List<DataStructureVersion> findAllByModelUrnIn(Collection<String> modelUrns);
 }

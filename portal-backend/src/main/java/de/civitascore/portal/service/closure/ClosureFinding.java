@@ -1,24 +1,21 @@
 package de.civitascore.portal.service.closure;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
- * One reason a participating artifact blocks its dataset from being staged or released.
+ * One reason a participating artifact blocks its Data Set from being staged or released.
  *
  * <p>The reason vocabulary is deliberately coarser than the conditions behind it. An artifact that
- * does not resolve, one the platform holds no lifecycle record for, and one the caller may not read
- * all report {@link Reason#NOT_AVAILABLE}: reporting them apart would disclose the existence and
- * name of a model the caller is not entitled to see, since the walk reaches artifacts the caller
- * never named. The distinction is recorded in the log instead.
+ * does not resolve, one the platform holds no lifecycle record of, and one the caller may not read
+ * all report {@link Reason#NOT_AVAILABLE}: telling them apart would disclose the existence and name
+ * of a model the caller is not entitled to see, since the walk reaches artifacts the caller never
+ * named. The distinction is recorded in the log instead.
  *
  * @param pipelineId the pipeline whose flow reaches the artifact
- * @param artifactUrn the versioned CORE URN of the offending artifact
+ * @param artifactUrn the CORE URN of the offending artifact
  * @param reason why it blocks
- * @param details diagnostics for {@link Reason#INVALID}; empty for every other reason
  */
-public record ClosureFinding(
-    UUID pipelineId, String artifactUrn, Reason reason, List<String> details) {
+public record ClosureFinding(UUID pipelineId, String artifactUrn, Reason reason) {
 
   /** Why a participating artifact blocks publication. */
   public enum Reason {
@@ -28,29 +25,14 @@ public record ClosureFinding(
      */
     NOT_AVAILABLE,
     /** Resolves and is readable, but is still a draft. */
-    NOT_RELEASED,
-    /**
-     * Resolves, is readable and is released, but its stored model no longer compiles. Not a
-     * complete correctness statement: the registry's schema validation strips CORE-URN {@code
-     * $ref}s before compiling, so a reference to a deleted artifact is caught by the closure walk
-     * finding that artifact absent, not by this reason.
-     */
-    INVALID
-  }
-
-  public ClosureFinding {
-    details = List.copyOf(details);
+    NOT_RELEASED
   }
 
   public static ClosureFinding notAvailable(UUID pipelineId, String artifactUrn) {
-    return new ClosureFinding(pipelineId, artifactUrn, Reason.NOT_AVAILABLE, List.of());
+    return new ClosureFinding(pipelineId, artifactUrn, Reason.NOT_AVAILABLE);
   }
 
   public static ClosureFinding notReleased(UUID pipelineId, String artifactUrn) {
-    return new ClosureFinding(pipelineId, artifactUrn, Reason.NOT_RELEASED, List.of());
-  }
-
-  public static ClosureFinding invalid(UUID pipelineId, String artifactUrn, List<String> details) {
-    return new ClosureFinding(pipelineId, artifactUrn, Reason.INVALID, details);
+    return new ClosureFinding(pipelineId, artifactUrn, Reason.NOT_RELEASED);
   }
 }

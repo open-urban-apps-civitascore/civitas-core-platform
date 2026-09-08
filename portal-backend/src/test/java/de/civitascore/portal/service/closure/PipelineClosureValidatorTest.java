@@ -5,31 +5,33 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
+import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.entity.DataStructure;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.util.PipelineClosureTooLargeException;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.PipelineClosureValidationException;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PipelineClosureValidator")
@@ -37,45 +39,29 @@ class PipelineClosureValidatorTest {
 
   private static final String PIPELINE_URN =
       "urn:core:platform:civitas:pipeline:common:Ingest:aaaaaaaaaa:1.0.0";
+  private static final String OTHER_PIPELINE_URN =
+      "urn:core:platform:civitas:pipeline:common:Second:dddddddddd:1.0.0";
   private static final String STRUCTURE_URN =
       "urn:core:platform:civitas:datastructure:common:Sensor:bbbbbbbbbb:1.0.0";
   private static final String ELEMENT_URN =
       "urn:core:platform:civitas:element:common:Address:cccccccccc:1.0.0";
 
   @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private DataStructureVersionRepository dataStructureVersionRepository;
+  @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
 
-  /** Records what it was handed, so dispatch and batching can be asserted. */
-  private static final class RecordingCheck implements ClosureNodeCheck {
-    private final String artifactType;
-    private final List<List<ClosureNode>> calls = new ArrayList<>();
-    private List<ClosureFinding> findings = List.of();
+  private final UUID pipelineId = UUID.randomUUID();
 
-    private RecordingCheck(String artifactType) {
-      this.artifactType = artifactType;
-    }
-
-    @Override
-    public String artifactType() {
-      return artifactType;
-    }
-
-    @Override
-    public List<ClosureFinding> check(List<ClosureNode> nodes) {
-      calls.add(List.copyOf(nodes));
-      return findings;
-    }
+  private PipelineClosureValidator validator() {
+    return validator(10);
   }
 
-  private PipelineClosureValidator validator(List<ClosureNodeCheck> checks) {
-    return validator(checks, 10, 500);
-  }
-
-  private PipelineClosureValidator validator(
-      List<ClosureNodeCheck> checks, int maxDepth, int maxArtifacts) {
+  private PipelineClosureValidator validator(int maxDepth) {
     return new PipelineClosureValidator(
         modelRegistryGateway,
-        new PipelineClosureValidationProperties(maxDepth, maxArtifacts),
-        checks);
+        dataStructureVersionRepository,
+        scopeAccessAuthorizer,
+        new PipelineClosureValidationProperties(maxDepth));
   }
 
   private static Pipeline pipeline(UUID id, String modelUrn) {
@@ -85,17 +71,38 @@ class PipelineClosureValidatorTest {
     return pipeline;
   }
 
-  private void closureOf(String pipelineUrn, String... urns) {
+  /** What the registry reports for a flow: everything it reaches, and what it no longer holds. */
+  private void closureOf(String pipelineUrn, Set<String> artifacts, Set<String> unresolved) {
     lenient()
-        .when(modelRegistryGateway.transitiveDependencyUrns(eq(pipelineUrn), anyInt()))
-        .thenReturn(new LinkedHashSet<>(List.of(urns)));
+        .when(modelRegistryGateway.closure(eq(pipelineUrn), anyInt()))
+        .thenReturn(new ModelRegistryGateway.ArtifactClosure(artifacts, unresolved));
   }
 
-  private void allResolve() {
-    lenient().when(modelRegistryGateway.exists(anyString())).thenReturn(true);
-    lenient()
-        .when(modelRegistryGateway.artifactType(anyString()))
-        .thenAnswer(call -> call.getArgument(0, String.class).split(":")[4]);
+  private static DataStructureVersion version(
+      String modelUrn, DataStructureVersionStatus versionStatus, DataStructureStatus parentStatus) {
+    DataStructure parent = new DataStructure();
+    parent.setId(UUID.randomUUID());
+    parent.setDataStructureStatus(parentStatus);
+    DataStructureVersion version = new DataStructureVersion();
+    version.setId(UUID.randomUUID());
+    version.setModelUrn(modelUrn);
+    version.setDataStructure(parent);
+    version.setDataStructureVersionStatus(versionStatus);
+    return version;
+  }
+
+  private static DataStructureVersion released(String modelUrn) {
+    return version(modelUrn, DataStructureVersionStatus.AVAILABLE, DataStructureStatus.AVAILABLE);
+  }
+
+  private static List<ClosureFinding> findingsOf(Throwable thrown) {
+    return ((PipelineClosureValidationException) thrown).getFindings();
+  }
+
+  private void denyEveryStructure() {
+    doThrow(new AccessDeniedException("denied"))
+        .when(scopeAccessAuthorizer)
+        .authorizeReferences(any(), any());
   }
 
   @Nested
@@ -103,244 +110,236 @@ class PipelineClosureValidatorTest {
   class TheWalk {
 
     @Test
-    @DisplayName("bounds the traversal depth it asks the registry for")
+    @DisplayName("asks the registry only as deep as it is configured to")
     void passesTheConfiguredDepth() {
-      UUID pipelineId = UUID.randomUUID();
-      when(modelRegistryGateway.transitiveDependencyUrns(PIPELINE_URN, 7)).thenReturn(Set.of());
+      closureOf(PIPELINE_URN, Set.of(), Set.of());
 
-      validator(List.of(), 7, 500).validate(List.of(pipeline(pipelineId, PIPELINE_URN)));
+      validator(7).validate(List.of(pipeline(pipelineId, PIPELINE_URN)));
 
-      verify(modelRegistryGateway).transitiveDependencyUrns(PIPELINE_URN, 7);
+      verify(modelRegistryGateway).closure(PIPELINE_URN, 7);
     }
 
     @Test
     @DisplayName("skips a pipeline whose flow has not been authored yet")
     void skipsPipelineWithoutAModel() {
-      validator(List.of()).validate(List.of(pipeline(UUID.randomUUID(), null)));
+      validator().validate(List.of(pipeline(pipelineId, null)));
 
-      verify(modelRegistryGateway, never()).transitiveDependencyUrns(any(), anyInt());
+      verify(modelRegistryGateway, never()).closure(any(), anyInt());
     }
 
     @Test
-    @DisplayName("examines each pipeline's own flow, so several are all walked")
+    @DisplayName("examines every pipeline's own flow")
     void walksEveryPipeline() {
-      String otherPipelineUrn = "urn:core:platform:civitas:pipeline:common:Second:dddddddddd:1.0.0";
-      closureOf(PIPELINE_URN, STRUCTURE_URN);
-      closureOf(otherPipelineUrn, ELEMENT_URN);
-      allResolve();
-      RecordingCheck check = new RecordingCheck("datastructure");
+      closureOf(PIPELINE_URN, Set.of(), Set.of());
+      closureOf(OTHER_PIPELINE_URN, Set.of(), Set.of());
 
-      validator(List.of(check))
+      validator()
           .validate(
               List.of(
-                  pipeline(UUID.randomUUID(), PIPELINE_URN),
-                  pipeline(UUID.randomUUID(), otherPipelineUrn)));
+                  pipeline(pipelineId, PIPELINE_URN),
+                  pipeline(UUID.randomUUID(), OTHER_PIPELINE_URN)));
 
-      verify(modelRegistryGateway).transitiveDependencyUrns(PIPELINE_URN, 10);
-      verify(modelRegistryGateway).transitiveDependencyUrns(otherPipelineUrn, 10);
+      verify(modelRegistryGateway).closure(PIPELINE_URN, 10);
+      verify(modelRegistryGateway).closure(OTHER_PIPELINE_URN, 10);
+    }
+
+    @Test
+    @DisplayName("passes a dataset with no pipelines")
+    void noPipelinesIsNothingToValidate() {
+      assertThatCode(() -> validator().validate(List.of())).doesNotThrowAnyException();
+      assertThatCode(() -> validator().validate(null)).doesNotThrowAnyException();
     }
   }
 
   @Nested
-  @DisplayName("resolvability")
-  class Resolvability {
+  @DisplayName("what a participating artifact must satisfy")
+  class WhatAParticipatingArtifactMustSatisfy {
 
     @Test
-    @DisplayName("reports an artifact the registry no longer holds as not available")
-    void unresolvedArtifactIsReported() {
-      UUID pipelineId = UUID.randomUUID();
-      closureOf(PIPELINE_URN, ELEMENT_URN);
-      when(modelRegistryGateway.exists(ELEMENT_URN)).thenReturn(false);
+    @DisplayName("an artifact the registry no longer holds blocks the flow")
+    void unresolvedArtifactBlocks() {
+      closureOf(PIPELINE_URN, Set.of(ELEMENT_URN), Set.of(ELEMENT_URN));
 
-      assertThatThrownBy(
-              () -> validator(List.of()).validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
+      assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
           .isInstanceOf(PipelineClosureValidationException.class)
           .satisfies(
               thrown ->
-                  assertThat(((PipelineClosureValidationException) thrown).getFindings())
+                  assertThat(findingsOf(thrown))
                       .containsExactly(ClosureFinding.notAvailable(pipelineId, ELEMENT_URN)));
     }
 
     @Test
-    @DisplayName("holds an artifact of a kind no check covers to resolvability alone")
-    void resolvableArtifactOfUncheckedKindPasses() {
-      closureOf(PIPELINE_URN, ELEMENT_URN);
-      allResolve();
+    @DisplayName("a member element is held to resolvability alone")
+    void aResolvableElementPasses() {
+      closureOf(PIPELINE_URN, Set.of(ELEMENT_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any())).thenReturn(List.of());
 
-      assertThatCode(
-              () ->
-                  validator(List.of(new RecordingCheck("datastructure")))
-                      .validate(List.of(pipeline(UUID.randomUUID(), PIPELINE_URN))))
+      assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
+          .as("an element carries no version record, so there is no lifecycle to judge")
           .doesNotThrowAnyException();
     }
 
     @Test
-    @DisplayName("does not hand an unresolved artifact to its kind's check")
-    void unresolvedArtifactIsNotChecked() {
-      closureOf(PIPELINE_URN, STRUCTURE_URN);
-      when(modelRegistryGateway.exists(STRUCTURE_URN)).thenReturn(false);
-      RecordingCheck check = new RecordingCheck("datastructure");
+    @DisplayName("asks the platform about a whole flow in one query")
+    void looksUpGovernanceOnce() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN, ELEMENT_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+          .thenReturn(List.of(released(STRUCTURE_URN)));
 
-      assertThatThrownBy(
-              () ->
-                  validator(List.of(check))
-                      .validate(List.of(pipeline(UUID.randomUUID(), PIPELINE_URN))))
-          .isInstanceOf(PipelineClosureValidationException.class);
+      validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN)));
 
-      assertThat(check.calls).as("nothing can be asked of an artifact that is not there").isEmpty();
-    }
-  }
-
-  @Nested
-  @DisplayName("dispatch to a kind's check")
-  class Dispatch {
-
-    @Test
-    @DisplayName("hands every node of a kind over in one call, across all pipelines")
-    void batchesNodesOfOneKindAcrossPipelines() {
-      String otherPipelineUrn = "urn:core:platform:civitas:pipeline:common:Second:dddddddddd:1.0.0";
-      String otherStructureUrn =
-          "urn:core:platform:civitas:datastructure:common:Other:eeeeeeeeee:1.0.0";
-      UUID firstPipeline = UUID.randomUUID();
-      UUID secondPipeline = UUID.randomUUID();
-      closureOf(PIPELINE_URN, STRUCTURE_URN, ELEMENT_URN);
-      closureOf(otherPipelineUrn, otherStructureUrn);
-      allResolve();
-      RecordingCheck check = new RecordingCheck("datastructure");
-
-      validator(List.of(check))
-          .validate(
-              List.of(
-                  pipeline(firstPipeline, PIPELINE_URN),
-                  pipeline(secondPipeline, otherPipelineUrn)));
-
-      assertThat(check.calls).as("one call, not one per artifact or per pipeline").hasSize(1);
-      assertThat(check.calls.getFirst())
-          .containsExactly(
-              new ClosureNode(firstPipeline, STRUCTURE_URN, "datastructure"),
-              new ClosureNode(secondPipeline, otherStructureUrn, "datastructure"));
+      verify(dataStructureVersionRepository).findAllByModelUrnIn(any());
     }
 
     @Test
-    @DisplayName("gives a check only the nodes of its own kind")
-    void dispatchesByArtifactType() {
-      closureOf(PIPELINE_URN, STRUCTURE_URN, ELEMENT_URN);
-      allResolve();
-      RecordingCheck structures = new RecordingCheck("datastructure");
-      RecordingCheck mappings = new RecordingCheck("mapping");
+    @DisplayName("a released, readable data structure passes")
+    void aReleasedStructurePasses() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+          .thenReturn(List.of(released(STRUCTURE_URN)));
 
-      validator(List.of(structures, mappings))
-          .validate(List.of(pipeline(UUID.randomUUID(), PIPELINE_URN)));
-
-      assertThat(structures.calls.getFirst())
-          .singleElement()
-          .extracting(ClosureNode::artifactUrn)
-          .isEqualTo(STRUCTURE_URN);
-      assertThat(mappings.calls).as("no mapping was reached, so its check is not called").isEmpty();
+      assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
+          .doesNotThrowAnyException();
     }
 
     @Test
-    @DisplayName("reports findings from every kind's check together in one failure")
-    void collectsFindingsAcrossChecks() {
-      UUID pipelineId = UUID.randomUUID();
-      String mappingUrn = "urn:core:platform:civitas:mapping:common:Temp:ffffffffff:1.0.0";
-      closureOf(PIPELINE_URN, STRUCTURE_URN, mappingUrn);
-      allResolve();
-      RecordingCheck structures = new RecordingCheck("datastructure");
-      structures.findings = List.of(ClosureFinding.notReleased(pipelineId, STRUCTURE_URN));
-      RecordingCheck mappings = new RecordingCheck("mapping");
-      mappings.findings =
-          List.of(ClosureFinding.invalid(pipelineId, mappingUrn, List.of("broken")));
-
-      assertThatThrownBy(
-              () ->
-                  validator(List.of(structures, mappings))
-                      .validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
-          .isInstanceOf(PipelineClosureValidationException.class)
-          .satisfies(
-              thrown ->
-                  assertThat(((PipelineClosureValidationException) thrown).getFindings())
-                      .as("one attempt names everything that needs repairing")
-                      .hasSize(2));
-    }
-  }
-
-  @Nested
-  @DisplayName("the artifact bound")
-  class TheArtifactBound {
-
-    @Test
-    @DisplayName("refuses a flow reaching more artifacts than the bound")
-    void refusesAnOversizedClosure() {
-      UUID pipelineId = UUID.randomUUID();
-      Set<String> tooMany =
-          IntStream.range(0, 4)
-              .mapToObj(i -> "urn:core:platform:civitas:element:common:E" + i + ":gggggggggg:1.0.0")
-              .collect(Collectors.toCollection(LinkedHashSet::new));
-      when(modelRegistryGateway.transitiveDependencyUrns(PIPELINE_URN, 10)).thenReturn(tooMany);
-
-      assertThatThrownBy(
-              () ->
-                  validator(List.of(), 10, 3).validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
-          .isInstanceOf(PipelineClosureTooLargeException.class)
-          .satisfies(
-              thrown ->
-                  assertThat(((PipelineClosureTooLargeException) thrown).getOversizedClosures())
-                      .containsExactly(
-                          new PipelineClosureTooLargeException.OversizedClosure(pipelineId, 4, 3)));
-    }
-
-    @Test
-    @DisplayName("examines no artifact of an oversized flow")
-    void examinesNothingWhenOversized() {
-      Set<String> tooMany =
-          new LinkedHashSet<>(
-              List.of(
-                  STRUCTURE_URN,
-                  ELEMENT_URN,
-                  "urn:core:platform:civitas:element:common:Third:hhhhhhhhhh:1.0.0"));
-      when(modelRegistryGateway.transitiveDependencyUrns(PIPELINE_URN, 10)).thenReturn(tooMany);
-      RecordingCheck check = new RecordingCheck("datastructure");
-
-      assertThatThrownBy(
-              () ->
-                  validator(List.of(check), 10, 2)
-                      .validate(List.of(pipeline(UUID.randomUUID(), PIPELINE_URN))))
-          .isInstanceOf(PipelineClosureTooLargeException.class);
-
-      verify(modelRegistryGateway, never()).exists(anyString());
-      assertThat(check.calls).isEmpty();
-    }
-
-    @Test
-    @DisplayName("refuses rather than reporting the flows it did manage to examine")
-    void oversizeHidesPartialFindings() {
-      String otherPipelineUrn = "urn:core:platform:civitas:pipeline:common:Second:dddddddddd:1.0.0";
-      closureOf(PIPELINE_URN, ELEMENT_URN);
-      when(modelRegistryGateway.exists(ELEMENT_URN)).thenReturn(false);
-      when(modelRegistryGateway.transitiveDependencyUrns(otherPipelineUrn, 10))
+    @DisplayName("a data structure still in draft blocks the flow")
+    void aDraftStructureBlocks() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
           .thenReturn(
-              new LinkedHashSet<>(
-                  List.of(
+              List.of(
+                  version(
                       STRUCTURE_URN,
-                      "urn:core:platform:civitas:element:common:Third:hhhhhhhhhh:1.0.0")));
+                      DataStructureVersionStatus.DRAFT,
+                      DataStructureStatus.AVAILABLE)));
+
+      assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
+          .satisfies(
+              thrown ->
+                  assertThat(findingsOf(thrown))
+                      .containsExactly(ClosureFinding.notReleased(pipelineId, STRUCTURE_URN)));
+    }
+
+    @Test
+    @DisplayName("a released version of a data structure still in draft blocks the flow")
+    void aReleasedVersionOfADraftStructureBlocks() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+          .thenReturn(
+              List.of(
+                  version(
+                      STRUCTURE_URN,
+                      DataStructureVersionStatus.AVAILABLE,
+                      DataStructureStatus.DRAFT)));
+
+      assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
+          .satisfies(
+              thrown ->
+                  assertThat(findingsOf(thrown))
+                      .containsExactly(ClosureFinding.notReleased(pipelineId, STRUCTURE_URN)));
+    }
+
+    @Test
+    @DisplayName("one released record is enough, since a flow pins the artifact")
+    void oneReleasedRecordIsEnough() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+          .thenReturn(
+              List.of(
+                  version(
+                      STRUCTURE_URN, DataStructureVersionStatus.DRAFT, DataStructureStatus.DRAFT),
+                  released(STRUCTURE_URN)));
+
+      assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
+          .as("two records pin one artifact when their content is identical")
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("reports every flow's findings together, not the first")
+    void collectsFindingsAcrossPipelines() {
+      UUID otherPipeline = UUID.randomUUID();
+      closureOf(PIPELINE_URN, Set.of(ELEMENT_URN), Set.of(ELEMENT_URN));
+      closureOf(OTHER_PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of(STRUCTURE_URN));
 
       assertThatThrownBy(
               () ->
-                  validator(List.of(), 10, 1)
+                  validator()
                       .validate(
                           List.of(
-                              pipeline(UUID.randomUUID(), PIPELINE_URN),
-                              pipeline(UUID.randomUUID(), otherPipelineUrn))))
-          .as("a partial answer would read as the complete picture")
-          .isInstanceOf(PipelineClosureTooLargeException.class);
+                              pipeline(pipelineId, PIPELINE_URN),
+                              pipeline(otherPipeline, OTHER_PIPELINE_URN))))
+          .satisfies(
+              thrown ->
+                  assertThat(findingsOf(thrown))
+                      .as("one attempt names everything that needs repairing")
+                      .containsExactly(
+                          ClosureFinding.notAvailable(pipelineId, ELEMENT_URN),
+                          ClosureFinding.notAvailable(otherPipeline, STRUCTURE_URN)));
+    }
+
+    @Test
+    @DisplayName("an artifact no flow reaches never enters the question")
+    void nonParticipatingArtifactDoesNotBlock() {
+      // The registry reports what a flow reaches, so a dataset member no flow reaches is simply
+      // absent from the answer and is never examined.
+      closureOf(PIPELINE_URN, Set.of(ELEMENT_URN), Set.of());
+
+      assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
+          .doesNotThrowAnyException();
     }
   }
 
-  @Test
-  @DisplayName("passes a dataset with no pipelines")
-  void noPipelinesIsNothingToValidate() {
-    assertThatCode(() -> validator(List.of()).validate(List.of())).doesNotThrowAnyException();
-    assertThatCode(() -> validator(List.of()).validate(null)).doesNotThrowAnyException();
+  @Nested
+  @DisplayName("withholding what the caller may not know")
+  class Withholding {
+
+    @Test
+    @DisplayName("an artifact the platform holds no record for is held to resolvability alone")
+    void anUngovernedArtifactPasses() {
+      // Forced by the element case: a member element never has a version record, so "no record"
+      // cannot mean "blocked" without blocking every flow on its own elements.
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any())).thenReturn(List.of());
+
+      assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("an unreadable artifact is reported in the same terms as an unresolved one")
+    void unreadableAndUnknownAreIndistinguishable() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+          .thenReturn(List.of(released(STRUCTURE_URN)));
+      denyEveryStructure();
+
+      assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
+          .satisfies(
+              thrown ->
+                  assertThat(findingsOf(thrown))
+                      .as("the difference would be an existence oracle over structure URNs")
+                      .containsExactly(ClosureFinding.notAvailable(pipelineId, STRUCTURE_URN)));
+    }
+
+    @Test
+    @DisplayName("says nothing of the lifecycle of a structure the caller may not read")
+    void withholdsDraftStateFromAnUnauthorizedCaller() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+          .thenReturn(
+              List.of(
+                  version(
+                      STRUCTURE_URN, DataStructureVersionStatus.DRAFT, DataStructureStatus.DRAFT)));
+      denyEveryStructure();
+
+      assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
+          .satisfies(
+              thrown ->
+                  assertThat(findingsOf(thrown))
+                      .as("a draft reason would confirm the structure exists")
+                      .containsExactly(ClosureFinding.notAvailable(pipelineId, STRUCTURE_URN)));
+    }
   }
 }

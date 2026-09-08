@@ -43,6 +43,29 @@ class ArtifactRepository {
     }
 
     /**
+     * The stored versions of the given artifacts, each row carrying its artifact's current-version
+     * pointer — everything needed to decide, without a second query, which of a set of reference
+     * URNs resolves.
+     *
+     * <p>Filtered on {@code logical_urn}, which is unique, so this reads the requested artifacts
+     * rather than scanning every version row. An artifact holding no version contributes no row,
+     * which is what makes it unresolvable.
+     *
+     * @param logicalUrns the logical URNs to report versions for; must not be empty
+     */
+    List<ArtifactVersionIdentity> findVersionIdentities(List<String> logicalUrns) {
+        return jdbc.sql("""
+                select a.logical_urn, a.current_version, v.version
+                  from model_forge.artifact a
+                  join model_forge.artifact_version v on v.artifact_id = a.id
+                 where a.logical_urn in (:logicalUrns)
+                """)
+            .param("logicalUrns", logicalUrns)
+            .query(ArtifactVersionIdentity.class)
+            .list();
+    }
+
+    /**
      * Logical URNs of the given type whose CURRENT version has a stored representation in
      * {@code format} (e.g. elements whose current version stores an XSD). Used by the
      * {@code format=xsd} list filter, where only versions that actually store XSD qualify.
