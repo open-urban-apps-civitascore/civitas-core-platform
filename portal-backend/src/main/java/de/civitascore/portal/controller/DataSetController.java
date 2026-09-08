@@ -264,8 +264,7 @@ public class DataSetController
       responseCode = "422",
       description =
           "A pipeline DataSource is out of the dataset's datapool scope, or an artifact"
-              + " participating in a pipeline's flow cannot carry a release, or a flow reaches"
-              + " more artifacts than the configured bound",
+              + " participating in a pipeline's flow cannot carry a release",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> stage(@PathVariable UUID id) {
     DataSet ready = dataSetService.stage(id);
@@ -301,8 +300,7 @@ public class DataSetController
       responseCode = "422",
       description =
           "A pipeline DataSource is out of the dataset's datapool scope, or an artifact"
-              + " participating in a pipeline's flow cannot carry a release, or a flow reaches"
-              + " more artifacts than the configured bound",
+              + " participating in a pipeline's flow cannot carry a release",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> release(@PathVariable UUID id) {
     DataSet released = dataSetService.release(id);
