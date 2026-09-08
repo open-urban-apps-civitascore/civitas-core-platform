@@ -375,7 +375,9 @@
               "deleteStyle": "Delete Style",
               "validation": {
                 "nameRequired": "Style name is required",
-                "sldContentRequired": "Style content is required"
+                "sldContentRequired": "Style content is required",
+                "sldContentDoctypeNotAllowed": "Style content must not include a DOCTYPE declaration. Remove the <!DOCTYPE ...>",
+                "sldContentMalformed": "Style content is not valid XML"
               },
               "noStyles": {
                 "title": "No styles available",
