@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { getDataset } from '@/app/services/api/datasets/serverRequests'
+import { DATASET_STATUS_TYPES } from '@/types/datasets'
 import { API_STANDARDS, API_TYPE_QUERY, isApiTypeQuery } from '@/types/namedApis'
 import { hasApiType } from '@/utils/namedApis'
 
@@ -20,6 +21,10 @@ const ApisPage = async (props: ApisPageProps) => {
   }
 
   const { data: dataset } = await getDataset(datasetId)
+
+  if (dataset.dataSetStatus !== DATASET_STATUS_TYPES.DRAFT) {
+    redirect(`/datasets/${datasetId}`)
+  }
 
   if (type === API_TYPE_QUERY.OWS && hasApiType(dataset.namedApis ?? [], API_STANDARDS.OWS)) {
     redirect(`/datasets/${datasetId}`)

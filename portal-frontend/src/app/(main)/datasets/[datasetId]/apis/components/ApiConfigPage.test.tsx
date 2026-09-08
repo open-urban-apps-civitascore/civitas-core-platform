@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { UseFormReturn } from 'react-hook-form'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { Dataset } from '@/types/datasets'
+import { Dataset, DATASET_STATUS_TYPES } from '@/types/datasets'
 import { API_TYPE_QUERY, NamedApi, StaApiFormData } from '@/types/namedApis'
 
 import { ApiConfigPage } from './ApiConfigPage'
@@ -19,9 +19,12 @@ const mockReplace = vi.fn()
 const mockRefresh = vi.fn()
 const mockGetSearchParam = vi.fn().mockReturnValue(null)
 
+let mockDatasetData: Dataset
+
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   usePatchDataset: () => ({ mutateAsync: mockPatchDataset, isPending: false }),
   useCreateNamedApi: () => ({ mutateAsync: mockCreateNamedApi, isPending: false }),
+  useGetDataset: () => ({ data: { data: mockDatasetData } }),
 }))
 
 vi.mock('@/app/services/api/datasets/layers/clientRequests', () => ({
@@ -45,12 +48,14 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
+const mockHasPermission = vi.fn().mockReturnValue(true)
+
 vi.mock('@/hooks/use-permissions', () => ({
   usePermissions: () => ({
-    hasPermission: () => true,
-    hasScopedPermission: () => true,
-    hasPermissionInScope: () => true,
-    hasAnyPermission: () => true,
+    hasPermission: mockHasPermission,
+    hasScopedPermission: mockHasPermission,
+    hasPermissionInScope: mockHasPermission,
+    hasAnyPermission: mockHasPermission,
   }),
 }))
 
@@ -59,10 +64,10 @@ vi.mock('sonner', () => ({
 }))
 
 vi.mock('./base-info/BaseInfoForm', () => ({
-  BaseInfoForm: ({ form }: { form: UseFormReturn<StaApiFormData> }) => (
+  BaseInfoForm: ({ form, isReadOnly }: { form: UseFormReturn<StaApiFormData>; isReadOnly: boolean }) => (
     <div>
-      <input data-testid="nameInput" {...form.register('baseInfo.name')} />
-      <input data-testid="slugInput" {...form.register('baseInfo.slug')} />
+      <input data-testid="nameInput" disabled={isReadOnly} {...form.register('baseInfo.name')} />
+      <input data-testid="slugInput" disabled={isReadOnly} {...form.register('baseInfo.slug')} />
     </div>
   ),
 }))
@@ -85,6 +90,10 @@ vi.mock('@/components/content-card/ContentCard', () => ({
   ContentCard: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
+vi.mock('@/components/loading-spinner/LoadingSpinner', () => ({
+  LoadingSpinner: () => <div data-testid="loadingSpinner" />,
+}))
+
 // --- helpers ---
 
 const makeDataset = (overrides: Partial<Dataset> = {}): Dataset => ({
@@ -93,6 +102,7 @@ const makeDataset = (overrides: Partial<Dataset> = {}): Dataset => ({
   description: 'A test dataset',
   dataSetStatus: 'DRAFT',
   pipelines: [],
+  datapool: null,
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
   openDataAccess: false,
@@ -117,16 +127,23 @@ interface RenderProps {
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
-const renderComponent = ({ dataset, apiType, existingApi }: RenderProps = {}) =>
-  render(
+const renderComponent = ({ dataset, apiType, existingApi }: RenderProps = {}) => {
+  mockDatasetData = dataset ?? makeDataset()
+  return render(
     <QueryClientProvider client={queryClient}>
       <ApiConfigPage
-        dataset={dataset ?? makeDataset()}
+        dataset={mockDatasetData}
         apiType={apiType ?? API_TYPE_QUERY.SENSORTHINGS}
         existingApi={existingApi}
       />
     </QueryClientProvider>,
   )
+}
+
+const submitForm = () =>
+  act(async () => {
+    fireEvent.submit(screen.getByTestId('apiConfigForm'))
+  })
 
 // --- tests ---
 
@@ -134,6 +151,7 @@ describe('ApiConfigPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetSearchParam.mockReturnValue(null)
+    mockHasPermission.mockReturnValue(true)
   })
 
   describe('Mode detection', () => {
@@ -155,6 +173,64 @@ describe('ApiConfigPage', () => {
       renderComponent({ existingApi: makeExistingApi() })
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
+    })
+  })
+
+  describe.each([DATASET_STATUS_TYPES.READY, DATASET_STATUS_TYPES.AVAILABLE])(
+    'Read-only on a %s dataset',
+    dataSetStatus => {
+      const dataset = makeDataset({ dataSetStatus })
+
+      it('keeps an existing api read-only, even with mode=edit in the url', () => {
+        mockGetSearchParam.mockReturnValue('edit')
+        renderComponent({ dataset, existingApi: makeExistingApi() })
+        expect(screen.getByTestId('nameInput')).toBeDisabled()
+        expect(screen.queryByTestId('cancelButton')).not.toBeInTheDocument()
+      })
+
+      it('hides the edit button for an existing api', () => {
+        renderComponent({ dataset, existingApi: makeExistingApi() })
+        expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      })
+
+      it('redirects to the dataset instead of rendering a form', () => {
+        renderComponent({ dataset })
+        expect(screen.queryByTestId('apiConfigForm')).not.toBeInTheDocument()
+        expect(mockReplace).toHaveBeenCalledWith('/datasets/test-id')
+      })
+
+      it('does not patch the dataset on submit with mode=edit in the url', async () => {
+        mockGetSearchParam.mockReturnValue('edit')
+        renderComponent({ dataset, existingApi: makeExistingApi() })
+        await submitForm()
+        expect(mockPatchDataset).not.toHaveBeenCalled()
+      })
+    },
+  )
+
+  describe('Read-only without edit permission', () => {
+    it('keeps a DRAFT dataset read-only, even with mode=edit in the url', () => {
+      mockHasPermission.mockReturnValue(false)
+      mockGetSearchParam.mockReturnValue('edit')
+      renderComponent({ existingApi: makeExistingApi() })
+      expect(screen.getByTestId('nameInput')).toBeDisabled()
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('cancelButton')).not.toBeInTheDocument()
+    })
+
+    it('sends create mode on a DRAFT dataset back to the dataset', () => {
+      mockHasPermission.mockReturnValue(false)
+      renderComponent()
+      expect(screen.queryByTestId('apiConfigForm')).not.toBeInTheDocument()
+      expect(screen.getByTestId('loadingSpinner')).toBeInTheDocument()
+      expect(mockReplace).toHaveBeenCalledWith('/datasets/test-id')
+    })
+
+    it('still renders an existing api read-only rather than redirecting', () => {
+      mockHasPermission.mockReturnValue(false)
+      renderComponent({ existingApi: makeExistingApi() })
+      expect(screen.getByTestId('apiConfigForm')).toBeInTheDocument()
+      expect(mockReplace).not.toHaveBeenCalled()
     })
   })
 
@@ -216,43 +292,37 @@ describe('ApiConfigPage', () => {
     it('calls createNamedApi.mutateAsync with correct payload and shows success toast', async () => {
       renderComponent({ apiType: API_TYPE_QUERY.SENSORTHINGS })
       await userEvent.type(screen.getByTestId('nameInput'), 'My New API')
-      fireEvent.submit(screen.getByTestId('apiConfigForm'))
+      await submitForm()
 
-      await waitFor(() => {
-        expect(mockCreateNamedApi).toHaveBeenCalledWith(
-          expect.objectContaining({
-            datasetId: 'test-id',
-            api: expect.objectContaining({
-              name: 'My New API',
-              slug: 'sta',
-              standard: 'STA',
-            }),
-            existingApis: [],
+      expect(mockCreateNamedApi).toHaveBeenCalledWith(
+        expect.objectContaining({
+          datasetId: 'test-id',
+          api: expect.objectContaining({
+            name: 'My New API',
+            slug: 'sta',
+            standard: 'STA',
           }),
-        )
-        expect(toast.success).toHaveBeenCalled()
-      })
+          existingApis: [],
+        }),
+      )
+      expect(toast.success).toHaveBeenCalled()
     })
 
     it('navigates to the new api slug with mode=edit after successful create', async () => {
       renderComponent({ apiType: API_TYPE_QUERY.SENSORTHINGS })
       await userEvent.type(screen.getByTestId('nameInput'), 'My New API')
-      fireEvent.submit(screen.getByTestId('apiConfigForm'))
+      await submitForm()
 
-      await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith('/datasets/test-id/apis/sta?mode=edit')
-      })
+      expect(mockReplace).toHaveBeenCalledWith('/datasets/test-id/apis/sta?mode=edit')
     })
 
     it('shows error toast when createNamedApi rejects', async () => {
       mockCreateNamedApi.mockRejectedValueOnce(new Error('network'))
       renderComponent({ apiType: API_TYPE_QUERY.SENSORTHINGS })
       await userEvent.type(screen.getByTestId('nameInput'), 'My New API')
-      fireEvent.submit(screen.getByTestId('apiConfigForm'))
+      await submitForm()
 
-      await waitFor(() => {
-        expect(toast.error).toHaveBeenCalled()
-      })
+      expect(toast.error).toHaveBeenCalled()
     })
   })
 
@@ -262,29 +332,25 @@ describe('ApiConfigPage', () => {
       const existingApi = makeExistingApi()
       renderComponent({ existingApi })
       await userEvent.type(screen.getByTestId('nameInput'), ' Updated')
-      fireEvent.submit(screen.getByTestId('apiConfigForm'))
+      await submitForm()
 
-      await waitFor(() => {
-        expect(mockPatchDataset).toHaveBeenCalledWith(
-          expect.objectContaining({
-            id: 'test-id',
-            namedApis: expect.arrayContaining([expect.objectContaining({ slug: 'existing-slug' })]),
-          }),
-        )
-        expect(toast.success).toHaveBeenCalled()
-      })
+      expect(mockPatchDataset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'test-id',
+          namedApis: expect.arrayContaining([expect.objectContaining({ slug: 'existing-slug' })]),
+        }),
+      )
+      expect(toast.success).toHaveBeenCalled()
     })
 
     it('calls router.refresh and switches to view mode after successful update', async () => {
       mockGetSearchParam.mockReturnValue('edit')
       renderComponent({ existingApi: makeExistingApi() })
       await userEvent.type(screen.getByTestId('nameInput'), ' Updated')
-      fireEvent.submit(screen.getByTestId('apiConfigForm'))
+      await submitForm()
 
-      await waitFor(() => {
-        expect(mockRefresh).toHaveBeenCalled()
-        expect(mockReplace).toHaveBeenCalledWith('/datasets/test-id/apis/existing-slug', { scroll: false })
-      })
+      expect(mockRefresh).toHaveBeenCalled()
+      expect(mockReplace).toHaveBeenCalledWith('/datasets/test-id/apis/existing-slug', { scroll: false })
     })
 
     it('trims whitespace from name and description before saving', async () => {
@@ -292,15 +358,13 @@ describe('ApiConfigPage', () => {
       renderComponent({ existingApi: makeExistingApi() })
       await userEvent.clear(screen.getByTestId('nameInput'))
       await userEvent.type(screen.getByTestId('nameInput'), '  Trimmed Name  ')
-      fireEvent.submit(screen.getByTestId('apiConfigForm'))
+      await submitForm()
 
-      await waitFor(() => {
-        expect(mockPatchDataset).toHaveBeenCalledWith(
-          expect.objectContaining({
-            namedApis: expect.arrayContaining([expect.objectContaining({ name: 'Trimmed Name' })]),
-          }),
-        )
-      })
+      expect(mockPatchDataset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          namedApis: expect.arrayContaining([expect.objectContaining({ name: 'Trimmed Name' })]),
+        }),
+      )
     })
 
     it('excludes other apis from the update payload when the dataset has multiple apis', async () => {
@@ -310,13 +374,11 @@ describe('ApiConfigPage', () => {
       const dataset = makeDataset({ namedApis: [existingApi, otherApi] })
       renderComponent({ existingApi, dataset })
       await userEvent.type(screen.getByTestId('nameInput'), ' Updated')
-      fireEvent.submit(screen.getByTestId('apiConfigForm'))
+      await submitForm()
 
-      await waitFor(() => {
-        const namedApis = mockPatchDataset.mock.calls[0][0].namedApis as { slug: string }[]
-        expect(namedApis.some(a => a.slug === 'other-api')).toBe(true)
-        expect(namedApis.some(a => a.slug === 'existing-slug')).toBe(true)
-      })
+      const namedApis = mockPatchDataset.mock.calls[0][0].namedApis as { slug: string }[]
+      expect(namedApis.some(a => a.slug === 'other-api')).toBe(true)
+      expect(namedApis.some(a => a.slug === 'existing-slug')).toBe(true)
     })
   })
 })

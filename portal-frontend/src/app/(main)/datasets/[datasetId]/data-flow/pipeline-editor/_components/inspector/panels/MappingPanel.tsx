@@ -15,10 +15,10 @@ import { DataModelImportModal } from '@/app/(main)/datasources/[datasourceId]/co
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
 
 import type { StaTargetVocabulary } from '../../../_constants/staTargetCatalog'
 import { parseCompositeKey, useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
-import { usePipelinePermissions } from '../../../_hooks/use-pipeline-permissions'
 import type { MappingNodeData } from '../../../_types/nodes'
 import { emptyMappingConfig, type MappingConfig } from '../../mapping-editor/_types'
 import { MappingEditorModal } from '../../mapping-editor/MappingEditorModal'
@@ -39,7 +39,7 @@ interface DatastructureFieldProps {
 /** Datastructure-version picker reusing DataModelImportModal. */
 const DatastructureField = ({ label, placeholder, selectedKey, name, onSelect }: DatastructureFieldProps) => {
   const { datasetId } = useParams<{ datasetId: string }>()
-  const { canReadDatastructures } = usePipelinePermissions(datasetId)
+  const { canReadDatastructures } = useDatasetPermissionsById(datasetId)
   const [isOpen, setIsOpen] = useState(false)
 
   const handleSelect = (selection: Record<string, boolean>) => {
