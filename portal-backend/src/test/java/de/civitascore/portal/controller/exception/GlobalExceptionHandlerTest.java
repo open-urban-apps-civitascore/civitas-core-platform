@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -80,6 +81,19 @@ class GlobalExceptionHandlerTest {
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INVALID_INPUT");
       assertThat(problemDetail.getDetail()).isEqualTo("Name is required");
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName("Should return 400 for DataSetNotEditableException")
+    void shouldReturn400ForDataSetNotEditable() {
+      DataSetNotEditableException ex = new DataSetNotEditableException("Dataset must be DRAFT");
+
+      ProblemDetail problemDetail = handler.handleDataSetNotEditable(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:DATASET_NOT_EDITABLE");
+      assertThat(problemDetail.getDetail()).isEqualTo("Dataset must be DRAFT");
       assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 

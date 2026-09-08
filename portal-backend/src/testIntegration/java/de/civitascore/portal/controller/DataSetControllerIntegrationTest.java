@@ -50,6 +50,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 @DisplayName("DataSet Controller Integration Tests")
@@ -1052,11 +1053,20 @@ class DataSetControllerIntegrationTest
       updateInput.setDescription("Updated description");
       updateInput.setOpenDataAccess(false);
 
-      ResponseEntity<DataSetOutputDTO> response = performUpdate(dataSetId, updateInput);
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSetId,
+              org.springframework.http.HttpMethod.PUT,
+              createAuthHeaders(),
+              updateInput);
 
       assertThat(response.getStatusCode())
           .as("Should return BAD_REQUEST status for %s dataset", status)
           .isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getType())
+          .as("Published error contract; clients dispatch on this URN")
+          .hasToString("urn:civitas:error:DATASET_NOT_EDITABLE");
 
       // Verify dataset was not modified
       DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElse(null);
@@ -1067,6 +1077,53 @@ class DataSetControllerIntegrationTest
       assertThat(unchangedDataSet.getDataSetStatus())
           .as("Status should remain unchanged")
           .isEqualTo(status);
+    }
+
+    @Test
+    @DisplayName("Should reject PUT on a DRAFT dataset whose unrelease teardown is still running")
+    void shouldRejectUpdateWhileUnreleaseSagaInFlight() {
+      DataSet dataSet = createDataSetWithRelationships();
+      // The post-unrelease state, set directly because unrelease itself publishes to a broker this
+      // context has none of. Unstage still runs for real below: it is the step that lets a pending
+      // UNRELEASE through, and removing that exemption must break this test.
+      dataSet.setDataSetStatus(DataSetStatus.READY);
+      dataSet.setPendingSagaType(PendingSagaType.UNRELEASE);
+      dataSet = dataSetRepository.save(dataSet);
+      UUID dataSetId = dataSet.getId();
+      String originalName = dataSet.getName();
+
+      ResponseEntity<DataSetOutputDTO> unstageResponse =
+          exchange(
+              getEndpointPath() + "/" + dataSetId + "/unstage",
+              org.springframework.http.HttpMethod.POST,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+      assertThat(unstageResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(dataSetRepository.findById(dataSetId).orElseThrow())
+          .satisfies(
+              persisted -> {
+                assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+                assertThat(persisted.getPendingSagaType()).isEqualTo(PendingSagaType.UNRELEASE);
+              });
+
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Updated While Teardown Runs");
+      updateInput.setDescription("Updated description");
+      updateInput.setOpenDataAccess(false);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSetId,
+              org.springframework.http.HttpMethod.PUT,
+              createAuthHeaders(),
+              updateInput);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
+      assertThat(dataSetRepository.findById(dataSetId).orElseThrow().getName())
+          .isEqualTo(originalName);
     }
 
     @ParameterizedTest

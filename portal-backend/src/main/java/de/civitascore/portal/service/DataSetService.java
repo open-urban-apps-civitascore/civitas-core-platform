@@ -21,6 +21,7 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -74,6 +75,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
+  private final DataSetMutationGuard dataSetMutationGuard;
+
   public DataSetService(
       DataSetRepository dataSetRepository,
       DataSinkRepository dataSinkRepository,
@@ -84,7 +87,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       DataSetSagaPublisher sagaPublisher,
       PipelineRuntimeStatusService pipelineRuntimeStatusService,
       ObjectProvider<AllowedScopes> allowedScopesProvider,
-      DataSourceDatapoolScopeValidator datapoolScopeValidator) {
+      DataSourceDatapoolScopeValidator datapoolScopeValidator,
+      DataSetMutationGuard dataSetMutationGuard) {
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
     this.layerRepository = layerRepository;
@@ -95,6 +99,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     this.pipelineRuntimeStatusService = pipelineRuntimeStatusService;
     this.allowedScopesProvider = allowedScopesProvider;
     this.datapoolScopeValidator = datapoolScopeValidator;
+    this.dataSetMutationGuard = dataSetMutationGuard;
   }
 
   /**
@@ -294,24 +299,20 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Override update to ensure it can only be called for DRAFT datasets. For released datasets, use
+   * Rejects updates to a dataset that is not editable. For released datasets, use
    * updateReleasedMeta instead.
    *
-   * @param id the dataset ID
-   * @param input the update input
-   * @return the updated dataset
-   * @throws InvalidInputException if trying to update a non-DRAFT dataset
+   * <p>Guards the public entry point rather than {@code preProcessUpdateInput}: the ready- and
+   * released-metadata endpoints reach {@code super.update} through {@code updateMetaOf}, and they
+   * must keep working on a non-DRAFT dataset.
+   *
+   * @throws DataSetNotEditableException if the dataset is not in DRAFT
+   * @throws ResourceInUseException if a saga is in flight, which a DRAFT dataset still carries
+   *     while an unrelease teardown runs
    */
   @Override
   public DataSet update(UUID id, DataSetInputDTO input) {
-    DataSet existingEntity = findByIdOrThrow(id);
-    if (existingEntity.getDataSetStatus() != DataSetStatus.DRAFT) {
-      throw new InvalidInputException(
-          "dataSetStatus",
-          id,
-          "DataSet can only be updated in DRAFT status, current status: "
-              + existingEntity.getDataSetStatus());
-    }
+    dataSetMutationGuard.requireMutable(findByIdOrThrow(id));
     return super.update(id, input);
   }
 

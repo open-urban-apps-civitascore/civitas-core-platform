@@ -62,7 +62,9 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
       DataSetRepository dataSetRepository,
       DataStructureVersionRepository dataStructureVersionRepository,
       LayerRepository layerRepository,
-      ScopeAccessAuthorizer scopeAccessAuthorizer) {
+      ScopeAccessAuthorizer scopeAccessAuthorizer,
+      DataSetMutationGuard dataSetMutationGuard) {
+    super(dataSetMutationGuard);
     this.dataSinkRepository = dataSinkRepository;
     this.dataSinkMapper = dataSinkMapper;
     this.dataSetRepository = dataSetRepository;

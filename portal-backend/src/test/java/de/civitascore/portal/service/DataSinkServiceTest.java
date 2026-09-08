@@ -54,6 +54,8 @@ class DataSinkServiceTest {
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
 
+  @Mock private DataSetMutationGuard dataSetMutationGuard;
+
   @InjectMocks private DataSinkService dataSinkService;
 
   private DataStructureVersion dataStructureVersion(UUID id) {
