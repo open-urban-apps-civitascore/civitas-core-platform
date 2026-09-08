@@ -40,8 +40,12 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.service.closure.ClosureFinding;
+import de.civitascore.portal.service.closure.PipelineClosureValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.PipelineClosureTooLargeException;
+import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.SagaInFlightException;
 import java.util.HashSet;
@@ -79,6 +83,7 @@ class DataSetServiceTest {
   @Mock private PipelineRuntimeStatusService pipelineRuntimeStatusService;
   @Mock private ObjectProvider<AllowedScopes> allowedScopesProvider;
   @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private PipelineClosureValidator pipelineClosureValidator;
 
   private DataSetService createService() {
     // Default to TENANT wildcard so the F4 target-pool check passes for existing pool-setting
@@ -106,7 +111,8 @@ class DataSetServiceTest {
         allowedScopesProvider,
         new DataSourceDatapoolScopeValidator(),
         modelRegistryGateway,
-        new DataSetMutationGuard(dataSetRepository));
+        new DataSetMutationGuard(dataSetRepository),
+        pipelineClosureValidator);
   }
 
   private static AllowedScopes wildcardScopes() {
@@ -2386,6 +2392,106 @@ class DataSetServiceTest {
       createService().unlinkMember(id, MEMBER_URN);
 
       verify(modelRegistryGateway, never()).unlinkFromDataSet(any(), any());
+    }
+  }
+
+  @Nested
+  @DisplayName("participating artifact validation")
+  class ParticipatingArtifactValidation {
+
+    private DataSet stageable(UUID id) {
+      DataSet ds = draftDataSet(id);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSources(new HashSet<>(List.of(new DataSource())));
+      ds.getPipelines().add(pipeline);
+      return ds;
+    }
+
+    /**
+     * A READY dataset publishing no named API, so the map/API-surface check passes and the
+     * participating-artifact validation is the only thing that can reject the release.
+     */
+    private DataSet releasable(UUID id) {
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.READY);
+      ds.setPipelines(new HashSet<>());
+      ds.setNamedApis(new HashSet<>());
+      return ds;
+    }
+
+    @Test
+    @DisplayName("a dataset whose flows carry a defect is not staged")
+    void blockedStagingLeavesTheDatasetInDraft() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = stageable(id);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      doThrow(
+              new PipelineClosureValidationException(
+                  List.of(ClosureFinding.notReleased(UUID.randomUUID(), "urn:core:x"))))
+          .when(pipelineClosureValidator)
+          .validate(any());
+
+      assertThatThrownBy(() -> createService().stage(id))
+          .isInstanceOf(PipelineClosureValidationException.class);
+
+      assertThat(ds.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+      verify(dataSetRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("a blocked release provisions nothing, rather than compensating afterwards")
+    void blockedReleasePublishesNoSaga() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = releasable(id);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      doThrow(
+              new PipelineClosureValidationException(
+                  List.of(ClosureFinding.notAvailable(UUID.randomUUID(), "urn:core:x"))))
+          .when(pipelineClosureValidator)
+          .validate(any());
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(PipelineClosureValidationException.class);
+
+      verify(sagaPublisher, never()).publishCreateRequested(any());
+      assertThat(ds.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+      assertThat(ds.getPendingSagaType()).isNull();
+      verify(dataSetRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("a flow too large to examine also publishes no saga")
+    void oversizedClosureBlocksTheRelease() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = releasable(id);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      doThrow(
+              new PipelineClosureTooLargeException(
+                  List.of(
+                      new PipelineClosureTooLargeException.OversizedClosure(
+                          UUID.randomUUID(), 900, 500))))
+          .when(pipelineClosureValidator)
+          .validate(any());
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(PipelineClosureTooLargeException.class);
+
+      verify(sagaPublisher, never()).publishCreateRequested(any());
+      assertThat(ds.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+    }
+
+    @Test
+    @DisplayName("the flows are validated again at release, not only at staging")
+    void releaseRevalidates() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = releasable(id);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().release(id);
+
+      verify(pipelineClosureValidator).validate(any());
     }
   }
 }

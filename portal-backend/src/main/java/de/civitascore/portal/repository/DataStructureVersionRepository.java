@@ -1,6 +1,7 @@
 package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -59,4 +60,25 @@ public interface DataStructureVersionRepository extends BaseRepository<DataStruc
    */
   @EntityGraph(attributePaths = {"dataStructure"})
   Optional<DataStructureVersion> findFirstByModelUrn(String modelUrn);
+
+  /**
+   * Every version pinned by exactly {@code modelUrn}.
+   *
+   * <p>Distinct from {@link #findFirstByModelUrnStartingWith}, which matches any version of a
+   * structure because a parent's identity is all an authorization decision needs. A release
+   * lifecycle belongs to one version, so a check on it must name that version: matching
+   * version-agnostically would let a flow pinned to a draft version pass on the status of a
+   * different, released one.
+   *
+   * <p>Several rows can share one pin, so this returns all of them rather than one. The registry
+   * returns the version it already holds when a stored model is byte-identical to it, so two
+   * versions authored with the same content are pinned to the same artifact — and {@code model_urn}
+   * carries no unique constraint. The {@code dataStructure} is eagerly fetched so the caller can
+   * read each parent's own status outside the persistence context.
+   *
+   * @param modelUrn the versioned CORE URN a flow pins
+   * @return every version pinned by that URN, empty if the platform holds no record of it
+   */
+  @EntityGraph(attributePaths = {"dataStructure"})
+  List<DataStructureVersion> findAllByModelUrn(String modelUrn);
 }

@@ -254,7 +254,19 @@ public class DataSetController
       operationId = "stageDataSet",
       summary = "Stage a dataset",
       description =
-          "Validates the dataset's pipeline configuration and transitions status from DRAFT to READY.")
+          "Validates the dataset's pipeline configuration and the artifacts participating in its"
+              + " flows, then transitions status from DRAFT to READY.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "The dataset is staged",
+      content = @Content(schema = @Schema(implementation = DataSetOutputDTO.class)))
+  @ApiResponse(
+      responseCode = "422",
+      description =
+          "A pipeline DataSource is out of the dataset's datapool scope, or an artifact"
+              + " participating in a pipeline's flow cannot carry a release, or a flow reaches"
+              + " more artifacts than the configured bound",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> stage(@PathVariable UUID id) {
     DataSet ready = dataSetService.stage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(ready);
@@ -278,8 +290,19 @@ public class DataSetController
 
   @Override
   @ApiResponse(
+      responseCode = "202",
+      description = "The release was accepted; infrastructure is provisioned asynchronously",
+      content = @Content(schema = @Schema(implementation = DataSetOutputDTO.class)))
+  @ApiResponse(
       responseCode = "409",
       description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "422",
+      description =
+          "A pipeline DataSource is out of the dataset's datapool scope, or an artifact"
+              + " participating in a pipeline's flow cannot carry a release, or a flow reaches"
+              + " more artifacts than the configured bound",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> release(@PathVariable UUID id) {
     DataSet released = dataSetService.release(id);

@@ -23,6 +23,7 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.service.closure.PipelineClosureValidator;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -77,6 +78,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final PipelineClosureValidator pipelineClosureValidator;
 
   private final DataSetMutationGuard dataSetMutationGuard;
 
@@ -92,7 +94,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       ObjectProvider<AllowedScopes> allowedScopesProvider,
       DataSourceDatapoolScopeValidator datapoolScopeValidator,
       ModelRegistryGateway modelRegistryGateway,
-      DataSetMutationGuard dataSetMutationGuard) {
+      DataSetMutationGuard dataSetMutationGuard,
+      PipelineClosureValidator pipelineClosureValidator) {
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
     this.layerRepository = layerRepository;
@@ -105,6 +108,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     this.datapoolScopeValidator = datapoolScopeValidator;
     this.modelRegistryGateway = modelRegistryGateway;
     this.dataSetMutationGuard = dataSetMutationGuard;
+    this.pipelineClosureValidator = pipelineClosureValidator;
   }
 
   /**
@@ -446,6 +450,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     revalidatePipelineDataSourcesAgainstPool(dataSet);
+    pipelineClosureValidator.validate(dataSet.getPipelines());
 
     dataSet.setDataSetStatus(DataSetStatus.READY);
     return dataSetRepository.save(dataSet);
@@ -517,6 +522,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
     revalidatePipelineDataSourcesAgainstPool(dataSet);
     verifyPublishedSurfacesAreServable(dataSet);
+    // Re-asserted here and not only at staging: a structure a flow depends on can be unreleased
+    // while the dataset waits in READY, and this is the transition that provisions infrastructure.
+    pipelineClosureValidator.validate(dataSet.getPipelines());
 
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
     dataSet.setPendingSagaType(PendingSagaType.CREATE);

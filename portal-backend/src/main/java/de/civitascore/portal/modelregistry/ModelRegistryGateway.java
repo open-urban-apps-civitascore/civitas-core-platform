@@ -14,9 +14,12 @@ import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -241,6 +244,63 @@ public class ModelRegistryGateway {
         .filter(u -> artifactType.equals(UrnParser.artifactTypeFromUrn(u)))
         .distinct()
         .toList();
+  }
+
+  /**
+   * The versioned CORE URNs of every artifact reachable from {@code urn} within {@code maxDepth}
+   * reference hops, excluding {@code urn} itself — the participating closure of a flow.
+   *
+   * <p>Unlike {@link #dependencyUrnsOfType}, which reports direct edges of one type, this walks the
+   * graph transitively. Model Forge's walk is level-bounded and guards against a cyclic graph with
+   * a visited set, so a mutually referencing pair terminates rather than recursing. It applies no
+   * bound on how many artifacts it returns; a caller that needs one enforces it on the result.
+   *
+   * <p>A returned URN is not a promise that the artifact exists: an unresolved reference — one
+   * whose target the registry no longer holds — is deliberately kept as an edge, so it appears here
+   * and is only detected by {@link #exists}.
+   *
+   * @param urn the flow's entry artifact, logical or versioned; null or blank yields an empty set
+   * @param maxDepth how many hops to walk; zero or negative yields an empty set
+   */
+  public Set<String> transitiveDependencyUrns(String urn, int maxDepth) {
+    if (urn == null || urn.isBlank() || maxDepth <= 0) {
+      return Set.of();
+    }
+    return modelForge
+        .dependencies(new DependencyQuery(new ArtifactId(urn), maxDepth))
+        .nodes()
+        .stream()
+        .map(node -> node.artifactId().value())
+        .filter(candidate -> !candidate.equals(urn))
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+  }
+
+  /**
+   * Whether the registry holds the artifact behind {@code urn}, of any kind.
+   *
+   * <p>Reads the artifact's own content rather than a bundled view, so it does not resolve the
+   * references the artifact makes — the question is whether this one artifact is there.
+   *
+   * @param urn a logical or versioned CORE URN; null or blank is not held
+   */
+  public boolean exists(String urn) {
+    if (urn == null || urn.isBlank()) {
+      return false;
+    }
+    return modelForge.getArtifact(new ArtifactId(urn)).isPresent();
+  }
+
+  /**
+   * The CORE artifact-type segment of a URN — {@code element}, {@code datastructure}, {@code
+   * dataset}, {@code mapping}, {@code pipeline}, {@code datasource} or {@code datasink}. Exposed so
+   * host services can dispatch on artifact kind without importing Model Forge's {@code UrnParser},
+   * as {@link #logicalUrn} is.
+   *
+   * @param urn a logical or versioned CORE URN
+   * @return the type segment, or null when {@code urn} is not a well-formed CORE URN
+   */
+  public String artifactType(String urn) {
+    return UrnParser.artifactTypeFromUrn(urn);
   }
 
   /**
