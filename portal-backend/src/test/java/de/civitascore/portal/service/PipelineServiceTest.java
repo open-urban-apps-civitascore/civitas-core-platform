@@ -58,6 +58,8 @@ class PipelineServiceTest {
 
   @Spy private DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
+  @Mock private DataSetMutationGuard dataSetMutationGuard;
+
   @InjectMocks private PipelineService pipelineService;
 
   /** A request that came through OPA. Lenient: only the datasource-reference path consults it. */

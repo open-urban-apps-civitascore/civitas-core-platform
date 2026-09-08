@@ -2,11 +2,11 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -23,6 +23,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -32,9 +34,13 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("DataSink Controller Integration Tests")
 class DataSinkControllerIntegrationTest
-    extends BaseControllerIntegrationTest<DataSinkInputDTO, DataSinkOutputDTO> {
+    extends DataSetSubEntityControllerIntegrationTest<DataSinkInputDTO, DataSinkOutputDTO> {
 
-  @Autowired protected PortalTestDataFactory portalData;
+  @Override
+  protected String getSubEntityPathSegment() {
+    return "datasinks";
+  }
+
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private PipelineRepository pipelineRepository;
@@ -139,23 +145,6 @@ class DataSinkControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDetail())
           .isEqualTo("Missing or invalid dataSetId in path variables");
-    }
-
-    @Test
-    @DisplayName("Should return 404 when getting DataSink from wrong dataset")
-    void shouldReturn404WhenGettingFromWrongDataset() {
-      UUID sinkId = createTestEntity();
-      DataSet otherDataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
-
-      ResponseEntity<DataSinkOutputDTO> response =
-          exchange(
-              "/datasets/" + otherDataSet.getId() + "/datasinks/" + sinkId,
-              HttpMethod.GET,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
@@ -471,22 +460,6 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("PUT returns 404 when updating a DataSink from a different dataset")
-    void putReturns404ForCrossDatasetUpdate() {
-      UUID sinkId = createTestEntity();
-      DataSet otherDataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/" + otherDataSet.getId() + "/datasinks/" + sinkId,
-              HttpMethod.PUT,
-              createAuthHeaders(),
-              createUpdateInput());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
     @DisplayName("PUT returns 400 when configuration is invalid for the type")
     void putRejectsInvalidConfiguration() {
       UUID id = createTestEntity();
@@ -693,25 +666,6 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("PATCH returns 404 when DataSink belongs to a different dataset")
-    void patchReturns404ForCrossDatasetUpdate() {
-      UUID sinkId = createTestEntity();
-      DataSet otherDataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
-
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("configuration", Map.of());
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/" + otherDataSet.getId() + "/datasinks/" + sinkId,
-              HttpMethod.PATCH,
-              createAuthHeaders(),
-              patchMap);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
     @DisplayName("PATCH returns 400 when patched against a non-UUID dataSetId path variable")
     void patchReturns400ForInvalidDataSetIdPath() {
       UUID sinkId = createTestEntity();
@@ -768,23 +722,6 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("DELETE returns 404 when DataSink belongs to a different dataset")
-    void deleteReturns404ForCrossDataset() {
-      UUID sinkId = createTestEntity();
-      DataSet otherDataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/" + otherDataSet.getId() + "/datasinks/" + sinkId,
-              HttpMethod.DELETE,
-              createAuthHeaders(),
-              null);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-      assertThat(dataSinkRepository.findById(sinkId)).isPresent();
-    }
-
-    @Test
     @DisplayName("DELETE returns 409 when a Layer references the DataSink")
     void deleteReturns409WhenLayerReferencesDataSink() {
       ensureTestData();
@@ -799,6 +736,153 @@ class DataSinkControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
       assertThat(dataSinkRepository.findById(sink.getId())).isPresent();
+    }
+  }
+
+  @Nested
+  @DisplayName("Parent DataSet Mutation Guard")
+  class MutationGuardTests {
+
+    private static final String NOT_EDITABLE_URN = "urn:civitas:error:DATASET_NOT_EDITABLE";
+    private static final String IN_USE_URN = "urn:civitas:error:RESOURCE_IN_USE";
+
+    private void setParentStatus(DataSetStatus status) {
+      ensureTestData();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      dataSet.setDataSetStatus(status);
+      dataSetRepository.save(dataSet);
+    }
+
+    private void setParentPendingSaga(PendingSagaType pendingSagaType) {
+      ensureTestData();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      dataSet.setPendingSagaType(pendingSagaType);
+      dataSetRepository.save(dataSet);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("POST is rejected when the parent dataset is not DRAFT")
+    void createRejectedWhenParentNotDraft(DataSetStatus status) {
+      DataSinkInputDTO input = createValidInput();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(dataSinkRepository.findByDataSetId(testDataSetId)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("PUT is rejected when the parent dataset is not DRAFT")
+    void updateRejectedWhenParentNotDraft(DataSetStatus status) {
+      UUID sinkId = createTestEntity();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + sinkId,
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              createUpdateInput());
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(dataSinkRepository.findById(sinkId)).isPresent();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("PATCH is rejected when the parent dataset is not DRAFT")
+    void patchRejectedWhenParentNotDraft(DataSetStatus status) {
+      UUID sinkId = createTestEntity();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + sinkId,
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("configuration", Map.of()));
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("DELETE is rejected when the parent dataset is not DRAFT")
+    void deleteRejectedWhenParentNotDraft(DataSetStatus status) {
+      UUID sinkId = createTestEntity();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + sinkId, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(dataSinkRepository.findById(sinkId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("POST is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void createRejectedWhileSagaInFlight() {
+      DataSinkInputDTO input = createValidInput();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertThat(dataSinkRepository.findByDataSetId(testDataSetId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("PUT is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void updateRejectedWhileSagaInFlight() {
+      UUID sinkId = createTestEntity();
+      Map<String, Object> originalConfiguration =
+          dataSinkRepository.findById(sinkId).orElseThrow().getConfiguration();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + sinkId,
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              createUpdateInput());
+
+      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertThat(dataSinkRepository.findById(sinkId).orElseThrow().getConfiguration())
+          .isEqualTo(originalConfiguration);
+    }
+
+    @Test
+    @DisplayName("DELETE is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void deleteRejectedWhileSagaInFlight() {
+      UUID sinkId = createTestEntity();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + sinkId, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertThat(dataSinkRepository.findById(sinkId))
+          .as("Entity survives the rejected delete")
+          .isPresent();
+    }
+
+    @Test
+    @DisplayName("PUT, PATCH and DELETE all succeed on a DRAFT dataset")
+    void mutationsAcceptedOnDraftParent() {
+      UUID sinkId = createTestEntity();
+
+      assertThat(performUpdate(sinkId, createUpdateInput()).getStatusCode())
+          .isEqualTo(HttpStatus.OK);
+      assertThat(performPatch(sinkId, Map.of("configuration", Map.of())).getStatusCode())
+          .isEqualTo(HttpStatus.OK);
+      assertThat(performDelete(sinkId).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
   }
 }

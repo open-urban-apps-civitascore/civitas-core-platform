@@ -44,6 +44,8 @@ class LayerServiceTest {
   @Mock private DataSinkRepository dataSinkRepository;
   @Mock private StyleRepository styleRepository;
 
+  @Mock private DataSetMutationGuard dataSetMutationGuard;
+
   @InjectMocks private LayerService layerService;
 
   private DataSet dataSet(UUID id) {

@@ -2,7 +2,8 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
@@ -18,6 +19,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -28,20 +31,33 @@ import tools.jackson.core.type.TypeReference;
 
 @DisplayName("Style Controller Integration Tests")
 class StyleControllerIntegrationTest
-    extends BaseControllerIntegrationTest<StyleInputDTO, StyleOutputDTO> {
+    extends DataSetSubEntityControllerIntegrationTest<StyleInputDTO, StyleOutputDTO> {
 
-  @Autowired protected PortalTestDataFactory portalData;
+  @Override
+  protected String getSubEntityPathSegment() {
+    return "styles";
+  }
+
+  @Override
+  protected boolean supportsPatch() {
+    return false;
+  }
+
   @Autowired private StyleRepository styleRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private LayerRepository layerRepository;
 
   private UUID testDataSetId;
 
-  @Override
-  protected String getEndpointPath() {
+  private void ensureTestDataSet() {
     if (testDataSetId == null || dataSetRepository.findById(testDataSetId).isEmpty()) {
       testDataSetId = portalData.dataSet().getId();
     }
+  }
+
+  @Override
+  protected String getEndpointPath() {
+    ensureTestDataSet();
     return "/datasets/" + testDataSetId + "/styles";
   }
 
@@ -120,21 +136,6 @@ class StyleControllerIntegrationTest
   class CreateStyleTests {
 
     @Test
-    @DisplayName("Should return 400 when dataSetId in path is not a valid UUID")
-    void shouldReturn400WhenCreateWithInvalidDataSetId() {
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/not-a-valid-uuid/styles",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              createValidInput());
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDetail())
-          .isEqualTo("Missing or invalid dataSetId in path variables");
-    }
-
-    @Test
     @DisplayName("Should persist name and sldContent in database after create")
     void shouldPersistEntityInDatabase() {
       StyleInputDTO input = createValidInput();
@@ -195,21 +196,6 @@ class StyleControllerIntegrationTest
   class UpdateStyleTests {
 
     @Test
-    @DisplayName("Should return 400 when dataSetId in path is not a valid UUID")
-    void shouldReturn400WhenUpdateWithInvalidDataSetId() {
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/not-a-valid-uuid/styles/" + UUID.randomUUID(),
-              HttpMethod.PUT,
-              createAuthHeaders(),
-              createUpdateInput());
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDetail())
-          .isEqualTo("Missing or invalid dataSetId in path variables");
-    }
-
-    @Test
     @DisplayName("Should persist updated name and sldContent in database after PUT")
     void shouldPersistUpdatedEntityInDatabase() {
       UUID id = createTestEntity();
@@ -226,57 +212,6 @@ class StyleControllerIntegrationTest
       Style saved = styleRepository.findById(id).orElseThrow();
       assertThat(saved.getName()).isEqualTo(update.getName());
       assertThat(saved.getSldContent()).isEqualTo(update.getSldContent());
-    }
-  }
-
-  @Nested
-  @DisplayName("Cross-Dataset Access Tests")
-  class CrossDatasetTests {
-
-    @Test
-    @DisplayName("Should return 404 when accessing Style from a different dataset")
-    void shouldReturn404ForStyleFromDifferentDataset() {
-      UUID styleId = createTestEntity();
-      DataSet otherDataSet = portalData.dataSet();
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/" + otherDataSet.getId() + "/styles/" + styleId,
-              HttpMethod.GET,
-              createAuthHeaders(),
-              null);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Should return 400 when dataSetId in path is not a valid UUID on GET by ID")
-    void shouldReturn400WhenGetByIdWithInvalidDataSetId() {
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/not-a-valid-uuid/styles/" + UUID.randomUUID(),
-              HttpMethod.GET,
-              createAuthHeaders(),
-              null);
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDetail())
-          .isEqualTo("Missing or invalid dataSetId in path variables");
-    }
-
-    @Test
-    @DisplayName("Should return 400 when dataSetId in path is not a valid UUID on DELETE")
-    void shouldReturn400WhenDeleteWithInvalidDataSetId() {
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/not-a-valid-uuid/styles/" + UUID.randomUUID(),
-              HttpMethod.DELETE,
-              createAuthHeaders(),
-              null);
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDetail())
-          .isEqualTo("Missing or invalid dataSetId in path variables");
     }
   }
 
@@ -421,6 +356,133 @@ class StyleControllerIntegrationTest
               null);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+  }
+
+  @Nested
+  @DisplayName("Parent DataSet Mutation Guard")
+  class MutationGuardTests {
+
+    private static final String NOT_EDITABLE_URN = "urn:civitas:error:DATASET_NOT_EDITABLE";
+    private static final String IN_USE_URN = "urn:civitas:error:RESOURCE_IN_USE";
+
+    private void setParentStatus(DataSetStatus status) {
+      ensureTestDataSet();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      dataSet.setDataSetStatus(status);
+      dataSetRepository.save(dataSet);
+    }
+
+    private void setParentPendingSaga(PendingSagaType pendingSagaType) {
+      ensureTestDataSet();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      dataSet.setPendingSagaType(pendingSagaType);
+      dataSetRepository.save(dataSet);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("POST is rejected when the parent dataset is not DRAFT")
+    void createRejectedWhenParentNotDraft(DataSetStatus status) {
+      StyleInputDTO input = createValidInput();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(styleRepository.count()).as("No style was created").isZero();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("PUT is rejected when the parent dataset is not DRAFT")
+    void updateRejectedWhenParentNotDraft(DataSetStatus status) {
+      UUID styleId = createTestEntity();
+      String originalName = styleRepository.findById(styleId).orElseThrow().getName();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + styleId,
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              createUpdateInput());
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(styleRepository.findById(styleId).orElseThrow().getName()).isEqualTo(originalName);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("DELETE is rejected when the parent dataset is not DRAFT")
+    void deleteRejectedWhenParentNotDraft(DataSetStatus status) {
+      UUID styleId = createTestEntity();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + styleId, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(styleRepository.findById(styleId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("POST is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void createRejectedWhileSagaInFlight() {
+      StyleInputDTO input = createValidInput();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertThat(styleRepository.count()).as("No style was created").isZero();
+    }
+
+    @Test
+    @DisplayName("PUT is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void updateRejectedWhileSagaInFlight() {
+      UUID styleId = createTestEntity();
+      String originalName = styleRepository.findById(styleId).orElseThrow().getName();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + styleId,
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              createUpdateInput());
+
+      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertThat(styleRepository.findById(styleId).orElseThrow().getName()).isEqualTo(originalName);
+    }
+
+    @Test
+    @DisplayName("DELETE is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void deleteRejectedWhileSagaInFlight() {
+      UUID styleId = createTestEntity();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + styleId, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertThat(styleRepository.findById(styleId))
+          .as("Entity survives the rejected delete")
+          .isPresent();
+    }
+
+    @Test
+    @DisplayName("PUT and DELETE both succeed on a DRAFT dataset")
+    void mutationsAcceptedOnDraftParent() {
+      UUID styleId = createTestEntity();
+
+      assertThat(performUpdate(styleId, createUpdateInput()).getStatusCode())
+          .isEqualTo(HttpStatus.OK);
+      assertThat(performDelete(styleId).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
   }
 }

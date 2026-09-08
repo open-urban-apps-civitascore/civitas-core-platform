@@ -528,7 +528,14 @@ public class OpenApiConfig {
                   "validation_failed",
                   problemExample(400, "VALIDATION_FAILED", "Request body validation failed", path),
                   "malformed_request",
-                  problemExample(400, "MALFORMED_REQUEST", "Failed to read request body", path)));
+                  problemExample(400, "MALFORMED_REQUEST", "Failed to read request body", path),
+                  "dataset_not_editable",
+                  problemExample(
+                      400,
+                      "DATASET_NOT_EDITABLE",
+                      "A dataset and its sub-entities can only be changed while the dataset is "
+                          + "DRAFT. Unstage or unrelease the dataset first.",
+                      path)));
       case "404" ->
           problemExamples(
               orderedMap(

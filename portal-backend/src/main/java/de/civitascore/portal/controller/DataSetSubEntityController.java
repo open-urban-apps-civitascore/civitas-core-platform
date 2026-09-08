@@ -5,9 +5,13 @@ import de.civitascore.portal.model.input.DataSetOwnedInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
 import de.civitascore.portal.repository.specification.base.BaseSpec;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.UUID;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -48,12 +52,41 @@ public abstract class DataSetSubEntityController<
   }
 
   @Override
+  @ApiResponse(
+      responseCode = "400",
+      description = "Parent dataset is not in DRAFT",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "A saga is in flight on the parent dataset",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<O> create(@Valid @RequestBody I input) {
+    return super.create(input);
+  }
+
+  @Override
+  @ApiResponse(
+      responseCode = "400",
+      description = "Parent dataset is not in DRAFT",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "A saga is in flight on the parent dataset",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<O> update(@PathVariable UUID id, @Valid @RequestBody I input) {
     requireOwnedByPathDataSet(id);
     return super.update(id, input);
   }
 
   @Override
+  @ApiResponse(
+      responseCode = "400",
+      description = "Parent dataset is not in DRAFT",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "A saga is in flight on the parent dataset",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<O> patch(@PathVariable UUID id, @RequestBody JsonNode updates)
       throws IOException {
     requireOwnedByPathDataSet(id);
@@ -61,6 +94,14 @@ public abstract class DataSetSubEntityController<
   }
 
   @Override
+  @ApiResponse(
+      responseCode = "400",
+      description = "Parent dataset is not in DRAFT",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "A saga is in flight on the parent dataset",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public void delete(@PathVariable UUID id) {
     requireOwnedByPathDataSet(id);
     super.delete(id);

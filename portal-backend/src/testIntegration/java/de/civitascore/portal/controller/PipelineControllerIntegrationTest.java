@@ -2,11 +2,11 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -40,9 +40,13 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("Pipeline Controller Integration Tests")
 class PipelineControllerIntegrationTest
-    extends BaseControllerIntegrationTest<PipelineInputDTO, PipelineOutputDTO> {
+    extends DataSetSubEntityControllerIntegrationTest<PipelineInputDTO, PipelineOutputDTO> {
 
-  @Autowired protected PortalTestDataFactory portalData;
+  @Override
+  protected String getSubEntityPathSegment() {
+    return "pipelines";
+  }
+
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
@@ -50,12 +54,15 @@ class PipelineControllerIntegrationTest
 
   private UUID testDataSetId;
 
-  @Override
-  protected String getEndpointPath() {
-    // Create a new dataset for each test if needed
+  private void ensureTestDataSet() {
     if (testDataSetId == null || dataSetRepository.findById(testDataSetId).isEmpty()) {
       testDataSetId = createTestDataSet().getId();
     }
+  }
+
+  @Override
+  protected String getEndpointPath() {
+    ensureTestDataSet();
     return "/datasets/" + testDataSetId + "/pipelines";
   }
 
@@ -566,39 +573,6 @@ class PipelineControllerIntegrationTest
           .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
-    @ParameterizedTest
-    @EnumSource(
-        value = DataSetStatus.class,
-        mode = EnumSource.Mode.EXCLUDE,
-        names = {"DRAFT"})
-    @DisplayName("Should fail to delete pipeline when dataset is not in DRAFT status")
-    void shouldFailToDeletePipelineWhenDatasetNotDraft(DataSetStatus status) {
-      // Create a pipeline
-      UUID pipelineId = createTestEntity();
-
-      // Update the dataset status to non-DRAFT
-      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
-      dataSet.setDataSetStatus(status);
-      dataSetRepository.save(dataSet);
-
-      // Attempt to delete the pipeline
-      ResponseEntity<Void> response = performDelete(pipelineId);
-
-      // Currently returns INTERNAL_SERVER_ERROR because IllegalStateException is thrown
-      // This should ideally be BAD_REQUEST with proper error handling
-      assertThat(response.getStatusCode())
-          .as("Should not allow deletion when dataset is %s", status)
-          .isIn(HttpStatus.BAD_REQUEST, HttpStatus.INTERNAL_SERVER_ERROR);
-
-      // Verify pipeline still exists (if deletion properly failed with 400)
-      if (response.getStatusCode() == HttpStatus.BAD_REQUEST) {
-        ResponseEntity<PipelineOutputDTO> getResponse = performGetById(pipelineId);
-        assertThat(getResponse.getStatusCode())
-            .as("Pipeline should still exist after failed deletion attempt")
-            .isEqualTo(HttpStatus.OK);
-      }
-    }
-
     @Test
     @DisplayName("Should fail to delete non-existent pipeline")
     void shouldFailToDeleteNonExistentPipeline() {
@@ -912,28 +886,13 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should return 404 when getting pipeline from wrong dataset")
-    void shouldReturn404WhenGettingPipelineFromWrongDataset() {
+    @DisplayName(
+        "Should return 404, not the parent's status, for PUT from a non-DRAFT wrong dataset")
+    void shouldNotRevealParentStatusOnPutFromWrongDataset() {
       UUID pipelineId = createTestEntity();
-      DataSet otherDataSet = createTestDataSet();
-
-      ResponseEntity<PipelineOutputDTO> response =
-          exchange(
-              "/datasets/" + otherDataSet.getId() + "/pipelines/" + pipelineId,
-              org.springframework.http.HttpMethod.GET,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode())
-          .as("Should return NOT_FOUND for pipeline from wrong dataset")
-          .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Should return 404 when updating pipeline from wrong dataset via PUT")
-    void shouldReturn404WhenUpdatingPipelineFromWrongDataset() {
-      UUID pipelineId = createTestEntity();
+      DataSet ownDataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      ownDataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      dataSetRepository.save(ownDataSet);
       DataSet otherDataSet = createTestDataSet();
 
       ResponseEntity<PipelineOutputDTO> response =
@@ -945,43 +904,8 @@ class PipelineControllerIntegrationTest
               getOutputTypeReference());
 
       assertThat(response.getStatusCode())
-          .as("Should return NOT_FOUND for PUT from wrong dataset")
+          .as("A foreign pipeline id must answer 404 regardless of its parent's status")
           .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Should return 404 when patching pipeline from wrong dataset via PATCH")
-    void shouldReturn404WhenPatchingPipelineFromWrongDataset() {
-      UUID pipelineId = createTestEntity();
-      DataSet otherDataSet = createTestDataSet();
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/" + otherDataSet.getId() + "/pipelines/" + pipelineId,
-              HttpMethod.PATCH,
-              createAuthHeaders(),
-              Map.of("name", "patched-from-elsewhere"));
-
-      assertThat(response.getStatusCode())
-          .as("Should return NOT_FOUND for PATCH from wrong dataset")
-          .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Should reject a malformed dataSetId as invalid input, not a server error")
-    void shouldRejectMalformedDataSetId() {
-      UUID pipelineId = createTestEntity();
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/not-a-uuid/pipelines/" + pipelineId,
-              HttpMethod.GET,
-              createAuthHeaders(),
-              null);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:INVALID_INPUT");
     }
 
     // Without these three, nothing would catch the removal of the path-injection in
@@ -1078,29 +1002,6 @@ class PipelineControllerIntegrationTest
           .as("PATCH must not move the pipeline to the dataset named in the body")
           .isEqualTo(testDataSetId)
           .isNotEqualTo(otherDataSet.getId());
-    }
-
-    @Test
-    @DisplayName("Should return 404 when deleting pipeline from wrong dataset")
-    void shouldReturn404WhenDeletingPipelineFromWrongDataset() {
-      UUID pipelineId = createTestEntity();
-      DataSet otherDataSet = createTestDataSet();
-
-      ResponseEntity<Void> response =
-          exchange(
-              "/datasets/" + otherDataSet.getId() + "/pipelines/" + pipelineId,
-              org.springframework.http.HttpMethod.DELETE,
-              createAuthHeaders(),
-              null,
-              new ParameterizedTypeReference<>() {});
-
-      assertThat(response.getStatusCode())
-          .as("Should return NOT_FOUND for DELETE from wrong dataset")
-          .isEqualTo(HttpStatus.NOT_FOUND);
-
-      assertThat(pipelineRepository.findById(pipelineId))
-          .as("Pipeline should still exist after failed cross-dataset delete")
-          .isPresent();
     }
   }
 
@@ -1550,6 +1451,157 @@ class PipelineControllerIntegrationTest
           .isPresent()
           .get()
           .satisfies(s -> assertThat(s.getPipeline()).isNull());
+    }
+  }
+
+  @Nested
+  @DisplayName("Parent DataSet Mutation Guard")
+  class MutationGuardTests {
+
+    private static final String NOT_EDITABLE_URN = "urn:civitas:error:DATASET_NOT_EDITABLE";
+    private static final String IN_USE_URN = "urn:civitas:error:RESOURCE_IN_USE";
+
+    private void setParentStatus(DataSetStatus status) {
+      ensureTestDataSet();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      dataSet.setDataSetStatus(status);
+      dataSetRepository.save(dataSet);
+    }
+
+    private void setParentPendingSaga(PendingSagaType pendingSagaType) {
+      ensureTestDataSet();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      dataSet.setPendingSagaType(pendingSagaType);
+      dataSetRepository.save(dataSet);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("POST is rejected when the parent dataset is not DRAFT")
+    void createRejectedWhenParentNotDraft(DataSetStatus status) {
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath(), HttpMethod.POST, createAuthHeaders(), createValidInput());
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(pipelineRepository.count()).as("No pipeline was created").isZero();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("PUT is rejected when the parent dataset is not DRAFT")
+    void updateRejectedWhenParentNotDraft(DataSetStatus status) {
+      UUID pipelineId = createTestEntity();
+      String originalName = pipelineRepository.findById(pipelineId).orElseThrow().getName();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + pipelineId,
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              createUpdateInput());
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(pipelineRepository.findById(pipelineId).orElseThrow().getName())
+          .isEqualTo(originalName);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("PATCH is rejected when the parent dataset is not DRAFT")
+    void patchRejectedWhenParentNotDraft(DataSetStatus status) {
+      UUID pipelineId = createTestEntity();
+      String originalName = pipelineRepository.findById(pipelineId).orElseThrow().getName();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + pipelineId,
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("name", "patched_pipeline"));
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(pipelineRepository.findById(pipelineId).orElseThrow().getName())
+          .isEqualTo(originalName);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("DELETE is rejected when the parent dataset is not DRAFT")
+    void deleteRejectedWhenParentNotDraft(DataSetStatus status) {
+      UUID pipelineId = createTestEntity();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + pipelineId, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(pipelineRepository.findById(pipelineId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("POST is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void createRejectedWhileSagaInFlight() {
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath(), HttpMethod.POST, createAuthHeaders(), createValidInput());
+
+      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertThat(pipelineRepository.count()).as("No pipeline was created").isZero();
+    }
+
+    @Test
+    @DisplayName("PUT is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void updateRejectedWhileSagaInFlight() {
+      UUID pipelineId = createTestEntity();
+      String originalName = pipelineRepository.findById(pipelineId).orElseThrow().getName();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + pipelineId,
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              createUpdateInput());
+
+      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertThat(pipelineRepository.findById(pipelineId).orElseThrow().getName())
+          .isEqualTo(originalName);
+    }
+
+    @Test
+    @DisplayName("DELETE is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void deleteRejectedWhileSagaInFlight() {
+      UUID pipelineId = createTestEntity();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + pipelineId, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertThat(pipelineRepository.findById(pipelineId))
+          .as("Entity survives the rejected delete")
+          .isPresent();
+    }
+
+    @Test
+    @DisplayName("PUT, PATCH and DELETE all succeed on a DRAFT dataset")
+    void mutationsAcceptedOnDraftParent() {
+      UUID pipelineId = createTestEntity();
+
+      assertThat(performUpdate(pipelineId, createUpdateInput()).getStatusCode())
+          .isEqualTo(HttpStatus.OK);
+      assertThat(performPatch(pipelineId, Map.of("description", "patched")).getStatusCode())
+          .isEqualTo(HttpStatus.OK);
+      assertThat(performDelete(pipelineId).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
   }
 }

@@ -2,7 +2,8 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -18,6 +19,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -28,9 +31,18 @@ import tools.jackson.core.type.TypeReference;
 
 @DisplayName("Layer Controller Integration Tests")
 class LayerControllerIntegrationTest
-    extends BaseControllerIntegrationTest<LayerInputDTO, LayerOutputDTO> {
+    extends DataSetSubEntityControllerIntegrationTest<LayerInputDTO, LayerOutputDTO> {
 
-  @Autowired protected PortalTestDataFactory portalData;
+  @Override
+  protected String getSubEntityPathSegment() {
+    return "layers";
+  }
+
+  @Override
+  protected boolean supportsPatch() {
+    return false;
+  }
+
   @Autowired private LayerRepository layerRepository;
   @Autowired private DataSetRepository dataSetRepository;
 
@@ -130,21 +142,6 @@ class LayerControllerIntegrationTest
   class CreateLayerTests {
 
     @Test
-    @DisplayName("Should return 400 when dataSetId in path is not a valid UUID")
-    void shouldReturn400WhenCreateWithInvalidDataSetId() {
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/not-a-valid-uuid/layers",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              createValidInput());
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDetail())
-          .isEqualTo("Missing or invalid dataSetId in path variables");
-    }
-
-    @Test
     @DisplayName(
         "Should persist layerName, dataSinkId and alternativeStyleIds in database after create")
     void shouldPersistEntityInDatabase() {
@@ -173,21 +170,6 @@ class LayerControllerIntegrationTest
   @Nested
   @DisplayName("Update Layer Tests")
   class UpdateLayerTests {
-
-    @Test
-    @DisplayName("Should return 400 when dataSetId in path is not a valid UUID")
-    void shouldReturn400WhenUpdateWithInvalidDataSetId() {
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/not-a-valid-uuid/layers/" + UUID.randomUUID(),
-              HttpMethod.PUT,
-              createAuthHeaders(),
-              createUpdateInput());
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDetail())
-          .isEqualTo("Missing or invalid dataSetId in path variables");
-    }
 
     @Test
     @DisplayName("Should persist updated layerName in database after PUT")
@@ -347,53 +329,131 @@ class LayerControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Cross-Dataset Access Tests")
-  class CrossDatasetTests {
+  @DisplayName("Parent DataSet Mutation Guard")
+  class MutationGuardTests {
 
-    @Test
-    @DisplayName("Should return 404 when accessing Layer from a different dataset")
-    void shouldReturn404ForLayerFromDifferentDataset() {
+    private static final String NOT_EDITABLE_URN = "urn:civitas:error:DATASET_NOT_EDITABLE";
+    private static final String IN_USE_URN = "urn:civitas:error:RESOURCE_IN_USE";
+
+    private void setParentStatus(DataSetStatus status) {
+      ensurePrerequisites();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      dataSet.setDataSetStatus(status);
+      dataSetRepository.save(dataSet);
+    }
+
+    private void setParentPendingSaga(PendingSagaType pendingSagaType) {
+      ensurePrerequisites();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      dataSet.setPendingSagaType(pendingSagaType);
+      dataSetRepository.save(dataSet);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("POST is rejected when the parent dataset is not DRAFT")
+    void createRejectedWhenParentNotDraft(DataSetStatus status) {
+      LayerInputDTO input = createValidInput();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(layerRepository.existsByDataSetId(testDataSetId)).isFalse();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("PUT is rejected when the parent dataset is not DRAFT")
+    void updateRejectedWhenParentNotDraft(DataSetStatus status) {
       UUID layerId = createTestEntity();
-      DataSet otherDataSet = portalData.dataSet();
+      String originalName = layerRepository.findById(layerId).orElseThrow().getLayerName();
+      setParentStatus(status);
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(
-              "/datasets/" + otherDataSet.getId() + "/layers/" + layerId,
-              HttpMethod.GET,
+              getEndpointPath() + "/" + layerId,
+              HttpMethod.PUT,
               createAuthHeaders(),
-              null);
+              createUpdateInput());
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(layerRepository.findById(layerId).orElseThrow().getLayerName())
+          .isEqualTo(originalName);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("DELETE is rejected when the parent dataset is not DRAFT")
+    void deleteRejectedWhenParentNotDraft(DataSetStatus status) {
+      UUID layerId = createTestEntity();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + layerId, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(layerRepository.findById(layerId)).isPresent();
     }
 
     @Test
-    @DisplayName("Should return 400 when dataSetId in path is not a valid UUID on GET by ID")
-    void shouldReturn400WhenGetByIdWithInvalidDataSetId() {
+    @DisplayName("POST is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void createRejectedWhileSagaInFlight() {
+      LayerInputDTO input = createValidInput();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
       ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              "/datasets/not-a-valid-uuid/layers/" + UUID.randomUUID(),
-              HttpMethod.GET,
-              createAuthHeaders(),
-              null);
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDetail())
-          .isEqualTo("Missing or invalid dataSetId in path variables");
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertThat(layerRepository.existsByDataSetId(testDataSetId)).isFalse();
     }
 
     @Test
-    @DisplayName("Should return 400 when dataSetId in path is not a valid UUID on DELETE")
-    void shouldReturn400WhenDeleteWithInvalidDataSetId() {
+    @DisplayName("PUT is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void updateRejectedWhileSagaInFlight() {
+      UUID layerId = createTestEntity();
+      String originalName = layerRepository.findById(layerId).orElseThrow().getLayerName();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(
-              "/datasets/not-a-valid-uuid/layers/" + UUID.randomUUID(),
-              HttpMethod.DELETE,
+              getEndpointPath() + "/" + layerId,
+              HttpMethod.PUT,
               createAuthHeaders(),
-              null);
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDetail())
-          .isEqualTo("Missing or invalid dataSetId in path variables");
+              createUpdateInput());
+
+      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertThat(layerRepository.findById(layerId).orElseThrow().getLayerName())
+          .isEqualTo(originalName);
+    }
+
+    @Test
+    @DisplayName("DELETE is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void deleteRejectedWhileSagaInFlight() {
+      UUID layerId = createTestEntity();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + layerId, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertThat(layerRepository.findById(layerId))
+          .as("Entity survives the rejected delete")
+          .isPresent();
+    }
+
+    @Test
+    @DisplayName("PUT and DELETE both succeed on a DRAFT dataset")
+    void mutationsAcceptedOnDraftParent() {
+      UUID layerId = createTestEntity();
+
+      assertThat(performUpdate(layerId, createUpdateInput()).getStatusCode())
+          .isEqualTo(HttpStatus.OK);
+      assertThat(performDelete(layerId).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
   }
 }

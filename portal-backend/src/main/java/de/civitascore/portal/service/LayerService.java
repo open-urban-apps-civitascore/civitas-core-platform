@@ -42,7 +42,9 @@ public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
       LayerMapper layerMapper,
       DataSetRepository dataSetRepository,
       DataSinkRepository dataSinkRepository,
-      StyleRepository styleRepository) {
+      StyleRepository styleRepository,
+      DataSetMutationGuard dataSetMutationGuard) {
+    super(dataSetMutationGuard);
     this.layerRepository = layerRepository;
     this.layerMapper = layerMapper;
     this.dataSetRepository = dataSetRepository;

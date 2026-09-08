@@ -89,7 +89,8 @@ class DataSetServiceTest {
         sagaPublisher,
         pipelineRuntimeStatusService,
         allowedScopesProvider,
-        new DataSourceDatapoolScopeValidator());
+        new DataSourceDatapoolScopeValidator(),
+        new DataSetMutationGuard(dataSetRepository));
   }
 
   private static AllowedScopes wildcardScopes() {

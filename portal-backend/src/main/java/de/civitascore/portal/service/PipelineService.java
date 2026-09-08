@@ -1,7 +1,6 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.PipelineMapper;
-import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -62,7 +61,9 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
       DataSinkService dataSinkService,
       DataSinkRepository dataSinkRepository,
       DataSourceDatapoolScopeValidator datapoolScopeValidator,
-      ObjectProvider<AllowedScopes> allowedScopesProvider) {
+      ObjectProvider<AllowedScopes> allowedScopesProvider,
+      DataSetMutationGuard dataSetMutationGuard) {
+    super(dataSetMutationGuard);
     this.pipelineRepository = pipelineRepository;
     this.pipelineMapper = pipelineMapper;
     this.dataSetRepository = dataSetRepository;
@@ -287,21 +288,9 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
             });
   }
 
-  /**
-   * Detaches the pipeline's DataSinks, which survive the deletion.
-   *
-   * @throws InvalidInputException if the parent dataset is not in DRAFT
-   */
+  /** Detaches the pipeline's DataSinks, which survive the deletion. */
   @Override
   protected void onDelete(Pipeline pipeline) {
-    if (pipeline.getDataSet() != null
-        && pipeline.getDataSet().getDataSetStatus() != DataSetStatus.DRAFT) {
-      throw new InvalidInputException(
-          "Pipeline",
-          pipeline.getId(),
-          "Cannot delete pipeline associated with a dataset that is not in DRAFT status.");
-    }
-
     dataSinkService.unlinkByPipelineId(pipeline.getId());
   }
 }

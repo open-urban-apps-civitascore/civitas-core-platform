@@ -35,7 +35,9 @@ public class StyleService extends DataSetOwnedService<Style, StyleInputDTO> {
       StyleMapper styleMapper,
       DataSetRepository dataSetRepository,
       LayerRepository layerRepository,
-      SldContentValidator sldContentValidator) {
+      SldContentValidator sldContentValidator,
+      DataSetMutationGuard dataSetMutationGuard) {
+    super(dataSetMutationGuard);
     this.styleRepository = styleRepository;
     this.styleMapper = styleMapper;
     this.dataSetRepository = dataSetRepository;

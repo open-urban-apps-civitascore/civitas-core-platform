@@ -43,6 +43,8 @@ class StyleServiceTest {
   @Spy
   private SldContentValidator sldContentValidator = new SldContentValidator(new SldParserFactory());
 
+  @Mock private DataSetMutationGuard dataSetMutationGuard;
+
   @InjectMocks private StyleService styleService;
 
   private DataSet dataSet(UUID id) {
