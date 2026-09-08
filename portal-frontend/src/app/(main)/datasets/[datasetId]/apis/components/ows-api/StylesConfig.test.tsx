@@ -13,9 +13,8 @@ vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => false,
 }))
 
-const DOCTYPE_ERROR_TEXT =
-  'Style content must not include a DOCTYPE declaration. Remove the <!DOCTYPE ...> line and try again.'
-const MALFORMED_ERROR_TEXT = 'Style content is not valid XML. Check the markup for errors and try again.'
+const DOCTYPE_ERROR_TEXT = 'Style content must not include a DOCTYPE declaration. Remove the <!DOCTYPE ...>'
+const MALFORMED_ERROR_TEXT = 'Style content is not valid XML'
 
 const makeStyle = (overrides: Partial<StyleFormData> = {}): StyleFormData => ({
   id: 'style-1',
