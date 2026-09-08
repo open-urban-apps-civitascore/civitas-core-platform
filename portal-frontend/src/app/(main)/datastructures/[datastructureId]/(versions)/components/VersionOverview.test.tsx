@@ -4,7 +4,6 @@ import { NextIntlClientProvider } from 'next-intl'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
-import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import messages from '@/messages/de.json'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import {
@@ -33,20 +32,13 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/datastructures/test-id/versions/v-1',
 }))
 
+let mockSubTabValue = 'versionInfo'
+
 vi.mock('@/hooks/use-query-params', () => ({
   useQueryParams: () => ({
     setSubTabValueParam: vi.fn(),
-    subTabValue: 'versionInfo',
+    subTabValue: mockSubTabValue,
   }),
-}))
-
-vi.mock('@/components/uml-modeler/hooks/use-multi-session-manager', () => ({
-  useMultiSessionManager: vi.fn(({ initialSession }: { initialSession: { id: string } | null }) => ({
-    activeSession: null,
-    activeSessionId: initialSession?.id ?? null,
-    setSession: vi.fn(),
-    markSessionDirty: vi.fn(),
-  })),
 }))
 
 const mockUpdateMutateAsync = vi.fn()
@@ -123,22 +115,6 @@ const mockVersionWithModel: DatastructureVersion = {
   },
 }
 
-const createModelSessionManagerMock = (version: DatastructureVersion) =>
-  ({
-    activeSession: {
-      id: version.styles?.id ?? 'session-1',
-      isDirty: false,
-      diagram: version.styles!,
-      dirtyFields: new Set(),
-      lastModified: version.styles?.lastModified ?? new Date('2024-01-01'),
-      created: version.styles?.lastModified ?? new Date('2024-01-01'),
-      name: version.modelName ?? version.styles?.name ?? 'Test Model',
-    },
-    activeSessionId: version.styles?.id ?? 'session-1',
-    setSession: vi.fn(),
-    markSessionDirty: vi.fn(),
-  }) as unknown as ReturnType<typeof useMultiSessionManager>
-
 const setCurrentUserPermissions = (permissions: PermissionName[]) => {
   vi.mocked(useGetCurrentUser).mockReturnValue({
     data: {
@@ -177,16 +153,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     mockCreateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockStatusUpdateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockSearchParams = new URLSearchParams('mode=edit')
-    vi.mocked(useMultiSessionManager).mockReset()
-    vi.mocked(useMultiSessionManager).mockImplementation(
-      ({ initialSession }) =>
-        ({
-          activeSession: null,
-          activeSessionId: initialSession?.id ?? null,
-          setSession: vi.fn(),
-          markSessionDirty: vi.fn(),
-        }) as unknown as ReturnType<typeof useMultiSessionManager>,
-    )
+    mockSubTabValue = 'versionInfo'
     vi.mocked(useGetCurrentUser).mockReturnValue({
       data: {
         username: 'test',
@@ -373,7 +340,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     })
 
     it('marks structure tab as completed when version has a data structure', async () => {
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await waitFor(() => {
@@ -440,7 +406,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('enables AVAILABLE option when all tabs are completed', async () => {
       const user = userEvent.setup()
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await openStatusDropdown(user)
@@ -457,7 +422,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('marks the description as invalid when it is cleared while the status is AVAILABLE', async () => {
       const user = userEvent.setup()
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await selectAvailableStatus(user)
@@ -471,7 +435,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('keeps the description valid when it is cleared while the status is DRAFT', async () => {
       const user = userEvent.setup()
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await user.clear(screen.getByTestId('descriptionTextArea'))
@@ -482,7 +445,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('disables the save button while a required field is empty at status AVAILABLE', async () => {
       const user = userEvent.setup()
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await selectAvailableStatus(user)
@@ -497,7 +459,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('keeps the save button enabled with an empty description at status DRAFT', async () => {
       const user = userEvent.setup()
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await user.clear(screen.getByTestId('descriptionTextArea'))
@@ -553,7 +514,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         ...mockVersionWithModel,
         dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
       }
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(availableVersionWithModel))
       renderComponent({ version: availableVersionWithModel })
 
       expect(screen.getByTestId('versionTextField')).toBeDisabled()
@@ -597,7 +557,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('calls the publish API when status is set from DRAFT to AVAILABLE', async () => {
       const user = userEvent.setup()
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
       renderComponent({ version: mockVersionWithModel })
 
       await openStatusDropdown(user)
@@ -621,7 +580,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         ...mockVersionWithModel,
         dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
       }
-      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(availableVersionWithModel))
       renderComponent({ version: availableVersionWithModel })
 
       await openStatusDropdown(user)
@@ -904,6 +862,45 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         )
         expect(mockPush).toHaveBeenCalled()
       })
+    })
+  })
+
+  describe('save button after model changes', () => {
+    beforeEach(() => {
+      mockSubTabValue = 'structure'
+    })
+
+    const versionWithSelectedNode: DatastructureVersion = {
+      ...mockVersionWithModel,
+      styles: {
+        ...mockVersionWithModel.styles!,
+        nodes: [{ ...mockVersionWithModel.styles!.nodes[0], selected: true }],
+      },
+    }
+
+    it('enables the save button after the diagram was renamed', async () => {
+      const user = userEvent.setup()
+      renderComponent({ version: mockVersionWithModel })
+
+      expect(screen.getByTestId('confirmButton')).toBeDisabled()
+
+      await user.dblClick(screen.getByText('Test Model'))
+      const diagramNameInput = screen.getByDisplayValue('Test Model')
+      await user.clear(diagramNameInput)
+      await user.type(diagramNameInput, 'Renamed Model{Enter}')
+
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).toBeEnabled())
+    })
+
+    it('enables the save button after a class was renamed in the inspector', async () => {
+      const user = userEvent.setup()
+      renderComponent({ version: versionWithSelectedNode })
+
+      expect(screen.getByTestId('confirmButton')).toBeDisabled()
+
+      await user.type(screen.getByPlaceholderText('Element name'), 'X')
+
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).toBeEnabled())
     })
   })
 })

@@ -224,7 +224,9 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     return undefined
   }, [isInUse, isLastAvailableVersionInAvailableDatastructure, t])
 
-  const isConfirmButtonDisabled = !hasUserChanges || !form.formState.isValid || !!versionAlreadyExistsError || isLoading
+  // isValid must be read on every render, otherwise RHF's validation does not run
+  const { isValid } = form.formState
+  const isConfirmButtonDisabled = !hasUserChanges || !isValid || !!versionAlreadyExistsError || isLoading
 
   const renderTabContent = () => {
     switch (subTabValue) {
