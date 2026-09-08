@@ -44,6 +44,8 @@ public class ModelValidator {
     private final SchemaValidatorsConfig config =
         SchemaValidatorsConfig.builder().locale(Locale.ENGLISH).build();
 
+    private final JsonSchema metaSchema = CoreJsonSchemaFactory.metaSchemaValidator(config);
+
     /**
      * Validate {@code data} against {@code schema}.
      *
@@ -77,14 +79,14 @@ public class ModelValidator {
     }
 
     /**
-     * Check that {@code schema} is a parseable JSON Schema 2020-12 document.
+     * Check that {@code schema} conforms to JSON Schema 2020-12 and is parseable.
      *
      * <p>CORE-URN {@code $ref} values are treated as opaque (they resolve against the
      * registry, not against schema files) - they are neutralised before compilation.
      * All remaining refs are resolved eagerly so dangling local pointers
      * ({@code #/$defs/Missing}) are reported instead of failing later at data-validation time.
      *
-     * @return empty list if valid; a single error diagnostic if parsing fails
+     * @return empty list if valid; one {@link Diagnostic} per violation otherwise
      */
     public List<Diagnostic> validateSchema(JsonNode schema) {
         // Local pointers are checked first-party so the diagnostic can name the offending pointer:
@@ -92,6 +94,8 @@ public class ModelValidator {
         // to keep third-party detail out of the response.
         List<Diagnostic> dangling = danglingLocalRefs(schema);
         if (!dangling.isEmpty()) return dangling;
+        List<Diagnostic> nonConforming = metaSchemaViolations(schema);
+        if (!nonConforming.isEmpty()) return nonConforming;
         try {
             schemaRegistry.getSchema(JacksonBridge.toJackson2(neutralizeCoreUrnRefs(schema)), config).initializeValidators();
             return List.of();
@@ -104,6 +108,29 @@ public class ModelValidator {
             // stable, generic message (no third-party exception detail).
             log.warn("Invalid JSON Schema submitted for parsing", e);
             return List.of(new Diagnostic(DiagnosticSeverity.ERROR, "Invalid JSON Schema", "schema-parse", null));
+        }
+    }
+
+    /**
+     * One diagnostic per way {@code schema} contradicts JSON Schema 2020-12 — a {@code "type"} that
+     * names no type, a {@code "required"} that is not an array. Such a document compiles: the
+     * keyword is unrecognised at that position and carries no validator, so it silently constrains
+     * nothing, and the mistake surfaces only when real data is validated against it.
+     *
+     * <p>Checked against the document as authored rather than the neutralised copy: a diagnostic
+     * points at a location the author can find in what they submitted, and the neutralised copy
+     * drops {@code $ref} nodes that a conformance error may sit on.
+     */
+    private List<Diagnostic> metaSchemaViolations(JsonNode schema) {
+        try {
+            return metaSchema.validate(JacksonBridge.toJackson2(schema)).stream()
+                .map(e -> SchemaErrors.toDiagnostic(e, "schema-nonconforming"))
+                .toList();
+        } catch (Exception e) {
+            // Never let a meta-validation fault reject an otherwise valid schema: fall through to
+            // the compile check, which decides. The fault detail stays server-side.
+            log.warn("Meta-schema validation could not be run", e);
+            return List.of();
         }
     }
 
