@@ -4,14 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
+import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.entity.DataStructure;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
+import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +33,8 @@ class DataSinkAssemblerTest {
 
   @Mock private DataSinkMapper dataSinkMapper;
   @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private DataStructureVersionRepository dataStructureVersionRepository;
+  @Mock private DataStructureVersionMapper dataStructureVersionMapper;
 
   @InjectMocks private DataSinkAssembler assembler;
 
@@ -132,6 +139,62 @@ class DataSinkAssemblerTest {
       PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
       assertThat(config.getTableName()).isEqualTo("traffic_data");
       assertThat(config.getElement()).isEqualTo(elementUrn);
+    }
+
+    /** Stubs the URN-to-version lookup and its summary mapping for the given element URN. */
+    private DataStructureVersionSummaryDTO stubResolvedVersion(String elementUrn) {
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(UUID.randomUUID());
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(UUID.randomUUID());
+      version.setModelUrn(elementUrn);
+      version.setDataStructure(dataStructure);
+
+      DataStructureVersionSummaryDTO summary = new DataStructureVersionSummaryDTO();
+      summary.setId(version.getId());
+      summary.setDataStructureId(dataStructure.getId());
+
+      lenient()
+          .when(dataStructureVersionRepository.findFirstByModelUrn(elementUrn))
+          .thenReturn(Optional.of(version));
+      lenient().when(dataStructureVersionMapper.toSummary(version)).thenReturn(summary);
+      return summary;
+    }
+
+    @Test
+    @DisplayName("Should resolve the element URN to the DataStructureVersion it pins")
+    void shouldResolveElementUrnToDataStructureVersion() {
+      String elementUrn = "urn:core:platform:civitas:element:common:SldTestModel:dpvxg3i2hx:1.0.0";
+      DataStructureVersionSummaryDTO expected = stubResolvedVersion(elementUrn);
+      DataSink entity =
+          sinkWithPipeline(
+              DataSinkType.POSTGIS,
+              Map.of("tableName", "sld_test_features", "element", elementUrn));
+
+      DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
+
+      PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
+      assertThat(config.getElement()).isEqualTo(elementUrn);
+      assertThat(config.getDataStructureVersion()).isSameAs(expected);
+    }
+
+    @Test
+    @DisplayName("Should leave dataStructureVersion unset when the element URN resolves to nothing")
+    void shouldLeaveVersionUnsetWhenElementResolvesToNothing() {
+      String elementUrn = "urn:core:platform:civitas:element:common:gone:1.0.0";
+      lenient()
+          .when(dataStructureVersionRepository.findFirstByModelUrn(elementUrn))
+          .thenReturn(Optional.empty());
+      DataSink entity =
+          sinkWithPipeline(
+              DataSinkType.POSTGIS, Map.of("tableName", "traffic_data", "element", elementUrn));
+
+      DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
+
+      PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
+      assertThat(config.getElement()).isEqualTo(elementUrn);
+      assertThat(config.getDataStructureVersion()).isNull();
     }
 
     @Test

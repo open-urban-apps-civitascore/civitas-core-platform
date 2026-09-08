@@ -1,6 +1,7 @@
 package de.civitascore.portal.model.output.assembler;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
+import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.datasink.DataSinkConfigurationOutput;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
@@ -8,6 +9,7 @@ import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -23,8 +25,9 @@ import org.springframework.stereotype.Component;
  *
  * <ul>
  *   <li>FROST — sets a {@link FrostConfigurationOutput} with the referenced target structure.
- *   <li>POSTGIS — looks up the {@link de.civitascore.portal.model.entity.DataStructureVersion} and
- *       builds a {@link PostgisConfigurationOutput} with the nested summary.
+ *   <li>POSTGIS — builds a {@link PostgisConfigurationOutput} with the table name, the referenced
+ *       element URN, and the {@link de.civitascore.portal.model.entity.DataStructureVersion} that
+ *       URN pins.
  * </ul>
  */
 @Component
@@ -33,6 +36,8 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
 
   private final DataSinkMapper dataSinkMapper;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final DataStructureVersionRepository dataStructureVersionRepository;
+  private final DataStructureVersionMapper dataStructureVersionMapper;
 
   /** {@inheritDoc} Delegates to the {@link DataSinkMapper} for basic field mapping. */
   @Override
@@ -117,6 +122,10 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     return output;
   }
 
+  /**
+   * The nested {@code dataStructureVersion} resolves {@code element} to the portal entity it pins,
+   * a mapping only the backend can make. It stays unset for an element no stored version carries.
+   */
   private PostgisConfigurationOutput buildPostgisConfiguration(Map<String, Object> raw) {
     PostgisConfigurationOutput output = new PostgisConfigurationOutput();
     if (raw == null) {
@@ -125,6 +134,10 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     output.setTableName((String) raw.get("tableName"));
     if (raw.get("element") instanceof String element) {
       output.setElement(element);
+      dataStructureVersionRepository
+          .findFirstByModelUrn(element)
+          .map(dataStructureVersionMapper::toSummary)
+          .ifPresent(output::setDataStructureVersion);
     }
     return output;
   }

@@ -1,6 +1,7 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.type;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
@@ -172,6 +173,8 @@ class DataSinkControllerIntegrationTest
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
       dsv = portalData.attachModel(dsv, portalData.dataStructureVersionModel("ReadTest"));
+      String modelUrn = dsv.getModelUrn();
+      UUID versionId = dsv.getId();
 
       DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
       DataSink sink = new DataSink();
@@ -190,6 +193,17 @@ class DataSinkControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
       assertThat(response.getBody().getDataSetId()).isEqualTo(testDataSetId);
+      assertThat(response.getBody().getConfiguration())
+          .asInstanceOf(type(PostgisConfigurationOutput.class))
+          .satisfies(
+              config -> {
+                assertThat(config.getTableName()).isEqualTo("sensor_data");
+                assertThat(config.getElement()).isEqualTo(modelUrn);
+                assertThat(config.getDataStructureVersion()).isNotNull();
+                assertThat(config.getDataStructureVersion().getId()).isEqualTo(versionId);
+                assertThat(config.getDataStructureVersion().getDataStructureId())
+                    .isEqualTo(ds.getId());
+              });
     }
 
     @Test
@@ -247,10 +261,12 @@ class DataSinkControllerIntegrationTest
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
       dsv = portalData.attachModel(dsv, portalData.dataStructureVersionModel("PostgisCreate"));
+      String elementUrn = dsv.getModelUrn();
+      UUID versionId = dsv.getId();
 
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.POSTGIS);
-      input.setConfiguration(Map.of("tableName", "sensor_data", "element", dsv.getModelUrn()));
+      input.setConfiguration(Map.of("tableName", "sensor_data", "element", elementUrn));
 
       ResponseEntity<DataSinkOutputDTO> response = performCreate(input);
 
@@ -258,6 +274,16 @@ class DataSinkControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
       assertThat(response.getBody().getDataSetId()).isEqualTo(testDataSetId);
+      assertThat(response.getBody().getConfiguration())
+          .asInstanceOf(type(PostgisConfigurationOutput.class))
+          .satisfies(
+              config -> {
+                assertThat(config.getElement()).isEqualTo(elementUrn);
+                assertThat(config.getDataStructureVersion()).isNotNull();
+                assertThat(config.getDataStructureVersion().getId()).isEqualTo(versionId);
+                assertThat(config.getDataStructureVersion().getDataStructureId())
+                    .isEqualTo(ds.getId());
+              });
     }
 
     @Test
