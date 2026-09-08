@@ -152,6 +152,42 @@ class StyleControllerIntegrationTest
       assertThat(saved.getName()).isEqualTo(input.getName());
       assertThat(saved.getSldContent()).isEqualTo(input.getSldContent());
     }
+
+    @Test
+    @DisplayName("Should ignore a foreign dataSetId in the create body and use the path dataset")
+    void shouldIgnoreForeignDataSetIdOnCreate() {
+      DataSet otherDataSet = portalData.dataSet();
+
+      Map<String, Object> body =
+          Map.of(
+              "name",
+              "style_with_foreign_dataset_id",
+              "sldContent",
+              "<StyledLayerDescriptor version=\"1.0.0\"/>",
+              "dataSetId",
+              otherDataSet.getId().toString());
+
+      ResponseEntity<StyleOutputDTO> response =
+          exchange(
+              getEndpointPath(),
+              HttpMethod.POST,
+              createAuthHeaders(),
+              body,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSetId())
+          .as("POST must echo the dataset from the path, not the one named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
+
+      Style saved = styleRepository.findById(response.getBody().getId()).orElseThrow();
+      assertThat(saved.getDataSet().getId())
+          .as("POST must use the dataset from the path, not the one named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
+    }
   }
 
   @Nested

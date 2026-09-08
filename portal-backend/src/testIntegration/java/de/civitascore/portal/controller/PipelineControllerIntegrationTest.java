@@ -823,7 +823,6 @@ class PipelineControllerIntegrationTest
     @DisplayName("Should automatically associate pipeline with dataset from URL path")
     void shouldAutomaticallyAssociatePipelineWithDataset() {
       PipelineInputDTO input = createValidInput();
-      // Note: dataSetId should not be set manually, it comes from URL path
 
       ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
@@ -983,6 +982,102 @@ class PipelineControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getType()).hasToString("urn:civitas:error:INVALID_INPUT");
+    }
+
+    // Without these three, nothing would catch the removal of the path-injection in
+    // DataSetSubEntityController.preProcessInput, the only mechanism keeping a
+    // sub-entity in its path dataset since the per-service guards were consolidated.
+    @Test
+    @DisplayName("Should ignore a foreign dataSetId in the create body and use the path dataset")
+    void shouldIgnoreForeignDataSetIdOnCreate() {
+      DataSet otherDataSet = createTestDataSet();
+
+      Map<String, Object> body = new HashMap<>();
+      body.put("name", "pipeline_create_with_foreign_dataset_id");
+      body.put("dataSetId", otherDataSet.getId().toString());
+
+      ResponseEntity<PipelineOutputDTO> response =
+          exchange(
+              getEndpointPath(),
+              HttpMethod.POST,
+              createAuthHeaders(),
+              body,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+
+      assertThat(response.getBody().getDataSetId())
+          .as("POST must echo the dataset from the path, not the one named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
+
+      Pipeline saved = pipelineRepository.findById(response.getBody().getId()).orElseThrow();
+      assertThat(saved.getDataSet().getId())
+          .as("POST must use the dataset from the path, not the one named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
+    }
+
+    @Test
+    @DisplayName("Should ignore a foreign dataSetId in the PUT body and keep the path dataset")
+    void shouldIgnoreForeignDataSetIdOnUpdate() {
+      UUID pipelineId = createTestEntity();
+      DataSet otherDataSet = createTestDataSet();
+
+      Map<String, Object> body = new HashMap<>();
+      body.put("name", "pipeline_put_with_foreign_dataset_id");
+      body.put("dataSetId", otherDataSet.getId().toString());
+
+      ResponseEntity<PipelineOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + pipelineId,
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              body,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSetId())
+          .as("PUT must echo the path dataset, not the one named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
+
+      Pipeline saved = pipelineRepository.findById(pipelineId).orElseThrow();
+      assertThat(saved.getDataSet().getId())
+          .as("PUT must not move the pipeline to the dataset named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
+    }
+
+    @Test
+    @DisplayName("Should ignore a foreign dataSetId in the PATCH body and keep the path dataset")
+    void shouldIgnoreForeignDataSetIdOnPatch() {
+      UUID pipelineId = createTestEntity();
+      DataSet otherDataSet = createTestDataSet();
+
+      ResponseEntity<PipelineOutputDTO> response =
+          performPatch(
+              pipelineId,
+              Map.of(
+                  "name",
+                  "pipeline_patch_with_foreign_dataset_id",
+                  "dataSetId",
+                  otherDataSet.getId().toString()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSetId())
+          .as("PATCH must echo the path dataset, not the one named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
+
+      Pipeline saved = pipelineRepository.findById(pipelineId).orElseThrow();
+      assertThat(saved.getDataSet().getId())
+          .as("PATCH must not move the pipeline to the dataset named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
     }
 
     @Test
