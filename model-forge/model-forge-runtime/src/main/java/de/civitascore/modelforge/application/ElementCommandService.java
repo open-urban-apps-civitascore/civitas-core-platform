@@ -6,8 +6,12 @@ import de.civitascore.modelforge.graph.DependencyGraphService;
 import de.civitascore.modelforge.graph.SchemaRefExtractor;
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
 import de.civitascore.modelforge.contract.ArtifactInUseException;
+import de.civitascore.modelforge.contract.Diagnostic;
+import de.civitascore.modelforge.contract.DiagnosticSeverity;
+import de.civitascore.modelforge.contract.ValidationFailedException;
 import de.civitascore.modelforge.contract.VersionBump;
 import de.civitascore.modelforge.urn.UrnParser;
+import de.civitascore.modelforge.validation.ModelValidator;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -29,13 +33,16 @@ public class ElementCommandService {
     private final ArtifactRegistry registry;
     private final DependencyGraphService graph;
     private final SchemaRefExtractor     refExtractor;
+    private final ModelValidator         validator;
 
     public ElementCommandService(ArtifactRegistry registry,
                                        DependencyGraphService graph,
-                                       SchemaRefExtractor refExtractor) {
+                                       SchemaRefExtractor refExtractor,
+                                       ModelValidator validator) {
         this.registry     = registry;
         this.graph        = graph;
         this.refExtractor = refExtractor;
+        this.validator    = validator;
     }
 
     /**
@@ -49,12 +56,18 @@ public class ElementCommandService {
      *     itself, so no read-back is needed
      */
     public String storeJsonSchema(String urn, JsonNode schema, VersionBump bump, String bumpFromVersion) {
+        UrnParser.requireUrn(urn, "Element id");
         // A JSON Schema document is an object. Nothing upstream enforces that — saveArtifact routes
         // ELEMENT on isTextual() alone and the CORE validator has no ELEMENT schema — so an array or
         // scalar would otherwise reach the cast below and surface as a 500 instead of a rejection.
         if (schema == null || !schema.isObject()) {
             throw new IllegalArgumentException(
                 "A JSON Schema Element must be a JSON object: " + urn);
+        }
+        List<Diagnostic> nonConforming = validator.validateSchema(schema);
+        if (nonConforming.stream().anyMatch(d -> d.severity() == DiagnosticSeverity.ERROR)) {
+            throw new ValidationFailedException(
+                "Element is not a conforming JSON Schema", nonConforming);
         }
         ObjectNode updated = (ObjectNode) schema.deepCopy();
         String existingId = updated.path("$id").asText(null);
@@ -77,6 +90,7 @@ public class ElementCommandService {
      * @return the concrete versioned URN (pin) the write resolved to
      */
     public String storeXsd(String urn, String xsdContent, VersionBump bump) {
+        UrnParser.requireUrn(urn, "Element id");
         Set<String> importRefs = registry.extractImportRefs(xsdContent);
         String pin = registry.storeXsdElement(urn, xsdContent, importRefs, bump);
         graph.register(pin != null && !pin.isBlank() ? pin : urn, new LinkedHashSet<>(importRefs));

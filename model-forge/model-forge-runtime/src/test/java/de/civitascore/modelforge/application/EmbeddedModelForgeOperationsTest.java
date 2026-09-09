@@ -58,11 +58,12 @@ class EmbeddedModelForgeOperationsTest {
         var refExtractor = mock(SchemaRefExtractor.class);
         when(refExtractor.extractRefs(any())).thenReturn(Set.of());
         when(refExtractor.extractCoreRefTypes(any())).thenReturn(Set.of());
-        elementCommandService = new ElementCommandService(registry, graph, refExtractor);
+        var modelValidator = mock(ModelValidator.class);
+        when(modelValidator.validateSchema(any())).thenReturn(List.of());
+        elementCommandService = new ElementCommandService(registry, graph, refExtractor, modelValidator);
         var elementQueryService = new ElementQueryService(registry);
         schemaImportService = mock(SchemaImportService.class);
         viewService = mock(ViewService.class);
-        var modelValidator = mock(ModelValidator.class);
         var smartDataModelsService = mock(SmartDataModelsService.class);
         var xRepositoryService = mock(XRepositoryService.class);
 
