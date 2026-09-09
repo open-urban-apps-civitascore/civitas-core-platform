@@ -1,5 +1,5 @@
 # Use JRE Alpine for small image size and security
-FROM eclipse-temurin:25-jre-alpine@sha256:609c3d5184aeabe15c1a077af6d1c53d0ba65df18347c67043d00195267c4f7d
+FROM eclipse-temurin:25-jre-alpine@sha256:3137541deb3cac6626b5d9a4a2187bc0d6a34312f858bd2c67dd01e732e6b682
 
 LABEL maintainer="CIVITAS/CORE Team"
 LABEL description="CIVITAS/CORE Portal Backend - IoT Schema Service"
