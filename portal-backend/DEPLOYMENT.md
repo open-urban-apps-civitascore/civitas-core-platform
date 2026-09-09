@@ -19,6 +19,7 @@
    - [Logging](#25-logging)
    - [OpenAPI / Swagger UI](#26-openapi--swagger-ui)
    - [Security Permit Paths](#27-security-permit-paths)
+   - [Group-Member Backfill (one-shot)](#28-group-member-backfill-one-shot)
 3. [Seed Data Profile (init)](#3-seed-data-profile-init)
 4. [Local Development Only](#4-local-development-only)
    - [Local Defaults](#41-local-defaults)
@@ -266,6 +267,18 @@ SECURITY_PERMIT_PATHS_0=/actuator/health/**
 SECURITY_PERMIT_PATHS_1=/actuator/info
 SECURITY_PERMIT_PATHS_2=/api-docs/**
 ```
+
+---
+
+### 2.8 Group-Member Backfill (one-shot)
+
+One-time migration switch that reconciles the members of already-synced groups (those with a Keycloak `externalId`) into Keycloak, covering groups whose `group_members` rows predate the group-side member sync. On startup, after the catch-up sync, it re-emits `GROUP_UPDATED` per already-synced group; the config-adapter reconciles membership diff-based.
+
+| Property / Env Var | Default | Description |
+|---|---|---|
+| `KEYCLOAK_GROUP_MEMBER_BACKFILL` | `false` | When `true`, reconcile already-synced groups' members into Keycloak on startup |
+
+Enable for a single rollout deploy, then check the completion log — `Group-member backfill completed: N succeeded, M failed, K skipped (of T candidates)` — and re-run while the flag is on if `M > 0` (failures are also logged individually at `ERROR`). Once it reports `0 failed`, set the flag back to `false`. The reconcile is idempotent; there is no run-once marker, so the flag must be turned off after rollout.
 
 ---
 

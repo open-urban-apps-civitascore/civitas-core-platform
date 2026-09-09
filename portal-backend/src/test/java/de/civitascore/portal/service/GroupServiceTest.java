@@ -48,7 +48,7 @@ class GroupServiceTest {
   private static final String TARGET_REALM = "test-realm";
   private static final String AUTH_SERVER_URL = "http://keycloak:8080";
   private static final KeycloakProperties KEYCLOAK_PROPERTIES =
-      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, true);
+      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, true, false);
 
   private GroupService createService() {
     return new GroupService(

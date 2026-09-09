@@ -39,7 +39,7 @@ class UserServiceTest {
   private static final String TARGET_REALM = "test-realm";
   private static final String AUTH_SERVER_URL = "http://keycloak:8080";
   private static final KeycloakProperties KEYCLOAK_PROPERTIES =
-      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, true);
+      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, true, false);
   private static final int CONFIG_ADAPTER_TIMEOUT_SECONDS = 10;
 
   private UserService createService() {
@@ -138,7 +138,8 @@ class UserServiceTest {
     @DisplayName("Should omit CONFIGURE_TOTP for new user when OTP enforcement is disabled")
     void shouldOmitConfigureTotpWhenEnforcementDisabled() {
       UserService service =
-          createService(new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, false));
+          createService(
+              new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, false, false));
       User user = userWithId(UUID.randomUUID());
       user.setExternalId(null);
       UserInputDTO input = new UserInputDTO();
