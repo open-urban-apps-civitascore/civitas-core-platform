@@ -1372,7 +1372,8 @@
       "diagramUnresolvable": "\"{name}\" provides no mappable fields: {reason}",
       "toolbar": {
         "title": "Mapping",
-        "status": "{mapped} mapped · {unmapped} unmapped"
+        "status": "{mapped} mapped · {unmapped} unmapped",
+        "errors": "{count, plural, one {# error} other {# errors}}"
       },
       "palette": {
         "title": "Transforms"
@@ -1390,7 +1391,8 @@
         "typeMismatchWithType": "Types don't match ({type}). Add a conversion function.",
         "typeMismatch": "Types don't match. Add a conversion function.",
         "outputToOutput": "Two outputs can't be connected.",
-        "inputToInput": "Two inputs can't be connected."
+        "inputToInput": "Two inputs can't be connected.",
+        "connectionsBroken": "{count, plural, one {# connection no longer matches} other {# connections no longer match}} the new type ({type})."
       },
       "unconnectedWarning": {
         "title": "Remove unconnected transforms?",
@@ -1411,12 +1413,13 @@
               "placeholder": "Select type…"
             },
             "value": {
-              "label": "Value"
+              "label": "Value",
+              "required": "A value is required."
             }
           }
         },
         "concat": {
-          "description": "Concatenate two or more values.",
+          "description": "Concatenate two or more scalars into text.",
           "fields": {
             "separator": {
               "label": "Separator"
@@ -1427,16 +1430,16 @@
           "description": "any scalar → str"
         },
         "toInt": {
-          "description": "str / number → int"
+          "description": "str / int / number → int"
         },
         "toFloat": {
-          "description": "str / int → number"
+          "description": "str / int / number → number"
         },
         "toUuid": {
           "description": "str → uuid"
         },
         "toDate": {
-          "description": "str → date",
+          "description": "str / date → date",
           "fields": {
             "pattern": {
               "label": "Input format"
@@ -1444,7 +1447,7 @@
           }
         },
         "toDateTime": {
-          "description": "str → datetime",
+          "description": "str / datetime → datetime",
           "fields": {
             "pattern": {
               "label": "Input format"

@@ -16,7 +16,7 @@ import {
   InspectorShell,
   PaletteShell,
 } from '@/components/node-editor'
-import type { PortType, TransformNodeData } from '@/components/node-editor/types'
+import type { PortDef, TransformNodeData } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -26,7 +26,7 @@ import { buildDataStructureUrn } from '@/utils/urn'
 import type { StaTargetVocabulary } from '../../_constants/staTargetCatalog'
 import { deriveStaMatchKeys } from '../../_constants/staTargetCatalog'
 import type { MappingConfig } from './_types'
-import { ARRAY_EDGE_STYLE } from './_types'
+import { ARRAY_EDGE_STYLE, INVALID_EDGE_STYLE } from './_types'
 import {
   compileCanvas,
   decompileConfig,
@@ -38,7 +38,8 @@ import { TransformInspector } from './inspector/TransformInspector'
 import { MegaNode } from './nodes/MegaNode'
 import { flattenTree, objectFieldsCompatible, requiredFieldPaths } from './schema/fieldTree'
 import { versionToSchemaTree } from './schema/versionTree'
-import { computeStatus } from './status'
+import type { PortInfo } from './status'
+import { computeStatus, findNodeConfigErrors, portsCompatible } from './status'
 import type { MappingTransformDef } from './transforms'
 import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
 
@@ -172,10 +173,7 @@ export const MappingEditorModal = ({
     initialized.current = true
   }, [open, isReady, sourceTree, targetTree, config, setNodes, setEdges])
 
-  const endpointInfo = (
-    nodeId: string,
-    handleId: string,
-  ): { type: PortType; sub?: string; accepts?: readonly string[] } | null => {
+  const endpointInfo = (nodeId: string, handleId: string): PortInfo | null => {
     if (nodeId === SOURCE_NODE_ID) {
       const field = sourceFields.get(handleId)
       if (!field) return null
@@ -198,30 +196,6 @@ export const MappingEditorModal = ({
     return port ? { type: port.type, sub: port.dataType, accepts: port.accepts } : null
   }
 
-  /**
-   * Two ports are compatible when:
-   *  - both have the same portType category (scalar / geometry / array / object)
-   *  - AND for scalar/geometry ports: the subtype matches exactly (int↔int, str↔str, Point↔Point, …)
-   *    — type conversions must go through an explicit conversion node.
-   * Exception: an input port with an `accepts` set matches by membership instead of exact equality —
-   * e.g. a numeric conversion input accepts str/int/number and rejects uuid/bool/date/geometry.
-   */
-  const portsCompatible = useCallback(
-    (
-      from: { type: PortType; sub?: string; accepts?: readonly string[] } | null,
-      to: { type: PortType; sub?: string; accepts?: readonly string[] } | null,
-    ): boolean => {
-      if (!from || !to) return false
-      if (from.type !== to.type) return false
-      if (from.type === 'scalar' || from.type === 'geometry') {
-        if (to.accepts) return !!from.sub && to.accepts.includes(from.sub)
-        if (from.sub && to.sub && from.sub !== to.sub) return false
-      }
-      return true
-    },
-    [],
-  )
-
   const isValidConnection: IsValidConnection = useCallback(
     connection => {
       const from = endpointInfo(connection.source, connection.sourceHandle ?? '')
@@ -242,7 +216,7 @@ export const MappingEditorModal = ({
     },
     // endpointInfo reads nodes/sourceFields/targetFields via closure — include them
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [nodes, sourceFields, targetFields, portsCompatible],
+    [nodes, sourceFields, targetFields],
   )
 
   /** Tracks the source endpoint of an in-progress drag so we can show a toast on failure. */
@@ -314,8 +288,27 @@ export const MappingEditorModal = ({
     setNodes(nds => [...nds, { id, type: 'transform', position, data }])
   }
 
+  /** Outgoing edges of `nodeId` that the rewritten output port no longer type-matches. */
+  const edgesBrokenBy = (nodeId: string, port: PortDef): Edge[] =>
+    edges.filter(
+      e =>
+        e.source === nodeId &&
+        (e.sourceHandle ?? '') === port.id &&
+        !portsCompatible({ type: port.type, sub: port.dataType }, endpointInfo(e.target, e.targetHandle ?? '')),
+    )
+
   const updateConfig = (key: string, value: string) => {
     if (!selectedId) return
+
+    const selectedDefType = (nodes.find(n => n.id === selectedId)?.data as TransformNodeData | undefined)?.defType
+    if (key === 'type' && selectedDefType === 'const') {
+      const newPort = literalOutputPort(value || LITERAL_DEFAULT_TYPE)
+      const broken = edgesBrokenBy(selectedId, newPort)
+      if (broken.length > 0) {
+        toast.error(t('errors.connectionsBroken', { count: broken.length, type: newPort.dataType ?? '' }))
+      }
+    }
+
     setNodes(nds =>
       nds.map(node => {
         if (node.id !== selectedId) return node
@@ -333,11 +326,15 @@ export const MappingEditorModal = ({
   }
 
   const status = useMemo(
-    () => computeStatus(edges, sourceFields, targetFields, endpointInfo),
+    () => computeStatus(nodes, edges, sourceFields, targetFields, endpointInfo),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [edges, nodes, sourceFields, targetFields],
   )
 
+  const configErrors = useMemo(() => findNodeConfigErrors(nodes, edges), [nodes, edges])
+
+  // Port statuses and error flags are injected for rendering only — never into the `nodes`
+  // state, so compileCanvas keeps seeing the persisted node data.
   const displayNodes = useMemo(
     () =>
       nodes.map(node =>
@@ -349,15 +346,37 @@ export const MappingEditorModal = ({
                 portStatus: node.data.role === 'source' ? status.sourcePortStatus : status.targetPortStatus,
               },
             }
-          : node,
+          : {
+              ...node,
+              data: {
+                ...node.data,
+                portStatus: status.transformPortStatus[node.id],
+                hasError: !!configErrors.byNode[node.id],
+              },
+            },
       ),
-    [nodes, status],
+    [nodes, status, configErrors],
   )
+
+  const displayEdges = useMemo(() => {
+    const invalid = new Set(status.invalidEdgeIds)
+    return edges.map(edge =>
+      invalid.has(edge.id) ? { ...edge, style: { ...edge.style, ...INVALID_EDGE_STYLE } } : edge,
+    )
+  }, [edges, status.invalidEdgeIds])
 
   const selectedNode = nodes.find(n => n.id === selectedId)
   const selectedData = selectedNode?.type === 'transform' ? (selectedNode.data as TransformNodeData) : undefined
   // Look up the def from the translated registry so the inspector receives translated labels
   const selectedDef = selectedData ? translatedRegistry.byType[selectedData.defType] : undefined
+  // validate() returns i18n keys; translate here so the inspector just renders strings.
+  const selectedErrors = useMemo(() => {
+    const keys = selectedId ? configErrors.byNode[selectedId] : undefined
+    if (!keys) return undefined
+    return Object.fromEntries(
+      Object.entries(keys).map(([fieldKey, messageKey]) => [fieldKey, t(messageKey as Parameters<typeof t>[0])]),
+    )
+  }, [selectedId, configErrors, t])
 
   // Transform nodes that aren't wired to the output — compileCanvas drops these on save.
   const unconnectedTransforms = useMemo(() => findUnconnectedTransformNodes(nodes, edges), [nodes, edges])
@@ -397,13 +416,19 @@ export const MappingEditorModal = ({
   }
 
   const { mapped, unmapped } = status.counts
+  const errorCount = status.counts.errors + configErrors.blockingCount
 
   const toolbar = (
     <div className="grid grid-cols-3 items-center px-4 py-2">
       <DialogTitle className="text-base">{name || t('toolbar.title')}</DialogTitle>
-      <span className="text-center text-xs text-muted-foreground">{t('toolbar.status', { mapped, unmapped })}</span>
+      <span className="text-center text-xs text-muted-foreground">
+        {t('toolbar.status', { mapped, unmapped })}
+        {errorCount > 0 && (
+          <span className="ml-2 font-medium text-destructive">{t('toolbar.errors', { count: errorCount })}</span>
+        )}
+      </span>
       <div className="flex items-center justify-end gap-2">
-        <Button size="sm" onClick={() => requestExit('apply')} disabled={!isReady}>
+        <Button size="sm" onClick={() => requestExit('apply')} disabled={!isReady || errorCount > 0}>
           {tCommon('actions.apply')}
         </Button>
         <Button size="sm" variant="outline" onClick={() => requestExit('close')}>
@@ -442,14 +467,19 @@ export const MappingEditorModal = ({
                 emptyMessage={t('inspector.emptyMessage')}
               >
                 {selectedDef && selectedData && (
-                  <TransformInspector def={selectedDef} config={selectedData.config} onChange={updateConfig} />
+                  <TransformInspector
+                    def={selectedDef}
+                    config={selectedData.config}
+                    onChange={updateConfig}
+                    errors={selectedErrors}
+                  />
                 )}
               </InspectorShell>
             }
           >
             <CanvasScaffold
               nodes={displayNodes}
-              edges={edges}
+              edges={displayEdges}
               nodeTypes={nodeTypes}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}

@@ -1359,7 +1359,8 @@
       "diagramUnresolvable": "„{name}“ liefert keine abbildbaren Felder: {reason}",
       "toolbar": {
         "title": "Mapping",
-        "status": "{mapped} zugeordnet · {unmapped} nicht zugeordnet"
+        "status": "{mapped} zugeordnet · {unmapped} nicht zugeordnet",
+        "errors": "{count, plural, one {# Fehler} other {# Fehler}}"
       },
       "palette": {
         "title": "Transformationen"
@@ -1377,7 +1378,8 @@
         "typeMismatchWithType": "Typen stimmen nicht überein ({type}). Konvertierungsfunktion hinzufügen.",
         "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen.",
         "outputToOutput": "Zwei Ausgänge können nicht verbunden werden.",
-        "inputToInput": "Zwei Eingänge können nicht verbunden werden."
+        "inputToInput": "Zwei Eingänge können nicht verbunden werden.",
+        "connectionsBroken": "{count, plural, one {# Verbindung passt} other {# Verbindungen passen}} nicht mehr zum neuen Typ ({type})."
       },
       "unconnectedWarning": {
         "title": "Nicht verbundene Transformationen entfernen?",
@@ -1398,12 +1400,13 @@
               "placeholder": "Typ auswählen…"
             },
             "value": {
-              "label": "Wert"
+              "label": "Wert",
+              "required": "Ein Wert ist erforderlich."
             }
           }
         },
         "concat": {
-          "description": "Zwei oder mehr Werte verketten.",
+          "description": "Zwei oder mehr Skalare zu Text verketten.",
           "fields": {
             "separator": {
               "label": "Trennzeichen"
@@ -1414,16 +1417,16 @@
           "description": "beliebiger Skalar → str"
         },
         "toInt": {
-          "description": "str / number → int"
+          "description": "str / int / number → int"
         },
         "toFloat": {
-          "description": "str / int → number"
+          "description": "str / int / number → number"
         },
         "toUuid": {
           "description": "str → uuid"
         },
         "toDate": {
-          "description": "str → date",
+          "description": "str / date → date",
           "fields": {
             "pattern": {
               "label": "Eingabeformat"
@@ -1431,7 +1434,7 @@
           }
         },
         "toDateTime": {
-          "description": "str → datetime",
+          "description": "str / datetime → datetime",
           "fields": {
             "pattern": {
               "label": "Eingabeformat"

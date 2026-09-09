@@ -1,5 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 
+import type { PortStatus } from './PortHandle'
+
 export type PortType = 'scalar' | 'geometry' | 'array' | 'object'
 
 export interface PortDef {
@@ -51,6 +53,10 @@ export interface TransformNodeData extends Record<string, unknown> {
   config: Record<string, unknown>
   inputs?: PortDef[]
   outputs?: PortDef[]
+  /** portId → status; injected for display only, never persisted. */
+  portStatus?: Record<string, PortStatus>
+  /** Injected for display only, never persisted. */
+  hasError?: boolean
 }
 
 export interface NodeRegistry<T extends TransformDef = TransformDef> {

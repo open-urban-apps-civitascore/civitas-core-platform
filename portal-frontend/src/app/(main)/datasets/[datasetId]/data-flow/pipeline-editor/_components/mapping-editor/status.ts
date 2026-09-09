@@ -1,11 +1,12 @@
-import type { Edge } from '@xyflow/react'
+import type { Edge, Node } from '@xyflow/react'
 
 import type { PortStatus } from '@/components/node-editor'
-import type { PortType } from '@/components/node-editor/types'
+import type { PortType, TransformNodeData } from '@/components/node-editor/types'
 
 import type { FieldNode } from './_types'
-import { SOURCE_NODE_ID, TARGET_NODE_ID } from './compile'
+import { findUnconnectedTransformNodes, SOURCE_NODE_ID, TARGET_NODE_ID } from './compile'
 import { resolveCoveredLeaf } from './schema/fieldTree'
+import { mappingRegistry } from './transforms'
 
 export interface MappingCounts {
   mapped: number
@@ -16,13 +17,87 @@ export interface MappingCounts {
 export interface MappingStatus {
   sourcePortStatus: Record<string, PortStatus>
   targetPortStatus: Record<string, PortStatus>
+  /** nodeId → portId → status, for transform nodes only. */
+  transformPortStatus: Record<string, Record<string, PortStatus>>
+  invalidEdgeIds: string[]
   counts: MappingCounts
 }
 
-export type EndpointInfo = (
-  nodeId: string,
-  handleId: string,
-) => { type: PortType; sub?: string; accepts?: readonly string[] } | null
+export interface PortInfo {
+  type: PortType
+  sub?: string
+  /**
+   * Input-only: accepted source subtypes. If present, the from `sub` must be one of the accepted
+   * types instead of equal to the to `sub`.
+   */
+  accepts?: readonly string[]
+}
+
+export type EndpointInfo = (nodeId: string, handleId: string) => PortInfo | null
+
+/**
+ * Two ports are compatible when:
+ * Both must share the port category (scalar / geometry / array / object)
+ * For scalar and geometry the subtype decides, first matching rule wins:
+ *  1. `to.accepts` is set → `from.sub` must be one of them (numeric inputs take str/int/number).
+ *  2. both sides carry a `sub` → the two must be equal (int↔int, Point↔Point).
+ *  3. either has no `sub` → compatible (`toString`, `concat`); every output carries one.
+ */
+export const portsCompatible = (from: PortInfo | null, to: PortInfo | null): boolean => {
+  if (!from || !to) return false
+  if (from.type !== to.type) return false
+  if (from.type === 'scalar' || from.type === 'geometry') {
+    if (to.accepts) return !!from.sub && to.accepts.includes(from.sub)
+    if (from.sub && to.sub && from.sub !== to.sub) return false
+  }
+  return true
+}
+
+/**
+ * Edges whose endpoints both resolve but whose types no longer match, e.g. a literal's type was
+ * changed after it was connected.
+ */
+export const findInvalidEdges = (edges: Edge[], endpointInfo: EndpointInfo): Edge[] =>
+  edges.filter(edge => {
+    const from = endpointInfo(edge.source, edge.sourceHandle ?? '')
+    const to = endpointInfo(edge.target, edge.targetHandle ?? '')
+    return !!from && !!to && !portsCompatible(from, to)
+  })
+
+/** Transform nodes that don't reach the target — compileCanvas drops these on save. */
+const droppedNodeIds = (nodes: Node[], edges: Edge[]): Set<string> =>
+  new Set(findUnconnectedTransformNodes(nodes, edges).map(n => n.id))
+
+export interface NodeConfigErrors {
+  /** nodeId → fieldKey → i18n key, for every wired transform node. */
+  byNode: Record<string, Record<string, string>>
+  /** How many of those reach the target and therefore block saving. */
+  blockingCount: number
+}
+
+/**
+ * Config errors of the transform nodes the user has wired up. A node is checked once it has an
+ * outgoing edge, so the error shows the moment the connection is drawn. Only nodes that reach
+ * the target count as blocking: compileCanvas drops the rest, and the unconnected-transform
+ * warning already covers them.
+ */
+export const findNodeConfigErrors = (nodes: Node[], edges: Edge[]): NodeConfigErrors => {
+  const wired = new Set(edges.map(e => e.source))
+  const dropped = droppedNodeIds(nodes, edges)
+  const byNode: Record<string, Record<string, string>> = {}
+  let blockingCount = 0
+
+  for (const node of nodes) {
+    if (node.type !== 'transform' || !wired.has(node.id)) continue
+    const data = node.data as TransformNodeData
+    const fieldErrors = mappingRegistry.byType[data.defType]?.validate?.(data.config)
+    if (!fieldErrors) continue
+    byNode[node.id] = fieldErrors
+    if (!dropped.has(node.id)) blockingCount++
+  }
+
+  return { byNode, blockingCount }
+}
 
 /** True when `path` is a descendant of `ancestor` in the JSONPath hierarchy. */
 const isDescendantOf = (path: string, ancestor: string): boolean =>
@@ -53,8 +128,9 @@ const relativeNameChain = (ancestorPath: string, leafPath: string, targetFields:
   return names
 }
 
-/** Per-port state (§12) plus toolbar counts derived from the current edges. */
+/** Per-port state (§12) plus toolbar counts derived from the current nodes and edges. */
 export const computeStatus = (
+  nodes: Node[],
   edges: Edge[],
   sourceFields: Map<string, FieldNode>,
   targetFields: Map<string, FieldNode>,
@@ -62,6 +138,19 @@ export const computeStatus = (
 ): MappingStatus => {
   const sourcePortStatus: Record<string, PortStatus> = {}
   const targetPortStatus: Record<string, PortStatus> = {}
+  const transformPortStatus: Record<string, Record<string, PortStatus>> = {}
+
+  const invalidEdges = findInvalidEdges(edges, endpointInfo)
+  // Both ends of a broken edge go red so the cause (e.g. the retyped literal) is visible too.
+  // Mega-node source ports are the exception: they never go red.
+  const markMismatch = (nodeId: string, handleId: string) => {
+    if (nodeId === SOURCE_NODE_ID || nodeId === TARGET_NODE_ID) return
+    transformPortStatus[nodeId] = { ...transformPortStatus[nodeId], [handleId]: 'mismatch' }
+  }
+  invalidEdges.forEach(edge => {
+    markMismatch(edge.source, edge.sourceHandle ?? '')
+    markMismatch(edge.target, edge.targetHandle ?? '')
+  })
 
   const consumed = new Set(edges.filter(e => e.source === SOURCE_NODE_ID).map(e => e.sourceHandle ?? ''))
   sourceFields.forEach((_field, path) => {
@@ -77,7 +166,10 @@ export const computeStatus = (
 
   let mapped = 0
   let unmapped = 0
-  let errors = 0
+  // Only edges that end up in the compiled mapping block saving; the rest are dropped on save
+  // and merely show red. The direct-edge branch below must not count them again.
+  const dropped = droppedNodeIds(nodes, edges)
+  let errors = invalidEdges.filter(e => !dropped.has(e.target)).length
 
   targetFields.forEach((field, path) => {
     const edge = targetEdges.find(e => (e.targetHandle ?? '') === path)
@@ -86,18 +178,11 @@ export const computeStatus = (
     // Directly connected target port.
     if (edge) {
       const src = endpointInfo(edge.source, edge.sourceHandle ?? '')
-      // Port category mismatch (scalar/geometry vs object/array), OR — for scalar/geometry
-      // ports — a concrete subtype mismatch such as Point vs Polygon. The source's `sub`
-      // carries the concrete field type, so comparing it to the target's `type` catches it directly.
-      const hasCategoryMismatch = !!src && src.type !== field.portType
-      const hasSubtypeMismatch =
-        !!src && (field.portType === 'scalar' || field.portType === 'geometry') && !!src.sub && src.sub !== field.type
-      const isMismatch = hasCategoryMismatch || hasSubtypeMismatch
+      const isMismatch = !!src && !portsCompatible(src, { type: field.portType, sub: field.type })
 
       targetPortStatus[path] = isMismatch ? 'mismatch' : 'mapped'
 
-      if (isLeaf && isMismatch) errors++
-      else if (isLeaf) mapped++
+      if (isLeaf && !isMismatch) mapped++
       return
     }
 
@@ -129,5 +214,11 @@ export const computeStatus = (
     if (isLeaf) unmapped++
   })
 
-  return { sourcePortStatus, targetPortStatus, counts: { mapped, unmapped, errors } }
+  return {
+    sourcePortStatus,
+    targetPortStatus,
+    transformPortStatus,
+    invalidEdgeIds: invalidEdges.map(e => e.id),
+    counts: { mapped, unmapped, errors },
+  }
 }

@@ -16,10 +16,16 @@ export interface MappingTransformDef extends TransformDef {
   toValueNode: (inputs: ValueNode[], config: Record<string, unknown>) => ValueNode
   opInputs: (op: OpNode) => ValueNode[]
   opConfig: (op: OpNode) => Record<string, unknown>
+  /** Per-field config errors as i18n keys, relative to `pipelineEditor.mappingEditor`. */
+  validate?: (config: Record<string, unknown>) => Record<string, string> | undefined
 }
 
 const scalar = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'scalar', dataType })
 const geometry = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'geometry', dataType })
+
+/** Port label for a conversion input, derived from what the port actually accepts. */
+const inputLabel = (inSubtype?: string, accepts?: readonly string[]): string =>
+  accepts?.join(' / ') ?? inSubtype ?? 'any scalar'
 
 /** stringConcat is variadic; ports are grown on demand and persisted on the node. */
 export const concatInputPorts = (count: number): PortDef[] =>
@@ -34,7 +40,6 @@ const patternField: ConfigField = {
 
 /**
  * Build a conversion node definition.
- * @param inLabel  Human-readable label for the input port (e.g. "str/int")
  * @param inSubtype  The actual primitive subtype for type-matching (undefined = accepts any scalar)
  * @param outSubtype The actual primitive subtype produced
  * @param label  Display label for the node; defaults to the op name. Decoupled from `op` so the
@@ -44,7 +49,6 @@ const patternField: ConfigField = {
  */
 const conversion = (
   type: ConversionOp,
-  inLabel: string,
   inSubtype: string | undefined,
   outSubtype: string,
   icon: LucideIcon,
@@ -57,7 +61,7 @@ const conversion = (
   label,
   description: `transforms.${type}.description`,
   icon,
-  inputs: [{ ...scalar('in', inLabel, inSubtype), ...(accepts ? { accepts } : {}) }],
+  inputs: [{ ...scalar('in', inputLabel(inSubtype, accepts), inSubtype), ...(accepts ? { accepts } : {}) }],
   outputs: [scalar('out', outSubtype, outSubtype)],
   config,
   op: type,
@@ -89,11 +93,12 @@ export const LITERAL_DEFAULT_TYPE = 'String'
  * Geometries are first-class typed ports: their `dataType` is the concrete
  * geometry name (e.g. 'Point') so Point vs Polygon is matched by exact type;
  * other primitives → scalar port with the matching subtype.
+ * The port label shows that same subtype, matching the conversion nodes.
  */
 export const literalOutputPort = (umlType: string): PortDef => {
   const isGeom = (GEOMETRY as Set<string>).has(umlType)
   const dataType = isGeom ? umlType : (PRIMITIVE[umlType] ?? 'str')
-  return { id: 'out', label: 'value', type: isGeom ? 'geometry' : 'scalar', dataType }
+  return { id: 'out', label: dataType, type: isGeom ? 'geometry' : 'scalar', dataType }
 }
 
 const literal: MappingTransformDef = {
@@ -125,6 +130,8 @@ const literal: MappingTransformDef = {
   }),
   opInputs: () => [],
   opConfig: op => (op.op === 'const' ? { value: op.value, type: op.valueType ?? LITERAL_DEFAULT_TYPE } : {}),
+  validate: cfg =>
+    String(cfg.value ?? '').trim() === '' ? { value: 'transforms.literal.fields.value.required' } : undefined,
 }
 
 const concat: MappingTransformDef = {
@@ -134,7 +141,7 @@ const concat: MappingTransformDef = {
   description: 'transforms.concat.description',
   icon: Combine,
   inputs: concatInputPorts(2),
-  outputs: [scalar('out', 'out', 'str')],
+  outputs: [scalar('out', 'str', 'str')],
   config: [
     {
       key: 'separator',
@@ -177,23 +184,16 @@ const geoPoint: MappingTransformDef = {
  * Conversion nodes
  */
 const conversions: MappingTransformDef[] = [
-  // toString: accepts any scalar (no subtype restriction on input), produces str
-  conversion('toString', 'any scalar', undefined, 'str', Type),
-  // toInt: accepts only numerically-parseable scalars (str/int/number), produces int
-  conversion('toInt', 'str / number', undefined, 'int', Binary, [], 'toInt', NUMERIC_SUBTYPES),
-  // toFloat: accepts only numerically-parseable scalars (str/int/number), produces number. Wire op
-  // stays 'toFloat' (backend contract); only the display label is 'toNumber'.
-  conversion('toFloat', 'str / int', undefined, 'number', Binary, [], 'toNumber', NUMERIC_SUBTYPES),
-  // toUuid: accepts str, produces uuid. No RecordPath function backs it — the value is passed
-  // through and the sink parses it. A uuid source needs no transform; it matches a uuid target
-  // directly.
-  conversion('toUuid', 'str', 'str', 'uuid', Fingerprint),
-  // toDate: accepts str and date, produces date
-  conversion('toDate', 'str / date', undefined, 'date', Calendar, [patternField], 'toDate', ['str', 'date']),
-  // toDateTime: accepts str and datetime, produces datetime
+  conversion('toString', undefined, 'str', Type),
+  conversion('toInt', undefined, 'int', Binary, [], 'toInt', NUMERIC_SUBTYPES),
+  // Wire op stays 'toFloat' (backend contract); only the display label is 'toNumber'.
+  conversion('toFloat', undefined, 'number', Binary, [], 'toNumber', NUMERIC_SUBTYPES),
+  // No RecordPath function backs toUuid — the value is passed through and the sink parses it.
+  // A uuid source needs no transform; it matches a uuid target directly.
+  conversion('toUuid', 'str', 'uuid', Fingerprint),
+  conversion('toDate', undefined, 'date', Calendar, [patternField], 'toDate', ['str', 'date']),
   conversion(
     'toDateTime',
-    'str / datetime',
     undefined,
     'datetime',
     Clock,
@@ -207,11 +207,8 @@ const conversions: MappingTransformDef[] = [
     'toDateTime',
     ['str', 'datetime'],
   ),
-  // format: accepts date and datetime, produces str — reuse patternField but with the format-specific
-  // translation key
   conversion(
     'format',
-    'date / datetime',
     undefined,
     'str',
     CalendarClock,
