@@ -18,6 +18,7 @@ import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.ImportSmartDataModelCommand;
 import de.civitascore.modelforge.contract.ImportXRepositoryCommand;
+import de.civitascore.modelforge.contract.NonConformingArtifact;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
 import de.civitascore.modelforge.contract.SchemaViewQuery;
 import de.civitascore.modelforge.contract.ValidateInstanceCommand;
@@ -538,6 +539,23 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         // the registry reports as members of zero DataSets.
         return search(new ArtifactSearchQuery(null, typeSegmentFor(kind), null, Integer.MAX_VALUE, 0)).stream()
             .filter(summary -> registry.dataSetMemberships(summary.artifactId().value()).isEmpty())
+            .toList();
+    }
+
+    @Override
+    public List<NonConformingArtifact> nonConformingElements() {
+        // Only the stored JSON Schema representation can be meta-validated; an XSD Element has no
+        // JSON Schema to check, and fetch() returns nothing for it, so it drops out here.
+        return search(new ArtifactSearchQuery(null, typeSegmentFor(ArtifactKind.ELEMENT), null, Integer.MAX_VALUE, 0))
+            .stream()
+            .flatMap(summary -> elementQueryService.rawJsonSchema(summary.artifactId().value())
+                .map(schema -> modelValidator.validateSchema(schema).stream()
+                    .filter(d -> d.severity() == DiagnosticSeverity.ERROR)
+                    .toList())
+                .filter(diagnostics -> !diagnostics.isEmpty())
+                .map(diagnostics -> new NonConformingArtifact(
+                    summary.artifactId(), summary.title(), diagnostics))
+                .stream())
             .toList();
     }
 
