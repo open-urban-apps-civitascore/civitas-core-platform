@@ -16,12 +16,11 @@
 #   - validate-schemas docs-drift guard: the docs schema copies moved to the documentation repo,
 #                          so only the JSON Schema metaschema validation is kept below
 #
-# NOTE on versioning: Model Forge keeps its own fixed version (0.1.0-SNAPSHOT from its poms);
-# it does NOT use the ${revision} pattern of portal-model / config-adapter and does not take part
-# in repo-wide version tags. portal-backend consumes core-model-forge-*:0.1.0-SNAPSHOT. Today the
-# backend still resolves it from the external Model Forge project registry; once its pom
-# <repository> is repointed to this project's registry, add `portal-backend/**/*` to the change
-# rule below and wire a `needs: [publish-model-forge]` ordering into the backend build.
+# NOTE on versioning: Model Forge uses the same ${revision} pattern as portal-model and
+# config-adapter — main/tags publish the bare version, develop publishes -SNAPSHOT, and each
+# merge request publishes its own -MR-<iid>-SNAPSHOT. portal-backend, its only consumer, is
+# built against the version this pipeline published, so it always resolves its own branch's
+# Model Forge rather than whatever last wrote a shared coordinate.
 
 # Hidden job that defines rules for model-forge changes. All model-forge jobs extend this.
 .only-model-forge-changes:
@@ -33,12 +32,53 @@
     # Always run on main and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "develop"
-    # Run on MR only when model-forge (or its CI) changes
+    # Mirrors .only-backend-changes: every pipeline that builds portal-backend must also
+    # publish Model Forge for that branch, since the backend jobs require it.
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - model-forge/**/*
+        - portal-backend/**/*
+        - portal-model/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/model-forge.yml
+        - .gitlab/ci/backend.yml
+        - .gitlab/ci/portal-model.yml
+
+# Setup version for model-forge from pom.xml with branch-based suffixes
+# - main/tags: release version (e.g., 0.1.0)
+# - develop: snapshot version (e.g., 0.1.0-SNAPSHOT)
+# - MR: merge request version (e.g., 0.1.0-MR-123-SNAPSHOT)
+setup-version-model-forge:
+  image: maven:3.9-eclipse-temurin-25-alpine
+  stage: .pre
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: model-forge-maven
+      files:
+        - model-forge/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd model-forge
+    - BASE_VERSION=$(mvn help:evaluate -Dexpression=revision -q -DforceStdout)
+    - echo "Base version from pom.xml - $BASE_VERSION"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ -n "$CI_COMMIT_TAG" ]; then
+        MODEL_FORGE_VERSION="$BASE_VERSION"
+      elif [ "$CI_COMMIT_BRANCH" = "develop" ]; then
+        MODEL_FORGE_VERSION="${BASE_VERSION}-SNAPSHOT"
+      elif [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        MODEL_FORGE_VERSION="${BASE_VERSION}-MR-${CI_MERGE_REQUEST_IID}-SNAPSHOT"
+      else
+        MODEL_FORGE_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
+      fi
+    - echo "MODEL_FORGE_VERSION=$MODEL_FORGE_VERSION" > ../model-forge-version.env
+    - echo "Setting MODEL_FORGE_VERSION=$MODEL_FORGE_VERSION"
+  artifacts:
+    reports:
+      dotenv: model-forge-version.env
 
 # Generate the maven dependency graph JSON for license/dependency scanning.
 # Always runs (own rules, no `changes`) so the scanner has the graph even when the
@@ -46,6 +86,9 @@
 generate-graph-model-forge:
   image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
+  needs:
+    - job: setup-version-model-forge
+      artifacts: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_TAG
@@ -64,7 +107,7 @@ generate-graph-model-forge:
   script:
     - cd model-forge
     # Reactor build: writes one maven.graph.json per module (and the aggregator pom).
-    - mvn -B dependency:tree -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
+    - mvn -B dependency:tree -Drevision=$MODEL_FORGE_VERSION -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
   artifacts:
     when: always
     expire_in: 1 week
@@ -172,7 +215,9 @@ test-model-forge:
   extends: .only-model-forge-changes
   image: maven:3.9-eclipse-temurin-25
   stage: build-package
-  needs: []
+  needs:
+    - job: setup-version-model-forge
+      artifacts: true
   services:
     - name: docker:27-dind
       alias: docker
@@ -191,7 +236,7 @@ test-model-forge:
       - .m2/repository
   script:
     - cd model-forge
-    - mvn $MAVEN_CLI_OPTS verify
+    - mvn $MAVEN_CLI_OPTS verify -Drevision=$MODEL_FORGE_VERSION
   artifacts:
     when: always
     expire_in: 1 month
@@ -203,24 +248,16 @@ test-model-forge:
       junit:
         - model-forge/*/target/surefire-reports/TEST-*.xml
 
-# Publish the Maven artifacts to this project's GitLab Maven registry so consumers can
-# resolve core-model-forge-*:0.1.0-SNAPSHOT. Skips tests/quality (already run in test-model-forge).
+# Publish the Maven artifacts to this project's GitLab Maven registry so portal-backend can
+# resolve them. Skips tests/quality (already run in test-model-forge).
 # The admin UI sets maven.deploy.skip, so the console is not published.
-# The coordinate is fixed rather than per-merge-request, so two Model Forge merge requests open at
-# once overwrite each other's snapshot.
 publish-model-forge:
+  extends: .only-model-forge-changes
   image: maven:3.9-eclipse-temurin-25-alpine
   stage: deploy-package
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "develop"
-    # Publish from a merge request that changes Model Forge, so portal-backend can resolve the
-    # snapshot before the module reaches develop.
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - model-forge/**/*
   needs:
+    - job: setup-version-model-forge
+      artifacts: true
     - job: test-model-forge
       artifacts: false
   variables:
@@ -235,7 +272,7 @@ publish-model-forge:
   script:
     - cd model-forge
     - |
-      mvn deploy -DskipTests \
+      mvn deploy -DskipTests -Drevision=$MODEL_FORGE_VERSION \
         -Dspotless.check.skip=true \
         -Dspotbugs.skip=true \
         -Djacoco.skip=true \

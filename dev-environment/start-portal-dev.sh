@@ -871,13 +871,11 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
     fi
 
     # Model Forge is the source of the Admin UI fat JAR (the reactor build packages
-    # core-model-forge-admin-ui too), so build it into the container Maven cache before the image
-    # build. portal-backend does not consume core-model-forge-* yet, so this is only needed for the
-    # Admin UI today; it is kept on the backend path as well so the dependency, once declared,
-    # resolves locally rather than from the external registry. Model Forge keeps its own fixed
-    # version (no -Drevision). Only the Java jars are needed.
+    # core-model-forge-admin-ui too) and of the core-model-forge-* artifacts portal-backend
+    # compiles against, so build it into the container Maven cache before the image build.
+    # Only the Java jars are needed.
     if [ "$backend_option" = "1" ] || [ "$START_ADMIN_UI" = "true" ]; then
-        if ! mvn_build "$SCRIPT_DIR/../model-forge" $MVN_CLEAN install -DskipTests -Dspotless.check.skip=true -Dspotbugs.skip=true -q; then
+        if ! mvn_build "$SCRIPT_DIR/../model-forge" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -Dspotless.check.skip=true -Dspotbugs.skip=true -q; then
             echo "ERROR: Model Forge build failed"
             exit 1
         fi
@@ -900,7 +898,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
 
     # Portal Backend JAR (needed by portal-backend Dockerfile)
     if [ "$backend_option" = "1" ]; then
-        if ! mvn_build "$SCRIPT_DIR/../portal-backend" $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -q; then
+        if ! mvn_build "$SCRIPT_DIR/../portal-backend" $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -Dmodel-forge.version=$DEV_VERSION -q; then
             echo "ERROR: Portal Backend build failed"
             exit 1
         fi

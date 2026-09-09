@@ -36,9 +36,31 @@ Add the starter to the host application:
 <dependency>
   <groupId>de.civitascore</groupId>
   <artifactId>core-model-forge-spring-boot-starter</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>${model-forge.version}</version>
 </dependency>
 ```
+
+## Versioning
+
+Model Forge uses the `${revision}` scheme of the other mono-repo Maven modules
+(`portal-model`, `config-adapter`). `model-forge/pom.xml` holds the base version, and CI
+publishes it under a branch-dependent coordinate:
+
+| Pipeline | Published version |
+|---|---|
+| `main`, tags | `0.1.0` |
+| `develop` | `0.1.0-SNAPSHOT` |
+| merge request | `0.1.0-MR-<iid>-SNAPSHOT` |
+
+`portal-backend` is the only consumer. Its build resolves the version this pipeline
+published (`-Dmodel-forge.version`), so it always compiles against the Model Forge on its
+own branch instead of whatever last wrote a shared coordinate; two merge requests
+touching Model Forge no longer overwrite each other's artifact.
+
+`portal-backend`'s `model-forge.version` property falls back to `0.1.0-SNAPSHOT`
+(develop's line) for builds that pass no version — a fresh clone, or CI's dependency-graph
+job. The dev-environment scripts install Model Forge under their own `-Drevision` and hand
+the backend the same value, so a locally changed module reaches the backend build.
 
 Model Forge reuses the host application's `spring.datasource`. For the
 `portal-backend` integration this matches the existing PostgreSQL setup:

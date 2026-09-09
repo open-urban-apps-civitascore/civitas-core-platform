@@ -76,7 +76,7 @@ Components:
 
 Options:
   --skip-model-forge     with --backend, do NOT rebuild model-forge (reuse the
-                         cached 0.1.0-SNAPSHOT) — use when only backend code changed
+                         cached build) — use when only backend code changed
   --no-clean             incremental Maven build (drop the 'clean' goal)
   -h, --help             show this help
 EOF
@@ -197,19 +197,15 @@ if [ "$DO_BACKEND" = "true" ]; then
     echo "  Building portal-model ($DEV_VERSION) — backend dependency..."
     mvn_in_container "$PROJECT_ROOT/portal-model" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q
     if [ "$SKIP_MODEL_FORGE" = "false" ]; then
-        # model-forge publishes core-model-forge-*:0.1.0-SNAPSHOT (fixed version, no
-        # -Drevision). The backend does not depend on it yet; rebuilding it into the cache
-        # keeps the Admin UI jar current and makes the dependency resolvable locally once
-        # it is declared.
-        echo "  Building model-forge (0.1.0-SNAPSHOT)..."
-        mvn_in_container "$PROJECT_ROOT/model-forge" $MVN_CLEAN install -DskipTests \
+        echo "  Building model-forge ($DEV_VERSION) — backend dependency..."
+        mvn_in_container "$PROJECT_ROOT/model-forge" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION \
             -Dspotless.check.skip=true -Dspotbugs.skip=true -q
     else
         echo "  (--skip-model-forge) reusing the cached model-forge"
     fi
     echo "  Building portal-backend JAR (containerized Maven)..."
     mvn_in_container "$PROJECT_ROOT/portal-backend" $MVN_CLEAN package -DskipTests \
-        -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -q
+        -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -Dmodel-forge.version=$DEV_VERSION -q
     rebuild_image_and_recreate portal-backend civitas-portal-backend
     echo
 fi

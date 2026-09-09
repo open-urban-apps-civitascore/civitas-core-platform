@@ -45,7 +45,8 @@ mvn -pl model-forge-contract -am install
 ```
 
 The module inherits dependency management and the version from the parent POM.
-The current source version is `0.1.0-SNAPSHOT`.
+The base version is `0.1.0`; CI appends a branch suffix (see
+[Versioning](#versioning)).
 
 ## Maven Usage
 
@@ -65,7 +66,7 @@ sets the Maven version to the tag without the leading `v` before publishing.
   <dependency>
     <groupId>de.civitascore</groupId>
     <artifactId>core-model-forge-contract</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>${model-forge.version}</version>
   </dependency>
 </dependencies>
 ```
@@ -104,7 +105,7 @@ repositories {
 }
 
 dependencies {
-    implementation("de.civitascore:core-model-forge-contract:0.1.0-SNAPSHOT")
+    implementation("de.civitascore:core-model-forge-contract:0.1.0")
 }
 ```
 
@@ -162,8 +163,9 @@ pinned. `versionFromUrn` returns `null` for the logical form.
 ## Versioning
 
 The mono-repo owns the release process; this module does not use semantic-release.
-Until a release tag is published, consumers should use the current snapshot
-version: `0.1.0-SNAPSHOT`.
+The reactor's `${revision}` scheme applies: `main`/tags publish `0.1.0`, `develop`
+publishes `0.1.0-SNAPSHOT`, and a merge request publishes `0.1.0-MR-<iid>-SNAPSHOT`
+(see the [reactor README](../README.md#versioning)).
 
 Breaking changes to public records or utility method behavior require a major
 version bump once the project leaves the initial `0.x` phase.
