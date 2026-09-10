@@ -52,6 +52,10 @@ publishes it under a branch-dependent coordinate:
 | `develop` | `0.1.0-SNAPSHOT` |
 | merge request | `0.1.0-MR-<iid>-SNAPSHOT` |
 
+A repository-wide single version was rejected: `portal-backend` is Model Forge's only consumer,
+so a shared version buys no cross-module traceability while forcing every unrelated module to
+bump on each release.
+
 `portal-backend` is the only consumer. Its build resolves the version this pipeline
 published (`-Dmodel-forge.version`), so it always compiles against the Model Forge on its
 own branch instead of whatever last wrote a shared coordinate; two merge requests
