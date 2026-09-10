@@ -14,11 +14,10 @@ WORKDIR /app
 ENV TZ=Europe/Berlin
 RUN apk add --no-cache curl tzdata
 
-# Pre-built Spring Boot fat JAR (mvn package -> spring-boot repackage). The trailing [0-9T]
-# class pins the match to the repackaged artifact: a version ends in a digit or in SNAPSHOT,
-# while -sources.jar/-javadoc.jar/-tests.jar do not — without it a second jar in target/ makes
-# COPY fail (two sources, one file destination) or ships the wrong one.
-COPY target/core-model-forge-admin-ui-*[0-9T].jar ./app.jar
+# Pre-built Spring Boot fat JAR (mvn package -> spring-boot repackage). repackage renames the
+# thin jar to *.jar.original, so this glob matches only the fat jar — same pattern as
+# portal-backend/Dockerfile and authz/repository/Dockerfile.
+COPY target/*.jar ./app.jar
 
 RUN addgroup -g 1001 -S spring && \
     adduser -u 1001 -S spring -G spring && \

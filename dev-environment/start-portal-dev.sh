@@ -887,7 +887,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
     # fail here with the actionable message instead.
     if [ "$SKIP_BUILD" = "true" ] && [ "$START_ADMIN_UI" = "true" ]; then
         ADMIN_UI_TARGET="$SCRIPT_DIR/../model-forge/model-forge-admin-ui/target"
-        if ! ls "$ADMIN_UI_TARGET"/core-model-forge-admin-ui-*[0-9T].jar >/dev/null 2>&1; then
+        if ! ls "$ADMIN_UI_TARGET"/core-model-forge-admin-ui-*.jar >/dev/null 2>&1; then
             echo "ERROR: --skip-build was passed but no Admin UI JAR exists in"
             echo "       model-forge/model-forge-admin-ui/target/"
             echo "       Run once without --skip-build, or start with --no-admin-ui."
