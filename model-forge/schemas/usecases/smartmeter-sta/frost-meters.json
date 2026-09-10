@@ -1,0 +1,29 @@
+[
+  {
+    "id":       "MTR-MS-001",
+    "name":     "Musterstraße 1 — Haushalt",
+    "owner":    "Mustermann GmbH",
+    "operator": "Stadtwerke Münster",
+    "type":     "residential",
+    "lat":      51.9612,
+    "lon":      7.6283
+  },
+  {
+    "id":       "MTR-MS-002",
+    "name":     "Gewerbepark Nord — Büro",
+    "owner":    "Gewerbepark Nord GmbH",
+    "operator": "Stadtwerke Münster",
+    "type":     "commercial",
+    "lat":      51.9701,
+    "lon":      7.6154
+  },
+  {
+    "id":       "MTR-MS-003",
+    "name":     "Industriegebiet Ost — Produktion",
+    "owner":    "Industriewerk Münster AG",
+    "operator": "Westfalen Weser Netz GmbH",
+    "type":     "industrial",
+    "lat":      51.9498,
+    "lon":      7.6521
+  }
+]

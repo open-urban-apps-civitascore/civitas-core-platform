@@ -1,0 +1,59 @@
+<html xmlns:wicket="http://wicket.apache.org">
+<body>
+<wicket:extend>
+  <h2>Artifacts</h2>
+
+  <div wicket:id="statsStrip" class="mf-stats">
+    <div class="mf-stat mf-stat--total">
+      <span class="mf-stat-count" wicket:id="totalCount"></span>
+      <span class="mf-stat-label">Total</span>
+    </div>
+    <div wicket:id="statRows" class="mf-stat">
+      <span wicket:id="statDot"></span>
+      <span class="mf-stat-count" wicket:id="statCount"></span>
+      <span class="mf-stat-label" wicket:id="statLabel"></span>
+    </div>
+  </div>
+
+  <form wicket:id="searchForm">
+    <div class="field-row">
+      <label>Text</label>
+      <input type="text" wicket:id="text"/>
+    </div>
+    <div class="field-row">
+      <label>Type (element, data_structure, mapping, pipeline, data_source, data_sink, data_set)</label>
+      <input type="text" wicket:id="type"/>
+    </div>
+    <div class="field-row">
+      <label>Format (json-schema, xsd)</label>
+      <input type="text" wicket:id="format"/>
+    </div>
+    <button type="submit">Search</button>
+    <a wicket:id="navEdit" class="button-link">New artifact</a>
+  </form>
+
+  <div wicket:id="resultsContainer">
+    <table>
+      <thead>
+      <tr>
+        <th>URN</th>
+        <th>Type</th>
+        <th>Title</th>
+        <th>Version</th>
+        <th>Format</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr wicket:id="rows">
+        <td><a wicket:id="viewLink"><span wicket:id="urn"></span></a></td>
+        <td><span wicket:id="type"></span></td>
+        <td><span wicket:id="title"></span></td>
+        <td><span wicket:id="version"></span></td>
+        <td><span wicket:id="format"></span></td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</wicket:extend>
+</body>
+</html>

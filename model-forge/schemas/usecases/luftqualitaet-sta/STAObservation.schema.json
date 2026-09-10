@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0",
+  "title": "STAObservation",
+  "description": "OGC SensorThings API v1.1 Observation entity. One individual measurement result posted to POST /FROST-Server/v1.1/Observations. The Datastream @iot.id link implicitly carries Thing, Sensor, ObservedProperty, and unit.",
+  "type": "object",
+  "required": [
+    "phenomenonTime",
+    "result",
+    "Datastream"
+  ],
+  "properties": {
+    "phenomenonTime": {
+      "type": "string",
+      "description": "ISO-8601 timestamp or interval. Instant: '2024-01-15T08:00:00Z'. Interval: '2024-01-15T08:00:00Z/2024-01-15T08:01:00Z'."
+    },
+    "resultTime": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "When the result was recorded. May be null."
+    },
+    "result": {
+      "description": "Observed value. Type follows Datastream.observationType: number (OM_Measurement), string (OM_Category), boolean (OM_Truth)."
+    },
+    "resultQuality": {
+      "description": "Quality flag (simple string) or ISO 19157 DQ_Element array.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "good",
+            "suspect",
+            "bad",
+            "unknown"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      ]
+    },
+    "validTime": {
+      "type": "string",
+      "description": "ISO-8601 interval during which this result is valid."
+    },
+    "parameters": {
+      "type": "object",
+      "description": "Traceability context (not part of the phenomenon).",
+      "properties": {
+        "stationId": {
+          "type": "string"
+        },
+        "observedProperty": {
+          "type": "string"
+        },
+        "rawValue": {
+          "type": "number",
+          "description": "Uncalibrated value before calibration factor."
+        },
+        "unit": {
+          "type": "string"
+        }
+      }
+    },
+    "Datastream": {
+      "type": "object",
+      "required": [
+        "@iot.id"
+      ],
+      "description": "Datastream reference. @iot.id resolved at runtime from the domain master data.",
+      "properties": {
+        "@iot.id": {
+          "type": "integer",
+          "description": "FROST-Server Datastream ID."
+        }
+      }
+    },
+    "FeatureOfInterest": {
+      "type": "object",
+      "description": "Optional. If omitted FROST auto-derives from the Thing's Location.",
+      "properties": {
+        "@iot.id": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

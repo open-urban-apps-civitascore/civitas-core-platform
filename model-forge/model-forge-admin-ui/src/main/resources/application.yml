@@ -1,0 +1,57 @@
+server:
+  # 8092 everywhere: the image listens here by default, its healthcheck probes it, and
+  # dev-environment/apps/docker-compose.yml publishes it. When running the Admin UI BY HAND
+  # alongside the main dev stack (dev-environment/start-portal-dev.sh), 8092 is already taken
+  # by that container — start with SERVER_PORT=8093 (see dev-environment/model-forge/vertical-slice.sh).
+  port: 8092
+
+spring:
+  application:
+    name: model-forge-admin-ui
+  # DEFAULT: the Admin UI is a console over the PLATFORM registry. It points at
+  # portal-backend's own database and creates/owns the `model_forge` schema there itself.
+  # portal-backend does not consume the Model Forge libraries yet, so on a fresh stack this
+  # registry is EMPTY — it shows only what you create through these pages. Start the platform
+  # stack first (dev-environment/start-portal-dev.sh), then run the Admin UI
+  # (see dev-environment/model-forge/vertical-slice.sh).
+  #
+  # NOTE: this is a read-WRITE console — imports/edits/deletes here hit the real registry.
+  #
+  # STANDALONE (no portal-backend, seeded example schemas): point it at the bundled Postgres
+  # from dev-environment/model-forge/docker-compose.yml (host port 5439 — 5432 is
+  # portal-backend's database and 5433 is Keycloak's) and enable the seed instead — see
+  # dev-environment/model-forge/local-demo.md:
+  #   SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5439/model_forge_admin?sslmode=disable \
+  #   SPRING_DATASOURCE_USERNAME=model_forge SPRING_DATASOURCE_PASSWORD=model_forge \
+  #   MODEL_FORGE_ADMIN_UI_SEED_ENABLED=true mvn spring-boot:run
+  datasource:
+    url: jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable
+    username: admin
+    password: admin
+    hikari:
+      # Hikari's 30s default makes every page hang for half a minute when the database is
+      # unreachable (the sidebar tree queries the registry on every render). Fail fast instead.
+      connection-timeout: 3000
+  # The admin-ui has no host-owned migrations of its own, and Model Forge's starter already
+  # runs its own dedicated Flyway instance against the model_forge schema. Spring Boot's
+  # default flywayInitializer would otherwise also try to migrate (against whatever schema the
+  # datasource's default search_path resolves to) and fail once that schema is non-empty.
+  autoconfigure:
+    exclude: org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
+
+wicket:
+  # Wicket's own default is DEVELOPMENT, which renders full stack traces into the browser on
+  # any unhandled request. Keep DEPLOYMENT as the default and set
+  # WICKET_CONFIGURATION=development when you want the traces while debugging locally.
+  configuration: deployment
+
+model-forge:
+  admin-ui:
+    seed:
+      # DEFAULT off: when pointed at portal-backend's registry we must NOT seed the bundled
+      # OGC SensorThings examples into it. Enable only for STANDALONE mode (own database).
+      enabled: false
+
+logging:
+  level:
+    de.civitascore.modelforge: INFO

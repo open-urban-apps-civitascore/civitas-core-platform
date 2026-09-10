@@ -1,24 +1,22 @@
 package de.civitascore.portal.model.output.assembler;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.util.InvalidInputException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,10 +32,26 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class DataSinkAssemblerTest {
 
   @Mock private DataSinkMapper dataSinkMapper;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private DataStructureVersionMapper dataStructureVersionMapper;
 
   @InjectMocks private DataSinkAssembler assembler;
+
+  /**
+   * Pins a registry-stored configuration on the sink and stubs the gateway read for it. A null or
+   * empty configuration means nothing was ever stored (FROST): the pin stays null.
+   */
+  private void applyConfiguration(DataSink entity, Map<String, Object> configuration) {
+    if (configuration == null || configuration.isEmpty()) {
+      return;
+    }
+    String urn = "urn:core:platform:civitas:data-sink:common:sink-" + UUID.randomUUID() + ":1.0.0";
+    entity.setConfigurationUrn(urn);
+    lenient()
+        .when(modelRegistryGateway.fetchPayload(urn))
+        .thenReturn(Optional.of(new ModelRegistryGateway.RegistryDocument(configuration, null)));
+  }
 
   private DataSink sinkWithPipeline(DataSinkType type, Map<String, Object> configuration) {
     DataSet dataSet = new DataSet();
@@ -53,7 +67,7 @@ class DataSinkAssemblerTest {
     entity.setDataSet(dataSet);
     entity.setPipeline(pipeline);
     entity.setDataSinkType(type);
-    entity.setConfiguration(configuration);
+    applyConfiguration(entity, configuration);
     return entity;
   }
 
@@ -65,7 +79,7 @@ class DataSinkAssemblerTest {
     DataSink entity = new DataSink();
     entity.setDataSet(dataSet);
     entity.setDataSinkType(type);
-    entity.setConfiguration(configuration);
+    applyConfiguration(entity, configuration);
     return entity;
   }
 
@@ -81,7 +95,6 @@ class DataSinkAssemblerTest {
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
       assertThat(result.getConfiguration()).isInstanceOf(FrostConfigurationOutput.class);
-      verifyNoInteractions(dataStructureVersionRepository);
     }
 
     @Test
@@ -92,36 +105,19 @@ class DataSinkAssemblerTest {
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
       assertThat(result.getConfiguration()).isInstanceOf(FrostConfigurationOutput.class);
-      verifyNoInteractions(dataStructureVersionRepository);
     }
 
     @Test
-    @DisplayName("Should echo the referenced dataStructureVersionId back onto the output")
-    void shouldEchoDataStructureVersionId() {
-      UUID dsvId = UUID.randomUUID();
-      DataSink entity =
-          sinkWithPipeline(DataSinkType.FROST, Map.of("dataStructureVersionId", dsvId.toString()));
+    @DisplayName("Should echo the referenced element URN back onto the output")
+    void shouldEchoElement() {
+      String elementUrn = "urn:core:platform:civitas:element:common:target:1.0.0";
+      DataSink entity = sinkWithPipeline(DataSinkType.FROST, Map.of("element", elementUrn));
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
       assertThat(result.getConfiguration()).isInstanceOf(FrostConfigurationOutput.class);
       FrostConfigurationOutput config = (FrostConfigurationOutput) result.getConfiguration();
-      assertThat(config.getDataStructureVersionId()).isEqualTo(dsvId);
-      verifyNoInteractions(dataStructureVersionRepository);
-    }
-
-    @Test
-    @DisplayName("Should reject a malformed persisted dataStructureVersionId, naming the sink")
-    void shouldRejectMalformedDataStructureVersionId() {
-      DataSink entity =
-          sinkWithPipeline(DataSinkType.FROST, Map.of("dataStructureVersionId", "not-a-uuid"));
-      UUID sinkId = UUID.randomUUID();
-      entity.setId(sinkId);
-
-      DataSinkOutputDTO dto = new DataSinkOutputDTO();
-      assertThatThrownBy(() -> assembler.enrichDto(dto, entity))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining(sinkId.toString());
+      assertThat(config.getElement()).isEqualTo(elementUrn);
     }
   }
 
@@ -130,72 +126,79 @@ class DataSinkAssemblerTest {
   class PostgisEnrichment {
 
     @Test
-    @DisplayName("Should build PostgisOutputConfiguration with tableName and resolved DSV summary")
-    void shouldBuildPostgisConfigurationWithDsv() {
-      UUID dsvId = UUID.randomUUID();
-
+    @DisplayName("Should build PostgisConfigurationOutput with tableName and element URN")
+    void shouldBuildPostgisConfigurationWithElement() {
+      String elementUrn = "urn:core:platform:civitas:element:common:observation:1.0.0";
       DataSink entity =
           sinkWithPipeline(
-              DataSinkType.POSTGIS,
-              Map.of("tableName", "traffic_data", "dataStructureVersionId", dsvId.toString()));
-
-      DataStructureVersion dsv = new DataStructureVersion();
-      DataStructureVersionSummaryDTO dsvSummary = new DataStructureVersionSummaryDTO();
-      dsvSummary.setId(dsvId);
-      dsvSummary.setVersion("1.0.0");
-
-      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(dsv));
-      when(dataStructureVersionMapper.toSummary(dsv)).thenReturn(dsvSummary);
+              DataSinkType.POSTGIS, Map.of("tableName", "traffic_data", "element", elementUrn));
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
       assertThat(result.getConfiguration()).isInstanceOf(PostgisConfigurationOutput.class);
       PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
       assertThat(config.getTableName()).isEqualTo("traffic_data");
-      assertThat(config.getDataStructureVersion()).isSameAs(dsvSummary);
-      verify(dataStructureVersionRepository).findById(dsvId);
+      assertThat(config.getElement()).isEqualTo(elementUrn);
+    }
+
+    /** Stubs the URN-to-version lookup and its summary mapping for the given element URN. */
+    private DataStructureVersionSummaryDTO stubResolvedVersion(String elementUrn) {
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(UUID.randomUUID());
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(UUID.randomUUID());
+      version.setModelUrn(elementUrn);
+      version.setDataStructure(dataStructure);
+
+      DataStructureVersionSummaryDTO summary = new DataStructureVersionSummaryDTO();
+      summary.setId(version.getId());
+      summary.setDataStructureId(dataStructure.getId());
+
+      lenient()
+          .when(dataStructureVersionRepository.findFirstByModelUrn(elementUrn))
+          .thenReturn(Optional.of(version));
+      lenient().when(dataStructureVersionMapper.toSummary(version)).thenReturn(summary);
+      return summary;
     }
 
     @Test
-    @DisplayName("Should set tableName but leave DSV null when the DSV ID cannot be resolved")
-    void shouldLeaveDataStructureVersionNullWhenNotFound() {
-      UUID dsvId = UUID.randomUUID();
-
+    @DisplayName("Should resolve the element URN to the DataStructureVersion it pins")
+    void shouldResolveElementUrnToDataStructureVersion() {
+      String elementUrn = "urn:core:platform:civitas:element:common:SldTestModel:dpvxg3i2hx:1.0.0";
+      DataStructureVersionSummaryDTO expected = stubResolvedVersion(elementUrn);
       DataSink entity =
           sinkWithPipeline(
               DataSinkType.POSTGIS,
-              Map.of("tableName", "traffic_data", "dataStructureVersionId", dsvId.toString()));
-
-      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.empty());
+              Map.of("tableName", "sld_test_features", "element", elementUrn));
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
-      assertThat(result.getConfiguration()).isInstanceOf(PostgisConfigurationOutput.class);
       PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
-      assertThat(config.getTableName()).isEqualTo("traffic_data");
+      assertThat(config.getElement()).isEqualTo(elementUrn);
+      assertThat(config.getDataStructureVersion()).isSameAs(expected);
+    }
+
+    @Test
+    @DisplayName("Should leave dataStructureVersion unset when the element URN resolves to nothing")
+    void shouldLeaveVersionUnsetWhenElementResolvesToNothing() {
+      String elementUrn = "urn:core:platform:civitas:element:common:gone:1.0.0";
+      lenient()
+          .when(dataStructureVersionRepository.findFirstByModelUrn(elementUrn))
+          .thenReturn(Optional.empty());
+      DataSink entity =
+          sinkWithPipeline(
+              DataSinkType.POSTGIS, Map.of("tableName", "traffic_data", "element", elementUrn));
+
+      DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
+
+      PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
+      assertThat(config.getElement()).isEqualTo(elementUrn);
       assertThat(config.getDataStructureVersion()).isNull();
     }
 
     @Test
-    @DisplayName(
-        "Should leave DSV null and not query the repository when dataStructureVersionId is not a valid UUID")
-    void shouldLeaveDataStructureVersionNullWhenDsvIdIsMalformed() {
-      DataSink entity =
-          sinkWithPipeline(
-              DataSinkType.POSTGIS,
-              Map.of("tableName", "traffic_data", "dataStructureVersionId", "not-a-uuid"));
-
-      DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
-
-      assertThat(result.getConfiguration()).isInstanceOf(PostgisConfigurationOutput.class);
-      PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
-      assertThat(config.getTableName()).isEqualTo("traffic_data");
-      assertThat(config.getDataStructureVersion()).isNull();
-      verifyNoInteractions(dataStructureVersionRepository);
-    }
-
-    @Test
-    @DisplayName("Should return empty PostgisOutputConfiguration when entity configuration is null")
+    @DisplayName("Should return empty PostgisConfigurationOutput when entity configuration is null")
     void shouldHandleNullConfigurationForPostgis() {
       DataSink entity = sinkWithPipeline(DataSinkType.POSTGIS, null);
 
@@ -204,8 +207,7 @@ class DataSinkAssemblerTest {
       assertThat(result.getConfiguration()).isInstanceOf(PostgisConfigurationOutput.class);
       PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
       assertThat(config.getTableName()).isNull();
-      assertThat(config.getDataStructureVersion()).isNull();
-      verifyNoInteractions(dataStructureVersionRepository);
+      assertThat(config.getElement()).isNull();
     }
   }
 
@@ -221,7 +223,6 @@ class DataSinkAssemblerTest {
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
       assertThat(result.getConfiguration()).isNull();
-      verifyNoInteractions(dataStructureVersionRepository);
     }
   }
 

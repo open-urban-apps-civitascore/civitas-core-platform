@@ -106,6 +106,22 @@ event:
   # Timeout waiting for config-adapter to process event (seconds)
   config-adapter-timeout-seconds: 10
 
+# Model Forge — embedded schema/model registry.
+# Reuses the host spring.datasource; owns a separate `model_forge` schema migrated by its own
+# Flyway instance (does not touch the host db/migration). portal-backend owns workflow/status.
+model-forge:
+  registry:
+    backend: postgres
+    schema: model_forge
+    migration-table: model_forge_schema_history
+    migrations-enabled: true
+  urn:
+    scope: platform
+    owner: civitas
+    domain: common
+  workflow:
+    enabled: false
+
 management:
   endpoints:
     web:

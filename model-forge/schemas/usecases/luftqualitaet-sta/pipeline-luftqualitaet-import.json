@@ -1,0 +1,191 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Pipeline",
+  "id": "urn:core:platform:civitas:pipeline:luftqualitaet:Luftqualitaet-Import:1.0.0",
+  "title": "Luftqualitaets-Import",
+  "debug": false,
+  "nodes": [
+    {
+      "id": "n-start",
+      "kind": "start",
+      "label": "Start",
+      "x-ui-position": {
+        "x": 60,
+        "y": 300
+      }
+    },
+    {
+      "id": "n-source",
+      "kind": "source",
+      "label": "Luftqualitaet MQTT",
+      "sourceRef": "urn:core:platform:civitas:datasource:luftqualitaet:airquality-mqtt:1.0.0",
+      "x-ui-position": {
+        "x": 220,
+        "y": 300
+      }
+    },
+    {
+      "id": "n-filter",
+      "kind": "filter",
+      "label": "Qualitaetsfilter",
+      "expression": "$.no2.quality != 'bad' && $.pm25.quality != 'bad' && $.co.quality != 'bad'",
+      "x-ui-position": {
+        "x": 400,
+        "y": 300
+      }
+    },
+    {
+      "id": "n-enrich",
+      "kind": "enrich",
+      "label": "Stammdaten anreichern",
+      "lookupSourceRef": "urn:core:platform:civitas:datasource:luftqualitaet:station-db:1.0.0",
+      "lookupKey": "$.stationId",
+      "x-ui-position": {
+        "x": 580,
+        "y": 300
+      }
+    },
+    {
+      "id": "n-map-no2",
+      "kind": "mapping",
+      "label": "NO2 normalisieren",
+      "mappingRef": "urn:core:platform:civitas:mapping:luftqualitaet:airquality-no2-to-observation:1.0.0",
+      "x-ui-position": {
+        "x": 780,
+        "y": 140
+      }
+    },
+    {
+      "id": "n-map-pm25",
+      "kind": "mapping",
+      "label": "PM2.5 normalisieren",
+      "mappingRef": "urn:core:platform:civitas:mapping:luftqualitaet:airquality-pm25-to-observation:1.0.0",
+      "x-ui-position": {
+        "x": 780,
+        "y": 300
+      }
+    },
+    {
+      "id": "n-map-co",
+      "kind": "mapping",
+      "label": "CO normalisieren",
+      "mappingRef": "urn:core:platform:civitas:mapping:luftqualitaet:airquality-co-to-observation:1.0.0",
+      "x-ui-position": {
+        "x": 780,
+        "y": 460
+      }
+    },
+    {
+      "id": "n-sink-no2",
+      "kind": "sink",
+      "label": "FROST NO2",
+      "sinkRef": "urn:core:platform:civitas:datasink:luftqualitaet:frost-observations:1.0.0",
+      "x-ui-position": {
+        "x": 980,
+        "y": 140
+      }
+    },
+    {
+      "id": "n-sink-pm25",
+      "kind": "sink",
+      "label": "FROST PM2.5",
+      "sinkRef": "urn:core:platform:civitas:datasink:luftqualitaet:frost-observations:1.0.0",
+      "x-ui-position": {
+        "x": 980,
+        "y": 300
+      }
+    },
+    {
+      "id": "n-sink-co",
+      "kind": "sink",
+      "label": "FROST CO",
+      "sinkRef": "urn:core:platform:civitas:datasink:luftqualitaet:frost-observations:1.0.0",
+      "x-ui-position": {
+        "x": 980,
+        "y": 460
+      }
+    },
+    {
+      "id": "n-end",
+      "kind": "end",
+      "label": "End",
+      "x-ui-position": {
+        "x": 1160,
+        "y": 300
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-src",
+      "source": "n-start",
+      "target": "n-source",
+      "kind": "control"
+    },
+    {
+      "id": "e-src-filter",
+      "source": "n-source",
+      "target": "n-filter",
+      "kind": "data"
+    },
+    {
+      "id": "e-filter-enrich",
+      "source": "n-filter",
+      "target": "n-enrich",
+      "kind": "data"
+    },
+    {
+      "id": "e-enrich-no2",
+      "source": "n-enrich",
+      "target": "n-map-no2",
+      "kind": "data"
+    },
+    {
+      "id": "e-enrich-pm25",
+      "source": "n-enrich",
+      "target": "n-map-pm25",
+      "kind": "data"
+    },
+    {
+      "id": "e-enrich-co",
+      "source": "n-enrich",
+      "target": "n-map-co",
+      "kind": "data"
+    },
+    {
+      "id": "e-no2-sink",
+      "source": "n-map-no2",
+      "target": "n-sink-no2",
+      "kind": "data"
+    },
+    {
+      "id": "e-pm25-sink",
+      "source": "n-map-pm25",
+      "target": "n-sink-pm25",
+      "kind": "data"
+    },
+    {
+      "id": "e-co-sink",
+      "source": "n-map-co",
+      "target": "n-sink-co",
+      "kind": "data"
+    },
+    {
+      "id": "e-sink1-end",
+      "source": "n-sink-no2",
+      "target": "n-end",
+      "kind": "control"
+    },
+    {
+      "id": "e-sink2-end",
+      "source": "n-sink-pm25",
+      "target": "n-end",
+      "kind": "control"
+    },
+    {
+      "id": "e-sink3-end",
+      "source": "n-sink-co",
+      "target": "n-end",
+      "kind": "control"
+    }
+  ]
+}

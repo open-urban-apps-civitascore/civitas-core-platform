@@ -1,0 +1,21 @@
+<html xmlns:wicket="http://wicket.apache.org">
+<body>
+<wicket:extend>
+  <h2>Import from Smart Data Models</h2>
+  <p>Public catalogue: <a href="https://smartdatamodels.org" target="_blank" rel="noopener">smartdatamodels.org</a>.
+     Example: subject <code>Weather</code>, data model <code>WeatherObserved</code>.</p>
+
+  <form wicket:id="importForm">
+    <div class="field-row">
+      <label>Subject (repository, e.g. "Weather")</label>
+      <input type="text" wicket:id="subject"/>
+    </div>
+    <div class="field-row">
+      <label>Data model (e.g. "WeatherObserved")</label>
+      <input type="text" wicket:id="dataModel"/>
+    </div>
+    <button type="submit">Import</button>
+  </form>
+</wicket:extend>
+</body>
+</html>

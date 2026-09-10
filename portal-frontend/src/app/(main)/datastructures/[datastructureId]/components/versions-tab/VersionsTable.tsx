@@ -42,7 +42,9 @@ export const VersionsTable = (props: VersionsTableProps) => {
     columnHelper.accessor('versionNumber', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.versionNumber')} />,
       cell: ({ row }) => (
-        <LinkCell href={`/datastructures/${datastructureId}/${row.original.id}`}>{row.original.versionNumber}</LinkCell>
+        <LinkCell href={`/datastructures/${datastructureId}/${row.original.id}`}>
+          {row.original.versionNumber ?? '-'}
+        </LinkCell>
       ),
       meta: {
         truncate: true,

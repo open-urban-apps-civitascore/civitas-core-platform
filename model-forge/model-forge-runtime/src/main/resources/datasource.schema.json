@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://civitasconnect.digital/core/datasource/v1",
+  "title":   "CORE DataSource",
+  "description": "Configuration for a data source that feeds data into a CORE pipeline. The connector-specific fields are chosen by 'connectionType' (mqtt | sql); each variant declares exactly the fields the host persists (the connector configuration POJO). Only 'password' is stored ENCRYPTED by the host — every other field is stored as-is. 'element' references the DataStructure describing the payload format by versioned CORE URN.",
+  "oneOf": [
+    { "$ref": "#/$defs/MqttDataSource" },
+    { "$ref": "#/$defs/SqlDataSource" }
+  ],
+  "$defs": {
+    "MqttDataSource": {
+      "type": "object",
+      "title": "MQTT DataSource",
+      "description": "Subscribes to one or more MQTT brokers and topics.",
+      "required": ["$schema", "id", "connectionType"],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "enum": [
+            "https://civitasconnect.digital/core/datasource/v1",
+            "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "description": "Versioned CORE URN of this DataSource.",
+          "pattern": "^urn:core:[^:]+:[^:]+:datasource:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+        },
+        "title":       { "type": "string", "description": "Human-readable display name." },
+        "description": { "type": "string" },
+        "connectionType": { "const": "mqtt", "description": "MQTT broker subscription source." },
+        "element": {
+          "type": "string",
+          "description": "Versioned CORE URN of the DataStructure that describes the payload format.",
+          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+          "x-core-ref": { "type": "urn:core:type:DataStructure" }
+        },
+        "urls":   { "type": ["array", "null"], "items": { "type": "string" }, "description": "MQTT broker URLs, e.g. 'mqtt://mosquitto:1883'." },
+        "topics": { "type": ["array", "null"], "items": { "type": "string" }, "description": "MQTT topic filter(s) to subscribe to. Wildcards (+, #) are supported." },
+        "client_id":       { "type": ["string", "null"], "description": "Optional MQTT client ID. Auto-generated if omitted." },
+        "qos":             { "enum": [0, 1, 2, null], "description": "MQTT Quality of Service level: 0, 1 or 2." },
+        "connect_timeout": { "type": ["string", "null"], "description": "Connection timeout, e.g. '5s'." },
+        "keepalive":       { "type": ["string", "null"], "description": "Keep-alive interval, e.g. '30s'." },
+        "tls": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": { "enabled": { "type": "boolean" } },
+          "description": "TLS settings for the broker connection."
+        },
+        "user":     { "type": ["string", "null"], "description": "MQTT username." },
+        "password": { "type": ["string", "null"], "description": "MQTT password. Stored ENCRYPTED by the host; null/absent when unset." }
+      }
+    },
+    "SqlDataSource": {
+      "type": "object",
+      "title": "SQL DataSource",
+      "description": "Polls a relational database via a JDBC/SQL query.",
+      "required": ["$schema", "id", "connectionType"],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "enum": [
+            "https://civitasconnect.digital/core/datasource/v1",
+            "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "description": "Versioned CORE URN of this DataSource.",
+          "pattern": "^urn:core:[^:]+:[^:]+:datasource:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+        },
+        "title":       { "type": "string", "description": "Human-readable display name." },
+        "description": { "type": "string" },
+        "connectionType": { "const": "sql", "description": "SQL/JDBC polling source." },
+        "element": {
+          "type": "string",
+          "description": "Versioned CORE URN of the DataStructure that describes the row format.",
+          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+          "x-core-ref": { "type": "urn:core:type:DataStructure" }
+        },
+        "driver":  { "type": ["string", "null"], "description": "Database driver, e.g. 'postgres'. Only 'postgres' is wired in the NiFi engine." },
+        "dsn":     { "type": ["string", "null"], "description": "Connection URL / data-source name (embedded credentials are stripped)." },
+        "table":   { "type": ["string", "null"], "description": "Table to poll." },
+        "columns": { "type": ["array", "null"], "items": { "type": "string" }, "description": "Columns to select." },
+        "where":   { "type": ["string", "null"], "description": "SQL WHERE clause." },
+        "prefix":  { "type": ["string", "null"], "description": "SQL prefix prepended to the query (not honored by the NiFi engine)." },
+        "suffix":  { "type": ["string", "null"], "description": "SQL suffix appended to the query (not honored by the NiFi engine)." },
+        "init_statement":     { "type": ["string", "null"], "description": "SQL executed on connection init (not honored by the NiFi engine)." },
+        "conn_max_idle_time": { "type": ["string", "null"], "description": "Maximum idle time per connection, e.g. '10m'." },
+        "conn_max_life_time": { "type": ["string", "null"], "description": "Maximum lifetime per connection, e.g. '1h'." },
+        "conn_max_idle":      { "type": "integer", "description": "Maximum number of idle connections. Default 2." },
+        "conn_max_open":      { "type": "integer", "description": "Maximum number of open connections. 0 = unlimited. Default 0." },
+        "user":     { "type": ["string", "null"], "description": "Database login username." },
+        "password": { "type": ["string", "null"], "description": "Database login password. Stored ENCRYPTED by the host; null/absent when unset." }
+      }
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://civitasconnect.digital/core-datastructure/v1",
+  "title": "CORE DataStructure",
+  "description": "A CORE DataStructure is a JSON-Schema '$defs' library of member Elements, identified by its ':datastructure:' '$id' URN. Each '$defs' entry is EITHER an inline member Element schema carrying its own Element CORE URN as '$id' (the canonical, split-ready form the editor emits — Model Forge splits it into a separate Element artifact under that identity, without minting a new one; any version segment is advisory, because Model Forge assigns the version inside the write) OR a bare '$ref' to an already-stored member Element URN (the form Model Forge persists after splitting, pinned to the version the member write assigned, and the form used to reference existing Elements). A raw imported JSON Schema whose members carry no '$id' is also accepted (Model Forge then mints the URNs). An optional top-level '$ref' designates one member Element as the root shape. The UML diagram travels under 'x-ui-styles'.",
+  "type": "object",
+  "required": ["$schema", "$id"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "$id": {
+      "type": "string",
+      "description": "CORE URN of this DataStructure (logical, or with a trailing :version).",
+      "pattern": "^urn:core:[^:]+:[^:]+:datastructure:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+    },
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "$defs": {
+      "type": "object",
+      "description": "The member Elements, keyed by member name. Each value is either a bare Element '$ref' or an inline Element schema (see the DataStructure description).",
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "object",
+            "description": "A reference to an already-stored member Element by CORE URN.",
+            "required": ["$ref"],
+            "additionalProperties": false,
+            "properties": {
+              "$ref": {
+                "type": "string",
+                "description": "CORE URN of the member Element.",
+                "pattern": "^urn:core:[^:]+:[^:]+:element:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+                "x-core-ref": { "type": "urn:core:type:Element" }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "An inline member Element schema (an ordinary JSON Schema). When it carries a '$id' it MUST be the member's Element CORE URN; Model Forge then splits it into a separate Element artifact under that URN. A member carrying '$ref' is not an inline schema and must satisfy the reference branch instead, so that branch's Element-URN pattern cannot be bypassed through this one.",
+            "not": {
+              "required": [
+                "$ref"
+              ]
+            },
+            "properties": {
+              "$id": {
+                "type": "string",
+                "description": "Element CORE URN this inline member is stored under.",
+                "pattern": "^urn:core:[^:]+:[^:]+:element:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+                "x-core-ref": { "type": "urn:core:type:Element" }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "$ref": {
+      "type": "string",
+      "description": "Optional root shape: the CORE URN of the member Element that is the structure's entry point.",
+      "pattern": "^urn:core:[^:]+:[^:]+:element:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+      "x-core-ref": { "type": "urn:core:type:Element" }
+    }
+  }
+}

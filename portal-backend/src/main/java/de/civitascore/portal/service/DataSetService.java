@@ -10,11 +10,13 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
@@ -74,6 +76,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
+  private final ModelRegistryGateway modelRegistryGateway;
 
   private final DataSetMutationGuard dataSetMutationGuard;
 
@@ -88,6 +91,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       PipelineRuntimeStatusService pipelineRuntimeStatusService,
       ObjectProvider<AllowedScopes> allowedScopesProvider,
       DataSourceDatapoolScopeValidator datapoolScopeValidator,
+      ModelRegistryGateway modelRegistryGateway,
       DataSetMutationGuard dataSetMutationGuard) {
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
@@ -99,6 +103,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     this.pipelineRuntimeStatusService = pipelineRuntimeStatusService;
     this.allowedScopesProvider = allowedScopesProvider;
     this.datapoolScopeValidator = datapoolScopeValidator;
+    this.modelRegistryGateway = modelRegistryGateway;
     this.dataSetMutationGuard = dataSetMutationGuard;
   }
 
@@ -270,6 +275,18 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       }
       entity.getNamedApis().removeIf(api -> !incomingSlugs.contains(api.getSlug()));
       cleanUpOrphanedOwsLayers(entity);
+    }
+
+    // A DataSet is backed by a Model Forge manifest artifact its members are linked into
+    // (pipelines,
+    // and transitively their sources/sinks/mappings/structures). Create it once, on first persist
+    // (when no manifest is pinned yet); its title mirrors the dataset name. Model Forge validates
+    // it.
+    if (entity.getManifestLogicalUrn() == null) {
+      ModelRegistryGateway.ModelPin pin =
+          modelRegistryGateway.createDataSetManifest(entity.getName());
+      entity.setManifestLogicalUrn(pin.logicalUrn());
+      entity.setManifestUrn(pin.versionedUrn());
     }
     return super.postConvertToEntity(entity, input);
   }
@@ -597,6 +614,33 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
+   * Explicitly adds a reusable artifact (by CORE URN) to this dataset's manifest — the "Beides"
+   * explicit-assignment path, independent of any Pipeline that uses it. Model Forge maintains the
+   * manifest (a {@code dataset-ref} membership edge).
+   */
+  @Transactional
+  public void linkMember(UUID datasetId, String memberUrn) {
+    DataSet dataSet = findByIdOrThrow(datasetId);
+    if (dataSet.getManifestLogicalUrn() == null) {
+      throw new InvalidInputException(
+          "DataSet", datasetId, "DataSet has no manifest to link members into");
+    }
+    if (memberUrn == null || memberUrn.isBlank()) {
+      throw new InvalidInputException("member", datasetId, "member artifact URN is required");
+    }
+    modelRegistryGateway.linkToDataSet(dataSet.getManifestLogicalUrn(), memberUrn);
+  }
+
+  /** Explicitly removes an artifact (by CORE URN) from this dataset's manifest. */
+  @Transactional
+  public void unlinkMember(UUID datasetId, String memberUrn) {
+    DataSet dataSet = findByIdOrThrow(datasetId);
+    if (dataSet.getManifestLogicalUrn() != null && memberUrn != null && !memberUrn.isBlank()) {
+      modelRegistryGateway.unlinkFromDataSet(dataSet.getManifestLogicalUrn(), memberUrn);
+    }
+  }
+
+  /**
    * Handles a completed saga result. Updates infrastructure fields and transitions state based on
    * the saga type that was pending.
    */
@@ -807,17 +851,79 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    *
    * <p>Flushing here keeps a constraint violation inside this call instead of surfacing it at
    * commit, after a caller has already logged the removal as done.
+   *
+   * <p>This is the only place a dataset row is removed — a provisioned dataset keeps its row until
+   * its teardown saga reports back — so the manifest cleanup belongs here rather than in the {@code
+   * postDelete} hook, which a two-phase delete never reaches.
+   *
+   * <p>The sinks' own configuration artifacts are left in the registry: the dataset's pipelines are
+   * removed by a JPA cascade that does not run their service hook, so a pipeline artifact survives
+   * holding a reference onto each sink configuration, and the registry refuses to delete a
+   * referenced artifact. Removing them here would therefore fail the whole delete.
    */
   private void deleteWithSinks(DataSet dataSet) {
-    dataSinkRepository
-        .findByDataSetId(dataSet.getId())
-        .forEach(
-            sink -> {
-              sink.setPipeline(null);
-              dataSinkRepository.delete(sink);
-            });
+    // The registry artifacts this DataSet owns, read while its rows still exist. A pipeline is
+    // removed by a JPA cascade that does not run its service hook, so its artifact would otherwise
+    // survive holding pipeline-node edges onto the DataSource, sink configuration and Mapping it
+    // wires — leaving those referenced, and a referenced artifact cannot be deleted.
+    List<String> pipelineUrns =
+        dataSet.getPipelines().stream()
+            .map(Pipeline::getModelLogicalUrn)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+    List<String> mappingUrns =
+        pipelineUrns.stream()
+            .flatMap(urn -> modelRegistryGateway.dependencyUrnsOfType(urn, "mapping").stream())
+            .map(modelRegistryGateway::logicalUrn)
+            .distinct()
+            .toList();
+    List<DataSink> sinks = dataSinkRepository.findByDataSetId(dataSet.getId());
+    List<String> sinkConfigurationUrns =
+        sinks.stream()
+            .map(DataSink::getConfigurationLogicalUrn)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+
+    sinks.forEach(
+        sink -> {
+          sink.setPipeline(null);
+          dataSinkRepository.delete(sink);
+        });
     dataSetRepository.delete(dataSet);
     dataSetRepository.flush();
+
+    // The manifest goes first: it holds the dataset-ref edges onto the members, which is what keeps
+    // them referenced. Then the pipeline artifacts, whose edges keep the rest referenced, and only
+    // then the members those edges pointed at.
+    if (dataSet.getManifestLogicalUrn() != null) {
+      modelRegistryGateway.deleteDataSet(dataSet.getManifestLogicalUrn());
+    }
+    removeOwnedArtifacts("pipeline", pipelineUrns);
+    removeOwnedArtifacts("mapping", mappingUrns);
+    removeOwnedArtifacts("datasink configuration", sinkConfigurationUrns);
+  }
+
+  /**
+   * Removes registry artifacts a deleted DataSet owned. A refusal is logged, not thrown: the rows
+   * are already gone and the teardown saga has completed, so failing here would leave the platform
+   * inconsistent and have the delete redelivered forever. An artifact another DataSet still
+   * references is refused by the registry and stays, which is the outcome that keeps a shared
+   * member intact.
+   */
+  private void removeOwnedArtifacts(String kind, List<String> logicalUrns) {
+    for (String logicalUrn : logicalUrns) {
+      try {
+        modelRegistryGateway.deletePayload(logicalUrn);
+      } catch (RuntimeException e) {
+        log.warn(
+            "Could not remove {} artifact {} of a deleted DataSet: {}",
+            kind,
+            Encode.forJava(logicalUrn),
+            Encode.forJava(e.getMessage()));
+      }
+    }
   }
 
   /**

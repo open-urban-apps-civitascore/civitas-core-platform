@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="https://civitasconnect.digital/xsd/advanced"
+           targetNamespace="https://civitasconnect.digital/xsd/advanced"
+           elementFormDefault="qualified">
+
+  <xs:simpleType name="BoundedCode">
+    <xs:annotation>
+      <xs:documentation>Short uppercase code.</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:minLength value="2"/>
+      <xs:maxLength value="8"/>
+      <xs:pattern value="[A-Z]+"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="Percentage">
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0"/>
+      <xs:maxExclusive value="100"/>
+      <xs:fractionDigits value="2"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="KeywordList">
+    <xs:list itemType="xs:string"/>
+  </xs:simpleType>
+
+  <xs:complexType name="BaseThing">
+    <xs:sequence>
+      <xs:element name="Name" type="xs:string" minOccurs="1"/>
+      <xs:element name="Code" type="tns:BoundedCode" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="baseId" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="ExtendedThing">
+    <xs:complexContent>
+      <xs:extension base="tns:BaseThing">
+        <xs:sequence>
+          <xs:element name="Score" type="tns:Percentage" minOccurs="0"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="MeasurementValue">
+    <xs:simpleContent>
+      <xs:extension base="xs:decimal">
+        <xs:attribute name="unit" type="xs:string"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <xs:complexType name="ChoiceContainer">
+    <xs:choice>
+      <xs:element name="Email" type="xs:string"/>
+      <xs:element name="Phone" type="xs:string"/>
+    </xs:choice>
+  </xs:complexType>
+
+  <xs:complexType name="AllContainer">
+    <xs:all>
+      <xs:element name="Latitude" type="xs:double"/>
+      <xs:element name="Longitude" type="xs:double"/>
+    </xs:all>
+  </xs:complexType>
+
+  <xs:complexType name="InlinePayload">
+    <xs:sequence>
+      <xs:element name="AnyPayload" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Value" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

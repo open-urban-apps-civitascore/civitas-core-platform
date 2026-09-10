@@ -27,6 +27,10 @@ public class DataStructureVersionOutputDTO extends BaseOutputDTO {
   private DataStructureVersionSource dataStructureVersionSource;
 
   private String modelName;
+
+  /** Versioned CORE URN of this version's model (DataStructure) artifact in Model Forge. */
+  private String modelUrn;
+
   private Map<String, Object> styles;
 
   @Schema(description = "Data model definition as a JSON Schema document")

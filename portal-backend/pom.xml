@@ -17,6 +17,9 @@
     <description>portal-backend</description>
 
     <repositories>
+        <!-- Mono-repo package registry: portal-model, config-adapter and Model Forge
+             (core-model-forge-*) are all published here by their CI jobs, so a single
+             repository resolves every intra-repo dependency. -->
         <repository>
             <id>gitlab-maven</id>
             <url>https://gitlab.com/api/v4/projects/72402288/packages/maven</url>
@@ -43,9 +46,14 @@
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
-        <config-adapter.version>1.0.2-MR-717-SNAPSHOT</config-adapter.version>
+        <!-- Pinned to this merge request's config-adapter snapshot: the branch changes
+             config-adapter, so portal-backend has to resolve the adapter artifacts built for it
+             rather than another branch's. CI overrides it with -Dconfig-adapter.version. -->
+        <config-adapter.version>1.0.2-MR-788-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
         <at.yawk.lz4.version>1.11.2</at.yawk.lz4.version>
+        <model-forge.version>0.1.0-SNAPSHOT</model-forge.version>
+        <archunit.version>1.4.2</archunit.version>
     </properties>
 
     <dependencyManagement>
@@ -70,6 +78,14 @@
             <groupId>de.civitascore</groupId>
             <artifactId>portal-model</artifactId>
             <version>${portal-model.version}</version>
+        </dependency>
+
+        <!-- Model Forge — embedded schema/model registry (facade + auto-configuration).
+             Web-free; brings contract and runtime transitively. -->
+        <dependency>
+            <groupId>de.civitascore</groupId>
+            <artifactId>core-model-forge-spring-boot-starter</artifactId>
+            <version>${model-forge.version}</version>
         </dependency>
 
         <!-- Web, Data, Validation -->
@@ -150,6 +166,12 @@
         </dependency>
 
         <!-- Test -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security-test</artifactId>
@@ -323,6 +345,15 @@
                         <ignoredUnusedDeclaredDependency>org.hibernate.orm:hibernate-processor</ignoredUnusedDeclaredDependency>
                         <!-- Wired via META-INF/services (EventPublisher, EventConsumer) -->
                         <ignoredUnusedDeclaredDependency>de.civitas-core:event-handler-kafka</ignoredUnusedDeclaredDependency>
+                        <!-- Model Forge starter is declared for its Spring auto-configuration
+                             (provides the ModelForge bean + runtime + Postgres persistence);
+                             portal-backend compiles only against the contract module it pulls
+                             transitively, so the starter itself has no direct class usage -->
+                        <ignoredUnusedDeclaredDependency>de.civitascore:core-model-forge-spring-boot-starter</ignoredUnusedDeclaredDependency>
+                        <!-- ArchUnit JUnit5 aggregator: declared per the ArchUnit docs so its
+                             test engine is on the classpath; the boundary tests import only the
+                             core + junit5-api classes it pulls transitively -->
+                        <ignoredUnusedDeclaredDependency>com.tngtech.archunit:archunit-junit5</ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
                     <!-- Compile scope is required for application boot; direct imports happen
                          only in tests, so the analyzer wants them narrowed to test scope. -->

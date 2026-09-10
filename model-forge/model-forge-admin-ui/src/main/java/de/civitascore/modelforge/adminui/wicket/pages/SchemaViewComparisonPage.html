@@ -1,0 +1,20 @@
+<html xmlns:wicket="http://wicket.apache.org">
+<body>
+<wicket:extend>
+  <h2>Bundled vs. inlined view: <span wicket:id="urn"></span></h2>
+  <p>Bundled = $refs embedded under $defs, still $ref-based. Inlined = $refs recursively
+    inlined. Result: <strong><span wicket:id="identical"></span></strong>.</p>
+
+  <div class="split-pane">
+    <div>
+      <h3>Bundled</h3>
+      <pre wicket:id="bundled" class="content-pre tall"></pre>
+    </div>
+    <div>
+      <h3>Inlined</h3>
+      <pre wicket:id="inlined" class="content-pre tall"></pre>
+    </div>
+  </div>
+</wicket:extend>
+</body>
+</html>

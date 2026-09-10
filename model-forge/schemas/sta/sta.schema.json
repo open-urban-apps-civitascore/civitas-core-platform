@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OGC SensorThings API — Core Model",
+  "description": "OGC SensorThings API core data model, as implemented by the Fraunhofer IOSB FROST Server. Pure $defs container — the DataStructure grouping the nine entities below; it carries no shape of its own and is not itself stored as an Element.",
+  "$defs": {
+    "Thing": {
+      "$id": "urn:core:platform:civitas:element:sta:Thing:h2s9s5nlvw:1.0.0",
+      "title": "Thing",
+      "description": "OGC SensorThings API — a Thing is an object of the physical or information world capable of being identified and integrated into communication networks.",
+      "type": "object",
+      "properties": {
+        "name":        { "type": "string" },
+        "description": { "type": "string" },
+        "properties":  { "type": "object", "description": "Free-form key/value properties of the Thing.", "additionalProperties": true },
+        "Locations": {
+          "type": "array",
+          "description": "Association to the Locations of this Thing.",
+          "items": {
+            "type": "string",
+            "pattern": "^urn:",
+            "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Location:l2p8y4efpu:1.0.0" }
+          }
+        },
+        "HistoricalLocations": {
+          "type": "array",
+          "description": "Association to the time history of this Thing's Locations.",
+          "items": {
+            "type": "string",
+            "pattern": "^urn:",
+            "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:HistoricalLocation:kpu3mldt72:1.0.0" }
+          }
+        },
+        "Datastreams": {
+          "type": "array",
+          "description": "Association to the Datastreams produced by this Thing.",
+          "items": {
+            "type": "string",
+            "pattern": "^urn:",
+            "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Datastream:s04brbdcz9:1.0.0" }
+          }
+        }
+      },
+      "required": ["name", "description"]
+    },
+    "Location": {
+      "$id": "urn:core:platform:civitas:element:sta:Location:l2p8y4efpu:1.0.0",
+      "title": "Location",
+      "description": "OGC SensorThings API — the location of a Thing, typically a GeoJSON geometry.",
+      "type": "object",
+      "properties": {
+        "name":         { "type": "string" },
+        "description":  { "type": "string" },
+        "encodingType": { "type": "string", "description": "Encoding of the location, e.g. 'application/geo+json'." },
+        "location": {
+          "type": "object",
+          "description": "GeoJSON geometry object.",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["Point", "MultiPoint", "LineString", "MultiLineString", "Polygon", "MultiPolygon", "GeometryCollection"]
+            },
+            "coordinates": { "type": "array" }
+          },
+          "required": ["type", "coordinates"]
+        },
+        "Things": {
+          "type": "array",
+          "description": "Association to the Things at this Location.",
+          "items": {
+            "type": "string",
+            "pattern": "^urn:",
+            "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Thing:h2s9s5nlvw:1.0.0" }
+          }
+        },
+        "HistoricalLocations": {
+          "type": "array",
+          "description": "Association to the HistoricalLocations recorded at this Location.",
+          "items": {
+            "type": "string",
+            "pattern": "^urn:",
+            "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:HistoricalLocation:kpu3mldt72:1.0.0" }
+          }
+        }
+      },
+      "required": ["name", "description", "encodingType", "location"]
+    },
+    "HistoricalLocation": {
+      "$id": "urn:core:platform:civitas:element:sta:HistoricalLocation:kpu3mldt72:1.0.0",
+      "title": "HistoricalLocation",
+      "description": "OGC SensorThings API — the time history of a Thing's Locations.",
+      "type": "object",
+      "properties": {
+        "time": { "type": "string", "format": "date-time", "description": "Time when the Thing was at the Locations." },
+        "Thing": {
+          "type": "string",
+          "pattern": "^urn:",
+          "description": "Association to the Thing this history entry belongs to.",
+          "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Thing:h2s9s5nlvw:1.0.0" }
+        },
+        "Locations": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Association to the Locations the Thing was at. One HistoricalLocation SHALL have one or many Locations.",
+          "items": {
+            "type": "string",
+            "pattern": "^urn:",
+            "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Location:l2p8y4efpu:1.0.0" }
+          }
+        }
+      },
+      "required": ["time", "Thing", "Locations"]
+    },
+    "Datastream": {
+      "$id": "urn:core:platform:civitas:element:sta:Datastream:s04brbdcz9:1.0.0",
+      "title": "Datastream",
+      "description": "OGC SensorThings API — a Datastream groups Observations measuring the same ObservedProperty with the same Sensor.",
+      "type": "object",
+      "properties": {
+        "name":            { "type": "string" },
+        "description":     { "type": "string" },
+        "observationType": { "type": "string", "format": "uri", "description": "OM observation type URI, e.g. OM_Measurement." },
+        "unitOfMeasurement": {
+          "description": "Composition — the unit of measurement is a value object with no independent identity, always embedded.",
+          "$ref": "urn:core:platform:civitas:element:sta:UnitOfMeasurement:fy7igxkv4b:1.0.0"
+        },
+        "observedArea": {
+          "type": "object",
+          "description": "GeoJSON Polygon spatial bounding box of all Observations' FeaturesOfInterest.",
+          "properties": {
+            "type":        { "type": "string", "enum": ["Polygon", "MultiPolygon"] },
+            "coordinates": { "type": "array" }
+          },
+          "required": ["type", "coordinates"]
+        },
+        "phenomenonTime": { "type": "string", "description": "ISO 8601 time interval covered by the Observations." },
+        "resultTime":     { "type": "string", "description": "ISO 8601 time interval of the result generation." },
+        "Thing": {
+          "type": "string",
+          "pattern": "^urn:",
+          "description": "Association to the Thing this Datastream belongs to.",
+          "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Thing:h2s9s5nlvw:1.0.0" }
+        },
+        "Sensor": {
+          "type": "string",
+          "pattern": "^urn:",
+          "description": "Association to the Sensor producing this Datastream's Observations.",
+          "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Sensor:m8i4hc3h56:1.0.0" }
+        },
+        "ObservedProperty": {
+          "type": "string",
+          "pattern": "^urn:",
+          "description": "Association to the phenomenon measured by this Datastream.",
+          "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:ObservedProperty:yduda2m190:1.0.0" }
+        },
+        "Observations": {
+          "type": "array",
+          "description": "Association to this Datastream's Observations.",
+          "items": {
+            "type": "string",
+            "pattern": "^urn:",
+            "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Observation:ulhry9fjx6:1.0.0" }
+          }
+        }
+      },
+      "required": ["name", "description", "observationType", "unitOfMeasurement", "Thing", "Sensor", "ObservedProperty"]
+    },
+    "Sensor": {
+      "$id": "urn:core:platform:civitas:element:sta:Sensor:m8i4hc3h56:1.0.0",
+      "title": "Sensor",
+      "description": "OGC SensorThings API — a Sensor is an instrument that observes a property or phenomenon.",
+      "type": "object",
+      "properties": {
+        "name":         { "type": "string" },
+        "description":  { "type": "string" },
+        "encodingType": { "type": "string", "description": "MIME type of the metadata, e.g. 'application/pdf' or 'text/html'." },
+        "metadata":     { "type": "string", "description": "Detailed description / data sheet of the sensor." },
+        "Datastreams": {
+          "type": "array",
+          "description": "Association to the Datastreams produced by this Sensor.",
+          "items": {
+            "type": "string",
+            "pattern": "^urn:",
+            "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Datastream:s04brbdcz9:1.0.0" }
+          }
+        }
+      },
+      "required": ["name", "description", "encodingType", "metadata"]
+    },
+    "ObservedProperty": {
+      "$id": "urn:core:platform:civitas:element:sta:ObservedProperty:yduda2m190:1.0.0",
+      "title": "ObservedProperty",
+      "description": "OGC SensorThings API — the phenomenon of an Observation (e.g. air temperature).",
+      "type": "object",
+      "properties": {
+        "name":        { "type": "string" },
+        "definition":  { "type": "string", "format": "uri", "description": "URI to the property definition (e.g. a vocabulary entry)." },
+        "description": { "type": "string" },
+        "Datastreams": {
+          "type": "array",
+          "description": "Association to the Datastreams measuring this phenomenon.",
+          "items": {
+            "type": "string",
+            "pattern": "^urn:",
+            "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Datastream:s04brbdcz9:1.0.0" }
+          }
+        }
+      },
+      "required": ["name", "definition", "description"]
+    },
+    "Observation": {
+      "$id": "urn:core:platform:civitas:element:sta:Observation:ulhry9fjx6:1.0.0",
+      "title": "Observation",
+      "description": "OGC SensorThings API — an Observation is the act of measuring the value of a property of a FeatureOfInterest.",
+      "type": "object",
+      "properties": {
+        "phenomenonTime": { "type": "string", "description": "Time instant or interval when the Observation happened (ISO 8601)." },
+        "result":         { "description": "The estimated value of the ObservedProperty. Any JSON type (number, string, boolean, object, array)." },
+        "resultTime":     { "type": ["string", "null"], "description": "Time the result was generated (ISO 8601), may be null." },
+        "resultQuality":  { "description": "Optional DQ_Element describing the quality of the result." },
+        "validTime":      { "type": "string", "description": "ISO 8601 interval during which the result is valid." },
+        "parameters":     { "type": "object", "description": "Key/value pairs of environmental conditions during measurement.", "additionalProperties": true },
+        "Datastream": {
+          "type": "string",
+          "pattern": "^urn:",
+          "description": "Association to the Datastream this Observation belongs to.",
+          "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Datastream:s04brbdcz9:1.0.0" }
+        },
+        "FeatureOfInterest": {
+          "type": "string",
+          "pattern": "^urn:",
+          "description": "Association to the feature this Observation was made on.",
+          "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:FeatureOfInterest:an2vwx133n:1.0.0" }
+        }
+      },
+      "required": ["phenomenonTime", "result", "Datastream"]
+    },
+    "FeatureOfInterest": {
+      "$id": "urn:core:platform:civitas:element:sta:FeatureOfInterest:an2vwx133n:1.0.0",
+      "title": "FeatureOfInterest",
+      "description": "OGC SensorThings API — the feature whose property is observed (e.g. the geographic point sampled).",
+      "type": "object",
+      "properties": {
+        "name":         { "type": "string" },
+        "description":  { "type": "string" },
+        "encodingType": { "type": "string", "description": "Encoding of the feature, e.g. 'application/geo+json'." },
+        "feature": {
+          "type": "object",
+          "description": "GeoJSON geometry of the feature of interest.",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["Point", "MultiPoint", "LineString", "MultiLineString", "Polygon", "MultiPolygon", "GeometryCollection"]
+            },
+            "coordinates": { "type": "array" }
+          },
+          "required": ["type", "coordinates"]
+        },
+        "Observations": {
+          "type": "array",
+          "description": "Association to the Observations made on this feature.",
+          "items": {
+            "type": "string",
+            "pattern": "^urn:",
+            "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Observation:ulhry9fjx6:1.0.0" }
+          }
+        }
+      },
+      "required": ["name", "description", "encodingType", "feature"]
+    },
+    "UnitOfMeasurement": {
+      "$id": "urn:core:platform:civitas:element:sta:UnitOfMeasurement:fy7igxkv4b:1.0.0",
+      "title": "UnitOfMeasurement",
+      "description": "OGC SensorThings API — unit of measurement of a Datastream (UCUM). A composition value object with no independent identity — it has no own STA endpoint and is always embedded in its owning Datastream.",
+      "type": "object",
+      "properties": {
+        "name":       { "type": "string", "description": "Full name of the unit, e.g. 'degree Celsius'." },
+        "symbol":     { "type": "string", "description": "Unit symbol, e.g. '°C'." },
+        "definition": { "type": "string", "format": "uri", "description": "URI to the unit definition, e.g. a UCUM entry." }
+      },
+      "required": ["name", "symbol", "definition"]
+    }
+  }
+}

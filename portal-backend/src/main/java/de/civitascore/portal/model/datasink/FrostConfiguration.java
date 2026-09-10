@@ -1,7 +1,6 @@
 package de.civitascore.portal.model.datasink;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.util.UUID;
 import lombok.Data;
 
 /**
@@ -15,7 +14,8 @@ public class FrostConfiguration {
 
   @Schema(
       description =
-          "ID of the DataStructureVersion of the mapping's Thing-shaped target structure;"
-              + " required when the pipeline maps into this sink, absent for passthrough")
-  private UUID dataStructureVersionId;
+          "Versioned CORE URN of the Element (a DataStructureVersion's model) of the mapping's"
+              + " Thing-shaped target structure; required when the pipeline maps into this sink,"
+              + " absent for passthrough")
+  private String element;
 }

@@ -21,6 +21,7 @@ import {
   useDeleteDataSink,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
@@ -36,12 +37,17 @@ import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import { tableNameOwnerOutsideNode, tableNameOwnersOutsideSession } from '../../_services/dataSinkNameService'
 import {
   buildDataSinkPayloads,
+  buildMappingArtifacts,
   buildPipelinePayload,
   createDataSinkSnapshot,
+  createMappingSnapshot,
   type DataSinkSnapshot,
   getRemovedDataSinkIds,
   hasDataSinkChanged,
+  hasMappingChanged,
   isDestructiveDataSinkChange,
+  type MappingSnapshot,
+  updateNodeData,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
 import {
@@ -109,12 +115,17 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const createDataSinkMutation = useCreateDataSink()
   const deleteDataSinkMutation = useDeleteDataSink()
   const updateDataSinkMutation = useUpdateDataSink()
+  const createMappingMutation = useCreateMapping(datasetId)
+  const updateMappingMutation = useUpdateMapping(datasetId)
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
 
+  // ===== Mapping snapshot for change detection =====
+  const mappingSnapshotsRef = useRef<Record<string, MappingSnapshot>>({})
+
   // ===== Data-loss confirmation dialog =====
-  // A destructive sink change (tableName / dataStructureVersionId) on an already-provisioned
+  // A destructive sink change (tableName / referenced element) on an already-provisioned
   // dataset discards its stored data (the sink's storage is rebuilt on the next release).
   // Save-All pauses on such a change and awaits an explicit confirmation via this promise before
   // sending confirmDataLoss to the backend.
@@ -157,9 +168,23 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     // Load all sessions into the session manager
     sessionManager.loadSessions(sessions, activeSessionId)
 
-    // Create initial data sink snapshots for change detection
+    // Create initial data sink and mapping snapshots for change detection. A schema-invalid
+    // document here (e.g. stale data predating a schema change) must not crash the whole editor on
+    // load — fall back to an empty snapshot, which change detection already treats as "everything
+    // is new".
     for (const session of sessions) {
-      dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(session.pipeline)
+      try {
+        dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(session.pipeline)
+      } catch (error) {
+        console.error('Failed to build data sink snapshot for session:', session.name, error)
+        dataSinkSnapshotsRef.current[session.id] = {}
+      }
+      try {
+        mappingSnapshotsRef.current[session.id] = createMappingSnapshot(session.pipeline)
+      } catch (error) {
+        console.error('Failed to build mapping snapshot for session:', session.name, error)
+        mappingSnapshotsRef.current[session.id] = {}
+      }
     }
   }, [pipelinesQuery.data, sessionManager, requestedPipelineId])
 
@@ -470,9 +495,17 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       isProvisioned &&
       dirtySessions.some(session => {
         const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
-        return buildDataSinkPayloads(session.pipeline).some(({ nodeId, payload }) =>
-          isDestructiveDataSinkChange(nodeId, payload, snapshot),
-        )
+        try {
+          return buildDataSinkPayloads(session.pipeline).some(({ nodeId, payload }) =>
+            isDestructiveDataSinkChange(nodeId, payload, snapshot),
+          )
+        } catch (error) {
+          // A schema-invalid sink document is reported properly by the per-session save loop below
+          // (step 2), which validates again and surfaces it via the normal saveFailedNames path —
+          // this pre-scan only needs a best-effort answer, not to abort the whole save here.
+          console.error('Failed to evaluate destructive sink changes for session:', session.name, error)
+          return false
+        }
       })
 
     // Claim the guard before awaiting the dialog: the confirmation is async, so without this a
@@ -490,8 +523,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
       // Serialize saves to avoid concurrent mutation state issues
       for (const session of dirtySessions) {
+        // Declared outside the try below so the catch can still see whatever refs were stashed
+        // onto it before the failing step.
+        let currentPipeline = session.pipeline
         try {
-          let currentPipeline = session.pipeline
           const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
 
           // Step 1: Delete data sinks for removed persistence nodes
@@ -500,12 +535,16 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             await deleteDataSinkMutation.mutateAsync({ datasetId, dataSinkId: dataSinkId })
           }
 
-          // Step 2: Save data sinks (create new / update changed)
+          // Step 2: Save data sinks (create new / update changed). Stash the sink's CORE
+          // configurationUrn back onto the node so it is emitted as the CORE model's `sinkRef`.
           const dataSinkPayloads = buildDataSinkPayloads(currentPipeline)
           for (const { nodeId, entityId, payload } of dataSinkPayloads) {
             if (!entityId) {
               const response = await createDataSinkMutation.mutateAsync({ datasetId, data: payload })
               currentPipeline = updateNodeEntityId(currentPipeline, nodeId, response.data.id)
+              currentPipeline = updateNodeData(currentPipeline, nodeId, {
+                configurationUrn: response.data?.configurationUrn,
+              })
             } else if (hasDataSinkChanged(nodeId, payload, snapshot)) {
               // The destructive-change confirmation was obtained up front; flag the payload so the
               // backend permits the table rebuild. Only the sinks that are actually destructive
@@ -514,11 +553,40 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
                 hasDestructiveChange && isDestructiveDataSinkChange(nodeId, payload, snapshot)
                   ? { ...payload, confirmDataLoss: true }
                   : payload
-              await updateDataSinkMutation.mutateAsync({ datasetId, dataSinkId: entityId, data })
+              const response = await updateDataSinkMutation.mutateAsync({
+                datasetId,
+                dataSinkId: entityId,
+                data,
+              })
+              currentPipeline = updateNodeData(currentPipeline, nodeId, {
+                configurationUrn: response?.data?.configurationUrn,
+              })
             }
           }
 
-          // Step 3: Save pipeline (with updated entityIds from step 1)
+          // Step 2.5: Create/version mapping artifacts for configured mapping nodes (POST/PUT
+          // /v1/mappings). An already-created mapping (has logicalUrn) whose body is unchanged since
+          // the last save is skipped — the mapping API creates a new version per request, so sending
+          // it on every save (e.g. for an unrelated node edit) would churn versions for nothing.
+          // Stash the returned versioned URN (→ CORE model `mappingRef`) and logical URN (→ future
+          // PUT-versioning) back onto the node. Validation happens inside buildMappingArtifacts,
+          // which throws on a schema-invalid mapping document.
+          const mappingArtifacts = buildMappingArtifacts(currentPipeline)
+          const mappingSnapshot = mappingSnapshotsRef.current[session.id] ?? {}
+          for (const { nodeId, logicalUrn, body } of mappingArtifacts) {
+            if (logicalUrn && !hasMappingChanged(nodeId, body, mappingSnapshot)) continue
+
+            const response = logicalUrn
+              ? await updateMappingMutation.mutateAsync({ logicalUrn, ...body })
+              : await createMappingMutation.mutateAsync(body)
+            currentPipeline = updateNodeData(currentPipeline, nodeId, {
+              mappingRef: response.data.versionedUrn,
+              mappingLogicalUrn: response.data.logicalUrn,
+            })
+          }
+
+          // Step 3: Save pipeline (with updated entityIds/URNs from the steps above). The CORE
+          // `model` is validated against the generated schema inside buildPipelinePayload.
           const pipelinePayload = buildPipelinePayload(currentPipeline)
           const pipelineId = currentPipeline.id
 
@@ -533,8 +601,16 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           sessionManager.updateSessionPipeline(session.id, { ...currentPipeline, isDirty: false })
           sessionManager.markSessionClean(session.id)
           dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(currentPipeline)
+          mappingSnapshotsRef.current[session.id] = createMappingSnapshot(currentPipeline)
           toast.success(t('header.saveSuccess', { name: currentPipeline.name }))
         } catch (error) {
+          // A later step (mapping/pipeline validation or save) may fail after an earlier step
+          // already created backend artifacts (a data sink, a mapping) and stashed their refs onto
+          // currentPipeline. Persist that partial progress — still dirty — so a retry sees the
+          // stashed entityId/logicalUrn and PUT-updates the existing artifact instead of re-POSTing
+          // and leaking a duplicate.
+          sessionManager.updateSessionPipeline(session.id, currentPipeline)
+
           if (isDatapoolScopeViolationError(error)) {
             scopeViolationNames.push(session.name)
           } else if (isTableNameConflictError(error)) {
@@ -570,6 +646,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     createDataSinkMutation,
     deleteDataSinkMutation,
     updateDataSinkMutation,
+    createMappingMutation,
+    updateMappingMutation,
     datasetId,
     datasetQuery.data,
     confirmDataLoss,

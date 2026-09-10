@@ -27,7 +27,9 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
   return datastructures.map(datastructure => {
     const highestVersion: DatastructureVersionSummary | null =
       datastructure.dataStructureVersions.reduce<DatastructureVersionSummary | null>((highest, current) => {
-        if (!highest) return current
+        // A version with no stored model has no number, so it has no place in the ordering.
+        if (!current.version) return highest
+        if (!highest?.version) return current
         return current.version.localeCompare(highest.version, undefined, { numeric: true }) > 0 ? current : highest
       }, null)
     return {
@@ -36,14 +38,14 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       name: datastructure.name,
       description: datastructure.description || '-',
       status: datastructure.dataStructureStatus,
-      versionNumber: highestVersion?.version || null,
+      versionNumber: highestVersion?.version ?? null,
       source: highestVersion?.dataStructureVersionSource || null,
       inUse: datastructure.inUse,
       // add versions field to versions for showing subrows in table
       versions: datastructure.dataStructureVersions.map(version => ({
         id: version.id,
         versionNumber: version.version,
-        name: `Version ${version.version}`,
+        name: version.version ? `Version ${version.version}` : '-',
         description: version.description || '-',
         status: version.dataStructureVersionStatus,
         source: version.dataStructureVersionSource,
@@ -59,7 +61,7 @@ export const mapDatastructureVersionsApiToListData = (
   versions.map(version => ({
     id: version.id,
     versionNumber: version.version,
-    name: `Version ${version.version}`,
+    name: version.version ? `Version ${version.version}` : '-',
     description: version.description || '-',
     status: version.dataStructureVersionStatus,
     source: version.dataStructureVersionSource,
@@ -67,7 +69,7 @@ export const mapDatastructureVersionsApiToListData = (
 
 export const mapDatastructureVersionApiToFormData = (version: DatastructureVersion): DatastructureVersionFormData => ({
   id: version.id,
-  version: version.version,
+  version: version.version ?? '',
   description: version.description || '',
   dataStructureVersionStatus: version.dataStructureVersionStatus,
   dataStructureVersionSource: version.dataStructureVersionSource,
@@ -83,7 +85,6 @@ export const mapDatastructureVersionFormToApiData = (
 ): DatastructureVersionPutData => {
   return {
     id: version.id,
-    version: version.version,
     description: version.description,
     dataStructureVersionSource: version.dataStructureVersionSource,
     dataStructureVersionStatus: version.dataStructureVersionStatus,

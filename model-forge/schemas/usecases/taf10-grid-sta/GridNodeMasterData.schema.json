@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:core:platform:civitas:element:taf10-grid:GridNodeMasterData:1.0.0",
+  "title": "GridNodeMasterData",
+  "description": "Reference data for a low-voltage grid node, feeder, or transformer area. Looked up at runtime by gridNodeId to enrich TAF10GridReading messages with operational thresholds and controllable assets.",
+  "type": "object",
+  "required": ["gridNodeId", "gridNodeName", "location"],
+  "properties": {
+    "gridNodeId": {
+      "type": "string",
+      "description": "Primary key; matches TAF10GridReading.gridNodeId."
+    },
+    "gridNodeName": {
+      "type": "string",
+      "description": "Human-readable grid node or feeder name."
+    },
+    "operator": {
+      "type": "string",
+      "description": "Distribution system operator responsible for this grid node."
+    },
+    "transformerId": {
+      "type": "string",
+      "description": "Transformer station identifier."
+    },
+    "feederId": {
+      "type": "string",
+      "description": "Low-voltage feeder identifier."
+    },
+    "gridNodeType": {
+      "type": "string",
+      "enum": ["transformer", "feeder", "meter-aggregation", "switch-cabinet"],
+      "description": "Operational role of this node in the low-voltage grid."
+    },
+    "maxLoadW": {
+      "type": "number",
+      "description": "Operational load threshold in W before mitigation is considered."
+    },
+    "maxFeedInW": {
+      "type": "number",
+      "description": "Operational feed-in threshold in W, e.g. photovoltaic export limit for this segment."
+    },
+    "voltageMinV": {
+      "type": "number",
+      "description": "Lower voltage band limit in V."
+    },
+    "voltageMaxV": {
+      "type": "number",
+      "description": "Upper voltage band limit in V."
+    },
+    "controllableAssets": {
+      "type": "array",
+      "description": "Assets that may receive switching or curtailment commands.",
+      "items": {
+        "type": "object",
+        "required": ["assetId", "assetType"],
+        "properties": {
+          "assetId": { "type": "string" },
+          "assetType": {
+            "type": "string",
+            "enum": ["pv-inverter", "battery", "controllable-load", "switch"]
+          },
+          "priority": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "location": {
+      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+      "description": "Fixed installation coordinates of the grid node."
+    },
+    "frostThingId": {
+      "type": "integer",
+      "description": "FROST-Server @iot.id of the STA Thing entity corresponding to this grid node. Populated after initial sync."
+    },
+    "frostDatastreamIds": {
+      "type": "object",
+      "description": "Maps electrical quantities to their FROST Datastream @iot.id. Populated after initial sync.",
+      "properties": {
+        "activePowerPlus": { "type": "integer" },
+        "activePowerMinus": { "type": "integer" },
+        "voltage": { "type": "integer" }
+      }
+    }
+  }
+}

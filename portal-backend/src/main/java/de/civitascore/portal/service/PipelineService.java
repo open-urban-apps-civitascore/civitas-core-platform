@@ -7,6 +7,8 @@ import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.PipelineInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -50,6 +52,7 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
   private final DataSourceRepository dataSourceRepository;
   private final DataSinkService dataSinkService;
   private final DataSinkRepository dataSinkRepository;
+  private final ModelRegistryGateway modelRegistryGateway;
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
@@ -60,6 +63,7 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
       DataSourceRepository dataSourceRepository,
       DataSinkService dataSinkService,
       DataSinkRepository dataSinkRepository,
+      ModelRegistryGateway modelRegistryGateway,
       DataSourceDatapoolScopeValidator datapoolScopeValidator,
       ObjectProvider<AllowedScopes> allowedScopesProvider,
       DataSetMutationGuard dataSetMutationGuard) {
@@ -70,6 +74,7 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
     this.dataSourceRepository = dataSourceRepository;
     this.dataSinkService = dataSinkService;
     this.dataSinkRepository = dataSinkRepository;
+    this.modelRegistryGateway = modelRegistryGateway;
     this.datapoolScopeValidator = datapoolScopeValidator;
     this.allowedScopesProvider = allowedScopesProvider;
   }
@@ -125,7 +130,62 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
       entity.setDataSources(null);
     }
 
+    storeDefinitionInRegistry(entity, input);
+
     return super.postConvertToEntity(entity, input);
+  }
+
+  /**
+   * Stores the pipeline definition (editor-built graph plus the React Flow layout merged in as
+   * {@code x-ui-styles}) in the Model Forge registry and mirrors the assigned pin onto the shell.
+   * When the input carries neither model nor styles, the content pin is cleared (a full update may
+   * clear the definition); the logical URN is kept so a later store versions the same artifact.
+   *
+   * @param entity the pipeline entity
+   * @param input the input DTO carrying model and styles
+   */
+  private void storeDefinitionInRegistry(Pipeline entity, PipelineInputDTO input) {
+    boolean hasModel = input.getModel() != null && !input.getModel().isEmpty();
+    // A PIPELINE artifact's content IS the CORE model; the React Flow layout only decorates it as
+    // x-ui-styles. Without a model there is nothing to store or validate — a draft may still carry
+    // layout but no graph yet — so clear the content pin rather than shipping a null/empty model to
+    // Model Forge, which would reject it against pipeline.schema.json.
+    if (!hasModel) {
+      entity.setModelUrn(null);
+      return;
+    }
+    if (entity.getModelUrn() != null
+        && modelRegistryGateway.isUnchanged(
+            entity.getModelUrn(), input.getModel(), input.getStyles())) {
+      // Unchanged content keeps the existing pin — a metadata-only update or PATCH round-trip must
+      // not mint a new registry version.
+      return;
+    }
+    // Pass-through: the FRONTEND delivers a clean, schema-valid CORE Pipeline document (nodes keyed
+    // by
+    // `kind` with sourceRef/sinkRef/mappingRef CORE URNs). The backend is a thin shell — it stores
+    // the
+    // model verbatim (Model Forge validates it against pipeline.schema.json and stamps $schema +
+    // id) and
+    // never parses the pipeline's contents. The ReactFlow editor layout rides along as x-ui-styles.
+    // Link the pipeline into its DataSet's manifest (Model Forge adds it and its whole reference
+    // closure — sources/sinks/mappings/structures — as dataset-ref members). The pipeline belongs
+    // to
+    // exactly one DataSet; its manifest is created when the dataset is created.
+    String dataSetUrn =
+        entity.getDataSet() != null ? entity.getDataSet().getManifestLogicalUrn() : null;
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storePayload(
+            PayloadKind.PIPELINE,
+            Optional.ofNullable(entity.getModelLogicalUrn()),
+            entity.getName(),
+            input.getModel(),
+            input.getStyles(),
+            dataSetUrn);
+    if (entity.getModelLogicalUrn() == null) {
+      entity.setModelLogicalUrn(pin.logicalUrn());
+    }
+    entity.setModelUrn(pin.versionedUrn());
   }
 
   /**
@@ -292,5 +352,20 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
   @Override
   protected void onDelete(Pipeline pipeline) {
     dataSinkService.unlinkByPipelineId(pipeline.getId());
+  }
+
+  /**
+   * After the pipeline row is deleted, delete the backing definition artifact from Model Forge in
+   * the same transaction. No-op when no definition was ever stored. (Datasets cascade-delete their
+   * pipelines via JPA without this hook; the orphaned registry artifacts are harmless append-only
+   * history — see concept 6.7.)
+   *
+   * @param entity the deleted pipeline
+   */
+  @Override
+  protected void postDelete(Pipeline entity) {
+    if (entity != null && entity.getModelLogicalUrn() != null) {
+      modelRegistryGateway.deletePayload(entity.getModelLogicalUrn());
+    }
   }
 }

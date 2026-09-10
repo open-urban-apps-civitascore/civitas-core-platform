@@ -4,11 +4,13 @@ import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.datasink.DataSinkConfigurationOutput;
 import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.util.InvalidInputException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -18,12 +20,14 @@ import org.springframework.stereotype.Component;
  * Assembler for converting {@link DataSink} entities to {@link DataSinkOutputDTO}. Participates in
  * the template method pattern defined by {@link BaseAssembler}.
  *
- * <p>{@link #enrichDto} resolves the type-specific configuration:
+ * <p>{@link #enrichDto} resolves the type-specific configuration (read back from the Model Forge
+ * registry via the sink's {@code configurationUrn} pin):
  *
  * <ul>
  *   <li>FROST — sets a {@link FrostConfigurationOutput} with the referenced target structure.
- *   <li>POSTGIS — looks up the {@link de.civitascore.portal.model.entity.DataStructureVersion} and
- *       builds a {@link PostgisConfigurationOutput} with the nested summary.
+ *   <li>POSTGIS — builds a {@link PostgisConfigurationOutput} with the table name, the referenced
+ *       element URN, and the {@link de.civitascore.portal.model.entity.DataStructureVersion} that
+ *       URN pins.
  * </ul>
  */
 @Component
@@ -31,6 +35,7 @@ import org.springframework.stereotype.Component;
 public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutputDTO, UUID> {
 
   private final DataSinkMapper dataSinkMapper;
+  private final ModelRegistryGateway modelRegistryGateway;
   private final DataStructureVersionRepository dataStructureVersionRepository;
   private final DataStructureVersionMapper dataStructureVersionMapper;
 
@@ -41,8 +46,8 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
   }
 
   /**
-   * {@inheritDoc} Resolves the type-specific {@code configuration} object from the raw JSONB map
-   * and the derived {@code inUse} flag.
+   * {@inheritDoc} Resolves the type-specific {@code configuration} object from the registry-stored
+   * configuration document and the derived {@code inUse} flag.
    */
   @Override
   public DataSinkOutputDTO enrichDto(DataSinkOutputDTO dto, DataSink entity) {
@@ -52,67 +57,88 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
       return dto;
     }
 
-    dto.setConfiguration(buildConfiguration(entity));
+    dto.setConfiguration(buildConfiguration(entity, fetchConfiguration(entity)));
+    dto.setConfigurationUrn(entity.getConfigurationUrn());
     return dto;
   }
 
-  /** {@inheritDoc} Converts a DataSink entity back to its input DTO for PATCH operations. */
+  /**
+   * {@inheritDoc} Converts a DataSink entity back to its input DTO for PATCH operations. The
+   * current configuration is read from the registry (an empty map when none is stored, e.g. FROST
+   * sinks, satisfying the input's not-null constraint).
+   */
   @Override
   @SuppressWarnings("unchecked")
   public <I> I toInput(DataSink entity) {
-    return (I) dataSinkMapper.toInput(entity);
+    DataSinkInputDTO input = dataSinkMapper.toInput(entity);
+    Map<String, Object> configuration = fetchConfiguration(entity);
+    input.setConfiguration(configuration != null ? configuration : new HashMap<>());
+    return (I) input;
   }
 
-  private DataSinkConfigurationOutput buildConfiguration(DataSink entity) {
-    Map<String, Object> raw = entity.getConfiguration();
+  /**
+   * Reads the sink's configuration document back from the registry; {@code null} when no
+   * configuration is stored (e.g. FROST sinks).
+   *
+   * <p>The {@code connectionType} discriminator is <b>synthetic</b>: {@link
+   * de.civitascore.portal.service.DataSinkService} derives it from {@code dataSinkType} and stamps
+   * it into the payload on write so the document satisfies {@code datasink.schema.json}'s {@code
+   * oneOf}. It is not user-authored configuration, so it is stripped here — symmetric to the write
+   * — leaving {@code configuration} as pure host content. Without this, a PATCH would reconstitute
+   * the current configuration (via {@link #toInput}) with {@code connectionType} included, and
+   * {@code DataSinkService.validateFrostConfiguration} (which requires an exact {@code {element}}
+   * key set) would reject the unchanged FROST config with a 400.
+   */
+  private Map<String, Object> fetchConfiguration(DataSink entity) {
+    if (entity.getConfigurationUrn() == null) {
+      return null;
+    }
+    return modelRegistryGateway
+        .fetchPayload(entity.getConfigurationUrn())
+        .map(ModelRegistryGateway.RegistryDocument::content)
+        .map(
+            content -> {
+              // Defensive copy: the registry read is mutable, but a stubbed Map.of(...) is not.
+              Map<String, Object> hostContent = new HashMap<>(content);
+              hostContent.remove("connectionType");
+              return hostContent;
+            })
+        .orElse(null);
+  }
+
+  private DataSinkConfigurationOutput buildConfiguration(DataSink entity, Map<String, Object> raw) {
     return switch (entity.getDataSinkType()) {
-      case FROST -> buildFrostConfiguration(entity.getId(), raw);
+      case FROST -> buildFrostConfiguration(raw);
       case POSTGIS -> buildPostgisConfiguration(raw);
       default -> null;
     };
   }
 
-  private FrostConfigurationOutput buildFrostConfiguration(UUID sinkId, Map<String, Object> raw) {
+  private FrostConfigurationOutput buildFrostConfiguration(Map<String, Object> raw) {
     FrostConfigurationOutput output = new FrostConfigurationOutput();
-    Object dsvIdRaw = raw == null ? null : raw.get("dataStructureVersionId");
-    if (dsvIdRaw != null) {
-      try {
-        output.setDataStructureVersionId(UUID.fromString(dsvIdRaw.toString()));
-      } catch (IllegalArgumentException e) {
-        // Validated at sink save time, so this is unreachable in practice — but a corrupt raw
-        // value must fail like its write-path sibling (a controlled 400) rather than escaping as
-        // an unhandled 500 that echoes the malformed value.
-        throw new InvalidInputException(
-            "DataSink",
-            "configuration.dataStructureVersionId",
-            "dataStructureVersionId on sink " + sinkId + " is not a valid UUID");
-      }
+    if (raw != null && raw.get("element") instanceof String element) {
+      output.setElement(element);
     }
     return output;
   }
 
+  /**
+   * The nested {@code dataStructureVersion} resolves {@code element} to the portal entity it pins,
+   * a mapping only the backend can make. It stays unset for an element no stored version carries.
+   */
   private PostgisConfigurationOutput buildPostgisConfiguration(Map<String, Object> raw) {
     PostgisConfigurationOutput output = new PostgisConfigurationOutput();
-
     if (raw == null) {
       return output;
     }
-
     output.setTableName((String) raw.get("tableName"));
-
-    Object dsvIdRaw = raw.get("dataStructureVersionId");
-    if (dsvIdRaw != null) {
-      try {
-        UUID dsvId = UUID.fromString(dsvIdRaw.toString());
-        dataStructureVersionRepository
-            .findById(dsvId)
-            .ifPresent(
-                dsv -> output.setDataStructureVersion(dataStructureVersionMapper.toSummary(dsv)));
-      } catch (IllegalArgumentException ignored) {
-        // keep dataStructureVersion unset for malformed persisted config
-      }
+    if (raw.get("element") instanceof String element) {
+      output.setElement(element);
+      dataStructureVersionRepository
+          .findFirstByModelUrn(element)
+          .map(dataStructureVersionMapper::toSummary)
+          .ifPresent(output::setDataStructureVersion);
     }
-
     return output;
   }
 }

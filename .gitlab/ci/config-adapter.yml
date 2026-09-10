@@ -94,7 +94,7 @@ generate-graph-config-adapter:
       - config-adapter/maven.graph.json
 
 lint-config-adapter:
-  extends: .only-config-adapter-changes
+  extends: .api-test-stack-changes
   image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs:
@@ -113,7 +113,7 @@ lint-config-adapter:
     - mvn spotless:check -Drevision=$CONFIG_ADAPTER_VERSION
 
 dependency-prune-config-adapter:
-  extends: .only-config-adapter-changes
+  extends: .api-test-stack-changes
   image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs:
@@ -240,7 +240,7 @@ integration-test-config-adapter-data-services:
     MODULES: config-adapter-frost,config-adapter-geoserver,config-adapter-postgis,config-adapter-flowable,event-handler-kafka,config-adapter-application
 
 build-config-adapter:
-  extends: .only-config-adapter-changes
+  extends: .api-test-stack-changes
   image: maven:3.9-eclipse-temurin-25-alpine
   stage: build-package
   needs:

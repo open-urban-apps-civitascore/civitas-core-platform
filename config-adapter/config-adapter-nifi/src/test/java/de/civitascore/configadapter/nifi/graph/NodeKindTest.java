@@ -17,20 +17,19 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the node-kind vocabulary. The type strings are the editor's node types and half of the
- * editor/adapter mirror — the frontend's node-flow declarations assign the same roles to the same
+ * Pins the node-kind vocabulary. The kind strings are the CORE Pipeline schema's node {@code kind}s
+ * and half of the editor/adapter mirror — the pipeline document assigns the same roles to the same
  * strings; a change on either side must consciously touch both.
  */
 class NodeKindTest {
 
   @Test
-  void pinsTypeStringToRoleTable() {
+  void pinsKindStringToRoleTable() {
     Map<String, Role> expected =
         Map.of(
-            "dataSource", Role.SOURCE,
+            "source", Role.SOURCE,
             "mapping", Role.TRANSFORM,
-            "frost", Role.SINK,
-            "geoPersistence", Role.SINK,
+            "sink", Role.SINK,
             "cron", Role.TRIGGER,
             "start", Role.CONTROL,
             "end", Role.CONTROL);
@@ -38,16 +37,19 @@ class NodeKindTest {
     assertEquals(expected.size(), NodeKind.values().length);
     for (Map.Entry<String, Role> entry : expected.entrySet()) {
       NodeKind kind =
-          NodeKind.fromTypeString(entry.getKey())
+          NodeKind.fromKind(entry.getKey())
               .orElseThrow(() -> new AssertionError("no kind for '" + entry.getKey() + "'"));
       assertEquals(entry.getValue(), kind.role(), entry.getKey());
-      assertEquals(entry.getKey(), kind.typeString());
+      assertEquals(entry.getKey(), kind.kindString());
     }
   }
 
   @Test
-  void unknownAndNullTypesHaveNoKind() {
-    assertTrue(NodeKind.fromTypeString("filter").isEmpty());
-    assertTrue(NodeKind.fromTypeString(null).isEmpty());
+  void unsupportedAndNullKindsHaveNoKind() {
+    // filter/enrich/split are CORE kinds this adapter does not deploy; the old editor type strings
+    // (dataSource/frost/geoPersistence) are no longer the vocabulary either.
+    assertTrue(NodeKind.fromKind("filter").isEmpty());
+    assertTrue(NodeKind.fromKind("dataSource").isEmpty());
+    assertTrue(NodeKind.fromKind(null).isEmpty());
   }
 }

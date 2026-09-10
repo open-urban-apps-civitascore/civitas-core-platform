@@ -20,6 +20,17 @@ cd "$SCRIPT_DIR"
 
 OS_TYPE=$(uname -s)
 
+# ---- Docker-on-Windows path helpers ---------------------------------
+# Git Bash / MSYS rewrites a lone "/foo" command-line arg into a Windows path
+# (e.g. C:/Program Files/Git/foo), which corrupts container-internal paths passed to
+# `docker run` (-w, -v targets, in-container tool args). A leading "//" is left untouched
+# by MSYS and still resolves to "/foo" inside Linux. Bind-mount HOST paths additionally
+# need to be real Windows paths, so convert them with cygpath. On Linux/macOS CP="/" and
+# winhost() is a plain echo, so behaviour there is byte-for-byte unchanged.
+CP="/"
+case "$OS_TYPE" in MINGW*|MSYS*|CYGWIN*) CP="//" ;; esac
+winhost() { case "$OS_TYPE" in MINGW*|MSYS*|CYGWIN*) cygpath -m "$1" ;; *) printf '%s' "$1" ;; esac; }
+
 # ---- CLI Arguments ---------------------------------------------------
 
 authz_arg=""
@@ -27,16 +38,34 @@ config_adapter_arg=""
 backend_arg=""
 frontend_arg=""
 keycloak_secret_arg="dev-only-portal-frontend-secret"
+skip_build_arg=""
+no_clean_arg=""
+
+# Optional infra services (default: start them). These are Kafka-decoupled from the modeling
+# path (frontend → APISIX → backend → Keycloak/Postgres/Kafka), so they
+# can be skipped when you only need to model DataStructures/Datasets/Pipelines and don't deploy.
+# Turned off by --no-frost/--no-geoserver/--no-nifi, or all at once (plus config-adapter) by --modeling.
+START_FROST=true
+START_GEOSERVER=true
+START_NIFI=true
+# Model Forge Admin UI — the registry console (dev-environment/apps: model-forge-admin-ui on :8092,
+# pointed at portal-backend's model_forge schema). Part of the MODELING path (it inspects/edits what
+# modeling creates), so it stays ON under --modeling; turn it off with --no-admin-ui.
+START_ADMIN_UI=true
+# pgAdmin — optional web DB console for the portal Postgres (schemas public + model_forge). OFF by
+# default (it is a debugging convenience, not part of any path); enable with --pgadmin (:5050).
+START_PGADMIN=false
 
 usage() {
     echo "Usage: $(basename "$0") [OPTIONS]"
     echo
     echo "Options:"
     echo "  --authz=full|allowall            AuthZ mode (default: prompt, default answer: allowall)"
-    echo "  --config-adapter=auto|cmd|ide    Config Adapter startup (default: prompt)"
+    echo "  --config-adapter=auto|cmd|ide|none  Config Adapter startup (default: prompt)"
     echo "                                   auto = Docker container (recommended)"
     echo "                                   cmd  = command line (java -jar, requires Java 25+)"
     echo "                                   ide  = manual/IDE debugging (requires Java 25+)"
+    echo "                                   none = do not start it (alias: --no-config-adapter)"
     echo "  --backend=auto|cmd|ide           Portal Backend startup (default: prompt)"
     echo "                                   auto = Docker container (recommended)"
     echo "                                   cmd  = command line (mvn spring-boot:run, requires Java 25+)"
@@ -45,12 +74,27 @@ usage() {
     echo "                                   auto = Docker container (production build)"
     echo "                                   cmd  = command line (pnpm dev, requires Node.js)"
     echo "  --keycloak-secret=SECRET         Keycloak client secret for portal-frontend"
+    echo "  --skip-build                     Reuse the already-built JARs/images and just"
+    echo "                                   (re)start the containers (no Maven build, no"
+    echo "                                   'docker build'). Use after a first full run when"
+    echo "                                   nothing changed — much faster startup."
+    echo "  --no-clean                       Incremental Maven build (drop 'clean'); only"
+    echo "                                   changed modules recompile (default: clean build)."
+    echo "  --no-frost                       Do not start the FROST server"
+    echo "  --no-geoserver                   Do not start GeoServer"
+    echo "  --no-nifi                        Do not start Apache NiFi"
+    echo "  --no-config-adapter              Do not start the Config Adapter"
+    echo "  --no-admin-ui                    Do not start the Model Forge Admin UI (:8092)"
+    echo "  --pgadmin                        Also start pgAdmin (optional DB console, :5050)"
+    echo "  --modeling                       Modeling-only: skip config-adapter, NiFi, FROST and"
+    echo "                                   GeoServer (the deployment side). They are Kafka-decoupled,"
+    echo "                                   so modeling DataStructures/Datasets/Pipelines still works."
     echo "  -h, --help                       Show this help message"
     echo
     echo "Examples:"
     echo "  $0 --authz=allowall --config-adapter=auto --backend=auto --frontend=auto"
     echo "  $0 --config-adapter=cmd --backend=cmd --frontend=manual"
-    echo "  $0 --config-adapter=ide --backend=ide --frontend=manual"
+    echo "  $0 --backend=auto --frontend=auto --modeling      # just the modeling stack"
     echo "  $0 --backend=auto --keycloak-secret=abc123"
     exit 0
 }
@@ -70,8 +114,20 @@ while [ $# -gt 0 ]; do
                 auto) config_adapter_arg="1" ;;
                 cmd)  config_adapter_arg="2" ;;
                 ide)  config_adapter_arg="3" ;;
-                *) echo "ERROR: --config-adapter must be 'auto', 'cmd', or 'ide'"; exit 1 ;;
+                none) config_adapter_arg="0" ;;
+                *) echo "ERROR: --config-adapter must be 'auto', 'cmd', 'ide', or 'none'"; exit 1 ;;
             esac ;;
+        --no-config-adapter) config_adapter_arg="0" ;;
+        --no-frost)     START_FROST=false ;;
+        --no-geoserver) START_GEOSERVER=false ;;
+        --no-nifi)      START_NIFI=false ;;
+        --no-admin-ui)  START_ADMIN_UI=false ;;
+        --pgadmin)      START_PGADMIN=true ;;
+        --modeling)
+            # Modeling-only: skip the deployment side. Only default the config-adapter to "none"
+            # so an explicit --config-adapter=... still wins.
+            [ -z "$config_adapter_arg" ] && config_adapter_arg="0"
+            START_FROST=false; START_GEOSERVER=false; START_NIFI=false ;;
         --backend=*)
             val="${1#*=}"
             case "$val" in
@@ -90,6 +146,8 @@ while [ $# -gt 0 ]; do
             esac ;;
         --keycloak-secret=*)
             keycloak_secret_arg="${1#*=}" ;;
+        --skip-build) skip_build_arg="true" ;;
+        --no-clean) no_clean_arg="true" ;;
         -h|--help) usage ;;
         *)
             echo "ERROR: Unknown option: $1"
@@ -98,6 +156,24 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
+
+# ---- Build vs. reuse -------------------------------------------------
+# By default every run rebuilds the Maven artifacts (clean) and the Docker images.
+# --skip-build reuses the already-built JARs/images and only (re)starts the containers.
+SKIP_BUILD="${skip_build_arg:-false}"
+if [ "$SKIP_BUILD" = "true" ]; then COMPOSE_BUILD=""; else COMPOSE_BUILD="--build"; fi
+# --no-clean drops the Maven 'clean' goal for incremental builds. Default keeps 'clean',
+# so an unchanged invocation behaves exactly as before.
+NO_CLEAN="${no_clean_arg:-false}"
+if [ "$NO_CLEAN" = "true" ]; then MVN_CLEAN=""; else MVN_CLEAN="clean"; fi
+# Wrapper around mvn_in_container that no-ops when --skip-build is set.
+mvn_build() {
+    if [ "$SKIP_BUILD" = "true" ]; then
+        echo "  (--skip-build) reusing existing artifacts, skipping build of ${1##*/}"
+        return 0
+    fi
+    mvn_in_container "$@"
+}
 
 echo "======================================================"
 echo "CIVITAS CORE Platform - Portal Development Setup"
@@ -178,7 +254,7 @@ fi
 # Docker mode uses containerized Maven inside a JDK 25 container.
 MVN_AVAILABLE=false
 if command -v mvn >/dev/null 2>&1; then
-    MVN_VERSION=$(mvn -version 2>&1 | head -1 | awk '{print $3}')
+    MVN_VERSION=$(mvn -version 2>&1 | awk '/Apache Maven/ {print $3; exit}')
     MVN_MAJOR=$(echo "$MVN_VERSION" | cut -d'.' -f1)
     MVN_MINOR=$(echo "$MVN_VERSION" | cut -d'.' -f2)
     if [ "$MVN_MAJOR" -gt 3 ] || { [ "$MVN_MAJOR" -eq 3 ] && [ "$MVN_MINOR" -ge 6 ]; }; then
@@ -240,10 +316,10 @@ mvn_in_container() {
     host_gid=$(id -g)
 
     docker run --rm \
-        -v "$PROJECT_ROOT:/project" \
-        -v "$MVN_CACHE_VOLUME:/var/maven/.m2" \
-        -e MAVEN_CONFIG=/var/maven/.m2 \
-        -w "/project/$rel_path" \
+        -v "$(winhost "$PROJECT_ROOT"):${CP}project" \
+        -v "$MVN_CACHE_VOLUME:${CP}var/maven/.m2" \
+        -e "MAVEN_CONFIG=${CP}var/maven/.m2" \
+        -w "${CP}project/$rel_path" \
         maven:3.9-eclipse-temurin-25 \
         sh -c "
             chown -R $host_uid:$host_gid /var/maven/.m2 && \
@@ -307,6 +383,7 @@ echo
 if [ -n "$config_adapter_arg" ]; then
     config_adapter_option="$config_adapter_arg"
     case "$config_adapter_option" in
+        0) echo "Config Adapter: disabled (--config-adapter=none)" ;;
         1) echo "Config Adapter: Docker (--config-adapter=auto)" ;;
         2) echo "Config Adapter: Command line (--config-adapter=cmd)" ;;
         3) echo "Config Adapter: IDE (--config-adapter=ide)" ;;
@@ -317,8 +394,9 @@ else
     echo "  1) Docker (build & run as container)  [recommended]"
     echo "  2) Command line (java -jar in terminal — requires Java 25+)"
     echo "  3) Manual / IDE (for debugging — requires Java 25+)"
+    echo "  0) None (skip — not needed for modeling; it only deploys to NiFi/FROST/GeoServer)"
     echo
-    read -p "Select option [1/2/3]: " config_adapter_option
+    read -p "Select option [1/2/3/0]: " config_adapter_option
 fi
 
 echo
@@ -431,6 +509,7 @@ echo "Configuration Summary"
 echo "------------------------------------------------------"
 echo "  AuthZ mode:      $([ "$authz_option" = "1" ] && echo 'Full AuthZ' || echo 'Allow-all')"
 case "$config_adapter_option" in
+    0) echo "  Config Adapter:  disabled" ;;
     1) echo "  Config Adapter:  Docker" ;;
     2) echo "  Config Adapter:  Command line" ;;
     3) echo "  Config Adapter:  Manual/IDE" ;;
@@ -445,6 +524,14 @@ case "$frontend_option" in
     2) echo "  Portal Frontend: Command line" ;;
     3) echo "  Portal Frontend: Manual" ;;
 esac
+skipped_infra=""
+[ "$START_FROST" = "true" ]     || skipped_infra="$skipped_infra FROST"
+[ "$START_GEOSERVER" = "true" ] || skipped_infra="$skipped_infra GeoServer"
+[ "$START_NIFI" = "true" ]      || skipped_infra="$skipped_infra NiFi"
+[ "$START_ADMIN_UI" = "true" ]  || skipped_infra="$skipped_infra Admin-UI"
+[ -n "$skipped_infra" ] && echo "  Skipped infra:  $skipped_infra"
+[ "$START_ADMIN_UI" = "true" ]  && echo "  Model Forge Admin UI: http://localhost:8092"
+[ "$START_PGADMIN" = "true" ]   && echo "  pgAdmin:              http://localhost:5050 (admin@civitas.com / admin)"
 echo "------------------------------------------------------"
 echo
 
@@ -532,11 +619,11 @@ fi
 echo "  Running database migrations..."
 FLYWAY_MIGRATIONS="$SCRIPT_DIR/../portal-backend/src/main/resources/db/migration"
 if docker run --rm --network civitas-network \
-    -v "$FLYWAY_MIGRATIONS:/flyway/sql:ro" \
+    -v "$(winhost "$FLYWAY_MIGRATIONS"):${CP}flyway/sql:ro" \
     flyway/flyway:11-alpine \
     -url=jdbc:postgresql://postgres-portal:5432/portal_backend \
     -user=admin -password=admin \
-    -locations=filesystem:/flyway/sql \
+    -locations=filesystem:${CP}flyway/sql \
     migrate; then
     echo "  Database migrations complete"
 else
@@ -565,11 +652,11 @@ fi
 # Build AuthZ Repository JAR (required by its Dockerfile)
 # Uses containerized Maven (JDK 25) so the host doesn't need Java 25 installed.
 echo "Building AuthZ Repository..."
-if ! mvn_in_container "$SCRIPT_DIR/../portal-model" clean install -DskipTests -Drevision=$DEV_VERSION -q; then
+if ! mvn_build "$SCRIPT_DIR/../portal-model" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q; then
     echo "ERROR: Portal Model build failed"
     exit 1
 fi
-if ! mvn_in_container "$SCRIPT_DIR/../authz/repository" clean package -DskipTests -Dportal-model.version=$DEV_VERSION -q; then
+if ! mvn_build "$SCRIPT_DIR/../authz/repository" $MVN_CLEAN package -DskipTests -Dportal-model.version=$DEV_VERSION -q; then
     echo "ERROR: AuthZ Repository build failed"
     exit 1
 fi
@@ -577,7 +664,7 @@ echo "  AuthZ Repository built successfully"
 
 # Start AuthZ services (OPA + AuthZ Repository)
 cd "$SCRIPT_DIR/apisix"
-$DOCKER_COMPOSE -f docker-compose.authz.yml up -d --build
+$DOCKER_COMPOSE -f docker-compose.authz.yml up -d $COMPOSE_BUILD
 echo "  AuthZ services started (OPA + AuthZ Repository)"
 
 # Start APISIX gateway
@@ -585,30 +672,39 @@ cd "$SCRIPT_DIR/apisix"
 $DOCKER_COMPOSE up -d
 echo "  APISIX started"
 
-cd "$SCRIPT_DIR/frost"
-if [ ! -f .env ] && [ -f .env.example ]; then
-    cp .env.example .env
-    echo "  Created frost/.env from .env.example (set FROST_DB_PASSWORD to change the password)"
-fi
-if $DOCKER_COMPOSE up -d 2>&1; then
-    echo "  FROST Server started"
+if [ "$START_FROST" = "true" ]; then
+    cd "$SCRIPT_DIR/frost"
+    if [ ! -f .env ] && [ -f .env.example ]; then
+        cp .env.example .env
+        echo "  Created frost/.env from .env.example (set FROST_DB_PASSWORD to change the password)"
+    fi
+    if $DOCKER_COMPOSE up -d 2>&1; then
+        echo "  FROST Server started"
+    else
+        echo "  WARNING: FROST Server failed to start (may not support this architecture)"
+        echo "           Portal development works fine without it."
+    fi
 else
-    echo "  WARNING: FROST Server failed to start (may not support this architecture)"
-    echo "           Portal development works fine without it."
+    echo "  Skipping FROST Server (--no-frost/--modeling)"
 fi
 
-cd "$SCRIPT_DIR/geoserver"
-if [ ! -f .env ] && [ -f .env.example ]; then
-    cp .env.example .env
-    echo "  Created geoserver/.env from .env.example (set GEOSERVER_ADMIN_PASSWORD to change the password)"
-fi
-if $DOCKER_COMPOSE up -d 2>&1; then
-    echo "  GeoServer started"
+if [ "$START_GEOSERVER" = "true" ]; then
+    cd "$SCRIPT_DIR/geoserver"
+    if [ ! -f .env ] && [ -f .env.example ]; then
+        cp .env.example .env
+        echo "  Created geoserver/.env from .env.example (set GEOSERVER_ADMIN_PASSWORD to change the password)"
+    fi
+    if $DOCKER_COMPOSE up -d 2>&1; then
+        echo "  GeoServer started"
+    else
+        echo "  WARNING: GeoServer failed to start"
+        echo "           Portal development works fine without it."
+    fi
 else
-    echo "  WARNING: GeoServer failed to start"
-    echo "           Portal development works fine without it."
+    echo "  Skipping GeoServer (--no-geoserver/--modeling)"
 fi
 
+if [ "$START_NIFI" = "true" ]; then
 cd "$SCRIPT_DIR/nifi"
 # Seed the NiFi credentials file from the checked-in example
 if [ ! -f .env ] && [ -f .env.example ]; then
@@ -660,6 +756,9 @@ else
     echo "  WARNING: Apache NiFi failed to start"
     echo "           Dataset pipeline deployment will not work."
 fi
+else
+    echo "  Skipping Apache NiFi (--no-nifi/--modeling)"
+fi
 
 cd "$SCRIPT_DIR"
 
@@ -708,7 +807,7 @@ wait_for_service() {
 wait_for_service "Keycloak" "http://localhost:8080/realms/master" 60
 wait_for_service "Kafka UI" "http://localhost:8090" 30
 wait_for_service "OPA" "http://localhost:8181/health" 30
-wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 60
+wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 120
 
 # macOS: disable Keycloak https requirement on master realm on macos
 if [ "$OS_TYPE" = "Darwin" ]; then
@@ -730,8 +829,9 @@ docker rm -f civitas-portal-backend 2>/dev/null || true
 docker rm -f civitas-portal-frontend 2>/dev/null || true
 sleep 1
 
-# Now kill any remaining non-Docker processes on these ports
-for port in 8088 8089 3000; do
+# Now kill any remaining non-Docker processes on these ports (8092 = Model Forge Admin UI,
+# which local-demo.md/vertical-slice.sh also run by hand outside Docker)
+for port in 8088 8089 3000 8092; do
     if [ "$OS_TYPE" = "Darwin" ]; then
         pid=$(lsof -ti :"$port" 2>/dev/null | head -1)
     else
@@ -751,11 +851,11 @@ echo
 
 # Docker mode: build JARs via containerized Maven (JDK 25), then
 # start containers via docker compose. No local Java 25 required.
-if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
+if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$START_ADMIN_UI" = "true" ] || [ "$START_PGADMIN" = "true" ]; then
     echo "Building Java artifacts for Docker images (containerized Maven)..."
 
     # portal-model is a dependency for both services
-    if ! mvn_in_container "$SCRIPT_DIR/../portal-model" clean install -DskipTests -Drevision=$DEV_VERSION -q; then
+    if ! mvn_build "$SCRIPT_DIR/../portal-model" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q; then
         echo "ERROR: Portal Model build failed"
         exit 1
     fi
@@ -763,16 +863,44 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
 
     # Config Adapter JAR (needed by config-adapter Dockerfile)
     if [ "$config_adapter_option" = "1" ]; then
-        if ! mvn_in_container "$SCRIPT_DIR/../config-adapter" clean install -DskipTests -Drevision=$DEV_VERSION -Pdist -q; then
+        if ! mvn_build "$SCRIPT_DIR/../config-adapter" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -Pdist -q; then
             echo "ERROR: Config Adapter build failed"
             exit 1
         fi
         echo "  Config Adapter JAR built"
     fi
 
+    # Model Forge is the source of the Admin UI fat JAR (the reactor build packages
+    # core-model-forge-admin-ui too), so build it into the container Maven cache before the image
+    # build. portal-backend does not consume core-model-forge-* yet, so this is only needed for the
+    # Admin UI today; it is kept on the backend path as well so the dependency, once declared,
+    # resolves locally rather than from the external registry. Model Forge keeps its own fixed
+    # version (no -Drevision). Only the Java jars are needed.
+    if [ "$backend_option" = "1" ] || [ "$START_ADMIN_UI" = "true" ]; then
+        if ! mvn_build "$SCRIPT_DIR/../model-forge" $MVN_CLEAN install -DskipTests -Dspotless.check.skip=true -Dspotbugs.skip=true -q; then
+            echo "ERROR: Model Forge build failed"
+            exit 1
+        fi
+        echo "  Model Forge built"
+    fi
+
+    # --skip-build never runs the Model Forge build, but the Admin UI image copies the fat JAR
+    # straight out of target/. With no JAR the image build fails with a confusing COPY error, so
+    # fail here with the actionable message instead.
+    if [ "$SKIP_BUILD" = "true" ] && [ "$START_ADMIN_UI" = "true" ]; then
+        ADMIN_UI_TARGET="$SCRIPT_DIR/../model-forge/model-forge-admin-ui/target"
+        if ! ls "$ADMIN_UI_TARGET"/core-model-forge-admin-ui-*[0-9T].jar >/dev/null 2>&1; then
+            echo "ERROR: --skip-build was passed but no Admin UI JAR exists in"
+            echo "       model-forge/model-forge-admin-ui/target/"
+            echo "       Run once without --skip-build, or start with --no-admin-ui."
+            exit 1
+        fi
+        echo "  (--skip-build) Admin UI JAR present — note it may be STALE; drop --skip-build to rebuild"
+    fi
+
     # Portal Backend JAR (needed by portal-backend Dockerfile)
     if [ "$backend_option" = "1" ]; then
-        if ! mvn_in_container "$SCRIPT_DIR/../portal-backend" clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -q; then
+        if ! mvn_build "$SCRIPT_DIR/../portal-backend" $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -q; then
             echo "ERROR: Portal Backend build failed"
             exit 1
         fi
@@ -793,8 +921,14 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
     if [ "$backend_option" = "1" ]; then
         COMPOSE_SERVICES="$COMPOSE_SERVICES portal-backend"
     fi
+    if [ "$START_ADMIN_UI" = "true" ]; then
+        COMPOSE_SERVICES="$COMPOSE_SERVICES model-forge-admin-ui"
+    fi
+    if [ "$START_PGADMIN" = "true" ]; then
+        COMPOSE_SERVICES="$COMPOSE_SERVICES pgadmin"
+    fi
 
-    $DOCKER_COMPOSE up -d --build $COMPOSE_SERVICES
+    $DOCKER_COMPOSE up -d $COMPOSE_BUILD $COMPOSE_SERVICES
     echo "  Application containers started: $COMPOSE_SERVICES"
     echo
 fi
@@ -806,7 +940,7 @@ if [ "$config_adapter_option" = "2" ] || [ "$backend_option" = "2" ]; then
 
     # portal-model is a dependency for both services
     cd "$SCRIPT_DIR/../portal-model"
-    if ! mvn clean install -DskipTests -Drevision=$DEV_VERSION -q; then
+    if ! mvn $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q; then
         echo "ERROR: Portal Model build failed"
         exit 1
     fi
@@ -814,7 +948,7 @@ if [ "$config_adapter_option" = "2" ] || [ "$backend_option" = "2" ]; then
 
     if [ "$config_adapter_option" = "2" ]; then
         cd "$SCRIPT_DIR/../config-adapter"
-        if ! mvn clean install -DskipTests -Drevision=$DEV_VERSION -Pdist; then
+        if ! mvn $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -Pdist; then
             echo "ERROR: Config Adapter build failed"
             exit 1
         fi
@@ -823,7 +957,7 @@ if [ "$config_adapter_option" = "2" ] || [ "$backend_option" = "2" ]; then
 
     if [ "$backend_option" = "2" ]; then
         cd "$SCRIPT_DIR/../portal-backend"
-        if ! mvn clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION; then
+        if ! mvn $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION; then
             echo "ERROR: Portal Backend build failed"
             exit 1
         fi
@@ -850,6 +984,7 @@ export HEALTHCHECK_PORT=8088
 # "encrypted credentials present but CIVITAS_MASTER_KEY is not configured".
 export CIVITAS_MASTER_KEY=${CIVITAS_MASTER_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
 export ADAPTERS=keycloak,apisix,frost
+export CIVITAS_MASTER_KEY=${CIVITAS_MASTER_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
 export EVENTHANDLER_NAME=kafka
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 export KAFKA_GROUP_ID=config-adapter-group
@@ -965,7 +1100,7 @@ if [ "$config_adapter_option" = "3" ]; then
     echo
     echo "Build first (if not already done):"
     echo "  cd config-adapter"
-    echo "  mvn clean install -DskipTests -Drevision=$DEV_VERSION"
+    echo "  mvn $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION"
     echo
     echo "Then start in your IDE:"
     echo "  Project: config-adapter/config-adapter-application"
@@ -1028,9 +1163,9 @@ if [ "$backend_option" = "3" ]; then
     echo "======================================================"
     echo
     echo "Build first (if not already done):"
-    echo "  cd portal-model && mvn clean install -DskipTests && cd .."
+    echo "  cd portal-model && mvn $MVN_CLEAN install -DskipTests && cd .."
     echo "  cd portal-backend"
-    echo "  mvn clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION"
+    echo "  mvn $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION"
     echo
     echo "Then start in your IDE:"
     echo "  Project: portal-backend"
@@ -1065,6 +1200,26 @@ if [ "$backend_option" = "1" ]; then
     if [ "$BACKEND_READY" = false ]; then
         echo "  WARNING: Portal Backend may not be ready yet (timeout after 180s)"
         echo "           Check: docker compose -f apps/docker-compose.yml logs portal-backend"
+    fi
+    echo
+fi
+
+# The Admin UI logs "Started AdminUiApplication" BEFORE its graph warmup runs, so a failed
+# start still looks successful in the log — probe the port instead of trusting the log line.
+if [ "$START_ADMIN_UI" = "true" ]; then
+    echo "Waiting for Model Forge Admin UI to be healthy..."
+    ADMIN_UI_READY=false
+    for i in $(seq 1 60); do
+        if curl -s -f "http://localhost:8092/" >/dev/null 2>&1; then
+            echo "  Model Forge Admin UI is ready"
+            ADMIN_UI_READY=true
+            break
+        fi
+        sleep 2
+    done
+    if [ "$ADMIN_UI_READY" = false ]; then
+        echo "  WARNING: Model Forge Admin UI may not be ready yet (timeout after 120s)"
+        echo "           Check: docker compose -f apps/docker-compose.yml logs model-forge-admin-ui"
     fi
     echo
 fi
@@ -1122,7 +1277,7 @@ if [ "$frontend_option" = "1" ]; then
     echo "Starting Portal Frontend (Docker)..."
     docker rm -f civitas-portal-frontend 2>/dev/null || true
     cd "$SCRIPT_DIR/apps"
-    $DOCKER_COMPOSE up -d --build portal-frontend
+    $DOCKER_COMPOSE up -d $COMPOSE_BUILD portal-frontend
     echo "  Frontend container started on http://localhost:3000"
     echo "  Logs: cd dev-environment/apps && docker compose logs -f portal-frontend"
     cd "$SCRIPT_DIR"

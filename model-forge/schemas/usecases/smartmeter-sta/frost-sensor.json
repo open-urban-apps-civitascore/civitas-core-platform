@@ -1,0 +1,6 @@
+{
+  "name":         "SML Smart Meter",
+  "description":  "Smart electricity meter with SML (Smart Message Language) output, read via optical interface (IR head) or direct MQTT gateway",
+  "encodingType": "application/pdf",
+  "metadata":     "https://example.org/sml-meter-datasheet"
+}

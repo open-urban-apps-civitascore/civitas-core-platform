@@ -1,0 +1,11 @@
+{
+  "$schema": "https://civitasconnect.digital/core/datasink/v1",
+  "id": "urn:core:platform:civitas:datasink:common:aq-http-sink:s7mqw72qmh:1.0.0",
+  "title": "Air Quality HTTP Sink",
+  "description": "Posts normalized observations to the city data platform.",
+  "connectionType": "http",
+  "url": "https://data.example.test/observations",
+  "method": "POST",
+  "contentType": "application/json",
+  "element": "urn:core:platform:civitas:element:common:Observation:ulhry9fjx6:1.0.0"
+}

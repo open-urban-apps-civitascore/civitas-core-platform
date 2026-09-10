@@ -159,4 +159,60 @@ class CoreUrnTest {
     assertFalse(CoreUrn.sameStructureVersion(valid, null));
     assertFalse(CoreUrn.sameStructureVersion(null, null));
   }
+
+  @Test
+  @DisplayName("logicalUrn strips the trailing SemVer version segment")
+  void logicalUrn_stripsVersion() {
+    assertEquals(
+        "urn:core:tenant:stadt:mapping:mobility:Parking:0000000001",
+        CoreUrn.logicalUrn("urn:core:tenant:stadt:mapping:mobility:Parking:0000000001:2.1.0"));
+  }
+
+  @Test
+  @DisplayName(
+      "logicalUrn returns an already-logical URN (no version tail) unchanged, and null for null")
+  void logicalUrn_passthroughAndNull() {
+    assertEquals(
+        "urn:core:tenant:stadt:mapping:mobility:Parking:0000000001",
+        CoreUrn.logicalUrn("urn:core:tenant:stadt:mapping:mobility:Parking:0000000001"));
+    assertEquals("ds-1", CoreUrn.logicalUrn("ds-1"));
+    assertEquals(null, CoreUrn.logicalUrn(null));
+  }
+
+  @Test
+  @DisplayName("sameArtifact matches verbatim and across a version drift, but not across artifacts")
+  void sameArtifact() {
+    String v1 = "urn:core:tenant:stadt:mapping:mobility:Parking:0000000001:1.0.0";
+    String v2 = "urn:core:tenant:stadt:mapping:mobility:Parking:0000000001:2.3.4";
+    String other = "urn:core:tenant:stadt:mapping:mobility:Parking:0000000002:1.0.0";
+    assertTrue(CoreUrn.sameArtifact(v1, v1));
+    assertTrue(CoreUrn.sameArtifact(v1, v2));
+    assertTrue(CoreUrn.sameArtifact("ds-1", "ds-1"));
+    assertFalse(CoreUrn.sameArtifact(v1, other));
+    assertFalse(CoreUrn.sameArtifact(v1, null));
+    assertFalse(CoreUrn.sameArtifact(null, v1));
+  }
+
+  @Test
+  @DisplayName("accepts the dotted and underscored names the registry derives from schema titles")
+  void acceptsRegistryDerivedNames() {
+    // XOEV identifiers keep dots and underscores, and the registry preserves them in the name
+    // segment; rejecting them here would fail every mapping onto such a structure at deploy time.
+    assertTrue(
+        CoreUrn.isValid(
+            "urn:core:platform:civitas:element:common:Klaeranlage.0001:2dmtus8w40:1.0.0"));
+    assertTrue(
+        CoreUrn.isValid(
+            "urn:core:platform:civitas:element:common:Lokation.0002_Bundesland:2dmtus8w40:1.0.0"));
+    assertTrue(
+        CoreUrn.isValid("urn:core:platform:civitas:element:common:Reading-Set:2dmtus8w40:1.0.0"));
+  }
+
+  @Test
+  @DisplayName("still rejects a name segment carrying a separator or whitespace")
+  void rejectsNameWithSeparatorOrSpace() {
+    assertFalse(
+        CoreUrn.isValid("urn:core:platform:civitas:element:common:Bad Name:2dmtus8w40:1.0.0"));
+    assertFalse(CoreUrn.isValid("urn:core:platform:civitas:element:common::2dmtus8w40:1.0.0"));
+  }
 }

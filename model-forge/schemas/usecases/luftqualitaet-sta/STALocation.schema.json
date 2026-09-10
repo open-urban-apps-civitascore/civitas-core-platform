@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "urn:core:platform:civitas:element:sta:STALocation:1.0.0",
+  "title":   "STALocation",
+  "description": "OGC SensorThings API v1.1 Location entity. Describes a geographic position of a Thing using GeoJSON Point encoding, as required by the STA specification. Used inline in STAThing.Locations array when creating a new station in FROST-Server.",
+  "type": "object",
+  "required": ["name", "encodingType", "location"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Human-readable name for this location (e.g. station name)."
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the location."
+    },
+    "encodingType": {
+      "type": "string",
+      "const": "application/geo+json",
+      "description": "STA requires 'application/geo+json' for geographic locations."
+    },
+    "location": {
+      "type": "object",
+      "description": "GeoJSON Point geometry. Coordinates are [longitude, latitude] or [longitude, latitude, elevation] in WGS-84.",
+      "required": ["type", "coordinates"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "Point"
+        },
+        "coordinates": {
+          "type": "array",
+          "description": "[longitude, latitude] or [longitude, latitude, elevation] in WGS-84.",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 3
+        }
+      }
+    },
+    "properties": {
+      "type": "object",
+      "description": "Optional freeform metadata stored alongside the Location."
+    }
+  }
+}

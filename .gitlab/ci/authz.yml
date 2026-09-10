@@ -152,7 +152,7 @@ generate-graph-authz:
       - authz/repository/maven.graph.json
 
 lint-authz:
-  extends: .only-authz-changes
+  extends: .api-test-stack-changes
   image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   variables:
@@ -170,7 +170,7 @@ lint-authz:
     - mvn spotless:check
 
 dependency-prune-authz:
-  extends: .only-authz-changes
+  extends: .api-test-stack-changes
   image: maven:3.9-eclipse-temurin-25-alpine
   stage: test
   needs:
@@ -233,7 +233,7 @@ test-authz:
         path: authz/repository/target/site/jacoco/jacoco.xml
 
 build-authz:
-  extends: .only-authz-changes
+  extends: .api-test-stack-changes
   image: maven:3.9-eclipse-temurin-25-alpine
   stage: build
   needs:

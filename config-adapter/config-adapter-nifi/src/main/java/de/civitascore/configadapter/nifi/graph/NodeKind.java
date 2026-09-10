@@ -16,18 +16,23 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * The closed vocabulary of editor node kinds this adapter deploys, each with exactly one flow role.
- * Path derivation and validation dispatch on roles, never on raw type strings — this enum is the
- * only place a kind's string appears. Kept as a closed, hand-maintained set (like the hand-wired
- * stage registry) so the reviewable universe of deployable node kinds is visible in one file; a
- * graph node whose type is absent here is unknown to the adapter and must not be wired into the
- * data flow.
+ * The closed vocabulary of CORE Pipeline node kinds this adapter deploys, each with exactly one
+ * flow role. Path derivation and validation dispatch on roles, never on raw kind strings — this
+ * enum is the only place a kind's string appears. Kept as a closed, hand-maintained set (like the
+ * hand-wired stage registry) so the reviewable universe of deployable node kinds is visible in one
+ * file; a graph node whose {@code kind} is absent here is unknown to the adapter and must not be
+ * wired into the data flow.
+ *
+ * <p>Vocabulary from the CORE Pipeline schema ({@code source}/{@code sink}/{@code mapping}/{@code
+ * start}/{@code end}/{@code cron}). A {@code sink} node covers every sink engine (FROST, PostGIS,
+ * …); which one a node targets is decided later from the {@code DataSink} its {@code sinkRef}
+ * resolves to, not from the node kind. Unsupported CORE kinds ({@code filter}/{@code enrich}/{@code
+ * split}) are deliberately absent — the derivation rejects them if wired into the flow.
  */
 public enum NodeKind {
-  DATA_SOURCE("dataSource", Role.SOURCE),
+  SOURCE("source", Role.SOURCE),
   MAPPING("mapping", Role.TRANSFORM),
-  FROST("frost", Role.SINK),
-  GEO_PERSISTENCE("geoPersistence", Role.SINK),
+  SINK("sink", Role.SINK),
   CRON("cron", Role.TRIGGER),
   START("start", Role.CONTROL),
   END("end", Role.CONTROL);
@@ -46,20 +51,20 @@ public enum NodeKind {
     CONTROL
   }
 
-  private static final Map<String, NodeKind> BY_TYPE_STRING =
-      Stream.of(values()).collect(Collectors.toMap(k -> k.typeString, Function.identity()));
+  private static final Map<String, NodeKind> BY_KIND_STRING =
+      Stream.of(values()).collect(Collectors.toMap(k -> k.kindString, Function.identity()));
 
-  private final String typeString;
+  private final String kindString;
   private final Role role;
 
-  NodeKind(String typeString, Role role) {
-    this.typeString = typeString;
+  NodeKind(String kindString, Role role) {
+    this.kindString = kindString;
     this.role = role;
   }
 
-  /** The editor's node type string. */
-  public String typeString() {
-    return typeString;
+  /** The CORE Pipeline node {@code kind} string. */
+  public String kindString() {
+    return kindString;
   }
 
   public Role role() {
@@ -67,17 +72,17 @@ public enum NodeKind {
   }
 
   /**
-   * The kind for an editor type string, or empty for a kind unknown to this adapter.
+   * The kind for a CORE {@code kind} string, or empty for a kind unknown to this adapter.
    *
-   * @param type the node type string (nullable)
+   * @param kind the node kind string (nullable)
    * @return the kind, or empty
    */
-  public static Optional<NodeKind> fromTypeString(String type) {
-    return Optional.ofNullable(type == null ? null : BY_TYPE_STRING.get(type));
+  public static Optional<NodeKind> fromKind(String kind) {
+    return Optional.ofNullable(kind == null ? null : BY_KIND_STRING.get(kind));
   }
 
   /** The role of {@code node}'s kind, or empty for an unknown kind. */
   public static Optional<Role> roleOf(PipelineGraph.GraphNode node) {
-    return fromTypeString(node.type()).map(NodeKind::role);
+    return fromKind(node.kind()).map(NodeKind::role);
   }
 }

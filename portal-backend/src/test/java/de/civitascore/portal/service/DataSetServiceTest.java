@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,11 +27,13 @@ import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
@@ -54,6 +58,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -73,12 +78,22 @@ class DataSetServiceTest {
   @Mock private DataSetSagaPublisher sagaPublisher;
   @Mock private PipelineRuntimeStatusService pipelineRuntimeStatusService;
   @Mock private ObjectProvider<AllowedScopes> allowedScopesProvider;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
 
   private DataSetService createService() {
     // Default to TENANT wildcard so the F4 target-pool check passes for existing pool-setting
     // tests;
     // F4-specific tests override allowedScopesProvider.getObject() after calling createService().
     lenient().when(allowedScopesProvider.getObject()).thenReturn(wildcardScopes());
+    // Persisting a dataset creates its Model Forge manifest; return a dummy pin so tests exercising
+    // create/update do not NPE (lenient — not every test triggers a persist).
+    lenient()
+        .when(modelRegistryGateway.createDataSetManifest(any()))
+        .thenReturn(
+            new ModelRegistryGateway.ModelPin(
+                "urn:core:platform:civitas:dataset:common:test:abcdefghij",
+                "urn:core:platform:civitas:dataset:common:test:abcdefghij:1.0.0",
+                "1.0.0"));
     return new DataSetService(
         dataSetRepository,
         dataSinkRepository,
@@ -90,6 +105,7 @@ class DataSetServiceTest {
         pipelineRuntimeStatusService,
         allowedScopesProvider,
         new DataSourceDatapoolScopeValidator(),
+        modelRegistryGateway,
         new DataSetMutationGuard(dataSetRepository));
   }
 
@@ -2032,6 +2048,131 @@ class DataSetServiceTest {
       verify(dataSetRepository).delete(ds);
       verify(sagaPublisher, never()).publishDeleteRequested(any());
     }
+
+    private static final String PIPELINE_URN =
+        "urn:core:platform:civitas:pipeline:common:doomed-pipeline:abcdefghij";
+    private static final String MAPPING_URN =
+        "urn:core:platform:civitas:mapping:common:doomed-mapping:abcdefghij";
+    private static final String SINK_URN =
+        "urn:core:platform:civitas:data-sink:common:doomed-sink:abcdefghij";
+
+    /** A dataset carrying one pipeline that wires one mapping and one sink. */
+    private DataSet datasetWithOwnedArtifacts(UUID id, String manifestUrn) {
+      DataSet ds = readyDataSet(id);
+      ds.setManifestLogicalUrn(manifestUrn);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setId(UUID.randomUUID());
+      pipeline.setModelLogicalUrn(PIPELINE_URN);
+      ds.setPipelines(new java.util.HashSet<>(Set.of(pipeline)));
+      return ds;
+    }
+
+    private DataSink ownedSink() {
+      DataSink sink = new DataSink();
+      sink.setId(UUID.randomUUID());
+      sink.setConfigurationLogicalUrn(SINK_URN);
+      return sink;
+    }
+
+    private void stubOwnedArtifacts(UUID id, DataSet ds) {
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(ownedSink()));
+      lenient()
+          .when(modelRegistryGateway.dependencyUrnsOfType(PIPELINE_URN, "mapping"))
+          .thenReturn(List.of(MAPPING_URN + ":1.0.0"));
+      lenient()
+          .when(modelRegistryGateway.logicalUrn(MAPPING_URN + ":1.0.0"))
+          .thenReturn(MAPPING_URN);
+    }
+
+    @Test
+    @DisplayName("removing a dataset directly deletes the artifacts it owned")
+    void directRemovalDeletesRegistryArtifacts() {
+      UUID id = UUID.randomUUID();
+      DataSet ds =
+          datasetWithOwnedArtifacts(
+              id, "urn:core:platform:civitas:dataset:common:doomed:abcdefghij");
+      ds.setProvisioned(false);
+      stubOwnedArtifacts(id, ds);
+
+      createService().deleteById(id);
+
+      verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
+      // The pipeline artifact holds the edges that keep the mapping, the sink configuration and the
+      // DataSource referenced, so all three go — otherwise those stay undeletable for good.
+      verify(modelRegistryGateway).deletePayload(PIPELINE_URN);
+      verify(modelRegistryGateway).deletePayload(MAPPING_URN);
+      verify(modelRegistryGateway).deletePayload(SINK_URN);
+    }
+
+    @Test
+    @DisplayName("the manifest goes before the pipeline, and the pipeline before what it wires")
+    void deletesArtifactsInReferenceOrder() {
+      UUID id = UUID.randomUUID();
+      DataSet ds =
+          datasetWithOwnedArtifacts(
+              id, "urn:core:platform:civitas:dataset:common:ordered:abcdefghij");
+      ds.setProvisioned(false);
+      stubOwnedArtifacts(id, ds);
+
+      createService().deleteById(id);
+
+      // Order is the whole point: a referenced artifact cannot be deleted, so each step has to
+      // remove the edges that keep the next one referenced.
+      InOrder order = inOrder(modelRegistryGateway);
+      order.verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
+      order.verify(modelRegistryGateway).deletePayload(PIPELINE_URN);
+      order.verify(modelRegistryGateway).deletePayload(MAPPING_URN);
+      order.verify(modelRegistryGateway).deletePayload(SINK_URN);
+    }
+
+    @Test
+    @DisplayName("a member the registry refuses to remove does not fail the delete")
+    void refusedMemberDoesNotFailTheDelete() {
+      UUID id = UUID.randomUUID();
+      DataSet ds =
+          datasetWithOwnedArtifacts(
+              id, "urn:core:platform:civitas:dataset:common:shared:abcdefghij");
+      ds.setProvisioned(false);
+      stubOwnedArtifacts(id, ds);
+      // A mapping another DataSet still references is refused, which must leave it intact rather
+      // than abort a delete whose rows are already gone.
+      doThrow(new IllegalStateException("still referenced"))
+          .when(modelRegistryGateway)
+          .deletePayload(MAPPING_URN);
+
+      createService().deleteById(id);
+
+      verify(dataSetRepository).delete(ds);
+      verify(modelRegistryGateway).deletePayload(SINK_URN);
+    }
+
+    @Test
+    @DisplayName("completing the teardown saga deletes the manifest and the sinks' configurations")
+    void sagaCompletionDeletesRegistryArtifacts() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setProvisioned(true);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      ds.setManifestLogicalUrn("urn:core:platform:civitas:dataset:common:torn-down:abcdefghij");
+
+      DataSink sink = new DataSink();
+      sink.setId(UUID.randomUUID());
+      sink.setConfigurationLogicalUrn(
+          "urn:core:platform:civitas:data-sink:common:torn-down-sink:abcdefghij");
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(sink));
+
+      createService()
+          .handleSagaCompleted(
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
+
+      verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
+      verify(modelRegistryGateway).deletePayload(sink.getConfigurationLogicalUrn());
+    }
   }
 
   @Nested
@@ -2139,6 +2280,82 @@ class DataSetServiceTest {
           .postConvertToEntity(new DataSet(), inputWithApis(api("sensors", ApiStandard.STA)));
 
       verify(layerRepository, never()).deleteByDataSetId(any());
+    }
+  }
+
+  @Nested
+  @DisplayName("Membership")
+  class MembershipAndOrphans {
+
+    private static final String MANIFEST_URN =
+        "urn:core:platform:civitas:dataset:common:test:abcdefghij";
+    private static final String MEMBER_URN =
+        "urn:core:platform:civitas:datastructure:common:Thing:xyz1234567:1.0.0";
+
+    private DataSet dataSetWithManifest(UUID id) {
+      DataSet ds = draftDataSet(id);
+      ds.setManifestLogicalUrn(MANIFEST_URN);
+      return ds;
+    }
+
+    @Test
+    void linkMember_whenManifestAndUrnPresent_linksInRegistry() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(dataSetWithManifest(id)));
+
+      createService().linkMember(id, MEMBER_URN);
+
+      verify(modelRegistryGateway).linkToDataSet(MANIFEST_URN, MEMBER_URN);
+    }
+
+    @Test
+    void linkMember_whenDatasetMissing_throwsNotFound() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.empty());
+
+      assertThatThrownBy(() -> createService().linkMember(id, MEMBER_URN))
+          .isInstanceOf(ResourceNotFoundException.class);
+      verify(modelRegistryGateway, never()).linkToDataSet(any(), any());
+    }
+
+    @Test
+    void linkMember_whenManifestMissing_throwsInvalidInput() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(draftDataSet(id)));
+
+      assertThatThrownBy(() -> createService().linkMember(id, MEMBER_URN))
+          .isInstanceOf(InvalidInputException.class);
+      verify(modelRegistryGateway, never()).linkToDataSet(any(), any());
+    }
+
+    @Test
+    void linkMember_whenUrnBlank_throwsInvalidInput() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(dataSetWithManifest(id)));
+
+      assertThatThrownBy(() -> createService().linkMember(id, "  "))
+          .isInstanceOf(InvalidInputException.class);
+      verify(modelRegistryGateway, never()).linkToDataSet(any(), any());
+    }
+
+    @Test
+    void unlinkMember_whenManifestAndUrnPresent_unlinksInRegistry() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(dataSetWithManifest(id)));
+
+      createService().unlinkMember(id, MEMBER_URN);
+
+      verify(modelRegistryGateway).unlinkFromDataSet(MANIFEST_URN, MEMBER_URN);
+    }
+
+    @Test
+    void unlinkMember_whenManifestMissing_isNoOp() {
+      UUID id = UUID.randomUUID();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(draftDataSet(id)));
+
+      createService().unlinkMember(id, MEMBER_URN);
+
+      verify(modelRegistryGateway, never()).unlinkFromDataSet(any(), any());
     }
   }
 }

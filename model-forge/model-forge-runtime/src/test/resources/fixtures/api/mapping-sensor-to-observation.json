@@ -1,0 +1,26 @@
+{
+  "$schema": "https://civitasconnect.digital/core/mapping/v1",
+  "id": "urn:core:platform:civitas:mapping:common:sensor-to-observation:0qyaberslc:1.0.0",
+  "title": "Sensor Reading to Observation",
+  "description": "Maps raw sensor telemetry into the normalized observation model.",
+  "source": "urn:core:platform:civitas:element:common:SensorReading:d28s38wfmi:1.0.0",
+  "target": "urn:core:platform:civitas:element:common:Observation:ulhry9fjx6:1.0.0",
+  "fields": {
+    "id": {
+      "op": "copy",
+      "input": "$.sensorId"
+    },
+    "observedAt": {
+      "op": "copy",
+      "input": "$.timestamp"
+    },
+    "value": {
+      "op": "copy",
+      "input": "$.pm25"
+    },
+    "unit": {
+      "op": "const",
+      "value": "ug/m3"
+    }
+  }
+}

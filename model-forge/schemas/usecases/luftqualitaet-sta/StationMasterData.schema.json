@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:core:platform:civitas:element:luftqualitaet:StationMasterData:1.0.0",
+  "title": "StationMasterData",
+  "description": "Master record for an air-quality monitoring station. Stored in a PostgreSQL database and looked up by stationId at runtime to enrich incoming AirQualityRawReading messages.",
+  "type": "object",
+  "required": ["stationId", "stationName", "location"],
+  "properties": {
+    "stationId": {
+      "type": "string",
+      "description": "Primary key; matches AirQualityRawReading.stationId."
+    },
+    "stationName": {
+      "type": "string",
+      "description": "Human-readable station name, e.g. 'Muenster Weselerstrasse'."
+    },
+    "operator": {
+      "type": "string",
+      "description": "Organisation operating the station."
+    },
+    "installDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when the station was commissioned."
+    },
+    "stationType": {
+      "type": "string",
+      "enum": ["traffic", "background", "industry", "rural"],
+      "description": "Station classification according to EU Directive 2008/50/EC."
+    },
+    "location": {
+      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+      "description": "Fixed installation coordinates of the station."
+    },
+    "calibration": {
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:StationCalibration:1.0.0",
+      "description": "Currently active calibration parameters."
+    },
+    "frostThingId": {
+      "type": "integer",
+      "description": "FROST-Server @iot.id of the STA Thing entity corresponding to this station. Populated after initial sync."
+    },
+    "frostDatastreamIds": {
+      "type": "object",
+      "description": "Maps each pollutant to its FROST Datastream @iot.id. Populated after initial sync.",
+      "properties": {
+        "no2": { "type": "integer" },
+        "pm25": { "type": "integer" },
+        "co": { "type": "integer" }
+      }
+    }
+  }
+}

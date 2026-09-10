@@ -27,4 +27,8 @@ public class DataSinkOutputDTO extends BaseOutputDTO {
   })
   @Schema(oneOf = {PostgisConfigurationOutput.class, FrostConfigurationOutput.class})
   private DataSinkConfigurationOutput configuration;
+
+  @Schema(
+      description = "Versioned CORE URN of this DataSink's configuration artifact in Model Forge")
+  private String configurationUrn;
 }

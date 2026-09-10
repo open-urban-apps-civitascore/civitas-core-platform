@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.FreeAttribute;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.KeyAttribute;
@@ -363,5 +364,29 @@ class FrostSinkStageTest {
     assertTrue(
         ex.getMessage().contains("Datastreams") && ex.getMessage().contains("no items"),
         "the broken-schema error must name the offending array property, was: " + ex.getMessage());
+  }
+
+  @Test
+  void aMultiClassStructureWithoutARootDesignatorSurfacesTheActionableErrorCode() {
+    // The inlined form of a multi-element DataStructure released without a root designation (only
+    // reachable via the raw import API — the editor enforces a root at release). The failure must
+    // carry the dedicated code whose safe external message names the remedy, not INVALID_PAYLOAD's
+    // generic "Validation failed" — the saga error is all the modeller gets to see.
+    Map<String, Object> datasink =
+        json(
+            """
+            { "dataStructure": {
+                "title": "OrderStructure",
+                "$defs": {
+                  "Customer": { "properties": { "id": { "type": "string" } } },
+                  "Address":  { "properties": { "city": { "type": "string" } } } } } }
+            """);
+
+    FatalAdapterException ex =
+        assertThrows(FatalAdapterException.class, () -> stage.parseSpec(datasink, ctx));
+    assertEquals(AdapterErrorCode.UNRESOLVABLE_DATA_STRUCTURE, ex.getErrorCode());
+    assertTrue(
+        ex.getSafeExternalMessage().contains("designate a root element"),
+        "the external message must carry the remedy, was: " + ex.getSafeExternalMessage());
   }
 }

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "urn:core:platform:civitas:element:common:SensorReading:1.0.0",
+  "title":   "SensorReading",
+  "description": "A raw sensor reading as published to the MQTT broker. Produced by IoT devices (temperature sensors, weather stations, etc.).",
+  "type": "object",
+  "required": ["sensorId", "temperature", "observedAt"],
+  "properties": {
+    "sensorId": {
+      "type": "string",
+      "description": "Unique sensor identifier (device serial number or UUID)."
+    },
+    "temperature": {
+      "type": "number",
+      "description": "Temperature reading in degrees Celsius."
+    },
+    "humidity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Relative humidity in percent (0-100), optional."
+    },
+    "observedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp when the measurement was taken."
+    },
+    "unit": {
+      "type": "string",
+      "enum": ["degC", "degF", "K"],
+      "default": "degC",
+      "description": "Temperature unit. Defaults to Celsius."
+    },
+    "location": {
+      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+      "description": "GPS coordinates of the sensor, if available."
+    }
+  }
+}

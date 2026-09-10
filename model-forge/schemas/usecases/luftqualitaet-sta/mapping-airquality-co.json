@@ -1,0 +1,29 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
+  "id": "urn:core:platform:civitas:mapping:luftqualitaet:airquality-co-to-observation:1.0.0",
+  "title": "Air Quality CO -> STA Observation",
+  "source": "urn:core:platform:civitas:element:luftqualitaet:AirQualityRawReading:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0",
+  "fields": {
+    "phenomenonTime": {
+      "op": "copy",
+      "input": "$.timestamp"
+    },
+    "resultTime": {
+      "op": "copy",
+      "input": "$.timestamp"
+    },
+    "result": {
+      "op": "copy",
+      "input": "$.co.value"
+    },
+    "resultQuality": {
+      "op": "copy",
+      "input": "$.co.quality"
+    },
+    "Datastream.@iot.id": {
+      "op": "copy",
+      "input": "$.frostDatastreamIds.co"
+    }
+  }
+}

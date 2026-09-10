@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:core:platform:civitas:element:taf10-grid:TAF10GridReading:1.0.0",
+  "title": "TAF10GridReading",
+  "description": "Raw TAF10 low-voltage grid telemetry collected from smart meters and grid measurement points. The payload is published via MQTT (topic: taf10/grid/{gridNodeId}) and is used to identify load or feed-in peaks before triggering grid-protection switching actions.",
+  "type": "object",
+  "required": ["gridNodeId", "timestamp", "activePowerPlus", "activePowerMinus", "voltage"],
+  "properties": {
+    "gridNodeId": {
+      "type": "string",
+      "description": "Grid node, feeder, or aggregation point identifier; matches GridNodeMasterData.gridNodeId."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp of the meter readout or aggregation cycle."
+    },
+    "activePowerPlus": {
+      "$ref": "urn:core:platform:civitas:element:taf10-grid:Measurement:1.0.0",
+      "description": "Active power consumed from the low-voltage grid in W."
+    },
+    "activePowerMinus": {
+      "$ref": "urn:core:platform:civitas:element:taf10-grid:Measurement:1.0.0",
+      "description": "Active power fed into the low-voltage grid in W, for example from photovoltaic systems."
+    },
+    "voltage": {
+      "$ref": "urn:core:platform:civitas:element:taf10-grid:Measurement:1.0.0",
+      "description": "RMS voltage at the measurement point in V."
+    },
+    "current": {
+      "$ref": "urn:core:platform:civitas:element:taf10-grid:Measurement:1.0.0",
+      "description": "RMS current at the measurement point in A."
+    },
+    "frequency": {
+      "$ref": "urn:core:platform:civitas:element:taf10-grid:Measurement:1.0.0",
+      "description": "Grid frequency in Hz."
+    },
+    "location": {
+      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+      "description": "Optional measurement point location. Overrides the grid node master-data location."
+    }
+  }
+}

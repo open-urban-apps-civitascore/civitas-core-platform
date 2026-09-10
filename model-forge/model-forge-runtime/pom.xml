@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+           https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>de.civitascore</groupId>
+    <artifactId>core-model-forge-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>core-model-forge-runtime</artifactId>
+  <packaging>jar</packaging>
+
+  <properties>
+    <networknt.version>1.5.8</networknt.version>
+    <xmlschema.version>2.3.2</xmlschema.version>
+  </properties>
+
+  <name>CIVITAS/CORE Model Forge - Runtime</name>
+  <description>
+    The embedded Model Forge runtime: facade implementation, ports, application use cases
+    (import, validation, views, graph, store), the PostgreSQL artifact registry adapter with
+    its Flyway migrations, and the HTTP integration adapters (SSRF-guarded remote schema
+    fetching, XRepository client). Internal package boundaries (core/application/persistence/
+    integrations) are enforced by the per-slice ArchUnit tests, not by module walls.
+  </description>
+
+  <dependencies>
+    <dependency>
+      <groupId>de.civitascore</groupId>
+      <artifactId>core-model-forge-contract</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- Jackson 3 is the runtime's JSON stack (matches Spring Boot 4 hosts). -->
+    <dependency>
+      <groupId>tools.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <!-- Jackson 2, exclusively for the networknt validator behind validation/JacksonBridge. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.networknt</groupId>
+      <artifactId>json-schema-validator</artifactId>
+      <version>${networknt.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.ws.xmlschema</groupId>
+      <artifactId>xmlschema-core</artifactId>
+      <version>${xmlschema.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.annotation</groupId>
+      <artifactId>jakarta.annotation-api</artifactId>
+    </dependency>
+
+    <!-- PostgreSQL registry adapter -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <version>${archunit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-junit-jupiter</artifactId>
+      <version>${testcontainers.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-postgresql</artifactId>
+      <version>${testcontainers.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

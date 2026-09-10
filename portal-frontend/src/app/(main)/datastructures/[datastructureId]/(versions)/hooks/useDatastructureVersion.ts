@@ -16,6 +16,7 @@ import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi
 import { SchemaExportError } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
+import { DataStructureSchema } from '@/generated/core'
 import { useError } from '@/hooks/use-error'
 import { STATUS_TYPES } from '@/types/common'
 import {
@@ -37,7 +38,7 @@ import {
   parseDatastructureVersionFormData,
 } from '@/utils/datastructures'
 import { pickDirtyValues } from '@/utils/form'
-import { buildDataStructureUrn } from '@/utils/urn'
+import { buildDataStructureLogicalUrn } from '@/utils/urn'
 
 const draftResolver: Resolver<DatastructureVersionFormData> = zodResolver(DatastructureVersionFormDraftSchema)
 // The available schema narrows modelName to a non-null string, the form values stay the draft shape.
@@ -213,6 +214,8 @@ export const useDatastructureVersion = ({
         endpoint: `/datastructures/${datastructureId}/versions/${values.id}`,
       })
       toast.success(t('messages.updateSuccess'))
+      // Storing a model assigns the version its number, and the heading is rendered on the server.
+      router.refresh()
       return response.data
     } catch (error) {
       toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructureVersion') }))
@@ -275,9 +278,12 @@ export const useDatastructureVersion = ({
 
     try {
       const sessionDiagram = nodesWatch.length > 0 ? activeSession?.diagram || null : null
-      const modelUri = sessionDiagram
-        ? buildDataStructureUrn(dataStructureName, datastructureId, parsed.data.version)
-        : undefined
+      // The model document IS the DataStructure: its $id is the DataStructure URN. Model Forge folds
+      // the wrapper into a single DataStructure artifact (carrying the shape + styles) that CONTAINS
+      // its member Elements (the $defs classes) — with no separate root Element. Mappings and sinks
+      // pin a version of this same identity, so the model carries the logical form: the registry
+      // assigns the version on store, and one authored here would only be a guess.
+      const modelUri = sessionDiagram ? buildDataStructureLogicalUrn(dataStructureName, datastructureId) : undefined
       let model: Record<string, unknown> | null = null
       if (sessionDiagram) {
         try {
@@ -291,6 +297,18 @@ export const useDatastructureVersion = ({
           const reason = rootFailureMessage(tUmlModeler, error.failure)
           toast.error(t('errors.saveInvalidModel', { reason }))
           return false
+        }
+        // Validate the assembled CORE DataStructure document against the generated schema before
+        // sending — the frontend guarantees a schema-valid payload to the (schema-agnostic) backend,
+        // mirroring the pipeline/mapping/datasource editors. Model Forge splits the $defs members into
+        // Element artifacts on ingest; the host only ever stores the envelope.
+        if (model) {
+          const validated = DataStructureSchema.safeParse(model)
+          if (!validated.success) {
+            console.error('DataStructure model failed CORE schema validation:', validated.error.issues, model)
+            toast.error(tCommon('errors.unexpectedError'))
+            return false
+          }
         }
       }
       const payload = mapDatastructureVersionFormToApiData(parsed.data, sessionDiagram, model)
@@ -313,10 +331,7 @@ export const useDatastructureVersion = ({
 
   const dirtyFields = form.formState.dirtyFields
   const hasMetadataChanges =
-    dirtyFields.version ||
-    dirtyFields.description ||
-    dirtyFields.dataStructureVersionSource ||
-    dirtyFields.dataStructureVersionStatus
+    dirtyFields.description || dirtyFields.dataStructureVersionSource || dirtyFields.dataStructureVersionStatus
   const hasModelChanges =
     activeSession?.isDirty === true || (!!initialSession?.id && activeSessionId !== initialSession?.id)
   const hasUserChanges = hasMetadataChanges || hasModelChanges

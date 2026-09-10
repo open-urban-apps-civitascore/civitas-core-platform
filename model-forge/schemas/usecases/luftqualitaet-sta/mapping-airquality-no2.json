@@ -1,0 +1,29 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
+  "id": "urn:core:platform:civitas:mapping:luftqualitaet:airquality-no2-to-observation:1.0.0",
+  "title": "Air Quality NO2 -> STA Observation",
+  "source": "urn:core:platform:civitas:element:luftqualitaet:AirQualityRawReading:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0",
+  "fields": {
+    "phenomenonTime": {
+      "op": "copy",
+      "input": "$.timestamp"
+    },
+    "resultTime": {
+      "op": "copy",
+      "input": "$.timestamp"
+    },
+    "result": {
+      "op": "copy",
+      "input": "$.no2.value"
+    },
+    "resultQuality": {
+      "op": "copy",
+      "input": "$.no2.quality"
+    },
+    "Datastream.@iot.id": {
+      "op": "copy",
+      "input": "$.frostDatastreamIds.no2"
+    }
+  }
+}

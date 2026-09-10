@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildDataStructureUrn, toPascalCaseName } from './urn'
+import { buildDataStructureUrn, buildElementModelUrn, toPascalCaseName } from './urn'
 
 describe('toPascalCaseName', () => {
   it('joins words into PascalCase', () => {
@@ -64,5 +64,28 @@ describe('buildDataStructureUrn', () => {
 
   it('throws when the version is missing', () => {
     expect(() => buildDataStructureUrn('Weather Model', id, '')).toThrow()
+  })
+})
+
+describe('buildElementModelUrn', () => {
+  const id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+  const disambiguator = '2dmtus8w40'
+
+  it('mirrors buildDataStructureUrn but with the element artifact-type segment', () => {
+    expect(buildElementModelUrn('Weather Model', id, '1.0.0')).toBe(
+      `urn:core:platform:civitas:element:common:WeatherModel:${disambiguator}:1.0.0`,
+    )
+  })
+
+  it('shares name + disambiguator + version with the DataStructure URN, differing only in type', () => {
+    const ds = buildDataStructureUrn('Weather Model', id, '2.1.0')
+    const el = buildElementModelUrn('Weather Model', id, '2.1.0')
+    expect(el).toBe(ds.replace(':datastructure:', ':element:'))
+  })
+
+  it('throws on the same invalid inputs as buildDataStructureUrn', () => {
+    expect(() => buildElementModelUrn('', id, '1.0.0')).toThrow()
+    expect(() => buildElementModelUrn('Weather Model', '', '1.0.0')).toThrow()
+    expect(() => buildElementModelUrn('Weather Model', id, '')).toThrow()
   })
 })

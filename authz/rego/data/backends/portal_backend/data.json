@@ -143,6 +143,16 @@
       "GET": "DATASOURCE_READ",
       "POST": "DATASOURCE_CREATE"
     },
+    "/v1/datasets/{id}/mappings": {
+      "GET": "DATASET_READ",
+      "POST": "DATASET_CREATE",
+      "PUT": "DATASET_UPDATE",
+      "DELETE": "DATASET_DELETE"
+    },
+    "/v1/datasets/{id}/members": {
+      "POST": "DATASET_UPDATE",
+      "DELETE": "DATASET_UPDATE"
+    },
     "/v1/datasources/{id}": {
       "GET": "DATASOURCE_READ",
       "PUT": "DATASOURCE_UPDATE",

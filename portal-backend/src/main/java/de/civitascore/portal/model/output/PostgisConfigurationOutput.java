@@ -13,6 +13,17 @@ public class PostgisConfigurationOutput implements DataSinkConfigurationOutput {
   @Schema(description = "Target table name in the PostGIS database", example = "traffic_data")
   private String tableName;
 
-  @Schema(description = "The resolved DataStructureVersion that defines the table schema")
+  @Schema(
+      description =
+          "Versioned CORE URN of the Element (a DataStructureVersion's model) that defines the"
+              + " table schema")
+  private String element;
+
+  /** Read-only projection of {@link #element}; the input side stays URN-only. */
+  @Schema(
+      description =
+          "The DataStructureVersion pinned by 'element', resolved via its model URN; absent when"
+              + " no stored version carries that URN",
+      accessMode = Schema.AccessMode.READ_ONLY)
   private DataStructureVersionSummaryDTO dataStructureVersion;
 }

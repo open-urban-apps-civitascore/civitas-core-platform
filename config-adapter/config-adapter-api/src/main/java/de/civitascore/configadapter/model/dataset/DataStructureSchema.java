@@ -308,6 +308,10 @@ public final class DataStructureSchema {
    * Selects the single (or title-matching) named definition. Unlike the root entry in {@link
    * #resolveDefinition}, this never inspects root {@code properties}; it only chooses among {@code
    * $defs}/{@code definitions}.
+   *
+   * @throws UnresolvableDataStructureException if no definition can be selected unambiguously — the
+   *     modeller-fixable defect (designate a root element), as opposed to the plain {@link
+   *     IllegalArgumentException} a structurally broken schema raises
    */
   private static Map<String, Object> selectDefinitionNode(
       Map<String, Object> schema, Map<String, Object> definitions) {
@@ -322,14 +326,16 @@ public final class DataStructureSchema {
     if (single != null) {
       return single;
     }
-    throw new IllegalArgumentException(
+    throw new UnresolvableDataStructureException(
         definitions.isEmpty()
-            ? "dataStructure JSON Schema has empty definitions; cannot derive sink table columns"
+            ? "dataStructure JSON Schema has empty definitions; cannot derive the sink's target"
+                + " class"
             : "dataStructure JSON Schema has "
                 + definitions.size()
                 + " definitions and none matches the title '"
                 + title
-                + "'; the sink table mapping requires exactly one");
+                + "'; the sink target requires exactly one class — designate a root element in the"
+                + " data structure");
   }
 
   /**

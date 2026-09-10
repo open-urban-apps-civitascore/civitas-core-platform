@@ -1,0 +1,18 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
+  "id": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-feedin-curtail-action:1.0.0",
+  "title": "TAF10 Feed-In Peak -> SwitchingAction (curtail PV feed-in)",
+  "description": "Emitted only for a feed-in peak — the measured grid export exceeds the grid node's maxFeedInW threshold. This is the one condition for which curtailing PV feed-in is the correct mitigation.",
+  "source": "urn:core:platform:civitas:element:taf10-grid:TAF10GridReading:1.0.0",
+  "target": "urn:core:platform:civitas:element:taf10-grid:SwitchingAction:1.0.0",
+  "fields": {
+    "gridNodeId": { "op": "copy", "input": "$.gridNodeId" },
+    "requestedAt": { "op": "copy", "input": "$.timestamp" },
+    "actionType": { "op": "const", "value": "curtail-pv-feed-in" },
+    "reason": { "op": "const", "value": "TAF10 feed-in peak: measured grid export above the grid node's maxFeedInW threshold" },
+    "priority": { "op": "const", "value": "high" },
+    "measuredActivePowerPlusW": { "op": "copy", "input": "$.activePowerPlus.value" },
+    "measuredActivePowerMinusW": { "op": "copy", "input": "$.activePowerMinus.value" },
+    "measuredVoltageV": { "op": "copy", "input": "$.voltage.value" }
+  }
+}

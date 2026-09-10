@@ -1,0 +1,7 @@
+{
+  "$schema":        "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSink",
+  "id":             "urn:core:platform:civitas:datasink:smartmeter:frost-observations:1.0.0",
+  "title":          "FROST-Server Observations",
+  "connectionType": "frost",
+  "element":        "urn:core:platform:civitas:element:sta:STAObservation:1.0.0"
+}

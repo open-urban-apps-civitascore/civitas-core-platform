@@ -72,7 +72,7 @@ import org.slf4j.LoggerFactory;
  *     "indexes": [ {...} ],
  *     "readRole": { "name":"ds_42_geo", "canLogin":true,
  *                   "password":"ENC(...)", "privileges":["USAGE"] } },  // optional GeoServer role
- *   "dataStructure": { ... } }           // resolved JSON Schema from Model Atlas
+ *   "dataStructure": { ... } }           // resolved JSON Schema from Model Forge
  * }</pre>
  *
  * <p>The schema is not part of {@code configuration}: it is derived from the trigger's {@code

@@ -101,11 +101,12 @@ describe('buildUMLModelPayload', () => {
 
     expect(typeof payload.model).toBe('object')
     expect(payload.model.$schema).toBe('https://json-schema.org/draft/2020-12/schema')
-    expect(payload.model.type).toBe('object')
-    // The document root is the data structure, titled after the diagram; the root class MyClass is
-    // referenced from it, with its own schema (and MyInterface) under $defs.
+    // A DataStructure is a $defs library (no inline root shape): every class is a $defs member, and
+    // the root class MyClass is designated by a top-level $ref (a local #/$defs/ pointer without a
+    // model URN). Model Forge splits the members into Elements on ingest.
     expect(payload.model.title).toBe('Test Diagram')
-    expect(payload.model.properties).toEqual({ myclass: { $ref: '#/$defs/MyClass' } })
+    expect(payload.model.type).toBeUndefined()
+    expect(payload.model.$ref).toBe('#/$defs/MyClass')
     expect((payload.model.$defs as Record<string, unknown>).MyClass).toBeDefined()
   })
 
@@ -115,8 +116,10 @@ describe('buildUMLModelPayload', () => {
 
     expect(payload.name).toBe('Test Diagram')
     expect(payload.styles.nodePositions).toEqual({})
-    expect(payload.model.type).toBe('object')
-    expect(payload.model.properties).toEqual({})
+    // An empty diagram yields a library with no members and no root.
+    expect(payload.model.type).toBeUndefined()
+    expect(payload.model.$defs).toBeUndefined()
+    expect(payload.model.$ref).toBeUndefined()
   })
 
   it('should pass modelUri through to the JSON Schema $id', () => {

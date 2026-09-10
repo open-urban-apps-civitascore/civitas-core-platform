@@ -93,7 +93,16 @@ class PipelineDeploymentRequestTest {
   @Test
   void nullGraphDataBecomesEmptyMap() {
     PipelineDeploymentRequest request =
-        new PipelineDeploymentRequest("p-1", null, new Datasource(), new FrostSinkSpec("1", null));
+        new PipelineDeploymentRequest(
+            "p-1", null, new Datasource(), new FrostSinkSpec("1", null), Map.of());
     assertTrue(request.graphData().isEmpty());
+  }
+
+  @Test
+  void nullMappingsBecomeEmptyMap() {
+    PipelineDeploymentRequest request =
+        new PipelineDeploymentRequest(
+            "p-1", Map.of(), new Datasource(), new FrostSinkSpec("1", null), null);
+    assertTrue(request.mappings().isEmpty());
   }
 }

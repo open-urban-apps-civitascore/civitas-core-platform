@@ -2,13 +2,12 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
-import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
-import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -18,6 +17,8 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,7 +32,9 @@ import org.springframework.stereotype.Service;
 /**
  * Service for managing {@link DataSink} entities. A DataSink belongs directly to a {@link DataSet};
  * its {@link de.civitascore.portal.model.entity.Pipeline Pipeline} link is optional and managed by
- * {@link PipelineService} when a Pipeline declares the DataSink in its {@code dataSinkIds}.
+ * {@link PipelineService} when a Pipeline declares the DataSink in its {@code dataSinkIds}. The
+ * type-specific configuration document lives in the Model Forge registry, pinned by the sink's
+ * {@code configurationUrn}.
  */
 @Slf4j
 @Service
@@ -52,8 +55,9 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   private final DataSinkRepository dataSinkRepository;
   private final DataSinkMapper dataSinkMapper;
   private final DataSetRepository dataSetRepository;
-  private final DataStructureVersionRepository dataStructureVersionRepository;
   private final LayerRepository layerRepository;
+  private final DataStructureVersionRepository dataStructureVersionRepository;
+  private final ModelRegistryGateway modelRegistryGateway;
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
 
   public DataSinkService(
@@ -62,6 +66,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
       DataSetRepository dataSetRepository,
       DataStructureVersionRepository dataStructureVersionRepository,
       LayerRepository layerRepository,
+      ModelRegistryGateway modelRegistryGateway,
       ScopeAccessAuthorizer scopeAccessAuthorizer,
       DataSetMutationGuard dataSetMutationGuard) {
     super(dataSetMutationGuard);
@@ -70,6 +75,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     this.dataSetRepository = dataSetRepository;
     this.dataStructureVersionRepository = dataStructureVersionRepository;
     this.layerRepository = layerRepository;
+    this.modelRegistryGateway = modelRegistryGateway;
     this.scopeAccessAuthorizer = scopeAccessAuthorizer;
   }
 
@@ -114,13 +120,14 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   }
 
   /**
-   * A change to {@code tableName} or {@code dataStructureVersionId} rebuilds the sink's backing
+   * A change to {@code tableName} or the referenced {@code element} rebuilds the sink's backing
    * storage on the next release, discarding all stored data — for POSTGIS a table drop+recreate (no
    * ALTER TABLE), for FROST a re-provisioning of the target entities. If the parent dataset has
    * been provisioned (storage actually exists), such a change requires explicit {@code
-   * confirmDataLoss=true}; otherwise the update is rejected with 409. Comparing ids alone is
-   * sufficient because the AVAILABLE-only invariant makes a version's model immutable for the
-   * sink's lifetime (see {@link #requireExistingDataStructureVersion}).
+   * confirmDataLoss=true}; otherwise the update is rejected with 409. The current configuration is
+   * read back from the Model Forge registry (the sink no longer stores it on the entity). Comparing
+   * the {@code element} URN alone is sufficient because it is a versioned CORE URN whose content is
+   * immutable — a different model always yields a different URN.
    */
   private void requireDataLossConfirmation(DataSinkInputDTO input, DataSink existingEntity) {
     if (input.isConfirmDataLoss() || !existingEntity.getDataSet().isProvisioned()) {
@@ -131,11 +138,16 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     if (incoming == null) {
       return;
     }
-    Map<String, Object> current = existingEntity.getConfiguration();
+    Map<String, Object> current =
+        existingEntity.getConfigurationUrn() == null
+            ? null
+            : modelRegistryGateway
+                .fetchPayload(existingEntity.getConfigurationUrn())
+                .map(ModelRegistryGateway.RegistryDocument::content)
+                .orElse(null);
 
     boolean destructiveChange =
-        fieldChanged(incoming, current, "tableName")
-            || fieldChanged(incoming, current, "dataStructureVersionId");
+        fieldChanged(incoming, current, "tableName") || fieldChanged(incoming, current, "element");
     if (destructiveChange) {
       throw new ResourceInUseException(
           getEntityName(),
@@ -153,7 +165,8 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   }
 
   /**
-   * Resolves the parent dataset and validates the type-specific configuration.
+   * Resolves the parent dataset, validates the type-specific configuration and stores it in the
+   * Model Forge registry, mirroring the assigned pin onto the shell.
    *
    * @throws ResourceNotFoundException if the dataset is not found
    * @throws InvalidInputException if the configuration is invalid for the given type
@@ -170,6 +183,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     entity.setDataSet(dataSet);
 
     validateConfiguration(input.getDataSinkType(), input.getConfiguration());
+    storeConfigurationInRegistry(entity, input);
 
     return super.postConvertToEntity(entity, input);
   }
@@ -187,12 +201,15 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     if (entity.getDataSinkType() != DataSinkType.POSTGIS) {
       return;
     }
-    String tableName = (String) entity.getConfiguration().get("tableName");
+    String tableName = tableNameOf(entity);
+    if (tableName == null) {
+      return;
+    }
 
     dataSinkRepository.findByDataSetId(entity.getDataSet().getId()).stream()
         .filter(sibling -> !Objects.equals(sibling.getId(), entity.getId()))
         .filter(sibling -> sibling.getDataSinkType() == DataSinkType.POSTGIS)
-        .filter(sibling -> tableName.equalsIgnoreCase(siblingTableName(sibling)))
+        .filter(sibling -> tableName.equalsIgnoreCase(tableNameOf(sibling)))
         .findFirst()
         .ifPresent(
             _ -> {
@@ -217,9 +234,88 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
         + " dataset; rename it to change this sink";
   }
 
-  private static String siblingTableName(DataSink sink) {
-    Map<String, Object> config = sink.getConfiguration();
-    return config != null && config.get("tableName") instanceof String tableName ? tableName : null;
+  /**
+   * A sink's {@code tableName} lives in its registry-stored configuration document rather than on
+   * the row, so the uniqueness check resolves it through the sink's pin. Null when the sink has no
+   * stored configuration yet.
+   */
+  private String tableNameOf(DataSink sink) {
+    if (sink.getConfigurationUrn() == null) {
+      return null;
+    }
+    return modelRegistryGateway
+        .fetchPayload(sink.getConfigurationUrn())
+        .map(ModelRegistryGateway.RegistryDocument::content)
+        .map(content -> content.get("tableName"))
+        .filter(String.class::isInstance)
+        .map(String.class::cast)
+        .orElse(null);
+  }
+
+  /**
+   * Stores the validated configuration in the Model Forge registry (kind {@code DATA_SINK}) and
+   * mirrors the assigned pin onto the shell. Every DataSink — including a passthrough FROST sink
+   * whose only content is its {@code connectionType} — is a first-class CORE DataSink artifact that
+   * pipelines reference by {@code sinkRef}, so it always owns a {@code configurationUrn}. A {@code
+   * null} configuration (a metadata-only update that does not touch the config) keeps the existing
+   * pin untouched; an empty configuration still stores the stamped {@code connectionType} (all a
+   * FROST sink needs). The {@code element} URN soft reference is preserved verbatim inside the
+   * stored payload, where Model Forge records it as a {@code datasink-element} dependency edge onto
+   * the referenced model.
+   *
+   * @param entity the data sink entity
+   * @param input the input DTO carrying the configuration
+   */
+  private void storeConfigurationInRegistry(DataSink entity, DataSinkInputDTO input) {
+    Map<String, Object> configuration = input.getConfiguration();
+    DataSinkType type = input.getDataSinkType();
+    // No configuration and no type to identify the sink → nothing to store (clear the pin). A null
+    // configuration with a known type is a metadata-only update: keep the existing pin.
+    if (type == null) {
+      entity.setConfigurationUrn(null);
+      return;
+    }
+    if (configuration == null) {
+      return;
+    }
+    // The host supplies only content: the connectionType (from the sink type) plus any
+    // type-specific
+    // fields. Model Forge owns the artifact's self-description — it stamps $schema and id on every
+    // write (see EmbeddedModelForgeOperations.saveArtifact) so the stored payload satisfies
+    // datasink.schema.json. isUnchanged's comparable() ignores those stamps, so re-versions only
+    // mint when a real field changed.
+    Map<String, Object> payload = new LinkedHashMap<>(configuration);
+    payload.put("connectionType", type.name().toLowerCase(Locale.ROOT));
+    if (entity.getConfigurationUrn() != null
+        && modelRegistryGateway.isUnchanged(entity.getConfigurationUrn(), payload, null)) {
+      // Unchanged configuration keeps the existing pin — no new registry version.
+      return;
+    }
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storePayload(
+            PayloadKind.DATA_SINK,
+            Optional.ofNullable(entity.getConfigurationLogicalUrn()),
+            deriveArtifactName(input, configuration),
+            payload,
+            null);
+    if (entity.getConfigurationLogicalUrn() == null) {
+      entity.setConfigurationLogicalUrn(pin.logicalUrn());
+    }
+    entity.setConfigurationUrn(pin.versionedUrn());
+  }
+
+  /**
+   * Derives a readable registry artifact name for the sink configuration: the POSTGIS table name
+   * when present, otherwise the sink type. Model Forge appends a UUID, so equal names never
+   * collide.
+   */
+  private static String deriveArtifactName(DataSinkInputDTO input, Map<String, Object> config) {
+    if (config.get("tableName") instanceof String tableName && !tableName.isBlank()) {
+      return tableName;
+    }
+    return input.getDataSinkType() != null
+        ? input.getDataSinkType().name().toLowerCase() + "-sink"
+        : "datasink";
   }
 
   /**
@@ -250,6 +346,19 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     }
   }
 
+  /**
+   * After the sink row is deleted, delete the backing configuration artifact from Model Forge in
+   * the same transaction. No-op when no configuration was ever stored (FROST sinks).
+   *
+   * @param entity the deleted data sink
+   */
+  @Override
+  protected void postDelete(DataSink entity) {
+    if (entity != null && entity.getConfigurationLogicalUrn() != null) {
+      modelRegistryGateway.deletePayload(entity.getConfigurationLogicalUrn());
+    }
+  }
+
   private void validateConfiguration(DataSinkType type, Map<String, Object> config) {
     switch (type) {
       case FROST -> validateFrostConfiguration(config);
@@ -265,13 +374,11 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     if (config == null || config.isEmpty()) {
       return;
     }
-    if (!config.keySet().equals(Set.of("dataStructureVersionId"))) {
+    if (!config.keySet().equals(Set.of("element"))) {
       throw new InvalidInputException(
-          "DataSink",
-          "configuration",
-          "FROST sinks accept only an optional dataStructureVersionId");
+          "DataSink", "configuration", "FROST sinks accept only an optional element URN");
     }
-    requireExistingDataStructureVersion(config.get("dataStructureVersionId"));
+    requireExistingElement(config.get("element"));
   }
 
   private void validatePostgisConfiguration(Map<String, Object> config) {
@@ -299,61 +406,62 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
           "tableName must be at most " + MAX_TABLE_NAME_LENGTH + " characters");
     }
 
-    Object dsvIdRaw = config.get("dataStructureVersionId");
-    if (dsvIdRaw == null) {
+    Object elementRaw = config.get("element");
+    if (elementRaw == null) {
       throw new InvalidInputException(
-          "DataSink",
-          "configuration.dataStructureVersionId",
-          "dataStructureVersionId is required for POSTGIS sinks");
+          "DataSink", "configuration.element", "element is required for POSTGIS sinks");
     }
-    requireExistingDataStructureVersion(dsvIdRaw);
+    requireExistingElement(elementRaw);
   }
 
-  private void requireExistingDataStructureVersion(Object dsvIdRaw) {
-    UUID dsvId;
-    try {
-      dsvId = UUID.fromString(String.valueOf(dsvIdRaw));
-    } catch (IllegalArgumentException e) {
+  /**
+   * Validates the {@code element} soft reference: it must be a non-blank CORE URN that resolves to
+   * an existing model (Element) in the registry. Model Forge tracks this URN as a {@code
+   * datasink-element} dependency edge when the configuration is stored, which is what the in-use
+   * guard on {@code DataStructureVersion} queries.
+   */
+  private void requireExistingElement(Object elementRaw) {
+    if (!(elementRaw instanceof String urn) || urn.isBlank()) {
+      throw new InvalidInputException(
+          "DataSink", "configuration.element", "element must be a CORE URN");
+    }
+    if (modelRegistryGateway.fetchModel(urn).isEmpty()) {
       throw new InvalidInputException(
           "DataSink",
-          "configuration.dataStructureVersionId",
-          "dataStructureVersionId must be a valid UUID");
+          "configuration.element",
+          "Referenced Element not found in the model registry: " + urn);
     }
+    authorizeReferencedStructure(urn);
+  }
 
-    // Authorization scopes on the parent DataStructure, which is only known after loading the
-    // version, so existence is necessarily checked first. A missing version and an unauthorized
-    // one must yield the SAME outward failure, otherwise the 400-vs-403 difference is an existence
-    // oracle over version ids. Both therefore raise the identical "not available" 400; the real
-    // authorization denial is still logged server-side by ScopeAccessAuthorizer for audit.
-    DataStructureVersion dsv =
-        dataStructureVersionRepository.findById(dsvId).orElseThrow(this::versionNotAvailable);
-
-    // The version references a DATASTRUCTURE-scoped entity, which the DATASET-typed route header
-    // cannot cover — authorize the caller against the parent structure. This is the whole guard:
-    // DataSinkController is a plain BaseController with no scope filtering of its own.
+  /**
+   * Authorizes the caller against the DataStructure that owns the referenced {@code element} URN.
+   *
+   * <p>The sink's {@code element} is a versioned CORE {@code :datastructure:} URN (the mapping's
+   * target structure). It is resolved to the owning portal DataStructure via that structure's
+   * {@code modelUrn}, matched version-agnostically since every version of a structure shares the
+   * same parent. The DataStructure is DATASTRUCTURE-scoped, which the DATASET-typed route header
+   * cannot cover — so DataSinkService authorizes the reference here (DataSinkController is a plain
+   * BaseController with no scope filtering of its own). A URN that resolves to no known
+   * DataStructure and an unauthorized one must yield the SAME outward failure, otherwise the
+   * difference is an existence oracle over structure URNs; both raise the identical "not available"
+   * 400 and the real denial is logged by {@link ScopeAccessAuthorizer} for audit.
+   */
+  private void authorizeReferencedStructure(String elementUrn) {
+    UUID dataStructureId =
+        dataStructureVersionRepository
+            .findFirstByModelUrnStartingWith(modelRegistryGateway.logicalUrn(elementUrn) + ":")
+            .map(dsv -> dsv.getDataStructure().getId())
+            .orElseThrow(this::referencedStructureNotAvailable);
     try {
-      scopeAccessAuthorizer.authorizeReferences(
-          ScopeType.DATASTRUCTURE, Set.of(dsv.getDataStructure().getId()));
+      scopeAccessAuthorizer.authorizeReferences(ScopeType.DATASTRUCTURE, Set.of(dataStructureId));
     } catch (AccessDeniedException e) {
-      throw versionNotAvailable();
-    }
-
-    // A sink may only reference an AVAILABLE version. This makes the referenced model immutable for
-    // the sink's lifetime (an AVAILABLE version cannot go back to DRAFT while a sink uses it), so a
-    // same-id reference always means the same model — the data-loss diff can compare ids alone.
-    if (dsv.getDataStructureVersionStatus() != DataStructureVersionStatus.AVAILABLE
-        || dsv.getDataStructure().getDataStructureStatus() != DataStructureStatus.AVAILABLE) {
-      throw new InvalidInputException(
-          "DataSink",
-          "configuration.dataStructureVersionId",
-          "Referenced DataStructureVersion must be in AVAILABLE status");
+      throw referencedStructureNotAvailable();
     }
   }
 
-  private InvalidInputException versionNotAvailable() {
+  private InvalidInputException referencedStructureNotAvailable() {
     return new InvalidInputException(
-        "DataSink",
-        "configuration.dataStructureVersionId",
-        "Referenced DataStructureVersion is not available");
+        "DataSink", "configuration.element", "Referenced DataStructure is not available");
   }
 }

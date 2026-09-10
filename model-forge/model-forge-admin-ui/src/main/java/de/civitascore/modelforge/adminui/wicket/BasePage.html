@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:wicket="http://wicket.apache.org">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Model Forge Admin UI</title>
+</head>
+<body>
+  <nav>
+    <span class="brand">Model Forge</span>
+    <a wicket:id="navArtifacts">Browse</a>
+    <a wicket:id="navNew">New artifact</a>
+    <a wicket:id="navImport">Import schema</a>
+    <a wicket:id="navSeed">Seed</a>
+    <a wicket:id="navSmartDataModels">Smart Data Models</a>
+    <a wicket:id="navXRepository">XRepository</a>
+    <a wicket:id="navValidate">Validate</a>
+    <a wicket:id="navGraph">Graph</a>
+    <span class="mf-nav-spacer"></span>
+    <button type="button" id="mf-theme-toggle" class="mf-theme-toggle" aria-pressed="false">Dark</button>
+  </nav>
+  <div class="mf-layout">
+    <aside class="mf-sidebar">
+      <input type="text" id="mf-sidebar-filter" class="mf-filter" placeholder="Filter loaded artifacts…" autocomplete="off"/>
+      <p wicket:id="emptyNote" class="mf-empty">
+        No artifacts yet. Import a schema or load a seed model — and make sure the Postgres registry is running.
+      </p>
+      <div wicket:id="artifactTree" class="mf-tree"></div>
+    </aside>
+    <main>
+      <div wicket:id="feedback"></div>
+      <wicket:child/>
+    </main>
+  </div>
+</body>
+</html>
