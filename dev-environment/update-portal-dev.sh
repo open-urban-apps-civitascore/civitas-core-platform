@@ -75,8 +75,9 @@ Components:
   -a, --all              all three (explicit)
 
 Options:
-  --skip-model-forge     with --backend, do NOT rebuild model-forge (reuse the
-                         cached build) — use when only backend code changed
+  --skip-model-forge     with --backend, do NOT rebuild model-forge — use when only
+                         backend code changed. Requires an earlier run without it:
+                         model-forge $DEV_VERSION only ever comes from a local build.
   --no-clean             incremental Maven build (drop the 'clean' goal)
   -h, --help             show this help
 EOF
@@ -201,7 +202,16 @@ if [ "$DO_BACKEND" = "true" ]; then
         mvn_in_container "$PROJECT_ROOT/model-forge" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION \
             -Dspotless.check.skip=true -Dspotbugs.skip=true -q
     else
-        echo "  (--skip-model-forge) reusing the cached model-forge"
+        # The backend build below asks for core-model-forge-*:$DEV_VERSION, and the skipped build
+        # above is its only producer — no registry holds that coordinate. Fail here rather than in
+        # the -q backend build, whose Maven resolution error carries no context.
+        if ! docker run --rm -v "$MVN_CACHE_VOLUME:${CP}var/maven/.m2" maven:3.9-eclipse-temurin-25 \
+            sh -c "test -d ${CP}var/maven/.m2/repository/de/civitascore/core-model-forge-spring-boot-starter/$DEV_VERSION"; then
+            echo "ERROR: --skip-model-forge needs model-forge $DEV_VERSION in the Maven cache,"
+            echo "       and it is not there. Run once without --skip-model-forge."
+            exit 1
+        fi
+        echo "  (--skip-model-forge) reusing the cached model-forge ($DEV_VERSION)"
     fi
     echo "  Building portal-backend JAR (containerized Maven)..."
     mvn_in_container "$PROJECT_ROOT/portal-backend" $MVN_CLEAN package -DskipTests \

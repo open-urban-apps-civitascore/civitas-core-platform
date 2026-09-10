@@ -15,9 +15,10 @@ ENV TZ=Europe/Berlin
 RUN apk add --no-cache curl tzdata
 
 # Pre-built Spring Boot fat JAR (mvn package -> spring-boot repackage). repackage renames the
-# thin jar to *.jar.original, so this glob matches only the fat jar — same pattern as
-# portal-backend/Dockerfile and authz/repository/Dockerfile.
-COPY target/*.jar ./app.jar
+# thin jar to *.jar.original, so this glob matches only the fat jar. The version tail is not
+# constrained further: ${revision} makes it a branch suffix (-dev locally, -MR-<iid>-SNAPSHOT in
+# CI), and a glob that assumed a digit or SNAPSHOT would stop matching.
+COPY target/core-model-forge-admin-ui-*.jar ./app.jar
 
 RUN addgroup -g 1001 -S spring && \
     adduser -u 1001 -S spring -G spring && \
