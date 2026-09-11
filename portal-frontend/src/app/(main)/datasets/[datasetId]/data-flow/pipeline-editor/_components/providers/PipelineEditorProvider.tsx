@@ -443,14 +443,20 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           console.log('Pipeline deleted successfully')
         },
         onError: error => {
-          console.error('Failed to delete pipeline:', error)
+          if (isNotDraftError(error)) {
+            toast.error(t('header.notDraftError'))
+          } else if (isSagaInFlightError(error)) {
+            toast.error(t('header.sagaInFlightError'))
+          } else {
+            toast.error(t('toolbar.deleteFailed'))
+          }
         },
       })
     } else {
       // Never-saved pipeline → just remove the session
       removeSession()
     }
-  }, [activeSession, sessionManager, deletePipelineMutation, canDelete])
+  }, [activeSession, sessionManager, deletePipelineMutation, canDelete, t])
 
   const isDeleting = deletePipelineMutation.isPending
 
