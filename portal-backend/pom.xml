@@ -52,6 +52,9 @@
         <config-adapter.version>1.0.2-MR-788-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
         <at.yawk.lz4.version>1.11.2</at.yawk.lz4.version>
+        <!-- develop's snapshot, so a flagless build (generate-graph-backend, a fresh clone)
+             resolves something the registry actually holds. CI overrides it with
+             -Dmodel-forge.version so the backend builds against its own branch's Model Forge. -->
         <model-forge.version>0.1.0-SNAPSHOT</model-forge.version>
         <archunit.version>1.4.2</archunit.version>
     </properties>

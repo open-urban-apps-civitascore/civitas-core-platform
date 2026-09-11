@@ -45,68 +45,25 @@ mvn -pl model-forge-contract -am install
 ```
 
 The module inherits dependency management and the version from the parent POM.
-The current source version is `0.1.0-SNAPSHOT`.
+The base version is `0.1.0`; CI appends a branch suffix (see
+[Versioning](#versioning)).
 
-## Maven Usage
+## Usage
 
-The CI pipeline publishes Maven artifacts to the GitLab Package Registry on
-pushes to `main`. For tags matching `v<major>.<minor>.<patch>`, the pipeline
-sets the Maven version to the tag without the leading `v` before publishing.
-
-```xml
-<repositories>
-  <repository>
-    <id>gitlab-model-forge</id>
-    <url>https://gitlab.com/api/v4/projects/YOUR_PROJECT_ID/packages/maven</url>
-  </repository>
-</repositories>
-
-<dependencies>
-  <dependency>
-    <groupId>de.civitascore</groupId>
-    <artifactId>core-model-forge-contract</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
-  </dependency>
-</dependencies>
-```
-
-Replace `YOUR_PROJECT_ID` with the numeric GitLab project ID.
-
-For private package registry access, add matching credentials to
-`~/.m2/settings.xml`:
+Add as a Maven dependency:
 
 ```xml
-<settings>
-  <servers>
-    <server>
-      <id>gitlab-model-forge</id>
-      <username>DEPLOY_TOKEN_USERNAME</username>
-      <password>DEPLOY_TOKEN_OR_ACCESS_TOKEN</password>
-    </server>
-  </servers>
-</settings>
+<dependency>
+  <groupId>de.civitascore</groupId>
+  <artifactId>core-model-forge-contract</artifactId>
+  <version>${model-forge.version}</version>
+</dependency>
 ```
 
-## Gradle Usage
-
-```kotlin
-repositories {
-    maven {
-        url = uri("https://gitlab.com/api/v4/projects/YOUR_PROJECT_ID/packages/maven")
-        credentials(HttpHeaderCredentials::class) {
-            name = "Private-Token"
-            value = System.getenv("GITLAB_TOKEN")
-        }
-        authentication {
-            create<HttpHeaderAuthentication>("header")
-        }
-    }
-}
-
-dependencies {
-    implementation("de.civitascore:core-model-forge-contract:0.1.0-SNAPSHOT")
-}
-```
+This module publishes to the mono-repo's own GitLab Maven registry, already declared as a
+repository in `portal-backend/pom.xml` — the only consumer. There is no separate registry or
+credentials setup for this module; see the [reactor README](../README.md#versioning) for how
+`${model-forge.version}` is resolved.
 
 ## Examples
 
@@ -162,8 +119,9 @@ pinned. `versionFromUrn` returns `null` for the logical form.
 ## Versioning
 
 The mono-repo owns the release process; this module does not use semantic-release.
-Until a release tag is published, consumers should use the current snapshot
-version: `0.1.0-SNAPSHOT`.
+The reactor's `${revision}` scheme applies: `main`/tags publish `0.1.0`, `develop`
+publishes `0.1.0-SNAPSHOT`, and a merge request publishes `0.1.0-MR-<iid>-SNAPSHOT`
+(see the [reactor README](../README.md#versioning)).
 
 Breaking changes to public records or utility method behavior require a major
 version bump once the project leaves the initial `0.x` phase.
