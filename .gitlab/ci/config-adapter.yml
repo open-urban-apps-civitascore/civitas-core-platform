@@ -364,7 +364,8 @@ build-config-adapter-image:
   image: docker:27-dind
   stage: publish
   needs:
-    - job: setup-version-config-adapter
+    - job: setup-version
+      artifacts: true
     - job: publish-config-adapter
     - job: build-config-adapter
     - job: test-config-adapter
@@ -410,7 +411,8 @@ container-scan-config-adapter:
     entrypoint: ['']
   stage: container-qa
   needs:
-    - job: setup-version-config-adapter
+    - job: setup-version
+      artifacts: true
     - job: build-config-adapter-image
   variables:
     TRIVY_USERNAME: $CI_REGISTRY_USER
