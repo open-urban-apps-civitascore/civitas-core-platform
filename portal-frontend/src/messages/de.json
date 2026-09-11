@@ -479,7 +479,9 @@
               "updateStyleSuccess": "Stil wurde erfolgreich aktualisiert.",
               "saveStyleError": "Beim Speichern des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
               "deleteStyleSuccess": "Stil wurde erfolgreich gelöscht.",
-              "deleteStyleError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              "deleteStyleError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "notDraftError": "Der Datensatz muss im Entwurfsstatus sein, um Änderungen vorzunehmen.",
+              "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut."
             },
             "errors": {
               "name": {
@@ -1343,7 +1345,9 @@
       "saveFailed": "Speichern fehlgeschlagen: {names}",
       "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
       "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt.",
-      "tableNameConflict": "{names} kann nicht gespeichert werden: Ein Geo-Persistenz-Tabellenname wird bereits von einem anderen Datenspeicher dieses Datensatzes verwendet."
+      "tableNameConflict": "{names} kann nicht gespeichert werden: Ein Geo-Persistenz-Tabellenname wird bereits von einem anderen Datenspeicher dieses Datensatzes verwendet.",
+      "notDraftError": "Speichern nicht möglich: Der Datensatz muss im Entwurfsstatus sein.",
+      "sagaInFlightError": "Speichern nicht möglich: Der Datensatz wird gerade verarbeitet."
     },
     "tabs": {
       "closeTab": "Tab schließen",

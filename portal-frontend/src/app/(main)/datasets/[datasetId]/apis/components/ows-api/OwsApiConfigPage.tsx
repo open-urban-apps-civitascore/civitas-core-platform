@@ -11,6 +11,7 @@ import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientReq
 import { useDeleteLayer, useGetLayers } from '@/app/services/api/datasets/layers/clientRequests'
 import { useDeleteStyle, useGetStyles } from '@/app/services/api/datasets/styles/clientRequests'
 import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { isNotDraftError, isSagaInFlightError } from '@/utils/errors'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { Form } from '@/components/ui/form'
 import { Dataset } from '@/types/datasets'
@@ -241,8 +242,14 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
       try {
         await deleteLayer.mutateAsync({ datasetId: dataset.id, layerId: layer.id })
         toast.success(t('messages.deleteLayerSuccess'))
-      } catch {
-        toast.error(t('messages.deleteLayerError'))
+      } catch (error) {
+        if (isNotDraftError(error)) {
+          toast.error(t('messages.notDraftError'))
+        } else if (isSagaInFlightError(error)) {
+          toast.error(t('messages.sagaInFlightError'))
+        } else {
+          toast.error(t('messages.deleteLayerError'))
+        }
         throw new Error()
       }
     }
@@ -272,8 +279,14 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
       try {
         await deleteStyle.mutateAsync({ datasetId: dataset.id, stilId: style.id })
         toast.success(t('messages.deleteStyleSuccess'))
-      } catch {
-        toast.error(t('messages.deleteStyleError'))
+      } catch (error) {
+        if (isNotDraftError(error)) {
+          toast.error(t('messages.notDraftError'))
+        } else if (isSagaInFlightError(error)) {
+          toast.error(t('messages.sagaInFlightError'))
+        } else {
+          toast.error(t('messages.deleteStyleError'))
+        }
         throw new Error()
       }
     }

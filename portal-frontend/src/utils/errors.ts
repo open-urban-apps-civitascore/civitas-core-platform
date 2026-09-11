@@ -47,6 +47,20 @@ export const isTableNameConflictError = (error: unknown) => {
   return isConflictError && errorDetail.includes('tableName') && errorDetail.includes('already exists')
 }
 
+export const isNotDraftError = (error: unknown) => {
+  if (!isAxiosError(error)) return false
+  if (error.status !== 400 || !error.response) return false
+  const apiError = error.response.data as ApiError
+  return typeof apiError?.type === 'string' && apiError.type.endsWith('DATASET_NOT_EDITABLE')
+}
+
+export const isSagaInFlightError = (error: unknown) => {
+  if (!isAxiosError(error)) return false
+  if (error.status !== 409 || !error.response) return false
+  const apiError = error.response.data as ApiError
+  return typeof apiError?.type === 'string' && apiError.type.endsWith('RESOURCE_IN_USE')
+}
+
 export const isLayerNameError = (error: unknown) => {
   if (!isAxiosError(error)) return false
   const isConflictError = error.status === 409

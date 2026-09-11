@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest'
 import {
   isDatapoolScopeViolationError,
   isNameConflictError,
+  isNotDraftError,
   isPermissionsError,
+  isSagaInFlightError,
   isTableNameConflictError,
 } from './errors'
 
@@ -133,5 +135,65 @@ describe('isTableNameConflictError', () => {
 
   it('returns false for non-axios errors', () => {
     expect(isTableNameConflictError(new Error('plain error'))).toBe(false)
+  })
+})
+
+describe('isNotDraftError', () => {
+  it('returns true for a 400 error carrying the DATASET_NOT_EDITABLE type', () => {
+    const error = getError(
+      400,
+      'DataSet must be in DRAFT to modify sub-entities',
+      'urn:civitas:error:DATASET_NOT_EDITABLE',
+    )
+    expect(isNotDraftError(error)).toBe(true)
+  })
+
+  it('returns false for a 400 error with a different type', () => {
+    const error = getError(400, 'Bad request', 'urn:civitas:error:INVALID_INPUT')
+    expect(isNotDraftError(error)).toBe(false)
+  })
+
+  it('returns false for a 400 error without a type field', () => {
+    const error = getError(400, 'Bad request')
+    expect(isNotDraftError(error)).toBe(false)
+  })
+
+  it('returns false for non-400 status codes', () => {
+    const error = getError(409, 'Conflict', 'urn:civitas:error:DATASET_NOT_EDITABLE')
+    expect(isNotDraftError(error)).toBe(false)
+  })
+
+  it('returns false for non-axios errors', () => {
+    expect(isNotDraftError(new Error('plain error'))).toBe(false)
+  })
+})
+
+describe('isSagaInFlightError', () => {
+  it('returns true for a 409 error carrying the RESOURCE_IN_USE type', () => {
+    const error = getError(
+      409,
+      'DataSet has a pending RELEASE saga',
+      'urn:civitas:error:RESOURCE_IN_USE',
+    )
+    expect(isSagaInFlightError(error)).toBe(true)
+  })
+
+  it('returns false for a 409 error with a different type', () => {
+    const error = getError(409, 'Name conflict', 'urn:civitas:error:SOME_OTHER_ERROR')
+    expect(isSagaInFlightError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error without a type field', () => {
+    const error = getError(409, 'Conflict')
+    expect(isSagaInFlightError(error)).toBe(false)
+  })
+
+  it('returns false for non-409 status codes', () => {
+    const error = getError(400, 'Bad request', 'urn:civitas:error:RESOURCE_IN_USE')
+    expect(isSagaInFlightError(error)).toBe(false)
+  })
+
+  it('returns false for non-axios errors', () => {
+    expect(isSagaInFlightError(new Error('plain error'))).toBe(false)
   })
 })

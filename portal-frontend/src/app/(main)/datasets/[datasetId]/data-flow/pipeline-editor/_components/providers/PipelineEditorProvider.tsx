@@ -31,7 +31,12 @@ import {
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
-import { isDatapoolScopeViolationError, isTableNameConflictError } from '@/utils/errors'
+import {
+  isDatapoolScopeViolationError,
+  isNotDraftError,
+  isSagaInFlightError,
+  isTableNameConflictError,
+} from '@/utils/errors'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
@@ -521,6 +526,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     const saveFailedNames: string[] = []
     const scopeViolationNames: string[] = []
     const tableNameConflictNames: string[] = []
+    const notDraftNames: string[] = []
+    const sagaInFlightNames: string[] = []
     try {
       if (hasDestructiveChange) {
         const isConfirmed = await confirmDataLoss()
@@ -617,7 +624,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           // and leaking a duplicate.
           sessionManager.updateSessionPipeline(session.id, currentPipeline)
 
-          if (isDatapoolScopeViolationError(error)) {
+          if (isNotDraftError(error)) {
+            notDraftNames.push(session.name)
+          } else if (isSagaInFlightError(error)) {
+            sagaInFlightNames.push(session.name)
+          } else if (isDatapoolScopeViolationError(error)) {
             scopeViolationNames.push(session.name)
           } else if (isTableNameConflictError(error)) {
             tableNameConflictNames.push(session.name)
@@ -627,6 +638,12 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         }
       }
 
+      if (notDraftNames.length > 0) {
+        toast.error(t('header.notDraftError'))
+      }
+      if (sagaInFlightNames.length > 0) {
+        toast.error(t('header.sagaInFlightError'))
+      }
       if (scopeViolationNames.length > 0) {
         toast.error(t('header.datasourceScopeViolation', { name: scopeViolationNames.join(', ') }))
       }
@@ -636,7 +653,13 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       if (saveFailedNames.length > 0) {
         toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
       }
-      if (scopeViolationNames.length > 0 || tableNameConflictNames.length > 0 || saveFailedNames.length > 0) {
+      if (
+        notDraftNames.length > 0 ||
+        sagaInFlightNames.length > 0 ||
+        scopeViolationNames.length > 0 ||
+        tableNameConflictNames.length > 0 ||
+        saveFailedNames.length > 0
+      ) {
         return false
       }
 
