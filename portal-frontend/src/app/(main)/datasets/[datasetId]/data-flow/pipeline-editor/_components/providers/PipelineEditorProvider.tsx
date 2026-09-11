@@ -29,11 +29,13 @@ import {
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
+import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { isDatapoolScopeViolationError, isTableNameConflictError } from '@/utils/errors'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
+import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import { tableNameOwnerOutsideNode, tableNameOwnersOutsideSession } from '../../_services/dataSinkNameService'
 import {
   buildDataSinkPayloads,
@@ -117,6 +119,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const updateDataSinkMutation = useUpdateDataSink()
   const createMappingMutation = useCreateMapping(datasetId)
   const updateMappingMutation = useUpdateMapping(datasetId)
+
+  const { isReadOnly } = useReadOnly()
+
+  const { canDeletePipeline: canDelete } = useDatasetPermissions(datasetQuery.data?.data)
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
@@ -416,7 +422,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Pipeline Operations: Delete =====
   const deletePipeline = useCallback(() => {
-    if (!activeSession) return
+    if (!canDelete || !activeSession) return
 
     const pipelineId = activeSession.pipeline.id
 
@@ -439,7 +445,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       // Never-saved pipeline → just remove the session
       removeSession()
     }
-  }, [activeSession, sessionManager, deletePipelineMutation])
+  }, [activeSession, sessionManager, deletePipelineMutation, canDelete])
 
   const isDeleting = deletePipelineMutation.isPending
 
@@ -452,7 +458,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const [isSavingAll, setIsSavingAll] = useState(false)
 
   const saveAllPipelines = useCallback(async (): Promise<boolean> => {
-    if (isSavingAll) return false
+    if (isSavingAll || isReadOnly) return false
 
     const dirtySessions = sessionManager.sessions.filter(s => s.isDirty)
     if (dirtySessions.length === 0) return true
@@ -653,6 +659,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     confirmDataLoss,
     validationContextFor,
     t,
+    isReadOnly,
   ])
 
   useRegisterUnsavedChanges(hasAnyDirtySession, saveAllPipelines)

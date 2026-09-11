@@ -55,6 +55,20 @@ vi.mock('@/hooks/use-register-unsaved-changes', () => ({
   useRegisterUnsavedChanges: vi.fn(),
 }))
 
+const mockReadOnly = vi.hoisted(() => ({ isReadOnly: false }))
+
+vi.mock('../../_hooks/use-pipeline-read-only', () => ({
+  useReadOnly: () => mockReadOnly,
+  ReadOnlyProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
+
+const mockDatasetPermissions = vi.hoisted(() => ({ canDeletePipeline: true }))
+
+vi.mock('@/hooks/use-dataset-permissions', () => ({
+  useDatasetPermissions: () => mockDatasetPermissions,
+  useDatasetPermissionsById: () => ({ ...mockDatasetPermissions, isLoading: false }),
+}))
+
 vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useGetPipelines: vi.fn(),
   useCreatePipeline: vi.fn(),
@@ -193,6 +207,9 @@ let mockDeleteMutate: ReturnType<typeof vi.fn>
 beforeEach(() => {
   vi.clearAllMocks()
   contextRef.current = null
+
+  mockReadOnly.isReadOnly = false
+  mockDatasetPermissions.canDeletePipeline = true
 
   vi.mocked(buildDataSinkPayloads).mockReturnValue([])
   vi.mocked(buildMappingArtifacts).mockReturnValue([])
@@ -1884,6 +1901,73 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       expect(contextRef.current?.activeSessionId).not.toBe('session-1')
+    })
+
+    it('does not call the delete mutation when canDeletePipeline is false', () => {
+      mockDatasetPermissions.canDeletePipeline = false
+
+      const session = makeSession({
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-to-delete' },
+      })
+      renderProvider(session)
+
+      act(() => {
+        contextRef.current?.deletePipeline()
+      })
+
+      expect(mockDeleteMutate).not.toHaveBeenCalled()
+    })
+
+    it('does not remove the session when canDeletePipeline is false', () => {
+      mockDatasetPermissions.canDeletePipeline = false
+
+      const session = makeSession({
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-to-delete' },
+      })
+      renderProvider(session)
+
+      act(() => {
+        contextRef.current?.deletePipeline()
+      })
+
+      expect(contextRef.current?.activeSessionId).toBe('session-1')
+    })
+  })
+
+  describe('status guards', () => {
+    it('saveAllPipelines returns false without API calls when isReadOnly is true', async () => {
+      mockReadOnly.isReadOnly = true
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' },
+      })
+      renderProvider(session)
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+      expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
+      expect(mockCreatePipelineMutateAsync).not.toHaveBeenCalled()
+    })
+
+    it('saveAllPipelines proceeds when isReadOnly is false', async () => {
+      mockReadOnly.isReadOnly = false
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1', nodes: [makeNode('n-1')] },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(mockUpdatePipelineMutateAsync).toHaveBeenCalled()
     })
   })
 })

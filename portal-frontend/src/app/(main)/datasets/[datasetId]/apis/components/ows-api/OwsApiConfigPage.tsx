@@ -225,6 +225,7 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   }
 
   const handleAddLayer = () => {
+    if (isReadOnly) return
     const newIndex = layerFields.length
     appendLayer({ ...defaultLayer, id: `new-${crypto.randomUUID()}` })
     setSelectedLayerIndex(newIndex)
@@ -233,7 +234,7 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   const deleteLayer = useDeleteLayer()
 
   const handleDeleteLayer = async () => {
-    if (selectedLayerIndex === null) return
+    if (isReadOnly || selectedLayerIndex === null) return
     const layer = layerFields[selectedLayerIndex]
     const isNew = layer.id.startsWith('new-')
     if (!isNew) {
@@ -255,6 +256,7 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   }
 
   const handleAddStyle = () => {
+    if (isReadOnly) return
     const newIndex = styleFields.length
     appendStyle({ ...defaultStyle, id: `new-${crypto.randomUUID()}` })
     setSelectedStyleIndex(newIndex)
@@ -263,7 +265,7 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   const deleteStyle = useDeleteStyle()
 
   const handleDeleteStyle = async () => {
-    if (selectedStyleIndex === null) return
+    if (isReadOnly || selectedStyleIndex === null) return
     const style = styleFields[selectedStyleIndex]
     const isNew = style.id.startsWith('new-')
     if (!isNew) {

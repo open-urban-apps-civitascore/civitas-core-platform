@@ -9,7 +9,11 @@
  */
 
 import { ReactFlowProvider } from '@xyflow/react'
+import { useParams } from 'next/navigation'
 
+import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
+
+import { ReadOnlyProvider } from '../../_hooks/use-pipeline-read-only'
 import { PipelineEditorLayout } from './PipelineEditorLayout'
 
 // ============================================================================
@@ -29,9 +33,15 @@ interface PipelineEditorWrapperProps {
  *
  */
 export const PipelineEditorWrapper: React.FC<PipelineEditorWrapperProps> = ({ className = '' }) => {
+  const params = useParams<{ datasetId: string }>()
+
+  const { canEditPipeline: canEdit, canCreatePipeline: canCreate } = useDatasetPermissionsById(params.datasetId)
+
   return (
     <ReactFlowProvider>
-      <PipelineEditorLayout className={className} />
+      <ReadOnlyProvider isReadOnly={!canEdit && !canCreate}>
+        <PipelineEditorLayout className={className} />
+      </ReadOnlyProvider>
     </ReactFlowProvider>
   )
 }
