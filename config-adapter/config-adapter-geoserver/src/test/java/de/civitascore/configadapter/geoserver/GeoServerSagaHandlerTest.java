@@ -1228,6 +1228,26 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void succeedsWhenTheWorkspaceServesNoFeatureType() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // A workspace with a datastore and no published feature type is a normal state: a dataset
+        // may have a geographic sink and no map layer, and the clean-up step leaves one behind.
+        Response snapshot = emptySnapshotResponse();
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertNull(result.error());
+        assertEquals(List.of(), result.compensationData().get("previousFeatureTypes"));
+      }
+    }
+
+    @Test
     void provisionsWorkspaceAndDatastoreWhenMissingThenPublishesLayers() {
       try (GeoServerSagaHandler handler = createHandler()) {
         // Workspace not provisioned yet → the feature-types snapshot read returns 404 (empty).
@@ -1445,6 +1465,21 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void deletesNothingWhenTheWorkspaceServesNoFeatureType() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response snapshot = emptySnapshotResponse();
+        when(mockBuilder.get()).thenReturn(snapshot);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "PRUNE_FEATURE_TYPES", updatePayload("t1")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, times(0)).delete();
+      }
+    }
+
+    @Test
     void keepsFeatureTypesTheDatasetStillHasALayerFor() {
       try (GeoServerSagaHandler handler = createHandler()) {
         Response snapshot = snapshotResponse("t1");
@@ -1608,6 +1643,29 @@ class GeoServerSagaHandlerTest {
         assertEquals("COMPENSATION_COMPLETED", result.type());
         verify(mockBuilder, times(0)).get();
         verify(mockBuilder, times(0)).delete();
+      }
+    }
+
+    @Test
+    void restoresNothingWhenTheWorkspaceServesNoFeatureType() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // An update of a layerless dataset records an empty snapshot, so compensation has nothing
+        // to delete and nothing to put back.
+        Response snapshot = emptySnapshotResponse();
+        when(mockBuilder.get()).thenReturn(snapshot);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_WORKSPACE",
+                Map.of("workspaceName", "myws", "previousFeatureTypes", List.of()));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        assertNull(result.error());
+        verify(mockBuilder, times(0)).delete();
+        verify(mockBuilder, times(0)).put(any(Entity.class));
       }
     }
 
@@ -1822,6 +1880,17 @@ class GeoServerSagaHandlerTest {
     when(response.getStatus()).thenReturn(200);
     when(response.readEntity(Map.class))
         .thenReturn(Map.of("featureTypes", Map.of("featureType", featureTypes)));
+    return response;
+  }
+
+  /**
+   * Mocks the 200 {@code featuretypes.json} response for a workspace that serves no feature type:
+   * GeoServer answers an empty collection with an empty string, not an empty object.
+   */
+  private static Response emptySnapshotResponse() {
+    Response response = mock(Response.class);
+    when(response.getStatus()).thenReturn(200);
+    when(response.readEntity(Map.class)).thenReturn(Map.of("featureTypes", ""));
     return response;
   }
 
