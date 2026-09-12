@@ -955,6 +955,9 @@
       "title": "Datenquelle kann nicht gelöscht werden",
       "description": "Diese Datenquelle hat den Status \"Verfügbar\" und kann nicht gelöscht werden. Bitte setzen Sie den Status zuerst auf \"Entwurf\"."
     },
+    "messages": {
+      "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Datenquelle bereits verwendet wird."
+    },
     "errors": {
       "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
       "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)",
@@ -964,6 +967,7 @@
       "topicSingle": "Es ist nur ein Topic erlaubt.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
+      "inUseStatusChangeError": "Die Datenquelle kann nicht auf Entwurf gesetzt werden, da sie von einer Pipeline oder einem Datensatz verwendet wird.",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
     "connection": {

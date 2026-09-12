@@ -5,6 +5,7 @@ import {
   isDatapoolScopeViolationError,
   isNameConflictError,
   isPermissionsError,
+  isResourceInUseError,
   isTableNameConflictError,
 } from './errors'
 
@@ -112,6 +113,36 @@ describe('isDatapoolScopeViolationError', () => {
 
   it('returns false for non-axios errors', () => {
     expect(isDatapoolScopeViolationError(new Error('plain error'))).toBe(false)
+  })
+})
+
+describe('isResourceInUseError', () => {
+  it('returns true for a 409 error carrying the RESOURCE_IN_USE type', () => {
+    const error = getError(
+      409,
+      'Cannot unrelease DataSource because it is referenced by a Pipeline.',
+      'urn:civitas:error:RESOURCE_IN_USE',
+    )
+    expect(isResourceInUseError(error)).toBe(true)
+  })
+
+  it('returns false for a 409 error with a different error type', () => {
+    const error = getError(409, 'Group with name "x" already exists', 'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION')
+    expect(isResourceInUseError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error without a type field', () => {
+    const error = getError(409, 'Conflict')
+    expect(isResourceInUseError(error)).toBe(false)
+  })
+
+  it('returns false for non-409 status codes', () => {
+    const error = getError(400, 'Bad request', 'urn:civitas:error:RESOURCE_IN_USE')
+    expect(isResourceInUseError(error)).toBe(false)
+  })
+
+  it('returns false for non-axios errors', () => {
+    expect(isResourceInUseError(new Error('plain error'))).toBe(false)
   })
 })
 

@@ -963,6 +963,9 @@
       "title": "Data source cannot be deleted",
       "description": "This Data source has the status \"Available\" and cannot be deleted. Please set it to \"Draft\" first."
     },
+    "messages": {
+      "isInUseStatusHint": "Can not be set to draft since this Data source is already in use."
+    },
     "errors": {
       "invalidDsn": "Enter a valid URI (e.g. postgres://host:5432/db)",
       "invalidBrokerUrl": "Enter a valid broker URL (e.g. tcp://broker:1883)",
@@ -972,6 +975,7 @@
       "topicSingle": "Only one topic is allowed.",
       "creationError": "An error occurred while creating the Data source.",
       "updateError": "An error occurred while updating the Data source.",
+      "inUseStatusChangeError": "The Data source cannot be set to draft because it is used by a pipeline or dataset.",
       "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
     },
     "connection": {

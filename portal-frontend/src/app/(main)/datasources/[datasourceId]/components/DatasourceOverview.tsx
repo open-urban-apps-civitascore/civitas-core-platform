@@ -139,6 +139,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     hasStatusChanged,
     handleStatusChange,
     canStage,
+    canSetDraft,
+    statusHint,
     completedTabs,
     submitDatasource,
     resetToInitialState: resetDatasourceToInitialState,
@@ -285,6 +287,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
               statusOptions: Object.values(DATASOURCE_STATUS_TYPES),
               canStage,
               canRelease,
+              canSetDraft,
+              statusHint,
               availableHint: !canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined,
             }}
             confirmButtonType="button"
