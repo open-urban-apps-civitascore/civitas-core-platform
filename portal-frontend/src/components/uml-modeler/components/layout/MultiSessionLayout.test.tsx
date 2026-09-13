@@ -7,7 +7,7 @@ import * as diagramFileService from '../../services/diagramFileService'
 import { DiagramImportError } from '../../services/diagramFileService'
 import { SchemaExportError } from '../../services/jsonSchemaExportService'
 import type { UMLDiagram, UMLNode } from '../../types/diagram'
-import type { DiagramSession } from '../../types/session'
+import type { DiagramSession, UseMultiSessionReturn } from '../../types/session'
 import { MultiSessionLayout } from './MultiSessionLayout'
 
 vi.mock('next-intl', () => ({
@@ -100,7 +100,7 @@ describe('MultiSessionLayout Import & Export', () => {
     const utils = render(
       <ReadOnlyProvider isReadOnly={isReadOnly}>
         <MultiSessionLayout
-          externalSessionManager={mockSessionManager as any}
+          externalSessionManager={mockSessionManager as unknown as UseMultiSessionReturn}
           isMultiSessionMode={false}
           canExportModel={false}
           dataStructureName="School"

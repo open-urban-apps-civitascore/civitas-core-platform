@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DataStructureSchema } from '@/generated/core'
 
 import type { UMLDiagram } from '../types/diagram'
+import type { UMLClass } from '../types/uml'
 import {
   buildDiagramExport,
   buildDiagramFileName,
@@ -183,12 +184,28 @@ describe('diagramFileService', () => {
             type: 'composition',
             source: 'n-1',
             target: 'n-2',
+            data: {
+              relationship: {
+                id: 'rel-1',
+                type: 'composition',
+                source: 'n-1',
+                target: 'n-2',
+              },
+            },
           },
           {
             id: 'e-2',
             type: 'composition',
             source: 'n-2',
             target: 'n-1',
+            data: {
+              relationship: {
+                id: 'rel-2',
+                type: 'composition',
+                source: 'n-2',
+                target: 'n-1',
+              },
+            },
           },
         ],
         lastModified: new Date(),
@@ -270,11 +287,9 @@ describe('diagramFileService', () => {
     })
 
     it('rejects with INVALID_DATASTRUCTURE_DOCUMENT when JSON violates CORE DataStructureSchema', async () => {
-      const invalidCoreFile = new File(
-        [JSON.stringify({ notAValidCoreDocument: true })],
-        'invalid-core.json',
-        { type: 'application/json' },
-      )
+      const invalidCoreFile = new File([JSON.stringify({ notAValidCoreDocument: true })], 'invalid-core.json', {
+        type: 'application/json',
+      })
 
       await expect(readDiagramFile(invalidCoreFile)).rejects.toMatchObject({
         name: 'DiagramImportError',
@@ -284,7 +299,6 @@ describe('diagramFileService', () => {
 
     it('rejects with MISSING_UI_STYLES when valid CORE document lacks x-ui-styles', async () => {
       const exportedDoc = buildDiagramExport(sampleDiagram)
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { 'x-ui-styles': _styles, ...docWithoutStyles } = exportedDoc
 
       const file = new File([JSON.stringify(docWithoutStyles)], 'no-styles.json', { type: 'application/json' })
@@ -491,7 +505,7 @@ describe('diagramFileService', () => {
       expect(reimported.nodes[0].position).toEqual({ x: 120, y: 80 })
       expect(reimported.nodes[0].data.element.name).toBe('School')
       expect(reimported.nodes[0].data.element.isRoot).toBe(true)
-      expect(reimported.nodes[0].data.element.attributes).toHaveLength(2)
+      expect((reimported.nodes[0].data.element as UMLClass).attributes).toHaveLength(2)
 
       expect(reimported.nodes[1].id).toBe('node-classroom')
       expect(reimported.nodes[1].position).toEqual({ x: 420, y: 220 })
@@ -505,4 +519,3 @@ describe('diagramFileService', () => {
     })
   })
 })
-
