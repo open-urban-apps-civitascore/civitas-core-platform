@@ -30,6 +30,7 @@ export class DiagramImportError extends Error {
 export interface DiagramExportOptions {
   dataStructureName?: string
   datastructureId?: string
+  versionName?: string | null
 }
 
 /**
@@ -55,7 +56,6 @@ export const buildDiagramFileName = (dataStructureName?: string, versionName?: s
 export const cleanDiagramForExport = (diagram: UMLDiagram): Record<string, unknown> => {
   const cleanedNodes = diagram.nodes.map(node => {
     const rawData = (node.data || {}) as Record<string, unknown>
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { isSelected: _nodeSelected, isDirty: _nodeDirty, ...cleanData } = rawData
 
     return {
@@ -71,7 +71,6 @@ export const cleanDiagramForExport = (diagram: UMLDiagram): Record<string, unkno
 
   const cleanedEdges = diagram.edges.map(edge => {
     const rawData = (edge.data || {}) as Record<string, unknown>
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { isSelected: _edgeSelected, isDirty: _edgeDirty, ...cleanData } = rawData
 
     return {
@@ -111,10 +110,7 @@ export const cleanDiagramForExport = (diagram: UMLDiagram): Record<string, unkno
  *
  * @throws SchemaExportError if root resolution fails (e.g. cycles or ambiguous roots).
  */
-export const buildDiagramExport = (
-  diagram: UMLDiagram,
-  options?: DiagramExportOptions,
-): Record<string, unknown> => {
+export const buildDiagramExport = (diagram: UMLDiagram, options?: DiagramExportOptions): Record<string, unknown> => {
   const dataStructureName = options?.dataStructureName?.trim() || diagram.name?.trim() || 'DataStructure'
   const datastructureId = options?.datastructureId || crypto.randomUUID()
 
@@ -135,11 +131,10 @@ export const buildDiagramExport = (
 }
 
 /**
- * Triggers a file download dialog in the browser using a Blob and temporary anchor element.
+ * Initiates a browser file download of the serialized document.
  */
 export const downloadDiagramFile = (document: Record<string, unknown>, filename: string): void => {
-  const content = JSON.stringify(document, null, 2)
-  const blob = new Blob([content], { type: 'application/json' })
+  const blob = new Blob([JSON.stringify(document, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
 
   const link = window.document.createElement('a')
@@ -195,10 +190,7 @@ export const readDiagramFile = async (file: File): Promise<UMLDiagram> => {
   }
 
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new DiagramImportError(
-      'INVALID_DATASTRUCTURE_DOCUMENT',
-      'Document root must be a JSON object.',
-    )
+    throw new DiagramImportError('INVALID_DATASTRUCTURE_DOCUMENT', 'Document root must be a JSON object.')
   }
 
   // Stage 1: Validate CORE DataStructure schema
@@ -235,9 +227,8 @@ export const readDiagramFile = async (file: File): Promise<UMLDiagram> => {
 
   const docTitle = typeof doc.title === 'string' && doc.title.trim().length > 0 ? doc.title.trim() : undefined
   const fileTitle = file.name ? file.name.replace(/\.[^/.]+$/, '').trim() : undefined
-  const diagramName = validDiagram.name?.trim().length > 0
-    ? validDiagram.name.trim()
-    : docTitle || fileTitle || 'Imported Diagram'
+  const diagramName =
+    validDiagram.name?.trim().length > 0 ? validDiagram.name.trim() : docTitle || fileTitle || 'Imported Diagram'
 
   const normalizedNodes: UMLNode[] = validDiagram.nodes.map(node => ({
     id: node.id,

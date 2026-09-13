@@ -6,7 +6,7 @@ interface StructureDefinitionTabProps {
   isAvailable: boolean
   modelSessionManager: UseMultiSessionReturn
   dataStructureName?: string
-  versionName?: string
+  versionName?: string | null
   datastructureId?: string
 }
 export const StructureDefinitionTab = (props: StructureDefinitionTabProps) => {

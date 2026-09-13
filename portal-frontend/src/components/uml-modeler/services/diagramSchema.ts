@@ -1,14 +1,6 @@
 import { z } from 'zod'
 
-export const UMLPrimitiveTypeSchema = z.enum([
-  'String',
-  'Integer',
-  'Boolean',
-  'Number',
-  'Date',
-  'DateTime',
-  'Uuid',
-])
+export const UMLPrimitiveTypeSchema = z.enum(['String', 'Integer', 'Boolean', 'Number', 'Date', 'DateTime', 'Uuid'])
 
 export const UMLGeometryTypeSchema = z.enum([
   'Point',
@@ -27,16 +19,9 @@ export const UMLTypeReferenceSchema = z.object({
   href: z.string().optional(),
 })
 
-export const UMLTypeSchema = z.union([
-  UMLPrimitiveTypeSchema,
-  UMLGeometryTypeSchema,
-  UMLTypeReferenceSchema,
-])
+export const UMLTypeSchema = z.union([UMLPrimitiveTypeSchema, UMLGeometryTypeSchema, UMLTypeReferenceSchema])
 
-export const UMLReturnTypeSchema = z.union([
-  UMLTypeSchema,
-  z.literal('void'),
-])
+export const UMLReturnTypeSchema = z.union([UMLTypeSchema, z.literal('void')])
 
 export const VisibilitySchema = z.enum(['public', 'private', 'protected', 'package'])
 

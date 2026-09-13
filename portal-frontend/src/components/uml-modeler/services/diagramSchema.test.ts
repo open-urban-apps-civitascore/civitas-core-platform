@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { UMLDiagramSchema } from './diagramSchema'
@@ -10,10 +11,7 @@ const getFixturePath = () => {
     '../config-adapter/docs/examples/datastructure-version-jsonschema-nested.json',
   )
   if (existsSync(pathFromFrontend)) return pathFromFrontend
-  return resolve(
-    process.cwd(),
-    'config-adapter/docs/examples/datastructure-version-jsonschema-nested.json',
-  )
+  return resolve(process.cwd(), 'config-adapter/docs/examples/datastructure-version-jsonschema-nested.json')
 }
 
 describe('diagramSchema', () => {

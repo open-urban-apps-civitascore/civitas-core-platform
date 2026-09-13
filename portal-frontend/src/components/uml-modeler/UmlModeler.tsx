@@ -18,7 +18,7 @@ interface UmlModelerProps {
   placeHolder?: JSX.Element
   onImportFromDatastructure?: () => void
   dataStructureName?: string
-  versionName?: string
+  versionName?: string | null
   datastructureId?: string
 }
 
