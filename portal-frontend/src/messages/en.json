@@ -1484,20 +1484,38 @@
     }
   },
   "umlModeler": {
+    "modelNamePlaceholder": "Model name",
     "closeTabModal": {
       "title": "Discard model?",
       "description": "This action deletes the model. It can not be undone."
     },
     "import": {
       "title": "Import",
+      "file": "Import diagram",
       "fromPlatform": "from the platform",
-      "fromFile": "from file"
+      "fromFile": "from file",
+      "success": "Diagram imported successfully",
+      "fileError": "Failed to import file.",
+      "overwriteModal": {
+        "title": "Overwrite existing diagram?",
+        "description": "Importing will replace all current elements and relationships on the canvas. Unsaved changes will be lost.",
+        "confirm": "Overwrite"
+      },
+      "errors": {
+        "FILE_TOO_LARGE": "The file is too large (maximum 5 MB allowed).",
+        "INVALID_JSON": "The file does not contain valid JSON.",
+        "INVALID_DATASTRUCTURE_DOCUMENT": "The file does not conform to the CORE DataStructure schema.",
+        "MISSING_UI_STYLES": "The file is missing layout data (x-ui-styles) for the diagram.",
+        "INVALID_DIAGRAM_SCHEMA": "The diagram data in the file is invalid."
+      }
     },
     "save": {
       "success": "Model saved successfully",
       "error": "Failed to save model. Please try again."
     },
     "export": {
+      "title": "Export",
+      "file": "Export diagram",
       "success": "Diagram exported successfully",
       "error": "Failed to export diagram. Please try again."
     },

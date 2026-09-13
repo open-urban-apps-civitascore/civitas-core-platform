@@ -17,6 +17,9 @@ interface UmlModelerProps {
   canExportModel?: boolean
   placeHolder?: JSX.Element
   onImportFromDatastructure?: () => void
+  dataStructureName?: string
+  versionName?: string
+  datastructureId?: string
 }
 
 export const UmlModeler = (props: UmlModelerProps) => {
@@ -28,6 +31,9 @@ export const UmlModeler = (props: UmlModelerProps) => {
     canExportModel = true,
     placeHolder,
     onImportFromDatastructure,
+    dataStructureName,
+    versionName,
+    datastructureId,
   } = props
   return (
     <div data-testid="umlModeler" className={cn('flex h-full w-full flex-1 flex-col gap-4', className)}>
@@ -40,6 +46,9 @@ export const UmlModeler = (props: UmlModelerProps) => {
             canExportModel={canExportModel}
             placeHolder={placeHolder}
             onImportFromDatastructure={onImportFromDatastructure}
+            dataStructureName={dataStructureName}
+            versionName={versionName}
+            datastructureId={datastructureId}
           />
         </ReadOnlyProvider>
       </div>

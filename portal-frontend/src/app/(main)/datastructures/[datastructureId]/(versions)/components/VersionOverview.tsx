@@ -231,6 +231,9 @@ export const VersionOverview = (props: VersionOverviewProps) => {
             isReadOnly={isReadOnly}
             modelSessionManager={modelSessionManager}
             isAvailable={isVersionAvailable}
+            dataStructureName={datastructure.name}
+            versionName={version?.version}
+            datastructureId={datastructure.id}
           />
         )
     }
