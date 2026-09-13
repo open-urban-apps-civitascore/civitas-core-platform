@@ -1,7 +1,30 @@
+import { DataStructureSchema } from '@/generated/core'
 import { buildDataStructureLogicalUrn } from '@/utils/urn'
 
-import type { UMLDiagram } from '../types/diagram'
+import type { UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
+import { UMLDiagramSchema } from './diagramSchema'
 import { buildUMLModelPayload } from './modelUploadService'
+
+export const MAX_IMPORT_FILE_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
+
+export type DiagramImportErrorCode =
+  | 'FILE_TOO_LARGE'
+  | 'INVALID_JSON'
+  | 'INVALID_DATASTRUCTURE_DOCUMENT'
+  | 'MISSING_UI_STYLES'
+  | 'INVALID_DIAGRAM_SCHEMA'
+
+export class DiagramImportError extends Error {
+  readonly code: DiagramImportErrorCode
+  readonly details?: unknown
+
+  constructor(code: DiagramImportErrorCode, message: string, details?: unknown) {
+    super(message)
+    this.name = 'DiagramImportError'
+    this.code = code
+    this.details = details
+  }
+}
 
 export interface DiagramExportOptions {
   dataStructureName?: string
@@ -91,16 +114,14 @@ export const buildDiagramExport = (
   diagram: UMLDiagram,
   options?: DiagramExportOptions,
 ): Record<string, unknown> => {
-  const dataStructureName = options?.dataStructureName || diagram.name
-  const datastructureId = options?.datastructureId
+  const dataStructureName = options?.dataStructureName?.trim() || diagram.name?.trim() || 'DataStructure'
+  const datastructureId = options?.datastructureId || crypto.randomUUID()
 
   let modelUri: string | undefined
-  if (dataStructureName && datastructureId) {
-    try {
-      modelUri = buildDataStructureLogicalUrn(dataStructureName, datastructureId)
-    } catch {
-      modelUri = undefined
-    }
+  try {
+    modelUri = buildDataStructureLogicalUrn(dataStructureName, datastructureId)
+  } catch {
+    modelUri = undefined
   }
 
   const { model } = buildUMLModelPayload(diagram, modelUri)
@@ -128,4 +149,145 @@ export const downloadDiagramFile = (document: Record<string, unknown>, filename:
   window.document.body.removeChild(link)
 
   URL.revokeObjectURL(url)
+}
+
+/**
+ * Reads, parses, and validates an uploaded CORE DataStructure file.
+ *
+ * Performs a two-stage validation:
+ * 1. Stage 1: Validates the root CORE JSON document envelope via DataStructureSchema.
+ * 2. Stage 2: Validates the embedded UML diagram in 'x-ui-styles' via UMLDiagramSchema.
+ *
+ * Generates a fresh diagram ID while preserving all nodes, coordinates, and relationships.
+ *
+ * @throws DiagramImportError with specific error codes for each failure category.
+ */
+export const readDiagramFile = async (file: File): Promise<UMLDiagram> => {
+  if (file.size > MAX_IMPORT_FILE_SIZE_BYTES) {
+    throw new DiagramImportError(
+      'FILE_TOO_LARGE',
+      `File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds maximum allowed size of ${MAX_IMPORT_FILE_SIZE_BYTES / (1024 * 1024)} MB.`,
+    )
+  }
+
+  let text: string
+  try {
+    if (typeof file.text === 'function') {
+      text = await file.text()
+    } else {
+      text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(reader.error)
+        reader.readAsText(file)
+      })
+    }
+  } catch (error) {
+    throw new DiagramImportError('INVALID_JSON', 'Failed to read file contents.', error)
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch (error) {
+    throw new DiagramImportError('INVALID_JSON', 'File is not a valid JSON document.', error)
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new DiagramImportError(
+      'INVALID_DATASTRUCTURE_DOCUMENT',
+      'Document root must be a JSON object.',
+    )
+  }
+
+  // Stage 1: Validate CORE DataStructure schema
+  const coreValidation = DataStructureSchema.safeParse(parsed)
+  if (!coreValidation.success) {
+    throw new DiagramImportError(
+      'INVALID_DATASTRUCTURE_DOCUMENT',
+      'Document does not conform to the CORE DataStructure schema.',
+      coreValidation.error.format(),
+    )
+  }
+
+  const doc = parsed as Record<string, unknown>
+  const uiStyles = doc['x-ui-styles'] ?? doc['styles']
+
+  if (!uiStyles || typeof uiStyles !== 'object' || Array.isArray(uiStyles)) {
+    throw new DiagramImportError(
+      'MISSING_UI_STYLES',
+      "Document is missing the 'x-ui-styles' extension property containing diagram layout data.",
+    )
+  }
+
+  // Stage 2: Validate diagram structure in x-ui-styles
+  const diagramValidation = UMLDiagramSchema.safeParse(uiStyles)
+  if (!diagramValidation.success) {
+    throw new DiagramImportError(
+      'INVALID_DIAGRAM_SCHEMA',
+      "The diagram data in 'x-ui-styles' failed validation.",
+      diagramValidation.error.format(),
+    )
+  }
+
+  const validDiagram = diagramValidation.data
+
+  const docTitle = typeof doc.title === 'string' && doc.title.trim().length > 0 ? doc.title.trim() : undefined
+  const fileTitle = file.name ? file.name.replace(/\.[^/.]+$/, '').trim() : undefined
+  const diagramName = validDiagram.name?.trim().length > 0
+    ? validDiagram.name.trim()
+    : docTitle || fileTitle || 'Imported Diagram'
+
+  const normalizedNodes: UMLNode[] = validDiagram.nodes.map(node => ({
+    id: node.id,
+    type: node.type,
+    position: {
+      x: node.position.x,
+      y: node.position.y,
+    },
+    data: {
+      ...node.data,
+      element: node.data.element,
+      label: node.data.label || node.data.element.name,
+    },
+  }))
+
+  const normalizedEdges: UMLEdge[] = validDiagram.edges.map(edge => ({
+    id: edge.id,
+    type: edge.type,
+    source: edge.source,
+    target: edge.target,
+    data: {
+      ...edge.data,
+      relationship: edge.data?.relationship || {
+        id: edge.id,
+        type: edge.type,
+        source: edge.source,
+        target: edge.target,
+      },
+    },
+  }))
+
+  const importedDiagram: UMLDiagram = {
+    id: crypto.randomUUID(),
+    name: diagramName,
+    nodes: normalizedNodes,
+    edges: normalizedEdges,
+    lastModified: new Date(),
+    isDirty: true,
+  }
+
+  if (validDiagram.description || (typeof doc.description === 'string' && doc.description.trim())) {
+    importedDiagram.description = validDiagram.description || (doc.description as string).trim()
+  }
+
+  if (validDiagram.viewport) {
+    importedDiagram.viewport = {
+      x: validDiagram.viewport.x,
+      y: validDiagram.viewport.y,
+      zoom: validDiagram.viewport.zoom,
+    }
+  }
+
+  return importedDiagram
 }
