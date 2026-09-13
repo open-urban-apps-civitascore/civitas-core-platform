@@ -35,12 +35,12 @@ import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
 
 const tabs: Tab<DatastructureVersionTab>[] = [
   {
-    value: 'versionInfo',
-    label: 'datastructureVersions.tabs.versionInfo',
-  },
-  {
     value: 'structure',
     label: 'datastructureVersions.tabs.structure',
+  },
+  {
+    value: 'versionInfo',
+    label: 'datastructureVersions.tabs.versionInfo',
   },
 ]
 
@@ -222,7 +222,10 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const renderTabContent = () => {
     switch (subTabValue) {
+      case 'versionInfo':
+        return <VersionInfoTab form={form} isReadOnly={isReadOnly} isAvailable={isVersionAvailable} />
       case 'structure':
+      default:
         return (
           <StructureDefinitionTab
             isReadOnly={isReadOnly}
@@ -230,9 +233,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
             isAvailable={isVersionAvailable}
           />
         )
-      case 'versionInfo':
-      default:
-        return <VersionInfoTab form={form} isReadOnly={isReadOnly} isAvailable={isVersionAvailable} />
     }
   }
 

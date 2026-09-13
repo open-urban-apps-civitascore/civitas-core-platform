@@ -182,10 +182,17 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(screen.getByText('Edit Version')).toBeInTheDocument()
     })
 
-    it('renders tab navigation', () => {
+    it('renders tab navigation with structure tab first', () => {
       renderComponent()
-      expect(screen.getByTestId('tab-versionInfo')).toBeInTheDocument()
-      expect(screen.getByTestId('tab-structure')).toBeInTheDocument()
+      const tabs = screen.getAllByRole('tab')
+      expect(tabs[0]).toHaveAttribute('data-testid', 'tab-structure')
+      expect(tabs[1]).toHaveAttribute('data-testid', 'tab-versionInfo')
+    })
+
+    it('defaults to the structure tab when no subTabValue is set', () => {
+      mockSubTabValue = ''
+      renderComponent()
+      expect(screen.getByTestId('umlModeler')).toBeInTheDocument()
     })
   })
 
