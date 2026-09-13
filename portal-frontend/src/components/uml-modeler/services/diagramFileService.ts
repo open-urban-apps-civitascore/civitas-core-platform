@@ -2,6 +2,7 @@ import { DataStructureSchema } from '@/generated/core'
 import { buildDataStructureLogicalUrn } from '@/utils/urn'
 
 import type { UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
+import type { UMLElement } from '../types/uml'
 import { UMLDiagramSchema } from './diagramSchema'
 import { buildUMLModelPayload } from './modelUploadService'
 
@@ -206,7 +207,7 @@ export const readDiagramFile = async (file: File): Promise<UMLDiagram> => {
     throw new DiagramImportError(
       'INVALID_DATASTRUCTURE_DOCUMENT',
       'Document does not conform to the CORE DataStructure schema.',
-      coreValidation.error.format(),
+      coreValidation.error.issues,
     )
   }
 
@@ -226,7 +227,7 @@ export const readDiagramFile = async (file: File): Promise<UMLDiagram> => {
     throw new DiagramImportError(
       'INVALID_DIAGRAM_SCHEMA',
       "The diagram data in 'x-ui-styles' failed validation.",
-      diagramValidation.error.format(),
+      diagramValidation.error.issues,
     )
   }
 
@@ -247,7 +248,7 @@ export const readDiagramFile = async (file: File): Promise<UMLDiagram> => {
     },
     data: {
       ...node.data,
-      element: node.data.element,
+      element: node.data.element as UMLElement,
       label: node.data.label || node.data.element.name,
     },
   }))

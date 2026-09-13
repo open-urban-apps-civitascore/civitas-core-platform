@@ -29,9 +29,13 @@ export const UMLTypeReferenceSchema = z.object({
 
 export const UMLTypeSchema = z.union([
   UMLPrimitiveTypeSchema,
-  z.literal('void'),
   UMLGeometryTypeSchema,
   UMLTypeReferenceSchema,
+])
+
+export const UMLReturnTypeSchema = z.union([
+  UMLTypeSchema,
+  z.literal('void'),
 ])
 
 export const VisibilitySchema = z.enum(['public', 'private', 'protected', 'package'])
@@ -68,7 +72,7 @@ export const UMLParameterSchema = z.object({
 export const UMLOperationSchema = z.object({
   id: z.string(),
   name: z.string(),
-  returnType: UMLTypeSchema.optional(),
+  returnType: UMLReturnTypeSchema.optional(),
   visibility: VisibilitySchema.optional(),
   isStatic: z.boolean().optional(),
   isAbstract: z.boolean().optional(),
