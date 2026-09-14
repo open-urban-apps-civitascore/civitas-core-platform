@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.SagaInFlightException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +23,8 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -123,6 +127,24 @@ class GlobalExceptionHandlerTest {
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
       assertThat(problemDetail.getDetail()).isEqualTo("Referenced by DataSource");
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(PendingSagaType.class)
+    @DisplayName("Should return 409 with the pending saga type for SagaInFlightException")
+    void shouldReturn409ForSagaInFlight(PendingSagaType pendingSagaType) {
+      UUID id = UUID.randomUUID();
+      SagaInFlightException ex =
+          new SagaInFlightException(
+              id, pendingSagaType, "Cannot write while a saga is in-flight: " + pendingSagaType);
+
+      ProblemDetail problemDetail = handler.handleSagaInFlight(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:SAGA_IN_FLIGHT");
+      assertThat(problemDetail.getDetail()).contains(pendingSagaType.name());
+      assertThat(problemDetail.getProperties()).containsEntry("pendingSagaType", pendingSagaType);
       assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 

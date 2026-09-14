@@ -42,8 +42,8 @@ import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.SagaInFlightException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -249,7 +249,7 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("throws ResourceInUseException when a CREATE saga is in-flight")
+    @DisplayName("throws SagaInFlightException when a CREATE saga is in-flight")
     void throwsWhenCreateSagaInFlight() {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
@@ -257,7 +257,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().unstage(id))
-          .isInstanceOf(ResourceInUseException.class)
+          .isInstanceOf(SagaInFlightException.class)
           .hasMessageContaining("saga is in-flight");
     }
 
@@ -317,7 +317,7 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("throws ResourceInUseException when a saga is in-flight")
+    @DisplayName("throws SagaInFlightException when a saga is in-flight")
     void throwsWhenSagaInFlight() {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
@@ -325,7 +325,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().release(id))
-          .isInstanceOf(ResourceInUseException.class)
+          .isInstanceOf(SagaInFlightException.class)
           .hasMessageContaining("saga is in-flight");
     }
 
@@ -548,7 +548,7 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("throws ResourceInUseException when saga already in-flight")
+    @DisplayName("throws SagaInFlightException when saga already in-flight")
     void throwsWhenSagaInFlight() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
@@ -556,7 +556,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().unrelease(id))
-          .isInstanceOf(ResourceInUseException.class)
+          .isInstanceOf(SagaInFlightException.class)
           .hasMessageContaining("saga is in-flight");
     }
 
@@ -586,55 +586,27 @@ class DataSetServiceTest {
   @DisplayName("updateReleasedMeta()")
   class UpdateReleasedMetaTests {
 
-    @Test
-    @DisplayName("throws ResourceInUseException when CREATE saga is in-flight")
-    void throwsWhenCreateSagaInFlight() {
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(PendingSagaType.class)
+    @DisplayName("throws SagaInFlightException for every saga type")
+    void throwsWhenSagaInFlight(PendingSagaType pendingSagaType) {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
-      ds.setPendingSagaType(PendingSagaType.CREATE);
+      ds.setPendingSagaType(pendingSagaType);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
 
       assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
-          .isInstanceOf(ResourceInUseException.class)
+          .isInstanceOfSatisfying(
+              SagaInFlightException.class,
+              exception -> {
+                assertThat(exception.getDataSetId()).isEqualTo(id);
+                assertThat(exception.getPendingSagaType()).isEqualTo(pendingSagaType);
+              })
           .hasMessageContaining("saga is in-flight")
-          .hasMessageContaining("CREATE");
-    }
-
-    @Test
-    @DisplayName("throws ResourceInUseException when UPDATE saga is in-flight")
-    void throwsWhenUpdateSagaInFlight() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = availableDataSet(id);
-      ds.setPendingSagaType(PendingSagaType.UPDATE);
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
-
-      DataSetInputDTO input = new DataSetInputDTO();
-      input.setName("updated name");
-
-      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
-          .isInstanceOf(ResourceInUseException.class)
-          .hasMessageContaining("saga is in-flight")
-          .hasMessageContaining("UPDATE");
-    }
-
-    @Test
-    @DisplayName("throws ResourceInUseException when DELETE saga is in-flight")
-    void throwsWhenDeleteSagaInFlight() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = availableDataSet(id);
-      ds.setPendingSagaType(PendingSagaType.DELETE);
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
-
-      DataSetInputDTO input = new DataSetInputDTO();
-      input.setName("updated name");
-
-      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
-          .isInstanceOf(ResourceInUseException.class)
-          .hasMessageContaining("saga is in-flight")
-          .hasMessageContaining("DELETE");
+          .hasMessageContaining(pendingSagaType.name());
     }
 
     @Test
@@ -1038,7 +1010,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> endpoint.update(createService(), id, renameInput()))
-          .isInstanceOf(ResourceInUseException.class)
+          .isInstanceOf(SagaInFlightException.class)
           .hasMessageContaining("saga is in-flight")
           .hasMessageContaining("CREATE");
     }

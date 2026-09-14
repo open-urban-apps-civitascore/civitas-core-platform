@@ -5,8 +5,8 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.DataSetNotEditableException;
-import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.SagaInFlightException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +26,7 @@ public class DataSetMutationGuard {
 
   /**
    * @throws DataSetNotEditableException if the DataSet is not in DRAFT
-   * @throws ResourceInUseException if a saga is in flight on the DataSet
+   * @throws SagaInFlightException if a saga is in flight on the DataSet
    */
   public void requireMutable(DataSet dataSet) {
     requireMutable(dataSet, "update DataSet");
@@ -35,7 +35,7 @@ public class DataSetMutationGuard {
   /**
    * @param target what the rejection log line calls the attempted write
    * @throws DataSetNotEditableException if the DataSet is not in DRAFT
-   * @throws ResourceInUseException if a saga is in flight on the DataSet
+   * @throws SagaInFlightException if a saga is in flight on the DataSet
    */
   public void requireMutable(DataSet dataSet, String target) {
     // Status first: a released dataset always has the status problem, and reporting an incidental
@@ -54,16 +54,16 @@ public class DataSetMutationGuard {
           target,
           dataSet.getId(),
           dataSet.getPendingSagaType());
-      throw new ResourceInUseException(
-          "DataSet",
+      throw new SagaInFlightException(
           dataSet.getId(),
+          dataSet.getPendingSagaType(),
           "Cannot write while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
   }
 
   /**
    * @throws DataSetNotEditableException if the DataSet is not in DRAFT
-   * @throws ResourceInUseException if a saga is in flight on the DataSet
+   * @throws SagaInFlightException if a saga is in flight on the DataSet
    */
   public void requireMutable(DataSetOwnedEntity subEntity, String target) {
     requireMutable(subEntity.getDataSet(), target);
@@ -72,7 +72,7 @@ public class DataSetMutationGuard {
   /**
    * @throws ResourceNotFoundException if no DataSet with that id exists
    * @throws DataSetNotEditableException if the DataSet is not in DRAFT
-   * @throws ResourceInUseException if a saga is in flight on the DataSet
+   * @throws SagaInFlightException if a saga is in flight on the DataSet
    */
   public void requireMutable(UUID dataSetId, String target) {
     requireMutable(

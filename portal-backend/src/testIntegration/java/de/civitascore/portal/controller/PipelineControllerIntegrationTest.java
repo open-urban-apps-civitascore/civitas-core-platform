@@ -1484,7 +1484,7 @@ class PipelineControllerIntegrationTest
   class MutationGuardTests {
 
     private static final String NOT_EDITABLE_URN = "urn:civitas:error:DATASET_NOT_EDITABLE";
-    private static final String IN_USE_URN = "urn:civitas:error:RESOURCE_IN_USE";
+    private static final String SAGA_IN_FLIGHT_URN = "urn:civitas:error:SAGA_IN_FLIGHT";
 
     private void setParentStatus(DataSetStatus status) {
       ensureTestDataSet();
@@ -1578,7 +1578,7 @@ class PipelineControllerIntegrationTest
           exchangeForProblem(
               getEndpointPath(), HttpMethod.POST, createAuthHeaders(), createValidInput());
 
-      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertSagaRejected(response);
       assertThat(pipelineRepository.count()).as("No pipeline was created").isZero();
     }
 
@@ -1596,7 +1596,7 @@ class PipelineControllerIntegrationTest
               createAuthHeaders(),
               createUpdateInput());
 
-      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertSagaRejected(response);
       assertThat(pipelineRepository.findById(pipelineId).orElseThrow().getName())
           .isEqualTo(originalName);
     }
@@ -1611,10 +1611,16 @@ class PipelineControllerIntegrationTest
           exchangeForProblem(
               getEndpointPath() + "/" + pipelineId, HttpMethod.DELETE, createAuthHeaders(), null);
 
-      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertSagaRejected(response);
       assertThat(pipelineRepository.findById(pipelineId))
           .as("Entity survives the rejected delete")
           .isPresent();
+    }
+
+    private void assertSagaRejected(ResponseEntity<ProblemDetail> response) {
+      assertRejected(response, HttpStatus.CONFLICT, SAGA_IN_FLIGHT_URN);
+      assertThat(response.getBody().getProperties())
+          .containsEntry("pendingSagaType", PendingSagaType.UNRELEASE.name());
     }
 
     @Test

@@ -8,6 +8,7 @@ import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.SagaInFlightException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -123,6 +124,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public ProblemDetail handleResourceInUse(ResourceInUseException ex, HttpServletRequest request) {
     log.warn("Resource in use: {}", Encode.forJava(ex.getMessage()));
     return createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
+  }
+
+  /**
+   * Handles saga-in-flight exceptions and returns a 409 Problem Detail response.
+   *
+   * @param ex the saga in flight exception
+   * @param request the current HTTP request
+   * @return a Problem Detail with HTTP 409 status and the pending saga type
+   */
+  @ExceptionHandler(SagaInFlightException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ProblemDetail handleSagaInFlight(SagaInFlightException ex, HttpServletRequest request) {
+    log.warn("Saga in flight for DataSet {}: {}", ex.getDataSetId(), ex.getPendingSagaType());
+    // TR-03187 W-18/W-19: the dataset UUID and pending saga type are already exposed to callers
+    // authorised to read the dataset. Only the saga type is added to the response.
+    ProblemDetail problemDetail =
+        createProblemDetail(HttpStatus.CONFLICT, "SAGA_IN_FLIGHT", ex.getMessage(), request);
+    problemDetail.setProperty("pendingSagaType", ex.getPendingSagaType());
+    return problemDetail;
   }
 
   /**
