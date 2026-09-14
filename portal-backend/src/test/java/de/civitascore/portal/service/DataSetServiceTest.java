@@ -257,8 +257,14 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().unstage(id))
-          .isInstanceOf(SagaInFlightException.class)
-          .hasMessageContaining("saga is in-flight");
+          .isInstanceOfSatisfying(
+              SagaInFlightException.class,
+              exception -> {
+                assertThat(exception.getDataSetId()).isEqualTo(id);
+                assertThat(exception.getPendingSagaType()).isEqualTo(PendingSagaType.CREATE);
+              })
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining(PendingSagaType.CREATE.name());
     }
 
     @Test
@@ -325,8 +331,14 @@ class DataSetServiceTest {
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().release(id))
-          .isInstanceOf(SagaInFlightException.class)
-          .hasMessageContaining("saga is in-flight");
+          .isInstanceOfSatisfying(
+              SagaInFlightException.class,
+              exception -> {
+                assertThat(exception.getDataSetId()).isEqualTo(id);
+                assertThat(exception.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
+              })
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining(PendingSagaType.DELETE.name());
     }
 
     @Test
@@ -556,8 +568,14 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().unrelease(id))
-          .isInstanceOf(SagaInFlightException.class)
-          .hasMessageContaining("saga is in-flight");
+          .isInstanceOfSatisfying(
+              SagaInFlightException.class,
+              exception -> {
+                assertThat(exception.getDataSetId()).isEqualTo(id);
+                assertThat(exception.getPendingSagaType()).isEqualTo(PendingSagaType.CREATE);
+              })
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining(PendingSagaType.CREATE.name());
     }
 
     @Test
@@ -1999,6 +2017,27 @@ class DataSetServiceTest {
       assertThat(ds.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
       verify(sagaPublisher).publishDeleteRequested(ds);
       verify(dataSetRepository, never()).delete(any(DataSet.class));
+    }
+
+    @Test
+    @DisplayName("throws SagaInFlightException when a saga is in-flight")
+    void throwsWhenSagaInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setProvisioned(true);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().deleteById(id))
+          .isInstanceOfSatisfying(
+              SagaInFlightException.class,
+              exception -> {
+                assertThat(exception.getDataSetId()).isEqualTo(id);
+                assertThat(exception.getPendingSagaType()).isEqualTo(PendingSagaType.UPDATE);
+              })
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining(PendingSagaType.UPDATE.name());
+      verify(sagaPublisher, never()).publishDeleteRequested(any());
     }
 
     @Test

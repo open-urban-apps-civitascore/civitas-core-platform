@@ -126,13 +126,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
   }
 
-  /**
-   * Handles saga-in-flight exceptions and returns a 409 Problem Detail response.
-   *
-   * @param ex the saga in flight exception
-   * @param request the current HTTP request
-   * @return a Problem Detail with HTTP 409 status and the pending saga type
-   */
   @ExceptionHandler(SagaInFlightException.class)
   @ResponseStatus(HttpStatus.CONFLICT)
   public ProblemDetail handleSagaInFlight(SagaInFlightException ex, HttpServletRequest request) {
