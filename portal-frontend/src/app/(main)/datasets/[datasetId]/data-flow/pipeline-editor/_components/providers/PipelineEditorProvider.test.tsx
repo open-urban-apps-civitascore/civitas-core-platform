@@ -1677,6 +1677,122 @@ describe('PipelineEditorProviderComponent', () => {
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('header.saveFailed')
     })
 
+    it('shows a not-draft toast instead of a generic save failure on a DATASET_NOT_EDITABLE error', async () => {
+      const axiosError = new AxiosError(
+        'Bad Request',
+        undefined,
+        { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
+        undefined,
+        {
+          status: 400,
+          statusText: 'Bad Request',
+          headers: new AxiosHeaders(),
+          config: { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
+          data: {
+            detail: 'DataSet must be in DRAFT to modify sub-entities',
+            type: 'urn:civitas:error:DATASET_NOT_EDITABLE',
+          },
+        },
+      )
+      mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.notDraftError')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
+    })
+
+    it('returns false on a DATASET_NOT_EDITABLE error', async () => {
+      const axiosError = new AxiosError(
+        'Bad Request',
+        undefined,
+        { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
+        undefined,
+        {
+          status: 400,
+          statusText: 'Bad Request',
+          headers: new AxiosHeaders(),
+          config: { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
+          data: {
+            detail: 'DataSet must be in DRAFT to modify sub-entities',
+            type: 'urn:civitas:error:DATASET_NOT_EDITABLE',
+          },
+        },
+      )
+      mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+    })
+
+    it('shows a saga-in-flight toast instead of a generic save failure on a RESOURCE_IN_USE error', async () => {
+      const axiosError = new AxiosError(
+        'Conflict',
+        undefined,
+        { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
+        undefined,
+        {
+          status: 409,
+          statusText: 'Conflict',
+          headers: new AxiosHeaders(),
+          config: { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
+          data: {
+            detail: 'DataSet has a pending RELEASE saga',
+            type: 'urn:civitas:error:RESOURCE_IN_USE',
+          },
+        },
+      )
+      mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.sagaInFlightError')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
+    })
+
+    it('returns false on a RESOURCE_IN_USE error', async () => {
+      const axiosError = new AxiosError(
+        'Conflict',
+        undefined,
+        { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
+        undefined,
+        {
+          status: 409,
+          statusText: 'Conflict',
+          headers: new AxiosHeaders(),
+          config: { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
+          data: {
+            detail: 'DataSet has a pending RELEASE saga',
+            type: 'urn:civitas:error:RESOURCE_IN_USE',
+          },
+        },
+      )
+      mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+    })
+
     it('returns false on a 422 error', async () => {
       const axiosError = new AxiosError(
         'Unprocessable Entity',
@@ -1931,6 +2047,92 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       expect(contextRef.current?.activeSessionId).toBe('session-1')
+    })
+
+    it('shows a not-draft toast when the backend rejects with DATASET_NOT_EDITABLE', () => {
+      const session = makeSession({
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-to-delete' },
+      })
+      renderProvider(session)
+
+      act(() => {
+        contextRef.current?.deletePipeline()
+      })
+
+      const [, { onError }] = mockDeleteMutate.mock.calls[0]
+      const axiosError = new AxiosError(
+        'Bad Request',
+        undefined,
+        { headers: new AxiosHeaders(), method: 'DELETE', url: '/pipelines/pipeline-to-delete' } as InternalAxiosRequestConfig,
+        undefined,
+        {
+          status: 400,
+          statusText: 'Bad Request',
+          headers: new AxiosHeaders(),
+          config: { headers: new AxiosHeaders(), method: 'DELETE', url: '/pipelines/pipeline-to-delete' } as InternalAxiosRequestConfig,
+          data: {
+            detail: 'DataSet must be in DRAFT',
+            type: 'urn:civitas:error:DATASET_NOT_EDITABLE',
+          },
+        },
+      )
+      act(() => {
+        onError(axiosError)
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.notDraftError')
+    })
+
+    it('shows a saga-in-flight toast when the backend rejects with RESOURCE_IN_USE', () => {
+      const session = makeSession({
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-to-delete' },
+      })
+      renderProvider(session)
+
+      act(() => {
+        contextRef.current?.deletePipeline()
+      })
+
+      const [, { onError }] = mockDeleteMutate.mock.calls[0]
+      const axiosError = new AxiosError(
+        'Conflict',
+        undefined,
+        { headers: new AxiosHeaders(), method: 'DELETE', url: '/pipelines/pipeline-to-delete' } as InternalAxiosRequestConfig,
+        undefined,
+        {
+          status: 409,
+          statusText: 'Conflict',
+          headers: new AxiosHeaders(),
+          config: { headers: new AxiosHeaders(), method: 'DELETE', url: '/pipelines/pipeline-to-delete' } as InternalAxiosRequestConfig,
+          data: {
+            detail: 'DataSet has a pending RELEASE saga',
+            type: 'urn:civitas:error:RESOURCE_IN_USE',
+          },
+        },
+      )
+      act(() => {
+        onError(axiosError)
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.sagaInFlightError')
+    })
+
+    it('shows a generic delete-failed toast on an unrecognised error', () => {
+      const session = makeSession({
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-to-delete' },
+      })
+      renderProvider(session)
+
+      act(() => {
+        contextRef.current?.deletePipeline()
+      })
+
+      const [, { onError }] = mockDeleteMutate.mock.calls[0]
+      act(() => {
+        onError(new Error('Network failure'))
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('toolbar.deleteFailed')
     })
   })
 
