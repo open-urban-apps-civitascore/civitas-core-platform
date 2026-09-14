@@ -117,19 +117,39 @@ describe('isDatapoolScopeViolationError', () => {
   })
 })
 
+const TABLE_NAME_CONFLICT_ON_CREATE =
+  "Another POSTGIS DataSink of this dataset already uses tableName 'shared_table'; they would share one physical table"
+
+const TABLE_NAME_CONFLICT_ON_UPDATE =
+  "This DataSink's tableName 'T_ONE' is already used by another POSTGIS DataSink of this dataset; rename it to change this sink"
+
 describe('isTableNameConflictError', () => {
-  it('returns true for a 409 error naming the tableName field', () => {
-    const error = getError(409, "DataSink with configuration.tableName 'roads' and dataSetId 'ds-1' already exists")
+  it('returns true when a new data storage uses a table name that is already taken', () => {
+    const error = getError(409, TABLE_NAME_CONFLICT_ON_CREATE, 'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION')
     expect(isTableNameConflictError(error)).toBe(true)
   })
 
-  it('returns false for a 409 error about another field', () => {
-    const error = getError(409, 'Group with name "Local Data Consumers" already exists')
+  it('returns true when a saved data storage is renamed to a table name that is already taken', () => {
+    const error = getError(409, TABLE_NAME_CONFLICT_ON_UPDATE, 'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION')
+    expect(isTableNameConflictError(error)).toBe(true)
+  })
+
+  it('returns false when two pipelines have the same name', () => {
+    const error = getError(
+      409,
+      "Pipeline with name 'Test' and datasetId 'ds-1' already exists",
+      'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION',
+    )
+    expect(isTableNameConflictError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error without a type field', () => {
+    const error = getError(409, TABLE_NAME_CONFLICT_ON_CREATE)
     expect(isTableNameConflictError(error)).toBe(false)
   })
 
   it('returns false for non-409 status codes', () => {
-    const error = getError(400, "DataSink with configuration.tableName 'roads' already exists")
+    const error = getError(400, TABLE_NAME_CONFLICT_ON_CREATE, 'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION')
     expect(isTableNameConflictError(error)).toBe(false)
   })
 

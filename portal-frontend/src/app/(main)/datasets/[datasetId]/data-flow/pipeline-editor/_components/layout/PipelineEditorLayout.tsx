@@ -200,7 +200,6 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
  */
 export const PipelineEditorLayout: React.FC<PipelineEditorLayoutProps> = ({ className = '' }) => {
   // Single source of truth for session state
-
   const sessionManager = usePipelineSession()
 
   return (

@@ -1658,8 +1658,9 @@ describe('PipelineEditorProviderComponent', () => {
           headers: new AxiosHeaders(),
           config: { headers: new AxiosHeaders(), method: 'POST', url: '/datasinks' } as InternalAxiosRequestConfig,
           data: {
-            detail: "DataSink with configuration.tableName 'roads' and dataSetId 'dataset-1' already exists",
-            type: 'urn:civitas:error:CONFLICT',
+            detail:
+              "Another POSTGIS DataSink of this dataset already uses tableName 'roads'; they would share one physical table",
+            type: 'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION',
           },
         },
       )

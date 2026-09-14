@@ -43,11 +43,11 @@ export const isDatapoolScopeViolationError = (error: unknown) => {
 
 export const isTableNameConflictError = (error: unknown) => {
   if (!isAxiosError(error)) return false
-  const isConflictError = error.status === 409
-  if (!error?.response) return false
+  if (error.status !== 409 || !error.response) return false
   const apiError = error.response.data as ApiError
+  if (typeof apiError?.type !== 'string' || !apiError.type.endsWith('UNIQUE_CONSTRAINT_VIOLATION')) return false
   const errorDetail = apiError.detail || ''
-  return isConflictError && errorDetail.includes('tableName') && errorDetail.includes('already exists')
+  return errorDetail.includes('tableName') && /already use[sd]/.test(errorDetail)
 }
 
 export const isNotDraftError = (error: unknown) => {

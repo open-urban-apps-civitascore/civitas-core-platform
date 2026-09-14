@@ -446,7 +446,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     deletePipelineMutation.mutate(pipelineId, {
       onSuccess: () => {
         removeSession()
-        console.log('Pipeline deleted successfully')
       },
       onError: error => {
         if (isNotDraftError(error)) {
@@ -454,6 +453,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         } else if (isSagaInFlightError(error)) {
           toast.error(t('header.sagaInFlightError'))
         } else {
+          console.error('Failed to delete pipeline:', error)
           toast.error(t('toolbar.deleteFailed'))
         }
       },
