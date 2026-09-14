@@ -1343,7 +1343,10 @@
       "deletePipeline": "Delete Pipeline",
       "deleteConfirmTitle": "Delete Pipeline?",
       "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone.",
-      "deleteFailed": "Failed to delete the pipeline. Please try again."
+      "deleteFailed": "Failed to delete the pipeline. Please try again.",
+      "discardPipeline": "Discard Pipeline",
+      "discardConfirmTitle": "Discard Pipeline?",
+      "discardConfirmDescription": "Are you sure you want to discard this pipeline? This action cannot be undone."
     },
     "dataLoss": {
       "title": "Discard stored data and rebuild it?",

@@ -427,7 +427,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Pipeline Operations: Delete =====
   const deletePipeline = useCallback(() => {
-    if (!canDelete || !activeSession) return
+    if (!activeSession) return
 
     const pipelineId = activeSession.pipeline.id
 
@@ -435,27 +435,29 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       sessionManager.closeSession(activeSession.id)
     }
 
-    if (pipelineId) {
-      // Existing pipeline → DELETE from backend, then remove session
-      deletePipelineMutation.mutate(pipelineId, {
-        onSuccess: () => {
-          removeSession()
-          console.log('Pipeline deleted successfully')
-        },
-        onError: error => {
-          if (isNotDraftError(error)) {
-            toast.error(t('header.notDraftError'))
-          } else if (isSagaInFlightError(error)) {
-            toast.error(t('header.sagaInFlightError'))
-          } else {
-            toast.error(t('toolbar.deleteFailed'))
-          }
-        },
-      })
-    } else {
-      // Never-saved pipeline → just remove the session
+    // A never-saved pipeline exists only in the session, so discarding it needs no permission.
+    if (!pipelineId) {
       removeSession()
+      return
     }
+
+    if (!canDelete) return
+
+    deletePipelineMutation.mutate(pipelineId, {
+      onSuccess: () => {
+        removeSession()
+        console.log('Pipeline deleted successfully')
+      },
+      onError: error => {
+        if (isNotDraftError(error)) {
+          toast.error(t('header.notDraftError'))
+        } else if (isSagaInFlightError(error)) {
+          toast.error(t('header.sagaInFlightError'))
+        } else {
+          toast.error(t('toolbar.deleteFailed'))
+        }
+      },
+    })
   }, [activeSession, sessionManager, deletePipelineMutation, canDelete, t])
 
   const isDeleting = deletePipelineMutation.isPending

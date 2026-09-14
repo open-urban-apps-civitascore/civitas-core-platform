@@ -1330,7 +1330,10 @@
       "deletePipeline": "Pipeline löschen",
       "deleteConfirmTitle": "Pipeline löschen?",
       "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
-      "deleteFailed": "Beim Löschen der Pipeline ist ein Fehler aufgetreten. Bitte versuche es erneut."
+      "deleteFailed": "Beim Löschen der Pipeline ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+      "discardPipeline": "Pipeline verwerfen",
+      "discardConfirmTitle": "Pipeline wirklich verwerfen?",
+      "discardConfirmDescription": "Sind Sie sicher, dass Sie die Pipeline verwerfen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
     },
     "dataLoss": {
       "title": "Gespeicherte Daten verwerfen und neu erzeugen?",

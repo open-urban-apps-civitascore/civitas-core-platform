@@ -2019,6 +2019,22 @@ describe('PipelineEditorProviderComponent', () => {
       expect(contextRef.current?.activeSessionId).not.toBe('session-1')
     })
 
+    it('closes the session for a never-saved pipeline even without delete permission', () => {
+      mockDatasetPermissions.canDeletePipeline = false
+
+      const session = makeSession({
+        pipeline: { ...createEmptyPipeline('Test'), id: undefined },
+      })
+      renderProvider(session)
+
+      act(() => {
+        contextRef.current?.deletePipeline()
+      })
+
+      expect(mockDeleteMutate).not.toHaveBeenCalled()
+      expect(contextRef.current?.activeSessionId).not.toBe('session-1')
+    })
+
     it('does not call the delete mutation when canDeletePipeline is false', () => {
       mockDatasetPermissions.canDeletePipeline = false
 
