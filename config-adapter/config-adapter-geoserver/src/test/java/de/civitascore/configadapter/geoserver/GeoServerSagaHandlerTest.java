@@ -1267,6 +1267,25 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void treatsAnUnexpectedFeatureTypeEntryShapeAsNoFeatureTypes() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // The wrapper is a map, but its entry list is not a list. That is as unreadable as an
+        // unexpected wrapper, so it takes the same logged, non-failing path.
+        Response snapshot = unexpectedEntryShapeSnapshotResponse();
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(List.of(), result.compensationData().get("previousFeatureTypes"));
+      }
+    }
+
+    @Test
     void provisionsWorkspaceAndDatastoreWhenMissingThenPublishesLayers() {
       try (GeoServerSagaHandler handler = createHandler()) {
         // Workspace not provisioned yet → the feature-types snapshot read returns 404 (empty).
@@ -1918,6 +1937,15 @@ class GeoServerSagaHandlerTest {
     Response response = mock(Response.class);
     when(response.getStatus()).thenReturn(200);
     when(response.readEntity(Map.class)).thenReturn(Map.of("featureTypes", List.of("t1")));
+    return response;
+  }
+
+  /** Mocks a 200 {@code featuretypes.json} response whose {@code featureType} is not a list. */
+  private static Response unexpectedEntryShapeSnapshotResponse() {
+    Response response = mock(Response.class);
+    when(response.getStatus()).thenReturn(200);
+    when(response.readEntity(Map.class))
+        .thenReturn(Map.of("featureTypes", Map.of("featureType", Map.of("name", "t1"))));
     return response;
   }
 

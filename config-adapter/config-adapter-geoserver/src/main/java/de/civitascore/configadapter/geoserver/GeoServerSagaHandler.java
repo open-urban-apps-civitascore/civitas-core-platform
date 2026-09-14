@@ -1225,6 +1225,12 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       if (ftList instanceof List) {
         return (List<Map<String, Object>>) ftList;
       }
+      // Same reasoning as above: a wrapper without a readable entry list is not an empty workspace.
+      log.warn(
+          "{}/read-featuretypes: unexpected featureType shape {} for workspace {}",
+          Encode.forJava(step),
+          typeName(ftList),
+          Encode.forJava(workspaceName));
       return List.of();
     }
   }
