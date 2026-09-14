@@ -1,8 +1,8 @@
 import { act, render } from '@testing-library/react'
-import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios'
 import React from 'react'
 import { toast } from 'sonner'
 
+import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import {
   useCreateDataSink,
@@ -1618,21 +1618,10 @@ describe('PipelineEditorProviderComponent', () => {
     })
 
     it('shows a scope violation toast with the pipeline name on a 422 error', async () => {
-      const axiosError = new AxiosError(
-        'Unprocessable Entity',
-        undefined,
-        { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
-        undefined,
-        {
-          status: 422,
-          statusText: 'Unprocessable Entity',
-          headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
-          data: {
-            detail: 'DataSource "My DS" is not permitted for this datapool',
-            type: 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
-          },
-        },
+      const axiosError = mockApiError(
+        422,
+        'DataSource "My DS" is not permitted for this datapool',
+        'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
       )
       mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
 
@@ -1647,22 +1636,10 @@ describe('PipelineEditorProviderComponent', () => {
     })
 
     it('reports a duplicate table name instead of a generic save failure on a 409 error', async () => {
-      const axiosError = new AxiosError(
-        'Conflict',
-        undefined,
-        { headers: new AxiosHeaders(), method: 'POST', url: '/datasinks' } as InternalAxiosRequestConfig,
-        undefined,
-        {
-          status: 409,
-          statusText: 'Conflict',
-          headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'POST', url: '/datasinks' } as InternalAxiosRequestConfig,
-          data: {
-            detail:
-              "Another POSTGIS DataSink of this dataset already uses tableName 'roads'; they would share one physical table",
-            type: 'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION',
-          },
-        },
+      const axiosError = mockApiError(
+        409,
+        "Another POSTGIS DataSink of this dataset already uses tableName 'roads'; they would share one physical table",
+        'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION',
       )
       mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
 
@@ -1679,25 +1656,10 @@ describe('PipelineEditorProviderComponent', () => {
     })
 
     it('shows a not-draft toast instead of a generic save failure on a DATASET_NOT_EDITABLE error', async () => {
-      const axiosError = new AxiosError(
-        'Bad Request',
-        undefined,
-        { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
-        undefined,
-        {
-          status: 400,
-          statusText: 'Bad Request',
-          headers: new AxiosHeaders(),
-          config: {
-            headers: new AxiosHeaders(),
-            method: 'PUT',
-            url: '/pipelines/pipeline-1',
-          } as InternalAxiosRequestConfig,
-          data: {
-            detail: 'DataSet must be in DRAFT to modify sub-entities',
-            type: 'urn:civitas:error:DATASET_NOT_EDITABLE',
-          },
-        },
+      const axiosError = mockApiError(
+        400,
+        'DataSet must be in DRAFT to modify sub-entities',
+        'urn:civitas:error:DATASET_NOT_EDITABLE',
       )
       mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
 
@@ -1712,25 +1674,10 @@ describe('PipelineEditorProviderComponent', () => {
     })
 
     it('returns false on a DATASET_NOT_EDITABLE error', async () => {
-      const axiosError = new AxiosError(
-        'Bad Request',
-        undefined,
-        { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
-        undefined,
-        {
-          status: 400,
-          statusText: 'Bad Request',
-          headers: new AxiosHeaders(),
-          config: {
-            headers: new AxiosHeaders(),
-            method: 'PUT',
-            url: '/pipelines/pipeline-1',
-          } as InternalAxiosRequestConfig,
-          data: {
-            detail: 'DataSet must be in DRAFT to modify sub-entities',
-            type: 'urn:civitas:error:DATASET_NOT_EDITABLE',
-          },
-        },
+      const axiosError = mockApiError(
+        400,
+        'DataSet must be in DRAFT to modify sub-entities',
+        'urn:civitas:error:DATASET_NOT_EDITABLE',
       )
       mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
 
@@ -1745,25 +1692,10 @@ describe('PipelineEditorProviderComponent', () => {
     })
 
     it('shows a saga-in-flight toast instead of a generic save failure on a RESOURCE_IN_USE error', async () => {
-      const axiosError = new AxiosError(
-        'Conflict',
-        undefined,
-        { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
-        undefined,
-        {
-          status: 409,
-          statusText: 'Conflict',
-          headers: new AxiosHeaders(),
-          config: {
-            headers: new AxiosHeaders(),
-            method: 'PUT',
-            url: '/pipelines/pipeline-1',
-          } as InternalAxiosRequestConfig,
-          data: {
-            detail: 'Cannot write while a saga is in-flight: UNRELEASE',
-            type: 'urn:civitas:error:RESOURCE_IN_USE',
-          },
-        },
+      const axiosError = mockApiError(
+        409,
+        'Cannot write while a saga is in-flight: UNRELEASE',
+        'urn:civitas:error:RESOURCE_IN_USE',
       )
       mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
 
@@ -1778,25 +1710,10 @@ describe('PipelineEditorProviderComponent', () => {
     })
 
     it('returns false on a RESOURCE_IN_USE error', async () => {
-      const axiosError = new AxiosError(
-        'Conflict',
-        undefined,
-        { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
-        undefined,
-        {
-          status: 409,
-          statusText: 'Conflict',
-          headers: new AxiosHeaders(),
-          config: {
-            headers: new AxiosHeaders(),
-            method: 'PUT',
-            url: '/pipelines/pipeline-1',
-          } as InternalAxiosRequestConfig,
-          data: {
-            detail: 'Cannot write while a saga is in-flight: UNRELEASE',
-            type: 'urn:civitas:error:RESOURCE_IN_USE',
-          },
-        },
+      const axiosError = mockApiError(
+        409,
+        'Cannot write while a saga is in-flight: UNRELEASE',
+        'urn:civitas:error:RESOURCE_IN_USE',
       )
       mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
 
@@ -1811,21 +1728,10 @@ describe('PipelineEditorProviderComponent', () => {
     })
 
     it('returns false on a 422 error', async () => {
-      const axiosError = new AxiosError(
-        'Unprocessable Entity',
-        undefined,
-        { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
-        undefined,
-        {
-          status: 422,
-          statusText: 'Unprocessable Entity',
-          headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
-          data: {
-            detail: 'DataSource "My DS" is not permitted for this datapool',
-            type: 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
-          },
-        },
+      const axiosError = mockApiError(
+        422,
+        'DataSource "My DS" is not permitted for this datapool',
+        'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
       )
       mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
 
@@ -2093,30 +1999,7 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       const [, { onError }] = mockDeleteMutate.mock.calls[0]
-      const axiosError = new AxiosError(
-        'Bad Request',
-        undefined,
-        {
-          headers: new AxiosHeaders(),
-          method: 'DELETE',
-          url: '/pipelines/pipeline-to-delete',
-        } as InternalAxiosRequestConfig,
-        undefined,
-        {
-          status: 400,
-          statusText: 'Bad Request',
-          headers: new AxiosHeaders(),
-          config: {
-            headers: new AxiosHeaders(),
-            method: 'DELETE',
-            url: '/pipelines/pipeline-to-delete',
-          } as InternalAxiosRequestConfig,
-          data: {
-            detail: 'DataSet must be in DRAFT',
-            type: 'urn:civitas:error:DATASET_NOT_EDITABLE',
-          },
-        },
-      )
+      const axiosError = mockApiError(400, 'DataSet must be in DRAFT', 'urn:civitas:error:DATASET_NOT_EDITABLE')
       act(() => {
         onError(axiosError)
       })
@@ -2135,29 +2018,10 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       const [, { onError }] = mockDeleteMutate.mock.calls[0]
-      const axiosError = new AxiosError(
-        'Conflict',
-        undefined,
-        {
-          headers: new AxiosHeaders(),
-          method: 'DELETE',
-          url: '/pipelines/pipeline-to-delete',
-        } as InternalAxiosRequestConfig,
-        undefined,
-        {
-          status: 409,
-          statusText: 'Conflict',
-          headers: new AxiosHeaders(),
-          config: {
-            headers: new AxiosHeaders(),
-            method: 'DELETE',
-            url: '/pipelines/pipeline-to-delete',
-          } as InternalAxiosRequestConfig,
-          data: {
-            detail: 'Cannot write while a saga is in-flight: UNRELEASE',
-            type: 'urn:civitas:error:RESOURCE_IN_USE',
-          },
-        },
+      const axiosError = mockApiError(
+        409,
+        'Cannot write while a saga is in-flight: UNRELEASE',
+        'urn:civitas:error:RESOURCE_IN_USE',
       )
       act(() => {
         onError(axiosError)
