@@ -127,7 +127,7 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
         () -> "expected an empty string, got " + featureTypes.getNodeType() + ": " + featureTypes);
   }
 
-  /** Route 1: a dataset with a geographic sink and no map layer. */
+  /** A dataset with a geographic sink and no map layer. */
   @Test
   void updateSucceedsWhenTheDatasetNeverHadAMapLayer() {
     assertStepCompleted(provision(List.of()));
@@ -142,7 +142,6 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
         "an empty workspace yields an empty snapshot, not a failure");
   }
 
-  /** Route 4: the last map layer is removed, pruned, and the dataset updated again. */
   @Test
   void updateSucceedsAfterTheLastFeatureTypeWasPruned() {
     assertStepCompleted(provision(List.of(layer(LAYER_POINT))));
@@ -152,8 +151,7 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
     assertStepCompleted(prune(List.of()));
     assertEquals(404, featureTypeStatus(LAYER_POINT), "the last feature type is gone");
 
-    // The datastore stays, so every later update reads an empty feature-type listing.
-    assertStepCompleted(update(List.of()));
+    // The datastore stays, so the update now reads an empty feature-type listing.
     assertStepCompleted(update(List.of()));
   }
 

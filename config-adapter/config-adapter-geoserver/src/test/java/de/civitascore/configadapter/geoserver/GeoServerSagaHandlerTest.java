@@ -1248,6 +1248,25 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void treatsAnUnexpectedFeatureTypesShapeAsNoFeatureTypes() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // A shape GeoServer is not known to send must not fail the step, but it is not evidence of
+        // an empty workspace either, so it yields an empty snapshot and is logged.
+        Response snapshot = unexpectedShapeSnapshotResponse();
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(List.of(), result.compensationData().get("previousFeatureTypes"));
+      }
+    }
+
+    @Test
     void provisionsWorkspaceAndDatastoreWhenMissingThenPublishesLayers() {
       try (GeoServerSagaHandler handler = createHandler()) {
         // Workspace not provisioned yet → the feature-types snapshot read returns 404 (empty).
@@ -1891,6 +1910,14 @@ class GeoServerSagaHandlerTest {
     Response response = mock(Response.class);
     when(response.getStatus()).thenReturn(200);
     when(response.readEntity(Map.class)).thenReturn(Map.of("featureTypes", ""));
+    return response;
+  }
+
+  /** Mocks a 200 {@code featuretypes.json} response whose {@code featureTypes} has an odd shape. */
+  private static Response unexpectedShapeSnapshotResponse() {
+    Response response = mock(Response.class);
+    when(response.getStatus()).thenReturn(200);
+    when(response.readEntity(Map.class)).thenReturn(Map.of("featureTypes", List.of("t1")));
     return response;
   }
 

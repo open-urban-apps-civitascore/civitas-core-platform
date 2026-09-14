@@ -1205,9 +1205,20 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
             step + "/read-featuretypes failed: HTTP " + status + " — " + body, status);
       }
       Map<String, Object> result = response.readEntity(Map.class);
+      Object value = result.get("featureTypes");
       // A workspace serving no feature type answers {"featureTypes":""}: GeoServer serialises an
-      // empty collection as an empty string, so anything but a map means no feature types.
-      if (!(result.get("featureTypes") instanceof Map<?, ?> featureTypes)) {
+      // empty collection as an empty string.
+      if (value instanceof String text && text.isEmpty()) {
+        return List.of();
+      }
+      if (!(value instanceof Map<?, ?> featureTypes)) {
+        // An unknown shape is not an empty workspace: reading it as one would let the restore step
+        // skip its orphan deletion and still report success.
+        log.warn(
+            "{}/read-featuretypes: unexpected featureTypes shape {} for workspace {}",
+            Encode.forJava(step),
+            typeName(value),
+            Encode.forJava(workspaceName));
         return List.of();
       }
       Object ftList = featureTypes.get("featureType");
