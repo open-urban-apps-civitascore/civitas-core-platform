@@ -1248,40 +1248,33 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void treatsAnUnexpectedFeatureTypesShapeAsNoFeatureTypes() {
+    void failsWhenTheFeatureTypesWrapperCannotBeRead() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        // A shape GeoServer is not known to send must not fail the step, but it is not evidence of
-        // an empty workspace either, so it yields an empty snapshot and is logged.
+        // An unreadable listing must not pass as an empty workspace: compensation deletes every
+        // feature type absent from the snapshot, so a wrong empty unpublishes the whole dataset.
         Response snapshot = unexpectedShapeSnapshotResponse();
         when(mockBuilder.get()).thenReturn(snapshot);
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
 
         SagaCommandResult result =
             handler.handle(createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1")));
 
-        assertEquals("STEP_COMPLETED", result.type());
-        assertEquals(List.of(), result.compensationData().get("previousFeatureTypes"));
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
       }
     }
 
     @Test
-    void treatsAnUnexpectedFeatureTypeEntryShapeAsNoFeatureTypes() {
+    void failsWhenTheFeatureTypeEntryListCannotBeRead() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        // The wrapper is a map, but its entry list is not a list. That is as unreadable as an
-        // unexpected wrapper, so it takes the same logged, non-failing path.
+        // The wrapper is a map, but its entry list is not a list — as unreadable as a bad wrapper.
         Response snapshot = unexpectedEntryShapeSnapshotResponse();
         when(mockBuilder.get()).thenReturn(snapshot);
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
 
         SagaCommandResult result =
             handler.handle(createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1")));
 
-        assertEquals("STEP_COMPLETED", result.type());
-        assertEquals(List.of(), result.compensationData().get("previousFeatureTypes"));
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
       }
     }
 

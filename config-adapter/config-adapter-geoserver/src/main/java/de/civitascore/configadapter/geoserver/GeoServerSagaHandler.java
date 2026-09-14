@@ -1212,26 +1212,19 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
         return List.of();
       }
       if (!(value instanceof Map<?, ?> featureTypes)) {
-        // An unknown shape is not an empty workspace: reading it as one would let the restore step
-        // skip its orphan deletion and still report success.
-        log.warn(
-            "{}/read-featuretypes: unexpected featureTypes shape {} for workspace {}",
-            Encode.forJava(step),
-            typeName(value),
-            Encode.forJava(workspaceName));
-        return List.of();
+        // Same rule as the non-200 branch: a listing we cannot read is not an empty workspace. An
+        // empty snapshot is not merely lost restore state — compensation deletes every feature type
+        // absent from it, so a wrong empty here unpublishes the dataset's layers.
+        throw new SagaApiException(
+            step + "/read-featuretypes: unexpected featureTypes shape " + typeName(value), status);
       }
       Object ftList = featureTypes.get("featureType");
       if (ftList instanceof List) {
         return (List<Map<String, Object>>) ftList;
       }
-      // Same reasoning as above: a wrapper without a readable entry list is not an empty workspace.
-      log.warn(
-          "{}/read-featuretypes: unexpected featureType shape {} for workspace {}",
-          Encode.forJava(step),
-          typeName(ftList),
-          Encode.forJava(workspaceName));
-      return List.of();
+      // Same reasoning: a wrapper without a readable entry list is not an empty workspace either.
+      throw new SagaApiException(
+          step + "/read-featuretypes: unexpected featureType shape " + typeName(ftList), status);
     }
   }
 
