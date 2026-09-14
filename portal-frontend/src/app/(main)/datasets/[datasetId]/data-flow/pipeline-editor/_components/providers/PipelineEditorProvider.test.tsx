@@ -1687,7 +1687,11 @@ describe('PipelineEditorProviderComponent', () => {
           status: 400,
           statusText: 'Bad Request',
           headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
+          config: {
+            headers: new AxiosHeaders(),
+            method: 'PUT',
+            url: '/pipelines/pipeline-1',
+          } as InternalAxiosRequestConfig,
           data: {
             detail: 'DataSet must be in DRAFT to modify sub-entities',
             type: 'urn:civitas:error:DATASET_NOT_EDITABLE',
@@ -1716,7 +1720,11 @@ describe('PipelineEditorProviderComponent', () => {
           status: 400,
           statusText: 'Bad Request',
           headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
+          config: {
+            headers: new AxiosHeaders(),
+            method: 'PUT',
+            url: '/pipelines/pipeline-1',
+          } as InternalAxiosRequestConfig,
           data: {
             detail: 'DataSet must be in DRAFT to modify sub-entities',
             type: 'urn:civitas:error:DATASET_NOT_EDITABLE',
@@ -1745,7 +1753,11 @@ describe('PipelineEditorProviderComponent', () => {
           status: 409,
           statusText: 'Conflict',
           headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
+          config: {
+            headers: new AxiosHeaders(),
+            method: 'PUT',
+            url: '/pipelines/pipeline-1',
+          } as InternalAxiosRequestConfig,
           data: {
             detail: 'Cannot write while a saga is in-flight: UNRELEASE',
             type: 'urn:civitas:error:RESOURCE_IN_USE',
@@ -1774,7 +1786,11 @@ describe('PipelineEditorProviderComponent', () => {
           status: 409,
           statusText: 'Conflict',
           headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
+          config: {
+            headers: new AxiosHeaders(),
+            method: 'PUT',
+            url: '/pipelines/pipeline-1',
+          } as InternalAxiosRequestConfig,
           data: {
             detail: 'Cannot write while a saga is in-flight: UNRELEASE',
             type: 'urn:civitas:error:RESOURCE_IN_USE',
@@ -2079,13 +2095,21 @@ describe('PipelineEditorProviderComponent', () => {
       const axiosError = new AxiosError(
         'Bad Request',
         undefined,
-        { headers: new AxiosHeaders(), method: 'DELETE', url: '/pipelines/pipeline-to-delete' } as InternalAxiosRequestConfig,
+        {
+          headers: new AxiosHeaders(),
+          method: 'DELETE',
+          url: '/pipelines/pipeline-to-delete',
+        } as InternalAxiosRequestConfig,
         undefined,
         {
           status: 400,
           statusText: 'Bad Request',
           headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'DELETE', url: '/pipelines/pipeline-to-delete' } as InternalAxiosRequestConfig,
+          config: {
+            headers: new AxiosHeaders(),
+            method: 'DELETE',
+            url: '/pipelines/pipeline-to-delete',
+          } as InternalAxiosRequestConfig,
           data: {
             detail: 'DataSet must be in DRAFT',
             type: 'urn:civitas:error:DATASET_NOT_EDITABLE',
@@ -2113,13 +2137,21 @@ describe('PipelineEditorProviderComponent', () => {
       const axiosError = new AxiosError(
         'Conflict',
         undefined,
-        { headers: new AxiosHeaders(), method: 'DELETE', url: '/pipelines/pipeline-to-delete' } as InternalAxiosRequestConfig,
+        {
+          headers: new AxiosHeaders(),
+          method: 'DELETE',
+          url: '/pipelines/pipeline-to-delete',
+        } as InternalAxiosRequestConfig,
         undefined,
         {
           status: 409,
           statusText: 'Conflict',
           headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'DELETE', url: '/pipelines/pipeline-to-delete' } as InternalAxiosRequestConfig,
+          config: {
+            headers: new AxiosHeaders(),
+            method: 'DELETE',
+            url: '/pipelines/pipeline-to-delete',
+          } as InternalAxiosRequestConfig,
           data: {
             detail: 'Cannot write while a saga is in-flight: UNRELEASE',
             type: 'urn:civitas:error:RESOURCE_IN_USE',

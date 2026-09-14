@@ -11,7 +11,6 @@ import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientReq
 import { useDeleteLayer, useGetLayers } from '@/app/services/api/datasets/layers/clientRequests'
 import { useDeleteStyle, useGetStyles } from '@/app/services/api/datasets/styles/clientRequests'
 import { apiRequest } from '@/app/services/api/request/apiRequest'
-import { isNotDraftError, isSagaInFlightError } from '@/utils/errors'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { Form } from '@/components/ui/form'
 import { Dataset } from '@/types/datasets'
@@ -27,6 +26,7 @@ import {
   StaApiFormData,
 } from '@/types/namedApis'
 import { StyleFormData } from '@/types/styles'
+import { isNotDraftError, isSagaInFlightError } from '@/utils/errors'
 import { getNativeCRSFromDataSink, mapApiLayerToFormData, mapApiStyleToFormData } from '@/utils/namedApis'
 
 import { useApiConfig } from '../../hooks/useApiConfig'
