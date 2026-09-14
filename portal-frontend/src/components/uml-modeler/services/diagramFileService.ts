@@ -42,8 +42,14 @@ export interface DiagramExportOptions {
  * When name is absent, 'datastructure' is used as fallback.
  */
 export const buildDiagramFileName = (dataStructureName?: string, versionName?: string | null): string => {
-  const cleanName = dataStructureName?.trim().replace(/[^a-zA-Z0-9]/g, '_') || 'datastructure'
-  const cleanVersion = versionName?.trim() ? versionName.trim().replace(/[^a-zA-Z0-9]/g, '_') : 'draft'
+  const sanitizePart = (val?: string | null, fallback = ''): string => {
+    const trimmed = val?.trim() || ''
+    const sanitized = trimmed.replace(/[/\\:*?"<>|\x00-\x1f\x7f]/g, '_').trim()
+    return sanitized || fallback
+  }
+
+  const cleanName = sanitizePart(dataStructureName, 'datastructure')
+  const cleanVersion = sanitizePart(versionName, 'draft')
   return `${cleanName}-${cleanVersion}.json`
 }
 
@@ -204,6 +210,7 @@ export const readDiagramFile = async (file: File): Promise<UMLDiagram> => {
   }
 
   const doc = parsed as Record<string, unknown>
+  // Support 'x-ui-styles' per specification; fall back to legacy 'styles' property from prototype documents
   const uiStyles = doc['x-ui-styles'] ?? doc['styles']
 
   if (!uiStyles || typeof uiStyles !== 'object' || Array.isArray(uiStyles)) {

@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -32,6 +33,17 @@ vi.mock('../inspector/PropertyInspector', () => ({
 vi.mock('../palette/ElementPalette', () => ({
   ElementPalette: () => <div data-testid="element-palette" />,
 }))
+
+vi.mock('../tabs/Toolbar', () => ({
+  Toolbar: () => <div data-testid="toolbar" />,
+}))
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+    mutations: { retry: false },
+  },
+})
 
 const createSampleNode = (id: string, name: string): UMLNode => ({
   id,
@@ -73,7 +85,12 @@ describe('MultiSessionLayout Import & Export', () => {
     vi.clearAllMocks()
   })
 
-  const renderLayout = (diagram = createMockDiagram(), isReadOnly = false) => {
+  const renderLayout = (
+    diagram = createMockDiagram(),
+    isReadOnly = false,
+    canExportDiagram?: boolean,
+    datastructureId: string | undefined = '12345',
+  ) => {
     const session = createMockSession(diagram)
     let currentSession = session
     const mockSessionManager = {
@@ -98,16 +115,19 @@ describe('MultiSessionLayout Import & Export', () => {
     }
 
     const utils = render(
-      <ReadOnlyProvider isReadOnly={isReadOnly}>
-        <MultiSessionLayout
-          externalSessionManager={mockSessionManager as unknown as UseMultiSessionReturn}
-          isMultiSessionMode={false}
-          canExportModel={false}
-          dataStructureName="School"
-          versionName="v1"
-          datastructureId="12345"
-        />
-      </ReadOnlyProvider>,
+      <QueryClientProvider client={queryClient}>
+        <ReadOnlyProvider isReadOnly={isReadOnly}>
+          <MultiSessionLayout
+            externalSessionManager={mockSessionManager as unknown as UseMultiSessionReturn}
+            isMultiSessionMode={false}
+            canExportModel={true}
+            canExportDiagram={canExportDiagram}
+            dataStructureName="School"
+            versionName="v1"
+            datastructureId={datastructureId}
+          />
+        </ReadOnlyProvider>
+      </QueryClientProvider>,
     )
 
     return { ...utils, mockSessionManager }
@@ -144,7 +164,7 @@ describe('MultiSessionLayout Import & Export', () => {
     const imported = createMockDiagram([createSampleNode('node-1', 'ImportedClass')], 'ImportedModel')
     vi.spyOn(diagramFileService, 'readDiagramFile').mockResolvedValueOnce(imported)
 
-    const { mockSessionManager } = renderLayout(createMockDiagram([]))
+    const { mockSessionManager } = renderLayout(createMockDiagram([], 'Untitled Diagram'))
 
     const fileInput = screen.getByTestId('diagram-file-input')
     const file = new File(['{}'], 'valid.json', { type: 'application/json' })
@@ -158,6 +178,7 @@ describe('MultiSessionLayout Import & Export', () => {
           diagram: imported,
           name: 'ImportedModel',
           isDirty: true,
+          dirtyFields: new Set(['model', 'modelName']),
         }),
       )
       expect(toast.success).toHaveBeenCalledWith('import.success')
@@ -165,12 +186,37 @@ describe('MultiSessionLayout Import & Export', () => {
     expect(screen.queryByText('import.overwriteModal.title')).not.toBeInTheDocument()
   })
 
+  it('preserves existing custom session name on import without marking modelName dirty', async () => {
+    const imported = createMockDiagram([createSampleNode('node-1', 'ImportedClass')], 'ImportedModel')
+    vi.spyOn(diagramFileService, 'readDiagramFile').mockResolvedValueOnce(imported)
+
+    const { mockSessionManager } = renderLayout(createMockDiagram([], 'MyCustomStructure'))
+
+    const fileInput = screen.getByTestId('diagram-file-input')
+    const file = new File(['{}'], 'valid.json', { type: 'application/json' })
+
+    fireEvent.change(fileInput, { target: { files: [file] } })
+
+    await waitFor(() => {
+      expect(mockSessionManager.setSession).toHaveBeenCalledWith(
+        'session-1',
+        expect.objectContaining({
+          diagram: imported,
+          name: 'MyCustomStructure',
+          isDirty: true,
+          dirtyFields: new Set(['model']),
+        }),
+      )
+      expect(toast.success).toHaveBeenCalledWith('import.success')
+    })
+  })
+
   it('opens overwrite confirmation modal when canvas has existing nodes', async () => {
     const existingNode = createSampleNode('node-existing', 'ExistingClass')
     const imported = createMockDiagram([createSampleNode('node-imported', 'ImportedClass')], 'ImportedModel')
     vi.spyOn(diagramFileService, 'readDiagramFile').mockResolvedValueOnce(imported)
 
-    const { mockSessionManager } = renderLayout(createMockDiagram([existingNode]))
+    const { mockSessionManager } = renderLayout(createMockDiagram([existingNode], 'Untitled Diagram'))
 
     const fileInput = screen.getByTestId('diagram-file-input')
     const file = new File(['{}'], 'valid.json', { type: 'application/json' })
@@ -193,7 +239,7 @@ describe('MultiSessionLayout Import & Export', () => {
     const imported = createMockDiagram([createSampleNode('node-imported', 'ImportedClass')], 'ImportedModel')
     vi.spyOn(diagramFileService, 'readDiagramFile').mockResolvedValueOnce(imported)
 
-    const { mockSessionManager } = renderLayout(createMockDiagram([existingNode]))
+    const { mockSessionManager } = renderLayout(createMockDiagram([existingNode], 'Untitled Diagram'))
 
     const fileInput = screen.getByTestId('diagram-file-input')
     const file = new File(['{}'], 'valid.json', { type: 'application/json' })
@@ -212,10 +258,22 @@ describe('MultiSessionLayout Import & Export', () => {
         diagram: imported,
         name: 'ImportedModel',
         isDirty: true,
+        dirtyFields: new Set(['model', 'modelName']),
       }),
     )
     expect(toast.success).toHaveBeenCalledWith('import.success')
     expect(screen.queryByText('import.overwriteModal.title')).not.toBeInTheDocument()
+  })
+
+  it('hides the export button when datastructureId is missing or canExportDiagram is false', () => {
+    // 1. Missing datastructureId (e.g. on datasource page)
+    const { unmount } = renderLayout(createMockDiagram(), false, undefined, undefined)
+    expect(screen.queryByText('export.title')).not.toBeInTheDocument()
+    unmount()
+
+    // 2. Explicit canExportDiagram={false}
+    renderLayout(createMockDiagram(), false, false, '12345')
+    expect(screen.queryByText('export.title')).not.toBeInTheDocument()
   })
 
   it('exports active diagram with correct filename and download on Export click', () => {

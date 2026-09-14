@@ -50,8 +50,8 @@ describe('diagramFileService', () => {
   }
 
   describe('buildDiagramFileName', () => {
-    it('formats filename with sanitized name and version', () => {
-      expect(buildDiagramFileName('School Structure', '1.0.0')).toBe('School_Structure-1_0_0.json')
+    it('formats filename preserving dots, dashes, spaces and version numbers', () => {
+      expect(buildDiagramFileName('School Structure', '1.0.0')).toBe('School Structure-1.0.0.json')
     })
 
     it('falls back to draft when version is null or undefined or empty', () => {
@@ -61,12 +61,14 @@ describe('diagramFileService', () => {
     })
 
     it('falls back to datastructure when name is missing or empty', () => {
-      expect(buildDiagramFileName('', '2.0.0')).toBe('datastructure-2_0_0.json')
+      expect(buildDiagramFileName('', '2.0.0')).toBe('datastructure-2.0.0.json')
       expect(buildDiagramFileName(undefined, undefined)).toBe('datastructure-draft.json')
     })
 
-    it('sanitizes special characters to underscores', () => {
-      expect(buildDiagramFileName('Lärm-Karte / 2026', 'v1.0')).toBe('L_rm_Karte___2026-v1_0.json')
+    it('preserves unicode umlauts and replaces forbidden filesystem characters with underscores', () => {
+      expect(buildDiagramFileName('Lärm-Karte / 2026: "Test"', 'v1.0')).toBe(
+        'Lärm-Karte _ 2026_ _Test_-v1.0.json',
+      )
     })
   })
 

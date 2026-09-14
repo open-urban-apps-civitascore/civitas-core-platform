@@ -20,6 +20,7 @@ interface UmlModelerProps {
   dataStructureName?: string
   versionName?: string | null
   datastructureId?: string
+  canExportDiagram?: boolean
 }
 
 export const UmlModeler = (props: UmlModelerProps) => {
@@ -34,6 +35,7 @@ export const UmlModeler = (props: UmlModelerProps) => {
     dataStructureName,
     versionName,
     datastructureId,
+    canExportDiagram,
   } = props
   return (
     <div data-testid="umlModeler" className={cn('flex h-full w-full flex-1 flex-col gap-4', className)}>
@@ -44,6 +46,7 @@ export const UmlModeler = (props: UmlModelerProps) => {
             externalSessionManager={modelSessionManager}
             isMultiSessionMode={isMultiSessionMode}
             canExportModel={canExportModel}
+            canExportDiagram={canExportDiagram}
             placeHolder={placeHolder}
             onImportFromDatastructure={onImportFromDatastructure}
             dataStructureName={dataStructureName}

@@ -36,7 +36,12 @@ const Tab: React.FC<TabProps> = props => {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter') {
-        onRename(session.id, editName.trim())
+        const trimmed = editName.trim()
+        if (trimmed) {
+          onRename(session.id, trimmed)
+        } else {
+          setEditName(displayName)
+        }
         setIsEditing(false)
       } else if (e.key === 'Escape') {
         setEditName(displayName)
@@ -47,9 +52,14 @@ const Tab: React.FC<TabProps> = props => {
   )
 
   const handleBlur = useCallback(() => {
-    onRename(session.id, editName.trim())
+    const trimmed = editName.trim()
+    if (trimmed) {
+      onRename(session.id, trimmed)
+    } else {
+      setEditName(displayName)
+    }
     setIsEditing(false)
-  }, [session.id, editName, onRename])
+  }, [session.id, displayName, editName, onRename])
 
   const handleClose = useCallback(
     (e: React.MouseEvent) => {

@@ -1,18 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
 import { UMLDiagramSchema } from './diagramSchema'
 
-const getFixturePath = () => {
-  const pathFromFrontend = resolve(
-    process.cwd(),
-    '../config-adapter/docs/examples/datastructure-version-jsonschema-nested.json',
-  )
-  if (existsSync(pathFromFrontend)) return pathFromFrontend
-  return resolve(process.cwd(), 'config-adapter/docs/examples/datastructure-version-jsonschema-nested.json')
-}
+const getFixturePath = () => resolve(__dirname, '__fixtures__/nestedDatastructureExample.json')
 
 describe('diagramSchema', () => {
   it('validates the fixture styles from nested datastructure example as valid', () => {

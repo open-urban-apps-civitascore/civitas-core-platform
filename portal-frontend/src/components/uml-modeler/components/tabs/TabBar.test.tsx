@@ -132,6 +132,32 @@ describe('TabBar', () => {
     expect(screen.getByText('OldName')).toBeInTheDocument()
   })
 
+  it('keeps existing name and does not call onRenameSession when submitting empty input with Enter', () => {
+    const { props } = renderTabBar({ sessions: [createMockSession({ name: 'OldName' })] })
+
+    fireEvent.doubleClick(screen.getByText('OldName'))
+    const input = screen.getByPlaceholderText('modelNamePlaceholder')
+
+    fireEvent.change(input, { target: { value: '   ' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(props.onRenameSession).not.toHaveBeenCalled()
+    expect(screen.getByText('OldName')).toBeInTheDocument()
+  })
+
+  it('keeps existing name and does not call onRenameSession on blur with empty input', () => {
+    const { props } = renderTabBar({ sessions: [createMockSession({ name: 'OldName' })] })
+
+    fireEvent.doubleClick(screen.getByText('OldName'))
+    const input = screen.getByPlaceholderText('modelNamePlaceholder')
+
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.blur(input)
+
+    expect(props.onRenameSession).not.toHaveBeenCalled()
+    expect(screen.getByText('OldName')).toBeInTheDocument()
+  })
+
   it('renders Import and Export buttons when callbacks are provided', () => {
     renderTabBar()
 

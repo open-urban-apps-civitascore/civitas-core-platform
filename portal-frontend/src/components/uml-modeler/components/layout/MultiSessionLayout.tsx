@@ -36,6 +36,7 @@ interface MultiSessionLayoutProps {
   dataStructureName?: string
   versionName?: string | null
   datastructureId?: string
+  canExportDiagram?: boolean
 }
 
 const getImportErrorMessage = (error: unknown, t: (key: string) => string): string => {
@@ -69,7 +70,9 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     dataStructureName,
     versionName,
     datastructureId,
+    canExportDiagram,
   } = props
+  const shouldAllowExport = canExportDiagram ?? Boolean(datastructureId)
   const t = useTranslations('umlModeler')
   const tCommon = useTranslations('common')
   const sessionManager = useMultiSessionManager({ sessionManager: externalSessionManager })
@@ -130,12 +133,24 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
       const currentActiveSession = sessionManager.getActiveSession()
       if (!currentActiveSession) return
 
+      const hasCustomName =
+        Boolean(currentActiveSession.name) && currentActiveSession.name !== 'Untitled Diagram'
+      const targetName = hasCustomName
+        ? currentActiveSession.name
+        : importedDiagram.name || currentActiveSession.name
+      const nameChanged = targetName !== currentActiveSession.name
+
+      const dirtyFields = new Set<string>(['model'])
+      if (nameChanged) {
+        dirtyFields.add('modelName')
+      }
+
       sessionManager.setSession(currentActiveSession.id, {
         ...currentActiveSession,
-        name: importedDiagram.name || currentActiveSession.name,
+        name: targetName,
         diagram: importedDiagram,
         isDirty: true,
-        dirtyFields: new Set(['model', 'modelName']),
+        dirtyFields,
         lastModified: new Date(),
       })
       toast.success(t('import.success'))
@@ -216,7 +231,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
               onCreateSession={handleCreateSession}
               isMultiSessionMode={isMultiSessionMode}
               onImportClick={handleImportClick}
-              onExportClick={handleExportClick}
+              onExportClick={shouldAllowExport ? handleExportClick : undefined}
             />
 
             {/* Toolbar */}
