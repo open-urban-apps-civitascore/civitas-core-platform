@@ -1,12 +1,12 @@
 import { type DiagramSession, DirtyField, type MultiSessionState, type SessionAction } from '../types/session'
-import { createEmptyDiagram } from './diagramService'
+import { createEmptyDiagram, DEFAULT_DIAGRAM_NAME } from './diagramService'
 
 // Initial session state factory
 export const createEmptySession = (name?: string): DiagramSession => {
   const now = new Date()
   return {
     id: crypto.randomUUID(),
-    name: name || 'Untitled Diagram',
+    name: name || DEFAULT_DIAGRAM_NAME,
     diagram: createEmptyDiagram(),
     isDirty: false,
     dirtyFields: new Set(),
@@ -17,7 +17,7 @@ export const createEmptySession = (name?: string): DiagramSession => {
 
 // Initial multi-session state
 export const createInitialSessionState = (initialSession?: DiagramSession): MultiSessionState => {
-  const firstSession = initialSession || createEmptySession('Untitled Diagram')
+  const firstSession = initialSession || createEmptySession(DEFAULT_DIAGRAM_NAME)
   return {
     sessions: [firstSession],
     activeSessionId: firstSession.id,

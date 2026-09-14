@@ -66,9 +66,7 @@ describe('diagramFileService', () => {
     })
 
     it('preserves unicode umlauts and replaces forbidden filesystem characters with underscores', () => {
-      expect(buildDiagramFileName('Lärm-Karte / 2026: "Test"', 'v1.0')).toBe(
-        'Lärm-Karte _ 2026_ _Test_-v1.0.json',
-      )
+      expect(buildDiagramFileName('Lärm-Karte / 2026: "Test"', 'v1.0')).toBe('Lärm-Karte _ 2026_ _Test_-v1.0.json')
     })
   })
 

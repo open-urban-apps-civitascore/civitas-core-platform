@@ -89,7 +89,7 @@ describe('MultiSessionLayout Import & Export', () => {
     diagram = createMockDiagram(),
     isReadOnly = false,
     canExportDiagram?: boolean,
-    datastructureId: string | undefined = '12345',
+    hasDatastructureId = true,
   ) => {
     const session = createMockSession(diagram)
     let currentSession = session
@@ -124,7 +124,7 @@ describe('MultiSessionLayout Import & Export', () => {
             canExportDiagram={canExportDiagram}
             dataStructureName="School"
             versionName="v1"
-            datastructureId={datastructureId}
+            datastructureId={hasDatastructureId ? '12345' : undefined}
           />
         </ReadOnlyProvider>
       </QueryClientProvider>,
@@ -267,12 +267,12 @@ describe('MultiSessionLayout Import & Export', () => {
 
   it('hides the export button when datastructureId is missing or canExportDiagram is false', () => {
     // 1. Missing datastructureId (e.g. on datasource page)
-    const { unmount } = renderLayout(createMockDiagram(), false, undefined, undefined)
+    const { unmount } = renderLayout(createMockDiagram(), false, undefined, false)
     expect(screen.queryByText('export.title')).not.toBeInTheDocument()
     unmount()
 
     // 2. Explicit canExportDiagram={false}
-    renderLayout(createMockDiagram(), false, false, '12345')
+    renderLayout(createMockDiagram(), false, false, true)
     expect(screen.queryByText('export.title')).not.toBeInTheDocument()
   })
 

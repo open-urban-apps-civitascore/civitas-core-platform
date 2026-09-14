@@ -37,7 +37,7 @@ export interface DiagramExportOptions {
  * Builds the default export filename according to the convention:
  * <data structure name>-<version name>.json
  *
- * Non-alphanumeric characters are sanitized to underscores.
+ * Invalid filesystem characters are sanitized to underscores while preserving spaces, dots, dashes, and Unicode letters.
  * When version is absent, 'draft' is used as fallback.
  * When name is absent, 'datastructure' is used as fallback.
  */

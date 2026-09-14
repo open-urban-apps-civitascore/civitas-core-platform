@@ -15,6 +15,7 @@ import {
   downloadDiagramFile,
   readDiagramFile,
 } from '../../services/diagramFileService'
+import { DEFAULT_DIAGRAM_NAME } from '../../services/diagramService'
 import { SchemaExportError } from '../../services/jsonSchemaExportService'
 import { rootFailureMessage } from '../../services/rootFailureMessage'
 import type { UMLDiagram } from '../../types/diagram'
@@ -41,20 +42,7 @@ interface MultiSessionLayoutProps {
 
 const getImportErrorMessage = (error: unknown, t: (key: string) => string): string => {
   if (error instanceof DiagramImportError) {
-    switch (error.code) {
-      case 'FILE_TOO_LARGE':
-        return t('import.errors.FILE_TOO_LARGE')
-      case 'INVALID_JSON':
-        return t('import.errors.INVALID_JSON')
-      case 'INVALID_DATASTRUCTURE_DOCUMENT':
-        return t('import.errors.INVALID_DATASTRUCTURE_DOCUMENT')
-      case 'MISSING_UI_STYLES':
-        return t('import.errors.MISSING_UI_STYLES')
-      case 'INVALID_DIAGRAM_SCHEMA':
-        return t('import.errors.INVALID_DIAGRAM_SCHEMA')
-      default:
-        return t('import.fileError')
-    }
+    return t(`import.errors.${error.code}`)
   }
   return t('import.fileError')
 }
@@ -85,7 +73,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
   const activeSessionId = useMemo(() => sessionManager.activeSessionId || '', [sessionManager.activeSessionId])
   // Tab management handlers
   const handleCreateSession = useCallback(() => {
-    sessionManager.createSession('Untitled Diagram')
+    sessionManager.createSession(DEFAULT_DIAGRAM_NAME)
   }, [sessionManager])
 
   const handleCloseSession = () => {
@@ -133,15 +121,12 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
       const currentActiveSession = sessionManager.getActiveSession()
       if (!currentActiveSession) return
 
-      const hasCustomName =
-        Boolean(currentActiveSession.name) && currentActiveSession.name !== 'Untitled Diagram'
-      const targetName = hasCustomName
-        ? currentActiveSession.name
-        : importedDiagram.name || currentActiveSession.name
-      const nameChanged = targetName !== currentActiveSession.name
+      const hasCustomName = Boolean(currentActiveSession.name) && currentActiveSession.name !== DEFAULT_DIAGRAM_NAME
+      const targetName = hasCustomName ? currentActiveSession.name : importedDiagram.name || currentActiveSession.name
+      const hasNameChanged = targetName !== currentActiveSession.name
 
       const dirtyFields = new Set<string>(['model'])
-      if (nameChanged) {
+      if (hasNameChanged) {
         dirtyFields.add('modelName')
       }
 
@@ -182,7 +167,9 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
           applyImportedDiagram(importedDiagram)
         }
       } catch (error) {
-        console.error('Diagram import failed', error)
+        if (!(error instanceof DiagramImportError)) {
+          console.error('Diagram import failed', error)
+        }
         toast.error(getImportErrorMessage(error, t))
       }
     },

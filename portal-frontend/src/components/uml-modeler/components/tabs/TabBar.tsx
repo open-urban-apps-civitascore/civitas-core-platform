@@ -7,13 +7,13 @@ import { useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
 
 import { useReadOnly } from '../../hooks/use-read-only'
+import { DEFAULT_DIAGRAM_NAME } from '../../services/diagramService'
 import type { DiagramSession } from '../../types/session'
 
 interface TabProps {
   session: DiagramSession
   isActive: boolean
   isModelerReadOnly: boolean
-  isMultiSessionMode: boolean
   onSelect: (sessionId: string) => void
   onClose: (sessionId: string) => void
   onRename: (sessionId: string, newName: string) => void
@@ -22,7 +22,7 @@ interface TabProps {
 const Tab: React.FC<TabProps> = props => {
   const { session, isActive, onSelect, onClose, onRename, isModelerReadOnly } = props
   const t = useTranslations('umlModeler')
-  const isDefaultOrEmpty = !session.name || session.name === 'Untitled Diagram'
+  const isDefaultOrEmpty = !session.name || session.name === DEFAULT_DIAGRAM_NAME
   const displayName = isDefaultOrEmpty ? '' : session.name
 
   const [isEditing, setIsEditing] = useState(false)
@@ -162,7 +162,6 @@ export const TabBar: React.FC<TabBarProps> = props => {
             onClose={onCloseSession}
             onRename={onRenameSession}
             isModelerReadOnly={isModelerReadOnly}
-            isMultiSessionMode={isMultiSessionMode}
           />
         ))}
       </div>
