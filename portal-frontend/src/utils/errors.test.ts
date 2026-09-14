@@ -169,13 +169,28 @@ describe('isNotDraftError', () => {
 })
 
 describe('isSagaInFlightError', () => {
-  it('returns true for a 409 error carrying the RESOURCE_IN_USE type', () => {
+  it('returns true for a 409 error carrying the RESOURCE_IN_USE type and the saga marker', () => {
     const error = getError(
       409,
-      'DataSet has a pending RELEASE saga',
+      'Cannot write while a saga is in-flight: UNRELEASE',
       'urn:civitas:error:RESOURCE_IN_USE',
     )
     expect(isSagaInFlightError(error)).toBe(true)
+  })
+
+  it('returns true for a saga rejection raised outside the sub-entity guard', () => {
+    const error = getError(409, 'Cannot release while a saga is in-flight: CREATE', 'urn:civitas:error:RESOURCE_IN_USE')
+    expect(isSagaInFlightError(error)).toBe(true)
+  })
+
+  it('returns false for a 409 RESOURCE_IN_USE raised by a still-referenced style', () => {
+    const error = getError(409, 'Style is referenced by one or more Layers', 'urn:civitas:error:RESOURCE_IN_USE')
+    expect(isSagaInFlightError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 RESOURCE_IN_USE raised by a still-referenced data sink', () => {
+    const error = getError(409, 'DataSink is referenced by one or more Layers', 'urn:civitas:error:RESOURCE_IN_USE')
+    expect(isSagaInFlightError(error)).toBe(false)
   })
 
   it('returns false for a 409 error with a different type', () => {

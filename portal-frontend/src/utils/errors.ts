@@ -8,6 +8,9 @@ type ApiError = {
   instance: string
 }
 
+// Matches the saga guards in DataSetMutationGuard and DataSetService.
+const SAGA_IN_FLIGHT_MARKER = 'saga is in-flight'
+
 export const isNameConflictError = (error: unknown) => {
   if (!isAxiosError(error)) return false
   const isConflictError = error.status === 409
@@ -58,7 +61,8 @@ export const isSagaInFlightError = (error: unknown) => {
   if (!isAxiosError(error)) return false
   if (error.status !== 409 || !error.response) return false
   const apiError = error.response.data as ApiError
-  return typeof apiError?.type === 'string' && apiError.type.endsWith('RESOURCE_IN_USE')
+  if (typeof apiError?.type !== 'string' || !apiError.type.endsWith('RESOURCE_IN_USE')) return false
+  return (apiError.detail || '').includes(SAGA_IN_FLIGHT_MARKER)
 }
 
 export const isLayerNameError = (error: unknown) => {

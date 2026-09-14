@@ -208,11 +208,13 @@ export const useApiConfig = <TFormData extends FormData>({
           }
           isSaved = true
         } catch (error) {
-          if (error instanceof LayerSaveError && isLayerNameError(error.originalError)) {
+          const cause = error instanceof LayerSaveError ? error.originalError : error
+
+          if (error instanceof LayerSaveError && isLayerNameError(cause)) {
             handleLayerNameError(error)
-          } else if (isNotDraftError(error)) {
+          } else if (isNotDraftError(cause)) {
             toast.error(t('messages.notDraftError'))
-          } else if (isSagaInFlightError(error)) {
+          } else if (isSagaInFlightError(cause)) {
             toast.error(t('messages.sagaInFlightError'))
           } else {
             toast.error(t('messages.saveError'))

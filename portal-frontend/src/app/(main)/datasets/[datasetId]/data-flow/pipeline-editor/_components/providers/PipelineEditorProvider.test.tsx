@@ -1747,7 +1747,7 @@ describe('PipelineEditorProviderComponent', () => {
           headers: new AxiosHeaders(),
           config: { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
           data: {
-            detail: 'DataSet has a pending RELEASE saga',
+            detail: 'Cannot write while a saga is in-flight: UNRELEASE',
             type: 'urn:civitas:error:RESOURCE_IN_USE',
           },
         },
@@ -1776,7 +1776,7 @@ describe('PipelineEditorProviderComponent', () => {
           headers: new AxiosHeaders(),
           config: { headers: new AxiosHeaders(), method: 'PUT', url: '/pipelines/pipeline-1' } as InternalAxiosRequestConfig,
           data: {
-            detail: 'DataSet has a pending RELEASE saga',
+            detail: 'Cannot write while a saga is in-flight: UNRELEASE',
             type: 'urn:civitas:error:RESOURCE_IN_USE',
           },
         },
@@ -2105,7 +2105,7 @@ describe('PipelineEditorProviderComponent', () => {
           headers: new AxiosHeaders(),
           config: { headers: new AxiosHeaders(), method: 'DELETE', url: '/pipelines/pipeline-to-delete' } as InternalAxiosRequestConfig,
           data: {
-            detail: 'DataSet has a pending RELEASE saga',
+            detail: 'Cannot write while a saga is in-flight: UNRELEASE',
             type: 'urn:civitas:error:RESOURCE_IN_USE',
           },
         },
