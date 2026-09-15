@@ -217,24 +217,17 @@ public interface ModelForge {
     void deleteArtifact(ArtifactId artifactId, boolean cascade, boolean force);
 
     /**
-     * Logical URNs of the artifacts whose references make {@link #deleteArtifact} refuse — the same
-     * answer the refusal carries, without attempting the delete. Empty when nothing stands in the way.
+     * What stands in the way of deleting the artifact, without attempting the delete. Asked of the
+     * whole set a cascade removes, so a grouping does not report the Elements it owns. Empty when
+     * nothing stands in the way.
      *
-     * <p>Asked of the whole set one cascading delete removes — the artifact and, transitively, what
-     * it owns. A reference held from inside that set is removed by the same delete, so a grouping
-     * never blocks on the Elements it owns; only a referrer outside the set is reported.
+     * <p>A superset of what {@link #deleteArtifact} rejects: a cascade keeps an owned member
+     * something else holds rather than refusing. Memberships count for the named artifact only, from
+     * the second onwards.
      *
-     * <p>This is a superset of what {@link #deleteArtifact} rejects: a cascade keeps an owned member
-     * something else holds rather than refusing, so a member's referrer is reported here without
-     * failing the delete. Memberships are counted for the named artifact only, and appear from the
-     * second onwards, since a member of a single Data Set is deleted and unlinked from it.
-     *
-     * <p>A versioned URN asks about that version alone — a reference pinned to another version
-     * constrains that version, not this one. A logical URN asks about the artifact as a whole, which
-     * is the question a delete asks.
-     *
-     * <p>Answered from the stored references rather than the in-memory dependency graph, so the
-     * answer does not depend on what this process has seen since it started.
+     * <p>A versioned URN asks about that version alone; a logical URN about the artifact as a whole,
+     * which is the question a delete asks. Answered from the stored references, not the in-memory
+     * graph.
      */
     List<String> deletionBlockers(ArtifactId artifactId);
 

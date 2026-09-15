@@ -107,13 +107,10 @@ class ArtifactReferenceRepository {
     }
 
     /**
-     * Like {@link #nonDataSetBlockingDependents(String)}, restricted to the references that hold one
-     * version of the target.
-     *
-     * <p>A reference pinned to another version constrains that version, not this one — a Data Sink
-     * writing into version 1 leaves version 2 free. A reference that names no version follows
-     * whichever is current, so it holds every version and always counts. Pass {@code null} to ask
-     * for the artifact as a whole, which is the question a delete asks.
+     * Like {@link #nonDataSetBlockingDependents(String)}, restricted to the references holding one
+     * version of the target — a Data Sink writing into version 1 leaves version 2 free. A reference
+     * naming no version follows whichever is current and so holds every one. {@code null} asks for
+     * the artifact as a whole, which is the question a delete asks.
      */
     List<String> nonDataSetBlockingDependents(String targetLogicalUrn, String targetVersion) {
         return jdbc.sql("""
@@ -165,24 +162,14 @@ class ArtifactReferenceRepository {
     }
 
     /**
-     * Logical URNs of the artifacts the given one owns — the set a cascading delete may take with
-     * it. Ownership is carried by the edge, not by the target's kind:
+     * Target URNs of the artifacts the given one owns — the set a cascading delete may take with it.
+     * Ownership is carried by the edge rather than the target's kind, so an artifact reached only
+     * through its owner is owned and one that is merely grouped is not. An unresolved reference
+     * contributes nothing.
      *
-     * <ul>
-     *   <li>{@code datastructure-ref} — a grouping owns the Elements it is built from.</li>
-     *   <li>{@code pipeline-node} named {@code mapping} — a pipeline owns the Mapping it wires; its
-     *       source, sink and enrich nodes name artifacts of the Data Set, which outlive it.</li>
-     *   <li>{@code dataset-ref} named {@code pipeline} or {@code mapping} — a Data Set owns the
-     *       artifacts that exist only inside it. Its Data Structures, Data Sources and Data Sinks it
-     *       merely groups: those are reachable on their own and outlive it.</li>
-     * </ul>
-     *
-     * <p>Every other edge names something used rather than owned — a Mapping's two endpoints, a
-     * DataSource's or DataSink's element. An unresolved reference contributes nothing.
-     *
-     * <p>Each member is returned as the owner stored it, version and all, so a caller asking about
-     * one version of the owner learns which version of the member that owner holds. Pass a null
-     * {@code ownerVersion} to read the owner's current version.
+     * <p>Each member is returned as the owner pinned it, so a caller asking about one version of the
+     * owner learns which version of the member it holds. A null {@code ownerVersion} reads the
+     * owner's current version.
      */
     List<String> ownedMemberUrns(String ownerLogicalUrn) {
         return ownedMemberUrns(ownerLogicalUrn, null);

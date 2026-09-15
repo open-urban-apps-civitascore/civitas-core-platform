@@ -203,12 +203,9 @@ public class ModelRegistryGateway {
   }
 
   /**
-   * The DataStructure grouping a model is addressed by. A model is stored as a grouping artifact
-   * plus its member Elements; for a flat single-object model the stored pin is the Element itself,
-   * and its grouping differs only in the {@code :datastructure:} type segment. Addressing the
-   * grouping is what makes a delete remove the model with its members, and what makes the in-use
-   * answer describe that same set — asking the Element alone would report its own grouping as a
-   * reference. When the pin is already the grouping, the replace is a no-op.
+   * The DataStructure grouping a model is addressed by. A delete and the in-use answer both
+   * describe the grouping with its member Elements; asking an Element alone would report its own
+   * grouping as a reference.
    */
   private static String groupingUrnOf(String urn) {
     return urn.replace(":element:", ":datastructure:");

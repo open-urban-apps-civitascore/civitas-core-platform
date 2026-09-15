@@ -864,9 +864,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * edges onto the sink configurations it writes through.
    *
    * @param failOnRefusal whether a refused removal fails the whole delete. True while the caller
-   *     can still be told, so the rows survive with their artifacts. False once the teardown saga
-   *     has destroyed the infrastructure, where a failure would restore a dataset that no later
-   *     delete can remove.
+   *     can still be told. False once the teardown saga has destroyed the infrastructure, where
+   *     failing would restore a dataset no later delete can remove.
    */
   private void deleteWithSinks(DataSet dataSet, boolean failOnRefusal) {
     // The registry artifacts this DataSet owns, read while its rows still exist. A pipeline row is
@@ -906,12 +905,12 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   /**
    * Removes registry artifacts a deleted DataSet owned, each taking the artifacts it owns with it
-   * when {@code cascade} is set.
+   * when {@code cascade} is set. An artifact a second DataSet also lists is refused by the
+   * registry; one that only this DataSet listed is removed and unlinked.
    *
-   * <p>A refusal propagates and rolls the whole delete back, rows included, so the dataset never
-   * disappears while a model it owned survives with nothing left to reach it. An artifact another
-   * DataSet still holds is not owned by this delete: the registry keeps it and reports no refusal,
-   * so a shared member neither disappears nor fails the delete.
+   * <p>With {@code failOnRefusal} a refusal rolls the whole delete back, rows included, so the
+   * dataset never disappears while a model it owned survives with nothing left to reach it. Without
+   * it the refusal is recorded and the removal stands — see {@link #deleteWithSinks}.
    */
   private void removeOwnedArtifacts(
       List<String> logicalUrns, boolean cascade, boolean failOnRefusal) {

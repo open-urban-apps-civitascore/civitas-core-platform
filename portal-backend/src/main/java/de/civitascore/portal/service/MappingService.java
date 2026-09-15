@@ -175,9 +175,8 @@ public class MappingService {
   /**
    * The logical URNs of this DataSet's mappings.
    *
-   * <p>A mapping has no host row and is addressed by its URN alone, so without this a mapping whose
-   * pipeline no longer names it cannot be found, and the delete that would clear it has no address
-   * to aim at.
+   * <p>A mapping has no host row and is addressed by its URN alone, so without this a mapping that
+   * no pipeline names cannot be found, and the delete that would clear it has no address to aim at.
    *
    * @throws ResourceNotFoundException when the DataSet has no manifest
    */
