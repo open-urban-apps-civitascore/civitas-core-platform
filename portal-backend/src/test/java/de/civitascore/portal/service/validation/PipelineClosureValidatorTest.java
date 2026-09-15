@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -100,6 +101,10 @@ class PipelineClosureValidatorTest {
     return ((PipelineClosureValidationException) thrown).getFindings();
   }
 
+  private List<Pipeline> pipelines() {
+    return List.of(pipeline(pipelineId, PIPELINE_URN));
+  }
+
   private void denyEveryStructure() {
     doThrow(new AccessDeniedException("denied"))
         .when(scopeAccessAuthorizer)
@@ -118,6 +123,26 @@ class PipelineClosureValidatorTest {
       validator(7).validate(List.of(pipeline(pipelineId, PIPELINE_URN)));
 
       verify(modelRegistryGateway).closure(PIPELINE_URN, 7);
+    }
+
+    @Test
+    @DisplayName("decides a structure's readability once, however many versions reach it")
+    void readabilityIsDecidedOncePerStructure() {
+      DataStructure shared = new DataStructure();
+      shared.setId(UUID.randomUUID());
+      shared.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      DataStructureVersion first = released(STRUCTURE_URN);
+      first.setDataStructure(shared);
+      DataStructureVersion second = released(ELEMENT_URN);
+      second.setDataStructure(shared);
+
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN, ELEMENT_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+          .thenReturn(List.of(first, second));
+
+      validator().validate(pipelines());
+
+      verify(scopeAccessAuthorizer, times(1)).authorizeReferences(any(), any());
     }
 
     @Test
@@ -150,7 +175,7 @@ class PipelineClosureValidatorTest {
           .satisfies(
               thrown ->
                   assertThat(findingsOf(thrown))
-                      .containsExactly(ClosureFinding.notAvailable(pipelineId, ELEMENT_URN)));
+                      .containsExactly(ClosureFinding.notAvailable(pipelineId)));
     }
 
     @Test
@@ -249,14 +274,60 @@ class PipelineClosureValidatorTest {
                   assertThat(findingsOf(thrown))
                       .as("one attempt names everything that needs repairing")
                       .containsExactly(
-                          ClosureFinding.notAvailable(pipelineId, ELEMENT_URN),
-                          ClosureFinding.notAvailable(otherPipeline, STRUCTURE_URN)));
+                          ClosureFinding.notAvailable(pipelineId),
+                          ClosureFinding.notAvailable(otherPipeline)));
     }
   }
 
   @Nested
   @DisplayName("withholding what the caller may not know")
   class Withholding {
+
+    @Test
+    @DisplayName("a withheld artifact is named nowhere in the reply")
+    void aWithheldArtifactIsNamedNowhereInTheReply() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+          .thenReturn(List.of(released(STRUCTURE_URN)));
+      denyEveryStructure();
+
+      assertThat(findingsOf(catchThrowable(() -> validator().validate(pipelines()))))
+          .singleElement()
+          .satisfies(
+              finding -> {
+                assertThat(finding.reason()).isEqualTo(ClosureFinding.Reason.NOT_AVAILABLE);
+                assertThat(finding.artifactUrn())
+                    .as("a CORE URN spells the model's name in one of its segments")
+                    .isNull();
+              });
+    }
+
+    @Test
+    @DisplayName("a draft the caller may read is named, because they can act on it")
+    void aReadableDraftIsNamed() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+          .thenReturn(
+              List.of(
+                  version(
+                      STRUCTURE_URN,
+                      DataStructureVersionStatus.DRAFT,
+                      DataStructureStatus.AVAILABLE)));
+
+      assertThat(findingsOf(catchThrowable(() -> validator().validate(pipelines()))))
+          .containsExactly(ClosureFinding.notReleased(pipelineId, STRUCTURE_URN));
+    }
+
+    @Test
+    @DisplayName("many withheld artifacts of one flow collapse into a single entry")
+    void manyWithheldArtifactsCollapseIntoOneEntry() {
+      closureOf(
+          PIPELINE_URN, Set.of(STRUCTURE_URN, ELEMENT_URN), Set.of(STRUCTURE_URN, ELEMENT_URN));
+
+      assertThat(findingsOf(catchThrowable(() -> validator().validate(pipelines()))))
+          .as("entries that name no artifact are indistinguishable, so repeating them says nothing")
+          .containsExactly(ClosureFinding.notAvailable(pipelineId));
+    }
 
     @Test
     @DisplayName("an unreadable artifact is reported in the same terms as an unresolved one")
@@ -297,7 +368,7 @@ class PipelineClosureValidatorTest {
               thrown ->
                   assertThat(findingsOf(thrown))
                       .as("a draft reason would confirm the structure exists")
-                      .containsExactly(ClosureFinding.notAvailable(pipelineId, STRUCTURE_URN)));
+                      .containsExactly(ClosureFinding.notAvailable(pipelineId)));
     }
   }
 }

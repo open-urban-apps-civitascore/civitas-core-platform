@@ -12,6 +12,7 @@ import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.util.PipelineClosureValidationException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +59,13 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class PipelineClosureValidator {
 
+  /**
+   * How many pinned URNs one record lookup may carry. A flow can reach more artifacts than a single
+   * statement has bind slots, so the lookup is chunked the way the registry chunks its own
+   * existence probe.
+   */
+  private static final int RECORD_LOOKUP_BATCH_SIZE = 500;
+
   private final ModelRegistryGateway modelRegistryGateway;
   private final DataStructureVersionRepository dataStructureVersionRepository;
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
@@ -75,18 +83,23 @@ public class PipelineClosureValidator {
       return;
     }
     List<ClosureFinding> findings = new ArrayList<>();
+    // One verdict per structure for the whole call: several versions, and several flows, routinely
+    // reach the same structure, and each decision otherwise re-reads the caller's assignments.
+    Map<UUID, Boolean> readability = new HashMap<>();
     for (Pipeline pipeline : pipelines) {
       if (pipeline.getModelUrn() == null || pipeline.getModelUrn().isBlank()) {
         continue;
       }
-      findings.addAll(validateFlow(pipeline));
+      findings.addAll(validateFlow(pipeline, readability));
     }
     if (!findings.isEmpty()) {
-      throw new PipelineClosureValidationException(findings);
+      // Findings that name no artifact are identical per pipeline and reason, so one flow with
+      // many withheld artifacts would otherwise repeat the same entry once for each of them.
+      throw new PipelineClosureValidationException(findings.stream().distinct().toList());
     }
   }
 
-  private List<ClosureFinding> validateFlow(Pipeline pipeline) {
+  private List<ClosureFinding> validateFlow(Pipeline pipeline, Map<UUID, Boolean> readability) {
     ModelRegistryGateway.ArtifactClosure closure =
         modelRegistryGateway.closure(pipeline.getModelUrn(), properties.maxDepth());
 
@@ -96,24 +109,37 @@ public class PipelineClosureValidator {
           "Closure validation: unresolved reference to {} reached by pipeline {}",
           Encode.forJava(urn),
           pipeline.getId());
-      findings.add(ClosureFinding.notAvailable(pipeline.getId(), urn));
+      findings.add(ClosureFinding.notAvailable(pipeline.getId()));
     }
     List<String> resolved =
         closure.artifacts().stream().filter(urn -> !closure.unresolved().contains(urn)).toList();
     if (resolved.isEmpty()) {
       return findings;
     }
-    // One query for the whole flow, keyed by the URN each version pins.
     Map<String, List<DataStructureVersion>> governed =
-        dataStructureVersionRepository.findAllByModelUrnIn(resolved).stream()
+        recordsPinnedBy(resolved).stream()
             .collect(Collectors.groupingBy(DataStructureVersion::getModelUrn));
     for (String urn : resolved) {
       List<DataStructureVersion> records = governed.get(urn);
       if (records != null) {
-        inspectGoverned(pipeline.getId(), urn, records).ifPresent(findings::add);
+        inspectGoverned(pipeline.getId(), urn, records, readability).ifPresent(findings::add);
       }
     }
     return findings;
+  }
+
+  /** Every version record pinning one of these URNs, asked in batches a statement can carry. */
+  private List<DataStructureVersion> recordsPinnedBy(List<String> urns) {
+    if (urns.size() <= RECORD_LOOKUP_BATCH_SIZE) {
+      return dataStructureVersionRepository.findAllByModelUrnIn(urns);
+    }
+    List<DataStructureVersion> records = new ArrayList<>();
+    for (int from = 0; from < urns.size(); from += RECORD_LOOKUP_BATCH_SIZE) {
+      records.addAll(
+          dataStructureVersionRepository.findAllByModelUrnIn(
+              urns.subList(from, Math.min(from + RECORD_LOOKUP_BATCH_SIZE, urns.size()))));
+    }
+    return records;
   }
 
   /**
@@ -128,15 +154,19 @@ public class PipelineClosureValidator {
    * caller may read says so.
    */
   private Optional<ClosureFinding> inspectGoverned(
-      UUID pipelineId, String urn, List<DataStructureVersion> records) {
-    List<DataStructureVersion> readable = records.stream().filter(this::isReadable).toList();
+      UUID pipelineId,
+      String urn,
+      List<DataStructureVersion> records,
+      Map<UUID, Boolean> readability) {
+    List<DataStructureVersion> readable =
+        records.stream().filter(version -> isReadable(version, readability)).toList();
     if (readable.isEmpty()) {
       log.warn(
           "Closure validation: caller may not read any data structure holding {} reached by"
               + " pipeline {}",
           Encode.forJava(urn),
           pipelineId);
-      return Optional.of(ClosureFinding.notAvailable(pipelineId, urn));
+      return Optional.of(ClosureFinding.notAvailable(pipelineId));
     }
     if (readable.stream().noneMatch(PipelineClosureValidator::isReleased)) {
       return Optional.of(ClosureFinding.notReleased(pipelineId, urn));
@@ -150,7 +180,12 @@ public class PipelineClosureValidator {
    * <p>Decided here because OPA never sees a structure two hops away in the reference graph, and
    * the scope header it emits is typed to the route's own Data Set scope.
    */
-  private boolean isReadable(DataStructureVersion version) {
+  private boolean isReadable(DataStructureVersion version, Map<UUID, Boolean> readability) {
+    return readability.computeIfAbsent(
+        version.getDataStructure().getId(), structureId -> decideReadable(version));
+  }
+
+  private boolean decideReadable(DataStructureVersion version) {
     try {
       scopeAccessAuthorizer.authorizeReferences(
           ScopeType.DATASTRUCTURE, Set.of(version.getDataStructure().getId()));
