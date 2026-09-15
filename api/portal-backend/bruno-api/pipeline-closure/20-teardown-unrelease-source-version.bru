@@ -1,0 +1,22 @@
+meta {
+  name: 20. Teardown: unrelease its version
+  type: http
+  seq: 21
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{closureSourceStructureId}}
+  versionId: {{closureSourceVersionId}}
+}
+
+tests {
+  test("Removed", function() {
+    expect([200, 204]).to.include(res.getStatus());
+  });
+}

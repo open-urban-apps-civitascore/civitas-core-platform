@@ -1,0 +1,26 @@
+meta {
+  name: 19. Teardown: unrelease the released structure
+  type: http
+  seq: 20
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:id/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{closureSourceStructureId}}
+}
+
+tests {
+  test("Removed", function() {
+    expect([200, 204]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  The structure goes first: its only released version cannot be withdrawn while the structure
+  itself is still released.
+}

@@ -1,0 +1,21 @@
+meta {
+  name: 15. Teardown: delete the dataset
+  type: http
+  seq: 16
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{closureDataSetId}}
+}
+
+tests {
+  test("Removed", function() {
+    expect([200, 204]).to.include(res.getStatus());
+  });
+}

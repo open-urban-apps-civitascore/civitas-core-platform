@@ -1,0 +1,21 @@
+meta {
+  name: 21. Teardown: delete the released structure
+  type: http
+  seq: 22
+}
+
+delete {
+  url: {{baseUrl}}/datastructures/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{closureSourceStructureId}}
+}
+
+tests {
+  test("Removed", function() {
+    expect([200, 204]).to.include(res.getStatus());
+  });
+}

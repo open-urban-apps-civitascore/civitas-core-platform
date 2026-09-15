@@ -1,0 +1,49 @@
+meta {
+  name: 09. Create its version and keep it a draft
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{closureDraftStructureId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "description": "Deliberately left unreleased",
+    "modelName": "ClosureDraftModel",
+    "model": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ClosureDraftModel",
+      "type": "object",
+      "properties": { "stationId": { "type": "string" } }
+    },
+    "styles": {}
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('closureDraftVersionId', res.body.id);
+  }
+  if (res.body && res.body.modelUrn) {
+    bru.setVar('closureDraftModelUrn', res.body.modelUrn);
+  }
+}
+
+tests {
+  test("Created as a draft", function() {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.body.dataStructureVersionStatus).to.equal('DRAFT');
+  });
+  test("Carries a model urn", function() {
+    expect(bru.getVar('closureDraftModelUrn')).to.be.a('string');
+  });
+}

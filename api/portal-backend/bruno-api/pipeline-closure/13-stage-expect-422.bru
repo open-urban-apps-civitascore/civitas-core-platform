@@ -1,0 +1,46 @@
+meta {
+  name: 13. Staging must be refused (422)
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/stage
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{closureDataSetId}}
+}
+
+tests {
+  test("Status code is 422", function() {
+    expect(res.getStatus()).to.equal(422);
+  });
+  test("Carries the closure error type", function() {
+    expect(res.body.type).to.equal('urn:civitas:error:PIPELINE_CLOSURE_INVALID');
+  });
+  test("Reports one finding for the pipeline under test", function() {
+    expect(res.body.findings).to.be.an('array');
+    expect(res.body.findings).to.have.lengthOf(1);
+    expect(res.body.findings[0].pipelineId).to.equal(bru.getVar('closurePipelineId'));
+  });
+  test("Names the unreleased artifact and why it blocks", function() {
+    expect(res.body.findings[0].reason).to.equal('NOT_RELEASED');
+    expect(res.body.findings[0].artifactUrn).to.equal(bru.getVar('closureDraftModelUrn'));
+  });
+  test("The dataset stays a draft", function() {
+    expect(res.body.dataSetStatus).to.be.undefined;
+  });
+}
+
+docs {
+  **The assertion of this scenario.**
+
+  The sink's element pins a DataStructureVersion that was never released. Staging walks out from
+  the pipeline, reaches it through the sink's configuration, and must refuse.
+
+  `artifactUrn` is present because this caller may read the structure. A caller who may not read it
+  receives `NOT_AVAILABLE` and no `artifactUrn` at all — a CORE URN spells the model's name.
+}

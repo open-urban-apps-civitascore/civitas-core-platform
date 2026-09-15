@@ -1,0 +1,50 @@
+meta {
+  name: 12. Create the Pipeline wiring source to sink
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{closureDataSetId}}
+}
+
+body:json {
+  {
+    "name": "Closure Test Pipeline {{closureRunId}}",
+    "description": "Reaches the draft structure through its sink",
+    "dataSourceIds": ["{{closureDataSourceId}}"],
+    "dataSinkIds": ["{{closureDataSinkId}}"],
+    "model": {
+      "nodes": [
+        { "id": "44444444-4444-4000-8000-000000000001", "kind": "start", "label": "Start" },
+        { "id": "44444444-4444-4000-8000-000000000002", "kind": "source", "label": "Source", "sourceRef": "{{closureSourceConfigUrn}}" },
+        { "id": "44444444-4444-4000-8000-000000000003", "kind": "sink", "label": "Sink", "sinkRef": "{{closureSinkConfigUrn}}" },
+        { "id": "44444444-4444-4000-8000-000000000004", "kind": "end", "label": "End" }
+      ],
+      "edges": [
+        { "id": "44444444-4444-4000-8000-0000000000e1", "source": "44444444-4444-4000-8000-000000000001", "target": "44444444-4444-4000-8000-000000000002" },
+        { "id": "44444444-4444-4000-8000-0000000000e2", "source": "44444444-4444-4000-8000-000000000002", "target": "44444444-4444-4000-8000-000000000003" },
+        { "id": "44444444-4444-4000-8000-0000000000e3", "source": "44444444-4444-4000-8000-000000000003", "target": "44444444-4444-4000-8000-000000000004" }
+      ]
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('closurePipelineId', res.body.id);
+  }
+}
+
+tests {
+  test("Created with a stored definition", function() {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.body.modelUrn).to.be.a('string');
+  });
+}

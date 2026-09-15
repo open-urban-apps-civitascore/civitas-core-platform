@@ -1,0 +1,30 @@
+meta {
+  name: 07. Release the DataSource
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{closureDataSourceId}}
+}
+
+script:post-response {
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('closureSourceConfigUrn', res.body.configurationUrn);
+  }
+}
+
+tests {
+  test("Released", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Carries a configuration urn", function() {
+    expect(bru.getVar('closureSourceConfigUrn')).to.be.a('string');
+  });
+}

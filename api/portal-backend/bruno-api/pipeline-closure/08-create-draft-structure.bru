@@ -1,0 +1,33 @@
+meta {
+  name: 08. Create the DataStructure that stays a draft
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/datastructures
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Closure Sink Structure {{closureRunId}}",
+    "description": "Never released — this is what the walk must refuse",
+    "createdFromDataSource": false,
+    "dataStructureVersionIds": [],
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('closureDraftStructureId', res.body.id);
+  }
+}
+
+tests {
+  test("Created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
