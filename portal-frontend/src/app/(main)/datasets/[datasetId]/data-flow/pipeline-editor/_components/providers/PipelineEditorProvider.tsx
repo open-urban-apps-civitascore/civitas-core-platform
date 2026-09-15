@@ -34,6 +34,7 @@ import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import {
   isDatapoolScopeViolationError,
   isNotDraftError,
+  isResourceInUseError,
   isSagaInFlightError,
   isTableNameConflictError,
 } from '@/utils/errors'
@@ -534,6 +535,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     const saveFailedNames: string[] = []
     const scopeViolationNames: string[] = []
     const tableNameConflictNames: string[] = []
+    const sinkInUsePipelineNames: string[] = []
     const notDraftNames: string[] = []
     const sagaInFlightNames: string[] = []
     try {
@@ -640,6 +642,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             scopeViolationNames.push(session.name)
           } else if (isTableNameConflictError(error)) {
             tableNameConflictNames.push(session.name)
+          } else if (isResourceInUseError(error)) {
+            sinkInUsePipelineNames.push(session.name)
           } else {
             saveFailedNames.push(session.name)
           }
@@ -658,6 +662,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       if (tableNameConflictNames.length > 0) {
         toast.error(t('header.tableNameConflict', { names: tableNameConflictNames.join(', ') }))
       }
+      if (sinkInUsePipelineNames.length > 0) {
+        toast.error(t('header.dataSinkInUseError', { names: sinkInUsePipelineNames.join(', ') }))
+      }
       if (saveFailedNames.length > 0) {
         toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
       }
@@ -666,6 +673,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         sagaInFlightNames.length > 0 ||
         scopeViolationNames.length > 0 ||
         tableNameConflictNames.length > 0 ||
+        sinkInUsePipelineNames.length > 0 ||
         saveFailedNames.length > 0
       ) {
         return false

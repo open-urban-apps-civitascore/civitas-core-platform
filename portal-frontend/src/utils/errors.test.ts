@@ -7,6 +7,7 @@ import {
   isNameConflictError,
   isNotDraftError,
   isPermissionsError,
+  isResourceInUseError,
   isSagaInFlightError,
   isTableNameConflictError,
 } from './errors'
@@ -162,33 +163,16 @@ describe('isNotDraftError', () => {
   })
 })
 
+const SAGA_IN_FLIGHT = 'urn:civitas:error:SAGA_IN_FLIGHT'
+
 describe('isSagaInFlightError', () => {
-  it('returns true for a 409 error carrying the RESOURCE_IN_USE type and the saga marker', () => {
-    const error = mockApiError(
-      409,
-      'Cannot write while a saga is in-flight: UNRELEASE',
-      'urn:civitas:error:RESOURCE_IN_USE',
-    )
-    expect(isSagaInFlightError(error)).toBe(true)
-  })
-
-  it('returns true for a saga rejection raised outside the sub-entity guard', () => {
-    const error = mockApiError(
-      409,
-      'Cannot release while a saga is in-flight: CREATE',
-      'urn:civitas:error:RESOURCE_IN_USE',
-    )
-    expect(isSagaInFlightError(error)).toBe(true)
-  })
-
-  it('returns false for a 409 RESOURCE_IN_USE raised by a still-referenced style', () => {
-    const error = mockApiError(409, 'Style is referenced by one or more Layers', 'urn:civitas:error:RESOURCE_IN_USE')
-    expect(isSagaInFlightError(error)).toBe(false)
-  })
-
-  it('returns false for a 409 RESOURCE_IN_USE raised by a still-referenced data sink', () => {
-    const error = mockApiError(409, 'DataSink is referenced by one or more Layers', 'urn:civitas:error:RESOURCE_IN_USE')
-    expect(isSagaInFlightError(error)).toBe(false)
+  it.each([
+    'Cannot write while a saga is in-flight: UNRELEASE',
+    'Cannot write while a saga is in-flight: DELETE',
+    'Cannot release while a saga is in-flight: CREATE',
+    'Cannot unrelease while a saga is in-flight: UPDATE',
+  ])('returns true for a saga rejection: %s', detail => {
+    expect(isSagaInFlightError(mockApiError(409, detail, SAGA_IN_FLIGHT))).toBe(true)
   })
 
   it('returns false for a 409 error with a different type', () => {
@@ -202,11 +186,53 @@ describe('isSagaInFlightError', () => {
   })
 
   it('returns false for non-409 status codes', () => {
-    const error = mockApiError(400, 'Bad request', 'urn:civitas:error:RESOURCE_IN_USE')
+    const error = mockApiError(400, 'Cannot write while a saga is in-flight: UNRELEASE', SAGA_IN_FLIGHT)
     expect(isSagaInFlightError(error)).toBe(false)
   })
 
   it('returns false for non-axios errors', () => {
     expect(isSagaInFlightError(new Error('plain error'))).toBe(false)
+  })
+})
+
+const RESOURCE_IN_USE = 'urn:civitas:error:RESOURCE_IN_USE'
+
+describe('isResourceInUseError', () => {
+  it('returns true when a style is still referenced by layers', () => {
+    const error = mockApiError(409, 'Style is referenced by one or more Layers', RESOURCE_IN_USE)
+    expect(isResourceInUseError(error)).toBe(true)
+  })
+
+  it('returns true when a data sink is still referenced by layers', () => {
+    const error = mockApiError(409, 'DataSink is referenced by one or more Layers', RESOURCE_IN_USE)
+    expect(isResourceInUseError(error)).toBe(true)
+  })
+
+  it('returns false for a missing data-loss confirmation, which shares the type', () => {
+    const error = mockApiError(
+      409,
+      "This change rebuilds the sink's table and discards all stored data; set confirmDataLoss=true to proceed",
+      RESOURCE_IN_USE,
+    )
+    expect(isResourceInUseError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error with a different type', () => {
+    const error = mockApiError(409, 'Style is referenced by one or more Layers', SAGA_IN_FLIGHT)
+    expect(isResourceInUseError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error without a type field', () => {
+    const error = mockApiError(409, 'Style is referenced by one or more Layers')
+    expect(isResourceInUseError(error)).toBe(false)
+  })
+
+  it('returns false for non-409 status codes', () => {
+    const error = mockApiError(400, 'Style is referenced by one or more Layers', RESOURCE_IN_USE)
+    expect(isResourceInUseError(error)).toBe(false)
+  })
+
+  it('returns false for non-axios errors', () => {
+    expect(isResourceInUseError(new Error('plain error'))).toBe(false)
   })
 })

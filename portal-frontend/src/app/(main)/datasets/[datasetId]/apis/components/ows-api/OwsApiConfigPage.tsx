@@ -26,7 +26,7 @@ import {
   StaApiFormData,
 } from '@/types/namedApis'
 import { StyleFormData } from '@/types/styles'
-import { isNotDraftError, isSagaInFlightError } from '@/utils/errors'
+import { isNotDraftError, isResourceInUseError, isSagaInFlightError } from '@/utils/errors'
 import { getNativeCRSFromDataSink, mapApiLayerToFormData, mapApiStyleToFormData } from '@/utils/namedApis'
 
 import { useApiConfig } from '../../hooks/useApiConfig'
@@ -284,6 +284,8 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
           toast.error(t('messages.notDraftError'))
         } else if (isSagaInFlightError(error)) {
           toast.error(t('messages.sagaInFlightError'))
+        } else if (isResourceInUseError(error)) {
+          toast.error(t('messages.styleInUseError'))
         } else {
           toast.error(t('messages.deleteStyleError'))
         }

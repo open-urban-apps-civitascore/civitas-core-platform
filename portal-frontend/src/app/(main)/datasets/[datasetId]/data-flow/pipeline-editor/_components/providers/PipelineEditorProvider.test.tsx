@@ -1691,11 +1691,29 @@ describe('PipelineEditorProviderComponent', () => {
       expect(result).toBe(false)
     })
 
-    it('shows a saga-in-flight toast instead of a generic save failure on a RESOURCE_IN_USE error', async () => {
+    it('names the pipeline when a data sink is still referenced by a layer', async () => {
+      const axiosError = mockApiError(
+        409,
+        'DataSink is referenced by one or more Layers',
+        'urn:civitas:error:RESOURCE_IN_USE',
+      )
+      mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.dataSinkInUseError')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
+    })
+
+    it('shows a saga-in-flight toast instead of a generic save failure when a saga is running', async () => {
       const axiosError = mockApiError(
         409,
         'Cannot write while a saga is in-flight: UNRELEASE',
-        'urn:civitas:error:RESOURCE_IN_USE',
+        'urn:civitas:error:SAGA_IN_FLIGHT',
       )
       mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
 
@@ -1709,11 +1727,11 @@ describe('PipelineEditorProviderComponent', () => {
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
     })
 
-    it('returns false on a RESOURCE_IN_USE error', async () => {
+    it('returns false when a saga is running', async () => {
       const axiosError = mockApiError(
         409,
         'Cannot write while a saga is in-flight: UNRELEASE',
-        'urn:civitas:error:RESOURCE_IN_USE',
+        'urn:civitas:error:SAGA_IN_FLIGHT',
       )
       mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
 
@@ -2007,7 +2025,7 @@ describe('PipelineEditorProviderComponent', () => {
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.notDraftError')
     })
 
-    it('shows a saga-in-flight toast when the backend rejects with RESOURCE_IN_USE', () => {
+    it('shows a saga-in-flight toast when the backend rejects because a saga is running', () => {
       const session = makeSession({
         pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-to-delete' },
       })
@@ -2021,7 +2039,7 @@ describe('PipelineEditorProviderComponent', () => {
       const axiosError = mockApiError(
         409,
         'Cannot write while a saga is in-flight: UNRELEASE',
-        'urn:civitas:error:RESOURCE_IN_USE',
+        'urn:civitas:error:SAGA_IN_FLIGHT',
       )
       act(() => {
         onError(axiosError)

@@ -481,6 +481,7 @@
               "saveStyleError": "An error occurred while saving the style. Please try again.",
               "deleteStyleSuccess": "Style has been successfully deleted.",
               "deleteStyleError": "An error occurred while deleting the style. Please try again.",
+              "styleInUseError": "This style is still used by at least one layer. Remove it there first.",
               "notDraftError": "The dataset must be in draft status to make changes.",
               "sagaInFlightError": "The dataset is currently being processed. Please try again later."
             },
@@ -1363,6 +1364,7 @@
       "saveSuccess": "Pipeline \"{name}\" saved successfully",
       "datasourceScopeViolation": "Cannot save \"{name}\": one or more datasources are not permitted for this datapool.",
       "tableNameConflict": "Cannot save {names}: a geo persistence table name is already used by another data storage of this dataset.",
+      "dataSinkInUseError": "Cannot save {names}: a data storage is still used by at least one layer.",
       "notDraftError": "The dataset must be in draft status to make changes.",
       "sagaInFlightError": "The dataset is currently being processed. Please try again later."
     },

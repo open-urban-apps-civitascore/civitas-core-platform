@@ -20,9 +20,6 @@ const problemWithStatus = (error: unknown, status: number): Pick<ApiError, 'type
 
 const hasErrorType = (problem: Pick<ApiError, 'type'>, urnSuffix: string) => problem.type.endsWith(`:${urnSuffix}`)
 
-// Matches the saga guards in DataSetMutationGuard and DataSetService.
-const SAGA_IN_FLIGHT_MARKER = 'saga is in-flight'
-
 export const isNameConflictError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
   return !!problem && problem.detail.includes('with name') && problem.detail.includes('already exists')
@@ -53,7 +50,13 @@ export const isNotDraftError = (error: unknown) => {
 
 export const isSagaInFlightError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
-  return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && problem.detail.includes(SAGA_IN_FLIGHT_MARKER)
+  return !!problem && hasErrorType(problem, 'SAGA_IN_FLIGHT')
+}
+
+// RESOURCE_IN_USE also carries the missing confirmDataLoss rejection, which has a diferent detail description.
+export const isResourceInUseError = (error: unknown) => {
+  const problem = problemWithStatus(error, 409)
+  return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && problem.detail.includes('is referenced by')
 }
 
 export const isLayerNameError = (error: unknown) => {
