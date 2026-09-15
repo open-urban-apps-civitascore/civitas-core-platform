@@ -793,7 +793,7 @@ class DataSinkControllerIntegrationTest
           exchangeForProblem(
               getEndpointPath() + "/" + sink.getId(), HttpMethod.DELETE, createAuthHeaders(), null);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertRejected(response, HttpStatus.CONFLICT, "urn:civitas:error:RESOURCE_IN_USE");
       assertThat(dataSinkRepository.findById(sink.getId())).isPresent();
     }
   }
