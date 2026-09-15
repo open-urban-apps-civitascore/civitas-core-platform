@@ -87,9 +87,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public ProblemDetail handleDataSetNotEditable(
       DataSetNotEditableException ex, HttpServletRequest request) {
     log.warn("DataSet not editable: {}", Encode.forJava(ex.getMessage()));
-    // TR-03187 W-18/W-19: the detail is a fixed constant with no runtime data interpolated. The
-    // sibling 409 from the same guard does name the pending saga type, which OPA has already
-    // authorised the caller to read on this dataset.
+    // TR-03187 W-18/W-19: the detail is a fixed constant with no runtime data interpolated.
     return createProblemDetail(
         HttpStatus.BAD_REQUEST, "DATASET_NOT_EDITABLE", ex.getMessage(), request);
   }
@@ -129,7 +127,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(SagaInFlightException.class)
   @ResponseStatus(HttpStatus.CONFLICT)
   public ProblemDetail handleSagaInFlight(SagaInFlightException ex, HttpServletRequest request) {
-    log.warn("Saga in flight: {}", Encode.forJava(ex.getMessage()));
+    log.warn(
+        "Saga in flight on dataset {}: {}", ex.getDataSetId(), Encode.forJava(ex.getMessage()));
     // TR-03187 W-18/W-19: the saga type is already part of the detail message, so promoting it to
     // its own property discloses nothing further.
     ProblemDetail problemDetail =
