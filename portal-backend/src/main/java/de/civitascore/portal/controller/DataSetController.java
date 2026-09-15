@@ -357,6 +357,10 @@ public class DataSetController
               + "A dataset that still holds a provisioned sink is torn down asynchronously via a "
               + "DELETE saga and removed once the saga completes. An AVAILABLE dataset cannot be "
               + "deleted directly — unrelease it first (POST /{id}/unrelease).")
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public void delete(@PathVariable UUID id) {
     dataSetService.deleteById(id);
   }
