@@ -1691,6 +1691,24 @@ describe('PipelineEditorProviderComponent', () => {
       expect(result).toBe(false)
     })
 
+    it('names the pipeline when a destructive sink change was not confirmed', async () => {
+      const axiosError = mockApiError(
+        409,
+        "This change rebuilds the sink's table and discards all stored data; set confirmDataLoss=true to proceed",
+        'urn:civitas:error:RESOURCE_IN_USE',
+      )
+      mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.unconfirmedDataLossError')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
+    })
+
     it('names the pipeline when a data sink is still referenced by a layer', async () => {
       const axiosError = mockApiError(
         409,

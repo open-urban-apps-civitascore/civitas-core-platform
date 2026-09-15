@@ -10,6 +10,7 @@ import {
   isResourceInUseError,
   isSagaInFlightError,
   isTableNameConflictError,
+  isUnconfirmedDataLossError,
 } from './errors'
 
 describe('isNameConflictError', () => {
@@ -234,5 +235,44 @@ describe('isResourceInUseError', () => {
 
   it('returns false for non-axios errors', () => {
     expect(isResourceInUseError(new Error('plain error'))).toBe(false)
+  })
+})
+
+const UNCONFIRMED_DATA_LOSS =
+  "This change rebuilds the sink's table and discards all stored data; set confirmDataLoss=true to proceed"
+
+describe('isUnconfirmedDataLossError', () => {
+  it('returns true when a destructive sink change was not confirmed', () => {
+    const error = mockApiError(409, UNCONFIRMED_DATA_LOSS, RESOURCE_IN_USE)
+    expect(isUnconfirmedDataLossError(error)).toBe(true)
+  })
+
+  it('returns false when a style is still referenced, which shares the type', () => {
+    const error = mockApiError(409, 'Style is referenced by one or more Layers', RESOURCE_IN_USE)
+    expect(isUnconfirmedDataLossError(error)).toBe(false)
+  })
+
+  it('returns false when a data sink is still referenced, which shares the type', () => {
+    const error = mockApiError(409, 'DataSink is referenced by one or more Layers', RESOURCE_IN_USE)
+    expect(isUnconfirmedDataLossError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error with a different type', () => {
+    const error = mockApiError(409, UNCONFIRMED_DATA_LOSS, SAGA_IN_FLIGHT)
+    expect(isUnconfirmedDataLossError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error without a type field', () => {
+    const error = mockApiError(409, UNCONFIRMED_DATA_LOSS)
+    expect(isUnconfirmedDataLossError(error)).toBe(false)
+  })
+
+  it('returns false for non-409 status codes', () => {
+    const error = mockApiError(400, UNCONFIRMED_DATA_LOSS, RESOURCE_IN_USE)
+    expect(isUnconfirmedDataLossError(error)).toBe(false)
+  })
+
+  it('returns false for non-axios errors', () => {
+    expect(isUnconfirmedDataLossError(new Error('plain error'))).toBe(false)
   })
 })

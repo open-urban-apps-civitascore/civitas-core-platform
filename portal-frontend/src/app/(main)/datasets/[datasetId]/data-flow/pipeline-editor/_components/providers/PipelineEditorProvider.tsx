@@ -37,6 +37,7 @@ import {
   isResourceInUseError,
   isSagaInFlightError,
   isTableNameConflictError,
+  isUnconfirmedDataLossError,
 } from '@/utils/errors'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
@@ -536,6 +537,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     const scopeViolationNames: string[] = []
     const tableNameConflictNames: string[] = []
     const sinkInUsePipelineNames: string[] = []
+    const dataLossPipelineNames: string[] = []
     const notDraftNames: string[] = []
     const sagaInFlightNames: string[] = []
     try {
@@ -644,6 +646,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             tableNameConflictNames.push(session.name)
           } else if (isResourceInUseError(error)) {
             sinkInUsePipelineNames.push(session.name)
+          } else if (isUnconfirmedDataLossError(error)) {
+            dataLossPipelineNames.push(session.name)
           } else {
             saveFailedNames.push(session.name)
           }
@@ -665,6 +669,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       if (sinkInUsePipelineNames.length > 0) {
         toast.error(t('header.dataSinkInUseError', { names: sinkInUsePipelineNames.join(', ') }))
       }
+      if (dataLossPipelineNames.length > 0) {
+        toast.error(t('header.unconfirmedDataLossError', { names: dataLossPipelineNames.join(', ') }))
+      }
       if (saveFailedNames.length > 0) {
         toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
       }
@@ -674,6 +681,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         scopeViolationNames.length > 0 ||
         tableNameConflictNames.length > 0 ||
         sinkInUsePipelineNames.length > 0 ||
+        dataLossPipelineNames.length > 0 ||
         saveFailedNames.length > 0
       ) {
         return false

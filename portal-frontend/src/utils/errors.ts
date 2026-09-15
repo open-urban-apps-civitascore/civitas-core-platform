@@ -53,10 +53,14 @@ export const isSagaInFlightError = (error: unknown) => {
   return !!problem && hasErrorType(problem, 'SAGA_IN_FLIGHT')
 }
 
-// RESOURCE_IN_USE also carries the missing confirmDataLoss rejection, which has a diferent detail description.
 export const isResourceInUseError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
   return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && problem.detail.includes('is referenced by')
+}
+
+export const isUnconfirmedDataLossError = (error: unknown) => {
+  const problem = problemWithStatus(error, 409)
+  return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && problem.detail.includes('confirmDataLoss')
 }
 
 export const isLayerNameError = (error: unknown) => {
