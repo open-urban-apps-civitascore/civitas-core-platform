@@ -1484,9 +1484,9 @@
       "success": "Diagramm erfolgreich importiert",
       "fileError": "Fehler beim Importieren der Datei.",
       "overwriteModal": {
-        "title": "Bestehendes Diagramm überschreiben?",
-        "description": "Der Import ersetzt alle aktuellen Elemente und Beziehungen auf der Zeichenfläche. Nicht gespeicherte Änderungen gehen verloren.",
-        "confirm": "Überschreiben"
+        "title": "Bestehende Strukturdefinition ersetzen?",
+        "description": "Beim Import werden alle bestehenden Klassen, Attribute und Beziehungen in der Strukturdefinition ersetzt. Diese Aktion kann nicht rückgängig gemacht werden.",
+        "confirm": "Struktur ersetzen"
       },
       "errors": {
         "FILE_TOO_LARGE": "Die Datei ist zu groß (maximal 5 MB erlaubt).",

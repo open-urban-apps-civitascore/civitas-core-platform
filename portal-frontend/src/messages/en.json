@@ -1497,9 +1497,9 @@
       "success": "Diagram imported successfully",
       "fileError": "Failed to import file.",
       "overwriteModal": {
-        "title": "Overwrite existing diagram?",
-        "description": "Importing will replace all current elements and relationships on the canvas. Unsaved changes will be lost.",
-        "confirm": "Overwrite"
+        "title": "Replace existing structure definition?",
+        "description": "Importing will replace all existing classes, attributes, and relationships in the structure definition. This action cannot be undone.",
+        "confirm": "Replace structure"
       },
       "errors": {
         "FILE_TOO_LARGE": "The file is too large (maximum 5 MB allowed).",
