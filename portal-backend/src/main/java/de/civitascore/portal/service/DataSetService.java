@@ -25,8 +25,8 @@ import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.SagaInFlightException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -324,8 +324,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * must keep working on a non-DRAFT dataset.
    *
    * @throws DataSetNotEditableException if the dataset is not in DRAFT
-   * @throws ResourceInUseException if a saga is in flight, which a DRAFT dataset still carries
-   *     while an unrelease teardown runs
+   * @throws SagaInFlightException if a saga is in flight, which a DRAFT dataset still carries while
+   *     an unrelease teardown runs
    */
   @Override
   public DataSet update(UUID id, DataSetInputDTO input) {
@@ -344,7 +344,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @param input the update input
    * @return the updated dataset
    * @throws InvalidInputException if the dataset is DRAFT or the input carries {@code namedApis}
-   * @throws ResourceInUseException if a saga is in-flight for this dataset
+   * @throws SagaInFlightException if a saga is in-flight for this dataset
    */
   @Override
   @Transactional
@@ -379,9 +379,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   private DataSet updateMetaOf(DataSet existingEntity, DataSetInputDTO input) {
     UUID id = existingEntity.getId();
     if (existingEntity.getPendingSagaType() != null) {
-      throw new ResourceInUseException(
-          "DataSet",
+      throw new SagaInFlightException(
           id,
+          existingEntity.getPendingSagaType(),
           "Cannot update metadata while a saga is in-flight: "
               + existingEntity.getPendingSagaType());
     }
@@ -457,13 +457,12 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * <p>An in-flight UNRELEASE saga is allowed: after {@link #unrelease} the dataset is already
    * READY while its route/pipeline teardown runs, and the frontend chains unrelease + unstage to go
    * AVAILABLE → DRAFT in one step. The teardown keeps running; its completion callback leaves a
-   * DRAFT dataset untouched. An in-flight CREATE/UPDATE saga is still rejected — READY does not
-   * occur during those.
+   * DRAFT dataset untouched.
    *
    * @param id the dataset ID
    * @return the unstaged dataset
    * @throws InvalidInputException if dataset is not in READY status
-   * @throws ResourceInUseException if a CREATE or UPDATE saga is in-flight
+   * @throws SagaInFlightException if any saga other than UNRELEASE is in-flight
    */
   @Transactional
   public DataSet unstage(UUID id) {
@@ -476,8 +475,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
     PendingSagaType pending = dataSet.getPendingSagaType();
     if (pending != null && pending != PendingSagaType.UNRELEASE) {
-      throw new ResourceInUseException(
-          "DataSet", id, "Cannot unstage while a saga is in-flight: " + pending);
+      throw new SagaInFlightException(
+          id, pending, "Cannot unstage while a saga is in-flight: " + pending);
     }
 
     dataSet.setDataSetStatus(DataSetStatus.DRAFT);
@@ -494,7 +493,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @return the released dataset
    * @throws InvalidInputException if dataset is not in READY status, or if its map surface is only
    *     half configured
-   * @throws ResourceInUseException if a saga is already in-flight
+   * @throws SagaInFlightException if a saga is already in-flight
    */
   @Override
   @Transactional
@@ -510,9 +509,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     if (dataSet.getPendingSagaType() != null) {
-      throw new ResourceInUseException(
-          "DataSet",
+      throw new SagaInFlightException(
           id,
+          dataSet.getPendingSagaType(),
           "Cannot release while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
 
@@ -585,7 +584,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @param id the dataset ID
    * @return the dataset in READY status with a pending UNRELEASE saga
    * @throws InvalidInputException if dataset is not AVAILABLE
-   * @throws ResourceInUseException if a saga is already in-flight
+   * @throws SagaInFlightException if a saga is already in-flight
    */
   @Override
   @Transactional
@@ -598,9 +597,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     if (dataSet.getPendingSagaType() != null) {
-      throw new ResourceInUseException(
-          "DataSet",
+      throw new SagaInFlightException(
           id,
+          dataSet.getPendingSagaType(),
           "Cannot unrelease while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
 
@@ -825,9 +824,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     if (dataSet.getPendingSagaType() != null) {
-      throw new ResourceInUseException(
-          "DataSet",
+      throw new SagaInFlightException(
           id,
+          dataSet.getPendingSagaType(),
           "Cannot delete while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
 

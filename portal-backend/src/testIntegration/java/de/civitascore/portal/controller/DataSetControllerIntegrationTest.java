@@ -1130,7 +1130,9 @@ class DataSetControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:SAGA_IN_FLIGHT");
+      assertThat(response.getBody().getProperties())
+          .containsEntry("pendingSagaType", PendingSagaType.UNRELEASE.name());
       assertThat(dataSetRepository.findById(dataSetId).orElseThrow().getName())
           .isEqualTo(originalName);
     }
@@ -1335,6 +1337,35 @@ class DataSetControllerIntegrationTest
       assertThat(output.getDataSetStatus())
           .as("Status should remain READY")
           .isEqualTo(DataSetStatus.READY);
+    }
+
+    @Test
+    @DisplayName("Should reject /ready/meta while a saga is in flight")
+    void shouldRejectReadyMetaWhileSagaInFlight() {
+      DataSet dataSet = createDataSetWithRelationships();
+      dataSet.setDataSetStatus(DataSetStatus.READY);
+      dataSet.setPendingSagaType(PendingSagaType.CREATE);
+      dataSet = dataSetRepository.save(dataSet);
+      UUID dataSetId = dataSet.getId();
+      String originalName = dataSet.getName();
+
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Updated While Saga Runs");
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSetId + "/ready/meta",
+              org.springframework.http.HttpMethod.PUT,
+              createAuthHeaders(),
+              updateInput);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:SAGA_IN_FLIGHT");
+      assertThat(response.getBody().getProperties())
+          .containsEntry("pendingSagaType", PendingSagaType.CREATE.name());
+      assertThat(dataSetRepository.findById(dataSetId).orElseThrow().getName())
+          .isEqualTo(originalName);
     }
 
     @ParameterizedTest
