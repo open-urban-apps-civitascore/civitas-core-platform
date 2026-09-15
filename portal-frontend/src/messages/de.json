@@ -967,6 +967,7 @@
       "topicSingle": "Es ist nur ein Topic erlaubt.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
+      "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
     "connection": {
@@ -1104,6 +1105,7 @@
     },
     "errors": {
       "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten.",
+      "inUseError": "Diese Datenstruktur wird noch von einer Datenquelle oder einem Datenspeicher verwendet.",
       "creationError": "Beim Anlegen der Datenstruktur ist ein Fehler aufgetreten.",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
@@ -1146,7 +1148,8 @@
     },
     "errors": {
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
-      "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}"
+      "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}",
+      "inUseError": "Diese Version wird noch von einer Datenquelle oder einem Datenspeicher verwendet."
     }
   },
   "pipelineEditor": {

@@ -975,6 +975,7 @@
       "topicSingle": "Only one topic is allowed.",
       "creationError": "An error occurred while creating the Data source.",
       "updateError": "An error occurred while updating the Data source.",
+      "inUseError": "This data source is still used by a pipeline.",
       "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
     },
     "connection": {
@@ -1117,6 +1118,7 @@
     },
     "errors": {
       "deletionError": "An error occurred while deleting the Data structure.",
+      "inUseError": "This data structure is still used by a data source or data storage.",
       "creationError": "An error occurred while creating the Data structure.",
       "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
     },
@@ -1159,6 +1161,7 @@
     },
     "errors": {
       "creationError": "An error occurred while creating the Data structure version.",
+      "inUseError": "This version is still used by a data source or data storage.",
       "saveInvalidModel": "The version cannot be saved: {reason}"
     }
   },
