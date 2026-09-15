@@ -2088,12 +2088,6 @@ class DataSetServiceTest {
     private void stubOwnedArtifacts(UUID id, DataSet ds) {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(ownedSink()));
-      lenient()
-          .when(modelRegistryGateway.dependencyUrnsOfType(PIPELINE_URN, "mapping"))
-          .thenReturn(List.of(MAPPING_URN + ":1.0.0"));
-      lenient()
-          .when(modelRegistryGateway.logicalUrn(MAPPING_URN + ":1.0.0"))
-          .thenReturn(MAPPING_URN);
     }
 
     @Test
@@ -2109,11 +2103,10 @@ class DataSetServiceTest {
       createService().deleteById(id);
 
       verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
-      // The pipeline artifact holds the edges that keep the mapping, the sink configuration and the
-      // DataSource referenced, so all three go — otherwise those stay undeletable for good.
-      verify(modelRegistryGateway).deletePayload(PIPELINE_URN);
-      verify(modelRegistryGateway).deletePayload(MAPPING_URN);
-      verify(modelRegistryGateway).deletePayload(SINK_URN);
+      // A pipeline is deleted with the mappings it owns, so a mapping no other pipeline uses does
+      // not survive to refuse the deletion of the structures it joined.
+      verify(modelRegistryGateway).deleteArtifact(PIPELINE_URN, true);
+      verify(modelRegistryGateway).deleteArtifact(SINK_URN, false);
     }
 
     @Test
@@ -2132,30 +2125,27 @@ class DataSetServiceTest {
       // remove the edges that keep the next one referenced.
       InOrder order = inOrder(modelRegistryGateway);
       order.verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
-      order.verify(modelRegistryGateway).deletePayload(PIPELINE_URN);
-      order.verify(modelRegistryGateway).deletePayload(MAPPING_URN);
-      order.verify(modelRegistryGateway).deletePayload(SINK_URN);
+      order.verify(modelRegistryGateway).deleteArtifact(PIPELINE_URN, true);
+      order.verify(modelRegistryGateway).deleteArtifact(SINK_URN, false);
     }
 
     @Test
-    @DisplayName("a member the registry refuses to remove does not fail the delete")
-    void refusedMemberDoesNotFailTheDelete() {
+    @DisplayName("a refused removal fails the whole delete rather than stranding the artifact")
+    void refusedRemovalFailsTheWholeDelete() {
       UUID id = UUID.randomUUID();
       DataSet ds =
           datasetWithOwnedArtifacts(
               id, "urn:core:platform:civitas:dataset:common:shared:abcdefghij");
       ds.setProvisioned(false);
       stubOwnedArtifacts(id, ds);
-      // A mapping another DataSet still references is refused, which must leave it intact rather
-      // than abort a delete whose rows are already gone.
       doThrow(new IllegalStateException("still referenced"))
           .when(modelRegistryGateway)
-          .deletePayload(MAPPING_URN);
+          .deleteArtifact(PIPELINE_URN, true);
 
-      createService().deleteById(id);
-
-      verify(dataSetRepository).delete(ds);
-      verify(modelRegistryGateway).deletePayload(SINK_URN);
+      // Swallowing this would commit the row deletions and leave the artifact behind with nothing
+      // left to reach it; the transaction rolls back instead.
+      assertThatThrownBy(() -> createService().deleteById(id))
+          .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -2182,7 +2172,7 @@ class DataSetServiceTest {
                   id.toString(), null, null, null, null, null, null, null, null, null));
 
       verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
-      verify(modelRegistryGateway).deletePayload(sink.getConfigurationLogicalUrn());
+      verify(modelRegistryGateway).deleteArtifact(sink.getConfigurationLogicalUrn(), false);
     }
   }
 

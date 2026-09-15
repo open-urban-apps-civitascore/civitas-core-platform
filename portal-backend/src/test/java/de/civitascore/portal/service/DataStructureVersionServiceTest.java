@@ -87,8 +87,8 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Should block unrelease when version is in use by a DataSink")
-    void shouldBlockUnreleaseWhenInUseByDataSink() {
+    @DisplayName("Should block unrelease when the registry still holds a reference")
+    void shouldBlockUnreleaseWhenStillReferenced() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
@@ -99,7 +99,7 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(ds);
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(modelRegistryGateway.isReferencedBySink(any())).thenReturn(true);
+      when(modelRegistryGateway.isReferenced(any())).thenReturn(true);
 
       assertThatThrownBy(() -> dataStructureVersionService.unrelease(versionId))
           .isInstanceOf(ResourceInUseException.class);
@@ -161,8 +161,8 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Should block delete when version is in use by a DataSink")
-    void shouldBlockDeleteWhenInUseByDataSink() {
+    @DisplayName("Should block delete when the registry still holds a reference")
+    void shouldBlockDeleteWhenStillReferenced() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
       ds.setDataStructureStatus(DataStructureStatus.DRAFT);
@@ -174,7 +174,7 @@ class DataStructureVersionServiceTest {
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(modelRegistryGateway.isReferencedBySink(any())).thenReturn(true);
+      when(modelRegistryGateway.isReferenced(any())).thenReturn(true);
 
       assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
           .isInstanceOf(ResourceInUseException.class);

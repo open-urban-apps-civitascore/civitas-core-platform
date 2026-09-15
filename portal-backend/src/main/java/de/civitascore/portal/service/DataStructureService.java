@@ -218,18 +218,19 @@ public class DataStructureService
     if (versionIds.isEmpty()) {
       return;
     }
-    // Sink references live in the registry (a sink's config carries the version's model URN in its
-    // element field, tracked by Model Forge); the source dimension is a host FK.
+    // The registry answers for every reference it holds — a sink's or source's element, a mapping
+    // endpoint, a grouping member, a second data set; the host FK covers a source pinned to the
+    // version, which the registry does not record.
     boolean inUse =
         dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
             || versions.stream()
                 .map(DataStructureVersion::getModelUrn)
-                .anyMatch(modelRegistryGateway::isReferencedBySink);
+                .anyMatch(modelRegistryGateway::isReferenced);
     if (inUse) {
       throw new ResourceInUseException(
           "DataStructure",
           dataStructure.getId(),
-          "Cannot modify DataStructure because one or more of its versions is referenced by a DataSource or DataSink.");
+          "Cannot modify DataStructure because one or more of its versions is still referenced.");
     }
   }
 }

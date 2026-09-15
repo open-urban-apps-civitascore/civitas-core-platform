@@ -219,24 +219,14 @@ class MappingServiceTest {
   }
 
   @Test
-  void delete_whenNotForced_delegatesToPlainDeletePayload() {
+  @DisplayName("a delete goes to the registry, which refuses it while anything still references it")
+  void delete_delegatesToThePlainDeletePayload() {
     stubMembers(VERSIONED_URN);
 
-    mappingService.delete(DATA_SET_ID, VERSIONED_URN, false);
+    mappingService.delete(DATA_SET_ID, VERSIONED_URN);
 
     verify(registry).deletePayload(VERSIONED_URN);
-    verify(registry, never()).deleteArtifact(any(), anyBoolean(), anyBoolean());
-  }
-
-  @Test
-  void delete_whenForced_forceDeletesAndUnlinksFromDataSets() {
-    stubMembers(VERSIONED_URN);
-
-    mappingService.delete(DATA_SET_ID, VERSIONED_URN, true);
-
-    // force delete: no cascade, force=true (unlinks the mapping from any DataSets, ignores refs).
-    verify(registry).deleteArtifact(VERSIONED_URN, false, true);
-    verify(registry, never()).deletePayload(any());
+    verify(registry, never()).deleteArtifact(any(), anyBoolean());
   }
 
   @Test
@@ -264,10 +254,10 @@ class MappingServiceTest {
   void delete_whenNotAMemberOfThisDataSet_isRefused() {
     stubMembers(VERSIONED_URN);
 
-    assertThatThrownBy(() -> mappingService.delete(DATA_SET_ID, FOREIGN_URN, true))
+    assertThatThrownBy(() -> mappingService.delete(DATA_SET_ID, FOREIGN_URN))
         .isInstanceOf(ResourceNotFoundException.class);
 
-    verify(registry, never()).deleteArtifact(any(), anyBoolean(), anyBoolean());
+    verify(registry, never()).deleteArtifact(any(), anyBoolean());
     verify(registry, never()).deletePayload(any());
   }
 

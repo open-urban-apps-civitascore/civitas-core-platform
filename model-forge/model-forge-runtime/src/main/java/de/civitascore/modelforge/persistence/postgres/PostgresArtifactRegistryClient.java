@@ -267,6 +267,17 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         }
     }
 
+    @Override
+    public List<String> ownedMemberUrns(String urn) {
+        UrnParser.requireNoControlChars(urn);
+        String logical = UrnParser.logicalUrn(urn);
+        try {
+            return references.ownedMemberUrns(logical);
+        } catch (DataAccessException e) {
+            throw translate(e, "Could not read owned members of " + logical);
+        }
+    }
+
     // ── Read ──────────────────────────────────────────────────────────────────
 
     @Override

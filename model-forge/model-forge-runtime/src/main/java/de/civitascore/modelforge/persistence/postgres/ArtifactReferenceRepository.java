@@ -75,6 +75,9 @@ class ArtifactReferenceRepository {
      * dangle). A grouping edge ({@code datastructure-ref}) protects its member exactly like a hard
      * dependency does. Only the artifact's own versions (self-references, e.g. cycles inside one
      * document) are exempt — a document cannot block its own deletion.
+     *
+     * <p>Only a referrer's current version counts. A reference held by a superseded version records
+     * what that version declared and does not constrain its target.
      */
     List<String> blockingDependents(String targetLogicalUrn) {
         return jdbc.sql("""
@@ -82,6 +85,7 @@ class ArtifactReferenceRepository {
                   from model_forge.artifact_reference r
                   join model_forge.artifact_version fv on fv.id = r.from_version_id
                   join model_forge.artifact a          on a.id = fv.artifact_id
+                                                      and fv.version = a.current_version
                  where r.target_artifact_id = (select id from model_forge.artifact
                                                 where logical_urn = :logical)
                    and a.logical_urn <> :logical
@@ -104,6 +108,7 @@ class ArtifactReferenceRepository {
                   from model_forge.artifact_reference r
                   join model_forge.artifact_version fv on fv.id = r.from_version_id
                   join model_forge.artifact a          on a.id = fv.artifact_id
+                                                      and fv.version = a.current_version
                  where r.target_artifact_id = (select id from model_forge.artifact
                                                 where logical_urn = :logical)
                    and a.logical_urn <> :logical
@@ -134,6 +139,43 @@ class ArtifactReferenceRepository {
                  order by a.logical_urn
                 """)
             .param("logical", targetLogicalUrn)
+            .query(String.class)
+            .list();
+    }
+
+    /**
+     * Logical URNs of the artifacts the given one owns — the set a cascading delete may take with
+     * it. Ownership is carried by the edge, not by the target's kind:
+     *
+     * <ul>
+     *   <li>{@code datastructure-ref} — a grouping owns the Elements it is built from.</li>
+     *   <li>{@code pipeline-node} named {@code mapping} — a pipeline owns the Mapping it wires; its
+     *       source, sink and enrich nodes name artifacts of the Data Set, which outlive it.</li>
+     *   <li>{@code dataset-ref} named {@code pipeline} or {@code mapping} — a Data Set owns the
+     *       artifacts that exist only inside it. Its Data Structures, Data Sources and Data Sinks it
+     *       merely groups: those are reachable on their own and outlive it.</li>
+     * </ul>
+     *
+     * <p>Every other edge names something used rather than owned — a Mapping's two endpoints, a
+     * DataSource's or DataSink's element. Only the owner's current version is read, and an
+     * unresolved reference contributes nothing.
+     */
+    List<String> ownedMemberUrns(String ownerLogicalUrn) {
+        return jdbc.sql("""
+                select distinct ta.logical_urn
+                  from model_forge.artifact_reference r
+                  join model_forge.artifact_version fv on fv.id = r.from_version_id
+                  join model_forge.artifact a          on a.id = fv.artifact_id
+                                                      and fv.version = a.current_version
+                  join model_forge.artifact ta         on ta.id = r.target_artifact_id
+                 where a.logical_urn = :logical
+                   and ta.logical_urn <> :logical
+                   and (r.reference_type = 'datastructure-ref'
+                     or (r.reference_type = 'pipeline-node' and r.reference_name = 'mapping')
+                     or (r.reference_type = 'dataset-ref'   and r.reference_name in ('pipeline', 'mapping')))
+                 order by ta.logical_urn
+                """)
+            .param("logical", ownerLogicalUrn)
             .query(String.class)
             .list();
     }

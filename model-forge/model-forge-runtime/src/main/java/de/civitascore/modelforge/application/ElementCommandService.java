@@ -110,10 +110,15 @@ public class ElementCommandService {
      * is auto-unlinked from <em>every</em> DataSet so no manifest dangles it. Dangerous (it can leave
      * non-DataSet references dangling); use for administrative repair only.
      *
-     * <p>When {@code cascade} is set, the target's members are deleted after it, but each only if it
-     * becomes a fully-orphaned artifact once this container is gone (no non-DataSet referrer and no
-     * remaining DataSet membership). Shared / mutually-referencing members are kept. Each delete runs
-     * in its own transaction and re-checks the live registry, so cascade never dangles a reference.
+     * <p>When {@code cascade} is set, the artifacts this one owns are deleted after it — a grouping's
+     * Elements, a pipeline's Mapping, a Data Set's pipelines — each only if nothing else holds it
+     * once this container is gone: no non-DataSet referrer, and membership counted as it is for a
+     * direct delete, so one Data Set is unlinked with it and two keep it. Shared and
+     * mutually-referencing members are kept. Ownership is read off the edge, so a delete
+     * does not reach through a reference into an independent artifact such as a Mapping's endpoint.
+     *
+     * <p>Each delete re-checks the live registry, so a cascade never dangles a reference, and joins
+     * the caller's transaction where there is one, so several removals commit or roll back together.
      */
     public void delete(String urn, boolean cascade, boolean force) {
         String logical = UrnParser.logicalUrn(urn);
@@ -130,9 +135,7 @@ public class ElementCommandService {
             }
         }
         // Snapshot the members before the artifact — and with it its outgoing edges — are gone.
-        List<String> members = cascade
-            ? registry.fetchArtifactRefUrns(urn).stream().map(UrnParser::logicalUrn).distinct().toList()
-            : List.of();
+        List<String> members = cascade ? registry.ownedMemberUrns(urn) : List.of();
         registry.deleteArtifact(urn);
         graph.remove(urn);
         // Keep every DataSet manifest that listed this member consistent (the |D|=1 rule, and — with
@@ -141,12 +144,14 @@ public class ElementCommandService {
             unlinkFromDataSet(dataSet, logical);
         }
         for (String member : members) {
-            // Cascade-delete a member only now that this container is gone AND it is fully orphaned:
-            // no non-DataSet referrer and no remaining DataSet membership. Recurse so an orphaned
-            // member's own orphans are collected; shared / mutually-referencing members are kept.
+            // Cascade-delete a member only now that this container is gone and nothing else holds
+            // it. Membership is counted the same way a direct delete counts it — one Data Set is
+            // unlinked by the recursive call, two or more keep the member — so a cascade neither
+            // reaches further than a delete of the member itself would, nor stops short of it.
+            // Recurse so an orphaned member's own orphans are collected.
             if (registry.fetch(member).isPresent()
                 && registry.nonDataSetBlockingDependents(member).isEmpty()
-                && registry.dataSetMemberships(member).isEmpty()) {
+                && registry.dataSetMemberships(member).size() < 2) {
                 delete(member, true, force);
             }
         }
@@ -177,6 +182,10 @@ public class ElementCommandService {
         }
         if (changed) {
             registry.storeDataSet(dataSetLogicalUrn, doc, VersionBump.MINOR);
+            // Re-storing the manifest mints a new version, and the graph is keyed by the version a
+            // node was registered under. Without this the manifest's current version has no node,
+            // and every member of the Data Set reads as though it had been removed too.
+            graph.registerFromRegistry(dataSetLogicalUrn);
         }
     }
 }

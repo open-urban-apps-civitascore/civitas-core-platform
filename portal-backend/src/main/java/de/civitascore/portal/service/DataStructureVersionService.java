@@ -326,15 +326,14 @@ public class DataStructureVersionService
       throw new ResourceInUseException(
           "DataStructureVersion",
           versionId,
-          "Cannot modify DataStructureVersion because it is referenced by one or more DataSources or DataSinks.");
+          "Cannot modify DataStructureVersion because it is still referenced.");
     }
   }
 
   /**
-   * A version is in use when a data source (host FK) or a data sink references it. Sink references
-   * live in the registry: a sink's configuration carries the version's model URN in its {@code
-   * element} field, which Model Forge tracks as a dependency edge — so the sink dimension is
-   * answered by asking the registry who depends on the version's model.
+   * A version is in use while a data source is pinned to it (a host FK) or the registry still holds
+   * a reference onto its model. Asking the registry for its own deletion verdict keeps this answer
+   * and the delete from disagreeing, and covers every reference that refuses one.
    */
   private boolean isInUse(UUID versionId) {
     if (dataSourceRepository.existsByDataStructureVersionId(versionId)) {
@@ -345,7 +344,7 @@ public class DataStructureVersionService
             .findById(versionId)
             .map(DataStructureVersion::getModelUrn)
             .orElse(null);
-    return modelRegistryGateway.isReferencedBySink(modelUrn);
+    return modelRegistryGateway.isReferenced(modelUrn);
   }
 
   private void validateExistenceOfOtherReleasedVersion(

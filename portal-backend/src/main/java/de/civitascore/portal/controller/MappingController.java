@@ -78,14 +78,12 @@ public class MappingController {
   @Operation(
       summary = "Delete a Mapping artifact by its (logical or versioned) CORE URN",
       description =
-          "Without force=true the delete is rejected while another artifact (e.g. a pipeline's"
-              + " mappingRef) still references the mapping; force=true unlinks it from any DataSets"
-              + " and deletes regardless.")
+          "Rejected while another artifact still references the mapping — a pipeline's mappingRef,"
+              + " for instance. Remove that reference at the artifact holding it first; deleting a"
+              + " mapping a pipeline still uses would leave the pipeline pointing at nothing.")
   public ResponseEntity<Void> delete(
-      @PathVariable UUID dataSetId,
-      @RequestParam("urn") String urn,
-      @RequestParam(value = "force", defaultValue = "false") boolean force) {
-    mappingService.delete(dataSetId, urn, force);
+      @PathVariable UUID dataSetId, @RequestParam("urn") String urn) {
+    mappingService.delete(dataSetId, urn);
     return ResponseEntity.noContent().build();
   }
 

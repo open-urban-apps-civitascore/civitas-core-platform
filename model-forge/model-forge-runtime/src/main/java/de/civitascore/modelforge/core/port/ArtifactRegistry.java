@@ -137,11 +137,14 @@ public interface ArtifactRegistry {
     void deleteArtifact(String urn);
 
     /**
-     * Logical URNs of artifacts whose stored references point at any version of the given
-     * artifact and therefore block its deletion. Every reference type blocks — a grouping that
-     * merely lists the artifact ({@code datastructure-ref}) protects it just as a hard dependency
-     * does, so a "content" cannot be deleted while any "container" still references it. Only the
-     * artifact's own self-references do not block. Empty when nothing blocks the delete.
+     * Logical URNs of artifacts whose stored references point at the given artifact and therefore
+     * block its deletion. Every reference type blocks — a grouping that merely lists the artifact
+     * ({@code datastructure-ref}) protects it just as a hard dependency does, so a "content" cannot
+     * be deleted while any "container" still references it. Only the artifact's own self-references
+     * do not block. Empty when nothing blocks the delete.
+     *
+     * <p>Only a referrer's current version counts. A reference held by a superseded version records
+     * what that version declared and does not constrain its target.
      */
     List<String> blockingDependents(String urn);
 
@@ -153,6 +156,13 @@ public interface ArtifactRegistry {
 
     /** Logical URNs of the DataSets this artifact is a member of ({@code dataset-ref} in-edges). */
     List<String> dataSetMemberships(String urn);
+
+    /**
+     * Logical URNs of the artifacts this one owns — the set a cascading delete may take with it. A
+     * grouping owns its Elements, a pipeline its Mapping, a Data Set its pipelines and mappings;
+     * every other edge names something used rather than owned.
+     */
+    List<String> ownedMemberUrns(String urn);
 
     Optional<JsonNode> fetch(String urn);
 

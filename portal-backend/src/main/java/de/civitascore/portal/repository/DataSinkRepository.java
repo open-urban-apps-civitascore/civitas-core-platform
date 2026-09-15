@@ -32,5 +32,5 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
   // Sink -> DataStructureVersion references are no longer a relational column: a sink carries the
   // version's model URN in its registry-stored configuration ("element" field). The in-use guard
   // therefore asks Model Forge for dependents of the model URN
-  // (ModelRegistryGateway#isReferencedBySink) instead of querying this table.
+  // (ModelRegistryGateway#isReferenced) instead of querying this table.
 }

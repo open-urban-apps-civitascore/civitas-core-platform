@@ -213,6 +213,21 @@ public interface ModelForge {
      */
     void deleteArtifact(ArtifactId artifactId, boolean cascade, boolean force);
 
+    /**
+     * Logical URNs of the artifacts whose references make {@link #deleteArtifact} refuse — the same
+     * answer the refusal carries, without attempting the delete. Empty when nothing stands in the way.
+     *
+     * <p>Asked of the whole set one cascading delete removes — the artifact and, transitively, what
+     * it owns. A reference held from inside that set is removed by the same delete, so a grouping
+     * never blocks on the Elements it owns; only a referrer outside the set is reported.
+     *
+     * <p>Data Set memberships appear only from the second onwards, since a member of a single Data
+     * Set is deleted and unlinked from it. Answered from the stored references rather than the
+     * in-memory dependency graph, so a host gating a delete or an unrelease gets the answer the
+     * delete itself would give.
+     */
+    List<String> deletionBlockers(ArtifactId artifactId);
+
     // ── DataSet membership ─────────────────────────────────────────────────────
 
     /**

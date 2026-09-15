@@ -115,22 +115,16 @@ public class MappingService {
   }
 
   /**
-   * Deletes a Mapping artifact of this DataSet by its (logical or versioned) CORE URN. Without
-   * {@code force} the delete is rejected by Model Forge while another artifact still references the
-   * mapping (e.g. a pipeline's {@code mappingRef}); with {@code force} it is deleted regardless of
-   * who references it. Deleting a mapping that a pipeline still references leaves that pipeline
-   * pointing at nothing, so callers should delete referencing pipelines first (or pass {@code
-   * force}).
+   * Deletes a Mapping artifact of this DataSet by its (logical or versioned) CORE URN. Model Forge
+   * rejects the delete while another artifact still references the mapping — a pipeline's {@code
+   * mappingRef}, for instance — and the caller removes that reference at its own artifact first. A
+   * pipeline deleted on its own takes with it the mappings no other pipeline uses.
    *
    * @throws ResourceNotFoundException when the mapping is not a member of this DataSet
    */
-  public void delete(UUID dataSetId, String urn, boolean force) {
+  public void delete(UUID dataSetId, String urn) {
     requireMemberOfDataSet(manifestUrnOrThrow(dataSetId), urn);
-    if (force) {
-      registry.deleteArtifact(urn, false, true);
-    } else {
-      registry.deletePayload(urn);
-    }
+    registry.deletePayload(urn);
   }
 
   /**

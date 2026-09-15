@@ -34,7 +34,10 @@ import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.modelforge.urn.UrnService;
 import de.civitascore.modelforge.validation.CoreSchemaValidator;
 import de.civitascore.modelforge.validation.ModelValidator;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -530,6 +533,38 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     @Override
     public void deleteArtifact(ArtifactId artifactId, boolean cascade, boolean force) {
         elementCommandService.delete(artifactId.value(), cascade, force);
+    }
+
+    @Override
+    public List<String> deletionBlockers(ArtifactId artifactId) {
+        String root = UrnParser.logicalUrn(artifactId.value());
+        Set<String> removedTogether = deleteClosure(root);
+        // A reference held from inside the set is removed by the same delete, so only a referrer
+        // outside it stands in the way — a grouping does not block the Elements it owns.
+        List<String> blockers = removedTogether.stream()
+            .flatMap(member -> registry.nonDataSetBlockingDependents(member).stream())
+            .filter(blocker -> !removedTogether.contains(blocker))
+            .distinct()
+            .toList();
+        if (!blockers.isEmpty()) {
+            return blockers;
+        }
+        List<String> memberships = registry.dataSetMemberships(root);
+        return memberships.size() >= 2 ? memberships : List.of();
+    }
+
+    /** The artifact and, transitively, the artifacts it owns — what one cascading delete removes. */
+    private Set<String> deleteClosure(String rootLogicalUrn) {
+        Set<String> closure = new LinkedHashSet<>();
+        Deque<String> pending = new ArrayDeque<>();
+        pending.add(rootLogicalUrn);
+        while (!pending.isEmpty()) {
+            String current = pending.poll();
+            if (closure.add(current)) {
+                pending.addAll(registry.ownedMemberUrns(current));
+            }
+        }
+        return closure;
     }
 
     @Override

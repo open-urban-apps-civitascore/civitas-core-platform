@@ -855,26 +855,18 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * its teardown saga reports back — so the manifest cleanup belongs here rather than in the {@code
    * postDelete} hook, which a two-phase delete never reaches.
    *
-   * <p>The sinks' own configuration artifacts are left in the registry: the dataset's pipelines are
-   * removed by a JPA cascade that does not run their service hook, so a pipeline artifact survives
-   * holding a reference onto each sink configuration, and the registry refuses to delete a
-   * referenced artifact. Removing them here would therefore fail the whole delete.
+   * <p>Registry cleanup runs in reference order, because the registry refuses to delete an artifact
+   * anything still points at: the manifest holds the membership edges, and each pipeline holds the
+   * edges onto the sink configurations it writes through.
    */
   private void deleteWithSinks(DataSet dataSet) {
-    // The registry artifacts this DataSet owns, read while its rows still exist. A pipeline is
-    // removed by a JPA cascade that does not run its service hook, so its artifact would otherwise
-    // survive holding pipeline-node edges onto the DataSource, sink configuration and Mapping it
-    // wires — leaving those referenced, and a referenced artifact cannot be deleted.
+    // The registry artifacts this DataSet owns, read while its rows still exist. A pipeline row is
+    // removed by a JPA cascade that does not run its service hook, so its artifact is removed here
+    // instead, together with the mappings no other pipeline uses.
     List<String> pipelineUrns =
         dataSet.getPipelines().stream()
             .map(Pipeline::getModelLogicalUrn)
             .filter(Objects::nonNull)
-            .distinct()
-            .toList();
-    List<String> mappingUrns =
-        pipelineUrns.stream()
-            .flatMap(urn -> modelRegistryGateway.dependencyUrnsOfType(urn, "mapping").stream())
-            .map(modelRegistryGateway::logicalUrn)
             .distinct()
             .toList();
     List<DataSink> sinks = dataSinkRepository.findByDataSetId(dataSet.getId());
@@ -894,35 +886,27 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     dataSetRepository.flush();
 
     // The manifest goes first: it holds the dataset-ref edges onto the members, which is what keeps
-    // them referenced. Then the pipeline artifacts, whose edges keep the rest referenced, and only
-    // then the members those edges pointed at.
+    // them referenced. Then the pipeline artifacts, each taking the mappings no other pipeline
+    // uses,
+    // and only then the sink configurations those pipelines pointed at.
     if (dataSet.getManifestLogicalUrn() != null) {
       modelRegistryGateway.deleteDataSet(dataSet.getManifestLogicalUrn());
     }
-    removeOwnedArtifacts("pipeline", pipelineUrns);
-    removeOwnedArtifacts("mapping", mappingUrns);
-    removeOwnedArtifacts("datasink configuration", sinkConfigurationUrns);
+    removeOwnedArtifacts(pipelineUrns, true);
+    removeOwnedArtifacts(sinkConfigurationUrns, false);
   }
 
   /**
-   * Removes registry artifacts a deleted DataSet owned. A refusal is logged, not thrown: the rows
-   * are already gone and the teardown saga has completed, so failing here would leave the platform
-   * inconsistent and have the delete redelivered forever. An artifact another DataSet still
-   * references is refused by the registry and stays, which is the outcome that keeps a shared
-   * member intact.
+   * Removes registry artifacts a deleted DataSet owned, each taking the artifacts it owns with it
+   * when {@code cascade} is set.
+   *
+   * <p>A refusal propagates and rolls the whole delete back, rows included, so the dataset never
+   * disappears while a model it owned survives with nothing left to reach it. An artifact another
+   * DataSet still holds is not owned by this delete: the registry keeps it and reports no refusal,
+   * so a shared member neither disappears nor fails the delete.
    */
-  private void removeOwnedArtifacts(String kind, List<String> logicalUrns) {
-    for (String logicalUrn : logicalUrns) {
-      try {
-        modelRegistryGateway.deletePayload(logicalUrn);
-      } catch (RuntimeException e) {
-        log.warn(
-            "Could not remove {} artifact {} of a deleted DataSet: {}",
-            kind,
-            Encode.forJava(logicalUrn),
-            Encode.forJava(e.getMessage()));
-      }
-    }
+  private void removeOwnedArtifacts(List<String> logicalUrns, boolean cascade) {
+    logicalUrns.forEach(logicalUrn -> modelRegistryGateway.deleteArtifact(logicalUrn, cascade));
   }
 
   /**
