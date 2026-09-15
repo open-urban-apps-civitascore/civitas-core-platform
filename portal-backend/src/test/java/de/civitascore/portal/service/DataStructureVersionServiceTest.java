@@ -25,6 +25,7 @@ import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -41,6 +42,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataStructureVersionService Unit Tests")
 class DataStructureVersionServiceTest {
+
+  private static final String MODEL_URN =
+      "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0";
+  private static final String BLOCKER_URN =
+      "urn:core:platform:civitas:datasink:common:Store:4rrb1hifsm";
 
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private DataStructureVersionMapper dataStructureVersionMapper;
@@ -97,9 +103,10 @@ class DataStructureVersionServiceTest {
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructure(ds);
+      version.setModelUrn(MODEL_URN);
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(modelRegistryGateway.isReferenced(any())).thenReturn(true);
+      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(BLOCKER_URN));
 
       assertThatThrownBy(() -> dataStructureVersionService.unrelease(versionId))
           .isInstanceOf(ResourceInUseException.class);
@@ -174,7 +181,7 @@ class DataStructureVersionServiceTest {
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(modelRegistryGateway.isReferenced(any())).thenReturn(true);
+      when(modelRegistryGateway.referencesTo(any())).thenReturn(List.of(BLOCKER_URN));
 
       assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
           .isInstanceOf(ResourceInUseException.class);

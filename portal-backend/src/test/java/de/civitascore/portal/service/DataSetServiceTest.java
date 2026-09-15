@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -2102,7 +2103,7 @@ class DataSetServiceTest {
 
       createService().deleteById(id);
 
-      verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
+      verify(modelRegistryGateway).deleteArtifact(ds.getManifestLogicalUrn(), true);
       // A pipeline is deleted with the mappings it owns, so a mapping no other pipeline uses does
       // not survive to refuse the deletion of the structures it joined.
       verify(modelRegistryGateway).deleteArtifact(PIPELINE_URN, true);
@@ -2124,7 +2125,7 @@ class DataSetServiceTest {
       // Order is the whole point: a referenced artifact cannot be deleted, so each step has to
       // remove the edges that keep the next one referenced.
       InOrder order = inOrder(modelRegistryGateway);
-      order.verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
+      order.verify(modelRegistryGateway).deleteArtifact(ds.getManifestLogicalUrn(), true);
       order.verify(modelRegistryGateway).deleteArtifact(PIPELINE_URN, true);
       order.verify(modelRegistryGateway).deleteArtifact(SINK_URN, false);
     }
@@ -2138,6 +2139,8 @@ class DataSetServiceTest {
               id, "urn:core:platform:civitas:dataset:common:shared:abcdefghij");
       ds.setProvisioned(false);
       stubOwnedArtifacts(id, ds);
+      // The manifest goes first and succeeds; the refusal comes from the pipeline behind it.
+      doNothing().when(modelRegistryGateway).deleteArtifact(ds.getManifestLogicalUrn(), true);
       doThrow(new IllegalStateException("still referenced"))
           .when(modelRegistryGateway)
           .deleteArtifact(PIPELINE_URN, true);
@@ -2146,6 +2149,39 @@ class DataSetServiceTest {
       // left to reach it; the transaction rolls back instead.
       assertThatThrownBy(() -> createService().deleteById(id))
           .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("a refusal after the teardown saga does not restore the dataset")
+    void refusalAfterTeardownDoesNotRestoreTheDataSet() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setProvisioned(true);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      ds.setManifestLogicalUrn("urn:core:platform:civitas:dataset:common:torn-down:abcdefghij");
+
+      DataSink sink = new DataSink();
+      sink.setId(UUID.randomUUID());
+      sink.setConfigurationLogicalUrn(
+          "urn:core:platform:civitas:data-sink:common:torn-down-sink:abcdefghij");
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(sink));
+      doThrow(new IllegalStateException("still referenced"))
+          .when(modelRegistryGateway)
+          .deleteArtifact(sink.getConfigurationLogicalUrn(), false);
+
+      // The infrastructure this dataset described is already gone. Letting the refusal out would
+      // roll the row back with its pending saga type set, and every later delete refuses that.
+      assertThatCode(
+              () ->
+                  createService()
+                      .handleSagaCompleted(
+                          id,
+                          new SagaResultPayload(
+                              id.toString(), null, null, null, null, null, null, null, null, null)))
+          .doesNotThrowAnyException();
+      verify(dataSetRepository).delete(ds);
     }
 
     @Test
@@ -2171,7 +2207,7 @@ class DataSetServiceTest {
               new SagaResultPayload(
                   id.toString(), null, null, null, null, null, null, null, null, null));
 
-      verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
+      verify(modelRegistryGateway).deleteArtifact(ds.getManifestLogicalUrn(), true);
       verify(modelRegistryGateway).deleteArtifact(sink.getConfigurationLogicalUrn(), false);
     }
   }

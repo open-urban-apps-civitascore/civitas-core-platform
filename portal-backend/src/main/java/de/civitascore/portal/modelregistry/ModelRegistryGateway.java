@@ -228,10 +228,20 @@ public class ModelRegistryGateway {
    * @return true while at least one reference stands in the way of deleting the model
    */
   public boolean isReferenced(String modelUrn) {
+    return !referencesTo(modelUrn).isEmpty();
+  }
+
+  /**
+   * What stands in the way of deleting the model, named so a caller can go and remove it. Empty
+   * when nothing does.
+   *
+   * @param modelUrn versioned or logical CORE URN of the model; null/blank yields an empty list
+   */
+  public List<String> referencesTo(String modelUrn) {
     if (modelUrn == null || modelUrn.isBlank()) {
-      return false;
+      return List.of();
     }
-    return !modelForge.deletionBlockers(new ArtifactId(groupingUrnOf(modelUrn))).isEmpty();
+    return modelForge.deletionBlockers(new ArtifactId(groupingUrnOf(modelUrn)));
   }
 
   /**
@@ -339,21 +349,6 @@ public class ModelRegistryGateway {
         modelForge.createArtifact(
             new CreateArtifactCommand(ArtifactKind.DATA_SET, safeName, content));
     return toPin(result.artifactId());
-  }
-
-  /**
-   * Deletes a DataSet manifest by its logical URN, together with the pipelines and mappings it
-   * owns.
-   *
-   * <p>Its data structures, data sources and data sinks are kept: a DataSet groups those, and each
-   * is reachable on its own after the DataSet goes. A pipeline and a mapping are not — both are
-   * addressed underneath the DataSet, so leaving one behind would strand it, and a stranded mapping
-   * goes on refusing the deletion of the two data structures it joins.
-   */
-  public void deleteDataSet(String logicalUrn) {
-    if (logicalUrn != null && !logicalUrn.isBlank()) {
-      modelForge.deleteArtifact(new ArtifactId(logicalUrn), true, false);
-    }
   }
 
   /** Explicitly adds a member artifact to a DataSet's manifest ({@code dataset-ref} membership). */

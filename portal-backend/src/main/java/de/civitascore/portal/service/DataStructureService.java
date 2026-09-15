@@ -184,12 +184,12 @@ public class DataStructureService
   }
 
   /**
-   * Validates that none of the data structure's versions are in use by a data source or a data sink
-   * before allowing deletion.
+   * Validates that nothing still references any of the data structure's versions before allowing
+   * deletion.
    *
    * @param id the data structure ID to delete
    * @return the data structure entity to be deleted
-   * @throws ResourceInUseException if any version is referenced by a data source or a data sink
+   * @throws ResourceInUseException if any version is still referenced
    */
   @Override
   protected DataStructure preProcessDelete(UUID id) {
@@ -218,19 +218,27 @@ public class DataStructureService
     if (versionIds.isEmpty()) {
       return;
     }
-    // The registry answers for every reference it holds — a sink's or source's element, a mapping
-    // endpoint, a grouping member, a second data set; the host FK covers a source pinned to the
-    // version, which the registry does not record.
-    boolean inUse =
-        dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
-            || versions.stream()
-                .map(DataStructureVersion::getModelUrn)
-                .anyMatch(modelRegistryGateway::isReferenced);
-    if (inUse) {
+    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)) {
       throw new ResourceInUseException(
           "DataStructure",
           dataStructure.getId(),
-          "Cannot modify DataStructure because one or more of its versions is still referenced.");
+          "Cannot modify DataStructure because a DataSource is pinned to one of its versions.");
+    }
+    // The registry answers for every reference it holds onto a version's model — a sink's or
+    // source's element, a mapping endpoint, another model, a second data set.
+    List<String> blockers =
+        versions.stream()
+            .map(DataStructureVersion::getModelUrn)
+            .map(modelRegistryGateway::referencesTo)
+            .flatMap(List::stream)
+            .distinct()
+            .toList();
+    if (!blockers.isEmpty()) {
+      throw new ResourceInUseException(
+          "DataStructure",
+          dataStructure.getId(),
+          "Cannot modify DataStructure because one or more of its versions is still referenced.",
+          blockers);
     }
   }
 }

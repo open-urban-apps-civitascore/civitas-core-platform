@@ -154,6 +154,14 @@ public interface ArtifactRegistry {
      */
     List<String> nonDataSetBlockingDependents(String urn);
 
+    /**
+     * Like {@link #nonDataSetBlockingDependents(String)}, restricted to the references that hold one
+     * version of the target. A reference pinned to another version constrains that version, not this
+     * one; a reference naming no version holds every version. A null {@code targetVersion} asks for
+     * the artifact as a whole, which is the question a delete asks.
+     */
+    List<String> nonDataSetBlockingDependents(String urn, String targetVersion);
+
     /** Logical URNs of the DataSets this artifact is a member of ({@code dataset-ref} in-edges). */
     List<String> dataSetMemberships(String urn);
 
@@ -163,6 +171,13 @@ public interface ArtifactRegistry {
      * every other edge names something used rather than owned.
      */
     List<String> ownedMemberUrns(String urn);
+
+    /**
+     * Like {@link #ownedMemberUrns(String)}, read from one version of the owner. Each member is
+     * returned as that owner stored it, version and all. A null {@code ownerVersion} reads the
+     * owner's current version.
+     */
+    List<String> ownedMemberUrns(String urn, String ownerVersion);
 
     Optional<JsonNode> fetch(String urn);
 

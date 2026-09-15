@@ -6,6 +6,7 @@ import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -169,6 +170,24 @@ public class MappingService {
     if (!isMemberOfDataSet(manifestUrn, urn)) {
       throw new ResourceNotFoundException(ENTITY_NAME, urn);
     }
+  }
+
+  /**
+   * The logical URNs of this DataSet's mappings.
+   *
+   * <p>A mapping has no host row and is addressed by its URN alone, so without this a mapping whose
+   * pipeline no longer names it cannot be found, and the delete that would clear it has no address
+   * to aim at.
+   *
+   * @throws ResourceNotFoundException when the DataSet has no manifest
+   */
+  public List<String> list(UUID dataSetId) {
+    return registry
+        .dependencyUrnsOfType(manifestUrnOrThrow(dataSetId), MAPPING_ARTIFACT_TYPE)
+        .stream()
+        .map(registry::logicalUrn)
+        .distinct()
+        .toList();
   }
 
   /**

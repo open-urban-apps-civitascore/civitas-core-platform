@@ -143,6 +143,29 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     }
 
     @Test
+    @DisplayName("Deleting a Data Set takes its Pipelines, and through them their Mappings")
+    void deletingADataSetTakesItsPipelinesAndTheirMappings() {
+        String sourcePin = registry.storeDataSource("StationFeed", dataSource(), VersionBump.PATCH);
+        String sinkPin = registry.storeDataSink("ReadingStore", dataSink(), VersionBump.PATCH);
+        String mappingPin = registry.storeMapping("StationToReading", mapping(), VersionBump.PATCH);
+        String pipelinePin = registry.storePipeline(
+            "WeatherIngest", pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH);
+        String dataSetPin = registry.storeDataSet(
+            urns.mintDataSet("WeatherSet"), dataSetOfPipelines(pipelinePin), VersionBump.PATCH);
+
+        deletes.delete(dataSetPin, true);
+
+        // The recursion is load-bearing here: the Data Set owns the pipeline, the pipeline owns the
+        // mapping. A rename of either edge name would silently strand both.
+        assertThat(registry.fetch(dataSetPin)).isEmpty();
+        assertThat(registry.fetch(pipelinePin)).isEmpty();
+        assertThat(registry.fetch(mappingPin)).isEmpty();
+        // What the Data Set only grouped stays.
+        assertThat(registry.fetch(sourcePin)).isPresent();
+        assertThat(registry.fetch(sinkPin)).isPresent();
+    }
+
+    @Test
     @DisplayName("Deleting a Data Set keeps the Data Structures it grouped")
     void deletingADataSetKeepsTheDataStructuresItGrouped() {
         String structurePin = registry.storeDataStructure(
@@ -157,6 +180,38 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     }
 
     // ── What refuses a delete ────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("A reference pinned to one version leaves the other version free")
+    void aReferencePinnedToOneVersionLeavesTheOtherFree() {
+        String structureUrn = urns.mintDataStructure("WeatherStructure");
+        String v1 = registry.storeDataStructure(structureUrn, dataStructureOf(stationPin), VersionBump.PATCH, null);
+        registry.storeDataStructure(structureUrn, dataStructureOf(readingPin), VersionBump.MAJOR, null);
+        assertThat(versionsOf(logical(structureUrn))).containsExactly("1.0.0", "2.0.0");
+        // The sink writes into the first version and names it exactly.
+        String sink = registry.storeDataSink("ReadingStore", dataSinkFor(v1), VersionBump.PATCH);
+
+        assertThat(registry.nonDataSetBlockingDependents(structureUrn, "1.0.0"))
+            .containsExactly(logical(sink));
+        assertThat(registry.nonDataSetBlockingDependents(structureUrn, "2.0.0"))
+            .as("a version nothing writes into is free")
+            .isEmpty();
+        // Asked of the artifact as a whole the reference still counts: a delete removes every version.
+        assertThat(registry.nonDataSetBlockingDependents(structureUrn)).containsExactly(logical(sink));
+    }
+
+    @Test
+    @DisplayName("A member is read at the version its owner pinned")
+    void aMemberIsReadAtTheVersionItsOwnerPinned() {
+        String structureUrn = urns.mintDataStructure("WeatherStructure");
+        String v1 = registry.storeDataStructure(structureUrn, dataStructureOf(stationPin), VersionBump.PATCH, null);
+        String v2 = registry.storeDataStructure(structureUrn, dataStructureOf(readingPin), VersionBump.MAJOR, null);
+
+        assertThat(registry.ownedMemberUrns(v1, "1.0.0")).containsExactly(stationPin);
+        assertThat(registry.ownedMemberUrns(v2, "2.0.0")).containsExactly(readingPin);
+        // Without a version the owner's current one is read.
+        assertThat(registry.ownedMemberUrns(structureUrn)).containsExactly(readingPin);
+    }
 
     @Test
     @DisplayName("A reference refuses the delete and the refusal names what holds it")
@@ -304,6 +359,13 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
 
     private JsonNode dataSinkFor(String elementPin) {
         return mapper.readTree("{\"title\":\"Reading store\",\"element\":\"%s\"}".formatted(elementPin));
+    }
+
+    private JsonNode dataSetOfPipelines(String... pipelinePins) {
+        String refs = "\"" + String.join("\",\"", pipelinePins) + "\"";
+        return mapper.readTree("""
+            { "title": "Weather set", "pipelineRefs": [%s] }
+            """.formatted(refs));
     }
 
     private JsonNode dataSetOfMappings(String... mappingPins) {

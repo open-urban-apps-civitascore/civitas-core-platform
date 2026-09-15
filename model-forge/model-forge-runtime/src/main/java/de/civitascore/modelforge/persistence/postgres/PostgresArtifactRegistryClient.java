@@ -247,10 +247,15 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
 
     @Override
     public List<String> nonDataSetBlockingDependents(String urn) {
+        return nonDataSetBlockingDependents(urn, null);
+    }
+
+    @Override
+    public List<String> nonDataSetBlockingDependents(String urn, String targetVersion) {
         UrnParser.requireNoControlChars(urn);
         String logical = UrnParser.logicalUrn(urn);
         try {
-            return references.nonDataSetBlockingDependents(logical);
+            return references.nonDataSetBlockingDependents(logical, targetVersion);
         } catch (DataAccessException e) {
             throw translate(e, "Could not read dependents of " + logical);
         }
@@ -269,10 +274,15 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
 
     @Override
     public List<String> ownedMemberUrns(String urn) {
+        return ownedMemberUrns(urn, null);
+    }
+
+    @Override
+    public List<String> ownedMemberUrns(String urn, String ownerVersion) {
         UrnParser.requireNoControlChars(urn);
         String logical = UrnParser.logicalUrn(urn);
         try {
-            return references.ownedMemberUrns(logical);
+            return references.ownedMemberUrns(logical, ownerVersion);
         } catch (DataAccessException e) {
             throw translate(e, "Could not read owned members of " + logical);
         }

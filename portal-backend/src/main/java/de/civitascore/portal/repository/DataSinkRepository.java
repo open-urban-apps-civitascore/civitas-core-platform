@@ -29,8 +29,7 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
 
   boolean existsByDataSetIdAndDataSinkType(UUID dataSetId, DataSinkType dataSinkType);
 
-  // Sink -> DataStructureVersion references are no longer a relational column: a sink carries the
-  // version's model URN in its registry-stored configuration ("element" field). The in-use guard
-  // therefore asks Model Forge for dependents of the model URN
-  // (ModelRegistryGateway#isReferenced) instead of querying this table.
+  // A sink names the version's model in its registry-stored configuration ("element" field) rather
+  // than in a relational column, so the in-use guard asks Model Forge what would refuse the model's
+  // deletion (ModelRegistryGateway#isReferenced) instead of querying this table.
 }

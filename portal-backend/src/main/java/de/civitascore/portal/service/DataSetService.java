@@ -685,7 +685,11 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       case DELETE -> {
         // Teardown of the full infrastructure (including the sink) succeeded; now remove the
         // entity itself. Returning here skips the save() below — the row no longer exists.
-        deleteWithSinks(dataSet);
+        // A registry refusal is recorded rather than thrown: the infrastructure this dataset
+        // described is already gone, and letting the removal fail would restore the row with its
+        // pending saga type set, which every later delete then refuses. A stranded artifact is
+        // recoverable; a dataset that can never be deleted again is not.
+        deleteWithSinks(dataSet, false);
         log.info("Saga DELETE completed for dataset {}, entity removed", datasetId);
         return;
       }
@@ -819,7 +823,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     if (!dataSet.isProvisioned()) {
-      deleteWithSinks(dataSet);
+      deleteWithSinks(dataSet, true);
       return;
     }
 
@@ -858,8 +862,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * <p>Registry cleanup runs in reference order, because the registry refuses to delete an artifact
    * anything still points at: the manifest holds the membership edges, and each pipeline holds the
    * edges onto the sink configurations it writes through.
+   *
+   * @param failOnRefusal whether a refused removal fails the whole delete. True while the caller
+   *     can still be told, so the rows survive with their artifacts. False once the teardown saga
+   *     has destroyed the infrastructure, where a failure would restore a dataset that no later
+   *     delete can remove.
    */
-  private void deleteWithSinks(DataSet dataSet) {
+  private void deleteWithSinks(DataSet dataSet, boolean failOnRefusal) {
     // The registry artifacts this DataSet owns, read while its rows still exist. A pipeline row is
     // removed by a JPA cascade that does not run its service hook, so its artifact is removed here
     // instead, together with the mappings no other pipeline uses.
@@ -885,15 +894,14 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     dataSetRepository.delete(dataSet);
     dataSetRepository.flush();
 
-    // The manifest goes first: it holds the dataset-ref edges onto the members, which is what keeps
-    // them referenced. Then the pipeline artifacts, each taking the mappings no other pipeline
-    // uses,
-    // and only then the sink configurations those pipelines pointed at.
+    // The manifest goes first: it holds the dataset-ref edges onto the members. Then the pipeline
+    // artifacts, each taking the mappings no other pipeline uses, and only then the sink
+    // configurations those pipelines pointed at.
     if (dataSet.getManifestLogicalUrn() != null) {
-      modelRegistryGateway.deleteDataSet(dataSet.getManifestLogicalUrn());
+      removeOwnedArtifacts(List.of(dataSet.getManifestLogicalUrn()), true, failOnRefusal);
     }
-    removeOwnedArtifacts(pipelineUrns, true);
-    removeOwnedArtifacts(sinkConfigurationUrns, false);
+    removeOwnedArtifacts(pipelineUrns, true, failOnRefusal);
+    removeOwnedArtifacts(sinkConfigurationUrns, false, failOnRefusal);
   }
 
   /**
@@ -905,8 +913,21 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * DataSet still holds is not owned by this delete: the registry keeps it and reports no refusal,
    * so a shared member neither disappears nor fails the delete.
    */
-  private void removeOwnedArtifacts(List<String> logicalUrns, boolean cascade) {
-    logicalUrns.forEach(logicalUrn -> modelRegistryGateway.deleteArtifact(logicalUrn, cascade));
+  private void removeOwnedArtifacts(
+      List<String> logicalUrns, boolean cascade, boolean failOnRefusal) {
+    for (String logicalUrn : logicalUrns) {
+      try {
+        modelRegistryGateway.deleteArtifact(logicalUrn, cascade);
+      } catch (RuntimeException e) {
+        if (failOnRefusal) {
+          throw e;
+        }
+        log.error(
+            "Could not remove artifact {} of a deleted DataSet, it is now unreferenced: {}",
+            Encode.forJava(logicalUrn),
+            Encode.forJava(e.getMessage()));
+      }
+    }
   }
 
   /**

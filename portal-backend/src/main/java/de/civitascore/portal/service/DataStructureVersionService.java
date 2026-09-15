@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Service for managing {@link DataStructureVersion} entities through their lifecycle (DRAFT to
  * AVAILABLE). The version's JSON Schema (and its UI styles) lives in the Model Forge registry — the
  * service stores it through the {@link ModelRegistryGateway} and mirrors the assigned pin onto the
- * shell — and constrains versions that are in use by a data source or a data sink.
+ * shell — and constrains a version that something still references.
  */
 @Slf4j
 @Service
@@ -102,10 +102,10 @@ public class DataStructureVersionService
 
   /**
    * Validates and constrains update input based on the version's current state. If the version is
-   * in use by a data source or a data sink, structural fields (model, styles) are locked and only
-   * description and modelName may change — the input's model/styles are nulled so no new registry
-   * version is stored and the existing pin is preserved. A released version that is not in use may
-   * have its model replaced but never cleared — it must always retain a non-empty model.
+   * still referenced, structural fields (model, styles) are locked and only description and
+   * modelName may change — the input's model/styles are nulled so no new registry version is stored
+   * and the existing pin is preserved. A released version that is not in use may have its model
+   * replaced but never cleared — it must always retain a non-empty model.
    *
    * @param input the update input
    * @param existingEntity the current version entity
@@ -306,7 +306,7 @@ public class DataStructureVersionService
    *
    * @param id the version ID to delete
    * @return the version entity to be deleted
-   * @throws ResourceInUseException if the version is referenced by a data source or a data sink
+   * @throws ResourceInUseException if the version is still referenced
    * @throws InvalidInputException if the version is the only released version of a released data
    *     structure
    */
@@ -322,11 +322,19 @@ public class DataStructureVersionService
   }
 
   private void validateNotInUse(UUID versionId) {
-    if (isInUse(versionId)) {
+    if (dataSourceRepository.existsByDataStructureVersionId(versionId)) {
       throw new ResourceInUseException(
           "DataStructureVersion",
           versionId,
-          "Cannot modify DataStructureVersion because it is still referenced.");
+          "Cannot modify DataStructureVersion because a DataSource is pinned to it.");
+    }
+    List<String> blockers = modelRegistryGateway.referencesTo(modelUrnOf(versionId));
+    if (!blockers.isEmpty()) {
+      throw new ResourceInUseException(
+          "DataStructureVersion",
+          versionId,
+          "Cannot modify DataStructureVersion because it is still referenced.",
+          blockers);
     }
   }
 
@@ -336,15 +344,15 @@ public class DataStructureVersionService
    * and the delete from disagreeing, and covers every reference that refuses one.
    */
   private boolean isInUse(UUID versionId) {
-    if (dataSourceRepository.existsByDataStructureVersionId(versionId)) {
-      return true;
-    }
-    String modelUrn =
-        dataStructureVersionRepository
-            .findById(versionId)
-            .map(DataStructureVersion::getModelUrn)
-            .orElse(null);
-    return modelRegistryGateway.isReferenced(modelUrn);
+    return dataSourceRepository.existsByDataStructureVersionId(versionId)
+        || modelRegistryGateway.isReferenced(modelUrnOf(versionId));
+  }
+
+  private String modelUrnOf(UUID versionId) {
+    return dataStructureVersionRepository
+        .findById(versionId)
+        .map(DataStructureVersion::getModelUrn)
+        .orElse(null);
   }
 
   private void validateExistenceOfOtherReleasedVersion(

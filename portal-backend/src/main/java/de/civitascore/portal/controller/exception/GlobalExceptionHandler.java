@@ -121,7 +121,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ResponseStatus(HttpStatus.CONFLICT)
   public ProblemDetail handleResourceInUse(ResourceInUseException ex, HttpServletRequest request) {
     log.warn("Resource in use: {}", Encode.forJava(ex.getMessage()));
-    return createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
+    ProblemDetail problem =
+        createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
+    // The guard already knows what stands in the way; naming it is what lets a caller act on the
+    // refusal. It reveals nothing the delete endpoint does not already return.
+    if (!ex.getBlockedBy().isEmpty()) {
+      problem.setProperty("blockedBy", ex.getBlockedBy());
+    }
+    return problem;
   }
 
   @ExceptionHandler(SagaInFlightException.class)

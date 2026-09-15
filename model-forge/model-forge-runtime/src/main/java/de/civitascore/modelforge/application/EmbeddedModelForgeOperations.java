@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class EmbeddedModelForgeOperations implements ModelForge {
 
@@ -537,13 +538,18 @@ public class EmbeddedModelForgeOperations implements ModelForge {
 
     @Override
     public List<String> deletionBlockers(ArtifactId artifactId) {
-        String root = UrnParser.logicalUrn(artifactId.value());
+        String root = artifactId.value();
+        // Every artifact this one would take with it, each kept as the owner pinned it so a member's
+        // version is known. A caller naming one version asks about that version alone.
         Set<String> removedTogether = deleteClosure(root);
+        Set<String> logicalOfSet =
+            removedTogether.stream().map(UrnParser::logicalUrn).collect(Collectors.toSet());
         // A reference held from inside the set is removed by the same delete, so only a referrer
         // outside it stands in the way — a grouping does not block the Elements it owns.
         List<String> blockers = removedTogether.stream()
-            .flatMap(member -> registry.nonDataSetBlockingDependents(member).stream())
-            .filter(blocker -> !removedTogether.contains(blocker))
+            .flatMap(member -> registry
+                .nonDataSetBlockingDependents(member, UrnParser.versionFromUrn(member)).stream())
+            .filter(blocker -> !logicalOfSet.contains(UrnParser.logicalUrn(blocker)))
             .distinct()
             .toList();
         if (!blockers.isEmpty()) {
@@ -553,15 +559,19 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         return memberships.size() >= 2 ? memberships : List.of();
     }
 
-    /** The artifact and, transitively, the artifacts it owns — what one cascading delete removes. */
-    private Set<String> deleteClosure(String rootLogicalUrn) {
+    /**
+     * The artifact and, transitively, the artifacts it owns — what one cascading delete removes.
+     * Each entry keeps the version the owner pinned, so a blocker query can ask about that version.
+     */
+    private Set<String> deleteClosure(String rootUrn) {
         Set<String> closure = new LinkedHashSet<>();
         Deque<String> pending = new ArrayDeque<>();
-        pending.add(rootLogicalUrn);
+        pending.add(rootUrn);
         while (!pending.isEmpty()) {
             String current = pending.poll();
             if (closure.add(current)) {
-                pending.addAll(registry.ownedMemberUrns(current));
+                pending.addAll(
+                    registry.ownedMemberUrns(current, UrnParser.versionFromUrn(current)));
             }
         }
         return closure;

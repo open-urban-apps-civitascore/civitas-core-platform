@@ -26,6 +26,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * The deletion rules as a user meets them, exercised through the HTTP routes rather than the
@@ -72,8 +73,7 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
             "/datasets",
             Map.of("name", "deletion_policy_" + UUID.randomUUID(), "description", "d"));
     assertThat(created.getStatusCode()).as("%s", created.getBody()).isEqualTo(HttpStatus.CREATED);
-    UUID id =
-        UUID.fromString(created.getBody().replaceAll(".*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+    UUID id = UUID.fromString(field(created.getBody(), "id"));
     return dataSetRepository.findById(id).orElseThrow();
   }
 
@@ -193,6 +193,11 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(registry.isReferenced(target.getModelUrn())).isFalse();
   }
 
+  /** Reads one top-level field, so an added field cannot shift what a regex would have matched. */
+  private String field(String body, String name) {
+    return new ObjectMapper().readTree(body).get(name).asText();
+  }
+
   private String createMapping(
       DataSet dataSet, DataStructureVersion source, DataStructureVersion target) {
     ResponseEntity<String> created =
@@ -208,6 +213,6 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
                 "fields",
                 Map.of()));
     assertThat(created.getStatusCode()).as("%s", created.getBody()).isEqualTo(HttpStatus.CREATED);
-    return created.getBody().replaceAll(".*\"logicalUrn\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+    return field(created.getBody(), "logicalUrn");
   }
 }

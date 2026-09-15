@@ -16,6 +16,7 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.ResourceInUseException;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -30,6 +31,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataStructureService Unit Tests")
 class DataStructureServiceTest {
+
+  private static final String BLOCKER_URN =
+      "urn:core:platform:civitas:datasink:common:Store:4rrb1hifsm";
 
   @Mock private DataStructureRepository dataStructureRepository;
   @Mock private DataStructureMapper dataStructureMapper;
@@ -85,7 +89,7 @@ class DataStructureServiceTest {
       when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(false);
-      when(modelRegistryGateway.isReferenced(any())).thenReturn(true);
+      when(modelRegistryGateway.referencesTo(any())).thenReturn(List.of(BLOCKER_URN));
 
       assertThatThrownBy(() -> dataStructureService.unrelease(dsId))
           .isInstanceOf(ResourceInUseException.class);
@@ -160,7 +164,7 @@ class DataStructureServiceTest {
       when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(false);
-      when(modelRegistryGateway.isReferenced(any())).thenReturn(true);
+      when(modelRegistryGateway.referencesTo(any())).thenReturn(List.of(BLOCKER_URN));
 
       assertThatThrownBy(() -> dataStructureService.deleteById(dsId))
           .isInstanceOf(ResourceInUseException.class);

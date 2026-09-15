@@ -199,12 +199,15 @@ public interface ModelForge {
      *
      * <p>Non-DataSet references block unconditionally (referential integrity). DataSet membership is
      * count-based: 0 → delete; 1 → delete and auto-unlink from that DataSet's manifest; ≥2 → blocked
-     * (remove from the other DataSets first). Deleting a DataSet deletes only its manifest — its
-     * members are kept.
+     * (remove from the other DataSets first).
      *
-     * <p>When {@code cascade} is {@code true}, the target's members are deleted too, but each only if
-     * it becomes fully orphaned once this container is gone (no non-DataSet referrer, in no other
-     * DataSet); shared members are kept. When {@code force} is {@code true}, the blocks are overridden
+     * <p>When {@code cascade} is {@code true}, the artifacts the target <em>owns</em> are deleted too
+     * — a grouping's Elements, a pipeline's Mapping, a DataSet's pipelines and mappings — each only
+     * if nothing else holds it once this container is gone: no non-DataSet referrer, and membership
+     * counted as above, so one DataSet is unlinked with it and two keep it. A DataSet's data
+     * structures, data sources and data sinks are grouped rather than owned and are kept. Ownership
+     * is read off the reference, so a cascade never reaches through a reference into an independent
+     * artifact such as a Mapping's endpoint. When {@code force} is {@code true}, the blocks are overridden
      * and the target is deleted regardless of referrers (and auto-unlinked from every DataSet) —
      * dangerous (may dangle non-DataSet references); for administrative repair only.
      *
@@ -221,10 +224,17 @@ public interface ModelForge {
      * it owns. A reference held from inside that set is removed by the same delete, so a grouping
      * never blocks on the Elements it owns; only a referrer outside the set is reported.
      *
-     * <p>Data Set memberships appear only from the second onwards, since a member of a single Data
-     * Set is deleted and unlinked from it. Answered from the stored references rather than the
-     * in-memory dependency graph, so a host gating a delete or an unrelease gets the answer the
-     * delete itself would give.
+     * <p>This is a superset of what {@link #deleteArtifact} rejects: a cascade keeps an owned member
+     * something else holds rather than refusing, so a member's referrer is reported here without
+     * failing the delete. Memberships are counted for the named artifact only, and appear from the
+     * second onwards, since a member of a single Data Set is deleted and unlinked from it.
+     *
+     * <p>A versioned URN asks about that version alone — a reference pinned to another version
+     * constrains that version, not this one. A logical URN asks about the artifact as a whole, which
+     * is the question a delete asks.
+     *
+     * <p>Answered from the stored references rather than the in-memory dependency graph, so the
+     * answer does not depend on what this process has seen since it started.
      */
     List<String> deletionBlockers(ArtifactId artifactId);
 

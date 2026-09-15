@@ -103,6 +103,19 @@ class ArtifactReferenceRepository {
      * {@link #dataSetMemberships} and the deletion-policy concept).
      */
     List<String> nonDataSetBlockingDependents(String targetLogicalUrn) {
+        return nonDataSetBlockingDependents(targetLogicalUrn, null);
+    }
+
+    /**
+     * Like {@link #nonDataSetBlockingDependents(String)}, restricted to the references that hold one
+     * version of the target.
+     *
+     * <p>A reference pinned to another version constrains that version, not this one — a Data Sink
+     * writing into version 1 leaves version 2 free. A reference that names no version follows
+     * whichever is current, so it holds every version and always counts. Pass {@code null} to ask
+     * for the artifact as a whole, which is the question a delete asks.
+     */
+    List<String> nonDataSetBlockingDependents(String targetLogicalUrn, String targetVersion) {
         return jdbc.sql("""
                 select distinct a.logical_urn
                   from model_forge.artifact_reference r
@@ -113,9 +126,17 @@ class ArtifactReferenceRepository {
                                                 where logical_urn = :logical)
                    and a.logical_urn <> :logical
                    and r.reference_type <> 'dataset-ref'
+                   and (cast(:targetVersion as text) is null
+                     or r.target_version_id is null
+                     or r.target_version_id = (select av.id
+                                                 from model_forge.artifact_version av
+                                                 join model_forge.artifact ta on ta.id = av.artifact_id
+                                                where ta.logical_urn = :logical
+                                                  and av.version = cast(:targetVersion as text)))
                  order by a.logical_urn
                 """)
             .param("logical", targetLogicalUrn)
+            .param("targetVersion", targetVersion)
             .query(String.class)
             .list();
     }
@@ -157,25 +178,33 @@ class ArtifactReferenceRepository {
      * </ul>
      *
      * <p>Every other edge names something used rather than owned — a Mapping's two endpoints, a
-     * DataSource's or DataSink's element. Only the owner's current version is read, and an
-     * unresolved reference contributes nothing.
+     * DataSource's or DataSink's element. An unresolved reference contributes nothing.
+     *
+     * <p>Each member is returned as the owner stored it, version and all, so a caller asking about
+     * one version of the owner learns which version of the member that owner holds. Pass a null
+     * {@code ownerVersion} to read the owner's current version.
      */
     List<String> ownedMemberUrns(String ownerLogicalUrn) {
+        return ownedMemberUrns(ownerLogicalUrn, null);
+    }
+
+    List<String> ownedMemberUrns(String ownerLogicalUrn, String ownerVersion) {
         return jdbc.sql("""
-                select distinct ta.logical_urn
+                select distinct r.target_urn
                   from model_forge.artifact_reference r
                   join model_forge.artifact_version fv on fv.id = r.from_version_id
                   join model_forge.artifact a          on a.id = fv.artifact_id
-                                                      and fv.version = a.current_version
                   join model_forge.artifact ta         on ta.id = r.target_artifact_id
                  where a.logical_urn = :logical
+                   and fv.version = coalesce(cast(:ownerVersion as text), a.current_version)
                    and ta.logical_urn <> :logical
                    and (r.reference_type = 'datastructure-ref'
                      or (r.reference_type = 'pipeline-node' and r.reference_name = 'mapping')
                      or (r.reference_type = 'dataset-ref'   and r.reference_name in ('pipeline', 'mapping')))
-                 order by ta.logical_urn
+                 order by r.target_urn
                 """)
             .param("logical", ownerLogicalUrn)
+            .param("ownerVersion", ownerVersion)
             .query(String.class)
             .list();
     }

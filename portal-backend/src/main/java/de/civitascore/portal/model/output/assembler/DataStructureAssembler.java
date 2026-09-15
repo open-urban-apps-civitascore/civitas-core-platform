@@ -32,8 +32,8 @@ public class DataStructureAssembler
   }
 
   /**
-   * {@inheritDoc} Sets the {@code inUse} flag based on whether any data source or data sink
-   * references one of this structure's versions.
+   * {@inheritDoc} Sets the {@code inUse} flag from whether anything still references one of this
+   * structure's versions.
    */
   @Override
   public DataStructureOutputDTO enrichDto(DataStructureOutputDTO dto, DataStructure entity) {

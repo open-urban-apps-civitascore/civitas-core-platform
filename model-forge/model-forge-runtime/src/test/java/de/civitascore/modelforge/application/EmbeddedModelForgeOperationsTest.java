@@ -299,7 +299,7 @@ class EmbeddedModelForgeOperationsTest {
     void deletionBlockersNamesTheReferrersThatWouldRefuseTheDelete() {
         var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56");
         String mapping = "urn:core:platform:civitas:mapping:common:sensor-to-obs:4rrb1hifsm";
-        when(registry.nonDataSetBlockingDependents(artifactId.value())).thenReturn(List.of(mapping));
+        when(registry.nonDataSetBlockingDependents(artifactId.value(), null)).thenReturn(List.of(mapping));
 
         assertThat(operations.deletionBlockers(artifactId)).containsExactly(mapping);
     }
@@ -308,9 +308,9 @@ class EmbeddedModelForgeOperationsTest {
     void deletionBlockersIgnoresAReferenceHeldFromInsideTheDeletedSet() {
         var grouping = new ArtifactId("urn:core:platform:civitas:datastructure:common:Sensor:m8i4hc3h56");
         String member = "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56";
-        when(registry.ownedMemberUrns(grouping.value())).thenReturn(List.of(member));
+        when(registry.ownedMemberUrns(grouping.value(), null)).thenReturn(List.of(member));
         // The grouping is the only thing referencing its own member, and the same delete removes it.
-        when(registry.nonDataSetBlockingDependents(member)).thenReturn(List.of(grouping.value()));
+        when(registry.nonDataSetBlockingDependents(member, null)).thenReturn(List.of(grouping.value()));
 
         assertThat(operations.deletionBlockers(grouping)).isEmpty();
     }
@@ -320,8 +320,8 @@ class EmbeddedModelForgeOperationsTest {
         var grouping = new ArtifactId("urn:core:platform:civitas:datastructure:common:Sensor:m8i4hc3h56");
         String member = "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56";
         String mapping = "urn:core:platform:civitas:mapping:common:sensor-to-obs:4rrb1hifsm";
-        when(registry.ownedMemberUrns(grouping.value())).thenReturn(List.of(member));
-        when(registry.nonDataSetBlockingDependents(member))
+        when(registry.ownedMemberUrns(grouping.value(), null)).thenReturn(List.of(member));
+        when(registry.nonDataSetBlockingDependents(member, null))
             .thenReturn(List.of(grouping.value(), mapping));
 
         assertThat(operations.deletionBlockers(grouping)).containsExactly(mapping);
@@ -332,7 +332,7 @@ class EmbeddedModelForgeOperationsTest {
         var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56");
         String one = "urn:core:platform:civitas:dataset:common:ds1:1111111111";
         String two = "urn:core:platform:civitas:dataset:common:ds2:2222222222";
-        when(registry.nonDataSetBlockingDependents(artifactId.value())).thenReturn(List.of());
+        when(registry.nonDataSetBlockingDependents(artifactId.value(), null)).thenReturn(List.of());
 
         // A member of a single Data Set is deleted and unlinked from it, so that membership is no
         // obstacle and must not be reported as one.
@@ -346,7 +346,7 @@ class EmbeddedModelForgeOperationsTest {
     @Test
     void deletionBlockersIsEmptyWhenNothingStandsInTheWay() {
         var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56");
-        when(registry.nonDataSetBlockingDependents(artifactId.value())).thenReturn(List.of());
+        when(registry.nonDataSetBlockingDependents(artifactId.value(), null)).thenReturn(List.of());
         when(registry.dataSetMemberships(artifactId.value())).thenReturn(List.of());
 
         assertThat(operations.deletionBlockers(artifactId)).isEmpty();
