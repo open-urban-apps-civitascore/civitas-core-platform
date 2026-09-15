@@ -39,7 +39,9 @@ public record ClosureFinding(UUID pipelineId, String artifactUrn, Reason reason)
      */
     NOT_AVAILABLE,
     /** Resolves and is readable, but is still a draft. */
-    NOT_RELEASED
+    NOT_RELEASED,
+    /** The flow reaches further than the walk follows, so part of it was never examined. */
+    NOT_VERIFIED
   }
 
   /**
@@ -52,5 +54,10 @@ public record ClosureFinding(UUID pipelineId, String artifactUrn, Reason reason)
 
   public static ClosureFinding notReleased(UUID pipelineId, String artifactUrn) {
     return new ClosureFinding(pipelineId, artifactUrn, Reason.NOT_RELEASED);
+  }
+
+  /** A finding about the walk rather than an artifact, so it names none. */
+  public static ClosureFinding notVerified(UUID pipelineId) {
+    return new ClosureFinding(pipelineId, null, Reason.NOT_VERIFIED);
   }
 }

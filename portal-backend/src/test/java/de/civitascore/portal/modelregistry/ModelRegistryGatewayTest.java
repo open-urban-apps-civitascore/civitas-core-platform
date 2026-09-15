@@ -86,7 +86,7 @@ class ModelRegistryGatewayTest {
     void asksForABoundedWalk() {
       when(modelForge.closure(any()))
           .thenReturn(
-              new DependencyClosureView(new ArtifactId(PIPELINE_URN), List.of(), List.of()));
+              new DependencyClosureView(new ArtifactId(PIPELINE_URN), List.of(), List.of(), false));
 
       gateway.closure(PIPELINE_URN, 6);
 
@@ -97,6 +97,20 @@ class ModelRegistryGatewayTest {
     }
 
     @Test
+    @DisplayName("passes on that the depth bound stopped the walk short")
+    void carriesTruncation() {
+      when(modelForge.closure(any()))
+          .thenReturn(
+              new DependencyClosureView(
+                  new ArtifactId(PIPELINE_URN),
+                  List.of(new ArtifactId(STRUCTURE_URN)),
+                  List.of(),
+                  true));
+
+      assertThat(gateway.closure(PIPELINE_URN, 10).truncated()).isTrue();
+    }
+
+    @Test
     @DisplayName("reports what the flow reaches and what of it is missing")
     void reportsReachedAndMissing() {
       when(modelForge.closure(any()))
@@ -104,7 +118,8 @@ class ModelRegistryGatewayTest {
               new DependencyClosureView(
                   new ArtifactId(PIPELINE_URN),
                   List.of(new ArtifactId(STRUCTURE_URN), new ArtifactId(GHOST_URN)),
-                  List.of(new ArtifactId(GHOST_URN))));
+                  List.of(new ArtifactId(GHOST_URN)),
+                  false));
 
       ModelRegistryGateway.ArtifactClosure closure = gateway.closure(PIPELINE_URN, 10);
 

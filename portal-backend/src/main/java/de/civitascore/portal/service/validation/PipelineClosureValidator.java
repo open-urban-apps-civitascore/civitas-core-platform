@@ -104,6 +104,14 @@ public class PipelineClosureValidator {
         modelRegistryGateway.closure(pipeline.getModelUrn(), properties.maxDepth());
 
     List<ClosureFinding> findings = new ArrayList<>();
+    if (closure.truncated()) {
+      // Passing here would report "nothing found" for a flow nobody walked to its end.
+      log.warn(
+          "Closure validation: the flow of pipeline {} reaches beyond the configured depth of {}",
+          pipeline.getId(),
+          properties.maxDepth());
+      findings.add(ClosureFinding.notVerified(pipeline.getId()));
+    }
     for (String urn : closure.unresolved()) {
       log.info(
           "Closure validation: unresolved reference to {} reached by pipeline {}",

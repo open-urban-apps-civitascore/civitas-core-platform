@@ -75,9 +75,15 @@ class PipelineClosureValidatorTest {
 
   /** What the registry reports for a flow: everything it reaches, and what it no longer holds. */
   private void closureOf(String pipelineUrn, Set<String> artifacts, Set<String> unresolved) {
+    closureOf(pipelineUrn, artifacts, unresolved, false);
+  }
+
+  /** As above, with the registry reporting that the depth bound stopped the walk short. */
+  private void closureOf(
+      String pipelineUrn, Set<String> artifacts, Set<String> unresolved, boolean truncated) {
     lenient()
         .when(modelRegistryGateway.closure(eq(pipelineUrn), anyInt()))
-        .thenReturn(new ModelRegistryGateway.ArtifactClosure(artifacts, unresolved));
+        .thenReturn(new ModelRegistryGateway.ArtifactClosure(artifacts, unresolved, truncated));
   }
 
   private static DataStructureVersion version(
@@ -151,6 +157,28 @@ class PipelineClosureValidatorTest {
       validator().validate(List.of(pipeline(pipelineId, null)));
 
       verify(modelRegistryGateway, never()).closure(any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("a flow reaching past the bound is refused although all it examined was sound")
+    void aTruncatedWalkBlocks() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of(), true);
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+          .thenReturn(List.of(released(STRUCTURE_URN)));
+
+      assertThat(findingsOf(catchThrowable(() -> validator().validate(pipelines()))))
+          .as("what the walk did not see is the reason, not what it saw")
+          .containsExactly(ClosureFinding.notVerified(pipelineId));
+    }
+
+    @Test
+    @DisplayName("a flow that fits inside the bound is not held against it")
+    void anUntruncatedWalkPasses() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+          .thenReturn(List.of(released(STRUCTURE_URN)));
+
+      assertThatCode(() -> validator().validate(pipelines())).doesNotThrowAnyException();
     }
 
     @Test

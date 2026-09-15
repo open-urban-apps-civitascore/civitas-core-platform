@@ -652,20 +652,31 @@ class EmbeddedModelForgeOperationsTest {
     }
 
     @Test
+    void closureCarriesWhetherTheBoundCutTheWalkShort() {
+        when(graph.getTransitiveDependenciesBounded(CLOSURE_ROOT, 4))
+            .thenReturn(new DependencyGraphService.BoundedWalk(Set.of(CLOSURE_MEMBER), true));
+        when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_MEMBER));
+
+        assertThat(operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT), 4)).truncated())
+            .isTrue();
+    }
+
+    @Test
     void closureWalksToTheRequestedDepth() {
-        when(graph.getTransitiveDependencies(CLOSURE_ROOT, 4)).thenReturn(Set.of(CLOSURE_MEMBER));
+        when(graph.getTransitiveDependenciesBounded(CLOSURE_ROOT, 4))
+            .thenReturn(new DependencyGraphService.BoundedWalk(Set.of(CLOSURE_MEMBER), false));
         when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_MEMBER));
 
         operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT), 4));
 
-        verify(graph).getTransitiveDependencies(CLOSURE_ROOT, 4);
+        verify(graph).getTransitiveDependenciesBounded(CLOSURE_ROOT, 4);
         verify(graph, never()).getDependencies(any());
     }
 
     @Test
     void closureReportsTheUnheldMembersFromOneProbe() {
-        when(graph.getTransitiveDependencies(CLOSURE_ROOT, 10))
-            .thenReturn(new LinkedHashSet<>(List.of(CLOSURE_MEMBER, CLOSURE_GHOST)));
+        when(graph.getTransitiveDependenciesBounded(CLOSURE_ROOT, 10))
+            .thenReturn(new DependencyGraphService.BoundedWalk(new LinkedHashSet<>(List.of(CLOSURE_MEMBER, CLOSURE_GHOST)), false));
         when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_MEMBER));
 
         var view = operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT), 10));
@@ -681,8 +692,8 @@ class EmbeddedModelForgeOperationsTest {
     void closureExcludesEveryVersionOfTheRootEvenWhenACycleReachesIt() {
         String otherRootVersion =
             "urn:core:platform:civitas:pipeline:common:Ingest:aaaaaaaaaa:2.0.0";
-        when(graph.getTransitiveDependencies(CLOSURE_ROOT, 10))
-            .thenReturn(new LinkedHashSet<>(List.of(CLOSURE_MEMBER, CLOSURE_ROOT, otherRootVersion)));
+        when(graph.getTransitiveDependenciesBounded(CLOSURE_ROOT, 10))
+            .thenReturn(new DependencyGraphService.BoundedWalk(new LinkedHashSet<>(List.of(CLOSURE_MEMBER, CLOSURE_ROOT, otherRootVersion)), false));
         when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_MEMBER));
 
         var view = operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT), 10));

@@ -79,7 +79,11 @@ public class ModelRegistryGateway {
    * @param artifacts every artifact the walk reached, entry artifact excluded
    * @param unresolved those of {@code artifacts} the registry no longer holds
    */
-  public record ArtifactClosure(Set<String> artifacts, Set<String> unresolved) {}
+  /**
+   * What a flow reaches, what of it the registry does not hold, and whether the depth bound stopped
+   * the walk short of the whole flow.
+   */
+  public record ArtifactClosure(Set<String> artifacts, Set<String> unresolved, boolean truncated) {}
 
   /**
    * Stores a model (with its styles merged in as {@value #X_UI_STYLES}) in the registry and returns
@@ -274,11 +278,11 @@ public class ModelRegistryGateway {
    */
   public ArtifactClosure closure(String urn, int maxDepth) {
     if (urn == null || urn.isBlank() || maxDepth <= 0) {
-      return new ArtifactClosure(Set.of(), Set.of());
+      return new ArtifactClosure(Set.of(), Set.of(), false);
     }
     DependencyClosureView view =
         modelForge.closure(new DependencyQuery(new ArtifactId(urn), maxDepth));
-    return new ArtifactClosure(urns(view.closure()), urns(view.unresolved()));
+    return new ArtifactClosure(urns(view.closure()), urns(view.unresolved()), view.truncated());
   }
 
   private static Set<String> urns(List<ArtifactId> ids) {

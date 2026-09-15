@@ -246,8 +246,8 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         // The walk surfaces the root itself when a cycle leads back to it, and a cycle may reach a
         // different version of it. The closure is what the root participates in, so drop the whole
         // root artifact by logical identity.
-        List<String> members = dependencyGraph
-            .getTransitiveDependencies(root.value(), query.maxDepth())
+        var walk = dependencyGraph.getTransitiveDependenciesBounded(root.value(), query.maxDepth());
+        List<String> members = walk.visited()
             .stream()
             .filter(urn -> !rootLogical.equals(UrnParser.logicalUrn(urn)))
             .toList();
@@ -257,7 +257,8 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         return new DependencyClosureView(
             root,
             members.stream().map(ArtifactId::new).toList(),
-            members.stream().filter(urn -> !held.contains(urn)).map(ArtifactId::new).toList());
+            members.stream().filter(urn -> !held.contains(urn)).map(ArtifactId::new).toList(),
+            walk.truncated());
     }
 
     @Override

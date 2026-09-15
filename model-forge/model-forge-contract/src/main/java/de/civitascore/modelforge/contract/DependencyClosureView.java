@@ -21,14 +21,20 @@ import java.util.Objects;
  *
  * <p>{@code unresolved} is a subset of {@code closure}, and both keep the walk's discovery order.
  *
+ * <p><b>The bound may hide members.</b> {@code truncated} says an artifact lies immediately beyond
+ * the query's depth bound, so {@code closure} is what the walk reached rather than everything the
+ * root participates in. A truncated answer means "not known", not "nothing found".
+ *
  * @param root the artifact the closure was taken from, as the query named it
  * @param closure every artifact reachable from {@code root} within the query's depth bound
  * @param unresolved the members of {@code closure} the registry does not hold
+ * @param truncated whether the depth bound stopped the walk short of the full closure
  */
 public record DependencyClosureView(
     ArtifactId root,
     List<ArtifactId> closure,
-    List<ArtifactId> unresolved
+    List<ArtifactId> unresolved,
+    boolean truncated
 ) {
 
     public DependencyClosureView {

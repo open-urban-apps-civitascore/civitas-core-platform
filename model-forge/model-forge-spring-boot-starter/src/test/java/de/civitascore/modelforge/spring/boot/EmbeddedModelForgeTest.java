@@ -170,7 +170,7 @@ class EmbeddedModelForgeTest {
 
                 @Override
                 public DependencyClosureView closure(DependencyQuery query) {
-                    return new DependencyClosureView(query.artifactId(), List.of(), List.of());
+                    return new DependencyClosureView(query.artifactId(), List.of(), List.of(), false);
                 }
 
                 @Override

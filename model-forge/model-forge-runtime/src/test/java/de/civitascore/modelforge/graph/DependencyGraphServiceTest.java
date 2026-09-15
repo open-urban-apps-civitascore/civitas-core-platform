@@ -167,6 +167,34 @@ class DependencyGraphServiceTest {
     }
 
     @Test
+    void boundedWalk_reportsWhetherTheBoundCutItShort() {
+        // A → B → C → D
+        graph.register(A_V, Set.of(B_V));
+        graph.register(B_V, Set.of(C_V));
+        graph.register(C_V, Set.of(D_V));
+
+        assertThat(graph.getTransitiveDependenciesBounded(A, 2).truncated())
+            .as("D lies one hop past the bound, so the answer describes part of the chain")
+            .isTrue();
+        assertThat(graph.getTransitiveDependenciesBounded(A, 3).truncated())
+            .as("the whole chain fits, so nothing was left behind")
+            .isFalse();
+        assertThat(graph.getTransitiveDependenciesBounded(A, 3).visited())
+            .containsExactlyInAnyOrder(B, C, D);
+    }
+
+    @Test
+    void boundedWalk_aCycleWithinTheBoundIsNotTruncation() {
+        // A → B → A: everything reachable is reached, however deep the walk may go
+        graph.register(A_V, Set.of(B_V));
+        graph.register(B_V, Set.of(A_V));
+
+        assertThat(graph.getTransitiveDependenciesBounded(A, 5).truncated()).isFalse();
+        assertThat(graph.getTransitiveDependenciesBounded(A, 5).visited())
+            .containsExactlyInAnyOrder(A, B);
+    }
+
+    @Test
     void getTransitiveDependencies_depthBounded_cycleSafe() {
         // A → B → A (cycle): bounded BFS must terminate
         graph.register(A_V, Set.of(B_V));
