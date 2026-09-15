@@ -27,32 +27,20 @@ import org.springframework.stereotype.Component;
 
 /**
  * Refuses to let a Data Set be staged or released while an artifact its flows depend on cannot
- * carry a release.
+ * carry a release. Provisioning configures NiFi, FROST, PostGIS, GeoServer and APISIX, so an
+ * artifact that proves unusable afterwards has to be undone through saga compensation.
  *
- * <p>Provisioning a released Data Set configures NiFi, FROST, PostGIS, GeoServer and APISIX. An
- * artifact that proves unusable once that has begun has to be undone through saga compensation, so
- * the question is asked before the transition rather than after.
+ * <p>What participates is decided by the flow, not by Data Set membership: the walk starts at each
+ * Pipeline's model and follows the references the registry recorded. Pipeline content is never
+ * parsed, and a Data Set member no flow reaches does not block it.
  *
- * <p>What participates is decided by the flow, not by Data Set membership. The walk starts at each
- * Pipeline's own model and follows the references the registry recorded — a pipeline names a
- * mapping, a mapping names a source and a target structure, a structure names its member elements.
- * An artifact that belongs to the same Data Set but that no flow reaches is irrelevant here and
- * does not block it. The reference graph is the authority; pipeline content is never parsed.
+ * <p>Every artifact reached must resolve. One the platform holds a Data Structure Version for must
+ * also be readable by the caller and released — that record, not the URN's kind, is what gives it a
+ * lifecycle and a scope. One without a record is held to resolvability alone: elements are
+ * deliberately reusable, so inheriting a lifecycle would block a shared element on any unrelated
+ * draft.
  *
- * <p>Every artifact reached must resolve, which the registry answers for the whole closure at once.
- * An artifact the platform holds a Data Structure Version for is held to more, because that record
- * is what gives it a release lifecycle and an authorization scope: the caller must be allowed to
- * read it and it must itself be released. Being governed is decided by that record rather than by
- * the URN's kind — a version pins an {@code :element:} URN as readily as a {@code :datastructure:}
- * one, depending only on whether the model was authored with a diagram.
- *
- * <p>An artifact with no such record — a member element, a mapping, a sink configuration — is held
- * to resolvability alone. It carries no lifecycle of its own, and inheriting one would mean picking
- * a structure among several that may share it: elements are deliberately reusable, so a shared
- * element would otherwise be blocked by any unrelated draft that also uses it.
- *
- * <p>Findings are collected across every flow and reported together, so one attempt names
- * everything that needs repairing.
+ * <p>Findings are collected across every flow and reported together.
  */
 @Component
 @RequiredArgsConstructor
@@ -151,14 +139,10 @@ public class PipelineClosureValidator {
   }
 
   /**
-   * Holds one governed artifact to what a released flow needs of it, in the order the disclosure
-   * boundary requires: a caller who may not read it learns only that it is not available. Were its
-   * draft state reported first, the reply would confirm the artifact exists and name a model from
-   * another department.
+   * Holds one governed artifact to what a released flow needs of it. Readability is judged first:
+   * reporting a draft state to a caller who may not read the artifact would confirm it exists.
    *
-   * <p>A flow pins a registry artifact rather than one of the platform's records of it, and several
-   * records can pin the same artifact — the registry returns the version it already holds when
-   * content is byte-identical. The artifact can therefore carry a release as soon as one record the
+   * <p>Several records can pin the same artifact, so it carries a release as soon as one record the
    * caller may read says so.
    */
   private Optional<ClosureFinding> inspectGoverned(
@@ -183,10 +167,9 @@ public class PipelineClosureValidator {
   }
 
   /**
-   * Whether the caller may read the structure carrying this version.
-   *
-   * <p>Decided here because OPA never sees a structure two hops away in the reference graph, and
-   * the scope header it emits is typed to the route's own Data Set scope.
+   * Whether the caller may read the structure carrying this version. Decided here because OPA never
+   * sees a structure two hops away, and the scope header it emits is typed to the route's own
+   * scope.
    */
   private boolean isReadable(DataStructureVersion version, Map<UUID, Boolean> readability) {
     return readability.computeIfAbsent(

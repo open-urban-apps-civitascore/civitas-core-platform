@@ -8,22 +8,17 @@ import java.util.Objects;
  * called out separately — everything an artifact participates in, and what of it is missing.
  *
  * <p><b>The root is never a member.</b> {@code closure} lists the artifacts reachable <em>from</em>
- * {@code root}, never {@code root} itself — not even when a reference cycle leads back to it, which
- * the underlying walk does surface. Membership is decided by logical URN, so no version of the root
- * artifact appears. A caller that must judge the root judges it directly; it holds it already.
+ * {@code root}, never {@code root} itself, not even when a cycle leads back to it. Membership is
+ * decided by logical URN, so no version of the root appears.
  *
- * <p><b>URN form.</b> A member the registry resolved is a <em>versioned</em> URN, because the
- * dependency graph's nodes are versioned. A member it could not resolve — a pin whose version was
- * never stored, or a target whose artifact is gone — is carried <em>verbatim as authored</em>, so it
- * may be a pin, a logical URN or a {@code :latest} token. An entry in {@code unresolved} is
- * therefore the reference exactly as some artifact spells it, which is what a caller needs in order
- * to report or repair it.
+ * <p><b>URN form.</b> A resolved member is a <em>versioned</em> URN. An unresolved one is carried
+ * <em>verbatim as authored</em> — a pin, a logical URN or a {@code :latest} token — because that is
+ * how some artifact spells the reference a caller has to repair.
  *
  * <p>{@code unresolved} is a subset of {@code closure}, and both keep the walk's discovery order.
  *
- * <p><b>The bound may hide members.</b> {@code truncated} says an artifact lies immediately beyond
- * the query's depth bound, so {@code closure} is what the walk reached rather than everything the
- * root participates in. A truncated answer means "not known", not "nothing found".
+ * <p><b>The bound may hide members.</b> {@code truncated} says an artifact lies beyond the query's
+ * depth bound, so the answer means "not known", not "nothing found".
  *
  * @param root the artifact the closure was taken from, as the query named it
  * @param closure every artifact reachable from {@code root} within the query's depth bound
