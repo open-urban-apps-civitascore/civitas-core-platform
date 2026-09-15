@@ -266,6 +266,10 @@ public class DataSetController
       operationId = "unstageDataSet",
       summary = "Unstage a dataset",
       description = "Reverts the dataset from READY to DRAFT.")
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> unstage(@PathVariable UUID id) {
     DataSet draft = dataSetService.unstage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(draft);
@@ -273,6 +277,10 @@ public class DataSetController
   }
 
   @Override
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> release(@PathVariable UUID id) {
     DataSet released = dataSetService.release(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(released);

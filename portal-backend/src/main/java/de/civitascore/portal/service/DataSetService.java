@@ -457,13 +457,12 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * <p>An in-flight UNRELEASE saga is allowed: after {@link #unrelease} the dataset is already
    * READY while its route/pipeline teardown runs, and the frontend chains unrelease + unstage to go
    * AVAILABLE → DRAFT in one step. The teardown keeps running; its completion callback leaves a
-   * DRAFT dataset untouched. An in-flight CREATE/UPDATE saga is still rejected — READY does not
-   * occur during those.
+   * DRAFT dataset untouched.
    *
    * @param id the dataset ID
    * @return the unstaged dataset
    * @throws InvalidInputException if dataset is not in READY status
-   * @throws SagaInFlightException if a CREATE or UPDATE saga is in-flight
+   * @throws SagaInFlightException if any saga other than UNRELEASE is in-flight
    */
   @Transactional
   public DataSet unstage(UUID id) {
