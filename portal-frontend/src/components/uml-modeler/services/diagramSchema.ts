@@ -189,14 +189,14 @@ export const UMLDiagramSchema = RawUMLDiagramSchema.superRefine((diagram, ctx) =
     const node = diagram.nodes[i]
     if (node.data.element.id !== node.id) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: `Node ${node.id} element.id does not match node id`,
         path: ['nodes', i, 'data', 'element', 'id'],
       })
     }
     if (node.data.element.type !== node.type) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: `Node ${node.id} element.type does not match node type`,
         path: ['nodes', i, 'data', 'element', 'type'],
       })
@@ -208,7 +208,7 @@ export const UMLDiagramSchema = RawUMLDiagramSchema.superRefine((diagram, ctx) =
 
   if (rootCount > 1) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: 'Diagram cannot have more than one root element',
       path: ['nodes'],
     })
@@ -218,14 +218,14 @@ export const UMLDiagramSchema = RawUMLDiagramSchema.superRefine((diagram, ctx) =
     const edge = diagram.edges[i]
     if (!nodeIds.has(edge.source)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: `Edge ${edge.id} source (${edge.source}) does not exist in nodes`,
         path: ['edges', i, 'source'],
       })
     }
     if (!nodeIds.has(edge.target)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: `Edge ${edge.id} target (${edge.target}) does not exist in nodes`,
         path: ['edges', i, 'target'],
       })
@@ -234,14 +234,14 @@ export const UMLDiagramSchema = RawUMLDiagramSchema.superRefine((diagram, ctx) =
       const rel = edge.data.relationship
       if (!nodeIds.has(rel.source)) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: `Relationship in edge ${edge.id} source (${rel.source}) does not exist in nodes`,
           path: ['edges', i, 'data', 'relationship', 'source'],
         })
       }
       if (!nodeIds.has(rel.target)) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: `Relationship in edge ${edge.id} target (${rel.target}) does not exist in nodes`,
           path: ['edges', i, 'data', 'relationship', 'target'],
         })
