@@ -332,6 +332,15 @@ public class ModelRegistryGateway {
     return toPin(root);
   }
 
+  /**
+   * Whether {@code urn} is a CORE URN of artifact type {@code datastructure}. The registry types a
+   * stored schema solely from the identity it carries, so an install has to check this before
+   * writing: a model without a datastructure URN would silently be registered as a plain Element.
+   */
+  public boolean isDataStructureUrn(String urn) {
+    return UrnParser.isUrn(urn) && "datastructure".equals(UrnParser.artifactTypeFromUrn(urn));
+  }
+
   /** Result of an envelope import: the resolved pin, and whether this call created the artifact. */
   public record EnvelopeImportResult(ModelPin pin, boolean created) {}
 

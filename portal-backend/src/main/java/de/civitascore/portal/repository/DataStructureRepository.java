@@ -21,4 +21,14 @@ public interface DataStructureRepository extends NamedEntityRepository<DataStruc
   @EntityGraph(attributePaths = {"dataStructureVersions"})
   @Override
   @NonNull Optional<DataStructure> findById(@NonNull UUID id);
+
+  /**
+   * Whether a shell already pins this model identity. The registry itself is idempotent — the same
+   * URN resolves to the same artifact — but the shell layer is not: without this guard a repeated
+   * install would add another row pointing at the same artifact.
+   *
+   * @param modelLogicalUrn the version-free model URN
+   * @return true if a data structure already pins it
+   */
+  boolean existsByModelLogicalUrn(String modelLogicalUrn);
 }
