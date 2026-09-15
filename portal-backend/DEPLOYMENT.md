@@ -285,19 +285,13 @@ Enable for a single rollout deploy, then check the completion log — `Group-mem
 
 ### 2.9 Dataset Staging & Release
 
-Before a dataset is staged or released, the backend walks out from each of its pipelines over the
-references the model registry recorded and refuses the transition while an artifact the flow reaches
-cannot carry a release. The walk follows a bounded number of hops.
+Before a dataset is staged or released, the backend walks out from each of its pipelines over the references the model registry recorded and refuses the transition while an artifact the flow reaches cannot carry a release. The walk follows a bounded number of hops.
 
 | Property / Env Var | Default | Description |
 |---|---|---|
 | `DATASET_CLOSUREVALIDATION_MAXDEPTH` | `10` | Reference hops the walk follows out from a pipeline. A flow reaching further is **refused**, not passed unchecked — everything past the bound goes unexamined |
 
-Raise it only when real models legitimately nest deeper: observed flows reach two to three hops, so
-the default leaves roughly threefold headroom. Lowering it below what a deployment's models need
-makes those datasets unreleasable, with a finding naming the pipeline and the reason `NOT_VERIFIED`.
-The walk is an in-memory traversal that visits each artifact once and terminates on reference
-cycles, so the bound is not a performance tuning knob.
+Raise it only when real models legitimately nest deeper: observed flows reach two to three hops, so the default leaves roughly threefold headroom. Lowering it below what a deployment's models need makes those datasets unreleasable, with a finding naming the pipeline and the reason `NOT_VERIFIED`. The walk is an in-memory traversal that visits each artifact once and terminates on reference cycles, so the bound is not a performance tuning knob.
 
 ---
 
