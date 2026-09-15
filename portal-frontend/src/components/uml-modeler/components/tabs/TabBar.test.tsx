@@ -31,7 +31,7 @@ const renderTabBar = (props?: Partial<React.ComponentProps<typeof TabBar>>, isRe
   const defaultProps: React.ComponentProps<typeof TabBar> = {
     sessions: [createMockSession()],
     activeSessionId: 'session-1',
-    isMultiSessionMode: false,
+    isMultiSessionMode: true,
     onSelectSession: vi.fn(),
     onCloseSession: vi.fn(),
     onRenameSession: vi.fn(),
@@ -183,6 +183,14 @@ describe('TabBar', () => {
     renderTabBar({}, true)
 
     expect(screen.queryByText('import.title')).not.toBeInTheDocument()
+    expect(screen.getByText('export.title')).toBeInTheDocument()
+  })
+
+  it('does not render session tabs when isMultiSessionMode is false', () => {
+    renderTabBar({ isMultiSessionMode: false, sessions: [createMockSession({ name: 'SchoolModel' })] })
+
+    expect(screen.queryByText('SchoolModel')).not.toBeInTheDocument()
+    expect(screen.getByText('import.title')).toBeInTheDocument()
     expect(screen.getByText('export.title')).toBeInTheDocument()
   })
 })

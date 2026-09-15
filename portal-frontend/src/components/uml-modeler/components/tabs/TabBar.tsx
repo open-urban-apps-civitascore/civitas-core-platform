@@ -150,21 +150,23 @@ export const TabBar: React.FC<TabBarProps> = props => {
   const { isReadOnly: isModelerReadOnly } = useReadOnly()
   const canCreateSession = isMultiSessionMode
   return (
-    <div className="flex items-center bg-gray-50 border-b border-gray-200 overflow-hidden">
+    <div className="flex items-center bg-gray-50 border-b border-gray-200 overflow-hidden min-h-[38px]">
       {/* Scrollable Tabs Container */}
-      <div className="flex overflow-x-auto scrollbar-hide">
-        {sessions.map(session => (
-          <Tab
-            key={session.id}
-            session={session}
-            isActive={session.id === activeSessionId}
-            onSelect={onSelectSession}
-            onClose={onCloseSession}
-            onRename={onRenameSession}
-            isModelerReadOnly={isModelerReadOnly}
-          />
-        ))}
-      </div>
+      {isMultiSessionMode && (
+        <div className="flex overflow-x-auto scrollbar-hide">
+          {sessions.map(session => (
+            <Tab
+              key={session.id}
+              session={session}
+              isActive={session.id === activeSessionId}
+              onSelect={onSelectSession}
+              onClose={onCloseSession}
+              onRename={onRenameSession}
+              isModelerReadOnly={isModelerReadOnly}
+            />
+          ))}
+        </div>
+      )}
 
       {/* New Tab Button */}
       {!isModelerReadOnly && canCreateSession && (
