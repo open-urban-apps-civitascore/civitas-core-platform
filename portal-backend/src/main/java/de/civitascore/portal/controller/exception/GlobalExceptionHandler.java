@@ -129,9 +129,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(SagaInFlightException.class)
   @ResponseStatus(HttpStatus.CONFLICT)
   public ProblemDetail handleSagaInFlight(SagaInFlightException ex, HttpServletRequest request) {
-    log.warn("Saga in flight for DataSet {}: {}", ex.getDataSetId(), ex.getPendingSagaType());
-    // TR-03187 W-18/W-19: the dataset UUID and pending saga type are already exposed to callers
-    // authorised to read the dataset. Only the saga type is added to the response.
+    log.warn("Saga in flight: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 W-18/W-19: the saga type is already part of the detail message, so promoting it to
+    // its own property discloses nothing further.
     ProblemDetail problemDetail =
         createProblemDetail(HttpStatus.CONFLICT, "SAGA_IN_FLIGHT", ex.getMessage(), request);
     problemDetail.setProperty("pendingSagaType", ex.getPendingSagaType());
