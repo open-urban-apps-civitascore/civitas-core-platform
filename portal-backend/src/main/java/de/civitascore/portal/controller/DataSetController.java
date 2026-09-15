@@ -261,6 +261,12 @@ public class DataSetController
       description = "The dataset is staged",
       content = @Content(schema = @Schema(implementation = DataSetOutputDTO.class)))
   @ApiResponse(
+      responseCode = "400",
+      description =
+          "The dataset carries no name, description or Pipeline, or one of its Pipelines has no"
+              + " stored definition",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
       responseCode = "422",
       description =
           "A pipeline DataSource is out of the dataset's datapool scope, or an artifact"

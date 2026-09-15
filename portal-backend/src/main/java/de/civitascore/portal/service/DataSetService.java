@@ -449,6 +449,20 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "pipelines", id, "DataSet must have at least one Pipeline with DataSources");
     }
 
+    // A pipeline with no stored flow deploys nothing. NiFi rejects the empty graph at the last
+    // saga step, once every other system is provisioned and has to be torn down again.
+    Pipeline withoutDefinition =
+        dataSet.getPipelines().stream()
+            .filter(p -> StringUtils.isBlank(p.getModelUrn()))
+            .findFirst()
+            .orElse(null);
+    if (withoutDefinition != null) {
+      throw new InvalidInputException(
+          "pipelines",
+          id,
+          "Pipeline '" + withoutDefinition.getName() + "' has no stored definition");
+    }
+
     revalidatePipelineDataSourcesAgainstPool(dataSet);
     pipelineClosureValidator.validate(dataSet.getPipelines());
 

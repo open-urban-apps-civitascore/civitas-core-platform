@@ -172,6 +172,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
+      p.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
       p.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(p);
 
@@ -194,6 +195,25 @@ class DataSetServiceTest {
       assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DataSources");
+    }
+
+    @Test
+    @DisplayName("rejects a pipeline whose flow has not been authored yet")
+    void rejectsPipelineWithoutStoredDefinition() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSet(id);
+      Pipeline p = new Pipeline();
+      p.setName("Ingest");
+      p.setDataSources(new HashSet<>(List.of(new DataSource())));
+      ds.getPipelines().add(p);
+
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().stage(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Ingest")
+          .hasMessageContaining("no stored definition");
+      verify(dataSetRepository, never()).save(any());
     }
 
     @Test
@@ -231,6 +251,7 @@ class DataSetServiceTest {
     private DataSet draftDataSetWithPipeline(UUID id) {
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
+      p.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
       p.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(p);
       return ds;
@@ -459,6 +480,7 @@ class DataSetServiceTest {
 
     private void addPipelineWithSource(DataSet dataSet, DataSource source) {
       Pipeline p = new Pipeline();
+      p.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
       p.setDataSources(new HashSet<>(Set.of(source)));
       dataSet.getPipelines().add(p);
     }
@@ -2401,6 +2423,7 @@ class DataSetServiceTest {
     private DataSet stageable(UUID id) {
       DataSet ds = draftDataSet(id);
       Pipeline pipeline = new Pipeline();
+      pipeline.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
       pipeline.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(pipeline);
       return ds;
@@ -2446,7 +2469,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
       doThrow(
               new PipelineClosureValidationException(
-                  List.of(ClosureFinding.notAvailable(UUID.randomUUID(), "urn:core:x"))))
+                  List.of(ClosureFinding.notAvailable(UUID.randomUUID()))))
           .when(pipelineClosureValidator)
           .validate(any());
 
