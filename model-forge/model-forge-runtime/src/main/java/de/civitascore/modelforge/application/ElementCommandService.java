@@ -56,12 +56,12 @@ public class ElementCommandService {
      *     itself, so no read-back is needed
      */
     public String storeJsonSchema(String urn, JsonNode schema, VersionBump bump, String bumpFromVersion) {
-        UrnParser.requireUrn(urn, "Element id");
+        requireElementUrn(urn);
         // A JSON Schema document is an object. Nothing upstream enforces that — saveArtifact routes
         // ELEMENT on isTextual() alone and the CORE validator has no ELEMENT schema — so an array or
         // scalar would otherwise reach the cast below and surface as a 500 instead of a rejection.
         if (schema == null || !schema.isObject()) {
-            throw new IllegalArgumentException(
+            throw rejected("element-not-an-object",
                 "A JSON Schema Element must be a JSON object: " + urn);
         }
         List<Diagnostic> nonConforming = validator.validateSchema(schema);
@@ -87,14 +87,41 @@ public class ElementCommandService {
     /**
      * Stores raw XSD content and registers its {@code xs:import} references in the graph.
      *
+     * <p>Only the identity is checked here: an XSD carries no JSON Schema, so there is nothing for
+     * {@link ModelValidator} to meta-validate. Conformance of an XSD-derived Element is decided on
+     * the import path, where the converted JSON Schema exists.
+     *
      * @return the concrete versioned URN (pin) the write resolved to
      */
     public String storeXsd(String urn, String xsdContent, VersionBump bump) {
-        UrnParser.requireUrn(urn, "Element id");
+        requireElementUrn(urn);
         Set<String> importRefs = registry.extractImportRefs(xsdContent);
         String pin = registry.storeXsdElement(urn, xsdContent, importRefs, bump);
         graph.register(pin != null && !pin.isBlank() ? pin : urn, new LinkedHashSet<>(importRefs));
         return pin;
+    }
+
+    /**
+     * A write rejected for the caller's reason given, carrying the diagnostic shape the registry's
+     * other rejections carry — so a bad identity reaches the caller as a 400 with a reason, not as
+     * an unmapped server error.
+     */
+    private static ValidationFailedException rejected(String code, String message) {
+        return new ValidationFailedException(message,
+            List.of(new Diagnostic(DiagnosticSeverity.ERROR, message, code, "")));
+    }
+
+    /**
+     * {@link UrnParser#requireUrn}'s rule, raised as a caller-facing rejection. The identity check
+     * and its wording stay in {@code UrnParser}; only the exception type differs, because a write
+     * reached over HTTP answers a bad identity with a 400 rather than an unmapped server error.
+     */
+    private static void requireElementUrn(String urn) {
+        try {
+            UrnParser.requireUrn(urn, "Element id");
+        } catch (IllegalArgumentException e) {
+            throw rejected("invalid-artifact-id", e.getMessage());
+        }
     }
 
     /** Removes the artifact from the registry and the dependency graph. */

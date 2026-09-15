@@ -1,5 +1,7 @@
 package de.civitascore.modelforge.application;
 
+import de.civitascore.modelforge.contract.Diagnostic;
+import de.civitascore.modelforge.contract.DiagnosticSeverity;
 import de.civitascore.modelforge.contract.ValidationFailedException;
 import de.civitascore.modelforge.contract.VersionBump;
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
@@ -13,6 +15,8 @@ import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.InstanceOfAssertFactories.list;
+import static org.assertj.core.api.InstanceOfAssertFactories.throwable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -51,7 +55,7 @@ class ElementCommandServiceGuardTest {
     @Test
     void storeXsdRefusesADisplayNameAsIdentity() {
         assertThatThrownBy(() -> elements.storeXsd("StationXsd", XSD, VersionBump.PATCH))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(ValidationFailedException.class)
             .hasMessageContaining("StationXsd");
 
         verify(registry, never()).storeXsdElement(anyString(), anyString(), anySet(), any(VersionBump.class));
@@ -63,11 +67,24 @@ class ElementCommandServiceGuardTest {
             schema("""
                 {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}"""),
             VersionBump.PATCH, null))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(ValidationFailedException.class)
             .hasMessageContaining("StationJson");
 
         verify(registry, never()).storeElement(anyString(), any(), anySet(), anySet(),
             nullable(String.class), any(VersionBump.class), nullable(String.class));
+    }
+
+    /** A rejected identity that surfaced as a fault would reach the caller as a 500, not a 400. */
+    @Test
+    void aRefusedIdentityCarriesTheDiagnosticThatMakesItABadRequest() {
+        assertThatThrownBy(() -> elements.storeXsd("StationXsd", XSD, VersionBump.PATCH))
+            .asInstanceOf(throwable(ValidationFailedException.class))
+            .extracting(ValidationFailedException::diagnostics, list(Diagnostic.class))
+            .singleElement()
+            .satisfies(d -> {
+                assertThat(d.severity()).isEqualTo(DiagnosticSeverity.ERROR);
+                assertThat(d.code()).isEqualTo("invalid-artifact-id");
+            });
     }
 
     @Test
