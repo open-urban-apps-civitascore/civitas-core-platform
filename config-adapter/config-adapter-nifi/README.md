@@ -60,13 +60,13 @@ Deploy and redeploy touch these resources in order.
 
 1. The OpenID Connect provider's token endpoint. The adapter sends the client-credentials access token as a bearer token, caches it until shortly before expiry, and on a 401 refreshes once and replays. This endpoint has its own certificate-validating client, so relaxing TLS verification for NiFi never relaxes it here.
 2. The root process group. The 403 an OIDC-secured NiFi returns before the service account holds canvas rights self-heals: the missing root read and write policies are provisioned from the global rights the account already holds, then the step continues. It is a no-op once the policies exist.
-3. The root's children, to resolve the process group by name. An existing group is stopped, waited out, its controller services disabled and waited out, then deleted.
+3. The root's children, to resolve the process group by name. An existing group is stopped, waited out, its queues emptied, its controller services disabled and waited out, then deleted. Emptying the queues is what makes the delete possible at all: NiFi refuses to delete a group whose connections still hold FlowFiles, and stopping the group does not discard them. The drop runs after the group has stopped, because it only discards what is queued when it is submitted — a still-scheduled source would refill the queues behind it. 
 4. The process-group upload endpoint, which receives the flow definition.
 5. The controller-service and processor endpoints, to patch sensitive properties.
 6. The group's controller-service state endpoint, then polling until all are enabled.
 7. The group's state endpoint, then polling until every processor is running.
 
-A failure at or after step 4 deletes the half-deployed group on a best-effort basis before the original error propagates. A teardown resolves the group by name as in step 3 and runs the same stop, disable and delete sequence; a group that is already absent is a no-op.
+A failure at or after step 4 deletes the half-deployed group on a best-effort basis before the original error propagates. A teardown resolves the group by name as in step 3 and runs the same stop, empty, disable and delete sequence; a group that is already absent is a no-op. Queued data is discarded without being read, so a teardown logs how many FlowFiles went.
 
 | Outcome | Classification |
 |---|---|

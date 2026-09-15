@@ -928,7 +928,13 @@ public class NifiRestClient implements AutoCloseable {
     // running")
     // while any processor is still scheduled or draining a thread (e.g. ConsumeMQTT closing its
     // broker connection). Wait until the group is fully stopped before deleting.
-    awaitProcessGroupStopped(group.id());
+    long version = awaitProcessGroupStopped(group.id());
+
+    // Stopping the group does not discard what its connections already hold, and NiFi rejects the
+    // delete with HTTP 409 ("Queue not empty") while any FlowFile is queued. Drop them — strictly
+    // after the group has stopped, because a drop request only discards what is queued at
+    // submission time and a still-scheduled source would refill the queues behind it.
+    emptyAllQueues(group.id());
 
     // A process group cannot be deleted while its controller services are enabled.
     disableControllerServices(group.id());
@@ -939,7 +945,7 @@ public class NifiRestClient implements AutoCloseable {
             () ->
                 authorized(
                         target(API + "/process-groups/" + group.id())
-                            .queryParam("version", group.version())
+                            .queryParam("version", version)
                             .queryParam("clientId", CLIENT_ID))
                     .delete())) {
       if (response.getStatus() != 404) {
@@ -956,11 +962,17 @@ public class NifiRestClient implements AutoCloseable {
    * while a processor is still running or draining (HTTP 409), so this must complete before the
    * delete in {@link #stopAndDeleteProcessGroup}.
    *
+   * <p>Returns the revision read in the same request that observed the stop, so the caller can lock
+   * the delete against a version newer than the one the initial listing carried. That listing
+   * predates the stop, and a stale version is rejected with the same 409 this method exists to
+   * avoid.
+   *
    * @param pgId the process-group id
+   * @return the process group's revision version at the moment it reported stopped
    * @throws FatalAdapterException on a non-retryable error
    * @throws RetryableAdapterException if the group does not stop in time
    */
-  private void awaitProcessGroupStopped(String pgId)
+  private long awaitProcessGroupStopped(String pgId)
       throws FatalAdapterException, RetryableAdapterException {
     for (int attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
       JsonNode group = getJson(API + "/process-groups/" + pgId, "read process group state");
@@ -968,7 +980,7 @@ public class NifiRestClient implements AutoCloseable {
       int activeThreads =
           group.path("status").path("aggregateSnapshot").path("activeThreadCount").asInt(0);
       if (running == 0 && activeThreads == 0) {
-        return;
+        return requireRevisionVersion(group, "stopped process group " + pgId);
       }
       try {
         Thread.sleep(POLL_INTERVAL_MS);
@@ -980,6 +992,79 @@ public class NifiRestClient implements AutoCloseable {
     }
     throw new RetryableAdapterException(
         AdapterErrorCode.NIFI_ERROR, "process group " + pgId + " did not stop in time");
+  }
+
+  /**
+   * Discards every FlowFile queued anywhere inside the process group — the REST equivalent of the
+   * canvas action "Empty all queues". NiFi resolves the request recursively across all encompassed
+   * connections, child groups included, so one call covers the whole group.
+   *
+   * <p>The request is asynchronous: the POST only registers it. NiFi reports a failure in-band with
+   * HTTP 200 through {@code failureReason}, so that field decides the outcome and not the status
+   * code — without reading it the delete would run straight into the 409 this step prevents.
+   *
+   * @param pgId the process-group id
+   * @throws FatalAdapterException on a non-retryable error
+   * @throws RetryableAdapterException if the queues do not empty, or NiFi reports the drop failed
+   */
+  private void emptyAllQueues(String pgId) throws FatalAdapterException, RetryableAdapterException {
+    String requests = API + "/process-groups/" + pgId + "/empty-all-connections-requests";
+    JsonNode submitted = post(requests, "empty all queues").path("dropRequest");
+    String requestId = requireId(submitted.path("id").asText(), "drop request");
+    String request = requests + "/" + requestId;
+    try {
+      JsonNode dropRequest = awaitDropRequestFinished(request);
+      String failureReason = dropRequest.path("failureReason").asText("");
+      if (!failureReason.isBlank()) {
+        throw new RetryableAdapterException(
+            AdapterErrorCode.NIFI_ERROR,
+            "could not empty the queues of process group " + pgId + ": " + failureReason);
+      }
+      // Discarded data is an operationally relevant event, so name how much went.
+      LOG.info(
+          "Emptied the queues of process group {} — dropped {} FlowFiles",
+          pgId,
+          dropRequest.path("droppedCount").asLong(0));
+    } finally {
+      releaseDropRequest(request);
+    }
+  }
+
+  /** Polls a drop request until NiFi reports it finished, and returns its final state. */
+  private JsonNode awaitDropRequestFinished(String request)
+      throws FatalAdapterException, RetryableAdapterException {
+    for (int attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
+      JsonNode dropRequest = getJson(request, "read drop request").path("dropRequest");
+      if (dropRequest.path("finished").asBoolean(false)) {
+        return dropRequest;
+      }
+      try {
+        Thread.sleep(POLL_INTERVAL_MS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RetryableAdapterException(
+            AdapterErrorCode.NIFI_ERROR, e, "interrupted while waiting for the queues to empty");
+      }
+    }
+    throw new RetryableAdapterException(
+        AdapterErrorCode.NIFI_ERROR, "the queues did not empty in time");
+  }
+
+  /**
+   * Releases a finished drop request, best effort. NiFi expires an abandoned request on its own, so
+   * a failure here is logged and swallowed rather than thrown: it must never mask the outcome of
+   * the drop it cleans up after, which the caller reports from inside its {@code try}.
+   */
+  private void releaseDropRequest(String request) {
+    try (Response response = sendAuthorized(() -> authorized(target(request)).delete())) {
+      int status = response.getStatus();
+      if (status < 200 || status >= 300) {
+        LOG.warn(
+            "Could not release NiFi drop request (HTTP {}) — NiFi expires it on its own", status);
+      }
+    } catch (ProcessingException | FatalAdapterException | RetryableAdapterException e) {
+      LOG.warn("Could not release NiFi drop request: {}", e.getMessage());
+    }
   }
 
   // ─── HTTP helpers ──────────────────────────────────────────────────────────
@@ -1005,6 +1090,22 @@ public class NifiRestClient implements AutoCloseable {
       return node == null ? mapper.createObjectNode() : node;
     } catch (JsonProcessingException e) {
       throw new FatalAdapterException(AdapterErrorCode.NIFI_FLOW_ERROR, e, description);
+    }
+  }
+
+  /**
+   * POSTs without a body and returns the parsed response. NiFi's async-request endpoints take no
+   * body, but Jersey still needs an entity to carry the content type, hence the empty one.
+   */
+  private JsonNode post(String path, String description)
+      throws FatalAdapterException, RetryableAdapterException {
+    try (Response response =
+        sendAuthorized(
+            () -> authorized(target(path)).post(Entity.entity("", MediaType.APPLICATION_JSON)))) {
+      check(response, description);
+      return readTree(response, description);
+    } catch (ProcessingException e) {
+      throw network(description, e);
     }
   }
 
