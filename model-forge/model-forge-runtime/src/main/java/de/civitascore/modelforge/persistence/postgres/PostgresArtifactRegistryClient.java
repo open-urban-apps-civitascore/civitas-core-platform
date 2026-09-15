@@ -255,7 +255,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         UrnParser.requireNoControlChars(urn);
         String logical = UrnParser.logicalUrn(urn);
         try {
-            return references.nonDataSetBlockingDependents(logical, targetVersion);
+            return references.nonDataSetBlockingDependents(logical, pinnedVersion(targetVersion));
         } catch (DataAccessException e) {
             throw translate(e, "Could not read dependents of " + logical);
         }
@@ -272,6 +272,15 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         }
     }
 
+    /**
+     * The concrete version a caller named, or null for the {@code latest} token — which follows
+     * whichever version is current and so constrains the artifact as a whole. Stored reference URNs
+     * carry the token verbatim, so it reaches these queries as if it were a SemVer.
+     */
+    private static String pinnedVersion(String version) {
+        return UrnParser.LATEST.equals(version) ? null : version;
+    }
+
     @Override
     public List<String> ownedMemberUrns(String urn) {
         return ownedMemberUrns(urn, null);
@@ -282,7 +291,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         UrnParser.requireNoControlChars(urn);
         String logical = UrnParser.logicalUrn(urn);
         try {
-            return references.ownedMemberUrns(logical, ownerVersion);
+            return references.ownedMemberUrns(logical, pinnedVersion(ownerVersion));
         } catch (DataAccessException e) {
             throw translate(e, "Could not read owned members of " + logical);
         }

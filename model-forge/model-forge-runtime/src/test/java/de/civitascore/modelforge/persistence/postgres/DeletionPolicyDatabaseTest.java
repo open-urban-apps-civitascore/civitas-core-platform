@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -198,6 +199,25 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
             .isEmpty();
         // Asked of the artifact as a whole the reference still counts: a delete removes every version.
         assertThat(registry.nonDataSetBlockingDependents(structureUrn)).containsExactly(logical(sink));
+    }
+
+    @Test
+    @DisplayName("A member named by the latest token keeps its blockers")
+    void aMemberNamedByTheLatestTokenKeepsItsBlockers() {
+        // A grouping may name its member by the latest token instead of a pinned version.
+        String structurePin = registry.storeDataStructure(
+            urns.mintDataStructure("WeatherStructure"),
+            dataStructureOf(logical(stationPin) + ":latest"), VersionBump.PATCH, null);
+        String sink = registry.storeDataSink("ReadingStore", dataSinkFor(stationPin), VersionBump.PATCH);
+
+        List<String> members = registry.ownedMemberUrns(structurePin, "1.0.0");
+        assertThat(members).hasSize(1);
+
+        // What the closure then asks of that member must still find the sink writing into it. The
+        // grouping is in the answer too; the closure is what excludes it.
+        String member = members.get(0);
+        assertThat(registry.nonDataSetBlockingDependents(member, UrnParser.versionFromUrn(member)))
+            .contains(logical(sink));
     }
 
     @Test
