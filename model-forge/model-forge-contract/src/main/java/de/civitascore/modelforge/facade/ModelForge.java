@@ -199,19 +199,32 @@ public interface ModelForge {
      *
      * <p>Non-DataSet references block unconditionally (referential integrity). DataSet membership is
      * count-based: 0 → delete; 1 → delete and auto-unlink from that DataSet's manifest; ≥2 → blocked
-     * (remove from the other DataSets first). Deleting a DataSet deletes only its manifest — its
-     * members are kept.
+     * (remove from the other DataSets first).
      *
-     * <p>When {@code cascade} is {@code true}, the target's members are deleted too, but each only if
-     * it becomes fully orphaned once this container is gone (no non-DataSet referrer, in no other
-     * DataSet); shared members are kept. When {@code force} is {@code true}, the blocks are overridden
-     * and the target is deleted regardless of referrers (and auto-unlinked from every DataSet) —
-     * dangerous (may dangle non-DataSet references); for administrative repair only.
+     * <p>With {@code cascade}, the artifacts the target <em>owns</em> go too — a grouping's
+     * Elements, a pipeline's Mapping, a DataSet's pipelines and mappings — each only while nothing
+     * else holds it, under the same two rules. Ownership is read off the reference, so what a
+     * DataSet merely groups (its data structures, sources and sinks) stays. {@code force} overrides
+     * both blocks and unlinks from every DataSet; it may dangle references, so administrative
+     * repair only.
      *
      * @throws de.civitascore.modelforge.contract.ArtifactInUseException when a non-DataSet artifact
      *     still references the target, or it is a member of ≥2 DataSets, and {@code force} is false.
      */
     void deleteArtifact(ArtifactId artifactId, boolean cascade, boolean force);
+
+    /**
+     * What stands in the way of deleting the artifact, without attempting the delete. Asked of the
+     * whole set a cascade removes, so a grouping does not report the Elements it owns. Empty when
+     * nothing stands in the way.
+     *
+     * <p>Memberships count for the named artifact only, from the second onwards.
+     *
+     * <p>A versioned URN asks about that version alone; a logical URN about the artifact as a whole,
+     * which is the question a delete asks. Answered from the stored references, not the in-memory
+     * graph.
+     */
+    List<String> deletionBlockers(ArtifactId artifactId);
 
     // ── DataSet membership ─────────────────────────────────────────────────────
 

@@ -356,16 +356,19 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
 
   /**
    * After the pipeline row is deleted, delete the backing definition artifact from Model Forge in
-   * the same transaction. No-op when no definition was ever stored. (Datasets cascade-delete their
-   * pipelines via JPA without this hook; the orphaned registry artifacts are harmless append-only
-   * history — see concept 6.7.)
+   * the same transaction, taking with it the mappings no other pipeline uses. No-op when no
+   * definition was ever stored.
+   *
+   * <p>A mapping left behind would still name the two data structures it joined and refuse their
+   * deletion, and no route reaches a mapping once its pipeline is gone. The data source and data
+   * sink the pipeline wired belong to the data set and stay.
    *
    * @param entity the deleted pipeline
    */
   @Override
   protected void postDelete(Pipeline entity) {
     if (entity != null && entity.getModelLogicalUrn() != null) {
-      modelRegistryGateway.deletePayload(entity.getModelLogicalUrn());
+      modelRegistryGateway.deleteArtifact(entity.getModelLogicalUrn(), true);
     }
   }
 }

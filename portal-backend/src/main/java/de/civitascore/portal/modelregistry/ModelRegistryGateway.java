@@ -199,45 +199,41 @@ public class ModelRegistryGateway {
    * Deletes the artifact (all versions) behind a logical URN. No-op semantics are Model Forge's.
    */
   public void deleteModel(String logicalUrn) {
-    // A datastructure model is stored as a DataStructure grouping artifact plus its member
-    // Elements.
-    // For a flat single-object model the stored pin is the Element itself; its auto-created
-    // grouping
-    // (same name + disambiguator, differing only in the ':datastructure:' type segment) references
-    // it and — under Model Forge's strict deletion policy — a grouping edge blocks deleting the
-    // Element directly. Target the grouping with cascade so it and its now-orphaned member Elements
-    // are removed together, leaving no dangling grouping edge. When the pin is already the grouping
-    // (a multi-$defs model), the replace is a no-op and the same cascade delete applies.
-    String groupingUrn = logicalUrn.replace(":element:", ":datastructure:");
-    modelForge.deleteArtifact(new ArtifactId(groupingUrn), true, false);
+    modelForge.deleteArtifact(new ArtifactId(groupingUrnOf(logicalUrn)), true, false);
   }
 
   /**
-   * Whether any DataSink references the given model (Element) URN. A sink records the reference by
-   * carrying the URN in its configuration's top-level {@code element} field; Model Forge tracks
-   * that as a {@code datasink-element} dependency edge on store. This is the registry-native
-   * replacement for the former {@code data_sinks.configuration ->> 'dataStructureVersionId'} query
-   * — the host in-use guard on {@code DataStructureVersion} asks Model Forge who references the
-   * version's model.
+   * The DataStructure grouping a model is addressed by. A delete and the in-use answer both
+   * describe the grouping with its member Elements; asking an Element alone would report its own
+   * grouping as a reference.
+   */
+  private static String groupingUrnOf(String urn) {
+    return urn.replace(":element:", ":datastructure:");
+  }
+
+  /**
+   * Whether anything outside the model still references it — a DataSource or DataSink carrying one
+   * of its Elements, a Mapping naming one as an endpoint, another model associating with one, or
+   * membership of a second DataSet. Gates the delete and the unrelease of a DataStructure alike.
    *
    * @param modelUrn versioned or logical CORE URN of the model; null/blank yields {@code false}
-   * @return true if at least one DataSink artifact depends on the model
+   * @return true while at least one reference stands in the way of deleting the model
    */
-  public boolean isReferencedBySink(String modelUrn) {
-    if (modelUrn == null || modelUrn.isBlank()) {
-      return false;
-    }
-    return modelForge.dependents(new DependencyQuery(new ArtifactId(modelUrn))).nodes().stream()
-        .map(node -> node.artifactId().value())
-        .anyMatch(ModelRegistryGateway::isDataSinkUrn);
+  public boolean isReferenced(String modelUrn) {
+    return !referencesTo(modelUrn).isEmpty();
   }
 
   /**
-   * A CORE URN identifies a DataSink when its type segment (5th, colon-delimited) is "datasink".
+   * What stands in the way of deleting the model, named so a caller can go and remove it. Empty
+   * when nothing does.
+   *
+   * @param modelUrn versioned or logical CORE URN of the model; null/blank yields an empty list
    */
-  private static boolean isDataSinkUrn(String urn) {
-    String[] segments = urn.split(":");
-    return segments.length > 4 && "datasink".equals(segments[4]);
+  public List<String> referencesTo(String modelUrn) {
+    if (modelUrn == null || modelUrn.isBlank()) {
+      return List.of();
+    }
+    return modelForge.deletionBlockers(new ArtifactId(groupingUrnOf(modelUrn)));
   }
 
   /**
@@ -347,17 +343,6 @@ public class ModelRegistryGateway {
     return toPin(result.artifactId());
   }
 
-  /**
-   * Deletes a DataSet manifest by its logical URN. Its members are kept (a DataSet groups, it does
-   * not own); Model Forge drops the manifest's outgoing {@code dataset-ref} edges so no member
-   * dangles.
-   */
-  public void deleteDataSet(String logicalUrn) {
-    if (logicalUrn != null && !logicalUrn.isBlank()) {
-      modelForge.deleteArtifact(new ArtifactId(logicalUrn));
-    }
-  }
-
   /** Explicitly adds a member artifact to a DataSet's manifest ({@code dataset-ref} membership). */
   public void linkToDataSet(String dataSetUrn, String memberUrn) {
     try {
@@ -377,13 +362,14 @@ public class ModelRegistryGateway {
   }
 
   /**
-   * Deletes an artifact under the DataSet-aware deletion policy, optionally cascading into members
-   * and/or forcing past the blocks (admin repair — may dangle references). Non-force is the safe
-   * path.
+   * Deletes an artifact under the DataSet-aware deletion policy, taking the artifacts it owns with
+   * it when {@code cascade} is set. A reference the registry still holds refuses the delete; there
+   * is no way past that refusal here, because deleting past a reference leaves the artifact holding
+   * it pointing at nothing and reports success.
    */
-  public void deleteArtifact(String logicalUrn, boolean cascade, boolean force) {
+  public void deleteArtifact(String logicalUrn, boolean cascade) {
     if (logicalUrn != null && !logicalUrn.isBlank()) {
-      modelForge.deleteArtifact(new ArtifactId(logicalUrn), cascade, force);
+      modelForge.deleteArtifact(new ArtifactId(logicalUrn), cascade, false);
     }
   }
 
@@ -467,8 +453,9 @@ public class ModelRegistryGateway {
   }
 
   /**
-   * Dependency lists returned by registry writes (rel name -> target URNs). Not mirrored into host
-   * tables yet — full dependency mirroring is a later work package; log at debug for diagnosis.
+   * Dependency lists returned by registry writes (rel name -> target URNs), logged at debug for
+   * diagnosis. Deliberately not mirrored into host tables: Model Forge answers dependency questions
+   * itself, and a copy here would be a second record of the same edges to keep in step.
    */
   private static void logDependencies(
       ArtifactId artifactId, Map<String, List<ArtifactId>> dependencies) {

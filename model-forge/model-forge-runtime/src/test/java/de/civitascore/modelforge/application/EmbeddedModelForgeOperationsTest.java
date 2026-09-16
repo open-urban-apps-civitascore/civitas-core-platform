@@ -10,6 +10,7 @@ import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
+import de.civitascore.modelforge.contract.ValidationFailedException;
 import de.civitascore.modelforge.contract.VersionBump;
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
 import de.civitascore.modelforge.core.port.ArtifactSearchResult;
@@ -27,6 +28,7 @@ import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -278,14 +280,14 @@ class EmbeddedModelForgeOperationsTest {
         String sharedLogical = UrnParser.logicalUrn(shared);
 
         when(registry.nonDataSetBlockingDependents(container.value())).thenReturn(List.of());
-        when(registry.fetchArtifactRefUrns(container.value())).thenReturn(List.of(orphan, shared));
+        when(registry.ownedMemberUrns(container.value())).thenReturn(List.of(orphanLogical, sharedLogical));
         // Once the container is gone, A is orphaned but B is still grouped by another DataStructure.
         when(registry.nonDataSetBlockingDependents(orphanLogical)).thenReturn(List.of());
         when(registry.nonDataSetBlockingDependents(sharedLogical))
             .thenReturn(List.of("urn:core:platform:civitas:datastructure:common:d2:zzzzzzzzzz"));
         when(registry.fetch(orphanLogical)).thenReturn(Optional.of(mapper.createObjectNode()));
         when(registry.fetch(sharedLogical)).thenReturn(Optional.of(mapper.createObjectNode()));
-        when(registry.fetchArtifactRefUrns(orphanLogical)).thenReturn(List.of());
+        when(registry.ownedMemberUrns(orphanLogical)).thenReturn(List.of());
 
         operations.deleteArtifact(container, true);
 
@@ -293,6 +295,125 @@ class EmbeddedModelForgeOperationsTest {
         verify(registry).deleteArtifact(orphanLogical);
         verify(registry, org.mockito.Mockito.never()).deleteArtifact(shared);
         verify(registry, org.mockito.Mockito.never()).deleteArtifact(sharedLogical);
+    }
+
+    /** A Data Set the caller holds, the Mapping it names, and the Data Set that holds that Mapping. */
+    private static final ArtifactId MINE =
+        new ArtifactId("urn:core:platform:civitas:dataset:common:Mine:mmmmmmmmmm");
+    private static final ArtifactId MAPPING =
+        new ArtifactId("urn:core:platform:civitas:mapping:common:m1:aaaaaaaaaa");
+    private static final String THEIRS = "urn:core:platform:civitas:dataset:common:Theirs:tttttttttt";
+
+    private void manifestExists() {
+        when(registry.fetch(MINE.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+    }
+
+    @Test
+    void linkingAMappingADifferentDataSetHoldsIsRefused() {
+        manifestExists();
+        when(registry.fetch(MAPPING.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+        when(registry.dataSetMemberships(MAPPING.value())).thenReturn(List.of(THEIRS));
+
+        assertThatThrownBy(() -> operations.linkToDataSet(MINE, MAPPING))
+            .isInstanceOf(ValidationFailedException.class)
+            .as("the Data Set holding it stays unnamed")
+            .hasMessageNotContaining(THEIRS);
+        verify(registry, org.mockito.Mockito.never()).storeDataSet(anyString(), any(), any());
+    }
+
+    @Test
+    void aMappingThatDoesNotExistIsRefusedInTheSameWords() {
+        manifestExists();
+        when(registry.fetch(MAPPING.value())).thenReturn(Optional.empty());
+
+        String absent = catchThrowable(() -> operations.linkToDataSet(MINE, MAPPING)).getMessage();
+
+        when(registry.fetch(MAPPING.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+        when(registry.dataSetMemberships(MAPPING.value())).thenReturn(List.of(THEIRS));
+        String taken = catchThrowable(() -> operations.linkToDataSet(MINE, MAPPING)).getMessage();
+
+        // Telling the two apart would say which Mapping URNs are taken.
+        assertThat(absent).isEqualTo(taken);
+    }
+
+    @Test
+    void linkingAMappingOnlyItsOwnDataSetHoldsIsAllowed() {
+        manifestExists();
+        when(registry.fetch(MAPPING.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+        when(registry.dataSetMemberships(MAPPING.value())).thenReturn(List.of(MINE.value()));
+
+        operations.linkToDataSet(MINE, MAPPING);
+
+        verify(registry).storeDataSet(eq(MINE.value()), any(), eq(VersionBump.MINOR));
+    }
+
+    @Test
+    void linkingADataSinkADifferentDataSetHoldsIsAllowed() {
+        var sink = new ArtifactId("urn:core:platform:civitas:datasink:common:s1:bbbbbbbbbb");
+        manifestExists();
+
+        operations.linkToDataSet(MINE, sink);
+
+        // The one-Data-Set rule is the Mapping's alone: every other kind has a record and rights of
+        // its own, so sharing one discloses nothing.
+        verify(registry).storeDataSet(eq(MINE.value()), any(), eq(VersionBump.MINOR));
+    }
+
+    @Test
+    void deletionBlockersNamesTheReferrersThatWouldRefuseTheDelete() {
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56");
+        String mapping = "urn:core:platform:civitas:mapping:common:sensor-to-obs:4rrb1hifsm";
+        when(registry.nonDataSetBlockingDependents(artifactId.value(), null)).thenReturn(List.of(mapping));
+
+        assertThat(operations.deletionBlockers(artifactId)).containsExactly(mapping);
+    }
+
+    @Test
+    void deletionBlockersIgnoresAReferenceHeldFromInsideTheDeletedSet() {
+        var grouping = new ArtifactId("urn:core:platform:civitas:datastructure:common:Sensor:m8i4hc3h56");
+        String member = "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56";
+        when(registry.ownedMemberUrns(grouping.value(), null)).thenReturn(List.of(member));
+        // The grouping is the only thing referencing its own member, and the same delete removes it.
+        when(registry.nonDataSetBlockingDependents(member, null)).thenReturn(List.of(grouping.value()));
+
+        assertThat(operations.deletionBlockers(grouping)).isEmpty();
+    }
+
+    @Test
+    void deletionBlockersNamesAReferrerOfAnOwnedMember() {
+        var grouping = new ArtifactId("urn:core:platform:civitas:datastructure:common:Sensor:m8i4hc3h56");
+        String member = "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56";
+        String mapping = "urn:core:platform:civitas:mapping:common:sensor-to-obs:4rrb1hifsm";
+        when(registry.ownedMemberUrns(grouping.value(), null)).thenReturn(List.of(member));
+        when(registry.nonDataSetBlockingDependents(member, null))
+            .thenReturn(List.of(grouping.value(), mapping));
+
+        assertThat(operations.deletionBlockers(grouping)).containsExactly(mapping);
+    }
+
+    @Test
+    void deletionBlockersNamesTheDataSetsOnlyOnceAMemberIsSharedByTwo() {
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56");
+        String one = "urn:core:platform:civitas:dataset:common:ds1:1111111111";
+        String two = "urn:core:platform:civitas:dataset:common:ds2:2222222222";
+        when(registry.nonDataSetBlockingDependents(artifactId.value(), null)).thenReturn(List.of());
+
+        // A member of a single Data Set is deleted and unlinked from it, so that membership is no
+        // obstacle and must not be reported as one.
+        when(registry.dataSetMemberships(artifactId.value())).thenReturn(List.of(one));
+        assertThat(operations.deletionBlockers(artifactId)).isEmpty();
+
+        when(registry.dataSetMemberships(artifactId.value())).thenReturn(List.of(one, two));
+        assertThat(operations.deletionBlockers(artifactId)).containsExactly(one, two);
+    }
+
+    @Test
+    void deletionBlockersIsEmptyWhenNothingStandsInTheWay() {
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56");
+        when(registry.nonDataSetBlockingDependents(artifactId.value(), null)).thenReturn(List.of());
+        when(registry.dataSetMemberships(artifactId.value())).thenReturn(List.of());
+
+        assertThat(operations.deletionBlockers(artifactId)).isEmpty();
     }
 
     @Test

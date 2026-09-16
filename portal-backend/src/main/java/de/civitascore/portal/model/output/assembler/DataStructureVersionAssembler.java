@@ -36,15 +36,15 @@ public class DataStructureVersionAssembler
   }
 
   /**
-   * {@inheritDoc} Sets the {@code inUse} flag based on whether any data source or data sink
-   * references this version, and serves {@code model}/{@code styles} from the registry pin.
+   * {@inheritDoc} Sets the {@code inUse} flag from whether anything still references this version,
+   * and serves {@code model}/{@code styles} from the registry pin.
    */
   @Override
   public DataStructureVersionOutputDTO enrichDto(
       DataStructureVersionOutputDTO dto, DataStructureVersion entity) {
     dto.setInUse(
         dataSourceRepository.existsByDataStructureVersionId(entity.getId())
-            || modelRegistryGateway.isReferencedBySink(entity.getModelUrn()));
+            || modelRegistryGateway.isReferenced(entity.getModelUrn()));
     dto.setModelUrn(entity.getModelUrn());
     if (entity.getModelUrn() != null) {
       // Styles (the UML diagram) ride on the bundled view's x-ui-styles keyword.

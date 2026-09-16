@@ -127,7 +127,23 @@ class GlobalExceptionHandlerTest {
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
       assertThat(problemDetail.getDetail()).isEqualTo("Referenced by DataSource");
+      assertThat(problemDetail.getProperties()).isNullOrEmpty();
       assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName("Should keep the blocking artifacts out of the response body")
+    void shouldNotReturnBlockersForResourceInUse() {
+      List<String> blockers = List.of("urn:core:datasink:Readings", "urn:core:mapping:Join");
+      ResourceInUseException ex =
+          new ResourceInUseException(
+              "DataStructure", UUID.randomUUID(), "Still referenced", blockers);
+
+      ProblemDetail problemDetail = handler.handleResourceInUse(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getDetail()).isEqualTo("Still referenced");
+      assertThat(problemDetail.getProperties()).isNullOrEmpty();
     }
 
     @ParameterizedTest(name = "{0}")

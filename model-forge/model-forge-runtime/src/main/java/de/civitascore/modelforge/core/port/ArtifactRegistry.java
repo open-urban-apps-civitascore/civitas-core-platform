@@ -137,11 +137,14 @@ public interface ArtifactRegistry {
     void deleteArtifact(String urn);
 
     /**
-     * Logical URNs of artifacts whose stored references point at any version of the given
-     * artifact and therefore block its deletion. Every reference type blocks — a grouping that
-     * merely lists the artifact ({@code datastructure-ref}) protects it just as a hard dependency
-     * does, so a "content" cannot be deleted while any "container" still references it. Only the
-     * artifact's own self-references do not block. Empty when nothing blocks the delete.
+     * Logical URNs of artifacts whose stored references point at the given artifact and therefore
+     * block its deletion. Every reference type blocks — a grouping that merely lists the artifact
+     * ({@code datastructure-ref}) protects it just as a hard dependency does, so a "content" cannot
+     * be deleted while any "container" still references it. Only the artifact's own self-references
+     * do not block. Empty when nothing blocks the delete.
+     *
+     * <p>Only a referrer's current version counts. A reference held by a superseded version records
+     * what that version declared and does not constrain its target.
      */
     List<String> blockingDependents(String urn);
 
@@ -151,8 +154,30 @@ public interface ArtifactRegistry {
      */
     List<String> nonDataSetBlockingDependents(String urn);
 
+    /**
+     * Like {@link #nonDataSetBlockingDependents(String)}, restricted to the references that hold one
+     * version of the target. A reference pinned to another version constrains that version, not this
+     * one; a reference naming no version holds every version. A null {@code targetVersion} asks for
+     * the artifact as a whole, which is the question a delete asks.
+     */
+    List<String> nonDataSetBlockingDependents(String urn, String targetVersion);
+
     /** Logical URNs of the DataSets this artifact is a member of ({@code dataset-ref} in-edges). */
     List<String> dataSetMemberships(String urn);
+
+    /**
+     * Logical URNs of the artifacts this one owns — the set a cascading delete may take with it.
+     * Ownership is carried by the edge rather than the target's kind, so an artifact merely used is
+     * not owned.
+     */
+    List<String> ownedMemberUrns(String urn);
+
+    /**
+     * Like {@link #ownedMemberUrns(String)}, read from one version of the owner. Each member is
+     * returned as that owner stored it, version and all. A null {@code ownerVersion} reads the
+     * owner's current version.
+     */
+    List<String> ownedMemberUrns(String urn, String ownerVersion);
 
     Optional<JsonNode> fetch(String urn);
 

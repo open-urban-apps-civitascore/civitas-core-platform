@@ -130,6 +130,52 @@ access path to model content is the `ModelForge` facade; consistency comes
 from the shared datasource and transaction manager (one commit covers the
 host write and the registry write).
 
+For the same reason the host keeps no copy of the reference graph in tables of
+its own. It asks the registry which artifacts depend on a given one, rather
+than maintaining a second record of the same edges — a copy would have to be
+kept in step with the original, and the two would answer differently the moment
+they drifted.
+
+## Deletion
+
+A released model is not deleted. It is taken back to draft and replaced by a
+newer version; deleting is what clears a draft or a mistake.
+
+Five rules decide what one delete removes.
+
+1. Deleting a Data Structure removes the Elements that nothing else uses.
+   Deleting a Data Source removes nothing besides itself.
+2. Deleting a Pipeline also removes the Mappings no other Pipeline uses.
+3. Deleting a Data Set also removes its Pipelines and its Mappings.
+4. A delete that removes several artifacts removes all of them or none.
+5. A delete happens only while nothing uses the artifact.
+
+Rules 1 to 3 follow from **ownership**, which the registry reads off the
+reference itself rather than from everything an artifact points at. A grouping
+owns the Elements it is built from, a Pipeline owns the Mapping it wires, and a
+Data Set owns its Pipelines and its Mappings — the artifacts reached only
+through it. Every other reference names something used rather than owned: the
+two Data Structures a Mapping joins exist independently of it, and a Data
+Structure, a Data Source and a Data Sink each have an address of their own, so
+a Data Set groups those and they outlive it. An owned artifact is removed only
+once the container is gone and nothing else holds it, so a shared Element
+survives, and so does a Mapping a second Pipeline uses.
+
+Under rule 5 any reference from another artifact refuses the delete, and the
+refusal names what is in the way so the reference can be removed where it is
+held. Data Set membership is the exception: it is counted rather than refusing
+on its own, so an artifact belonging to one Data Set is deleted and unlinked
+from it, while one belonging to two is refused until it is removed from the
+others.
+
+Only an artifact's **current** version is asked. A reference recorded by a
+superseded version states what that version declared and stays readable, but it
+holds nothing back: a Data Sink repointed at a newer Data Structure leaves the
+older one free.
+
+An artifact is removed with its whole history; versions are not deleted one at
+a time.
+
 ## Local Build
 
 There is no root `pom.xml` in this repository — run Maven from `model-forge/`:

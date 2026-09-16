@@ -116,6 +116,11 @@ class EmbeddedModelForgeTest {
                 }
 
                 @Override
+                public List<String> deletionBlockers(ArtifactId artifactId) {
+                    return List.of();
+                }
+
+                @Override
                 public List<ArtifactSummary> orphans(de.civitascore.modelforge.contract.ArtifactKind kind) {
                     return List.of();
                 }
