@@ -416,5 +416,20 @@ class PipelineClosureValidatorTest {
                       .as("a draft reason would confirm the structure exists")
                       .containsExactly(pipelineId));
     }
+
+    @Test
+    @DisplayName("no artifact URN survives into the message, whatever blocked the flow")
+    void noArtifactUrnReachesTheMessage() {
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN, ELEMENT_URN), Set.of(ELEMENT_URN));
+      when(governingVersions.governingAll(any()))
+          .thenReturn(governedBy(List.of(released(STRUCTURE_URN))));
+      denyEveryStructure();
+
+      assertThat(catchThrowable(() -> validator().validate(pipelines())))
+          .as("the message is what a caller reads, so a URN appended here undoes the withholding")
+          .hasMessageNotContaining("urn:core:")
+          .hasMessageNotContaining("Sensor")
+          .hasMessageNotContaining("Address");
+    }
   }
 }

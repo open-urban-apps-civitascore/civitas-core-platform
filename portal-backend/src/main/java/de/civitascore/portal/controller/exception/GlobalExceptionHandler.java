@@ -171,7 +171,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    *
    * @param ex the validation exception carrying the findings
    * @param request the current HTTP request
-   * @return a Problem Detail with HTTP 422 status and a {@code findings} property
+   * @return a Problem Detail with HTTP 422 status and an {@code offendingPipelineIds} property
    */
   @ExceptionHandler(PipelineClosureValidationException.class)
   @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)

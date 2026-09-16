@@ -96,7 +96,7 @@ public class PipelineClosureValidator {
       blocks = true;
     }
     for (String urn : closure.unresolved()) {
-      log.info(
+      log.warn(
           "Closure validation: unresolved reference to {} reached by pipeline {}",
           Encode.forJava(urn),
           pipeline.getId());
@@ -140,7 +140,7 @@ public class PipelineClosureValidator {
       return true;
     }
     if (readable.stream().noneMatch(PipelineClosureValidator::isReleased)) {
-      log.info(
+      log.warn(
           "Closure validation: {} reached by pipeline {} is still a draft",
           Encode.forJava(urn),
           pipelineId);

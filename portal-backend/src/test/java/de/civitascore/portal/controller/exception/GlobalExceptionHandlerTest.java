@@ -181,7 +181,11 @@ class GlobalExceptionHandlerTest {
           .containsEntry("offendingPipelineIds", List.of(first, second));
       assertThat(problemDetail.getDetail())
           .as("the reply names no artifact, so the message has to state every condition")
-          .contains("exist", "readable", "released");
+          .contains("exist", "readable", "released")
+          .doesNotContain("urn:core:");
+      assertThat(problemDetail.getProperties().toString())
+          .as("an artifact added as a further property would disclose it just as well")
+          .doesNotContain("urn:core:");
     }
 
     @Test

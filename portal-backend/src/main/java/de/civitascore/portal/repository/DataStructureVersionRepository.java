@@ -50,53 +50,6 @@ public interface DataStructureVersionRepository extends BaseRepository<DataStruc
   Optional<DataStructureVersion> findFirstByModelUrnStartingWith(String modelUrnPrefix);
 
   /**
-   * Finds the version whose {@code modelUrn} is exactly the given versioned CORE URN — the pin a
-   * DataSink's {@code element} carries — so a sink resolves to the precise version it references
-   * rather than any version of the owning structure. {@code First} because the column carries no
-   * unique constraint. The {@code dataStructure} is eagerly fetched so the caller can read its id
-   * outside the persistence context.
-   *
-   * @param modelUrn the versioned CORE URN to match
-   * @return the version pinning that URN, or empty if no stored version does
-   */
-  @EntityGraph(attributePaths = {"dataStructure"})
-  Optional<DataStructureVersion> findFirstByModelUrn(String modelUrn);
-
-  /**
-   * Every version pinned by exactly {@code modelUrn}.
-   *
-   * <p>Distinct from {@link #findFirstByModelUrnStartingWith}, which matches any version of a
-   * structure because a parent's identity is all an authorization decision needs. A release
-   * lifecycle belongs to one version, so a check on it must name that version: matching
-   * version-agnostically would let a flow pinned to a draft version pass on the status of a
-   * different, released one.
-   *
-   * <p>Several rows can share one pin, so this returns all of them rather than one. The registry
-   * returns the version it already holds when a stored model is byte-identical to it, so two
-   * versions authored with the same content are pinned to the same artifact — and {@code model_urn}
-   * carries no unique constraint. The {@code dataStructure} is eagerly fetched so the caller can
-   * read each parent's own status outside the persistence context.
-   *
-   * @param modelUrn the versioned CORE URN a flow pins
-   * @return every version pinned by that URN, empty if the platform holds no record of it
-   */
-  @EntityGraph(attributePaths = {"dataStructure"})
-  List<DataStructureVersion> findAllByModelUrn(String modelUrn);
-
-  /**
-   * Every version pinned by any of {@code modelUrns} — the bulk form of {@link #findAllByModelUrn},
-   * so validating a whole flow is one query rather than one per artifact.
-   *
-   * <p>A URN with no row here is one the platform holds no lifecycle record for, which is what
-   * distinguishes an artifact it governs from one it merely stores.
-   *
-   * @param modelUrns the versioned CORE URNs a flow pins
-   * @return every version pinning any of them, empty when none is known
-   */
-  @EntityGraph(attributePaths = {"dataStructure"})
-  List<DataStructureVersion> findAllByModelUrnIn(Collection<String> modelUrns);
-
-  /**
    * Every version record of the structures these version-free URNs name.
    *
    * <p>A flow pins one version, but a draft version's pin advances inside its own major whenever

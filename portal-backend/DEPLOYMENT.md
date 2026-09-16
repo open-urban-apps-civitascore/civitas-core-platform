@@ -291,7 +291,7 @@ Before a dataset is staged or released, the backend walks out from each of its p
 |---|---|---|
 | `DATASET_CLOSUREVALIDATION_MAXDEPTH` | `10` | Reference hops the walk follows out from a pipeline. A flow reaching further is **refused**, not passed unchecked — everything past the bound goes unexamined |
 
-Raise it only when real models legitimately nest deeper: observed flows reach two to three hops, so the default leaves roughly threefold headroom. Lowering it below what a deployment's models need makes those datasets unreleasable, with a finding naming the pipeline and the reason `NOT_VERIFIED`. The walk is an in-memory traversal that visits each artifact once and terminates on reference cycles, so the bound is not a performance tuning knob.
+Raise it only when real models legitimately nest deeper: observed flows reach two to three hops, so the default leaves roughly threefold headroom. Lowering it below what a deployment's models need makes those datasets unreleasable, with a 422 naming the offending pipelines and the log recording that the bound cut the walk short. The walk visits each artifact once and terminates on reference cycles, but resolves every unpinned reference against the registry, so raising the bound does add reads.
 
 ---
 

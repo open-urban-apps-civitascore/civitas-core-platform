@@ -74,12 +74,6 @@ public class ModelRegistryGateway {
   public record RegistryDocument(Map<String, Object> content, Map<String, Object> styles) {}
 
   /**
-   * The artifacts a flow participates in, and the subset of them the registry does not hold.
-   *
-   * @param artifacts every artifact the walk reached, entry artifact excluded
-   * @param unresolved those of {@code artifacts} the registry no longer holds
-   */
-  /**
    * What a flow reaches, what of it the registry does not hold, and whether the depth bound stopped
    * the walk short of the whole flow.
    */
