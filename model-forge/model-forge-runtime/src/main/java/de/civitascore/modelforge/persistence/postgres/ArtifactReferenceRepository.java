@@ -101,16 +101,11 @@ class ArtifactReferenceRepository {
      * non-DataSet references that unconditionally block deletion (referential integrity). DataSet
      * membership is handled separately by the count-based deletion policy (see
      * {@link #dataSetMemberships} and the deletion-policy concept).
-     */
-    List<String> nonDataSetBlockingDependents(String targetLogicalUrn) {
-        return nonDataSetBlockingDependents(targetLogicalUrn, null);
-    }
-
-    /**
-     * Like {@link #nonDataSetBlockingDependents(String)}, restricted to the references holding one
-     * version of the target — a Data Sink writing into version 1 leaves version 2 free. A reference
-     * naming no version follows whichever is current and so holds every one. {@code null} asks for
-     * the artifact as a whole, which is the question a delete asks.
+     *
+     * <p>{@code targetVersion} restricts the answer to the references holding that one version — a
+     * Data Sink writing into version 1 leaves version 2 free. A reference naming no version follows
+     * whichever is current and so holds every one. {@code null} asks for the artifact as a whole,
+     * which is the question a delete asks.
      */
     List<String> nonDataSetBlockingDependents(String targetLogicalUrn, String targetVersion) {
         return jdbc.sql("""
@@ -171,10 +166,6 @@ class ArtifactReferenceRepository {
      * owner learns which version of the member it holds. A null {@code ownerVersion} reads the
      * owner's current version.
      */
-    List<String> ownedMemberUrns(String ownerLogicalUrn) {
-        return ownedMemberUrns(ownerLogicalUrn, null);
-    }
-
     List<String> ownedMemberUrns(String ownerLogicalUrn, String ownerVersion) {
         return jdbc.sql("""
                 select distinct r.target_urn
