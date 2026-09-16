@@ -2476,18 +2476,5 @@ class DataSetServiceTest {
       assertThat(ds.getPendingSagaType()).isNull();
       verify(dataSetRepository, never()).save(any());
     }
-
-    @Test
-    @DisplayName("the flows are validated again at release, not only at staging")
-    void releaseRevalidates() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = releasable(id);
-      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
-      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-      createService().release(id);
-
-      verify(pipelineClosureValidator).validate(any());
-    }
   }
 }

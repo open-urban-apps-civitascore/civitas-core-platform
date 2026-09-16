@@ -95,4 +95,19 @@ public interface DataStructureVersionRepository extends BaseRepository<DataStruc
    */
   @EntityGraph(attributePaths = {"dataStructure"})
   List<DataStructureVersion> findAllByModelUrnIn(Collection<String> modelUrns);
+
+  /**
+   * Every version record of the structures these version-free URNs name.
+   *
+   * <p>A flow pins one version, but a draft version's pin advances inside its own major whenever
+   * its model changes, so the pinned string stops naming any record. Resolving by structure and
+   * major finds the record that owns the pin, while a later major stays out of reach because it is
+   * a different record with a lifecycle of its own.
+   *
+   * @param modelLogicalUrns the version-free CORE URNs of the owning structures
+   * @return every version record of those structures, parents eagerly fetched
+   */
+  @EntityGraph(attributePaths = {"dataStructure"})
+  List<DataStructureVersion> findAllByDataStructure_ModelLogicalUrnIn(
+      Collection<String> modelLogicalUrns);
 }

@@ -7,10 +7,9 @@ import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
+import de.civitascore.portal.service.GoverningVersionLookup;
 import de.civitascore.portal.util.PipelineClosureValidationException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -18,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
@@ -47,15 +45,8 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class PipelineClosureValidator {
 
-  /**
-   * How many pinned URNs one record lookup may carry. A flow can reach more artifacts than a single
-   * statement has bind slots, so the lookup is chunked the way the registry chunks its own
-   * existence probe.
-   */
-  private static final int RECORD_LOOKUP_BATCH_SIZE = 500;
-
   private final ModelRegistryGateway modelRegistryGateway;
-  private final DataStructureVersionRepository dataStructureVersionRepository;
+  private final GoverningVersionLookup governingVersions;
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
   private final PipelineClosureValidationProperties properties;
 
@@ -116,9 +107,7 @@ public class PipelineClosureValidator {
     if (resolved.isEmpty()) {
       return blocks;
     }
-    Map<String, List<DataStructureVersion>> governed =
-        recordsPinnedBy(resolved).stream()
-            .collect(Collectors.groupingBy(DataStructureVersion::getModelUrn));
+    Map<String, List<DataStructureVersion>> governed = governingVersions.governingAll(resolved);
     for (String urn : resolved) {
       List<DataStructureVersion> records = governed.get(urn);
       if (records != null && governedBlocks(pipeline.getId(), urn, records, readability)) {
@@ -126,20 +115,6 @@ public class PipelineClosureValidator {
       }
     }
     return blocks;
-  }
-
-  /** Every version record pinning one of these URNs, asked in batches a statement can carry. */
-  private List<DataStructureVersion> recordsPinnedBy(List<String> urns) {
-    if (urns.size() <= RECORD_LOOKUP_BATCH_SIZE) {
-      return dataStructureVersionRepository.findAllByModelUrnIn(urns);
-    }
-    List<DataStructureVersion> records = new ArrayList<>();
-    for (int from = 0; from < urns.size(); from += RECORD_LOOKUP_BATCH_SIZE) {
-      records.addAll(
-          dataStructureVersionRepository.findAllByModelUrnIn(
-              urns.subList(from, Math.min(from + RECORD_LOOKUP_BATCH_SIZE, urns.size()))));
-    }
-    return records;
   }
 
   /**

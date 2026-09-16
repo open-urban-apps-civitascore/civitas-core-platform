@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -21,12 +22,14 @@ import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
+import de.civitascore.portal.service.GoverningVersionLookup;
 import de.civitascore.portal.util.PipelineClosureValidationException;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -49,7 +52,7 @@ class PipelineClosureValidatorTest {
       "urn:core:platform:civitas:element:common:Address:cccccccccc:1.0.0";
 
   @Mock private ModelRegistryGateway modelRegistryGateway;
-  @Mock private DataStructureVersionRepository dataStructureVersionRepository;
+  @Mock private GoverningVersionLookup governingVersions;
   @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
 
   private final UUID pipelineId = UUID.randomUUID();
@@ -58,10 +61,17 @@ class PipelineClosureValidatorTest {
     return validator(10);
   }
 
+  @org.junit.jupiter.api.BeforeEach
+  void stubLogicalUrn() {
+    lenient()
+        .when(modelRegistryGateway.logicalUrn(anyString()))
+        .thenAnswer(call -> logicalOf(call.getArgument(0)));
+  }
+
   private PipelineClosureValidator validator(int maxDepth) {
     return new PipelineClosureValidator(
         modelRegistryGateway,
-        dataStructureVersionRepository,
+        governingVersions,
         scopeAccessAuthorizer,
         new PipelineClosureValidationProperties(maxDepth));
   }
@@ -91,12 +101,28 @@ class PipelineClosureValidatorTest {
     DataStructure parent = new DataStructure();
     parent.setId(UUID.randomUUID());
     parent.setDataStructureStatus(parentStatus);
+    parent.setModelLogicalUrn(logicalOf(modelUrn));
     DataStructureVersion version = new DataStructureVersion();
     version.setId(UUID.randomUUID());
     version.setModelUrn(modelUrn);
+    version.setVersion(versionOf(modelUrn));
     version.setDataStructure(parent);
     version.setDataStructureVersionStatus(versionStatus);
     return version;
+  }
+
+  /** What the resolver reports: each record keyed by the pin the flow recorded. */
+  private static Map<String, List<DataStructureVersion>> governedBy(
+      List<DataStructureVersion> versions) {
+    return versions.stream().collect(Collectors.groupingBy(DataStructureVersion::getModelUrn));
+  }
+
+  private static String logicalOf(String urn) {
+    return urn.substring(0, urn.lastIndexOf(':'));
+  }
+
+  private static String versionOf(String urn) {
+    return urn.substring(urn.lastIndexOf(':') + 1);
   }
 
   private static DataStructureVersion released(String modelUrn) {
@@ -137,14 +163,14 @@ class PipelineClosureValidatorTest {
       DataStructure shared = new DataStructure();
       shared.setId(UUID.randomUUID());
       shared.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      shared.setModelLogicalUrn(logicalOf(STRUCTURE_URN));
       DataStructureVersion first = released(STRUCTURE_URN);
       first.setDataStructure(shared);
-      DataStructureVersion second = released(ELEMENT_URN);
+      DataStructureVersion second = released(STRUCTURE_URN);
       second.setDataStructure(shared);
 
-      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN, ELEMENT_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
-          .thenReturn(List.of(first, second));
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(governingVersions.governingAll(any())).thenReturn(governedBy(List.of(first, second)));
 
       validator().validate(pipelines());
 
@@ -163,8 +189,8 @@ class PipelineClosureValidatorTest {
     @DisplayName("a flow reaching past the bound is refused although all it examined was sound")
     void aTruncatedWalkBlocks() {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of(), true);
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
-          .thenReturn(List.of(released(STRUCTURE_URN)));
+      when(governingVersions.governingAll(any()))
+          .thenReturn(governedBy(List.of(released(STRUCTURE_URN))));
 
       assertThat(blockedPipelinesOf(catchThrowable(() -> validator().validate(pipelines()))))
           .as("what the walk did not see is the reason, not what it saw")
@@ -175,8 +201,8 @@ class PipelineClosureValidatorTest {
     @DisplayName("a flow that fits inside the bound is not held against it")
     void anUntruncatedWalkPasses() {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
-          .thenReturn(List.of(released(STRUCTURE_URN)));
+      when(governingVersions.governingAll(any()))
+          .thenReturn(governedBy(List.of(released(STRUCTURE_URN))));
 
       assertThatCode(() -> validator().validate(pipelines())).doesNotThrowAnyException();
     }
@@ -208,7 +234,7 @@ class PipelineClosureValidatorTest {
         "an artifact the platform holds no version record for is held to resolvability alone")
     void anArtifactWithoutAVersionRecordPasses() {
       closureOf(PIPELINE_URN, Set.of(ELEMENT_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any())).thenReturn(List.of());
+      when(governingVersions.governingAll(any())).thenReturn(governedBy(List.of()));
 
       assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
           .as("a member element, a mapping and a sink configuration all fall here")
@@ -219,8 +245,8 @@ class PipelineClosureValidatorTest {
     @DisplayName("a released, readable data structure passes")
     void aReleasedStructurePasses() {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
-          .thenReturn(List.of(released(STRUCTURE_URN)));
+      when(governingVersions.governingAll(any()))
+          .thenReturn(governedBy(List.of(released(STRUCTURE_URN))));
 
       assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
           .doesNotThrowAnyException();
@@ -230,13 +256,14 @@ class PipelineClosureValidatorTest {
     @DisplayName("a data structure still in draft blocks the flow")
     void aDraftStructureBlocks() {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+      when(governingVersions.governingAll(any()))
           .thenReturn(
-              List.of(
-                  version(
-                      STRUCTURE_URN,
-                      DataStructureVersionStatus.DRAFT,
-                      DataStructureStatus.AVAILABLE)));
+              governedBy(
+                  List.of(
+                      version(
+                          STRUCTURE_URN,
+                          DataStructureVersionStatus.DRAFT,
+                          DataStructureStatus.AVAILABLE))));
 
       assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
           .satisfies(thrown -> assertThat(blockedPipelinesOf(thrown)).containsExactly(pipelineId));
@@ -246,13 +273,14 @@ class PipelineClosureValidatorTest {
     @DisplayName("a released version of a data structure still in draft blocks the flow")
     void aReleasedVersionOfADraftStructureBlocks() {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+      when(governingVersions.governingAll(any()))
           .thenReturn(
-              List.of(
-                  version(
-                      STRUCTURE_URN,
-                      DataStructureVersionStatus.AVAILABLE,
-                      DataStructureStatus.DRAFT)));
+              governedBy(
+                  List.of(
+                      version(
+                          STRUCTURE_URN,
+                          DataStructureVersionStatus.AVAILABLE,
+                          DataStructureStatus.DRAFT))));
 
       assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
           .satisfies(thrown -> assertThat(blockedPipelinesOf(thrown)).containsExactly(pipelineId));
@@ -262,12 +290,15 @@ class PipelineClosureValidatorTest {
     @DisplayName("one released record is enough, since a flow pins the artifact")
     void oneReleasedRecordIsEnough() {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+      when(governingVersions.governingAll(any()))
           .thenReturn(
-              List.of(
-                  version(
-                      STRUCTURE_URN, DataStructureVersionStatus.DRAFT, DataStructureStatus.DRAFT),
-                  released(STRUCTURE_URN)));
+              governedBy(
+                  List.of(
+                      version(
+                          STRUCTURE_URN,
+                          DataStructureVersionStatus.DRAFT,
+                          DataStructureStatus.DRAFT),
+                      released(STRUCTURE_URN))));
 
       assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
           .as("two records pin one artifact when their content is identical")
@@ -304,8 +335,8 @@ class PipelineClosureValidatorTest {
     @DisplayName("a withheld artifact is named nowhere in the reply")
     void aWithheldArtifactIsNamedNowhereInTheReply() {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
-          .thenReturn(List.of(released(STRUCTURE_URN)));
+      when(governingVersions.governingAll(any()))
+          .thenReturn(governedBy(List.of(released(STRUCTURE_URN))));
       denyEveryStructure();
 
       assertThat(blockedPipelinesOf(catchThrowable(() -> validator().validate(pipelines()))))
@@ -317,13 +348,14 @@ class PipelineClosureValidatorTest {
     @DisplayName("a draft the caller may read is named, because they can act on it")
     void aReadableDraftIsNamed() {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+      when(governingVersions.governingAll(any()))
           .thenReturn(
-              List.of(
-                  version(
-                      STRUCTURE_URN,
-                      DataStructureVersionStatus.DRAFT,
-                      DataStructureStatus.AVAILABLE)));
+              governedBy(
+                  List.of(
+                      version(
+                          STRUCTURE_URN,
+                          DataStructureVersionStatus.DRAFT,
+                          DataStructureStatus.AVAILABLE))));
 
       assertThat(blockedPipelinesOf(catchThrowable(() -> validator().validate(pipelines()))))
           .containsExactly(pipelineId);
@@ -350,8 +382,8 @@ class PipelineClosureValidatorTest {
                   () -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN)))));
 
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
-          .thenReturn(List.of(released(STRUCTURE_URN)));
+      when(governingVersions.governingAll(any()))
+          .thenReturn(governedBy(List.of(released(STRUCTURE_URN))));
       denyEveryStructure();
       List<UUID> onUnreadable =
           blockedPipelinesOf(
@@ -367,11 +399,14 @@ class PipelineClosureValidatorTest {
     @DisplayName("says nothing of the lifecycle of a structure the caller may not read")
     void withholdsDraftStateFromAnUnauthorizedCaller() {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
-      when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
+      when(governingVersions.governingAll(any()))
           .thenReturn(
-              List.of(
-                  version(
-                      STRUCTURE_URN, DataStructureVersionStatus.DRAFT, DataStructureStatus.DRAFT)));
+              governedBy(
+                  List.of(
+                      version(
+                          STRUCTURE_URN,
+                          DataStructureVersionStatus.DRAFT,
+                          DataStructureStatus.DRAFT))));
       denyEveryStructure();
 
       assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
