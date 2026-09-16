@@ -10,6 +10,7 @@ import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
+import de.civitascore.modelforge.contract.ValidationFailedException;
 import de.civitascore.modelforge.contract.VersionBump;
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
 import de.civitascore.modelforge.core.port.ArtifactSearchResult;
@@ -27,6 +28,7 @@ import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -293,6 +295,68 @@ class EmbeddedModelForgeOperationsTest {
         verify(registry).deleteArtifact(orphanLogical);
         verify(registry, org.mockito.Mockito.never()).deleteArtifact(shared);
         verify(registry, org.mockito.Mockito.never()).deleteArtifact(sharedLogical);
+    }
+
+    /** A Data Set the caller holds, the Mapping it names, and the Data Set that holds that Mapping. */
+    private static final ArtifactId MINE =
+        new ArtifactId("urn:core:platform:civitas:dataset:common:Mine:mmmmmmmmmm");
+    private static final ArtifactId MAPPING =
+        new ArtifactId("urn:core:platform:civitas:mapping:common:m1:aaaaaaaaaa");
+    private static final String THEIRS = "urn:core:platform:civitas:dataset:common:Theirs:tttttttttt";
+
+    private void manifestExists() {
+        when(registry.fetch(MINE.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+    }
+
+    @Test
+    void linkingAMappingADifferentDataSetHoldsIsRefused() {
+        manifestExists();
+        when(registry.fetch(MAPPING.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+        when(registry.dataSetMemberships(MAPPING.value())).thenReturn(List.of(THEIRS));
+
+        assertThatThrownBy(() -> operations.linkToDataSet(MINE, MAPPING))
+            .isInstanceOf(ValidationFailedException.class)
+            .as("the Data Set holding it stays unnamed")
+            .hasMessageNotContaining(THEIRS);
+        verify(registry, org.mockito.Mockito.never()).storeDataSet(anyString(), any(), any());
+    }
+
+    @Test
+    void aMappingThatDoesNotExistIsRefusedInTheSameWords() {
+        manifestExists();
+        when(registry.fetch(MAPPING.value())).thenReturn(Optional.empty());
+
+        String absent = catchThrowable(() -> operations.linkToDataSet(MINE, MAPPING)).getMessage();
+
+        when(registry.fetch(MAPPING.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+        when(registry.dataSetMemberships(MAPPING.value())).thenReturn(List.of(THEIRS));
+        String taken = catchThrowable(() -> operations.linkToDataSet(MINE, MAPPING)).getMessage();
+
+        // Telling the two apart would say which Mapping URNs are taken.
+        assertThat(absent).isEqualTo(taken);
+    }
+
+    @Test
+    void linkingAMappingOnlyItsOwnDataSetHoldsIsAllowed() {
+        manifestExists();
+        when(registry.fetch(MAPPING.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+        when(registry.dataSetMemberships(MAPPING.value())).thenReturn(List.of(MINE.value()));
+
+        operations.linkToDataSet(MINE, MAPPING);
+
+        verify(registry).storeDataSet(eq(MINE.value()), any(), eq(VersionBump.MINOR));
+    }
+
+    @Test
+    void linkingADataSinkADifferentDataSetHoldsIsAllowed() {
+        var sink = new ArtifactId("urn:core:platform:civitas:datasink:common:s1:bbbbbbbbbb");
+        manifestExists();
+
+        operations.linkToDataSet(MINE, sink);
+
+        // The one-Data-Set rule is the Mapping's alone: every other kind has a record and rights of
+        // its own, so sharing one discloses nothing.
+        verify(registry).storeDataSet(eq(MINE.value()), any(), eq(VersionBump.MINOR));
     }
 
     @Test

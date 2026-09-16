@@ -465,6 +465,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
                 }
             }
             if (!present) {
+                requireOwnMapping(dataSetUrn, entry.getValue(), memberLogical);
                 refs.add(memberLogical);
                 changed = true;
             }
@@ -472,6 +473,25 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         if (changed) {
             saveArtifact(new SaveArtifactCommand(
                 new ArtifactId(UrnParser.logicalUrn(dataSetUrn)), ArtifactKind.DATA_SET, doc, VersionBump.MINOR));
+        }
+    }
+
+    /**
+     * A Mapping belongs to one Data Set — membership is the only condition that lets a caller read
+     * one, so a second link would grant that read. A Mapping that does not exist is refused in the
+     * same words, or the difference would tell a caller which URNs are taken.
+     */
+    private void requireOwnMapping(String dataSetUrn, ArtifactKind kind, String memberLogical) {
+        if (kind != ArtifactKind.MAPPING) {
+            return;
+        }
+        String own = UrnParser.logicalUrn(dataSetUrn);
+        boolean ours = registry.fetch(memberLogical).isPresent()
+            && registry.dataSetMemberships(memberLogical).stream()
+                .allMatch(holder -> own.equals(UrnParser.logicalUrn(holder)));
+        if (!ours) {
+            throw new ValidationFailedException(
+                "Mapping " + memberLogical + " is not a Mapping of this Data Set", List.of());
         }
     }
 
