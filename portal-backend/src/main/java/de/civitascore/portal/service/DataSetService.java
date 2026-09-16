@@ -850,10 +850,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * rather than at commit.
    *
    * <p>The only place a dataset row is removed — a provisioned dataset keeps its row until its
-   * teardown saga reports back — so the registry cleanup belongs here and not in {@code postDelete}.
+   * teardown saga reports back — so the registry cleanup belongs here, not in {@code postDelete}.
    *
-   * @param failOnRefusal whether a refused removal fails the whole delete; see
-   *     {@link #removeOwnedArtifacts}
+   * @param failOnRefusal whether a refused removal fails the whole delete or is only recorded
    */
   private void deleteWithSinks(DataSet dataSet, boolean failOnRefusal) {
     UUID datasetId = dataSet.getId();
@@ -876,7 +875,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     dataSetRepository.flush();
 
     // The manifest first: its dataset-ref edges carry the pipelines, and each pipeline takes the
-    // mappings no other pipeline uses. Only then the sink configurations those pipelines pointed at.
+    // mappings no other pipeline uses. The sink configurations they wrote through come last.
     if (dataSet.getManifestLogicalUrn() != null) {
       removeOwnedArtifacts(
           datasetId, List.of(dataSet.getManifestLogicalUrn()), true, failOnRefusal);
@@ -886,8 +885,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   /**
    * Removes registry artifacts a deleted DataSet owned, each taking the artifacts it owns with it
-   * when {@code cascade} is set. An artifact a second DataSet also lists is refused by the registry;
-   * one that only this DataSet listed is removed and unlinked.
+   * when {@code cascade} is set. The registry refuses one a second DataSet also lists; one only
+   * this DataSet listed is removed and unlinked.
    *
    * <p>With {@code failOnRefusal} a refusal rolls the whole delete back, rows included, so the
    * dataset never disappears while a model it owned survives with nothing left to reach it. Without
