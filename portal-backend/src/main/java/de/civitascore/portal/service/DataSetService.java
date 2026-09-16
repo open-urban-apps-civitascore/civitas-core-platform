@@ -616,6 +616,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * Explicitly adds a reusable artifact (by CORE URN) to this dataset's manifest — the "Beides"
    * explicit-assignment path, independent of any Pipeline that uses it. Model Forge maintains the
    * manifest (a {@code dataset-ref} membership edge).
+   *
+   * <p>No route reaches this: the caller's rights are read off the dataset, never off the artifact,
+   * so a route would let a caller pull in an artifact of a dataset they may not read.
    */
   @Transactional
   public void linkMember(UUID datasetId, String memberUrn) {
@@ -683,12 +686,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
             datasetId);
       }
       case DELETE -> {
-        // Teardown of the full infrastructure (including the sink) succeeded; now remove the
-        // entity itself. Returning here skips the save() below — the row no longer exists.
-        // A registry refusal is recorded rather than thrown: the infrastructure this dataset
-        // described is already gone, and letting the removal fail would restore the row with its
-        // pending saga type set, which every later delete then refuses. A stranded artifact is
-        // recoverable; a dataset that can never be deleted again is not.
+        // Teardown succeeded, so the entity goes now; returning skips the save() below.
+        // A refusal only recorded: a stranded artifact is recoverable, a dataset no later delete
+        // can remove is not.
         deleteWithSinks(dataSet, false);
         log.info("Saga DELETE completed for dataset {}, entity removed", datasetId);
         return;
@@ -841,42 +841,24 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Removes a dataset together with its DataSinks. A DataSink is owned by the dataset (its {@code
-   * dataset_id} FK is non-null) but the dataset has no cascading collection for it, and a released
-   * sink additionally carries a {@code pipeline_id} FK into one of the cascade-removed pipelines.
-   * Deleting the sinks first — after detaching them from their pipeline — clears both FKs before
-   * the dataset delete cascades into the pipelines, avoiding the FK violation that would otherwise
-   * roll the transaction back.
+   * Removes a dataset together with its DataSinks. A sink carries an FK onto the dataset and, once
+   * released, one onto a pipeline the dataset delete cascades away; removing the sinks first clears
+   * both before that cascade runs.
    *
-   * <p>Going through the repository deliberately bypasses the layer guard that rejects a standalone
-   * {@code DELETE /datasinks/{id}}: that guard protects a sink whose dataset lives on, whereas here
-   * the whole aggregate goes away.
+   * <p>Going through the repository bypasses the layer guard on a standalone sink delete, which
+   * protects a sink whose dataset lives on. Flushing keeps a constraint violation inside this call
+   * rather than at commit.
    *
-   * <p>Flushing here keeps a constraint violation inside this call instead of surfacing it at
-   * commit, after a caller has already logged the removal as done.
+   * <p>The only place a dataset row is removed — a provisioned dataset keeps its row until its
+   * teardown saga reports back — so the registry cleanup belongs here and not in {@code postDelete}.
    *
-   * <p>This is the only place a dataset row is removed — a provisioned dataset keeps its row until
-   * its teardown saga reports back — so the manifest cleanup belongs here rather than in the {@code
-   * postDelete} hook, which a two-phase delete never reaches.
-   *
-   * <p>Registry cleanup runs in reference order, because the registry refuses to delete an artifact
-   * anything still points at: the manifest holds the membership edges, and each pipeline holds the
-   * edges onto the sink configurations it writes through.
-   *
-   * @param failOnRefusal whether a refused removal fails the whole delete. True while the caller
-   *     can still be told. False once the teardown saga has destroyed the infrastructure, where
-   *     failing would restore a dataset no later delete can remove.
+   * @param failOnRefusal whether a refused removal fails the whole delete; see
+   *     {@link #removeOwnedArtifacts}
    */
   private void deleteWithSinks(DataSet dataSet, boolean failOnRefusal) {
-    // The registry artifacts this DataSet owns, read while its rows still exist. A pipeline row is
-    // removed by a JPA cascade that does not run its service hook, so its artifact is removed here
-    // instead, together with the mappings no other pipeline uses.
-    List<String> pipelineUrns =
-        dataSet.getPipelines().stream()
-            .map(Pipeline::getModelLogicalUrn)
-            .filter(Objects::nonNull)
-            .distinct()
-            .toList();
+    UUID datasetId = dataSet.getId();
+    // Read while the rows still exist: the manifest groups a sink rather than owning it, so the
+    // cascade leaves its configuration behind.
     List<DataSink> sinks = dataSinkRepository.findByDataSetId(dataSet.getId());
     List<String> sinkConfigurationUrns =
         sinks.stream()
@@ -893,27 +875,27 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     dataSetRepository.delete(dataSet);
     dataSetRepository.flush();
 
-    // The manifest goes first: it holds the dataset-ref edges onto the members. Then the pipeline
-    // artifacts, each taking the mappings no other pipeline uses, and only then the sink
-    // configurations those pipelines pointed at.
+    // The manifest first: its dataset-ref edges carry the pipelines, and each pipeline takes the
+    // mappings no other pipeline uses. Only then the sink configurations those pipelines pointed at.
     if (dataSet.getManifestLogicalUrn() != null) {
-      removeOwnedArtifacts(List.of(dataSet.getManifestLogicalUrn()), true, failOnRefusal);
+      removeOwnedArtifacts(
+          datasetId, List.of(dataSet.getManifestLogicalUrn()), true, failOnRefusal);
     }
-    removeOwnedArtifacts(pipelineUrns, true, failOnRefusal);
-    removeOwnedArtifacts(sinkConfigurationUrns, false, failOnRefusal);
+    removeOwnedArtifacts(datasetId, sinkConfigurationUrns, false, failOnRefusal);
   }
 
   /**
    * Removes registry artifacts a deleted DataSet owned, each taking the artifacts it owns with it
-   * when {@code cascade} is set. An artifact a second DataSet also lists is refused by the
-   * registry; one that only this DataSet listed is removed and unlinked.
+   * when {@code cascade} is set. An artifact a second DataSet also lists is refused by the registry;
+   * one that only this DataSet listed is removed and unlinked.
    *
    * <p>With {@code failOnRefusal} a refusal rolls the whole delete back, rows included, so the
    * dataset never disappears while a model it owned survives with nothing left to reach it. Without
-   * it the refusal is recorded and the removal stands — see {@link #deleteWithSinks}.
+   * it the refusal is only recorded, which is what the teardown saga needs once the infrastructure
+   * is already gone.
    */
   private void removeOwnedArtifacts(
-      List<String> logicalUrns, boolean cascade, boolean failOnRefusal) {
+      UUID datasetId, List<String> logicalUrns, boolean cascade, boolean failOnRefusal) {
     for (String logicalUrn : logicalUrns) {
       try {
         modelRegistryGateway.deleteArtifact(logicalUrn, cascade);
@@ -922,8 +904,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           throw e;
         }
         log.error(
-            "Could not remove artifact {} of a deleted DataSet, it is now unreferenced: {}",
+            "Could not remove artifact {} of deleted dataset {}, it is now stranded: {}",
             Encode.forJava(logicalUrn),
+            datasetId,
             Encode.forJava(e.getMessage()));
       }
     }

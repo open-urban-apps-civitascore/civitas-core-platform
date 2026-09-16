@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -2063,8 +2062,6 @@ class DataSetServiceTest {
 
     private static final String PIPELINE_URN =
         "urn:core:platform:civitas:pipeline:common:doomed-pipeline:abcdefghij";
-    private static final String MAPPING_URN =
-        "urn:core:platform:civitas:mapping:common:doomed-mapping:abcdefghij";
     private static final String SINK_URN =
         "urn:core:platform:civitas:data-sink:common:doomed-sink:abcdefghij";
 
@@ -2103,15 +2100,14 @@ class DataSetServiceTest {
 
       createService().deleteById(id);
 
+      // The manifest's membership edges carry the pipelines, and each pipeline the mappings no
+      // other pipeline uses, so one cascading removal covers them all.
       verify(modelRegistryGateway).deleteArtifact(ds.getManifestLogicalUrn(), true);
-      // A pipeline is deleted with the mappings it owns, so a mapping no other pipeline uses does
-      // not survive to refuse the deletion of the structures it joined.
-      verify(modelRegistryGateway).deleteArtifact(PIPELINE_URN, true);
       verify(modelRegistryGateway).deleteArtifact(SINK_URN, false);
     }
 
     @Test
-    @DisplayName("the manifest goes before the pipeline, and the pipeline before what it wires")
+    @DisplayName("the manifest goes before the sink configurations its pipelines wrote through")
     void deletesArtifactsInReferenceOrder() {
       UUID id = UUID.randomUUID();
       DataSet ds =
@@ -2122,11 +2118,10 @@ class DataSetServiceTest {
 
       createService().deleteById(id);
 
-      // Order is the whole point: a referenced artifact cannot be deleted, so each step has to
-      // remove the edges that keep the next one referenced.
+      // Order is the whole point: a referenced artifact cannot be deleted, and the pipelines the
+      // manifest cascade takes hold the edges onto the sink configurations.
       InOrder order = inOrder(modelRegistryGateway);
       order.verify(modelRegistryGateway).deleteArtifact(ds.getManifestLogicalUrn(), true);
-      order.verify(modelRegistryGateway).deleteArtifact(PIPELINE_URN, true);
       order.verify(modelRegistryGateway).deleteArtifact(SINK_URN, false);
     }
 
@@ -2139,11 +2134,9 @@ class DataSetServiceTest {
               id, "urn:core:platform:civitas:dataset:common:shared:abcdefghij");
       ds.setProvisioned(false);
       stubOwnedArtifacts(id, ds);
-      // The manifest goes first and succeeds; the refusal comes from the pipeline behind it.
-      doNothing().when(modelRegistryGateway).deleteArtifact(ds.getManifestLogicalUrn(), true);
       doThrow(new IllegalStateException("still referenced"))
           .when(modelRegistryGateway)
-          .deleteArtifact(PIPELINE_URN, true);
+          .deleteArtifact(ds.getManifestLogicalUrn(), true);
 
       // Swallowing this would commit the row deletions and leave the artifact behind with nothing
       // left to reach it; the transaction rolls back instead.
