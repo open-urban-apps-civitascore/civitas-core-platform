@@ -56,6 +56,22 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     }
 
     @Test
+    @DisplayName("A cascade inside a unit that fails afterwards removes nothing at all")
+    void aFailedUnitKeepsTheContainerAndItsMembers() {
+        String structurePin = registry.storeDataStructure(
+            urns.mintDataStructure("WeatherStructure"), dataStructure(), VersionBump.PATCH, null);
+
+        assertThatThrownBy(() -> registry.<Void>inTransaction(() -> {
+            deletes.delete(structurePin, true);
+            throw new IllegalStateException("the caller fails after the cascade");
+        })).isInstanceOf(IllegalStateException.class);
+
+        assertThat(registry.fetch(structurePin)).isPresent();
+        assertThat(registry.fetch(stationPin)).isPresent();
+        assertThat(registry.fetch(readingPin)).isPresent();
+    }
+
+    @Test
     @DisplayName("An Element a second Data Structure also groups survives the delete")
     void anElementASecondDataStructureGroupsSurvives() {
         String sharedPin = registry.storeDataStructure(
@@ -164,6 +180,24 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
         // What the Data Set only grouped stays.
         assertThat(registry.fetch(sourcePin)).isPresent();
         assertThat(registry.fetch(sinkPin)).isPresent();
+    }
+
+    @Test
+    @DisplayName("A Mapping a second Data Set also holds survives the delete of the first")
+    void aMappingASecondDataSetHoldsSurvives() {
+        String mappingPin = registry.storeMapping("StationToReading", mapping(), VersionBump.PATCH);
+        String firstSet = registry.storeDataSet(
+            urns.mintDataSet("FirstSet"), dataSetOfMappings(mappingPin), VersionBump.PATCH);
+        String secondSet = registry.storeDataSet(
+            urns.mintDataSet("SecondSet"), dataSetOfMappings(mappingPin), VersionBump.PATCH);
+
+        deletes.delete(firstSet, true);
+
+        assertThat(registry.fetch(firstSet)).isEmpty();
+        assertThat(registry.fetch(mappingPin)).as("held by %s", secondSet).isPresent();
+        assertThat(registry.fetch(logical(secondSet)).orElseThrow().toString())
+            .as("the surviving Data Set still lists it")
+            .contains(logical(mappingPin));
     }
 
     @Test

@@ -14,6 +14,7 @@ import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Write operations for Elements: store/update JSON Schemas and XSDs, keeping the
@@ -93,27 +94,12 @@ public class ElementCommandService {
     }
 
     /**
-     * Removes the artifact from the registry and the dependency graph, applying the DataSet-aware
-     * deletion policy (see the deletion-policy concept), optionally cascading into its members.
+     * Removes the artifact from the registry and the dependency graph under the DataSet-aware
+     * deletion policy, optionally cascading into the artifacts it owns.
      *
-     * <p>Model integrity — two kinds of referrer, treated differently:
-     * <ul>
-     *   <li><b>Non-DataSet references</b> (a Pipeline using a Mapping, a DataStructure grouping an
-     *       Element, …) block unconditionally: the target must not disappear or the reference would
-     *       dangle.</li>
-     *   <li><b>DataSet membership</b> ({@code dataset-ref} edges) is count-based: <b>0</b> → delete;
-     *       <b>1</b> → delete and auto-unlink the target from that one DataSet's manifest; <b>≥2</b>
-     *       → blocked (the shared member must be removed from the other DataSets first).</li>
-     * </ul>
-     *
-     * <p>{@code force} overrides both blocks — the target is deleted regardless of referrers, and it
-     * is auto-unlinked from <em>every</em> DataSet so no manifest dangles it. Dangerous (it can leave
-     * non-DataSet references dangling); use for administrative repair only.
-     *
-     * <p>When {@code cascade} is set, the artifacts this one owns are deleted after it, each only if
-     * nothing else holds it once this container is gone, under the same two rules. Ownership is read
-     * off the edge, so a delete does not reach through a reference into an independent artifact such
-     * as a Mapping's endpoint; shared and mutually-referencing members are kept.
+     * <p>Non-DataSet references block unconditionally; DataSet membership is counted: none or one
+     * lets the artifact go (that one manifest is unlinked with it), two or more block. {@code force}
+     * overrides both and unlinks from every DataSet, which may dangle references.
      *
      * <p>Each delete re-checks the live registry, so a cascade never dangles a reference, and joins
      * the caller's transaction where there is one, so several removals commit or roll back together.
@@ -134,6 +120,10 @@ public class ElementCommandService {
         }
         // Snapshot the members before the artifact — and with it its outgoing edges — are gone.
         List<String> members = cascade ? registry.ownedMemberUrns(urn) : List.of();
+        // Counted before this container's own edge goes, or a member of two would read one.
+        Set<String> heldByAnotherDataSet = members.stream()
+            .filter(member -> registry.dataSetMemberships(member).size() >= 2)
+            .collect(Collectors.toSet());
         registry.deleteArtifact(urn);
         graph.remove(urn);
         // Keep every DataSet manifest that listed this member consistent (the |D|=1 rule, and — with
@@ -142,11 +132,10 @@ public class ElementCommandService {
             unlinkFromDataSet(dataSet, logical);
         }
         for (String member : members) {
-            // Membership counts as it does for a direct delete: the recursive call unlinks the one
-            // Data Set, two or more keep the member. Recursing collects a member's own orphans.
+            // Recursing collects a member's own orphans; its one Data Set is unlinked with it.
             if (registry.fetch(member).isPresent()
                 && registry.nonDataSetBlockingDependents(member).isEmpty()
-                && registry.dataSetMemberships(member).size() < 2) {
+                && !heldByAnotherDataSet.contains(member)) {
                 delete(member, true, force);
             }
         }
