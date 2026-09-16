@@ -185,13 +185,18 @@ public interface ArtifactRegistry {
 
     List<String> fetchArtifactRefUrns(String urn);
 
-    /**
-     * Logical URNs of every artifact, of every type. Backs the whole-graph rebuild: the
-     * dependency graph indexes the durable per-type {@code artifact_reference} edges across all
-     * artifact kinds, not just Elements.
-     */
+    /** Logical URNs of every artifact, of every type. */
     List<String> listAllUrns();
 
+    /**
+     * Every stored reference edge, keyed by the <em>versioned</em> URN that holds it, targets
+     * verbatim and in document order. Backs the whole-graph rebuild, in one read.
+     *
+     * <p>Keyed per version, not per artifact: a reference may pin a superseded version, and only a
+     * node of its own carries what that version declared. A version holding no reference
+     * contributes no entry.
+     */
+    Map<String, List<String>> referenceEdgesByVersion();
 
     List<Map<String, String>> mappingsForElement(String datasetUrn, String role);
 

@@ -4,7 +4,10 @@ import de.civitascore.modelforge.urn.UrnParser;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -212,6 +215,31 @@ class ArtifactReferenceRepository {
             .param("v", fromVersionId)
             .query(String.class)
             .list();
+    }
+
+    /** One row of {@link #edgesByVersion}: the versioned URN that holds the edge, and its target. */
+    private record VersionEdge(String fromUrn, String targetUrn) {}
+
+    /** {@link #targetUrns} for every version at once, keyed by versioned URN, in stored order. */
+    Map<String, List<String>> edgesByVersion() {
+        List<VersionEdge> rows = jdbc.sql("""
+                select a.logical_urn, fv.version, r.target_urn
+                  from model_forge.artifact_reference r
+                  join model_forge.artifact_version fv on fv.id = r.from_version_id
+                  join model_forge.artifact a          on a.id = fv.artifact_id
+                 order by a.logical_urn, fv.version, r.sort_order nulls last, r.target_urn
+                """)
+            .query((rs, n) -> new VersionEdge(
+                UrnParser.withVersion(rs.getString("logical_urn"), rs.getString("version")),
+                rs.getString("target_urn")))
+            .list();
+
+        // Ordered by the grouping key, so a version's rows arrive contiguously.
+        Map<String, List<String>> edges = new LinkedHashMap<>();
+        for (VersionEdge row : rows) {
+            edges.computeIfAbsent(row.fromUrn(), k -> new ArrayList<>()).add(row.targetUrn());
+        }
+        return edges;
     }
 
     /**

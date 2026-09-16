@@ -6,9 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -22,11 +20,10 @@ import java.util.concurrent.locks.ReentrantLock;
  * it mirrors those per-type rows, so every artifact kind's relations are navigable, not just
  * Elements'.
  *
- * <p>Nodes are <strong>versioned</strong> URNs and edges are kept verbatim
- * (a pinned {@code …:1.0.0} or the {@code …:latest} token). A query by a logical or
- * {@code …:latest} URN — and a {@code latest} edge target — is resolved to the target's
- * current version at read time (via {@code ArtifactRegistry.resolveReference}); a
- * pinned URN is used as-is.
+ * <p>Nodes are <strong>versioned</strong> URNs, one per version that holds references, and edges
+ * are kept verbatim (a pinned {@code …:1.0.0} or the {@code …:latest} token). A query by a logical
+ * or {@code …:latest} URN — and a {@code latest} edge target — is resolved to the target's current
+ * version at read time (via {@code ArtifactRegistry.resolveReference}); a pinned URN is used as-is.
  *
  *   A → B  means: artifact A references artifact B  (A depends on B)
  */
@@ -59,9 +56,8 @@ public class DependencyGraphService {
      * kind. The full reference graph — including cycles — is retained, so the graph survives a
      * restart unchanged.
      *
-     * <p>Runs all per-artifact reads in parallel using virtual threads to avoid blocking the
-     * startup thread on large registries. Also rebuilds the XSD namespace→URN index
-     * (required before xs:import resolution).
+     * <p>Keyed per version, from {@link ArtifactRegistry#referenceEdgesByVersion()}. Also rebuilds
+     * the XSD namespace→URN index (required before xs:import resolution).
      */
     public void rebuild() {
         // Clear both maps atomically under the lock so a concurrent register()/remove() cannot
@@ -77,28 +73,25 @@ public class DependencyGraphService {
         // rebuildNamespaceIndex already parallelises internally
         registry.rebuildNamespaceIndex();
 
-        List<String> allUrns = registry.listAllUrns();
-        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            var futures = allUrns.stream()
-                .map(urn -> CompletableFuture.runAsync(() -> registerFromRegistry(urn), executor))
-                .toList();
-            CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
-                .exceptionally(ex -> { log.warn("Dependency graph rebuild partially failed: {}", ex.getMessage()); return null; })
-                .join();
+        Map<String, List<String>> edges = registry.referenceEdgesByVersion();
+        graphLock.lock();
+        try {
+            edges.forEach((node, targets) -> registerLocked(node, new LinkedHashSet<>(targets)));
+        } finally {
+            graphLock.unlock();
         }
 
-        log.info("Dependency graph built from artifact_reference: {} node(s), {} edge(s) ({} artifact(s) scanned)",
+        log.info("Dependency graph built from artifact_reference: {} node(s), {} edge(s)",
             dependencies.size(),
-            dependencies.values().stream().mapToInt(Set::size).sum(),
-            allUrns.size());
+            dependencies.values().stream().mapToInt(Set::size).sum());
     }
 
     /**
      * Register (or refresh) an artifact's outgoing edges from its durable {@code artifact_reference}
-     * rows — the single sync primitive shared by {@link #rebuild()} and every write path, for every
-     * artifact type. The artifact is registered under its <em>current</em> versioned URN (resolved
-     * from the logical URN), so a version bump lands on the right node; the reference targets are the
-     * verbatim persisted URNs (pinned or {@code latest}).
+     * rows — the sync primitive every write path shares, for every artifact type. The artifact is
+     * registered under its <em>current</em> versioned URN (resolved from the logical URN), so a
+     * version bump lands on the right node; the reference targets are the verbatim persisted URNs
+     * (pinned or {@code latest}).
      */
     public void registerFromRegistry(String urn) {
         String logical = UrnParser.logicalUrn(urn);
@@ -190,6 +183,9 @@ public class DependencyGraphService {
      * Direct incoming references (schemas that depend on this schema). Unions the dependents that
      * pin this exact version, those that track it via {@code :latest}, and those that reference the
      * logical URN — so a {@code latest} reference counts as a dependent of the current version.
+     *
+     * <p>Includes referrers whose declaring version is superseded — not the rule deletion applies,
+     * which counts a referrer's current version only and reads the durable rows.
      */
     public Set<String> getDependents(String urn) {
         String node = resolveToVersioned(urn);
