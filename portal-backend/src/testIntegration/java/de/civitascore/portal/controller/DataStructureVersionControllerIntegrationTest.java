@@ -251,6 +251,29 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
+    @DisplayName("Should reject a model that is not a conforming JSON Schema")
+    void shouldRejectNonConformingModel() {
+      // portal-backend does not validate the model itself; the registry refuses it on the way in.
+      // Without this, a break anywhere in that chain would persist an invalid model behind a 2xx.
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setModelName("NonConforming");
+      input.setModel(Map.of("type", "object", "properties", Map.of("t", Map.of("type", "nubmer"))));
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint(),
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody())
+          .as("the rejection names the position the author has to fix")
+          .contains("/properties/t/type");
+    }
+
+    @Test
     @DisplayName("Should fail to create version without authentication")
     void shouldFailToCreateVersionWithoutAuth() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
