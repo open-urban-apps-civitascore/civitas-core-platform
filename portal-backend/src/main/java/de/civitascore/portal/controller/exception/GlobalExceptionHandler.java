@@ -120,15 +120,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(ResourceInUseException.class)
   @ResponseStatus(HttpStatus.CONFLICT)
   public ProblemDetail handleResourceInUse(ResourceInUseException ex, HttpServletRequest request) {
-    log.warn("Resource in use: {}", Encode.forJava(ex.getMessage()));
-    ProblemDetail problem =
-        createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
-    // The guard already knows what stands in the way; naming it is what lets a caller act on the
-    // refusal. It reveals nothing the delete endpoint does not already return.
-    if (!ex.getBlockedBy().isEmpty()) {
-      problem.setProperty("blockedBy", ex.getBlockedBy());
-    }
-    return problem;
+    // TR-03187 W-18/W-19: what holds the resource is logged, not returned — the URNs carry the
+    // names of artifacts the caller need not be scoped for.
+    log.warn(
+        "Resource in use: {} blockedBy={}",
+        Encode.forJava(ex.getMessage()),
+        Encode.forJava(ex.getBlockedBy().toString()));
+    return createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
   }
 
   @ExceptionHandler(SagaInFlightException.class)

@@ -14,7 +14,7 @@ public class ResourceInUseException extends RuntimeException {
   private final String resourceType;
   private final UUID resourceId;
 
-  /** What still references the resource, empty when the caller could not name it. */
+  /** What still references the resource. Logged on refusal, never returned to the caller. */
   private final transient List<String> blockedBy;
 
   public ResourceInUseException(String resourceType, UUID resourceId, String message) {
