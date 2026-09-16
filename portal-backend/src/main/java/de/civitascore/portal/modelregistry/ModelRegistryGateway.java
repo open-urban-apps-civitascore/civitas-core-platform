@@ -214,12 +214,7 @@ public class ModelRegistryGateway {
   /**
    * Whether anything outside the model still references it — a DataSource or DataSink carrying one
    * of its Elements, a Mapping naming one as an endpoint, another model associating with one, or
-   * membership of a second DataSet. The answer is Model Forge's own deletion verdict for the set
-   * {@link #deleteModel} would remove, so a model reported free is a model the registry will let
-   * go.
-   *
-   * <p>Gates the delete and the unrelease of a DataStructure alike: a model that may not be deleted
-   * may not be taken back to draft either, and the two must not disagree about why.
+   * membership of a second DataSet. Gates the delete and the unrelease of a DataStructure alike.
    *
    * @param modelUrn versioned or logical CORE URN of the model; null/blank yields {@code false}
    * @return true while at least one reference stands in the way of deleting the model

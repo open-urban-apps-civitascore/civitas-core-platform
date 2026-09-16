@@ -166,9 +166,9 @@ public interface ArtifactRegistry {
     List<String> dataSetMemberships(String urn);
 
     /**
-     * Logical URNs of the artifacts this one owns — the set a cascading delete may take with it. A
-     * grouping owns its Elements, a pipeline its Mapping, a Data Set its pipelines and mappings;
-     * every other edge names something used rather than owned.
+     * Logical URNs of the artifacts this one owns — the set a cascading delete may take with it.
+     * Ownership is carried by the edge rather than the target's kind, so an artifact merely used is
+     * not owned.
      */
     List<String> ownedMemberUrns(String urn);
 
