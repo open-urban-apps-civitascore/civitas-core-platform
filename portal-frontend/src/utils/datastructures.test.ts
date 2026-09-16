@@ -1,6 +1,8 @@
 import { assert, describe, expect, it } from 'vitest'
 
+import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
+import { datastructureFixtures, DS_URN } from '@/test-support/datastructureFixtures'
 import type {
   Datastructure,
   DatastructuresListData,
@@ -466,5 +468,46 @@ describe('root designation round-trip through persisted styles', () => {
 
     const rebuilt = session.diagram.nodes.map(node => node.data.element)
     expect(rebuilt.map(element => element.isRoot)).toEqual([true, undefined])
+  })
+})
+
+/**
+ * AC 1 (reload half) and AC 2: the editor rehydrates from `styles`, never from the stored CORE
+ * model, so the provable statement is that a rehydrated diagram exports the same model again. The
+ * JSON hop is what gives the case its teeth — without it the test compares an object with itself.
+ *
+ * This is rehydration, not reload: the payload comes from the test, not from the server. Whether
+ * the backend returns `styles` unchanged is outside the frontend (see tickets/2108, plan.md).
+ */
+describe('CORE model survives a save/rehydrate round-trip', () => {
+  const formOf = (): DatastructureVersionFormData =>
+    ({
+      id: 'v1',
+      version: '1.0.0',
+      description: '',
+      dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
+      dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
+      modelName: 'Struct',
+    }) as DatastructureVersionFormData
+
+  const roundTrip = (diagram: UMLDiagram) => {
+    const before = buildUMLModelPayload(diagram, DS_URN).model
+    const persisted = JSON.parse(JSON.stringify(mapDatastructureVersionFormToApiData(formOf(), diagram, before)))
+    const rehydrated = buildSessionFromVersion(persisted as DatastructureVersion).diagram
+    return { before, after: buildUMLModelPayload(rehydrated, DS_URN).model }
+  }
+
+  it.each(datastructureFixtures)('$label exports an equivalent model after rehydration', ({ diagram }) => {
+    const { before, after } = roundTrip(diagram)
+    expect(after).toEqual(before)
+  })
+
+  it('keeps the $defs keys and Element URNs stable across the round-trip', () => {
+    const { before, after } = roundTrip(datastructureFixtures[4].diagram)
+    const idsOf = (model: Record<string, unknown>) =>
+      Object.entries((model.$defs ?? {}) as Record<string, { $id?: string }>).map(([key, def]) => [key, def.$id])
+
+    expect(idsOf(after)).toEqual(idsOf(before))
+    expect(after.$ref).toBe(before.$ref)
   })
 })

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { DataStructureSchema } from '@/generated/core'
+import { contractErrors } from '@/test-support/coreContracts'
+import { datastructureFixtures, DS_URN } from '@/test-support/datastructureFixtures'
 import { elementModelUrnForMember } from '@/utils/urn'
 
 import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality, UML_PRIMITIVE_TYPES } from '../constants/umlTypes'
@@ -13,6 +15,7 @@ import {
   sanitizeName,
   SchemaExportError,
 } from './jsonSchemaExportService'
+import { buildUMLModelPayload } from './modelUploadService'
 
 const baseDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
   id: 'diagram-1',
@@ -1253,5 +1256,21 @@ describe('canMultiplicityBePrimaryKey', () => {
     expect(canMultiplicityBePrimaryKey('1..*')).toBe(false)
     expect(canMultiplicityBePrimaryKey('2')).toBe(false)
     expect(canMultiplicityBePrimaryKey('1..5')).toBe(false)
+  })
+})
+
+/**
+ * The artifacts the editor stores must satisfy the published CORE-IR contract,
+ * not just the generated Zod copy of it.
+ */
+describe('CORE-IR conformance of the exported DataStructure', () => {
+  it.each(datastructureFixtures)('$label satisfies the published datastructure contract', ({ diagram }) => {
+    expect(contractErrors('datastructure', buildUMLModelPayload(diagram, DS_URN).model)).toEqual([])
+  })
+
+  it('carries the DataStructure URN as $id and an Element URN as the root $ref', () => {
+    const { model } = buildUMLModelPayload(datastructureFixtures[0].diagram, DS_URN)
+    expect(model.$id).toBe(DS_URN)
+    expect(model.$ref).toBe(elementModelUrnForMember(DS_URN, 'TrafficSensor'))
   })
 })

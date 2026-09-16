@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { CONTRACT_URIS, contractErrors, type ContractKind } from '@/test-support/coreContracts'
 import { DATASINK_TYPES, type DataSinkPayload } from '@/types/datasinks'
 
 import type { Pipeline, PipelineEdge, PipelineNode } from '../_types/pipeline'
@@ -400,5 +401,152 @@ describe('isDestructiveDataSinkChange', () => {
   it('does not flag a sink whose snapshot entry has no entityId', () => {
     const snapshot = snapshotFor(postgisPayload('old', 'v1'), null)
     expect(isDestructiveDataSinkChange('node-1', postgisPayload('new', 'v1'), snapshot)).toBe(false)
+  })
+})
+
+// ============================================================================
+// CORE-IR conformance — AC 1, create half
+// ============================================================================
+
+/**
+ * The gates inside the builders validate against the generated Zod copy of the CORE contracts.
+ * These cases hold the same artifacts against the published contract files instead.
+ * `$schema`/`id` are stamped here because Model Forge adds them on ingest and the builders
+ * deliberately leave them out.
+ */
+describe('CORE-IR conformance of the artifacts sent to Model Forge', () => {
+  const PIPELINE_URN = 'urn:core:platform:civitas:pipeline:common:P:abcdef1234:1.0.0'
+
+  const stamped = (kind: ContractKind, id: string, document: object) => ({
+    $schema: CONTRACT_URIS[kind],
+    id,
+    ...document,
+  })
+
+  // The backend derives connectionType from dataSinkType; buildDataSinkPayloads validates that same
+  // projection internally without returning it.
+  const sinkDocument = (payload: DataSinkPayload) =>
+    stamped('datasink', SINK_URN, { connectionType: payload.dataSinkType.toLowerCase(), ...payload.configuration })
+
+  const sinkPayloadOf = (p: Pipeline, type: string) =>
+    buildDataSinkPayloads(p).find(entry => entry.payload.dataSinkType === type)!.payload
+
+  const postgisNode: TestNode = {
+    id: 'sink-1',
+    type: 'geoPersistence',
+    position: { x: 30, y: 40 },
+    data: {
+      label: 'PostGIS',
+      configured: true,
+      entityType: 'persistence',
+      entityId: 'sink-guid-1',
+      configurationUrn: SINK_URN,
+      dataStructureVersionId: 'dsv-1',
+      tableName: 'my_table',
+    },
+  }
+
+  const configuredMapping: TestNode = {
+    id: 'map-1',
+    type: 'mapping',
+    position: { x: 50, y: 60 },
+    data: {
+      label: 'Mapping',
+      configured: true,
+      mappingRef: MAPPING_URN,
+      mappingConfig: { source: SRC_STRUCT_URN, target: TGT_STRUCT_URN, fields: { '$.a': '$.b' }, positions: {} },
+    },
+  }
+
+  it('a Pipeline covering every node kind, with a copy-only mapping, satisfies the published pipeline contract', () => {
+    const p = pipeline(
+      [startNode, cronNode, sourceNode(DS_URN), configuredMapping, postgisNode, endNode],
+      [
+        { source: 'start-1', target: 'src-1' },
+        { source: 'cron-1', target: 'src-1' },
+        { source: 'src-1', target: 'map-1', label: 'flow' },
+        { source: 'map-1', target: 'sink-1' },
+        { source: 'sink-1', target: 'end-1' },
+      ],
+    )
+    expect(contractErrors('pipeline', stamped('pipeline', PIPELINE_URN, buildPipelinePayload(p).model))).toEqual([])
+  })
+
+  it('a Pipeline without a cron node satisfies the published pipeline contract', () => {
+    const p = pipeline(
+      [startNode, sourceNode(DS_URN), configuredMapping, postgisNode, endNode],
+      [
+        { source: 'start-1', target: 'src-1' },
+        { source: 'src-1', target: 'map-1' },
+        { source: 'map-1', target: 'sink-1' },
+        { source: 'sink-1', target: 'end-1' },
+      ],
+    )
+    expect(contractErrors('pipeline', stamped('pipeline', PIPELINE_URN, buildPipelinePayload(p).model))).toEqual([])
+  })
+
+  it('a Pipeline without a mapping node satisfies the published pipeline contract', () => {
+    const p = pipeline(
+      [startNode, cronNode, sourceNode(DS_URN), postgisNode, endNode],
+      [
+        { source: 'start-1', target: 'src-1' },
+        { source: 'cron-1', target: 'src-1' },
+        { source: 'src-1', target: 'sink-1' },
+        { source: 'sink-1', target: 'end-1' },
+      ],
+    )
+    expect(contractErrors('pipeline', stamped('pipeline', PIPELINE_URN, buildPipelinePayload(p).model))).toEqual([])
+  })
+
+  // Both sink types, each with and without an upstream mapping
+  const sinkCases: [string, TestNode, TestNode, string][] = [
+    ['copy-only mapped PostGIS', configuredMapping, postgisNode, DATASINK_TYPES.POSTGIS],
+    ['copy-only mapped FROST', configuredMapping, frostNode, DATASINK_TYPES.FROST],
+    ['passthrough PostGIS', sourceNode(DS_URN), postgisNode, DATASINK_TYPES.POSTGIS],
+    ['passthrough FROST', sourceNode(DS_URN), frostNode, DATASINK_TYPES.FROST],
+  ]
+
+  it.each(sinkCases)('a %s sink satisfies the published datasink contract', (_label, upstream, sink, sinkType) => {
+    const p = pipeline([upstream, sink], [{ source: upstream.id, target: sink.id }])
+    expect(contractErrors('datasink', sinkDocument(sinkPayloadOf(p, sinkType)))).toEqual([])
+  })
+
+  it('a Mapping document with a single copy field satisfies the published mapping contract', () => {
+    const [artifact] = buildMappingArtifacts(pipeline([configuredMapping], []))
+    expect(contractErrors('mapping', stamped('mapping', MAPPING_URN, artifact.body))).toEqual([])
+  })
+
+  // One case per operation the mapping editor's transform palette offers, plus the copy shorthand it
+  // writes for a direct edge
+  const mappingOperations: [string, unknown][] = [
+    ['copy written as a path string', '$.source'],
+    ['copy written as an object with sourcePath', { op: 'copy', sourcePath: '$.source' }],
+    ['const', { op: 'const', value: 'fixed' }],
+    ['concat', { op: 'concat', inputs: ['$.first', '$.second'], separator: ' ' }],
+    ['geoPoint', { op: 'geoPoint', lon: '$.lon', lat: '$.lat' }],
+    ['toString', { op: 'toString', input: '$.source' }],
+    ['toInt', { op: 'toInt', input: '$.source' }],
+    ['toFloat', { op: 'toFloat', input: '$.source' }],
+    ['toDate', { op: 'toDate', input: '$.source', pattern: 'yyyy-MM-dd' }],
+    ['format', { op: 'format', input: '$.source', pattern: '%.2f' }],
+    ['toUuid', { op: 'toUuid', input: '$.source' }],
+    ['toDateTime', { op: 'toDateTime', input: '$.source', pattern: "yyyy-MM-dd'T'HH:mm:ssXXX" }],
+  ]
+
+  it.each(mappingOperations)('a Mapping using %s satisfies the published mapping contract', (_label, operation) => {
+    const node: TestNode = {
+      ...configuredMapping,
+      data: {
+        ...configuredMapping.data,
+        mappingConfig: {
+          source: SRC_STRUCT_URN,
+          target: TGT_STRUCT_URN,
+          fields: { '$.target': operation },
+          positions: {},
+        },
+      },
+    }
+    const [artifact] = buildMappingArtifacts(pipeline([node], []))
+    expect(contractErrors('mapping', stamped('mapping', MAPPING_URN, artifact.body))).toEqual([])
   })
 })
