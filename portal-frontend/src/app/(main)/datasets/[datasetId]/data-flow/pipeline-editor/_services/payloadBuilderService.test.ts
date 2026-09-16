@@ -9,6 +9,7 @@ import {
   buildPipelinePayload,
   createMappingSnapshot,
   type DataSinkSnapshot,
+  getRemovedMappingUrns,
   hasMappingChanged,
   isDestructiveDataSinkChange,
   MappingDocumentValidationError,
@@ -362,6 +363,37 @@ describe('createMappingSnapshot / hasMappingChanged', () => {
       data: { label: 'Mapping', configured: false, mappingConfig: { fields: {}, positions: {} } },
     }
     expect(createMappingSnapshot(pipeline([unconfigured], []))).toEqual({})
+  })
+
+  it('keeps the logical URN so a removed node can still be deleted', () => {
+    const snapshot = createMappingSnapshot(
+      pipeline([configuredMappingNode({ mappingLogicalUrn: 'urn:core:logical:x' })], []),
+    )
+    expect(snapshot['map-1'].logicalUrn).toBe('urn:core:logical:x')
+  })
+
+  it('records a null URN for a mapping node that was never saved', () => {
+    const snapshot = createMappingSnapshot(pipeline([configuredMappingNode()], []))
+    expect(snapshot['map-1'].logicalUrn).toBeNull()
+  })
+})
+
+describe('getRemovedMappingUrns', () => {
+  const savedMappingNode = () => configuredMappingNode({ mappingLogicalUrn: 'urn:core:logical:x' })
+
+  it('returns the URN of a mapping whose node was removed', () => {
+    const snapshot = createMappingSnapshot(pipeline([savedMappingNode()], []))
+    expect(getRemovedMappingUrns(pipeline([], []), snapshot)).toEqual(['urn:core:logical:x'])
+  })
+
+  it('ignores a mapping whose node is still in the pipeline', () => {
+    const current = pipeline([savedMappingNode()], [])
+    expect(getRemovedMappingUrns(current, createMappingSnapshot(current))).toEqual([])
+  })
+
+  it('ignores a removed node that was never saved (no artifact to delete)', () => {
+    const snapshot = createMappingSnapshot(pipeline([configuredMappingNode()], []))
+    expect(getRemovedMappingUrns(pipeline([], []), snapshot)).toEqual([])
   })
 })
 

@@ -1343,7 +1343,9 @@
       "saveFailed": "Speichern fehlgeschlagen: {names}",
       "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
       "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt.",
-      "tableNameConflict": "{names} kann nicht gespeichert werden: Ein Geo-Persistenz-Tabellenname wird bereits von einem anderen Datenspeicher dieses Datensatzes verwendet."
+      "tableNameConflict": "{names} kann nicht gespeichert werden: Ein Geo-Persistenz-Tabellenname wird bereits von einem anderen Datenspeicher dieses Datensatzes verwendet.",
+      "mappingStillInUse": "Ein aus Pipeline {name} entferntes Mapping kann nicht gelöscht werden, weil es noch von einer anderen Pipeline verwendet wird.",
+      "mappingCleanupFailed": "Ein aus Pipeline {name} entferntes Mapping konnte nicht gelöscht werden."
     },
     "tabs": {
       "closeTab": "Tab schließen",

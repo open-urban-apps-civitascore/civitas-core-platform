@@ -38,6 +38,14 @@ export const isDatapoolScopeViolationError = (error: unknown) => {
   return typeof apiError?.type === 'string' && apiError.type.endsWith('DATASOURCE_SCOPE_VIOLATION')
 }
 
+/** The backend refuses to delete an artifact another one still references. */
+export const isResourceInUseError = (error: unknown) => {
+  if (!isAxiosError(error)) return false
+  if (error.status !== 409 || !error.response) return false
+  const apiError = error.response.data as ApiError
+  return typeof apiError?.type === 'string' && apiError.type.endsWith('RESOURCE_IN_USE')
+}
+
 export const isTableNameConflictError = (error: unknown) => {
   if (!isAxiosError(error)) return false
   const isConflictError = error.status === 409

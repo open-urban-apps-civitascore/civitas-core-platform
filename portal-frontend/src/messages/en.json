@@ -1356,7 +1356,9 @@
       "saveFailed": "Failed to save: {names}",
       "saveSuccess": "Pipeline \"{name}\" saved successfully",
       "datasourceScopeViolation": "Cannot save \"{name}\": one or more datasources are not permitted for this datapool.",
-      "tableNameConflict": "Cannot save {names}: a geo persistence table name is already used by another data storage of this dataset."
+      "tableNameConflict": "Cannot save {names}: a geo persistence table name is already used by another data storage of this dataset.",
+      "mappingStillInUse": "A mapping removed from pipeline {name} cannot be deleted because another pipeline still uses it.",
+      "mappingCleanupFailed": "A mapping removed from pipeline {name} could not be deleted."
     },
     "tabs": {
       "closeTab": "Close tab",

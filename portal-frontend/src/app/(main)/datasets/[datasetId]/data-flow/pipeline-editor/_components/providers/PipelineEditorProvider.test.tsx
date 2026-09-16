@@ -9,7 +9,7 @@ import {
   useDeleteDataSink,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
-import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
+import { useCreateMapping, useDeleteMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
@@ -24,6 +24,7 @@ import {
   buildMappingArtifacts,
   createMappingSnapshot,
   getRemovedDataSinkIds,
+  getRemovedMappingUrns,
   hasDataSinkChanged,
   hasMappingChanged,
   isDestructiveDataSinkChange,
@@ -48,7 +49,7 @@ vi.mock('next-intl', () => ({
 }))
 
 vi.mock('sonner', () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }))
 
 vi.mock('@/hooks/use-register-unsaved-changes', () => ({
@@ -75,6 +76,7 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
 vi.mock('@/app/services/api/mappings/clientRequests', () => ({
   useCreateMapping: vi.fn(),
   useUpdateMapping: vi.fn(),
+  useDeleteMapping: vi.fn(),
 }))
 
 // Capture the latest WarningModal props so tests can drive the data-loss dialog (confirm/discard).
@@ -109,6 +111,7 @@ vi.mock('../../_services/payloadBuilderService', () => ({
   createDataSinkSnapshot: vi.fn().mockReturnValue({}),
   createMappingSnapshot: vi.fn().mockReturnValue({}),
   getRemovedDataSinkIds: vi.fn().mockReturnValue([]),
+  getRemovedMappingUrns: vi.fn().mockReturnValue([]),
   hasDataSinkChanged: vi.fn().mockReturnValue(false),
   hasMappingChanged: vi.fn().mockReturnValue(true),
   isDestructiveDataSinkChange: vi.fn().mockReturnValue(false),
@@ -158,6 +161,20 @@ const makeGeoPersistenceNode = (id: string, entityId?: string, tableName = `tabl
   } as unknown as ControlNodeData,
 })
 
+const makeResourceInUseError = () => {
+  const config = { headers: new AxiosHeaders(), method: 'DELETE', url: '/mappings' } as InternalAxiosRequestConfig
+  return new AxiosError('Conflict', undefined, config, undefined, {
+    status: 409,
+    statusText: 'Conflict',
+    headers: new AxiosHeaders(),
+    config,
+    data: {
+      detail: 'Cannot delete urn:core:mapping:x — still referenced by: urn:core:pipeline:y',
+      type: 'urn:civitas:error:RESOURCE_IN_USE',
+    },
+  })
+}
+
 const renderProvider = (initialSession?: PipelineSession) => {
   const Wrapper: React.FC = () => {
     const sessionManager = usePipelineSession(initialSession)
@@ -198,6 +215,7 @@ beforeEach(() => {
   vi.mocked(buildMappingArtifacts).mockReturnValue([])
   vi.mocked(createMappingSnapshot).mockReturnValue({})
   vi.mocked(getRemovedDataSinkIds).mockReturnValue([])
+  vi.mocked(getRemovedMappingUrns).mockReturnValue([])
   vi.mocked(hasDataSinkChanged).mockReturnValue(false)
   vi.mocked(hasMappingChanged).mockReturnValue(true)
   vi.mocked(updateNodeData).mockImplementation((pipeline: unknown) => pipeline as never)
@@ -264,6 +282,12 @@ beforeEach(() => {
     mutateAsync: vi.fn().mockResolvedValue({ data: { logicalUrn: 'urn:logical', versionedUrn: 'urn:versioned-2' } }),
     isPending: false,
   } as unknown as ReturnType<typeof useUpdateMapping>)
+
+  vi.mocked(useDeleteMapping).mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({}),
+    isPending: false,
+  } as unknown as ReturnType<typeof useDeleteMapping>)
 
   vi.mocked(validatePipelineWithNodeStatus).mockReturnValue({
     isValid: true,
@@ -1132,6 +1156,145 @@ describe('PipelineEditorProviderComponent', () => {
         mappingRef: 'urn:versioned-1',
         mappingLogicalUrn: 'urn:logical-1',
       })
+    })
+
+    it('deletes the mapping artifacts of removed mapping nodes', async () => {
+      const mockDeleteMappingMutateAsync = vi.fn().mockResolvedValue({})
+      vi.mocked(useDeleteMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockDeleteMappingMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useDeleteMapping>)
+
+      vi.mocked(getRemovedMappingUrns).mockReturnValue(['urn:logical-removed-1', 'urn:logical-removed-2'])
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(mockDeleteMappingMutateAsync).toHaveBeenCalledTimes(2)
+      expect(mockDeleteMappingMutateAsync).toHaveBeenCalledWith('urn:logical-removed-1')
+      expect(mockDeleteMappingMutateAsync).toHaveBeenCalledWith('urn:logical-removed-2')
+    })
+
+    it('deletes removed mappings only after the pipeline save, so the backend no longer sees the mappingRef', async () => {
+      const callOrder: string[] = []
+
+      const mockDeleteMappingMutateAsync = vi.fn().mockImplementation(async () => {
+        callOrder.push('deleteMapping')
+        return {}
+      })
+      vi.mocked(useDeleteMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockDeleteMappingMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useDeleteMapping>)
+
+      mockUpdatePipelineMutateAsync.mockImplementation(async () => {
+        callOrder.push('updatePipeline')
+        return {}
+      })
+
+      vi.mocked(getRemovedMappingUrns).mockReturnValue(['urn:logical-removed-1'])
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(callOrder).toEqual(['updatePipeline', 'deleteMapping'])
+    })
+
+    it('keeps a removed mapping when the pipeline save fails, so it is not orphaned', async () => {
+      const mockDeleteMappingMutateAsync = vi.fn().mockResolvedValue({})
+      vi.mocked(useDeleteMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockDeleteMappingMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useDeleteMapping>)
+
+      vi.mocked(getRemovedMappingUrns).mockReturnValue(['urn:logical-removed-1'])
+      mockUpdatePipelineMutateAsync.mockRejectedValue(new Error('save failed'))
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' },
+      })
+      renderProvider(session)
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(mockDeleteMappingMutateAsync).not.toHaveBeenCalled()
+      expect(result).toBe(false)
+    })
+
+    it('warns that a removed mapping is still in use elsewhere, but keeps the save successful', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.mocked(useDeleteMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockRejectedValue(makeResourceInUseError()),
+        isPending: false,
+      } as unknown as ReturnType<typeof useDeleteMapping>)
+
+      vi.mocked(getRemovedMappingUrns).mockReturnValue(['urn:logical-removed-1'])
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' },
+      })
+      renderProvider(session)
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(true)
+      expect(toast.success).toHaveBeenCalled()
+      expect(toast.warning).toHaveBeenCalledWith('header.mappingStillInUse')
+      expect(toast.error).not.toHaveBeenCalled()
+      consoleError.mockRestore()
+    })
+
+    it('distinguishes an unexpected delete failure from a mapping that is still in use', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.mocked(useDeleteMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockRejectedValue(new Error('network down')),
+        isPending: false,
+      } as unknown as ReturnType<typeof useDeleteMapping>)
+
+      vi.mocked(getRemovedMappingUrns).mockReturnValue(['urn:logical-removed-1'])
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' },
+      })
+      renderProvider(session)
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(true)
+      expect(toast.warning).toHaveBeenCalledWith('header.mappingCleanupFailed')
+      expect(toast.warning).not.toHaveBeenCalledWith('header.mappingStillInUse')
+      consoleError.mockRestore()
     })
 
     it('retains refs obtained before a later save step fails, so a retry does not re-POST', async () => {

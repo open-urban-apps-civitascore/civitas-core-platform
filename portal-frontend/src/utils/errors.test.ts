@@ -5,6 +5,7 @@ import {
   isDatapoolScopeViolationError,
   isNameConflictError,
   isPermissionsError,
+  isResourceInUseError,
   isTableNameConflictError,
 } from './errors'
 
@@ -112,6 +113,35 @@ describe('isDatapoolScopeViolationError', () => {
 
   it('returns false for non-axios errors', () => {
     expect(isDatapoolScopeViolationError(new Error('plain error'))).toBe(false)
+  })
+})
+
+describe('isResourceInUseError', () => {
+  it('returns true for a 409 error carrying the RESOURCE_IN_USE type', () => {
+    const error = getError(
+      409,
+      'Cannot delete urn:core:mapping:x — still referenced by: urn:core:pipeline:y',
+      'urn:civitas:error:RESOURCE_IN_USE',
+    )
+    expect(isResourceInUseError(error)).toBe(true)
+  })
+
+  it('returns false for a 409 error of another type', () => {
+    const error = getError(409, 'Something else conflicts', 'urn:civitas:error:SAGA_IN_FLIGHT')
+    expect(isResourceInUseError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error without a type field', () => {
+    expect(isResourceInUseError(getError(409, 'Conflict'))).toBe(false)
+  })
+
+  it('returns false for non-409 status codes', () => {
+    const error = getError(403, 'Forbidden', 'urn:civitas:error:RESOURCE_IN_USE')
+    expect(isResourceInUseError(error)).toBe(false)
+  })
+
+  it('returns false for non-axios errors', () => {
+    expect(isResourceInUseError(new Error('plain error'))).toBe(false)
   })
 })
 

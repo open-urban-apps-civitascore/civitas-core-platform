@@ -21,7 +21,7 @@ import {
   useDeleteDataSink,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
-import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
+import { useCreateMapping, useDeleteMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
@@ -30,7 +30,7 @@ import {
 } from '@/app/services/api/pipelines/clientRequests'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
-import { isDatapoolScopeViolationError, isTableNameConflictError } from '@/utils/errors'
+import { isDatapoolScopeViolationError, isResourceInUseError, isTableNameConflictError } from '@/utils/errors'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
@@ -43,6 +43,7 @@ import {
   createMappingSnapshot,
   type DataSinkSnapshot,
   getRemovedDataSinkIds,
+  getRemovedMappingUrns,
   hasDataSinkChanged,
   hasMappingChanged,
   isDestructiveDataSinkChange,
@@ -117,6 +118,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const updateDataSinkMutation = useUpdateDataSink()
   const createMappingMutation = useCreateMapping(datasetId)
   const updateMappingMutation = useUpdateMapping(datasetId)
+  const deleteMappingMutation = useDeleteMapping(datasetId)
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
@@ -515,6 +517,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     const saveFailedNames: string[] = []
     const scopeViolationNames: string[] = []
     const tableNameConflictNames: string[] = []
+    const mappingInUseNames: string[] = []
+    const mappingCleanupFailedNames: string[] = []
     try {
       if (hasDestructiveChange) {
         const isConfirmed = await confirmDataLoss()
@@ -597,6 +601,19 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             currentPipeline = { ...currentPipeline, id: response.data.id }
           }
 
+          // Step 3.5: Delete removed mappings. Has to be executed after the pipeline save,
+          // otherwise the backend refuses with 409.
+          for (const logicalUrn of getRemovedMappingUrns(currentPipeline, mappingSnapshot)) {
+            try {
+              await deleteMappingMutation.mutateAsync(logicalUrn)
+            } catch (error) {
+              // The save itself already succeeded, so a failed cleanup is reported on its own below.
+              console.error('Failed to delete removed mapping of pipeline:', session.name, logicalUrn, error)
+              const names = isResourceInUseError(error) ? mappingInUseNames : mappingCleanupFailedNames
+              if (!names.includes(session.name)) names.push(session.name)
+            }
+          }
+
           // Step 4: Update session state and snapshot
           sessionManager.updateSessionPipeline(session.id, { ...currentPipeline, isDirty: false })
           sessionManager.markSessionClean(session.id)
@@ -630,6 +647,13 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       if (saveFailedNames.length > 0) {
         toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
       }
+      // The pipeline itself was saved in both cases, so neither fails the save.
+      if (mappingInUseNames.length > 0) {
+        toast.warning(t('header.mappingStillInUse', { name: mappingInUseNames.join(', ') }))
+      }
+      if (mappingCleanupFailedNames.length > 0) {
+        toast.warning(t('header.mappingCleanupFailed', { name: mappingCleanupFailedNames.join(', ') }))
+      }
       if (scopeViolationNames.length > 0 || tableNameConflictNames.length > 0 || saveFailedNames.length > 0) {
         return false
       }
@@ -648,6 +672,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     updateDataSinkMutation,
     createMappingMutation,
     updateMappingMutation,
+    deleteMappingMutation,
     datasetId,
     datasetQuery.data,
     confirmDataLoss,
