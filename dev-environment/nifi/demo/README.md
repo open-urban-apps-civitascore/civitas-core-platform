@@ -177,7 +177,9 @@ demo/
 ├── scripts/
 │   ├── cleanup.sh                 # robust teardown (recovery fallback)
 │   ├── publish-loop.sh            # continuous synthetic publisher
-│   └── build-snapshot.sh          # snapshot regenerator (maintenance)
+│   ├── build-snapshot.sh          # snapshot regenerator (maintenance)
+│   ├── provision-sta-datastream.sh  # FROST sink: the STA entities the sink never creates
+│   └── publish-sta-loop.sh        # FROST sink: SensorThings envelope publisher
 └── bruno/
     ├── collection.bru             # collection-level auth
     ├── environments/local.bru     # base URL, credentials, names
@@ -186,6 +188,10 @@ demo/
     ├── 02_verify/                 # check the flow is healthy
     └── 03_cleanup/                # tear down
 ```
+
+A FROST sink in passthrough mode resolves an existing Datastream and never creates one, so
+`provision-sta-datastream.sh` has to run before `publish-sta-loop.sh` — observations whose
+Datastream does not resolve are routed to the error sink.
 
 ---
 
