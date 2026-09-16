@@ -15,8 +15,13 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Validates JSON documents against JSON Schema 2020-12.
@@ -45,6 +50,18 @@ public class ModelValidator {
         SchemaValidatorsConfig.builder().locale(Locale.ENGLISH).build();
 
     private final JsonSchema metaSchema = CoreJsonSchemaFactory.metaSchemaValidator(config);
+
+    /** Bounds one response: the violation count otherwise grows with the document. */
+    static final int MAX_NONCONFORMING_DIAGNOSTICS = 20;
+
+    /**
+     * The two branches of the meta-schema's {@code type} definition, an {@code anyOf} over a name
+     * and an array of names. Located by schema position rather than by the word {@code anyOf},
+     * which a document's own schema also contains.
+     */
+    private static final String TYPE_NAME_BRANCH = "/$defs/simpleTypes/enum";
+
+    private static final String TYPE_ARRAY_BRANCH = "/properties/type/anyOf/";
 
     /**
      * Validate {@code data} against {@code schema}.
@@ -123,7 +140,7 @@ public class ModelValidator {
      */
     private List<Diagnostic> metaSchemaViolations(JsonNode schema) {
         try {
-            return metaSchema.validate(JacksonBridge.toJackson2(schema)).stream()
+            return reportable(metaSchema.validate(JacksonBridge.toJackson2(schema)))
                 .map(e -> SchemaErrors.toDiagnostic(e, "schema-nonconforming"))
                 .toList();
         } catch (Exception e) {
@@ -132,6 +149,40 @@ public class ModelValidator {
             log.warn("Meta-schema validation could not be run", e);
             return List.of();
         }
+    }
+
+    /**
+     * The meta-schema's violations as the author's mistakes: each distinct one once, capped.
+     *
+     * <p>The 2020-12 meta-schema reaches one position through several {@code $dynamicRef} paths,
+     * so a single mistake arrives as many identical messages, and it decides {@code type} with an
+     * {@code anyOf} whose losing branch reports a rule the value was never subject to.
+     */
+    private static Stream<ValidationMessage> reportable(Set<ValidationMessage> errors) {
+        Collection<List<ValidationMessage>> byCause = errors.stream()
+            .collect(Collectors.groupingBy(
+                e -> e.getInstanceLocation() + "\u0000" + e.getType() + "\u0000" + e.getMessage(),
+                LinkedHashMap::new,
+                Collectors.toList()))
+            .values();
+        List<ValidationMessage> distinct = byCause.stream().map(List::getFirst).toList();
+        return distinct.stream()
+            .filter(e -> !losingTypeBranch(e, distinct))
+            .limit(MAX_NONCONFORMING_DIAGNOSTICS);
+    }
+
+    /**
+     * Whether {@code candidate} comes from the {@code type} branch the author's value was never
+     * judged by, so {@code "nubmer"} is not told to write an array. Dropped only while another
+     * message covers the position, so it never falls silent.
+     */
+    private static boolean losingTypeBranch(ValidationMessage candidate, List<ValidationMessage> all) {
+        var value = candidate.getInstanceNode();
+        String losing = value != null && value.isArray() ? TYPE_NAME_BRANCH : TYPE_ARRAY_BRANCH;
+        if (!String.valueOf(candidate.getSchemaLocation()).contains(losing)) return false;
+        return all.stream()
+            .filter(other -> other != candidate)
+            .anyMatch(other -> other.getInstanceLocation().equals(candidate.getInstanceLocation()));
     }
 
     /**

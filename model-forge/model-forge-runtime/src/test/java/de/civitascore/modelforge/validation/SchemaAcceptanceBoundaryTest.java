@@ -88,9 +88,12 @@ class SchemaAcceptanceBoundaryTest {
             }
             """));
 
-        assertThat(diagnostics).isNotEmpty();
+        assertThat(diagnostics).hasSize(1);
         assertThat(diagnostics).allSatisfy(
             d -> assertThat(d.path()).isEqualTo("/properties/temperature/type"));
+        assertThat(diagnostics.getFirst().message())
+            .contains("number")
+            .doesNotContain("array expected");
     }
 
     @Test
@@ -142,6 +145,117 @@ class SchemaAcceptanceBoundaryTest {
             }
             """)))
             .isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("One mistake is reported once however many meta-schema paths reach it")
+    void oneMistakePerPositionIsReportedOnce() {
+        List<Diagnostic> diagnostics = validator.validateSchema(json("""
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "object",
+              "properties": { "a": { "items": 42 }, "b": { "items": 7 } }
+            }
+            """));
+
+        assertThat(diagnostics)
+            .as("two mistakes, though the meta-schema reaches each through eight paths")
+            .hasSize(2);
+        assertThat(diagnostics).extracting(Diagnostic::path)
+            .containsExactlyInAnyOrder("/properties/a/items", "/properties/b/items");
+    }
+
+    @Test
+    @DisplayName("Mistakes at different positions are each reported")
+    void distinctPositionsAreEachReported() {
+        List<Diagnostic> diagnostics = validator.validateSchema(json("""
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "nubmer",
+              "required": "name"
+            }
+            """));
+
+        assertThat(diagnostics).extracting(Diagnostic::path)
+            .containsExactlyInAnyOrder("/type", "/required");
+    }
+
+    @Test
+    @DisplayName("A document with many mistakes reports a bounded number of them")
+    void diagnosticCountIsBounded() {
+        StringBuilder properties = new StringBuilder();
+        for (int i = 0; i < 40; i++) {
+            properties.append(i > 0 ? "," : "").append("\"p%d\": { \"type\": \"nubmer\" }".formatted(i));
+        }
+
+        assertThat(validator.validateSchema(json("""
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "object",
+              "properties": { %s }
+            }
+            """.formatted(properties))))
+            .hasSize(ModelValidator.MAX_NONCONFORMING_DIAGNOSTICS);
+    }
+
+    @Test
+    @DisplayName("An array-valued type reports what the array form objected to, not the name form")
+    void arrayValuedTypeReportsTheArrayBranch() {
+        // Both messages sit inside the meta-schema's own type anyOf, so a rule that preferred
+        // whatever came first would report "not in the enumeration" — false, since the entries
+        // are valid names and the real mistake is the duplicate.
+        List<Diagnostic> diagnostics = validator.validateSchema(json("""
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": ["object", "object"]
+            }
+            """));
+
+        assertThat(diagnostics).hasSize(1);
+        assertThat(diagnostics.getFirst().message()).contains("unique items");
+    }
+
+    @Test
+    @DisplayName("Two mistakes at one position are both reported")
+    void twoMistakesAtOnePositionAreBothReported() {
+        // nonNegativeInteger is type plus minimum, so one value breaks both and fixing either
+        // leaves the other standing; collapsing them costs the author a second round trip.
+        List<Diagnostic> diagnostics = validator.validateSchema(json("""
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "minProperties": -1.5
+            }
+            """));
+
+        assertThat(diagnostics).hasSize(2);
+        assertThat(diagnostics).extracting(Diagnostic::message)
+            .anySatisfy(m -> assertThat(m).contains("integer expected"))
+            .anySatisfy(m -> assertThat(m).contains("minimum value of 0"));
+    }
+
+    @Test
+    @DisplayName("A schema using anyOf itself is not mistaken for the meta-schema's own branch")
+    void authorAnyOfIsNotMistakenForTheMetaSchemaBranch() {
+        List<Diagnostic> diagnostics = validator.validateSchema(json("""
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "properties": { "t": { "anyOf": [ { "type": "nubmer" } ] } }
+            }
+            """));
+
+        assertThat(diagnostics).hasSize(1);
+        assertThat(diagnostics.getFirst().message()).doesNotContain("array expected");
+    }
+
+    @Test
+    @DisplayName("An array-valued type that is well formed is accepted")
+    void wellFormedArrayValuedTypeIsAccepted() {
+        assertThat(validator.validateSchema(json("""
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": ["string", "null"]
+            }
+            """))).isEmpty();
     }
 
     private JsonNode json(String raw) {
