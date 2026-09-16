@@ -410,4 +410,20 @@ class MappingServiceTest {
 
     assertThat(mappingService.store(DATA_SET_ID, null, Map.of("fields", Map.of()))).isNotNull();
   }
+
+  @Test
+  @DisplayName("the list names every mapping of the DataSet once, by logical URN")
+  void list_returnsTheManifestsMappingsAsLogicalUrns() {
+    stubMembers(VERSIONED_URN, LOGICAL_URN, FOREIGN_URN + ":2.0.0");
+
+    assertThat(mappingService.list(DATA_SET_ID)).containsExactly(LOGICAL_URN, FOREIGN_URN);
+  }
+
+  @Test
+  @DisplayName("a DataSet with no mapping lists none")
+  void list_whenTheManifestHoldsNoMapping_isEmpty() {
+    stubMembers();
+
+    assertThat(mappingService.list(DATA_SET_ID)).isEmpty();
+  }
 }
