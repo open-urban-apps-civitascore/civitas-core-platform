@@ -178,10 +178,11 @@ class DataStructureVersionServiceTest {
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setDataStructure(ds);
+      version.setModelUrn(MODEL_URN);
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(modelRegistryGateway.referencesTo(any())).thenReturn(List.of(BLOCKER_URN));
+      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(BLOCKER_URN));
 
       assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
           .isInstanceOf(ResourceInUseException.class);

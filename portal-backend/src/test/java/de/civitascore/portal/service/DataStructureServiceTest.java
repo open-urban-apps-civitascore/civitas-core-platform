@@ -1,7 +1,6 @@
 package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +31,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayName("DataStructureService Unit Tests")
 class DataStructureServiceTest {
 
+  private static final String MODEL_URN =
+      "urn:core:platform:civitas:element:common:Reading:8kq2n4p1vd:1.0.0";
   private static final String BLOCKER_URN =
       "urn:core:platform:civitas:datasink:common:Store:4rrb1hifsm";
 
@@ -80,6 +81,7 @@ class DataStructureServiceTest {
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setModelUrn(MODEL_URN);
 
       DataStructure ds = new DataStructure();
       ds.setId(dsId);
@@ -89,7 +91,7 @@ class DataStructureServiceTest {
       when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(false);
-      when(modelRegistryGateway.referencesTo(any())).thenReturn(List.of(BLOCKER_URN));
+      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(BLOCKER_URN));
 
       assertThatThrownBy(() -> dataStructureService.unrelease(dsId))
           .isInstanceOf(ResourceInUseException.class);
@@ -155,6 +157,7 @@ class DataStructureServiceTest {
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
+      version.setModelUrn(MODEL_URN);
 
       DataStructure ds = new DataStructure();
       ds.setId(dsId);
@@ -164,7 +167,7 @@ class DataStructureServiceTest {
       when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(false);
-      when(modelRegistryGateway.referencesTo(any())).thenReturn(List.of(BLOCKER_URN));
+      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(BLOCKER_URN));
 
       assertThatThrownBy(() -> dataStructureService.deleteById(dsId))
           .isInstanceOf(ResourceInUseException.class);
