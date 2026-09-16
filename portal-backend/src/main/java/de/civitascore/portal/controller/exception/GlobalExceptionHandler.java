@@ -177,11 +177,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
   public ProblemDetail handlePipelineClosureValidation(
       PipelineClosureValidationException ex, HttpServletRequest request) {
-    log.warn("Pipeline closure validation failed: {} finding(s)", ex.getFindings().size());
+    log.warn(
+        "Pipeline closure validation failed for {} pipeline(s)",
+        ex.getOffendingPipelineIds().size());
     ProblemDetail pd =
         createProblemDetail(
             HttpStatus.UNPROCESSABLE_ENTITY, "PIPELINE_CLOSURE_INVALID", ex.getMessage(), request);
-    pd.setProperty("findings", ex.getFindings());
+    pd.setProperty("offendingPipelineIds", ex.getOffendingPipelineIds());
     return pd;
   }
 

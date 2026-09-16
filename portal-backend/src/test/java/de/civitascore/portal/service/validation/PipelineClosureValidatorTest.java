@@ -103,8 +103,8 @@ class PipelineClosureValidatorTest {
     return version(modelUrn, DataStructureVersionStatus.AVAILABLE, DataStructureStatus.AVAILABLE);
   }
 
-  private static List<ClosureFinding> findingsOf(Throwable thrown) {
-    return ((PipelineClosureValidationException) thrown).getFindings();
+  private static List<UUID> blockedPipelinesOf(Throwable thrown) {
+    return ((PipelineClosureValidationException) thrown).getOffendingPipelineIds();
   }
 
   private List<Pipeline> pipelines() {
@@ -166,9 +166,9 @@ class PipelineClosureValidatorTest {
       when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
           .thenReturn(List.of(released(STRUCTURE_URN)));
 
-      assertThat(findingsOf(catchThrowable(() -> validator().validate(pipelines()))))
+      assertThat(blockedPipelinesOf(catchThrowable(() -> validator().validate(pipelines()))))
           .as("what the walk did not see is the reason, not what it saw")
-          .containsExactly(ClosureFinding.notVerified(pipelineId));
+          .containsExactly(pipelineId);
     }
 
     @Test
@@ -200,10 +200,7 @@ class PipelineClosureValidatorTest {
 
       assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
           .isInstanceOf(PipelineClosureValidationException.class)
-          .satisfies(
-              thrown ->
-                  assertThat(findingsOf(thrown))
-                      .containsExactly(ClosureFinding.notAvailable(pipelineId)));
+          .satisfies(thrown -> assertThat(blockedPipelinesOf(thrown)).containsExactly(pipelineId));
     }
 
     @Test
@@ -242,10 +239,7 @@ class PipelineClosureValidatorTest {
                       DataStructureStatus.AVAILABLE)));
 
       assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
-          .satisfies(
-              thrown ->
-                  assertThat(findingsOf(thrown))
-                      .containsExactly(ClosureFinding.notReleased(pipelineId, STRUCTURE_URN)));
+          .satisfies(thrown -> assertThat(blockedPipelinesOf(thrown)).containsExactly(pipelineId));
     }
 
     @Test
@@ -261,10 +255,7 @@ class PipelineClosureValidatorTest {
                       DataStructureStatus.DRAFT)));
 
       assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
-          .satisfies(
-              thrown ->
-                  assertThat(findingsOf(thrown))
-                      .containsExactly(ClosureFinding.notReleased(pipelineId, STRUCTURE_URN)));
+          .satisfies(thrown -> assertThat(blockedPipelinesOf(thrown)).containsExactly(pipelineId));
     }
 
     @Test
@@ -299,11 +290,9 @@ class PipelineClosureValidatorTest {
                               pipeline(otherPipeline, OTHER_PIPELINE_URN))))
           .satisfies(
               thrown ->
-                  assertThat(findingsOf(thrown))
+                  assertThat(blockedPipelinesOf(thrown))
                       .as("one attempt names everything that needs repairing")
-                      .containsExactly(
-                          ClosureFinding.notAvailable(pipelineId),
-                          ClosureFinding.notAvailable(otherPipeline)));
+                      .containsExactly(pipelineId, otherPipeline));
     }
   }
 
@@ -319,15 +308,9 @@ class PipelineClosureValidatorTest {
           .thenReturn(List.of(released(STRUCTURE_URN)));
       denyEveryStructure();
 
-      assertThat(findingsOf(catchThrowable(() -> validator().validate(pipelines()))))
-          .singleElement()
-          .satisfies(
-              finding -> {
-                assertThat(finding.reason()).isEqualTo(ClosureFinding.Reason.NOT_AVAILABLE);
-                assertThat(finding.artifactUrn())
-                    .as("a CORE URN spells the model's name in one of its segments")
-                    .isNull();
-              });
+      assertThat(blockedPipelinesOf(catchThrowable(() -> validator().validate(pipelines()))))
+          .as("a CORE URN spells the model's name, so the reply names the pipeline only")
+          .containsExactly(pipelineId);
     }
 
     @Test
@@ -342,8 +325,8 @@ class PipelineClosureValidatorTest {
                       DataStructureVersionStatus.DRAFT,
                       DataStructureStatus.AVAILABLE)));
 
-      assertThat(findingsOf(catchThrowable(() -> validator().validate(pipelines()))))
-          .containsExactly(ClosureFinding.notReleased(pipelineId, STRUCTURE_URN));
+      assertThat(blockedPipelinesOf(catchThrowable(() -> validator().validate(pipelines()))))
+          .containsExactly(pipelineId);
     }
 
     @Test
@@ -352,17 +335,17 @@ class PipelineClosureValidatorTest {
       closureOf(
           PIPELINE_URN, Set.of(STRUCTURE_URN, ELEMENT_URN), Set.of(STRUCTURE_URN, ELEMENT_URN));
 
-      assertThat(findingsOf(catchThrowable(() -> validator().validate(pipelines()))))
+      assertThat(blockedPipelinesOf(catchThrowable(() -> validator().validate(pipelines()))))
           .as("entries that name no artifact are indistinguishable, so repeating them says nothing")
-          .containsExactly(ClosureFinding.notAvailable(pipelineId));
+          .containsExactly(pipelineId);
     }
 
     @Test
     @DisplayName("an unreadable artifact is reported in the same terms as an unresolved one")
     void unreadableAndUnresolvedAreIndistinguishable() {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of(STRUCTURE_URN));
-      List<ClosureFinding> onUnresolved =
-          findingsOf(
+      List<UUID> onUnresolved =
+          blockedPipelinesOf(
               catchThrowable(
                   () -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN)))));
 
@@ -370,8 +353,8 @@ class PipelineClosureValidatorTest {
       when(dataStructureVersionRepository.findAllByModelUrnIn(any()))
           .thenReturn(List.of(released(STRUCTURE_URN)));
       denyEveryStructure();
-      List<ClosureFinding> onUnreadable =
-          findingsOf(
+      List<UUID> onUnreadable =
+          blockedPipelinesOf(
               catchThrowable(
                   () -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN)))));
 
@@ -394,9 +377,9 @@ class PipelineClosureValidatorTest {
       assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
           .satisfies(
               thrown ->
-                  assertThat(findingsOf(thrown))
+                  assertThat(blockedPipelinesOf(thrown))
                       .as("a draft reason would confirm the structure exists")
-                      .containsExactly(ClosureFinding.notAvailable(pipelineId)));
+                      .containsExactly(pipelineId));
     }
   }
 }

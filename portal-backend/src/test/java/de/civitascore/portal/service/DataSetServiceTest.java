@@ -39,7 +39,6 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
-import de.civitascore.portal.service.validation.ClosureFinding;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.service.validation.PipelineClosureValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
@@ -2448,9 +2447,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = stageable(id);
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
-      doThrow(
-              new PipelineClosureValidationException(
-                  List.of(ClosureFinding.notReleased(UUID.randomUUID(), "urn:core:x"))))
+      doThrow(new PipelineClosureValidationException(List.of(UUID.randomUUID())))
           .when(pipelineClosureValidator)
           .validate(any());
 
@@ -2467,9 +2464,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = releasable(id);
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
-      doThrow(
-              new PipelineClosureValidationException(
-                  List.of(ClosureFinding.notAvailable(UUID.randomUUID()))))
+      doThrow(new PipelineClosureValidationException(List.of(UUID.randomUUID())))
           .when(pipelineClosureValidator)
           .validate(any());
 

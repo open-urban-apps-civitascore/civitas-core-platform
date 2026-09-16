@@ -1,31 +1,32 @@
 package de.civitascore.portal.util;
 
-import de.civitascore.portal.service.validation.ClosureFinding;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
 /**
- * Thrown when artifacts participating in a dataset's flows cannot carry a release.
+ * Thrown when the artifacts a Data Set's flows reach cannot carry a release.
  *
- * <p>Carries every finding across every pipeline rather than the first, so one attempt reports
- * everything that needs repairing.
+ * <p>Names the offending pipelines and not the artifacts behind them: an artifact the caller may
+ * not read would otherwise be disclosed by its name, and telling an absent artifact from a withheld
+ * one would disclose it just as well. The message states every condition instead, and the log
+ * records which one applied.
  */
 @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
 public class PipelineClosureValidationException extends RuntimeException {
 
-  private final List<ClosureFinding> findings;
+  private final List<UUID> offendingPipelineIds;
 
-  public PipelineClosureValidationException(List<ClosureFinding> findings) {
+  public PipelineClosureValidationException(List<UUID> offendingPipelineIds) {
     super(
-        "Artifacts participating in this dataset's flows cannot carry a release ("
-            + (findings.size() == 1 ? "1 finding" : findings.size() + " findings")
-            + "). Each finding names the pipeline concerned, and the artifact where naming it"
-            + " discloses nothing; repair or remove what that flow reaches, then try again.");
-    this.findings = List.copyOf(findings);
+        "One or more Pipelines reach an artifact that cannot carry a release. Each artifact a"
+            + " Pipeline reaches must exist, be readable, and be released: "
+            + offendingPipelineIds);
+    this.offendingPipelineIds = List.copyOf(offendingPipelineIds);
   }
 
-  public List<ClosureFinding> getFindings() {
-    return findings;
+  public List<UUID> getOffendingPipelineIds() {
+    return offendingPipelineIds;
   }
 }

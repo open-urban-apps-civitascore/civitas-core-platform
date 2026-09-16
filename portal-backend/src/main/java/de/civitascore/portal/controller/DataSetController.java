@@ -7,7 +7,6 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
-import de.civitascore.portal.model.output.PipelineClosureFindings;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
 import de.civitascore.portal.model.output.summary.DataSourceSummaryDTO;
 import de.civitascore.portal.repository.specification.DataSetSpec;
@@ -273,8 +272,7 @@ public class DataSetController
           "A pipeline DataSource is out of the dataset's datapool scope, an artifact"
               + " participating in a pipeline's flow cannot carry a release, or a flow reaches"
               + " further than the walk is configured to follow",
-      content =
-          @Content(schema = @Schema(allOf = {ProblemDetail.class, PipelineClosureFindings.class})))
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> stage(@PathVariable UUID id) {
     DataSet ready = dataSetService.stage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(ready);
@@ -311,8 +309,7 @@ public class DataSetController
           "A pipeline DataSource is out of the dataset's datapool scope, an artifact"
               + " participating in a pipeline's flow cannot carry a release, or a flow reaches"
               + " further than the walk is configured to follow",
-      content =
-          @Content(schema = @Schema(allOf = {ProblemDetail.class, PipelineClosureFindings.class})))
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> release(@PathVariable UUID id) {
     DataSet released = dataSetService.release(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(released);

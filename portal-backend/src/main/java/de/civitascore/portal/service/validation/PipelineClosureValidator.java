@@ -13,9 +13,9 @@ import de.civitascore.portal.util.PipelineClosureValidationException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -63,14 +63,14 @@ public class PipelineClosureValidator {
    * Validates the artifacts participating in every one of the Data Set's flows.
    *
    * @param pipelines the Data Set's pipelines; one with no stored model yet contributes no flow
-   * @throws PipelineClosureValidationException if any participating artifact cannot carry a
-   *     release, carrying every finding across every flow
+   * @throws PipelineClosureValidationException naming every pipeline whose flow blocks, so one
+   *     attempt reports them all
    */
   public void validate(Collection<Pipeline> pipelines) {
     if (pipelines == null || pipelines.isEmpty()) {
       return;
     }
-    List<ClosureFinding> findings = new ArrayList<>();
+    Set<UUID> offending = new LinkedHashSet<>();
     // One verdict per structure for the whole call: several versions, and several flows, routinely
     // reach the same structure, and each decision otherwise re-reads the caller's assignments.
     Map<UUID, Boolean> readability = new HashMap<>();
@@ -78,50 +78,54 @@ public class PipelineClosureValidator {
       if (pipeline.getModelUrn() == null || pipeline.getModelUrn().isBlank()) {
         continue;
       }
-      findings.addAll(validateFlow(pipeline, readability));
+      if (flowBlocks(pipeline, readability)) {
+        offending.add(pipeline.getId());
+      }
     }
-    if (!findings.isEmpty()) {
-      // Findings that name no artifact are identical per pipeline and reason, so one flow with
-      // many withheld artifacts would otherwise repeat the same entry once for each of them.
-      throw new PipelineClosureValidationException(findings.stream().distinct().toList());
+    if (!offending.isEmpty()) {
+      throw new PipelineClosureValidationException(List.copyOf(offending));
     }
   }
 
-  private List<ClosureFinding> validateFlow(Pipeline pipeline, Map<UUID, Boolean> readability) {
+  /**
+   * Whether this flow blocks a release. Every reason is logged rather than returned: the reply
+   * names the pipeline only, so the log is where an operator learns which artifact and why.
+   */
+  private boolean flowBlocks(Pipeline pipeline, Map<UUID, Boolean> readability) {
     ModelRegistryGateway.ArtifactClosure closure =
         modelRegistryGateway.closure(pipeline.getModelUrn(), properties.maxDepth());
 
-    List<ClosureFinding> findings = new ArrayList<>();
+    boolean blocks = false;
     if (closure.truncated()) {
       // Passing here would report "nothing found" for a flow nobody walked to its end.
       log.warn(
           "Closure validation: the flow of pipeline {} reaches beyond the configured depth of {}",
           pipeline.getId(),
           properties.maxDepth());
-      findings.add(ClosureFinding.notVerified(pipeline.getId()));
+      blocks = true;
     }
     for (String urn : closure.unresolved()) {
       log.info(
           "Closure validation: unresolved reference to {} reached by pipeline {}",
           Encode.forJava(urn),
           pipeline.getId());
-      findings.add(ClosureFinding.notAvailable(pipeline.getId()));
+      blocks = true;
     }
     List<String> resolved =
         closure.artifacts().stream().filter(urn -> !closure.unresolved().contains(urn)).toList();
     if (resolved.isEmpty()) {
-      return findings;
+      return blocks;
     }
     Map<String, List<DataStructureVersion>> governed =
         recordsPinnedBy(resolved).stream()
             .collect(Collectors.groupingBy(DataStructureVersion::getModelUrn));
     for (String urn : resolved) {
       List<DataStructureVersion> records = governed.get(urn);
-      if (records != null) {
-        inspectGoverned(pipeline.getId(), urn, records, readability).ifPresent(findings::add);
+      if (records != null && governedBlocks(pipeline.getId(), urn, records, readability)) {
+        blocks = true;
       }
     }
-    return findings;
+    return blocks;
   }
 
   /** Every version record pinning one of these URNs, asked in batches a statement can carry. */
@@ -145,7 +149,7 @@ public class PipelineClosureValidator {
    * <p>Several records can pin the same artifact, so it carries a release as soon as one record the
    * caller may read says so.
    */
-  private Optional<ClosureFinding> inspectGoverned(
+  private boolean governedBlocks(
       UUID pipelineId,
       String urn,
       List<DataStructureVersion> records,
@@ -158,12 +162,16 @@ public class PipelineClosureValidator {
               + " pipeline {}",
           Encode.forJava(urn),
           pipelineId);
-      return Optional.of(ClosureFinding.notAvailable(pipelineId));
+      return true;
     }
     if (readable.stream().noneMatch(PipelineClosureValidator::isReleased)) {
-      return Optional.of(ClosureFinding.notReleased(pipelineId, urn));
+      log.info(
+          "Closure validation: {} reached by pipeline {} is still a draft",
+          Encode.forJava(urn),
+          pipelineId);
+      return true;
     }
-    return Optional.empty();
+    return false;
   }
 
   /**
