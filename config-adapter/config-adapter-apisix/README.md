@@ -80,6 +80,14 @@ Publication is per named API, not per dataset.
 - `OWS` routes carry a `response-rewrite` filter rewriting GeoServer's self-referential capabilities URLs
   onto the route's external endpoint, and strip the request `Accept-Encoding`, because that filter matches
   raw response bytes and would otherwise pass a gzipped capabilities document through unchanged.
+- `STA` routes carry the same kind of rewrite for FROST's `@iot.selfLink`, `*@iot.navigationLink` and
+  `@iot.nextLink`. Two filters, in this order: `["https?://[^/]+/{version}/Projects\({n}\)",
+  "https://{apiHost}{routePath}"]` then `["https?://[^/]+/{version}/", "https://{apiHost}{routePath}/"]`.
+  The first exists because `@iot.nextLink` repeats the project segment the route's own `regex_uri` adds
+  back; running the second first would double it. Version and project come from the route's upstream path,
+  so a route that is not project-scoped gets no rewrite. `Accept-Encoding` is stripped as on `OWS`, and
+  FROST must run with `useAbsoluteNavigationLinks: true` — a relative link is calibrated to FROST's own
+  path depth and cannot be repaired in the response.
 - `UPDATE_ROUTE` and `RESTORE_ROUTE` read the route back without the dataset's named-API metadata, so two
   labels carry that state: `civitas-frost-upstream-auth-header` names the credential header the adapter
   injected, so a re-apply removes a stale entry after a scheme or header-name change, and
