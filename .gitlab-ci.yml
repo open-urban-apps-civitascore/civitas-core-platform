@@ -5,6 +5,11 @@
 # Local testing:
 # gitlab-ci-local <jobName>
 
+# Use private runner (hosted by Frachtwerk @tobias.dillig@frachtwerk.de) when tag is defined;
+# commented out by default so jobs can run on standard/shared runners in forks without hanging.
+# default:
+#   tags: ['external']
+
 # Change to retrigger all pipeline for a new commit
 
 include:

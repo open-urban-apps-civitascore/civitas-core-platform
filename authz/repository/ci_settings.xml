@@ -29,6 +29,15 @@
             <updatePolicy>always</updatePolicy>
           </snapshots>
         </repository>
+        <!-- Upstream package registry fallback for forks -->
+        <repository>
+          <id>gitlab-maven-upstream</id>
+          <url>${env.CI_API_V4_URL}/projects/72402288/packages/maven</url>
+          <snapshots>
+            <enabled>true</enabled>
+            <updatePolicy>always</updatePolicy>
+          </snapshots>
+        </repository>
       </repositories>
     </profile>
   </profiles>
