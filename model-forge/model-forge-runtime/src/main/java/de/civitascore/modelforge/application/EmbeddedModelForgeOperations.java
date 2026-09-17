@@ -236,6 +236,14 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
+    /**
+     * Publishes a write's edges under the version it was stored as. Falls back to the request URN
+     * when the store returned no pin, which only a registry double does.
+     */
+    private void registerWritten(String pin, String requestUrn) {
+        dependencyGraph.registerFromRegistry(pin != null && !pin.isBlank() ? pin : requestUrn);
+    }
+
     @Override
     public DependencyClosureView closure(DependencyQuery query) {
         if (query.maxDepth() == null) {
@@ -408,13 +416,15 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             // The non-Element kinds store straight through the registry, which extracts and
             // persists their per-type reference edges (Mapping source/target, Pipeline nodes,
             // DataStructure/DataSet *Refs). registerFromRegistry() then mirrors those durable
-            // edges into the in-memory graph so dependencies()/dependents() see them.
-            case DATA_STRUCTURE -> { String p = registry.storeDataStructure(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case MAPPING -> { String p = registry.storeMapping(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case PIPELINE -> { String p = registry.storePipeline(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case DATA_SOURCE -> { String p = registry.storeDataSource(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case DATA_SINK -> { String p = registry.storeDataSink(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case DATA_SET -> { String p = registry.storeDataSet(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
+            // edges into the in-memory graph so dependencies()/dependents() see them. It is given
+            // the pin the write returned, not the request URN: a revision of an older version line
+            // does not become current, so resolving would index the wrong version.
+            case DATA_STRUCTURE -> { String p = registry.storeDataStructure(urn, content, bump); registerWritten(p, urn); yield p; }
+            case MAPPING -> { String p = registry.storeMapping(urn, content, bump); registerWritten(p, urn); yield p; }
+            case PIPELINE -> { String p = registry.storePipeline(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DATA_SOURCE -> { String p = registry.storeDataSource(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DATA_SINK -> { String p = registry.storeDataSink(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DATA_SET -> { String p = registry.storeDataSet(urn, content, bump); registerWritten(p, urn); yield p; }
         };
         // Defensive fallback (a registry double may return nothing): the honest unversioned
         // logical URN — deliberately NOT a resolveReference read-back.

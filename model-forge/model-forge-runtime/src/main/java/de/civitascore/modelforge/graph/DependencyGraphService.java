@@ -88,18 +88,17 @@ public class DependencyGraphService {
 
     /**
      * Register (or refresh) an artifact's outgoing edges from its durable {@code artifact_reference}
-     * rows — the sync primitive every write path shares, for every artifact type. The artifact is
-     * registered under its <em>current</em> versioned URN (resolved from the logical URN), so a
-     * version bump lands on the right node; the reference targets are the verbatim persisted URNs
-     * (pinned or {@code latest}).
+     * rows — the sync primitive every write path shares, for every artifact type.
+     *
+     * <p>A URN that names a version is registered under that version. A logical or {@code latest}
+     * URN resolves to the current one. A write therefore has to pass the pin it was given back:
+     * a version written onto a line that is not the newest never becomes current, and resolving
+     * would index a different version than the one just stored.
      */
     public void registerFromRegistry(String urn) {
-        String logical = UrnParser.logicalUrn(urn);
-        // Resolve via the logical URN so a version bump registers under the new current version,
-        // not whatever (possibly stale) pinned version the caller passed in.
-        String current = registry.resolveReference(logical).orElse(logical);
-        Set<String> refs = new LinkedHashSet<>(registry.fetchArtifactRefUrns(current));
-        register(current, refs);
+        String node = resolveToVersioned(urn);
+        Set<String> refs = new LinkedHashSet<>(registry.fetchArtifactRefUrns(node));
+        register(node, refs);
     }
 
     /**

@@ -708,7 +708,10 @@ public class SchemaImportService {
         // relations and no graph edges until the next full rebuild() — unlike the createArtifact
         // write path, which pairs every store with registerFromRegistry(). Queued rather than
         // applied, so it lands only if the surrounding import commits.
-        pendingNodes.add(PendingGraphNode.fromRegistry(dataStructureLogicalUrn));
+        // Queued under the pin, not the logical URN: a revision of an older version line does not
+        // become current, so resolving would index a different version than the one just written.
+        pendingNodes.add(PendingGraphNode.fromRegistry(
+            pin != null && !pin.isBlank() ? pin : dataStructureLogicalUrn));
         return pin;
     }
 

@@ -1,5 +1,6 @@
 package de.civitascore.modelforge.persistence.postgres;
 
+import de.civitascore.modelforge.contract.VersionBump;
 import de.civitascore.modelforge.graph.DependencyGraphService;
 import de.civitascore.modelforge.urn.UrnParser;
 import org.junit.jupiter.api.BeforeEach;
@@ -7,9 +8,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -99,6 +102,72 @@ class DependencyGraphRebuildDatabaseTest extends AbstractRegistryDatabaseTest {
             assertThat(targets).isEqualTo(registry.fetchArtifactRefUrns(versionedUrn)));
     }
 
+    @Test
+    @DisplayName("A write onto an older version line registers the version it wrote")
+    void writeOntoAnOlderLineRegistersTheVersionItWrote() {
+        // What editing the model of an older DataStructureVersion does: the bump counts from that
+        // version's own number, so it stays inside its major and never becomes current.
+        String v1 = registry.storeElement("Holder", composing(leafPin), Set.of(leafPin));
+        String logical = UrnParser.logicalUrn(v1);
+        registry.storeElement("Holder", identified(logical), Set.of(), VersionBump.MAJOR);
+        // Every write carries the same $id, or the registry mints a separate artifact instead of
+        // adding a version — and a separate artifact is current on its own and proves nothing.
+        String revised = registry.storeElement(
+            "Holder", identifiedComposing(logical, leafPin), Set.of(leafPin), Set.of(),
+            null, VersionBump.MINOR, UrnParser.versionFromUrn(v1));
+
+        assertThat(UrnParser.logicalUrn(revised)).isEqualTo(logical);
+        assertThat(currentVersionOf(logical))
+            .as("the revision stays on the older line, so it must not become current")
+            .isNotEqualTo(UrnParser.versionFromUrn(revised));
+
+        var graph = new DependencyGraphService(registry);
+        graph.registerFromRegistry(revised);
+
+        assertThat(graph.getDependencies(revised))
+            .as("resolving to the current version would index a version the write did not touch")
+            .containsExactly(leafPin);
+    }
+
+    @Test
+    @DisplayName("A version's edges come back in sort_order, not in row or URN order")
+    void edgesOfAVersionComeBackInSortOrder() {
+        List<String> alphabetical = Stream.of(
+                registry.storeElement("PartA", objectSchema(), Set.of()),
+                registry.storeElement("PartB", objectSchema(), Set.of()),
+                registry.storeElement("PartC", objectSchema(), Set.of()))
+            .sorted()
+            .toList();
+        String holder = registry.storeElement(
+            "Holder", objectSchema(), new LinkedHashSet<>(alphabetical));
+
+        // The write path numbers sort_order by insertion, so stored order, row order and URN order
+        // all agree. Renumber to a rotation to tell them apart. The renumber runs in URN order,
+        // not in the new order: an update rewrites the row at the end of the table, so renumbering
+        // in the expected order would make row order agree with sort_order again.
+        List<String> expected = List.of(alphabetical.get(2), alphabetical.get(0), alphabetical.get(1));
+        alphabetical.forEach(target -> setSortOrder(holder, target, expected.indexOf(target)));
+
+        assertThat(registry.referenceEdgesByVersion().get(holder)).isEqualTo(expected);
+    }
+
+    /** Renumbers one stored reference, so sort_order stops matching the order rows were written. */
+    private void setSortOrder(String fromVersionedUrn, String targetUrn, int sortOrder) {
+        jdbc.sql("""
+                update model_forge.artifact_reference set sort_order = :sort
+                 where target_urn = :target
+                   and from_version_id = (select av.id
+                                            from model_forge.artifact_version av
+                                            join model_forge.artifact a on a.id = av.artifact_id
+                                           where a.logical_urn = :logical and av.version = :version)
+                """)
+            .param("sort", sortOrder)
+            .param("target", targetUrn)
+            .param("logical", UrnParser.logicalUrn(fromVersionedUrn))
+            .param("version", UrnParser.versionFromUrn(fromVersionedUrn))
+            .update();
+    }
+
     /** The current version recorded for a logical artifact. */
     private String currentVersionOf(String logicalUrn) {
         return jdbc.sql("select current_version from model_forge.artifact where logical_urn = :urn")
@@ -127,6 +196,19 @@ class DependencyGraphRebuildDatabaseTest extends AbstractRegistryDatabaseTest {
               "properties": { "label": { "type": "string" } }
             }
             """.formatted(logicalUrn));
+    }
+
+    /** {@link #composing} under an existing identity, so the write adds a version to it. */
+    private JsonNode identifiedComposing(String logicalUrn, String referencedPin) {
+        return mapper.readTree("""
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "%s",
+              "type": "object",
+              "properties": { "part": { "$ref": "%s" } },
+              "required": ["part"]
+            }
+            """.formatted(logicalUrn, referencedPin));
     }
 
     private JsonNode composing(String referencedPin) {
