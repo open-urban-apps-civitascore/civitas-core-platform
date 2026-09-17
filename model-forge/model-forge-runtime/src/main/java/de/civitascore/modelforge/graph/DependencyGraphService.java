@@ -74,16 +74,24 @@ public class DependencyGraphService {
         registry.rebuildNamespaceIndex();
 
         Map<String, List<String>> edges = registry.referenceEdgesByVersion();
+        int rowsRead = edges.values().stream().mapToInt(List::size).sum();
         graphLock.lock();
         try {
-            edges.forEach((node, targets) -> registerLocked(node, new LinkedHashSet<>(targets)));
+            edges.forEach(this::registerLocked);
         } finally {
             graphLock.unlock();
         }
 
-        log.info("Dependency graph built from artifact_reference: {} node(s), {} edge(s)",
+        // Every version the read returned must have become a node. Registration is the only step
+        // between the two counts, so a mismatch is a defect here, not a short read.
+        if (dependencies.size() != edges.size()) {
+            log.warn("Dependency graph indexed {} of the {} version(s) read",
+                dependencies.size(), edges.size());
+        }
+        log.info("Dependency graph built from artifact_reference: {} node(s), {} edge(s) from {} row(s)",
             dependencies.size(),
-            dependencies.values().stream().mapToInt(Set::size).sum());
+            dependencies.values().stream().mapToInt(Set::size).sum(),
+            rowsRead);
     }
 
     /**
@@ -123,7 +131,7 @@ public class DependencyGraphService {
      * Forward/reverse edge update for {@code fromUrn}. The caller <strong>must</strong>
      * hold {@link #graphLock} so the forward and reverse maps stay consistent.
      */
-    private void registerLocked(String fromUrn, Set<String> toUrns) {
+    private void registerLocked(String fromUrn, Collection<String> toUrns) {
         Set<String> refs = new LinkedHashSet<>(toUrns);   // verbatim (pinned :version or :latest)
 
         // Remove old reverse entries for this exact node (re-registration replaces its edges).
