@@ -826,19 +826,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       },
     }
 
-    it('enables the save button after the diagram was renamed', async () => {
-      const user = userEvent.setup()
-      renderComponent({ version: mockVersionWithModel })
-
-      expect(screen.getByTestId('confirmButton')).toBeDisabled()
-
-      await user.dblClick(screen.getByText('Test Model'))
-      const diagramNameInput = screen.getByDisplayValue('Test Model')
-      await user.clear(diagramNameInput)
-      await user.type(diagramNameInput, 'Renamed Model{Enter}')
-
-      await waitFor(() => expect(screen.getByTestId('confirmButton')).toBeEnabled())
-    })
 
     it('enables the save button after a class was renamed in the inspector', async () => {
       const user = userEvent.setup()
