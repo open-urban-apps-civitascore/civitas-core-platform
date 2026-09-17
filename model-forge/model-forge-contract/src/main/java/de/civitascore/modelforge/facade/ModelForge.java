@@ -8,6 +8,7 @@ import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
 import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
+import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ImportResult;
@@ -23,8 +24,10 @@ import de.civitascore.modelforge.contract.NonConformingArtifact;
 import de.civitascore.modelforge.contract.ValidationResult;
 import de.civitascore.modelforge.contract.XRepositoryHit;
 import de.civitascore.modelforge.contract.XRepositorySearchQuery;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Public Java entry point for embedded Model Forge usage.
@@ -103,6 +106,20 @@ public interface ModelForge {
      */
     Optional<ArtifactView> getInlinedView(SchemaViewQuery query);
 
+    /**
+     * Of the given ids, the subset the registry holds — one call in place of a {@link #getArtifact}
+     * per id, and without reading any content.
+     *
+     * <p>A <em>versioned</em> id is held only when that concrete version exists; a logical or
+     * {@code :latest} id is held when the artifact exists at any version. Returned ids are the
+     * caller's own, verbatim, so the missing subset is a plain set difference. An empty input yields
+     * an empty result.
+     *
+     * <p>Takes a collection rather than a Command record, as {@link #orphans(ArtifactKind)} takes a
+     * bare kind: the question carries no parameters beyond the ids themselves.
+     */
+    Set<ArtifactId> existing(Collection<ArtifactId> artifactIds);
+
     // ── Validate ─────────────────────────────────────────────────────────────
 
     ValidationResult validateSchema(ValidateSchemaCommand command);
@@ -121,6 +138,22 @@ public interface ModelForge {
 
     /** Mappings that use this artifact as their target, as {@code mapped-from} edges. */
     DependencyGraphView mappedFrom(DependencyQuery query);
+
+    /**
+     * The transitive dependency closure of one artifact together with the part of it that does not
+     * resolve — "is everything this model participates in actually there", answered in one call
+     * rather than an existence probe per member.
+     *
+     * <p>The query's {@link DependencyQuery#maxDepth()} is <b>required</b>: the bound belongs to the
+     * caller, which knows how much traversal it is willing to spend. A depth of zero or less yields
+     * an empty closure.
+     *
+     * <p>See {@link DependencyClosureView} for the members' URN form and the root's exclusion.
+     * Traversal terminates on a cyclic graph.
+     *
+     * @throws IllegalArgumentException when the query carries no {@code maxDepth}
+     */
+    DependencyClosureView closure(DependencyQuery query);
 
     // ── Search ───────────────────────────────────────────────────────────────
 

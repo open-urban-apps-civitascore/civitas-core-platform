@@ -4,6 +4,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.StringNode;
 import de.civitascore.modelforge.contract.ArtifactId;
+import de.civitascore.modelforge.contract.DependencyClosureView;
+import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.contract.BumpVersionCommand;
@@ -18,6 +20,7 @@ import de.civitascore.modelforge.graph.DependencyGraphService;
 import de.civitascore.modelforge.graph.SchemaRefExtractor;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.modelforge.validation.ModelValidator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,7 +38,10 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -626,5 +632,91 @@ class EmbeddedModelForgeOperationsTest {
         assertThatThrownBy(() -> operations.bumpVersion(command))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("pins a version");
+    }
+
+    // ── closure / existing ────────────────────────────────────────────────────
+
+    private static final String CLOSURE_ROOT =
+        "urn:core:platform:civitas:pipeline:common:Ingest:aaaaaaaaaa:1.0.0";
+    private static final String CLOSURE_MEMBER =
+        "urn:core:platform:civitas:datastructure:common:Sensor:bbbbbbbbbb:1.0.0";
+    private static final String CLOSURE_GHOST =
+        "urn:core:platform:civitas:element:common:Ghost:cccccccccc:1.0.0";
+
+    @Test
+    void closureRejectsAQueryWithoutADepthBound() {
+        assertThatThrownBy(() -> operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("maxDepth");
+        verifyNoInteractions(graph);
+    }
+
+    @Test
+    void closureCarriesWhetherTheBoundCutTheWalkShort() {
+        when(graph.getTransitiveDependenciesBounded(CLOSURE_ROOT, 4))
+            .thenReturn(new DependencyGraphService.BoundedWalk(Set.of(CLOSURE_MEMBER), true));
+        when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_MEMBER));
+
+        assertThat(operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT), 4)).truncated())
+            .isTrue();
+    }
+
+    @Test
+    void closureWalksToTheRequestedDepth() {
+        when(graph.getTransitiveDependenciesBounded(CLOSURE_ROOT, 4))
+            .thenReturn(new DependencyGraphService.BoundedWalk(Set.of(CLOSURE_MEMBER), false));
+        when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_MEMBER));
+
+        operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT), 4));
+
+        verify(graph).getTransitiveDependenciesBounded(CLOSURE_ROOT, 4);
+        verify(graph, never()).getDependencies(any());
+    }
+
+    @Test
+    void closureReportsTheUnheldMembersFromOneProbe() {
+        when(graph.getTransitiveDependenciesBounded(CLOSURE_ROOT, 10))
+            .thenReturn(new DependencyGraphService.BoundedWalk(new LinkedHashSet<>(List.of(CLOSURE_MEMBER, CLOSURE_GHOST)), false));
+        when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_MEMBER));
+
+        var view = operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT), 10));
+
+        assertThat(view.closure()).extracting(ArtifactId::value)
+            .containsExactly(CLOSURE_MEMBER, CLOSURE_GHOST);
+        assertThat(view.unresolved()).extracting(ArtifactId::value).containsExactly(CLOSURE_GHOST);
+        assertThat(view.complete()).isFalse();
+        verify(registry, times(1)).heldUrns(any());
+    }
+
+    @Test
+    void closureExcludesEveryVersionOfTheRootEvenWhenACycleReachesIt() {
+        String otherRootVersion =
+            "urn:core:platform:civitas:pipeline:common:Ingest:aaaaaaaaaa:2.0.0";
+        when(graph.getTransitiveDependenciesBounded(CLOSURE_ROOT, 10))
+            .thenReturn(new DependencyGraphService.BoundedWalk(new LinkedHashSet<>(List.of(CLOSURE_MEMBER, CLOSURE_ROOT, otherRootVersion)), false));
+        when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_MEMBER));
+
+        var view = operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT), 10));
+
+        assertThat(view.closure()).extracting(ArtifactId::value).containsExactly(CLOSURE_MEMBER);
+        assertThat(view.complete()).isTrue();
+    }
+
+    @Test
+    void existingReturnsOnlyTheHeldSubsetInInputOrder() {
+        when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_GHOST, CLOSURE_MEMBER));
+
+        var held = operations.existing(
+            List.of(new ArtifactId(CLOSURE_MEMBER), new ArtifactId(CLOSURE_ROOT), new ArtifactId(CLOSURE_GHOST)));
+
+        assertThat(held).extracting(ArtifactId::value).containsExactly(CLOSURE_MEMBER, CLOSURE_GHOST);
+        verify(registry, times(1)).heldUrns(any());
+    }
+
+    @Test
+    void existingWithNothingAskedTouchesNoRegistry() {
+        assertThat(operations.existing(List.of())).isEmpty();
+        assertThat(operations.existing(null)).isEmpty();
+        verify(registry, never()).heldUrns(any());
     }
 }

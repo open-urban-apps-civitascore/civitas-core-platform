@@ -39,9 +39,11 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
-import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.service.validation.PipelineClosureValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.SagaInFlightException;
 import java.util.HashSet;
@@ -79,6 +81,7 @@ class DataSetServiceTest {
   @Mock private PipelineRuntimeStatusService pipelineRuntimeStatusService;
   @Mock private ObjectProvider<AllowedScopes> allowedScopesProvider;
   @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private PipelineClosureValidator pipelineClosureValidator;
 
   private DataSetService createService() {
     // Default to TENANT wildcard so the F4 target-pool check passes for existing pool-setting
@@ -106,7 +109,8 @@ class DataSetServiceTest {
         allowedScopesProvider,
         new DataSourceDatapoolScopeValidator(),
         modelRegistryGateway,
-        new DataSetMutationGuard(dataSetRepository));
+        new DataSetMutationGuard(dataSetRepository),
+        pipelineClosureValidator);
   }
 
   private static AllowedScopes wildcardScopes() {
@@ -167,6 +171,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
+      p.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
       p.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(p);
 
@@ -189,6 +194,25 @@ class DataSetServiceTest {
       assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DataSources");
+    }
+
+    @Test
+    @DisplayName("rejects a pipeline whose flow has not been authored yet")
+    void rejectsPipelineWithoutStoredDefinition() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSet(id);
+      Pipeline p = new Pipeline();
+      p.setName("Ingest");
+      p.setDataSources(new HashSet<>(List.of(new DataSource())));
+      ds.getPipelines().add(p);
+
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().stage(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Ingest")
+          .hasMessageContaining("no stored definition");
+      verify(dataSetRepository, never()).save(any());
     }
 
     @Test
@@ -226,6 +250,7 @@ class DataSetServiceTest {
     private DataSet draftDataSetWithPipeline(UUID id) {
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
+      p.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
       p.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(p);
       return ds;
@@ -454,6 +479,7 @@ class DataSetServiceTest {
 
     private void addPipelineWithSource(DataSet dataSet, DataSource source) {
       Pipeline p = new Pipeline();
+      p.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
       p.setDataSources(new HashSet<>(Set.of(source)));
       dataSet.getPipelines().add(p);
     }
@@ -2386,6 +2412,69 @@ class DataSetServiceTest {
       createService().unlinkMember(id, MEMBER_URN);
 
       verify(modelRegistryGateway, never()).unlinkFromDataSet(any(), any());
+    }
+  }
+
+  @Nested
+  @DisplayName("participating artifact validation")
+  class ParticipatingArtifactValidation {
+
+    private DataSet stageable(UUID id) {
+      DataSet ds = draftDataSet(id);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
+      pipeline.setDataSources(new HashSet<>(List.of(new DataSource())));
+      ds.getPipelines().add(pipeline);
+      return ds;
+    }
+
+    /**
+     * A READY dataset publishing no named API, so the map/API-surface check passes and the
+     * participating-artifact validation is the only thing that can reject the release.
+     */
+    private DataSet releasable(UUID id) {
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.READY);
+      ds.setPipelines(new HashSet<>());
+      ds.setNamedApis(new HashSet<>());
+      return ds;
+    }
+
+    @Test
+    @DisplayName("a dataset whose flows carry a defect is not staged")
+    void blockedStagingLeavesTheDatasetInDraft() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = stageable(id);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      doThrow(new PipelineClosureValidationException(List.of(UUID.randomUUID())))
+          .when(pipelineClosureValidator)
+          .validate(any());
+
+      assertThatThrownBy(() -> createService().stage(id))
+          .isInstanceOf(PipelineClosureValidationException.class);
+
+      assertThat(ds.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+      verify(dataSetRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("a blocked release provisions nothing, rather than compensating afterwards")
+    void blockedReleasePublishesNoSaga() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = releasable(id);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      doThrow(new PipelineClosureValidationException(List.of(UUID.randomUUID())))
+          .when(pipelineClosureValidator)
+          .validate(any());
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(PipelineClosureValidationException.class);
+
+      verify(sagaPublisher, never()).publishCreateRequested(any());
+      assertThat(ds.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+      assertThat(ds.getPendingSagaType()).isNull();
+      verify(dataSetRepository, never()).save(any());
     }
   }
 }

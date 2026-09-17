@@ -5,6 +5,7 @@ import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.ArtifactView;
+import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ImportResult;
@@ -19,9 +20,11 @@ import de.civitascore.modelforge.contract.ValidationResult;
 import de.civitascore.modelforge.contract.XRepositoryHit;
 import de.civitascore.modelforge.contract.XRepositorySearchQuery;
 import de.civitascore.modelforge.facade.ModelForge;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -158,6 +161,16 @@ class EmbeddedModelForgeTest {
                 @Override
                 public DependencyGraphView mappedFrom(DependencyQuery query) {
                     return new DependencyGraphView(List.of(), List.of());
+                }
+
+                @Override
+                public Set<ArtifactId> existing(Collection<ArtifactId> artifactIds) {
+                    return Set.of();
+                }
+
+                @Override
+                public DependencyClosureView closure(DependencyQuery query) {
+                    return new DependencyClosureView(query.artifactId(), List.of(), List.of(), false);
                 }
 
                 @Override

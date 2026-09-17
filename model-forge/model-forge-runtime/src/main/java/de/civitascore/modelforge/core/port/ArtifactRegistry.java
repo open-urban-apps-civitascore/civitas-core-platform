@@ -3,6 +3,8 @@ package de.civitascore.modelforge.core.port;
 import tools.jackson.databind.JsonNode;
 import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.VersionBump;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -223,6 +225,32 @@ public interface ArtifactRegistry {
     Optional<JsonNode> fetchElementOrXsd(String urn);
 
     Optional<String> resolveReference(String referenceUrn);
+
+    /**
+     * Of the given reference URNs, the subset this registry holds — the bulk form of
+     * {@link #resolveReference}, so a caller asking about many URNs is not one round trip per URN.
+     *
+     * <p>The rule per URN is exactly {@code resolveReference(urn).isPresent()}: a <em>pinned</em>
+     * URN is held only when that concrete version exists; a logical or {@code :latest} URN is held
+     * when the artifact exists at any version. Returned strings are the caller's own input, never
+     * normalised, so the missing subset is a plain set difference.
+     *
+     * <p>Null and blank entries are ignored and an empty input touches no store. This default
+     * answers by looping {@link #resolveReference}; an adapter that can do it in one query
+     * overrides it.
+     */
+    default Set<String> heldUrns(Collection<String> urns) {
+        if (urns == null || urns.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> held = new LinkedHashSet<>();
+        for (String urn : urns) {
+            if (urn != null && !urn.isBlank() && resolveReference(urn).isPresent()) {
+                held.add(urn);
+            }
+        }
+        return held;
+    }
 
     List<ArtifactSearchResult> searchArtifacts(ArtifactSearchCriteria criteria);
 }

@@ -22,7 +22,8 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
-import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.service.validation.PipelineClosureValidator;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -77,6 +78,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final PipelineClosureValidator pipelineClosureValidator;
 
   private final DataSetMutationGuard dataSetMutationGuard;
 
@@ -92,7 +94,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       ObjectProvider<AllowedScopes> allowedScopesProvider,
       DataSourceDatapoolScopeValidator datapoolScopeValidator,
       ModelRegistryGateway modelRegistryGateway,
-      DataSetMutationGuard dataSetMutationGuard) {
+      DataSetMutationGuard dataSetMutationGuard,
+      PipelineClosureValidator pipelineClosureValidator) {
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
     this.layerRepository = layerRepository;
@@ -105,6 +108,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     this.datapoolScopeValidator = datapoolScopeValidator;
     this.modelRegistryGateway = modelRegistryGateway;
     this.dataSetMutationGuard = dataSetMutationGuard;
+    this.pipelineClosureValidator = pipelineClosureValidator;
   }
 
   /**
@@ -445,7 +449,22 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "pipelines", id, "DataSet must have at least one Pipeline with DataSources");
     }
 
+    // A pipeline with no stored flow deploys nothing. NiFi rejects the empty graph at the last
+    // saga step, once every other system is provisioned and has to be torn down again.
+    Pipeline withoutDefinition =
+        dataSet.getPipelines().stream()
+            .filter(p -> StringUtils.isBlank(p.getModelUrn()))
+            .findFirst()
+            .orElse(null);
+    if (withoutDefinition != null) {
+      throw new InvalidInputException(
+          "pipelines",
+          id,
+          "Pipeline '" + withoutDefinition.getName() + "' has no stored definition");
+    }
+
     revalidatePipelineDataSourcesAgainstPool(dataSet);
+    pipelineClosureValidator.validate(dataSet.getPipelines());
 
     dataSet.setDataSetStatus(DataSetStatus.READY);
     return dataSetRepository.save(dataSet);
@@ -517,6 +536,10 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
     revalidatePipelineDataSourcesAgainstPool(dataSet);
     verifyPublishedSurfacesAreServable(dataSet);
+    // Re-asserted here and not only at staging: this is the transition that provisions
+    // infrastructure, and registry state can drift through routes that do not pass the in-use
+    // guard refusing to unrelease an artifact a flow still reaches.
+    pipelineClosureValidator.validate(dataSet.getPipelines());
 
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
     dataSet.setPendingSagaType(PendingSagaType.CREATE);

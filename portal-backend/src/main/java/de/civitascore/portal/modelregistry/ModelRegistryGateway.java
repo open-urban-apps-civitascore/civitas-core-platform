@@ -5,6 +5,7 @@ import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
+import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
@@ -14,9 +15,12 @@ import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -68,6 +72,12 @@ public class ModelRegistryGateway {
    * keyword's value (or {@code null} when the document carries none).
    */
   public record RegistryDocument(Map<String, Object> content, Map<String, Object> styles) {}
+
+  /**
+   * What a flow reaches, what of it the registry does not hold, and whether the depth bound stopped
+   * the walk short of the whole flow.
+   */
+  public record ArtifactClosure(Set<String> artifacts, Set<String> unresolved, boolean truncated) {}
 
   /**
    * Stores a model (with its styles merged in as {@value #X_UI_STYLES}) in the registry and returns
@@ -241,6 +251,36 @@ public class ModelRegistryGateway {
         .filter(u -> artifactType.equals(UrnParser.artifactTypeFromUrn(u)))
         .distinct()
         .toList();
+  }
+
+  /**
+   * A flow's participating closure: every artifact reachable from {@code urn} within {@code
+   * maxDepth} reference hops, and which of them the registry no longer holds.
+   *
+   * <p>Unlike {@link #dependencyUrnsOfType}, which reports direct edges of one type, this walks the
+   * graph transitively. The walk is level-bounded and guards a cyclic graph with a visited set, so
+   * a mutually referencing pair terminates rather than recursing. The entry artifact is not a
+   * member of its own closure.
+   *
+   * <p>An unresolved reference — one whose target the registry no longer holds — is deliberately
+   * kept as an edge, so it is reached by the walk and reported in {@code unresolved} rather than
+   * silently missing. The registry answers that for the whole closure at once.
+   *
+   * @param urn the flow's entry artifact, logical or versioned; null or blank yields an empty
+   *     closure
+   * @param maxDepth how many hops to walk; zero or negative yields an empty closure
+   */
+  public ArtifactClosure closure(String urn, int maxDepth) {
+    if (urn == null || urn.isBlank() || maxDepth <= 0) {
+      return new ArtifactClosure(Set.of(), Set.of(), false);
+    }
+    DependencyClosureView view =
+        modelForge.closure(new DependencyQuery(new ArtifactId(urn), maxDepth));
+    return new ArtifactClosure(urns(view.closure()), urns(view.unresolved()), view.truncated());
+  }
+
+  private static Set<String> urns(List<ArtifactId> ids) {
+    return ids.stream().map(ArtifactId::value).collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /**
