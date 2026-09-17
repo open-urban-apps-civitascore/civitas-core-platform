@@ -9,6 +9,7 @@ import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.service.GoverningVersionLookup;
 import java.util.HashMap;
 import java.util.Map;
@@ -38,6 +39,7 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
   private final ModelRegistryGateway modelRegistryGateway;
   private final GoverningVersionLookup governingVersions;
   private final DataStructureVersionMapper dataStructureVersionMapper;
+  private final LayerRepository layerRepository;
 
   /** {@inheritDoc} Delegates to the {@link DataSinkMapper} for basic field mapping. */
   @Override
@@ -47,11 +49,12 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
 
   /**
    * {@inheritDoc} Resolves the type-specific {@code configuration} object from the registry-stored
-   * configuration document and the derived {@code inUse} flag.
+   * configuration document and the two derived usage flags.
    */
   @Override
   public DataSinkOutputDTO enrichDto(DataSinkOutputDTO dto, DataSink entity) {
-    dto.setInUse(entity.getPipeline() != null);
+    dto.setInUseByPipeline(entity.getPipeline() != null);
+    dto.setInUseByLayer(layerRepository.existsByDataSinkId(entity.getId()));
 
     if (entity.getDataSinkType() == null) {
       return dto;

@@ -2,6 +2,7 @@ package de.civitascore.portal.model.output.assembler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
@@ -16,6 +17,7 @@ import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.service.GoverningVersionLookup;
 import java.util.Map;
 import java.util.Optional;
@@ -35,6 +37,7 @@ class DataSinkAssemblerTest {
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private GoverningVersionLookup governingVersions;
   @Mock private DataStructureVersionMapper dataStructureVersionMapper;
+  @Mock private LayerRepository layerRepository;
 
   @InjectMocks private DataSinkAssembler assembler;
 
@@ -223,27 +226,56 @@ class DataSinkAssemblerTest {
   }
 
   @Nested
-  @DisplayName("enrichDto() — inUse")
-  class InUseFlag {
+  @DisplayName("enrichDto() — inUseByPipeline")
+  class InUseByPipelineFlag {
 
     @Test
-    @DisplayName("Should set inUse=true when the DataSink has a linked pipeline")
-    void shouldSetInUseTrueWhenPipelineLinked() {
+    @DisplayName("Should set inUseByPipeline=true when the DataSink has a linked pipeline")
+    void shouldSetInUseByPipelineTrueWhenPipelineLinked() {
       DataSink entity = sinkWithPipeline(DataSinkType.FROST, Map.of());
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
-      assertThat(result.isInUse()).isTrue();
+      assertThat(result.isInUseByPipeline()).isTrue();
     }
 
     @Test
-    @DisplayName("Should set inUse=false when the DataSink has no linked pipeline")
-    void shouldSetInUseFalseWhenNoPipeline() {
+    @DisplayName("Should set inUseByPipeline=false when the DataSink has no linked pipeline")
+    void shouldSetInUseByPipelineFalseWhenNoPipeline() {
       DataSink entity = sinkWithoutPipeline(DataSinkType.FROST, Map.of());
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
-      assertThat(result.isInUse()).isFalse();
+      assertThat(result.isInUseByPipeline()).isFalse();
+    }
+  }
+
+  @Nested
+  @DisplayName("enrichDto() — inUseByLayer")
+  class InUseByLayerFlag {
+
+    @Test
+    @DisplayName("Should set inUseByLayer=true when a Layer references this DataSink")
+    void shouldSetInUseByLayerTrueWhenLayerReferences() {
+      DataSink entity = sinkWithoutPipeline(DataSinkType.FROST, Map.of());
+      entity.setId(UUID.randomUUID());
+      when(layerRepository.existsByDataSinkId(entity.getId())).thenReturn(true);
+
+      DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
+
+      assertThat(result.isInUseByLayer()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should set inUseByLayer=false when no Layer references this DataSink")
+    void shouldSetInUseByLayerFalseWhenNoLayerReferences() {
+      DataSink entity = sinkWithPipeline(DataSinkType.FROST, Map.of());
+      entity.setId(UUID.randomUUID());
+      when(layerRepository.existsByDataSinkId(entity.getId())).thenReturn(false);
+
+      DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
+
+      assertThat(result.isInUseByLayer()).isFalse();
     }
   }
 }
