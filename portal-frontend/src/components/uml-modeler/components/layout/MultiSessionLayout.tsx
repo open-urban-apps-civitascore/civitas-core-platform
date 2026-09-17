@@ -19,7 +19,7 @@ import { DEFAULT_DIAGRAM_NAME } from '../../services/diagramService'
 import { SchemaExportError } from '../../services/jsonSchemaExportService'
 import { rootFailureMessage } from '../../services/rootFailureMessage'
 import type { UMLDiagram } from '../../types/diagram'
-import type { UseMultiSessionReturn } from '../../types/session'
+import type { DirtyField, UseMultiSessionReturn } from '../../types/session'
 import { PropertyInspector } from '../inspector/PropertyInspector'
 import { ElementPalette } from '../palette/ElementPalette'
 import { ActiveDiagramProviderComponent } from '../providers/ActiveDiagramProvider'
@@ -125,7 +125,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
       const targetName = hasCustomName ? currentActiveSession.name : importedDiagram.name || currentActiveSession.name
       const hasNameChanged = targetName !== currentActiveSession.name
 
-      const dirtyFields = new Set<string>(['model'])
+      const dirtyFields = new Set<DirtyField>(['model'])
       if (hasNameChanged) {
         dirtyFields.add('modelName')
       }
