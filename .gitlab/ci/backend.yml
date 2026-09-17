@@ -265,6 +265,8 @@ saga-e2e-test-backend:
 # complementing the Maven-based unit and integration tests.
 # Auto-runs on main/develop, manual on MRs.
 api-test-backend:
+  tags:
+    - saas-linux-medium-amd64 # 4 cores, 16 GB memory
   extends: .api-test-stack-changes
   image: docker:27
   stage: test # runs after build jobs provide JAR artifacts
