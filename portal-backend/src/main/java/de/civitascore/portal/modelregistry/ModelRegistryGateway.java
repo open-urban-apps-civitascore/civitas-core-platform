@@ -6,13 +6,10 @@ import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyQuery;
-import de.civitascore.modelforge.contract.DiagnosticSeverity;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
 import de.civitascore.modelforge.contract.SchemaViewQuery;
-import de.civitascore.modelforge.contract.ValidateSchemaCommand;
-import de.civitascore.modelforge.contract.ValidationResult;
 import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.portal.util.InvalidInputException;
@@ -71,29 +68,6 @@ public class ModelRegistryGateway {
    * keyword's value (or {@code null} when the document carries none).
    */
   public record RegistryDocument(Map<String, Object> content, Map<String, Object> styles) {}
-
-  /**
-   * Validates a model as a JSON Schema via Model Forge.
-   *
-   * @param model the JSON Schema document; a null or empty model is treated as "nothing to
-   *     validate"
-   * @return the ERROR-level diagnostic messages, empty when the model is a valid JSON Schema
-   */
-  public List<String> validateSchema(Map<String, Object> model) {
-    if (model == null || model.isEmpty()) {
-      return List.of();
-    }
-    ValidationResult result =
-        modelForge.validateSchema(new ValidateSchemaCommand(objectMapper.valueToTree(model)));
-    return result.diagnostics().stream()
-        .filter(diagnostic -> diagnostic.severity() == DiagnosticSeverity.ERROR)
-        .map(
-            diagnostic ->
-                diagnostic.path() == null || diagnostic.path().isBlank()
-                    ? diagnostic.message()
-                    : diagnostic.message() + " (" + diagnostic.path() + ")")
-        .toList();
-  }
 
   /**
    * Stores a model (with its styles merged in as {@value #X_UI_STYLES}) in the registry and returns

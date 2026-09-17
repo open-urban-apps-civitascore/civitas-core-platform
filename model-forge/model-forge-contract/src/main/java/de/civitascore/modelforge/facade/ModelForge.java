@@ -19,6 +19,7 @@ import de.civitascore.modelforge.contract.SchemaViewQuery;
 import de.civitascore.modelforge.contract.ValidateInstanceCommand;
 import de.civitascore.modelforge.contract.ValidateSchemaCommand;
 import de.civitascore.modelforge.contract.ValidationFailedException;
+import de.civitascore.modelforge.contract.NonConformingArtifact;
 import de.civitascore.modelforge.contract.ValidationResult;
 import de.civitascore.modelforge.contract.XRepositoryHit;
 import de.civitascore.modelforge.contract.XRepositorySearchQuery;
@@ -234,6 +235,15 @@ public interface ModelForge {
      * they can be reviewed, assigned, or cleaned up.
      */
     List<ArtifactSummary> orphans(ArtifactKind kind);
+
+    /**
+     * Stored Elements whose schema does not conform to JSON Schema 2020-12 — the ones written before
+     * the write paths enforced conformance, which a re-save would now refuse.
+     *
+     * <p>Reads of these artifacts keep working; this is the inventory to review before treating the
+     * registry as uniformly conforming. An empty list means every stored Element conforms.
+     */
+    List<NonConformingArtifact> nonConformingElements();
 
     /**
      * Explicitly adds a reusable artifact to a DataSet's manifest (a {@code dataset-ref} member),

@@ -12,7 +12,6 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -78,10 +77,10 @@ public class DataStructureVersionService
                   "dataStructureId", entity.getId(), "dataStructureId cannot be null or blank");
             });
 
-    // Validate the model and store it in Model Forge (the version authority), mirroring the
-    // assigned version + URN onto the shell. Done here rather than in preSave because model,
-    // styles and the version bump live on the input DTO, which preSave does not receive.
-    validateModelSchema(entity, input);
+    // Store the model in Model Forge (the version authority), mirroring the assigned version + URN
+    // onto the shell. Done here rather than in preSave because model, styles and the version bump
+    // live on the input DTO, which preSave does not receive. The registry refuses a model that is
+    // not a conforming JSON Schema, reported as a 400 by ModelRegistryExceptionHandler.
     storeModelInRegistry(entity, input);
 
     return super.postConvertToEntity(entity, input);
@@ -134,27 +133,6 @@ public class DataStructureVersionService
     }
 
     return super.preProcessUpdateInput(input, existingEntity);
-  }
-
-  /**
-   * Validates the input's model as a JSON Schema via embedded Model Forge before saving.
-   * portal-backend has no schema validation of its own; a malformed model is rejected here on
-   * create and update. An absent/empty model is not validated (the release check enforces
-   * presence).
-   *
-   * @param entity the data structure version entity (for error context)
-   * @param input the input DTO carrying the model
-   * @throws InvalidInputException if the model is present but not a valid JSON Schema
-   */
-  private void validateModelSchema(
-      DataStructureVersion entity, DataStructureVersionInputDTO input) {
-    List<String> errors = modelRegistryGateway.validateSchema(input.getModel());
-    if (!errors.isEmpty()) {
-      throw new InvalidInputException(
-          "model",
-          entity.getId(),
-          "Model is not a valid JSON Schema: " + String.join("; ", errors));
-    }
   }
 
   /**

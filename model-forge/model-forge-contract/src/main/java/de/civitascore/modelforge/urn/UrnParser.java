@@ -63,6 +63,27 @@ public final class UrnParser {
     }
 
     /**
+     * The identity an artifact is written under, or {@link IllegalArgumentException} when {@code urn}
+     * is not a CORE URN.
+     *
+     * <p>A write is the last point where a malformed identity can still be refused cheaply. Past it
+     * the value becomes the artifact's {@code logical_urn}, and {@link #logicalUrn} returns a non-URN
+     * unchanged — so a display name persists as an identity that no URN navigation resolves, and the
+     * mistake surfaces far from where it was made.
+     *
+     * @return {@code urn}, so a caller can guard and assign in one expression
+     */
+    public static String requireUrn(String urn, String what) {
+        if (!isUrn(urn)) {
+            throw new IllegalArgumentException(
+                what + " '" + urn + "' is not a CORE URN (expected "
+                    + "urn:core:<scope>:<owner>:<type>:<domain>:<name>:<disambiguator>"
+                    + " with an optional :<version>).");
+        }
+        return urn;
+    }
+
+    /**
      * Rejects URN strings that contain ASCII control characters (0x00–0x1F, 0x7F).
      *
      * <p>Prevents injection when the URN is used in SQL, log lines, or URL path segments.

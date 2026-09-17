@@ -126,6 +126,11 @@ class EmbeddedModelForgeTest {
                 }
 
                 @Override
+                public List<de.civitascore.modelforge.contract.NonConformingArtifact> nonConformingElements() {
+                    return List.of();
+                }
+
+                @Override
                 public void linkToDataSet(ArtifactId dataSet, ArtifactId member) {
                     // no-op fake
                 }
