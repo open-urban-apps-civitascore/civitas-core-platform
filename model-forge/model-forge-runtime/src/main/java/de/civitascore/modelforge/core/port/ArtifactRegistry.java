@@ -185,9 +185,6 @@ public interface ArtifactRegistry {
 
     List<String> fetchArtifactRefUrns(String urn);
 
-    /** Logical URNs of every artifact, of every type. */
-    List<String> listAllUrns();
-
     /**
      * Every stored reference edge, keyed by the <em>versioned</em> URN that holds it, targets
      * verbatim and in document order. Backs the whole-graph rebuild, in one read.

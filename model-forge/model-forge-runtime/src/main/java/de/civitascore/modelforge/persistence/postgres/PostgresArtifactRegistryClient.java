@@ -336,11 +336,6 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     // ── List ──────────────────────────────────────────────────────────────────
 
     @Override
-    public List<String> listAllUrns() {
-        return read(artifacts::listAllLogicalUrns);
-    }
-
-    @Override
     public Map<String, List<String>> referenceEdgesByVersion() {
         return read(references::edgesByVersion);
     }

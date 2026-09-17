@@ -236,10 +236,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    /**
-     * Publishes a write's edges under the version it was stored as. Falls back to the request URN
-     * when the store returned no pin, which only a registry double does.
-     */
+    /** Publishes a write's edges under its pin; only a registry double returns none. */
     private void registerWritten(String pin, String requestUrn) {
         dependencyGraph.registerFromRegistry(pin != null && !pin.isBlank() ? pin : requestUrn);
     }
@@ -417,8 +414,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             // persists their per-type reference edges (Mapping source/target, Pipeline nodes,
             // DataStructure/DataSet *Refs). registerFromRegistry() then mirrors those durable
             // edges into the in-memory graph so dependencies()/dependents() see them. It is given
-            // the pin the write returned, not the request URN: a revision of an older version line
-            // does not become current, so resolving would index the wrong version.
+            // the pin the write returned, never the request URN.
             case DATA_STRUCTURE -> { String p = registry.storeDataStructure(urn, content, bump); registerWritten(p, urn); yield p; }
             case MAPPING -> { String p = registry.storeMapping(urn, content, bump); registerWritten(p, urn); yield p; }
             case PIPELINE -> { String p = registry.storePipeline(urn, content, bump); registerWritten(p, urn); yield p; }
@@ -599,7 +595,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         }
         String logical = UrnParser.logicalUrn(urn);
         String assigned = registry.bumpVersion(logical, command.bump());
-        dependencyGraph.registerFromRegistry(logical);
+        registerWritten(assigned, logical);
         var pin = new ArtifactId(assigned != null && !assigned.isBlank() ? assigned : logical);
         return new ArtifactWriteResult(pin, dependenciesOf(pin));
     }

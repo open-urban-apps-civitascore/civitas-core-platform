@@ -82,8 +82,7 @@ public class DependencyGraphService {
             graphLock.unlock();
         }
 
-        // Every version the read returned must have become a node. Registration is the only step
-        // between the two counts, so a mismatch is a defect here, not a short read.
+        // Registration is the only step between the rows read and the nodes held.
         if (dependencies.size() != edges.size()) {
             log.warn("Dependency graph indexed {} of the {} version(s) read",
                 dependencies.size(), edges.size());
