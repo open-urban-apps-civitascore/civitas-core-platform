@@ -206,10 +206,10 @@ public class ElementCommandService {
             }
         }
         if (changed) {
-            registry.storeDataSet(dataSetLogicalUrn, doc, VersionBump.MINOR);
+            String pin = registry.storeDataSet(dataSetLogicalUrn, doc, VersionBump.MINOR);
             // The graph is keyed by the version a node was registered under, and this mints a new
             // one. Without the refresh every member of the Data Set reads as removed.
-            graph.registerFromRegistry(dataSetLogicalUrn);
+            graph.registerFromRegistry(pin != null && !pin.isBlank() ? pin : dataSetLogicalUrn);
         }
     }
 }

@@ -719,4 +719,42 @@ class EmbeddedModelForgeOperationsTest {
         assertThat(operations.existing(null)).isEmpty();
         verify(registry, never()).heldUrns(any());
     }
+
+    // ── The version a write publishes to the graph ────────────────────────────
+
+    private static final String REVISED_LOGICAL = "urn:core:platform:civitas:datastructure:common:Holder:m8i4hc3h56";
+    private static final String REVISED_PIN     = REVISED_LOGICAL + ":1.1.0";
+    private static final String REVISED_CURRENT = REVISED_LOGICAL + ":2.0.0";
+    private static final String REVISED_MEMBER  = "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0";
+
+    @Test
+    void writeOntoAnOlderVersionLinePublishesThatVersion() {
+        // A revision of a line that is not the newest keeps its own major and stays behind the
+        // current version. The node has to be the version that was written.
+        var realGraph = new DependencyGraphService(registry);
+        var ops = operationsWith(realGraph);
+        when(registry.storeDataStructure(eq(REVISED_LOGICAL), any(), any())).thenReturn(REVISED_PIN);
+        when(registry.resolveReference(REVISED_LOGICAL)).thenReturn(Optional.of(REVISED_CURRENT));
+        when(registry.fetchArtifactRefUrns(REVISED_PIN)).thenReturn(List.of(REVISED_MEMBER));
+        when(registry.fetchArtifactRefUrns(REVISED_CURRENT)).thenReturn(List.of());
+
+        ops.saveArtifact(new SaveArtifactCommand(
+            new ArtifactId(REVISED_LOGICAL), ArtifactKind.DATA_STRUCTURE, mapper.createObjectNode(),
+            VersionBump.MINOR));
+
+        assertThat(realGraph.getDependencies(REVISED_PIN)).containsExactly(REVISED_MEMBER);
+        assertThat(realGraph.getDependencies(REVISED_CURRENT))
+            .as("the current version was not written and must keep its own edges")
+            .isEmpty();
+    }
+
+    /** The same operations, wired to a graph the test can read back. */
+    private EmbeddedModelForgeOperations operationsWith(DependencyGraphService realGraph) {
+        return new EmbeddedModelForgeOperations(
+            schemaImportService, new ElementQueryService(registry), elementCommandService, viewService,
+            mock(ModelValidator.class), mock(de.civitascore.modelforge.validation.CoreSchemaValidator.class),
+            new ReferenceExistenceValidator(registry, mock(SchemaRefExtractor.class)),
+            realGraph, registry, mock(SmartDataModelsService.class), mock(XRepositoryService.class),
+            new de.civitascore.modelforge.urn.UrnService("platform", "civitas", "common", "1.0.0"));
+    }
 }
