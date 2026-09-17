@@ -1,6 +1,8 @@
 package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -48,15 +50,17 @@ public interface DataStructureVersionRepository extends BaseRepository<DataStruc
   Optional<DataStructureVersion> findFirstByModelUrnStartingWith(String modelUrnPrefix);
 
   /**
-   * Finds the version whose {@code modelUrn} is exactly the given versioned CORE URN — the pin a
-   * DataSink's {@code element} carries — so a sink resolves to the precise version it references
-   * rather than any version of the owning structure. {@code First} because the column carries no
-   * unique constraint. The {@code dataStructure} is eagerly fetched so the caller can read its id
-   * outside the persistence context.
+   * Every version record of the structures these version-free URNs name.
    *
-   * @param modelUrn the versioned CORE URN to match
-   * @return the version pinning that URN, or empty if no stored version does
+   * <p>A flow pins one version, but a draft version's pin advances inside its own major whenever
+   * its model changes, so the pinned string stops naming any record. Resolving by structure and
+   * major finds the record that owns the pin, while a later major stays out of reach because it is
+   * a different record with a lifecycle of its own.
+   *
+   * @param modelLogicalUrns the version-free CORE URNs of the owning structures
+   * @return every version record of those structures, parents eagerly fetched
    */
   @EntityGraph(attributePaths = {"dataStructure"})
-  Optional<DataStructureVersion> findFirstByModelUrn(String modelUrn);
+  List<DataStructureVersion> findAllByDataStructure_ModelLogicalUrnIn(
+      Collection<String> modelLogicalUrns);
 }

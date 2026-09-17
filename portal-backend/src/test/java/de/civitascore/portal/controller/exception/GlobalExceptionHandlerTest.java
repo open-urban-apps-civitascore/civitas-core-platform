@@ -8,6 +8,7 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.SagaInFlightException;
@@ -127,7 +128,23 @@ class GlobalExceptionHandlerTest {
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
       assertThat(problemDetail.getDetail()).isEqualTo("Referenced by DataSource");
+      assertThat(problemDetail.getProperties()).isNullOrEmpty();
       assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName("Should keep the blocking artifacts out of the response body")
+    void shouldNotReturnBlockersForResourceInUse() {
+      List<String> blockers = List.of("urn:core:datasink:Readings", "urn:core:mapping:Join");
+      ResourceInUseException ex =
+          new ResourceInUseException(
+              "DataStructure", UUID.randomUUID(), "Still referenced", blockers);
+
+      ProblemDetail problemDetail = handler.handleResourceInUse(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getDetail()).isEqualTo("Still referenced");
+      assertThat(problemDetail.getProperties()).isNullOrEmpty();
     }
 
     @ParameterizedTest(name = "{0}")
@@ -146,6 +163,29 @@ class GlobalExceptionHandlerTest {
       assertThat(problemDetail.getDetail()).contains(pendingSagaType.name());
       assertThat(problemDetail.getProperties()).containsEntry("pendingSagaType", pendingSagaType);
       assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName("Should return 422 naming the blocked pipelines for PipelineClosureValidation")
+    void shouldReturn422NamingTheBlockedPipelines() {
+      UUID first = UUID.randomUUID();
+      UUID second = UUID.randomUUID();
+
+      ProblemDetail problemDetail =
+          handler.handlePipelineClosureValidation(
+              new PipelineClosureValidationException(List.of(first, second)), mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:PIPELINE_CLOSURE_INVALID");
+      assertThat(problemDetail.getProperties())
+          .containsEntry("offendingPipelineIds", List.of(first, second));
+      assertThat(problemDetail.getDetail())
+          .as("the reply names no artifact, so the message has to state every condition")
+          .contains("exist", "readable", "released")
+          .doesNotContain("urn:core:");
+      assertThat(problemDetail.getProperties().toString())
+          .as("an artifact added as a further property would disclose it just as well")
+          .doesNotContain("urn:core:");
     }
 
     @Test

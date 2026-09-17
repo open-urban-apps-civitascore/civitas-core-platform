@@ -39,9 +39,11 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
-import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.service.validation.PipelineClosureValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.SagaInFlightException;
 import java.util.HashSet;
@@ -79,6 +81,7 @@ class DataSetServiceTest {
   @Mock private PipelineRuntimeStatusService pipelineRuntimeStatusService;
   @Mock private ObjectProvider<AllowedScopes> allowedScopesProvider;
   @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private PipelineClosureValidator pipelineClosureValidator;
 
   private DataSetService createService() {
     // Default to TENANT wildcard so the F4 target-pool check passes for existing pool-setting
@@ -106,7 +109,8 @@ class DataSetServiceTest {
         allowedScopesProvider,
         new DataSourceDatapoolScopeValidator(),
         modelRegistryGateway,
-        new DataSetMutationGuard(dataSetRepository));
+        new DataSetMutationGuard(dataSetRepository),
+        pipelineClosureValidator);
   }
 
   private static AllowedScopes wildcardScopes() {
@@ -167,6 +171,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
+      p.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
       p.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(p);
 
@@ -189,6 +194,25 @@ class DataSetServiceTest {
       assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DataSources");
+    }
+
+    @Test
+    @DisplayName("rejects a pipeline whose flow has not been authored yet")
+    void rejectsPipelineWithoutStoredDefinition() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSet(id);
+      Pipeline p = new Pipeline();
+      p.setName("Ingest");
+      p.setDataSources(new HashSet<>(List.of(new DataSource())));
+      ds.getPipelines().add(p);
+
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().stage(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Ingest")
+          .hasMessageContaining("no stored definition");
+      verify(dataSetRepository, never()).save(any());
     }
 
     @Test
@@ -226,6 +250,7 @@ class DataSetServiceTest {
     private DataSet draftDataSetWithPipeline(UUID id) {
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
+      p.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
       p.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(p);
       return ds;
@@ -454,6 +479,7 @@ class DataSetServiceTest {
 
     private void addPipelineWithSource(DataSet dataSet, DataSource source) {
       Pipeline p = new Pipeline();
+      p.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
       p.setDataSources(new HashSet<>(Set.of(source)));
       dataSet.getPipelines().add(p);
     }
@@ -2062,8 +2088,6 @@ class DataSetServiceTest {
 
     private static final String PIPELINE_URN =
         "urn:core:platform:civitas:pipeline:common:doomed-pipeline:abcdefghij";
-    private static final String MAPPING_URN =
-        "urn:core:platform:civitas:mapping:common:doomed-mapping:abcdefghij";
     private static final String SINK_URN =
         "urn:core:platform:civitas:data-sink:common:doomed-sink:abcdefghij";
 
@@ -2088,12 +2112,6 @@ class DataSetServiceTest {
     private void stubOwnedArtifacts(UUID id, DataSet ds) {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(ownedSink()));
-      lenient()
-          .when(modelRegistryGateway.dependencyUrnsOfType(PIPELINE_URN, "mapping"))
-          .thenReturn(List.of(MAPPING_URN + ":1.0.0"));
-      lenient()
-          .when(modelRegistryGateway.logicalUrn(MAPPING_URN + ":1.0.0"))
-          .thenReturn(MAPPING_URN);
     }
 
     @Test
@@ -2108,16 +2126,14 @@ class DataSetServiceTest {
 
       createService().deleteById(id);
 
-      verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
-      // The pipeline artifact holds the edges that keep the mapping, the sink configuration and the
-      // DataSource referenced, so all three go — otherwise those stay undeletable for good.
-      verify(modelRegistryGateway).deletePayload(PIPELINE_URN);
-      verify(modelRegistryGateway).deletePayload(MAPPING_URN);
-      verify(modelRegistryGateway).deletePayload(SINK_URN);
+      // The manifest's membership edges carry the pipelines, and each pipeline the mappings no
+      // other pipeline uses, so one cascading removal covers them all.
+      verify(modelRegistryGateway).deleteArtifact(ds.getManifestLogicalUrn(), true);
+      verify(modelRegistryGateway).deleteArtifact(SINK_URN, false);
     }
 
     @Test
-    @DisplayName("the manifest goes before the pipeline, and the pipeline before what it wires")
+    @DisplayName("the manifest goes before the sink configurations its pipelines wrote through")
     void deletesArtifactsInReferenceOrder() {
       UUID id = UUID.randomUUID();
       DataSet ds =
@@ -2128,34 +2144,63 @@ class DataSetServiceTest {
 
       createService().deleteById(id);
 
-      // Order is the whole point: a referenced artifact cannot be deleted, so each step has to
-      // remove the edges that keep the next one referenced.
+      // Order is the whole point: a referenced artifact cannot be deleted, and the pipelines the
+      // manifest cascade takes hold the edges onto the sink configurations.
       InOrder order = inOrder(modelRegistryGateway);
-      order.verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
-      order.verify(modelRegistryGateway).deletePayload(PIPELINE_URN);
-      order.verify(modelRegistryGateway).deletePayload(MAPPING_URN);
-      order.verify(modelRegistryGateway).deletePayload(SINK_URN);
+      order.verify(modelRegistryGateway).deleteArtifact(ds.getManifestLogicalUrn(), true);
+      order.verify(modelRegistryGateway).deleteArtifact(SINK_URN, false);
     }
 
     @Test
-    @DisplayName("a member the registry refuses to remove does not fail the delete")
-    void refusedMemberDoesNotFailTheDelete() {
+    @DisplayName("a refused removal fails the whole delete rather than stranding the artifact")
+    void refusedRemovalFailsTheWholeDelete() {
       UUID id = UUID.randomUUID();
       DataSet ds =
           datasetWithOwnedArtifacts(
               id, "urn:core:platform:civitas:dataset:common:shared:abcdefghij");
       ds.setProvisioned(false);
       stubOwnedArtifacts(id, ds);
-      // A mapping another DataSet still references is refused, which must leave it intact rather
-      // than abort a delete whose rows are already gone.
       doThrow(new IllegalStateException("still referenced"))
           .when(modelRegistryGateway)
-          .deletePayload(MAPPING_URN);
+          .deleteArtifact(ds.getManifestLogicalUrn(), true);
 
-      createService().deleteById(id);
+      // Swallowing this would commit the row deletions and leave the artifact behind with nothing
+      // left to reach it; the transaction rolls back instead.
+      assertThatThrownBy(() -> createService().deleteById(id))
+          .isInstanceOf(IllegalStateException.class);
+    }
 
+    @Test
+    @DisplayName("a refusal after the teardown saga does not restore the dataset")
+    void refusalAfterTeardownDoesNotRestoreTheDataSet() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setProvisioned(true);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      ds.setManifestLogicalUrn("urn:core:platform:civitas:dataset:common:torn-down:abcdefghij");
+
+      DataSink sink = new DataSink();
+      sink.setId(UUID.randomUUID());
+      sink.setConfigurationLogicalUrn(
+          "urn:core:platform:civitas:data-sink:common:torn-down-sink:abcdefghij");
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(sink));
+      doThrow(new IllegalStateException("still referenced"))
+          .when(modelRegistryGateway)
+          .deleteArtifact(sink.getConfigurationLogicalUrn(), false);
+
+      // The infrastructure this dataset described is already gone. Letting the refusal out would
+      // roll the row back with its pending saga type set, and every later delete refuses that.
+      assertThatCode(
+              () ->
+                  createService()
+                      .handleSagaCompleted(
+                          id,
+                          new SagaResultPayload(
+                              id.toString(), null, null, null, null, null, null, null, null, null)))
+          .doesNotThrowAnyException();
       verify(dataSetRepository).delete(ds);
-      verify(modelRegistryGateway).deletePayload(SINK_URN);
     }
 
     @Test
@@ -2181,8 +2226,8 @@ class DataSetServiceTest {
               new SagaResultPayload(
                   id.toString(), null, null, null, null, null, null, null, null, null));
 
-      verify(modelRegistryGateway).deleteDataSet(ds.getManifestLogicalUrn());
-      verify(modelRegistryGateway).deletePayload(sink.getConfigurationLogicalUrn());
+      verify(modelRegistryGateway).deleteArtifact(ds.getManifestLogicalUrn(), true);
+      verify(modelRegistryGateway).deleteArtifact(sink.getConfigurationLogicalUrn(), false);
     }
   }
 
@@ -2367,6 +2412,69 @@ class DataSetServiceTest {
       createService().unlinkMember(id, MEMBER_URN);
 
       verify(modelRegistryGateway, never()).unlinkFromDataSet(any(), any());
+    }
+  }
+
+  @Nested
+  @DisplayName("participating artifact validation")
+  class ParticipatingArtifactValidation {
+
+    private DataSet stageable(UUID id) {
+      DataSet ds = draftDataSet(id);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
+      pipeline.setDataSources(new HashSet<>(List.of(new DataSource())));
+      ds.getPipelines().add(pipeline);
+      return ds;
+    }
+
+    /**
+     * A READY dataset publishing no named API, so the map/API-surface check passes and the
+     * participating-artifact validation is the only thing that can reject the release.
+     */
+    private DataSet releasable(UUID id) {
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.READY);
+      ds.setPipelines(new HashSet<>());
+      ds.setNamedApis(new HashSet<>());
+      return ds;
+    }
+
+    @Test
+    @DisplayName("a dataset whose flows carry a defect is not staged")
+    void blockedStagingLeavesTheDatasetInDraft() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = stageable(id);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      doThrow(new PipelineClosureValidationException(List.of(UUID.randomUUID())))
+          .when(pipelineClosureValidator)
+          .validate(any());
+
+      assertThatThrownBy(() -> createService().stage(id))
+          .isInstanceOf(PipelineClosureValidationException.class);
+
+      assertThat(ds.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+      verify(dataSetRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("a blocked release provisions nothing, rather than compensating afterwards")
+    void blockedReleasePublishesNoSaga() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = releasable(id);
+      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
+      doThrow(new PipelineClosureValidationException(List.of(UUID.randomUUID())))
+          .when(pipelineClosureValidator)
+          .validate(any());
+
+      assertThatThrownBy(() -> createService().release(id))
+          .isInstanceOf(PipelineClosureValidationException.class);
+
+      verify(sagaPublisher, never()).publishCreateRequested(any());
+      assertThat(ds.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+      assertThat(ds.getPendingSagaType()).isNull();
+      verify(dataSetRepository, never()).save(any());
     }
   }
 }

@@ -210,7 +210,7 @@ public class DependencyGraphService {
      * {@code Integer.MAX_VALUE} walks the full transitive closure. Cycle-safe via the visited set.
      */
     public Set<String> getTransitiveDependencies(String urn, int maxDepth) {
-        return transitive(urn, maxDepth, this::getDependencies);
+        return transitiveVisited(urn, maxDepth, this::getDependencies);
     }
 
     /**
@@ -218,23 +218,52 @@ public class DependencyGraphService {
      * {@code urn}, reachable within {@code maxDepth} hops. Same bounds and cycle-safety.
      */
     public Set<String> getTransitiveDependents(String urn, int maxDepth) {
-        return transitive(urn, maxDepth, this::getDependents);
+        return transitiveVisited(urn, maxDepth, this::getDependents);
     }
 
-    private static Set<String> transitive(String urn, int maxDepth, java.util.function.Function<String, Set<String>> direct) {
+    /**
+     * What a depth-bounded walk reached, and whether the bound stopped it short: {@code truncated}
+     * is true when an artifact the walk never reached lies immediately beyond it.
+     */
+    public record BoundedWalk(Set<String> visited, boolean truncated) {
+        public BoundedWalk {
+            // Order-preserving copy: the closure contract promises the walk's discovery order.
+            visited = Collections.unmodifiableSet(new LinkedHashSet<>(visited));
+        }
+    }
+
+    /**
+     * {@link #getTransitiveDependencies} plus whether the bound cut the walk short — what a caller
+     * needs to tell an exhausted closure from a truncated one.
+     */
+    public BoundedWalk getTransitiveDependenciesBounded(String urn, int maxDepth) {
+        return transitive(urn, maxDepth, this::getDependencies);
+    }
+
+    private static Set<String> transitiveVisited(String urn, int maxDepth, java.util.function.Function<String, Set<String>> direct) {
+        return transitive(urn, maxDepth, direct).visited();
+    }
+
+    private static BoundedWalk transitive(String urn, int maxDepth, java.util.function.Function<String, Set<String>> direct) {
         Set<String> visited = new LinkedHashSet<>();
-        if (maxDepth <= 0) return Collections.unmodifiableSet(visited);
+        if (maxDepth <= 0) {
+            return new BoundedWalk(Collections.unmodifiableSet(visited), !direct.apply(urn).isEmpty());
+        }
         Set<String> frontier = new LinkedHashSet<>(direct.apply(urn)); // level 1
+        Set<String> beyond = new LinkedHashSet<>();
         for (int level = 1; level <= maxDepth && !frontier.isEmpty(); level++) {
             Set<String> nextFrontier = new LinkedHashSet<>();
             for (String node : frontier) {
-                if (visited.add(node) && level < maxDepth) {
-                    nextFrontier.addAll(direct.apply(node));
+                if (visited.add(node)) {
+                    // The last level is visited but not expanded; collect its references so the
+                    // bound can report what it left behind.
+                    (level < maxDepth ? nextFrontier : beyond).addAll(direct.apply(node));
                 }
             }
             frontier = nextFrontier;
         }
-        return Collections.unmodifiableSet(visited);
+        beyond.removeAll(visited);
+        return new BoundedWalk(Collections.unmodifiableSet(visited), !beyond.isEmpty());
     }
 
     /**

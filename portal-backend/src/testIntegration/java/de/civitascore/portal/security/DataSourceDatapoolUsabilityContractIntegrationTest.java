@@ -9,6 +9,7 @@ import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.specification.DataSourceDatapoolUsability;
+import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import java.util.HashSet;
 import java.util.List;

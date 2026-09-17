@@ -240,14 +240,16 @@ public class ModelForgeAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean({ArtifactRegistry.class, DependencyGraphService.class, SchemaRefExtractor.class})
+    @ConditionalOnBean({ArtifactRegistry.class, DependencyGraphService.class, SchemaRefExtractor.class,
+        ModelValidator.class})
     @ConditionalOnMissingBean
     ElementCommandService modelForgeElementCommandService(
         ArtifactRegistry registry,
         DependencyGraphService graph,
-        SchemaRefExtractor refExtractor
+        SchemaRefExtractor refExtractor,
+        ModelValidator validator
     ) {
-        return new ElementCommandService(registry, graph, refExtractor);
+        return new ElementCommandService(registry, graph, refExtractor, validator);
     }
 
     @Bean
