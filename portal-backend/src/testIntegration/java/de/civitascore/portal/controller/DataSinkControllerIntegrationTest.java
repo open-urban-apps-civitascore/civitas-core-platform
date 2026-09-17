@@ -143,7 +143,8 @@ class DataSinkControllerIntegrationTest
       assertThat(body.getDataSinkType()).isEqualTo(DataSinkType.FROST);
       assertThat(body.getDataSetId()).isEqualTo(testDataSetId);
       assertThat(body.getPipelineId()).isNull();
-      assertThat(body.isInUse()).isFalse();
+      assertThat(body.isInUseByPipeline()).isFalse();
+      assertThat(body.isInUseByLayer()).isFalse();
     }
 
     @Test
@@ -207,8 +208,8 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should report inUse=true when the DataSink is linked to a pipeline")
-    void shouldReportInUseWhenLinkedToPipeline() {
+    @DisplayName("Should report inUseByPipeline=true when the DataSink is linked to a pipeline")
+    void shouldReportInUseByPipelineWhenLinkedToPipeline() {
       ensureTestData();
       DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
       Pipeline pipeline = pipelineRepository.findById(testPipelineId).orElseThrow();
@@ -222,7 +223,8 @@ class DataSinkControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().isInUse()).isTrue();
+      assertThat(response.getBody().isInUseByPipeline()).isTrue();
+      assertThat(response.getBody().isInUseByLayer()).isFalse();
       assertThat(response.getBody().getPipelineId()).isEqualTo(testPipelineId);
     }
   }
@@ -245,7 +247,8 @@ class DataSinkControllerIntegrationTest
       assertThat(body.getDataSinkType()).isEqualTo(DataSinkType.FROST);
       assertThat(body.getDataSetId()).isEqualTo(testDataSetId);
       assertThat(body.getPipelineId()).isNull();
-      assertThat(body.isInUse()).isFalse();
+      assertThat(body.isInUseByPipeline()).isFalse();
+      assertThat(body.isInUseByLayer()).isFalse();
       assertThat(dataSinkRepository.findById(body.getId()))
           .isPresent()
           .get()

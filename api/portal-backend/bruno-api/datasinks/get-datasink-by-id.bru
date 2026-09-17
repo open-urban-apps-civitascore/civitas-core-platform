@@ -37,5 +37,5 @@ tests {
 docs {
   **Precondition:** `dataSetId` and `dataSinkId` are set.
 
-  **Expected Response:** 200 OK, body contains the DataSink with matching `id`, including the `inUse` flag and (for POSTGIS) the inline DataStructureVersion summary.
+  **Expected Response:** 200 OK, body contains the DataSink with matching `id`, including the `inUseByPipeline` and `inUseByLayer` flags and (for POSTGIS) the inline DataStructureVersion summary.
 }
