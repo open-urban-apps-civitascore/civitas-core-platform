@@ -871,36 +871,40 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
     fi
 
     # Model Forge is the source of the Admin UI fat JAR (the reactor build packages
-    # core-model-forge-admin-ui too), so build it into the container Maven cache before the image
-    # build. portal-backend does not consume core-model-forge-* yet, so this is only needed for the
-    # Admin UI today; it is kept on the backend path as well so the dependency, once declared,
-    # resolves locally rather than from the external registry. Model Forge keeps its own fixed
-    # version (no -Drevision). Only the Java jars are needed.
+    # core-model-forge-admin-ui too) and of the core-model-forge-* artifacts portal-backend
+    # compiles against, so build it into the container Maven cache before the image build.
+    # Only the Java jars are needed.
     if [ "$backend_option" = "1" ] || [ "$START_ADMIN_UI" = "true" ]; then
-        if ! mvn_build "$SCRIPT_DIR/../model-forge" $MVN_CLEAN install -DskipTests -Dspotless.check.skip=true -Dspotbugs.skip=true -q; then
+        if ! mvn_build "$SCRIPT_DIR/../model-forge" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -Dspotless.check.skip=true -Dspotbugs.skip=true -q; then
             echo "ERROR: Model Forge build failed"
             exit 1
         fi
         echo "  Model Forge built"
     fi
 
-    # --skip-build never runs the Model Forge build, but the Admin UI image copies the fat JAR
-    # straight out of target/. With no JAR the image build fails with a confusing COPY error, so
-    # fail here with the actionable message instead.
-    if [ "$SKIP_BUILD" = "true" ] && [ "$START_ADMIN_UI" = "true" ]; then
-        ADMIN_UI_TARGET="$SCRIPT_DIR/../model-forge/model-forge-admin-ui/target"
-        if ! ls "$ADMIN_UI_TARGET"/core-model-forge-admin-ui-*[0-9T].jar >/dev/null 2>&1; then
-            echo "ERROR: --skip-build was passed but no Admin UI JAR exists in"
-            echo "       model-forge/model-forge-admin-ui/target/"
+    # The Admin UI image copies the fat JAR straight out of target/, and both ways that can go
+    # wrong surface as a confusing COPY error: no JAR at all (--skip-build never runs the build
+    # above), or two of them (--no-clean keeps the JAR of a previous ${revision} next to the new
+    # one). Fail here with the actionable message instead.
+    if [ "$START_ADMIN_UI" = "true" ]; then
+        ADMIN_UI_JARS=("$SCRIPT_DIR/../model-forge/model-forge-admin-ui/target"/core-model-forge-admin-ui-*.jar)
+        if [ ! -f "${ADMIN_UI_JARS[0]}" ]; then
+            echo "ERROR: no Admin UI JAR in model-forge/model-forge-admin-ui/target/"
             echo "       Run once without --skip-build, or start with --no-admin-ui."
             exit 1
+        elif [ "${#ADMIN_UI_JARS[@]}" -gt 1 ]; then
+            echo "ERROR: model-forge/model-forge-admin-ui/target/ holds several Admin UI JARs, so"
+            echo "       the image build cannot pick one. Run once without --no-clean."
+            exit 1
         fi
-        echo "  (--skip-build) Admin UI JAR present — note it may be STALE; drop --skip-build to rebuild"
+        if [ "$SKIP_BUILD" = "true" ]; then
+            echo "  (--skip-build) Admin UI JAR present — note it may be STALE; drop --skip-build to rebuild"
+        fi
     fi
 
     # Portal Backend JAR (needed by portal-backend Dockerfile)
     if [ "$backend_option" = "1" ]; then
-        if ! mvn_build "$SCRIPT_DIR/../portal-backend" $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -q; then
+        if ! mvn_build "$SCRIPT_DIR/../portal-backend" $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -Dmodel-forge.version=$DEV_VERSION -q; then
             echo "ERROR: Portal Backend build failed"
             exit 1
         fi

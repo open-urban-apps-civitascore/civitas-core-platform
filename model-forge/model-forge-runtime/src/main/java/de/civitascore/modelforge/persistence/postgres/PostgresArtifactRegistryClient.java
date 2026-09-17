@@ -27,8 +27,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -247,10 +249,15 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
 
     @Override
     public List<String> nonDataSetBlockingDependents(String urn) {
+        return nonDataSetBlockingDependents(urn, null);
+    }
+
+    @Override
+    public List<String> nonDataSetBlockingDependents(String urn, String targetVersion) {
         UrnParser.requireNoControlChars(urn);
         String logical = UrnParser.logicalUrn(urn);
         try {
-            return references.nonDataSetBlockingDependents(logical);
+            return references.nonDataSetBlockingDependents(logical, pinnedVersion(targetVersion));
         } catch (DataAccessException e) {
             throw translate(e, "Could not read dependents of " + logical);
         }
@@ -264,6 +271,31 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
             return references.dataSetMemberships(logical);
         } catch (DataAccessException e) {
             throw translate(e, "Could not read DataSet memberships of " + logical);
+        }
+    }
+
+    /**
+     * The concrete version a caller named, or null for the {@code latest} token — which follows
+     * whichever version is current and so constrains the artifact as a whole. Stored reference URNs
+     * carry the token verbatim, so it reaches these queries as if it were a SemVer.
+     */
+    private static String pinnedVersion(String version) {
+        return UrnParser.LATEST.equals(version) ? null : version;
+    }
+
+    @Override
+    public List<String> ownedMemberUrns(String urn) {
+        return ownedMemberUrns(urn, null);
+    }
+
+    @Override
+    public List<String> ownedMemberUrns(String urn, String ownerVersion) {
+        UrnParser.requireNoControlChars(urn);
+        String logical = UrnParser.logicalUrn(urn);
+        try {
+            return references.ownedMemberUrns(logical, pinnedVersion(ownerVersion));
+        } catch (DataAccessException e) {
+            throw translate(e, "Could not read owned members of " + logical);
         }
     }
 
@@ -513,6 +545,73 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     @Override
     public Set<String> extractImportRefs(String xsdContent) {
         return xsd.extractImportRefs(xsdContent, this::findXsdByNamespace);
+    }
+
+    /**
+     * How many artifacts one bulk-existence statement asks about. A collection parameter expands to
+     * one bind per element and the PostgreSQL wire protocol caps a statement at 65535 binds, so a
+     * large input is answered in fixed-size chunks. Fixed rather than input-sized, so full chunks
+     * reuse one prepared statement.
+     */
+    private static final int EXISTENCE_BATCH_SIZE = 500;
+
+    @Override
+    public Set<String> heldUrns(Collection<String> urns) {
+        if (urns == null || urns.isEmpty()) {
+            return Set.of();
+        }
+        // Keyed by the caller's own spelling, so a repeated URN does not consume a bind slot twice.
+        List<String> requested = urns.stream()
+            .filter(urn -> urn != null && !urn.isBlank())
+            .distinct()
+            .toList();
+        if (requested.isEmpty()) {
+            return Set.of();
+        }
+        // One read for the whole answer: a chunk failing mid-way must not surface as a smaller
+        // held set, which would read as "these are missing".
+        return read(() -> {
+            Map<String, ArtifactVersions> known = new HashMap<>();
+            List<String> logicals = requested.stream().map(UrnParser::logicalUrn).distinct().toList();
+            for (int from = 0; from < logicals.size(); from += EXISTENCE_BATCH_SIZE) {
+                List<String> batch =
+                    logicals.subList(from, Math.min(from + EXISTENCE_BATCH_SIZE, logicals.size()));
+                for (ArtifactVersionIdentity row : artifacts.findVersionIdentities(batch)) {
+                    known
+                        .computeIfAbsent(row.logicalUrn(), urn -> new ArtifactVersions(row.currentVersion()))
+                        .versions()
+                        .add(row.version());
+                }
+            }
+            Set<String> held = new LinkedHashSet<>();
+            for (String urn : requested) {
+                if (isHeld(urn, known.get(UrnParser.logicalUrn(urn)))) {
+                    held.add(urn);
+                }
+            }
+            return held;
+        });
+    }
+
+    /**
+     * The same decision {@link #resolveVersion} makes, against already-read rows: a pinned URN needs
+     * that version, a logical or {@code :latest} URN needs the artifact to have a current one.
+     */
+    private static boolean isHeld(String urn, ArtifactVersions stored) {
+        if (stored == null) {
+            return false;
+        }
+        String version = UrnParser.versionFromUrn(urn);
+        String target = (version == null || UrnParser.LATEST.equals(version))
+            ? stored.currentVersion() : version;
+        return target != null && stored.versions().contains(target);
+    }
+
+    /** The versions one artifact holds, and the one a version-free reference to it resolves to. */
+    private record ArtifactVersions(String currentVersion, Set<String> versions) {
+        ArtifactVersions(String currentVersion) {
+            this(currentVersion, new HashSet<>());
+        }
     }
 
     @Override

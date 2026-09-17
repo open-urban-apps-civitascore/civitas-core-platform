@@ -22,7 +22,7 @@
 
   <groupId>de.civitascore</groupId>
   <artifactId>core-model-forge-parent</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>${revision}</version>
   <packaging>pom</packaging>
 
   <name>CIVITAS/CORE Model Forge — Parent</name>
@@ -37,6 +37,10 @@
   </licenses>
 
   <properties>
+    <!-- Base version; CI appends a branch suffix via -Drevision (bare on main/tags,
+         -SNAPSHOT on develop, -MR-<iid>-SNAPSHOT on merge requests), same as
+         portal-model and config-adapter. -->
+    <revision>0.1.0</revision>
     <!-- Host baseline: portal-backend builds with Java 25 (portal-backend/pom.xml). -->
     <java.version>25</java.version>
     <!-- Reproducible builds: identical inputs produce byte-identical artifacts -->
@@ -166,6 +170,33 @@
                 </bannedDependencies>
               </rules>
             </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Resolves ${revision} in the POMs that get installed/deployed, so consumers see
+           the concrete version rather than the placeholder. -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>flatten-maven-plugin</artifactId>
+        <version>1.6.0</version>
+        <configuration>
+          <updatePomFile>true</updatePomFile>
+          <flattenMode>resolveCiFriendliesOnly</flattenMode>
+        </configuration>
+        <executions>
+          <execution>
+            <id>flatten</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>flatten</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>flatten.clean</id>
+            <phase>clean</phase>
+            <goals>
+              <goal>clean</goal>
+            </goals>
           </execution>
         </executions>
       </plugin>

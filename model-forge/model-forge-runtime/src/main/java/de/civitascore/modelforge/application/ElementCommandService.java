@@ -6,14 +6,19 @@ import de.civitascore.modelforge.graph.DependencyGraphService;
 import de.civitascore.modelforge.graph.SchemaRefExtractor;
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
 import de.civitascore.modelforge.contract.ArtifactInUseException;
+import de.civitascore.modelforge.contract.Diagnostic;
+import de.civitascore.modelforge.contract.DiagnosticSeverity;
+import de.civitascore.modelforge.contract.ValidationFailedException;
 import de.civitascore.modelforge.contract.VersionBump;
 import de.civitascore.modelforge.urn.UrnParser;
+import de.civitascore.modelforge.validation.ModelValidator;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Write operations for Elements: store/update JSON Schemas and XSDs, keeping the
@@ -29,13 +34,16 @@ public class ElementCommandService {
     private final ArtifactRegistry registry;
     private final DependencyGraphService graph;
     private final SchemaRefExtractor     refExtractor;
+    private final ModelValidator         validator;
 
     public ElementCommandService(ArtifactRegistry registry,
                                        DependencyGraphService graph,
-                                       SchemaRefExtractor refExtractor) {
+                                       SchemaRefExtractor refExtractor,
+                                       ModelValidator validator) {
         this.registry     = registry;
         this.graph        = graph;
         this.refExtractor = refExtractor;
+        this.validator    = validator;
     }
 
     /**
@@ -49,12 +57,18 @@ public class ElementCommandService {
      *     itself, so no read-back is needed
      */
     public String storeJsonSchema(String urn, JsonNode schema, VersionBump bump, String bumpFromVersion) {
+        requireElementUrn(urn);
         // A JSON Schema document is an object. Nothing upstream enforces that — saveArtifact routes
         // ELEMENT on isTextual() alone and the CORE validator has no ELEMENT schema — so an array or
         // scalar would otherwise reach the cast below and surface as a 500 instead of a rejection.
         if (schema == null || !schema.isObject()) {
-            throw new IllegalArgumentException(
+            throw rejected("element-not-an-object",
                 "A JSON Schema Element must be a JSON object: " + urn);
+        }
+        List<Diagnostic> nonConforming = validator.validateSchema(schema);
+        if (nonConforming.stream().anyMatch(d -> d.severity() == DiagnosticSeverity.ERROR)) {
+            throw new ValidationFailedException(
+                "Element is not a conforming JSON Schema", nonConforming);
         }
         ObjectNode updated = (ObjectNode) schema.deepCopy();
         String existingId = updated.path("$id").asText(null);
@@ -74,13 +88,41 @@ public class ElementCommandService {
     /**
      * Stores raw XSD content and registers its {@code xs:import} references in the graph.
      *
+     * <p>Only the identity is checked here: an XSD carries no JSON Schema, so there is nothing for
+     * {@link ModelValidator} to meta-validate. Conformance of an XSD-derived Element is decided on
+     * the import path, where the converted JSON Schema exists.
+     *
      * @return the concrete versioned URN (pin) the write resolved to
      */
     public String storeXsd(String urn, String xsdContent, VersionBump bump) {
+        requireElementUrn(urn);
         Set<String> importRefs = registry.extractImportRefs(xsdContent);
         String pin = registry.storeXsdElement(urn, xsdContent, importRefs, bump);
         graph.register(pin != null && !pin.isBlank() ? pin : urn, new LinkedHashSet<>(importRefs));
         return pin;
+    }
+
+    /**
+     * A write rejected for the caller's reason given, carrying the diagnostic shape the registry's
+     * other rejections carry — so a bad identity reaches the caller as a 400 with a reason, not as
+     * an unmapped server error.
+     */
+    private static ValidationFailedException rejected(String code, String message) {
+        return new ValidationFailedException(message,
+            List.of(new Diagnostic(DiagnosticSeverity.ERROR, message, code, "")));
+    }
+
+    /**
+     * {@link UrnParser#requireUrn}'s rule, raised as a caller-facing rejection. The identity check
+     * and its wording stay in {@code UrnParser}; only the exception type differs, because a write
+     * reached over HTTP answers a bad identity with a 400 rather than an unmapped server error.
+     */
+    private static void requireElementUrn(String urn) {
+        try {
+            UrnParser.requireUrn(urn, "Element id");
+        } catch (IllegalArgumentException e) {
+            throw rejected("invalid-artifact-id", e.getMessage());
+        }
     }
 
     /** Removes the artifact from the registry and the dependency graph. */
@@ -93,27 +135,15 @@ public class ElementCommandService {
     }
 
     /**
-     * Removes the artifact from the registry and the dependency graph, applying the DataSet-aware
-     * deletion policy (see the deletion-policy concept), optionally cascading into its members.
+     * Removes the artifact from the registry and the dependency graph under the DataSet-aware
+     * deletion policy, optionally cascading into the artifacts it owns.
      *
-     * <p>Model integrity — two kinds of referrer, treated differently:
-     * <ul>
-     *   <li><b>Non-DataSet references</b> (a Pipeline using a Mapping, a DataStructure grouping an
-     *       Element, …) block unconditionally: the target must not disappear or the reference would
-     *       dangle.</li>
-     *   <li><b>DataSet membership</b> ({@code dataset-ref} edges) is count-based: <b>0</b> → delete;
-     *       <b>1</b> → delete and auto-unlink the target from that one DataSet's manifest; <b>≥2</b>
-     *       → blocked (the shared member must be removed from the other DataSets first).</li>
-     * </ul>
+     * <p>Non-DataSet references block unconditionally; DataSet membership is counted: none or one
+     * lets the artifact go (that one manifest is unlinked with it), two or more block. {@code force}
+     * overrides both and unlinks from every DataSet, which may dangle references.
      *
-     * <p>{@code force} overrides both blocks — the target is deleted regardless of referrers, and it
-     * is auto-unlinked from <em>every</em> DataSet so no manifest dangles it. Dangerous (it can leave
-     * non-DataSet references dangling); use for administrative repair only.
-     *
-     * <p>When {@code cascade} is set, the target's members are deleted after it, but each only if it
-     * becomes a fully-orphaned artifact once this container is gone (no non-DataSet referrer and no
-     * remaining DataSet membership). Shared / mutually-referencing members are kept. Each delete runs
-     * in its own transaction and re-checks the live registry, so cascade never dangles a reference.
+     * <p>Each delete re-checks the live registry, so a cascade never dangles a reference, and joins
+     * the caller's transaction where there is one, so several removals commit or roll back together.
      */
     public void delete(String urn, boolean cascade, boolean force) {
         String logical = UrnParser.logicalUrn(urn);
@@ -130,9 +160,11 @@ public class ElementCommandService {
             }
         }
         // Snapshot the members before the artifact — and with it its outgoing edges — are gone.
-        List<String> members = cascade
-            ? registry.fetchArtifactRefUrns(urn).stream().map(UrnParser::logicalUrn).distinct().toList()
-            : List.of();
+        List<String> members = cascade ? registry.ownedMemberUrns(urn) : List.of();
+        // Counted before this container's own edge goes, or a member of two would read one.
+        Set<String> heldByAnotherDataSet = members.stream()
+            .filter(member -> registry.dataSetMemberships(member).size() >= 2)
+            .collect(Collectors.toSet());
         registry.deleteArtifact(urn);
         graph.remove(urn);
         // Keep every DataSet manifest that listed this member consistent (the |D|=1 rule, and — with
@@ -141,12 +173,10 @@ public class ElementCommandService {
             unlinkFromDataSet(dataSet, logical);
         }
         for (String member : members) {
-            // Cascade-delete a member only now that this container is gone AND it is fully orphaned:
-            // no non-DataSet referrer and no remaining DataSet membership. Recurse so an orphaned
-            // member's own orphans are collected; shared / mutually-referencing members are kept.
+            // Recursing collects a member's own orphans; its one Data Set is unlinked with it.
             if (registry.fetch(member).isPresent()
                 && registry.nonDataSetBlockingDependents(member).isEmpty()
-                && registry.dataSetMemberships(member).isEmpty()) {
+                && !heldByAnotherDataSet.contains(member)) {
                 delete(member, true, force);
             }
         }
@@ -177,6 +207,9 @@ public class ElementCommandService {
         }
         if (changed) {
             registry.storeDataSet(dataSetLogicalUrn, doc, VersionBump.MINOR);
+            // The graph is keyed by the version a node was registered under, and this mints a new
+            // one. Without the refresh every member of the Data Set reads as removed.
+            graph.registerFromRegistry(dataSetLogicalUrn);
         }
     }
 }

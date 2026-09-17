@@ -254,7 +254,25 @@ public class DataSetController
       operationId = "stageDataSet",
       summary = "Stage a dataset",
       description =
-          "Validates the dataset's pipeline configuration and transitions status from DRAFT to READY.")
+          "Validates the dataset's pipeline configuration and the artifacts participating in its"
+              + " flows, then transitions status from DRAFT to READY.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "The dataset is staged",
+      content = @Content(schema = @Schema(implementation = DataSetOutputDTO.class)))
+  @ApiResponse(
+      responseCode = "400",
+      description =
+          "The dataset carries no name, description or Pipeline, or one of its Pipelines has no"
+              + " stored definition",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "422",
+      description =
+          "A pipeline DataSource is out of the dataset's datapool scope, an artifact"
+              + " participating in a pipeline's flow cannot carry a release, or a flow reaches"
+              + " further than the walk is configured to follow",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> stage(@PathVariable UUID id) {
     DataSet ready = dataSetService.stage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(ready);
@@ -266,6 +284,10 @@ public class DataSetController
       operationId = "unstageDataSet",
       summary = "Unstage a dataset",
       description = "Reverts the dataset from READY to DRAFT.")
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> unstage(@PathVariable UUID id) {
     DataSet draft = dataSetService.unstage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(draft);
@@ -273,6 +295,21 @@ public class DataSetController
   }
 
   @Override
+  @ApiResponse(
+      responseCode = "202",
+      description = "The release was accepted; infrastructure is provisioned asynchronously",
+      content = @Content(schema = @Schema(implementation = DataSetOutputDTO.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "422",
+      description =
+          "A pipeline DataSource is out of the dataset's datapool scope, an artifact"
+              + " participating in a pipeline's flow cannot carry a release, or a flow reaches"
+              + " further than the walk is configured to follow",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> release(@PathVariable UUID id) {
     DataSet released = dataSetService.release(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(released);
@@ -349,6 +386,10 @@ public class DataSetController
               + "A dataset that still holds a provisioned sink is torn down asynchronously via a "
               + "DELETE saga and removed once the saga completes. An AVAILABLE dataset cannot be "
               + "deleted directly — unrelease it first (POST /{id}/unrelease).")
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public void delete(@PathVariable UUID id) {
     dataSetService.deleteById(id);
   }

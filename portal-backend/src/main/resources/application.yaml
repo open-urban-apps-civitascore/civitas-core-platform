@@ -149,6 +149,14 @@ civitas:
     # Form: https://host[:port] — no path, no trailing slash. No default.
     base-url:
 
+# Dataset staging and release
+dataset:
+  closure-validation:
+    # How many reference hops the participating-artifact walk follows out from a pipeline before
+    # staging or releasing a dataset. A flow that reaches further is refused rather than passed
+    # unchecked, so raise this only if real models legitimately nest deeper.
+    max-depth: 10
+
 # Security: paths permitted without authentication
 security:
   permit-paths:

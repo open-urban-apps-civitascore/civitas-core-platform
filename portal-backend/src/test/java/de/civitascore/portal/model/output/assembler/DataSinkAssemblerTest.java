@@ -16,7 +16,7 @@ import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.service.GoverningVersionLookup;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,7 +33,7 @@ class DataSinkAssemblerTest {
 
   @Mock private DataSinkMapper dataSinkMapper;
   @Mock private ModelRegistryGateway modelRegistryGateway;
-  @Mock private DataStructureVersionRepository dataStructureVersionRepository;
+  @Mock private GoverningVersionLookup governingVersions;
   @Mock private DataStructureVersionMapper dataStructureVersionMapper;
 
   @InjectMocks private DataSinkAssembler assembler;
@@ -155,9 +155,7 @@ class DataSinkAssemblerTest {
       summary.setId(version.getId());
       summary.setDataStructureId(dataStructure.getId());
 
-      lenient()
-          .when(dataStructureVersionRepository.findFirstByModelUrn(elementUrn))
-          .thenReturn(Optional.of(version));
+      lenient().when(governingVersions.governing(elementUrn)).thenReturn(Optional.of(version));
       lenient().when(dataStructureVersionMapper.toSummary(version)).thenReturn(summary);
       return summary;
     }
@@ -183,9 +181,7 @@ class DataSinkAssemblerTest {
     @DisplayName("Should leave dataStructureVersion unset when the element URN resolves to nothing")
     void shouldLeaveVersionUnsetWhenElementResolvesToNothing() {
       String elementUrn = "urn:core:platform:civitas:element:common:gone:1.0.0";
-      lenient()
-          .when(dataStructureVersionRepository.findFirstByModelUrn(elementUrn))
-          .thenReturn(Optional.empty());
+      lenient().when(governingVersions.governing(elementUrn)).thenReturn(Optional.empty());
       DataSink entity =
           sinkWithPipeline(
               DataSinkType.POSTGIS, Map.of("tableName", "traffic_data", "element", elementUrn));

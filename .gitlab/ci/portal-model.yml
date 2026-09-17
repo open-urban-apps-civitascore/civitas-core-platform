@@ -16,10 +16,14 @@
 
         - portal-backend/**/* # Backend depends on portal-model, so run when backend changes too
         - authz/**/* # AuthZ repository depends on portal-model
+        - config-adapter/**/* # build-authz also runs on config-adapter changes and needs portal-model published
+        - model-forge/**/* # A model-forge change builds the backend, which needs portal-model published
         - .gitlab-ci.yml
         - .gitlab/ci/portal-model.yml
         - .gitlab/ci/backend.yml # Also run when backend changes since it depends on portal-model
         - .gitlab/ci/authz.yml
+        - .gitlab/ci/config-adapter.yml
+        - .gitlab/ci/model-forge.yml
 
 # Setup version for portal-model from pom.xml with branch-based suffixes
 # - main/tags: release version (e.g., 1.0.0)
