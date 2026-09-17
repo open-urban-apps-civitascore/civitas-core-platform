@@ -826,7 +826,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       },
     }
 
-
     it('enables the save button after a class was renamed in the inspector', async () => {
       const user = userEvent.setup()
       renderComponent({ version: versionWithSelectedNode })

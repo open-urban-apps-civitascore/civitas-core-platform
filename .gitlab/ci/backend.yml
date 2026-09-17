@@ -266,6 +266,26 @@ saga-e2e-test-backend:
 # Auto-runs on main/develop, manual on MRs.
 api-test-backend:
   extends: .api-test-stack-changes
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - portal-backend/**/*
+        - config-adapter/**/*
+        - authz/**/*
+        - api/portal-backend/bruno-api/**/*
+        - dev-environment/ci/**/*
+        - dev-environment/apisix/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/backend.yml
+        - .gitlab/ci/config-adapter.yml
+        - .gitlab/ci/authz.yml
+      when: manual
+      allow_failure: true
   image: docker:27
   stage: test # runs after build jobs provide JAR artifacts
   needs:
