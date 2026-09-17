@@ -5,6 +5,7 @@ import de.civitascore.modelforge.contract.ArtifactInUseException;
 import de.civitascore.modelforge.contract.VersionBump;
 import de.civitascore.modelforge.graph.DependencyGraphService;
 import de.civitascore.modelforge.graph.SchemaRefExtractor;
+import de.civitascore.modelforge.validation.ModelValidator;
 import de.civitascore.modelforge.urn.UrnParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,7 +36,7 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @BeforeEach
     void wireTheDeletePolicy() {
         graph = new DependencyGraphService(registry);
-        deletes = new ElementCommandService(registry, graph, new SchemaRefExtractor());
+        deletes = new ElementCommandService(registry, graph, new SchemaRefExtractor(), new ModelValidator());
         stationPin = registry.storeElement("Station", schema("stationId"), Set.of());
         readingPin = registry.storeElement("Reading", schema("temperature"), Set.of());
     }
