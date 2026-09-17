@@ -649,10 +649,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       }
       // The pipeline itself was saved in both cases, so neither fails the save.
       if (mappingInUseNames.length > 0) {
-        toast.warning(t('header.mappingStillInUse', { name: mappingInUseNames.join(', ') }))
+        toast.error(t('header.mappingStillInUse', { name: mappingInUseNames.join(', ') }))
       }
       if (mappingCleanupFailedNames.length > 0) {
-        toast.warning(t('header.mappingCleanupFailed', { name: mappingCleanupFailedNames.join(', ') }))
+        toast.error(t('header.mappingCleanupFailed', { name: mappingCleanupFailedNames.join(', ') }))
       }
       if (scopeViolationNames.length > 0 || tableNameConflictNames.length > 0 || saveFailedNames.length > 0) {
         return false

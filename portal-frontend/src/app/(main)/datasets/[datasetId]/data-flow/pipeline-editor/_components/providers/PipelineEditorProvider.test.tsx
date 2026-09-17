@@ -49,7 +49,7 @@ vi.mock('next-intl', () => ({
 }))
 
 vi.mock('sonner', () => ({
-  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn() },
 }))
 
 vi.mock('@/hooks/use-register-unsaved-changes', () => ({
@@ -1242,7 +1242,7 @@ describe('PipelineEditorProviderComponent', () => {
       expect(result).toBe(false)
     })
 
-    it('warns that a removed mapping is still in use elsewhere, but keeps the save successful', async () => {
+    it('reports that a removed mapping is still in use elsewhere, but keeps the save successful', async () => {
       const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
       vi.mocked(useDeleteMapping).mockReturnValue({
         mutate: vi.fn(),
@@ -1265,12 +1265,12 @@ describe('PipelineEditorProviderComponent', () => {
 
       expect(result).toBe(true)
       expect(toast.success).toHaveBeenCalled()
-      expect(toast.warning).toHaveBeenCalledWith('header.mappingStillInUse')
-      expect(toast.error).not.toHaveBeenCalled()
+      expect(toast.error).toHaveBeenCalledWith('header.mappingStillInUse')
+      expect(toast.error).not.toHaveBeenCalledWith('header.saveFailed')
       consoleError.mockRestore()
     })
 
-    it('distinguishes an unexpected delete failure from a mapping that is still in use', async () => {
+    it('distinguishes an unexpected delete failure from a mapping that is still in use, but keeps the save successful', async () => {
       const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
       vi.mocked(useDeleteMapping).mockReturnValue({
         mutate: vi.fn(),
@@ -1292,8 +1292,10 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       expect(result).toBe(true)
-      expect(toast.warning).toHaveBeenCalledWith('header.mappingCleanupFailed')
-      expect(toast.warning).not.toHaveBeenCalledWith('header.mappingStillInUse')
+      expect(toast.success).toHaveBeenCalled()
+      expect(toast.error).toHaveBeenCalledWith('header.mappingCleanupFailed')
+      expect(toast.error).not.toHaveBeenCalledWith('header.mappingStillInUse')
+      expect(toast.error).not.toHaveBeenCalledWith('header.saveFailed')
       consoleError.mockRestore()
     })
 
