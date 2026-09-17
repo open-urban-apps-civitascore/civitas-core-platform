@@ -1183,7 +1183,7 @@ describe('PipelineEditorProviderComponent', () => {
       expect(mockDeleteMappingMutateAsync).toHaveBeenCalledWith('urn:logical-removed-2')
     })
 
-    it('deletes removed mappings only after the pipeline save, so the backend no longer sees the mappingRef', async () => {
+    it('deletes removed mappings after the pipeline save', async () => {
       const callOrder: string[] = []
 
       const mockDeleteMappingMutateAsync = vi.fn().mockImplementation(async () => {
@@ -1216,7 +1216,7 @@ describe('PipelineEditorProviderComponent', () => {
       expect(callOrder).toEqual(['updatePipeline', 'deleteMapping'])
     })
 
-    it('keeps a removed mapping when the pipeline save fails, so it is not orphaned', async () => {
+    it('does not delete a removed mapping when the pipeline save fails', async () => {
       const mockDeleteMappingMutateAsync = vi.fn().mockResolvedValue({})
       vi.mocked(useDeleteMapping).mockReturnValue({
         mutate: vi.fn(),
