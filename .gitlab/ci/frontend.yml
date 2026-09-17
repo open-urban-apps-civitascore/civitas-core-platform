@@ -13,6 +13,9 @@
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - portal-frontend/**/*
+        # The CORE contracts the frontend validates against and generates its Zod copy from; a
+        # change here must run the conformance and drift tests in the MR that causes it.
+        - model-forge/model-forge-runtime/src/main/resources/*.schema.json
         - .gitlab-ci.yml
         - .gitlab/ci/frontend.yml
 
