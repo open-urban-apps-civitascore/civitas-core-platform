@@ -2,6 +2,8 @@
 # Integrates custom jobs (blow) and Gitlab templates.
 # Publishes results in Gitlab that are shown inside Merge Requests
 
+# trigger full pipeline run
+
 # Local testing:
 # gitlab-ci-local <jobName>
 
