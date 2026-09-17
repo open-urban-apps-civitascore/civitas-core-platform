@@ -1,0 +1,54 @@
+meta {
+  name: Install a package whose member differs under the same URN (refused)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/installations
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "package": {
+      "id": "{{packageId}}_conflict",
+      "version": "1.0.0",
+      "title": "Soil moisture conflict (smoke)",
+      "members": [
+        {
+          "kind": "datastructure",
+          "urn": "{{memberUrn}}",
+          "name": "Soil moisture",
+          "content": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "{{memberUrn}}",
+            "title": "Soil moisture",
+            "$defs": {
+              "Reading": {
+                "type": "object",
+                "properties": {
+                  "tensionKpa": { "type": "number" },
+                  "depthCm": { "type": "integer" },
+                  "measuredAt": { "type": "string", "format": "date-time" }
+                },
+                "required": ["tensionKpa", "measuredAt"]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("should refuse: same identity with different content never overwrites", function() {
+    expect(res.status).to.equal(409);
+  });
+}

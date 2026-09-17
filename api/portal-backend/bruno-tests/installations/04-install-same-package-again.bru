@@ -1,0 +1,53 @@
+meta {
+  name: Install the same package again (refused)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/installations
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "package": {
+      "id": "{{packageId}}",
+      "version": "1.0.0",
+      "title": "Soil moisture (smoke)",
+      "members": [
+        {
+          "kind": "datastructure",
+          "urn": "{{memberUrn}}",
+          "name": "Soil moisture",
+          "content": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "{{memberUrn}}",
+            "title": "Soil moisture",
+            "$defs": {
+              "Reading": {
+                "type": "object",
+                "properties": {
+                  "tensionKpa": { "type": "number" },
+                  "measuredAt": { "type": "string", "format": "date-time" }
+                },
+                "required": ["tensionKpa", "measuredAt"]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("should refuse: a package installs once per instance", function() {
+    expect(res.status).to.equal(409);
+  });
+}
