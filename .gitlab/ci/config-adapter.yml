@@ -268,8 +268,15 @@ build-config-adapter:
       - config-adapter/*/target/classes/
       - config-adapter/*/target/test-classes/
       - config-adapter/*/target/*.jar
-      # The integration shards resolve inter-module dependencies from here.
-      - .m2/repository/de/civitas-core/
+      # The integration shards resolve inter-module dependencies from here. The cache this job
+      # restores is keyed on config-adapter/pom.xml alone, so it carries every version any MR has
+      # ever installed; uploading the directory wholesale grew the archive past the 1 GB limit and
+      # failed the job with 413. Only the version built here is needed downstream.
+      - .m2/repository/de/civitas-core/*/$CONFIG_ADAPTER_VERSION/
+    exclude:
+      # Already uploaded from config-adapter-application/target/, and the shade plugin makes it the
+      # largest single file in the archive.
+      - .m2/repository/de/civitas-core/config-adapter-application/*/*.jar
     expire_in: 1 month
 
 # Publish config-adapter artifacts to GitLab Maven repository
