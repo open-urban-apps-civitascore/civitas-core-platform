@@ -5,8 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /**
  * The kind of one package member, in the same vocabulary the artifact-type segment of a CORE URN
  * uses. Declared explicitly rather than derived from the member's URN so the manifest stays
- * readable, sortable and checkable without parsing any member's content — the same reason the
- * artifact envelope carries an {@code artifactType} next to its {@code artifactId}.
+ * readable, sortable and checkable without parsing any member's content.
  */
 public enum PackageMemberKind {
   @JsonProperty("datastructure")
