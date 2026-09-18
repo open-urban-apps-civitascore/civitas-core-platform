@@ -16,14 +16,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.nifi.auth.OidcClientCredentialsTokenProvider;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
@@ -339,6 +343,41 @@ abstract class AbstractNifiIT {
               client.getRootProcessGroupId();
               return true;
             });
+  }
+
+  /**
+   * The built {@code PutFrostRecord} NAR: the path given by {@code -Dfrost.nar} (the CI job passes
+   * the artifact of the extensions build), otherwise the newest one in the sibling build tree.
+   *
+   * <p>The NAR is built by its own Maven reactor, against the NiFi extension API rather than the
+   * Java of this repository, so it is not on the test classpath and cannot be resolved as a
+   * dependency here. A FROST IT skips when it is absent instead of timing out: NiFi leaves a flow
+   * with an unknown processor invalid without failing the deployment, which reads like a defect of
+   * the adapter.
+   */
+  protected static Optional<Path> frostNar() {
+    String configured = System.getProperty("frost.nar", System.getenv("FROST_NAR"));
+    if (configured != null && !configured.isBlank()) {
+      Path path = Path.of(configured);
+      return Files.isRegularFile(path) ? Optional.of(path) : Optional.empty();
+    }
+    Path target = Path.of("..", "..", "nifi-extensions", "nifi-frost-nar", "target");
+    if (!Files.isDirectory(target)) {
+      return Optional.empty();
+    }
+    try (Stream<Path> files = Files.list(target)) {
+      return files
+          .filter(path -> path.getFileName().toString().endsWith(".nar"))
+          .max(Comparator.comparingLong(path -> path.toFile().lastModified()));
+    } catch (IOException e) {
+      return Optional.empty();
+    }
+  }
+
+  /** Copies the NAR into the directory NiFi auto-loads extensions from. */
+  protected static void installFrostNar(GenericContainer<?> container, Path nar) {
+    container.withCopyFileToContainer(
+        MountableFile.forHostPath(nar), "/opt/nifi/nifi-current/extensions/nifi-frost-nar.nar");
   }
 
   /** Closes the HTTP client and stops NiFi. Subclasses stop their own containers separately. */

@@ -90,8 +90,8 @@ lint-nifi-extensions:
     - cd nifi-extensions
     - mvn spotless:check -Drevision=$NIFI_EXTENSIONS_VERSION
 
-# One job for the whole build: the tests need no container, and PMD, CPD and SpotBugs are bound at
-# verify. The NAR and its bill of materials leave as artifacts.
+# The unit tests, the static analysis and the NAR. The integration test needs a Docker daemon, so it
+# has its own job below and is skipped here; PMD, CPD and SpotBugs are bound at verify.
 build-nifi-extensions:
   extends:
     - .only-nifi-extensions-changes
@@ -103,7 +103,7 @@ build-nifi-extensions:
     - job: lint-nifi-extensions
   script:
     - cd nifi-extensions
-    - mvn -B verify install:install -Drevision=$NIFI_EXTENSIONS_VERSION
+    - mvn -B verify install:install -DskipITs -Drevision=$NIFI_EXTENSIONS_VERSION
     - |
       awk -F, \
       'NR>1 {missed+=$4; covered+=$5} \
@@ -126,6 +126,40 @@ build-nifi-extensions:
       coverage_report:
         coverage_format: jacoco
         path: nifi-extensions/*/target/site/jacoco/jacoco.xml
+
+# Writes with each port against a real FROST-Server. The test brings the server up itself through
+# Testcontainers, so this job carries no endpoint and no credential of an installation and needs no
+# CI secret: there is nothing here that could reach production data.
+integration-test-nifi-extensions:
+  extends:
+    - .only-nifi-extensions-changes
+    - .nifi-extensions-maven
+  image: maven:3.9-eclipse-temurin-25
+  stage: test
+  needs:
+    - job: setup-version-nifi-extensions
+    - job: build-nifi-extensions
+  services:
+    - name: docker:27-dind
+      alias: docker
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ''
+    DOCKER_DRIVER: overlay2
+    TESTCONTAINERS_HOST_OVERRIDE: docker
+  script:
+    - cd nifi-extensions
+    # Explicit goals keep package, spotless and spotbugs out of this job.
+    - mvn -B -pl nifi-frost-processors test-compile failsafe:integration-test failsafe:verify -Drevision=$NIFI_EXTENSIONS_VERSION
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - nifi-extensions/*/target/failsafe-reports/
+    reports:
+      junit:
+        - nifi-extensions/*/target/failsafe-reports/TEST-*.xml
 
 # The NAR goes to the GitLab Maven repository, where the NiFi image of the deployment project reads
 # it from.

@@ -14,7 +14,12 @@ that use them; the components themselves know nothing about the adapter.
 mvn verify                 # tests, Spotless, PMD, CPD, SpotBugs, the NAR and its bill of materials
 mvn spotless:apply         # format before committing
 mvn test -Dtest=ThingsPortTest
+mvn verify -DskipITs       # skip the integration test when no Docker daemon is running
 ```
+
+`PutFrostRecordIT` writes with each port against a real FROST-Server that it brings up itself
+through Testcontainers. Without a Docker daemon it skips, so `mvn verify` still passes on a
+workstation without one — check the failsafe report when you need to know whether it ran.
 
 The NAR is at `nifi-frost-nar/target/nifi-frost-nar-<version>.nar`.
 
@@ -93,16 +98,20 @@ entity, and patches it a second time.
 
 Source: [JSON batch requests](https://fraunhoferiosb.github.io/FROST-Server/extensions/JsonBatchRequest.html).
 
-### What the tests do not prove
+### What the tests prove, and what they do not
 
-The unit tests run against a loopback endpoint that answers what they tell it to. Three assumptions
-are the batch endpoint's behaviour and need a real FROST server to confirm, which is the integration
-test of #2283:
+The unit tests run against a loopback endpoint that answers what they tell it to, so they prove the
+document the processor builds and nothing about how a server reads it. `PutFrostRecordIT` closes
+that gap for the three assumptions that are the batch endpoint's behaviour: it asserts entities in
+FROST, not sub-requests in a document.
 
 - A back-reference in the path of a PATCH, `Things($r0-thing)`, and in a single-valued navigation,
-  `Datastreams($r0-ds)/Sensor`.
+  `Datastreams($r0-ds)/Sensor` — covered by the upsert tests and the ThingTree test.
 - What a sub-request whose `if` did not hold leaves in the response. The division reads an absent
   answer as "did not run"; an answer carrying a status would be read the same way, because it is
-  bound by identifier and order together.
-- The batch size a server accepts. The specification names none, and the cap of 100 here is a guard
-  rather than a measurement.
+  bound by identifier and order together. A defect here shows up as a record on `failure` although
+  its entity was written, which the second-delivery tests would catch.
+
+One assumption stays open: **the batch size a server accepts.** The specification names none, and
+the cap of 100 here is a guard rather than a measurement. The integration test sends three records
+in one batch, which proves the isolation of the groups, not the limit.

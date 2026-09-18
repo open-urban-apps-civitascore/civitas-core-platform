@@ -52,6 +52,10 @@
 		     halves are pinned here rather than left to the nearest declaration. -->
 		<junit.platform.version>1.14.4</junit.platform.version>
 		<mockito.version>5.23.0</mockito.version>
+		<!-- The integration test brings its own FROST server up, so the build needs no endpoint and
+		     no credential of an installation. -->
+		<testcontainers.version>2.0.5</testcontainers.version>
+		<awaitility.version>4.3.0</awaitility.version>
 		<jacoco.version>0.8.15</jacoco.version>
 		<spotless.version>3.4.0</spotless.version>
 		<nifi-nar-maven-plugin.version>2.4.0</nifi-nar-maven-plugin.version>
@@ -157,6 +161,18 @@
 				<version>${mockito.version}</version>
 				<scope>test</scope>
 			</dependency>
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers</artifactId>
+				<version>${testcontainers.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.awaitility</groupId>
+				<artifactId>awaitility</artifactId>
+				<version>${awaitility.version}</version>
+				<scope>test</scope>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
 
@@ -171,6 +187,11 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-surefire-plugin</artifactId>
+					<version>3.2.3</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-failsafe-plugin</artifactId>
 					<version>3.2.3</version>
 				</plugin>
 				<plugin>
@@ -191,6 +212,20 @@
 			</plugins>
 		</pluginManagement>
 		<plugins>
+			<!-- The *IT classes need a Docker daemon, so they run in the verify phase and not beside
+			     the unit tests. Without a daemon they skip themselves. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-failsafe-plugin</artifactId>
+				<executions>
+					<execution>
+						<goals>
+							<goal>integration-test</goal>
+							<goal>verify</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>com.diffplug.spotless</groupId>
 				<artifactId>spotless-maven-plugin</artifactId>

@@ -38,6 +38,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -45,6 +46,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import okhttp3.Request;
@@ -154,6 +156,11 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   @SuppressWarnings("resource")
   static void startStack() throws Exception {
     assumeTrue(dockerAvailable(), "Docker not available — skipping NiFi/FROST mapping IT");
+    Optional<Path> nar = frostNar();
+    assumeTrue(
+        nar.isPresent(),
+        "the PutFrostRecord NAR is not built — run 'mvn -f nifi-extensions/pom.xml package' or set"
+            + " -Dfrost.nar=<path>");
 
     network = Network.newNetwork();
 
@@ -214,10 +221,13 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     startNifi(
         HOST_PORT,
         network,
-        container ->
-            container.withCopyFileToContainer(
-                MountableFile.forHostPath(postgresDriverJar()),
-                "/opt/nifi/drivers/postgresql.jar"));
+        container -> {
+          container.withCopyFileToContainer(
+              MountableFile.forHostPath(postgresDriverJar()), "/opt/nifi/drivers/postgresql.jar");
+          // The mapped flow renders one port body and hands it to PutFrostRecord, so this path
+          // needs the NAR as much as the unmapped one does.
+          installFrostNar(container, nar.get());
+        });
 
     projectId = createProject();
     dsMapId = createDatastream(DS_MAP, REF_MAP, "HOLDER-MAP");
