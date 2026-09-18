@@ -1252,7 +1252,33 @@
       "serverName": "Server Name",
       "serverUrl": "Server URL",
       "internalServer": "Internal Server",
-      "version": "Version"
+      "version": "Version",
+      "port": "Port",
+      "portPlaceholder": "Select what this sink writes",
+      "portHelp": "The port decides what the sink writes. There is no default: without one the Dataset does not publish.",
+      "expects": "Expects:",
+      "logic": {
+        "ownKey": "Upsert with its own key",
+        "parentReference": "Append with a parent reference",
+        "composite": "Composite"
+      },
+      "ports": {
+        "Things": {
+          "description": "Upserts a Thing by its reference, inside the Dataset’s project.",
+          "cost": "1 entity for each record",
+          "expects": "properties.reference"
+        },
+        "Observations": {
+          "description": "Appends a measurement to a Datastream that must exist. A measurement carrying a reference of its own is updated instead of added.",
+          "cost": "1 entity for each record",
+          "expects": "parameters.thingReference, parameters.datastreamReference, result"
+        },
+        "ThingTree": {
+          "description": "Upserts a Thing with its Location, Datastream, Sensor and ObservedProperty, and appends one measurement.",
+          "cost": "6 entities for each record",
+          "expects": "properties.reference, Datastreams[].properties.reference"
+        }
+      }
     },
     "geoPersistencePanel": {
       "title": "Geospatial Data Storage",

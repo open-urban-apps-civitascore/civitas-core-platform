@@ -1239,7 +1239,33 @@
       "serverName": "Servername",
       "serverUrl": "Server-URL",
       "internalServer": "Interner Server",
-      "version": "Version"
+      "version": "Version",
+      "port": "Port",
+      "portPlaceholder": "Wählen Sie, was diese Senke schreibt",
+      "portHelp": "Der Port entscheidet, was die Senke schreibt. Es gibt keine Vorgabe: ohne ihn veröffentlicht das Dataset nicht.",
+      "expects": "Erwartet:",
+      "logic": {
+        "ownKey": "Upsert mit eigenem Schlüssel",
+        "parentReference": "Anhängen mit Elternreferenz",
+        "composite": "Zusammengesetzt"
+      },
+      "ports": {
+        "Things": {
+          "description": "Legt ein Thing über seine Referenz an oder aktualisiert es, im Projekt des Datasets.",
+          "cost": "1 Entität je Datensatz",
+          "expects": "properties.reference"
+        },
+        "Observations": {
+          "description": "Hängt eine Messung an einen Datastream an, der bestehen muss. Eine Messung mit eigener Referenz wird aktualisiert statt hinzugefügt.",
+          "cost": "1 Entität je Datensatz",
+          "expects": "parameters.thingReference, parameters.datastreamReference, result"
+        },
+        "ThingTree": {
+          "description": "Legt ein Thing mit Location, Datastream, Sensor und ObservedProperty an oder aktualisiert es und hängt eine Messung an.",
+          "cost": "6 Entitäten je Datensatz",
+          "expects": "properties.reference, Datastreams[].properties.reference"
+        }
+      }
     },
     "geoPersistencePanel": {
       "title": "Geodaten-Speicher",
