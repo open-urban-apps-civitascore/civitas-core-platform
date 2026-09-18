@@ -39,6 +39,7 @@ import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
@@ -400,7 +401,8 @@ class FlowDeploymentPlannerTest {
                               "p-frost-map",
                               graphWithMapping(),
                               mqttSource(null),
-                              new FrostSinkSpec("1", NifiTestFixtures.STA_KEYS))));
+                              new FrostSinkSpec(
+                                  "1", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS))));
       assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
       assertTrue(ex.getMessage().contains("unsupported FROST mapping target path"));
     }
@@ -421,7 +423,8 @@ class FlowDeploymentPlannerTest {
                               "p-frost-incomplete",
                               NifiTestFixtures.graphWithIncompleteFrostMapping(),
                               mqttSource(null),
-                              new FrostSinkSpec("1", NifiTestFixtures.STA_KEYS))));
+                              new FrostSinkSpec(
+                                  "1", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS))));
       assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
       assertTrue(
           ex.getMessage().contains("must map the thing match key(s): $.properties.reference"));
@@ -443,7 +446,7 @@ class FlowDeploymentPlannerTest {
                               "p-sql-frost-nomap",
                               graphWithoutMapping(),
                               sqlSource(null),
-                              new FrostSinkSpec("1", null))));
+                              new FrostSinkSpec("1", SinkPort.THING_TREE, null))));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       assertTrue(
           ex.getMessage()
@@ -465,7 +468,7 @@ class FlowDeploymentPlannerTest {
                       "p-mqtt-frost-map",
                       NifiTestFixtures.graphWithFrostMapping(),
                       mqttSource(null),
-                      new FrostSinkSpec("7", NifiTestFixtures.STA_KEYS)))
+                      new FrostSinkSpec("7", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS)))
               .snapshotJson();
       processorOfType(snapshot, "ConvertRecord");
       assertEquals(
@@ -494,7 +497,7 @@ class FlowDeploymentPlannerTest {
                       "p-sql-frost-map",
                       NifiTestFixtures.graphWithFrostMapping(),
                       sqlSource(null),
-                      new FrostSinkSpec("7", NifiTestFixtures.STA_KEYS)))
+                      new FrostSinkSpec("7", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS)))
               .snapshotJson();
       processorOfType(snapshot, "QueryDatabaseTableRecord");
       assertFalse(snapshot.contains("ConvertRecord"), "SQL records need no convert step");
@@ -517,14 +520,12 @@ class FlowDeploymentPlannerTest {
                       "p-frost-scoped",
                       graphWithoutMapping(),
                       mqttSource(null),
-                      new FrostSinkSpec("7", null)));
+                      new FrostSinkSpec("7", SinkPort.THING_TREE, null)));
       String snapshot = plan.snapshotJson();
+      // The project scopes the writes through the processor property now, not through forty URLs.
       assertTrue(
-          snapshot.contains("/Projects(7)/Things"),
-          "Thing leg must be scoped to the saga's project");
-      assertTrue(
-          snapshot.contains("Thing/Projects/id%20eq%207"),
-          "Datastream lookup must be filtered by the saga's project");
+          snapshot.contains("\"FROST Project Id\":\"7\""),
+          "the flow must carry the saga's project");
       assertFalse(snapshot.contains("secret"), "FROST secret must not enter the snapshot");
       assertEquals(
           "secret",
@@ -744,7 +745,7 @@ class FlowDeploymentPlannerTest {
                         "p-nofrost",
                         graphWithoutMapping(),
                         mqttSource(null),
-                        new FrostSinkSpec("1", null))));
+                        new FrostSinkSpec("1", SinkPort.THING_TREE, null))));
     assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 

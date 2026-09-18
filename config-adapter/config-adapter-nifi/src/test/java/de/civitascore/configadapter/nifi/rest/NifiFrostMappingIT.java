@@ -29,6 +29,7 @@ import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.io.File;
 import java.net.URI;
@@ -937,6 +938,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
                   source,
                   new FrostSinkSpec(
                       String.valueOf(projectId),
+                      SinkPort.THING_TREE,
                       StaProperties.ofKeys(List.of("reference"), List.of("reference"))),
                   mappings));
       client.deployFlow(plan);

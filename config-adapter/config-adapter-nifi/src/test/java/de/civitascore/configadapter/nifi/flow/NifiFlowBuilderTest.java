@@ -28,8 +28,8 @@ import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.ForkPlan;
-import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan;
-import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan.FilterTerm;
+import de.civitascore.configadapter.nifi.mapping.FrostPortPlan;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -401,112 +401,13 @@ class NifiFlowBuilderTest {
   }
 
   @Test
-  void buildsFrostUpsertSubFlow() throws Exception {
-    // Per Thing in the STA envelope: look up by reference, PATCH the resolved entity on a hit and
-    // POST only on a miss.
+  void frostProjectIdReachesTheProcessor() throws Exception {
+    // The project scopes every lookup and every write, so that a reference collision with another
+    // Dataset cannot resolve across Datasets. The processor holds it as a property now; before the
+    // rebuild it was interpolated into forty URLs.
     JsonNode flow = build(frostSink());
 
-    JsonNode split = component(flow, "processors", "SplitJson");
-    assertEquals(
-        "$.things", split.get("properties").get("JsonPath Expression").asText(), "splits things");
-
-    JsonNode get = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "GET");
-    assertTrue(
-        get.get("properties")
-            .get("HTTP URL")
-            .asText()
-            .contains("/Things?$filter=properties/reference"),
-        "looks up the Thing by reference");
-
-    JsonNode route = component(flow, "processors", "RouteOnAttribute");
-    assertEquals(
-        "${frost.id:isEmpty()}",
-        route.get("properties").get("new").asText(),
-        "routes to 'new' only when no @iot.id resolved");
-
-    JsonNode post = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "POST");
-    assertTrue(
-        post.get("properties").get("HTTP URL").asText().endsWith("/Things"), "POSTs a new Thing");
-    JsonNode patch = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "PATCH");
-    assertTrue(
-        patch.get("properties").get("HTTP URL").asText().endsWith("/Things(${frost.id})"),
-        "PATCHes the Thing resolved by reference");
-    // restore-then-POST: the captured entity body is written back before the POST
-    JsonNode restore = component(flow, "processors", "ReplaceText");
-    assertEquals("${frost.body}", restore.get("properties").get("Replacement Value").asText());
-  }
-
-  @Test
-  void buildsFrostObservationLeg() throws Exception {
-    // Second leg: resolve the observation's Datastream by reference+name and POST the observation
-    // with the resolved @iot.id merged in.
-    JsonNode flow = build(frostSink());
-
-    assertTrue(
-        hasProcessor(flow, "SplitJson", "JsonPath Expression", "$.observations"),
-        "splits observations");
-    assertTrue(
-        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Datastreams?$filter="),
-        "looks up the Datastream by reference+name");
-    assertTrue(
-        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Observations"), "POSTs the observation");
-    assertTrue(
-        hasProcessor(flow, "ReplaceText", "Replacement Value", "\"Datastream\""),
-        "merges the resolved Datastream id into the observation");
-  }
-
-  @Test
-  void frostProjectIdScopesTheFindOrCreateFlow() throws Exception {
-    // With the saga's project id, Things live under /Projects(n) (visible through the dataset's
-    // project-scoped named API) and the Datastream lookup is filtered by Thing/Projects/id — the
-    // projects plugin has no /Projects(n)/Datastreams collection, and an unfiltered lookup could
-    // match another dataset's Datastream on a reference collision.
-    FlowBuildSpec unscoped = frostSink();
-    JsonNode flow =
-        build(
-            new FlowBuildSpec(
-                unscoped.processGroupName(),
-                unscoped.sourceType(),
-                unscoped.sourceProperties(),
-                SinkType.FROST,
-                Map.of(
-                    FrostSinkStage.FROST_BASE_URL,
-                    "http://frost:8080/FROST-Server/v1.1",
-                    FrostSinkStage.FROST_PROJECT_ID,
-                    "7"),
-                List.of(),
-                Map.of(),
-                null,
-                null));
-
-    assertTrue(
-        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Projects(7)/Things?$filter="),
-        "Thing lookup is project-scoped");
-    boolean thingPostScoped = false;
-    boolean thingPatchScoped = false;
-    for (JsonNode c : flow.get("flowContents").get("processors")) {
-      if (c.path("type").asText().endsWith("InvokeHTTP")
-          && c.path("properties").path("HTTP Method").asText().equals("POST")
-          && c.path("properties").path("HTTP URL").asText().endsWith("/Projects(7)/Things")) {
-        thingPostScoped = true;
-      }
-      if (c.path("type").asText().endsWith("InvokeHTTP")
-          && c.path("properties").path("HTTP Method").asText().equals("PATCH")
-          && c.path("properties")
-              .path("HTTP URL")
-              .asText()
-              .endsWith("/Projects(7)/Things(${frost.id})")) {
-        thingPatchScoped = true;
-      }
-    }
-    assertTrue(thingPostScoped, "Thing POST is project-scoped");
-    assertTrue(thingPatchScoped, "Thing PATCH is project-scoped");
-    assertTrue(
-        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "Thing/Projects/id%20eq%207"),
-        "Datastream lookup filters on the project");
-    assertTrue(
-        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/FROST-Server/v1.1/Observations"),
-        "Observation POST stays at the root (scope flows via the Datastream)");
+    assertTrue(hasProcessor(flow, "PutFrostRecord", "FROST Project Id", "7"));
   }
 
   @Test
@@ -547,26 +448,19 @@ class NifiFlowBuilderTest {
 
   @Test
   void routesFrostSinkWriteFailuresToLogSink() throws Exception {
+    // No silent data loss at the sink: the record that FROST rejected and the record whose request
+    // did not complete both reach the error sink. An unrouted relationship would drop them.
     JsonNode flow = build(frostSink());
 
     String logId = component(flow, "processors", "LogMessage").get("identifier").asText();
-    // Both write outcomes must route their failure-side relationships to the log sink.
-    for (String method : List.of("POST", "PATCH")) {
-      JsonNode write = componentByProperty(flow, "InvokeHTTP", "HTTP Method", method);
-      String writeId = write.get("identifier").asText();
-      for (String relationship : List.of("Failure", "Retry", "No Retry")) {
-        assertFalse(
-            autoTerminates(write, relationship),
-            method + " must not auto-terminate " + relationship);
-        assertTrue(
-            hasConnection(flow, writeId, logId, relationship),
-            method + " " + relationship + " must route to the log sink");
-      }
+    JsonNode put = component(flow, "processors", "PutFrostRecord");
+    String putId = put.get("identifier").asText();
+    for (String relationship : List.of("failure", "retry")) {
+      assertFalse(autoTerminates(put, relationship), "must not auto-terminate " + relationship);
+      assertTrue(
+          hasConnection(flow, putId, logId, relationship),
+          relationship + " must reach the error sink");
     }
-    // the HTTP response itself is still discarded — only write failures are routed
-    JsonNode post = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "POST");
-    assertTrue(autoTerminates(post, "Response"), "POST Response stays terminated");
-    assertTrue(autoTerminates(post, "Original"), "POST Original stays terminated");
   }
 
   private boolean autoTerminates(JsonNode processor, String relationship) {
@@ -659,9 +553,10 @@ class NifiFlowBuilderTest {
 
   @Test
   void frostSinkWithMappingButNoEnvelopePlanIsRejected() {
-    // The builder is reachable directly (not only through the planner): a compiled mapping heading
-    // into the raw-JSON find-or-create without an envelope rebuild would silently vanish inside
-    // the envelope — the build must fail instead of dropping the transformation.
+    // The builder is reachable directly (not only through the planner): a compiled mapping without
+    // a port plan
+    // would deploy a flow that sends the mapped record instead of the port structure — the build
+    // must fail instead of writing the wrong document.
     FlowBuildSpec spec =
         new FlowBuildSpec(
             "pipeline-frost-map",
@@ -672,7 +567,9 @@ class NifiFlowBuilderTest {
                 FrostSinkStage.FROST_BASE_URL,
                 "http://frost:8080/x",
                 FrostSinkStage.FROST_PROJECT_ID,
-                "7"),
+                "7",
+                FrostSinkStage.FROST_PORT,
+                SinkPort.THING_TREE.label()),
             compiled(mapping()),
             Map.of(),
             null,
@@ -680,7 +577,49 @@ class NifiFlowBuilderTest {
     FatalAdapterException ex = assertThrows(FatalAdapterException.class, () -> builder.build(spec));
     assertTrue(
         ex.getMessage()
-            .contains("a record mapping was compiled for a raw-JSON sink but no entity plan"));
+            .contains("a record mapping was compiled for the FROST sink but no port plan"));
+  }
+
+  @Test
+  void mappedFrostFlow_buildsOneProcessorInsteadOfTheGraph() throws Exception {
+    // The generated find-or-create graph wrote each entity in its own request, which is where the
+    // twenty to forty processors came from. The processor writes the record in one request.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
+
+    assertEquals(1, countProcessors(flow, "PutFrostRecord"), "one processor writes the record");
+    assertEquals(0, countProcessors(flow, "InvokeHTTP"), "no request processor is left");
+  }
+
+  @Test
+  void mappedFrostFlow_carriesThePortAndTheScopeOnTheProcessor() throws Exception {
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
+
+    assertTrue(hasProcessor(flow, "PutFrostRecord", "Port", "ThingTree"), "the port is a property");
+    assertTrue(
+        hasProcessor(flow, "PutFrostRecord", "FROST Project Id", "7"),
+        "the project scopes every lookup and write");
+  }
+
+  @Test
+  void mappedFrostFlow_rendersThePortBodyBeforeTheProcessor() throws Exception {
+    // The processor reads the record as the port's structure, so the flow hands it that document
+    // and not the flat mapped record.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
+
+    assertTrue(
+        hasProcessor(flow, "ReplaceText", "Replacement Value", "{\"name\":\"${sta_0_name"),
+        "the port body is rendered from the captured attributes");
+  }
+
+  /** How many processors of a type the flow holds. */
+  private static int countProcessors(JsonNode flow, String type) {
+    int found = 0;
+    for (JsonNode processor : flow.findValue("processors")) {
+      if (processor.path("type").asText().endsWith("." + type)) {
+        found++;
+      }
+    }
+    return found;
   }
 
   @Test
@@ -699,57 +638,18 @@ class NifiFlowBuilderTest {
                 "PostGISConnectionPool",
                 Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x")),
             null,
-            new FrostEntityPlan(
-                List.of("sta_0_reference"),
-                List.of(new FilterTerm("properties/reference", "sta_0_reference")),
-                null,
-                null,
-                null,
-                List.of(),
-                null,
-                null,
-                null,
-                null,
-                null));
+            new FrostPortPlan(List.of("sta_0_reference"), "{\"properties\":{}}"));
     FatalAdapterException ex = assertThrows(FatalAdapterException.class, () -> builder.build(spec));
     assertTrue(ex.getMessage().contains("POSTGIS sink cannot consume a pre-region plan"));
   }
 
   @Test
-  void mappedFrostUpsertsLocationAndPatchesDatastreamNavigationEntities() throws Exception {
-    JsonNode flow = build(NifiTestFixtures.frostSinkWithRelatedEntityMapping());
-
-    assertTrue(
-        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Things(${frost.thing.id})/Locations?$top=1"),
-        "resolves the Thing's current Location");
-    assertTrue(
-        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Things(${frost.thing.id})/Locations"),
-        "creates and links a missing Location through the navigation collection");
-    assertTrue(
-        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Locations(${frost.location.id})"),
-        "patches an existing Location by id");
-    assertTrue(
-        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Datastreams(${frost.ds.id})/Sensor"),
-        "resolves the Datastream's Sensor navigation entity");
-    assertTrue(
-        hasProcessor(
-            flow, "InvokeHTTP", "HTTP URL", "/Datastreams(${frost.ds.id})/ObservedProperty"),
-        "resolves the Datastream's ObservedProperty navigation entity");
-    assertTrue(
-        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Sensors(${frost.sensor.id})"),
-        "patches the resolved Sensor by id");
-    assertTrue(
-        hasProcessor(
-            flow, "InvokeHTTP", "HTTP URL", "/ObservedProperties(${frost.observedProperty.id})"),
-        "patches the resolved ObservedProperty by id");
-  }
-
-  @Test
   void routesFrostIntermediateFailuresToLogSink() throws Exception {
-    // No silent data loss inside the find-or-create sub-flow: every Split/Extract/Replace stage's
-    // 'failure' must route to the LogMessage error sink, not stay auto-terminated.
-    JsonNode flow = build(frostSink());
+    // No silent data loss in front of the sink either: the split, the capture and the render route
+    // their 'failure' to the error sink rather than auto-terminating it.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
     String logId = component(flow, "processors", "LogMessage").get("identifier").asText();
+
     for (String type : List.of("SplitJson", "EvaluateJsonPath", "ReplaceText")) {
       boolean seen = false;
       for (JsonNode c : flow.get("flowContents").get("processors")) {
@@ -760,7 +660,7 @@ class NifiFlowBuilderTest {
         assertFalse(autoTerminates(c, "failure"), type + " must not auto-terminate failure");
         assertTrue(
             hasConnection(flow, c.get("identifier").asText(), logId, "failure"),
-            type + " failure must route to the log sink");
+            type + " failure must reach the error sink");
       }
       assertTrue(seen, "expected at least one " + type + " in the FROST sub-flow");
     }
@@ -789,33 +689,6 @@ class NifiFlowBuilderTest {
             null,
             null);
     assertThrows(FatalAdapterException.class, () -> builder.build(spec));
-  }
-
-  @Test
-  void frostFilterEscapesSingleQuotesForOData() throws Exception {
-    // A reference/name containing a single quote must not break the OData $filter: the value is
-    // quote-doubled (OData escape) before urlEncode, so O'Brien stays a valid literal.
-    JsonNode flow = build(frostSink());
-    boolean thing = false;
-    boolean datastream = false;
-    for (JsonNode c : flow.get("flowContents").get("processors")) {
-      String url = c.path("properties").path("HTTP URL").asText("");
-      if (url.contains("/Things?$filter=")) {
-        thing = true;
-        assertTrue(
-            url.contains("frost.ref:replaceAll(\"'\",\"''\")"),
-            "Things filter must OData-escape single quotes in the reference");
-      }
-      if (url.contains("/Datastreams?$filter=")) {
-        datastream = true;
-        assertTrue(
-            url.contains("frost.ref:replaceAll(\"'\",\"''\")"), "Datastream ref must escape");
-        assertTrue(
-            url.contains("frost.name:replaceAll(\"'\",\"''\")"), "Datastream name must escape");
-      }
-    }
-    assertTrue(thing, "expected a Things lookup GET");
-    assertTrue(datastream, "expected a Datastreams lookup GET");
   }
 
   @Test
@@ -925,217 +798,6 @@ class NifiFlowBuilderTest {
   }
 
   @Test
-  void buildsFrostFindOrCreateChainForMappedFlow() throws Exception {
-    // A mapped FROST flow runs ONE linear find-or-create chain per record: record chain
-    // (Convert + UpdateRecord), split $[*] → capture (flat keys) → Thing stage → Datastream stage
-    // → Observation POST. Stages are sequential — each create needs its parent's @iot.id.
-    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
-
-    // throws if absent: the MQTT payload must be converted to records for the mapping
-    component(flow, "processors", "ConvertRecord");
-    JsonNode update = component(flow, "processors", "UpdateRecord");
-    assertEquals(
-        "/station",
-        update.get("properties").get("/sta_0_name").asText(),
-        "mapping writes the flat intermediate fields");
-
-    JsonNode split = componentByProperty(flow, "SplitJson", "JsonPath Expression", "$[*]");
-    assertTrue(split != null, "record-writer array must be split into single records");
-    JsonNode capture = componentByProperty(flow, "EvaluateJsonPath", "sta_0_name", "$.sta_0_name");
-    assertTrue(capture != null, "flat fields must be captured into attributes");
-
-    // Thing stage: lookup by the structure's match key, create on miss (create set is mapped)
-    JsonNode thingGet =
-        componentByProperty(
-            flow,
-            "InvokeHTTP",
-            "HTTP URL",
-            "http://frost:8080/FROST-Server/v1.1/Projects(7)/Things?$filter=properties/reference"
-                + "%20eq%20'${sta_2_reference:replaceAll(\"'\",\"''\"):urlEncode()}'");
-    assertTrue(thingGet != null, "Thing lookup must filter on the match key inside the project");
-    assertTrue(
-        hasProcessor(flow, "ReplaceText", "Replacement Value", "{\"name\":\"${sta_0_name"),
-        "the Thing upsert body must be rendered from the captured attributes");
-    assertTrue(
-        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Projects(7)/Things(${frost.thing.id})"),
-        "an existing mapped Thing must be PATCHed by its resolved id");
-
-    // Datastream stage: lookup-only (create set unmapped) — a miss must route to the error sink
-    JsonNode dsGet =
-        componentByProperty(
-            flow,
-            "InvokeHTTP",
-            "HTTP URL",
-            "http://frost:8080/FROST-Server/v1.1/Datastreams?$filter=properties/reference"
-                + "%20eq%20'${sta_5_reference:replaceAll(\"'\",\"''\"):urlEncode()}'"
-                + "%20and%20Thing/Projects/id%20eq%207");
-    assertTrue(dsGet != null, "Datastream lookup must be project-filtered");
-    String logId = component(flow, "processors", "LogMessage").get("identifier").asText();
-    JsonNode dsRoute = null;
-    for (JsonNode c : flow.get("flowContents").get("processors")) {
-      if (c.path("type").asText().endsWith("RouteOnAttribute")
-          && c.path("properties").path("new").asText().contains("frost.ds.id")) {
-        dsRoute = c;
-      }
-    }
-    assertTrue(dsRoute != null, "Datastream stage must route on the extracted id");
-    assertTrue(
-        hasConnection(flow, dsRoute.get("identifier").asText(), logId, "new"),
-        "a missing datastream on a lookup-only stage must route to the error sink");
-
-    // Observation POST carries the resolved Datastream id
-    assertTrue(
-        hasProcessor(
-            flow,
-            "ReplaceText",
-            "Replacement Value",
-            "\"Datastream\":{\"@iot.id\":${frost.ds.id}}"),
-        "the Observation body must link the resolved Datastream");
-    JsonNode obsPost =
-        componentByProperty(
-            flow, "InvokeHTTP", "HTTP URL", "http://frost:8080/FROST-Server/v1.1/Observations");
-    assertTrue(obsPost != null, "observations must be posted to /Observations");
-  }
-
-  @Test
-  void guardsEmptyMatchKeysIntoTheErrorSink() throws Exception {
-    // A record with an empty match-key value must never reach the lookup: the miss route would
-    // CREATE an entity with an empty key that every later bad record silently converges on.
-    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
-    String logId = component(flow, "processors", "LogMessage").get("identifier").asText();
-
-    JsonNode guard = null;
-    for (JsonNode c : flow.get("flowContents").get("processors")) {
-      if (c.path("type").asText().endsWith("RouteOnAttribute")
-          && c.path("properties").has("missing")) {
-        guard = c;
-      }
-    }
-    assertTrue(guard != null, "the mapped chain must contain the match-key guard");
-    assertEquals(
-        "${sta_2_reference:isEmpty():or(${sta_5_reference:isEmpty()})}",
-        guard.get("properties").get("missing").asText(),
-        "the guard must cover every match-key attribute of the plan");
-    assertTrue(
-        hasConnection(flow, guard.get("identifier").asText(), logId, "missing"),
-        "an empty match key must route to the error sink");
-    assertFalse(autoTerminates(guard, "unmatched"), "valid records must continue into the chain");
-  }
-
-  @Test
-  void thingOnlyMappedChainTerminatesWithAutoTerminatedTails() throws Exception {
-    // A metadata-only pipeline ends after the Thing stage. Its terminal relationships must be
-    // auto-terminated: NiFi treats a processor with an unconnected relationship as invalid and
-    // silently skips it on start — the queue in front would stall forever.
-    JsonNode flow = build(NifiTestFixtures.frostSinkWithThingOnlyMapping());
-
-    // The chain ends at the create-confirm route (created-and-confirmed path); its 'unmatched'
-    // must be auto-terminated. Neither id extractor is terminal now — the re-GET feeds the confirm
-    // route.
-    int extractors = 0;
-    JsonNode route = null;
-    JsonNode confirm = null;
-    JsonNode patch = null;
-    for (JsonNode c : flow.get("flowContents").get("processors")) {
-      if (c.path("type").asText().endsWith("EvaluateJsonPath")
-          && c.path("properties").has("frost.thing.id")) {
-        extractors++;
-      }
-      if (c.path("type").asText().endsWith("RouteOnAttribute")
-          && c.path("properties").path("new").asText().contains("frost.thing.id")) {
-        route = c;
-      }
-      if (c.path("type").asText().endsWith("RouteOnAttribute")
-          && c.path("properties").path("unconfirmed").asText().contains("frost.thing.id")) {
-        confirm = c;
-      }
-      if (c.path("type").asText().endsWith("InvokeHTTP")
-          && c.path("properties").path("HTTP Method").asText().equals("PATCH")) {
-        patch = c;
-      }
-    }
-    assertEquals(2, extractors, "lookup and re-GET extractors must exist");
-    assertTrue(route != null, "the Thing route must exist");
-    assertTrue(confirm != null, "the create-confirm route must exist");
-    assertTrue(patch != null, "the Thing PATCH must exist");
-    assertTrue(
-        autoTerminates(confirm, "unmatched"),
-        "the created-and-confirmed path must be auto-terminated at the chain end");
-    assertFalse(autoTerminates(route, "unmatched"), "the found route must feed the Thing PATCH");
-    assertTrue(
-        autoTerminates(patch, "Original"),
-        "the successful update path must be auto-terminated at the chain end");
-    // no observation stage in this flow
-    for (JsonNode c : flow.get("flowContents").get("processors")) {
-      assertFalse(
-          c.path("properties").path("HTTP URL").asText().endsWith("/Observations"),
-          "a thing-only mapping must not post observations");
-    }
-  }
-
-  @Test
-  void bothThingOutcomesFeedTheNextStage() throws Exception {
-    // Regression guard against silent steady-state data loss: both the PATCHed-existing and the
-    // created-and-confirmed Thing must feed the Datastream GET.
-    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
-
-    String dsGetId = null;
-    String confirmId = null;
-    String patchId = null;
-    for (JsonNode c : flow.get("flowContents").get("processors")) {
-      String type = c.path("type").asText();
-      String props = c.path("properties").toString();
-      if (type.endsWith("InvokeHTTP")
-          && c.path("properties").path("HTTP Method").asText().equals("GET")
-          && c.path("properties").path("HTTP URL").asText().contains("/Datastreams")) {
-        dsGetId = c.path("identifier").asText();
-      }
-      if (type.endsWith("RouteOnAttribute") && props.contains("unconfirmed")) {
-        confirmId = c.path("identifier").asText();
-      }
-      if (type.endsWith("InvokeHTTP")
-          && c.path("properties").path("HTTP Method").asText().equals("PATCH")
-          && c.path("properties").path("HTTP URL").asText().contains("/Things(")) {
-        patchId = c.path("identifier").asText();
-      }
-    }
-    assertTrue(dsGetId != null, "the Datastream GET must exist");
-    assertTrue(confirmId != null, "the Thing create-confirm route must exist");
-    assertTrue(patchId != null, "the Thing update processor must exist");
-    assertTrue(
-        hasConnection(flow, confirmId, dsGetId, "unmatched"),
-        "the created-and-confirmed Thing must feed the Datastream GET");
-    assertTrue(
-        hasConnection(flow, patchId, dsGetId, "Original"),
-        "the PATCHed existing Thing must feed the Datastream GET");
-  }
-
-  @Test
-  void aCreatedEntityContinuesOnOriginalBecauseTheResponseIsCapturedIntoAnAttribute()
-      throws Exception {
-    // Chained onto 'Response', a first delivery would write no observation at all while a
-    // redelivery
-    // hid it by taking the lookup-hit path — no error, no failure route, no bulletin.
-    JsonNode flow = build(NifiTestFixtures.frostSinkWithThingOnlyMapping());
-
-    JsonNode post = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "POST");
-    assertFalse(
-        post.path("properties").path("Response Body Attribute Name").asText().isEmpty(),
-        "the entity POST must capture the response body, so a 4xx can be logged with its cause");
-    assertFalse(
-        autoTerminates(post, "Original"),
-        "the created entity leaves on 'Original' and must not be discarded there");
-    assertTrue(
-        autoTerminates(post, "Response"),
-        "'Response' never fires while the body is captured, so it must stay terminated");
-
-    String postId = post.get("identifier").asText();
-    assertTrue(
-        destinationOf(flow, postId, "Original") != null,
-        "the created entity must be chained onwards from 'Original'");
-  }
-
-  @Test
   void routesFrostEnvelopeRegionFailuresToLogSink() throws Exception {
     // No silent drop in the rebuild region: staRecordSplit/staCapture/staEnvelope route 'failure'
     // to the error sink.
@@ -1152,21 +814,15 @@ class NifiFlowBuilderTest {
   }
 
   @Test
-  void buildsFrostUpsertChainWithoutDbcp() throws Exception {
+  void buildsFrostSubFlowWithoutDbcp() throws Exception {
+    // ConsumeMQTT + SplitJson + PutFrostRecord + LogMessage. The generated find-or-create graph
+    // needed twenty-one processors for the same Pipeline.
     JsonNode flow = build(frostSink());
-    // ConsumeMQTT + LogMessage + Thing leg (split, body, ref, GET, id, route, two restores,
-    // POST, PATCH = 10)
-    // + Observation leg (split, body, ref, GET, id, route, restore, inject, POST = 9) = 21
-    assertEquals(21, flow.get("flowContents").get("processors").size());
-    // only reader + writer (no DBCP for a FROST/HTTP sink)
-    assertEquals(2, flow.get("flowContents").get("controllerServices").size());
 
-    // the base URL + project id drive the per-stage URLs, not a single /Observations POST
-    JsonNode get = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "GET");
-    assertTrue(
-        get.get("properties")
-            .get("HTTP URL")
-            .asText()
-            .startsWith("http://frost:8080/FROST-Server/v1.1/Projects(7)/Things"));
+    assertEquals(4, flow.get("flowContents").get("processors").size());
+    // The web client carries the transport; a FROST sink needs no database connection pool.
+    for (JsonNode service : flow.get("flowContents").get("controllerServices")) {
+      assertFalse(service.path("type").asText().contains("DBCP"), "no connection pool for FROST");
+    }
   }
 }
