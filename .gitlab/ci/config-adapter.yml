@@ -270,8 +270,7 @@ build-config-adapter:
       - config-adapter/*/target/*.jar
       # The integration shards resolve inter-module dependencies from here. The cache this job
       # restores is keyed on config-adapter/pom.xml alone, so it carries every version any MR has
-      # ever installed; uploading the directory wholesale grew the archive past the 1 GB limit and
-      # failed the job with 413. Only the version built here is needed downstream.
+      # ever installed; only the version built here is needed downstream.
       - .m2/repository/de/civitas-core/*/$CONFIG_ADAPTER_VERSION/
     exclude:
       # Already uploaded from config-adapter-application/target/, and the shade plugin makes it the
