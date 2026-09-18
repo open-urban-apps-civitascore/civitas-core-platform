@@ -1,0 +1,88 @@
+meta {
+  name: Install package with one data structure
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/installations
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "package": {
+      "id": "{{packageId}}",
+      "version": "1.0.0",
+      "title": "Soil moisture (smoke)",
+      "members": [
+        {
+          "kind": "datastructure",
+          "urn": "{{memberUrn}}",
+          "name": "Soil moisture",
+          "description": "Installed by the installations flow",
+          "content": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "{{memberUrn}}",
+            "title": "Soil moisture",
+            "$defs": {
+              "Reading": {
+                "type": "object",
+                "properties": {
+                  "tensionKpa": { "type": "number" },
+                  "measuredAt": { "type": "string", "format": "date-time" }
+                },
+                "required": ["tensionKpa", "measuredAt"]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  // A package installs once per instance and there is no uninstall yet, so every run uses its
+  // own package id. The flow stays re-runnable; each run leaves one data structure behind in the
+  // dev database. The member URN only has to be unique inside the package - the instance mints
+  // the URN the copy is installed under.
+  const runId = Date.now().toString(36);
+  bru.setVar('runId', runId);
+  bru.setVar('packageId', `urn:core:package:openurbanapps:soil_moisture_${runId}`);
+  bru.setVar('memberUrn', `urn:core:standard:openurbanapps:datastructure:environment:soil_moisture:${runId}`);
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar('installationId', res.body.id);
+    bru.setVar('installedShellId', res.body.artifacts[0].shellId);
+    bru.setVar('installedUrn', res.body.artifacts[0].urn);
+  }
+}
+
+tests {
+  test("should install the package", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.id).to.be.a('string');
+    expect(res.body.packageId).to.equal(bru.getVar('packageId'));
+    expect(res.body.packageVersion).to.equal("1.0.0");
+  });
+
+  test("should record one created data structure as a copy with its origin", function() {
+    expect(res.body.artifacts).to.have.lengthOf(1);
+    const line = res.body.artifacts[0];
+    expect(line.artifactType).to.equal("DATA_STRUCTURE");
+    expect(line.action).to.equal("CREATED");
+    expect(line.origin).to.equal(bru.getVar('memberUrn'));
+    expect(line.urn).to.have.string("urn:core:platform:civitas:datastructure:common:SoilMoisture:");
+    expect(line.urn).to.not.equal(bru.getVar('memberUrn'));
+    expect(line.versionedUrn).to.have.string(line.urn + ":");
+    expect(line.shellId).to.be.a('string');
+  });
+}
