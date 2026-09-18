@@ -49,7 +49,6 @@ public enum RoleDefault {
       PermissionName.DATAPOOL_CREATE,
       PermissionName.DATAPOOL_UPDATE,
       PermissionName.DATAPOOL_DELETE,
-      PermissionName.INSTALLATION_CREATE,
       PermissionName.INSTALLATION_READ),
 
   DATA_CONSUMER(
@@ -82,7 +81,6 @@ public enum RoleDefault {
       PermissionName.DATASTRUCTURE_DELETE,
       PermissionName.DATAPOOL_READ,
       PermissionName.DATAPOOL_UPDATE,
-      PermissionName.INSTALLATION_CREATE,
       PermissionName.INSTALLATION_READ),
 
   DATA_OWNER(

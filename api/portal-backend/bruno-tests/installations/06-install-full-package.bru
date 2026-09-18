@@ -1,0 +1,140 @@
+meta {
+  name: Install a package with structure, source, dataset and mapping
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/installations
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "datapoolId": "{{datapoolId}}",
+    "package": {
+      "id": "{{fullPackageId}}",
+      "version": "1.0.0",
+      "title": "Soil moisture, complete (smoke)",
+      "members": [
+        {
+          "kind": "mapping",
+          "urn": "{{fullMappingUrn}}",
+          "name": "Soil moisture to STA",
+          "content": {
+            "source": "{{fullStructureUrn}}",
+            "target": "{{fullStructureUrn}}",
+            "fields": {
+              "result": { "op": "copy", "sourcePath": "$.tensionKpa" }
+            }
+          }
+        },
+        {
+          "kind": "datasource",
+          "urn": "{{fullSourceUrn}}",
+          "name": "Soil sensor DB",
+          "description": "Installed by the installations flow",
+          "content": {
+            "connectionType": "sql",
+            "element": "{{fullStructureUrn}}",
+            "driver": "postgres",
+            "dsn": "jdbc:postgresql://postgis:5432/core",
+            "table": "soil_readings",
+            "columns": ["tensionKpa", "measuredAt"],
+            "user": "core",
+            "password": "not-a-real-password"
+          }
+        },
+        {
+          "kind": "dataset",
+          "urn": "{{fullDataSetUrn}}",
+          "name": "Soil moisture readings",
+          "description": "Installed by the installations flow",
+          "content": { "openDataAccess": false }
+        },
+        {
+          "kind": "datastructure",
+          "urn": "{{fullStructureUrn}}",
+          "name": "Soil moisture",
+          "content": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "{{fullStructureUrn}}",
+            "title": "Soil moisture",
+            "$defs": {
+              "Reading": {
+                "$id": "{{fullElementUrn}}",
+                "type": "object",
+                "properties": {
+                  "tensionKpa": { "type": "number" },
+                  "measuredAt": { "type": "string", "format": "date-time" }
+                },
+                "required": ["tensionKpa", "measuredAt"]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  // Members are listed out of order on purpose: the install sorts them by kind.
+  const axios = require('axios');
+  const runId = bru.getVar('runId') || Date.now().toString(36);
+  bru.setVar('runId', runId);
+  bru.setVar('fullPackageId', `urn:core:package:openurbanapps:soil_moisture_full_${runId}`);
+  bru.setVar('fullStructureUrn', `urn:core:standard:openurbanapps:datastructure:environment:soil_moisture:${runId}`);
+  bru.setVar('fullElementUrn', `urn:core:standard:openurbanapps:element:environment:soil_moisture_reading:${runId}`);
+  bru.setVar('fullSourceUrn', `urn:core:standard:openurbanapps:datasource:environment:soil_sensor_db:${runId}`);
+  bru.setVar('fullDataSetUrn', `urn:core:standard:openurbanapps:dataset:environment:soil_moisture:${runId}`);
+  bru.setVar('fullMappingUrn', `urn:core:standard:openurbanapps:mapping:environment:soil_to_sta:${runId}`);
+
+  // The datapool is instance knowledge the package cannot carry: created here per run, like an
+  // operator would pick or create one in the install dialog.
+  const res = await axios.post(
+    `${bru.getEnvVar('baseUrl')}/datapools`,
+    { name: `Install flow ${runId}`, description: 'Created by the installations flow' },
+    { headers: { Authorization: `Bearer ${bru.getVar('accessToken')}` } }
+  );
+  bru.setVar('datapoolId', res.data.id);
+}
+
+script:post-response {
+  if (res.status === 201) {
+    const byType = Object.fromEntries(res.body.artifacts.map(line => [line.artifactType, line]));
+    bru.setVar('installedSourceId', byType.DATA_SOURCE && byType.DATA_SOURCE.shellId);
+    bru.setVar('installedDataSetId', res.body.dataSetId);
+  }
+}
+
+tests {
+  test("should install the complete package", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.packageId).to.equal(bru.getVar('fullPackageId'));
+    expect(res.body.dataSetId).to.be.a('string');
+  });
+
+  test("should record the four members in install order, each with its origin", function() {
+    const lines = res.body.artifacts;
+    expect(lines.map(line => line.artifactType)).to.deep.equal(["DATA_STRUCTURE", "DATA_SOURCE", "DATA_SET", "MAPPING"]);
+    expect(lines.map(line => line.origin)).to.deep.equal([
+      bru.getVar('fullStructureUrn'), bru.getVar('fullSourceUrn'), bru.getVar('fullDataSetUrn'), bru.getVar('fullMappingUrn')
+    ]);
+    lines.forEach(line => expect(line.action).to.equal("CREATED"));
+  });
+
+  test("should mint every copy in this instance's namespace", function() {
+    const lines = res.body.artifacts;
+    expect(lines[0].urn).to.have.string("urn:core:platform:civitas:datastructure:common:SoilMoisture:");
+    expect(lines[1].urn).to.have.string("urn:core:platform:civitas:datasource:common:");
+    expect(lines[2].urn).to.have.string("urn:core:platform:civitas:dataset:common:");
+    expect(lines[3].urn).to.have.string("urn:core:platform:civitas:mapping:common:");
+    expect(lines[3].shellId).to.be.null;
+  });
+}

@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
+import java.util.UUID;
 import lombok.Data;
 
 /**
@@ -21,6 +22,13 @@ public class InstallationInputDTO {
 
   @Valid @NotNull(message = "package is required") @JsonProperty("package")
   private PackageManifestInputDTO packageManifest;
+
+  @Schema(
+      description =
+          "The datapool the package's data sources and datasets are installed into. Required as"
+              + " soon as the package ships either; a package of data structures alone needs none."
+              + " Instance knowledge, never package content: the pool decides who sees the data.")
+  private UUID datapoolId;
 
   @Schema(
       description =

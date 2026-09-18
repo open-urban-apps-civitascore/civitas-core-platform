@@ -1,0 +1,51 @@
+meta {
+  name: Install a package whose mapping references a structure it does not ship (refused)
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/installations
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "datapoolId": "{{datapoolId}}",
+    "package": {
+      "id": "{{fullPackageId}}_dangling",
+      "version": "1.0.0",
+      "title": "Soil moisture with a dangling reference (smoke)",
+      "members": [
+        {
+          "kind": "dataset",
+          "urn": "{{fullDataSetUrn}}",
+          "name": "Soil moisture readings",
+          "content": {}
+        },
+        {
+          "kind": "mapping",
+          "urn": "{{fullMappingUrn}}",
+          "name": "Soil moisture to STA",
+          "content": {
+            "source": "urn:core:standard:openurbanapps:datastructure:environment:not_in_this_package:x",
+            "fields": {
+              "result": { "op": "copy", "sourcePath": "$.tensionKpa" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("should refuse: a member may only reference members of its own package", function() {
+    expect(res.status).to.equal(400);
+  });
+}
