@@ -37,6 +37,7 @@ import {
   mapDatastructureVersionFormToApiData,
   parseDatastructureVersionFormData,
 } from '@/utils/datastructures'
+import { isResourceInUseError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 import { buildDataStructureLogicalUrn } from '@/utils/urn'
 
@@ -170,7 +171,7 @@ export const useDatastructureVersion = ({
       router.refresh()
       return response.data
     } catch (error) {
-      toast.error(tCommon('errors.statusChangeError'))
+      toast.error(isResourceInUseError(error) ? t('errors.inUseError') : tCommon('errors.statusChangeError'))
       throw error
     }
   }
@@ -218,7 +219,11 @@ export const useDatastructureVersion = ({
       router.refresh()
       return response.data
     } catch (error) {
-      toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructureVersion') }))
+      toast.error(
+        isResourceInUseError(error)
+          ? t('errors.inUseError')
+          : tCommon('errors.updateError', { item: tCommon('items.datastructureVersion') }),
+      )
       throw error
     }
   }

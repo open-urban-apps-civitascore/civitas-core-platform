@@ -43,7 +43,7 @@ import {
   DatasetUpdateApiData,
   DatasetUpdateApiSchema,
 } from '@/types/datasets'
-import { isDatapoolScopeViolationError } from '@/utils/errors'
+import { isDatapoolScopeViolationError, isSagaInFlightError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { mapDatasetToFormData } from '../../../utils/mappers'
@@ -227,6 +227,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     } catch (error) {
       if (isDatapoolScopeViolationError(error)) {
         toast.error(t('messages.datasourceScopeViolation'))
+      } else if (isSagaInFlightError(error)) {
+        toast.error(t('messages.sagaInFlightError'))
       } else {
         toast.error(t('messages.transitionError'))
       }

@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { AxiosError } from 'axios'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import { Dataset } from '@/types/datasets'
@@ -576,18 +576,11 @@ describe('DatasetOverview', () => {
     })
   })
 
-  describe('Save error handling: scope-violation vs. generic', () => {
-    const axios422 = (type?: string) =>
-      new AxiosError('request failed', undefined, undefined, undefined, {
-        status: 422,
-        statusText: '',
-        headers: {},
-        config: {} as never,
-        data: { detail: 'scope violation', type },
-      })
-
+  describe('Save error handling: scope-violation vs. saga vs. generic', () => {
     it('shows the scope-violation toast when the save fails with a DATASOURCE_SCOPE_VIOLATION 422', async () => {
-      mockPatchDataset.mockRejectedValueOnce(axios422('urn:civitas:error:DATASOURCE_SCOPE_VIOLATION'))
+      mockPatchDataset.mockRejectedValueOnce(
+        mockApiError(422, 'scope violation', 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION'),
+      )
       renderComponent()
       clickEditButton()
 
@@ -598,6 +591,24 @@ describe('DatasetOverview', () => {
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('messages.datasourceScopeViolation')
+      })
+      expect(toast.error).not.toHaveBeenCalledWith('messages.transitionError')
+    })
+
+    it('shows the saga toast when the save is rejected because a saga is running', async () => {
+      mockPatchDataset.mockRejectedValueOnce(
+        mockApiError(409, 'Cannot release while a saga is in-flight: CREATE', 'urn:civitas:error:SAGA_IN_FLIGHT'),
+      )
+      renderComponent()
+      clickEditButton()
+
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
+      })
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('messages.sagaInFlightError')
       })
       expect(toast.error).not.toHaveBeenCalledWith('messages.transitionError')
     })
