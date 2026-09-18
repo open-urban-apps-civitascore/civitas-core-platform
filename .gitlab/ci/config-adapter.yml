@@ -33,6 +33,12 @@ setup-version-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+  before_script:
+    # This job runs in .pre, so it is the only point in the pipeline where the cached repository
+    # holds no artifact any later job still needs: build-config-adapter reinstalls them, and the
+    # shards take them from its artifact. Dropping them here keeps the cache from carrying every
+    # version ever built, while the third-party dependencies it exists for stay put.
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core
   script:
     - cd config-adapter
     # Extract base version from pom.xml
