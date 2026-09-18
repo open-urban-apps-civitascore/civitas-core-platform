@@ -89,9 +89,6 @@ generate-graph-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
-    # Read-only: only build-config-adapter installs into the local repo, and the shards
-    # receive its output as an artifact. Without this every job re-uploads the whole
-    # repository under the shared key, overwriting each other with partial copies.
     policy: pull
   script:
     - cd config-adapter
@@ -270,6 +267,9 @@ build-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    # Keeps the default pull-push: this job installs into the local repo, so it is the one
+    # that has to write the cache back. The read-only jobs declare policy: pull instead, or
+    # each would re-upload the whole repository under the shared key.
   script:
     - cd config-adapter
     # The artifacts must land in the local repo, because the integration shards resolve inter-module
