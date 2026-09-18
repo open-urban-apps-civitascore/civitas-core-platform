@@ -83,6 +83,10 @@ generate-graph-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    # Read-only: only build-config-adapter installs into the local repo, and the shards
+    # receive its output as an artifact. Without this every job re-uploads the whole
+    # repository under the shared key, overwriting each other with partial copies.
+    policy: pull
   script:
     - cd config-adapter
     # Only generate dependency tree, no compilation needed
@@ -108,6 +112,7 @@ lint-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    policy: pull
   script:
     - cd config-adapter
     - mvn spotless:check -Drevision=$CONFIG_ADAPTER_VERSION
@@ -127,6 +132,7 @@ dependency-prune-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    policy: pull
   script:
     - cd config-adapter
     - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Drevision=$CONFIG_ADAPTER_VERSION -DfailOnWarning=true -DignoreNonCompile=false
@@ -150,6 +156,7 @@ test-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    policy: pull
   script:
     - cd config-adapter
     - mvn $MAVEN_CLI_OPTS test -Drevision=$CONFIG_ADAPTER_VERSION -T 2
@@ -211,6 +218,7 @@ test-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    policy: pull
   script:
     - cd config-adapter
     # Explicit goals keep package, spotless and spotbugs out of this job.
@@ -345,6 +353,7 @@ publish-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    policy: pull
   script:
     - cd config-adapter
     # Deploy to GitLab Maven repository
