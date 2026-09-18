@@ -48,7 +48,7 @@ vi.mock('next-intl', () => ({
 }))
 
 vi.mock('sonner', () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }))
 
 vi.mock('@/hooks/use-register-unsaved-changes', () => ({
@@ -1270,7 +1270,7 @@ describe('PipelineEditorProviderComponent', () => {
       })
     })
 
-    it('executes dataSink deletes before dataSink creates and pipeline save', async () => {
+    it('deletes removed dataSinks only after the pipeline was saved', async () => {
       const callOrder: string[] = []
 
       const mockDeleteDataSinkAsync = vi.fn().mockImplementation(async () => {
@@ -1317,7 +1317,7 @@ describe('PipelineEditorProviderComponent', () => {
         await contextRef.current?.saveAllPipelines()
       })
 
-      expect(callOrder).toEqual(['deleteDataSink', 'createDataSink', 'updatePipeline'])
+      expect(callOrder).toEqual(['createDataSink', 'updatePipeline', 'deleteDataSink'])
     })
 
     it('shows a success toast with the pipeline name after save', async () => {
@@ -1367,7 +1367,7 @@ describe('PipelineEditorProviderComponent', () => {
       expect(toast.error).toHaveBeenCalled()
     })
 
-    it('does not save the pipeline when dataSink deletion fails', async () => {
+    it('keeps the saved pipeline when dataSink deletion fails', async () => {
       vi.mocked(useDeleteDataSink).mockReturnValue({
         mutate: vi.fn(),
         mutateAsync: vi.fn().mockRejectedValue(new Error('DataSink deletion failed')),
@@ -1387,8 +1387,64 @@ describe('PipelineEditorProviderComponent', () => {
         result = await contextRef.current?.saveAllPipelines()
       })
 
+      expect(result).toBe(true)
+      expect(mockUpdatePipelineMutateAsync).toHaveBeenCalled()
+      expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('sinkDeleteFailed'))
+    })
+
+    it('reports a still-referenced dataSink separately', async () => {
+      const inUseError = mockApiError(
+        409,
+        'DataSink is referenced by one or more Layers',
+        'urn:civitas:error:RESOURCE_IN_USE',
+      )
+      vi.mocked(useDeleteDataSink).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockRejectedValue(inUseError),
+        isPending: false,
+      } as unknown as ReturnType<typeof useDeleteDataSink>)
+
+      vi.mocked(getRemovedDataSinkIds).mockReturnValue(['old-sink-1'])
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' },
+      })
+      renderProvider(session)
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(true)
+      expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('sinkStillInUse'))
+    })
+
+    it('does not delete removed dataSinks when the pipeline save fails', async () => {
+      const mockDeleteDataSinkAsync = vi.fn()
+      vi.mocked(useDeleteDataSink).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockDeleteDataSinkAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useDeleteDataSink>)
+
+      vi.mocked(getRemovedDataSinkIds).mockReturnValue(['old-sink-1'])
+      mockUpdatePipelineMutateAsync.mockRejectedValue(new Error('Pipeline save failed'))
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' },
+      })
+      renderProvider(session)
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
       expect(result).toBe(false)
-      expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
+      expect(mockDeleteDataSinkAsync).not.toHaveBeenCalled()
       expect(toast.error).toHaveBeenCalled()
     })
 

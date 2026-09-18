@@ -1371,7 +1371,9 @@
       "dataSinkInUseError": "Cannot save {names}: a data storage is still used by at least one layer.",
       "unconfirmedDataLossError": "Cannot save {names}: the change would discard stored data.",
       "notDraftError": "The dataset must be in draft status to make changes.",
-      "sagaInFlightError": "The dataset is currently being processed. Please try again later."
+      "sagaInFlightError": "The dataset is currently being processed. Please try again later.",
+      "sinkStillInUse": "{names} was saved, but a removed data storage is still in use and cannot be deleted.",
+      "sinkDeleteFailed": "{names} was saved, but a removed data storage could not be deleted."
     },
     "tabs": {
       "closeTab": "Close tab",
