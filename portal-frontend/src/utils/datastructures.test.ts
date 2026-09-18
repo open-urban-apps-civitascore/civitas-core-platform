@@ -472,14 +472,11 @@ describe('root designation round-trip through persisted styles', () => {
 })
 
 /**
- * AC 1 (reload half) and AC 2: the editor rehydrates from `styles`, never from the stored CORE
- * model, so the provable statement is that a rehydrated diagram exports the same model again. The
- * JSON hop is what gives the case its teeth — without it the test compares an object with itself.
- *
- * This is rehydration, not reload: the payload comes from the test, not from the server. Whether
- * the backend returns `styles` unchanged is outside the frontend (see tickets/2108, plan.md).
+ * The editor rehydrates from `styles`, never from the stored CORE model,
+ * so the provable statement is that a rehydrated diagram exports the same model again.
+ * This is rehydration, not reload: the payload comes from the test, not from the server.
  */
-describe('CORE model survives a save/rehydrate round-trip', () => {
+describe('the exported model survives a save/rehydrate round-trip', () => {
   const formOf = (): DatastructureVersionFormData =>
     ({
       id: 'v1',
@@ -490,11 +487,13 @@ describe('CORE model survives a save/rehydrate round-trip', () => {
       modelName: 'Struct',
     }) as DatastructureVersionFormData
 
-  const roundTrip = (diagram: UMLDiagram) => {
+  const noEdit = (diagram: UMLDiagram) => diagram
+
+  const roundTrip = (diagram: UMLDiagram, edit: (diagram: UMLDiagram) => UMLDiagram = noEdit) => {
     const before = buildUMLModelPayload(diagram, DS_URN).model
     const persisted = JSON.parse(JSON.stringify(mapDatastructureVersionFormToApiData(formOf(), diagram, before)))
     const rehydrated = buildSessionFromVersion(persisted as DatastructureVersion).diagram
-    return { before, after: buildUMLModelPayload(rehydrated, DS_URN).model }
+    return { before, after: buildUMLModelPayload(edit(rehydrated), DS_URN).model }
   }
 
   it.each(datastructureFixtures)('$label exports an equivalent model after rehydration', ({ diagram }) => {
@@ -509,5 +508,22 @@ describe('CORE model survives a save/rehydrate round-trip', () => {
 
     expect(idsOf(after)).toEqual(idsOf(before))
     expect(after.$ref).toBe(before.$ref)
+  })
+
+  const fixtureNamed = (label: string) => {
+    const fixture = datastructureFixtures.find(candidate => candidate.label === label)
+    assert(fixture, `no fixture labelled "${label}"`)
+    return fixture.diagram
+  }
+
+  it('moving a node changes no part of the exported model', () => {
+    const moveFirstNode = (diagram: UMLDiagram): UMLDiagram => ({
+      ...diagram,
+      nodes: diagram.nodes.map((node, index) => (index === 0 ? { ...node, position: { x: 512, y: 64 } } : node)),
+      viewport: { x: 10, y: 20, zoom: 2 },
+    })
+
+    const { before, after } = roundTrip(fixtureNamed('composition'), moveFirstNode)
+    expect(after).toEqual(before)
   })
 })

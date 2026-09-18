@@ -1,12 +1,20 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent, { UserEvent } from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
+import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import messages from '@/messages/de.json'
+import { contractErrors } from '@/test-support/coreContracts'
+import { cls, type FixtureAttribute } from '@/test-support/datastructureFixtures'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
-import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureVersion } from '@/types/datastructures'
+import {
+  Datastructure,
+  DATASTRUCTURE_STATUS_TYPES,
+  DatastructureVersion,
+  DatastructureVersionPutData,
+} from '@/types/datastructures'
 
 import { VersionOverview } from './VersionOverview'
 
@@ -811,13 +819,24 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       mockSubTabValue = 'structure'
     })
 
-    const versionWithSelectedNode: DatastructureVersion = {
+    type ClassDef = { properties?: Record<string, unknown>; required?: string[] }
+
+    const savedDefs = () => {
+      const { data } = mockUpdateMutateAsync.mock.calls[0][0] as { data: DatastructureVersionPutData }
+      return { data, defs: (data.model as { $defs: Record<string, ClassDef> }).$defs }
+    }
+
+    // Pre-selected in the fixture rather than clicked: the inspector renders nothing without a
+    // selected node, and React Flow needs real pointer events to select one.
+    const versionSelecting = (attribute: FixtureAttribute): DatastructureVersion => ({
       ...mockVersionWithModel,
       styles: {
         ...mockVersionWithModel.styles!,
-        nodes: [{ ...mockVersionWithModel.styles!.nodes[0], selected: true }],
+        nodes: [{ ...cls('elem-1', 'TestClass', [attribute]), selected: true }] as UMLDiagram['nodes'],
       },
-    }
+    })
+
+    const versionWithSelectedNode = versionSelecting({ id: 'attr-1', name: 'serial', type: 'Uuid' })
 
     it('enables the save button after the diagram was renamed', async () => {
       const user = userEvent.setup()
@@ -842,6 +861,133 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       await user.type(screen.getByPlaceholderText('Element name'), 'X')
 
       await waitFor(() => expect(screen.getByTestId('confirmButton')).toBeEnabled())
+    })
+
+    it('saves the renamed class into the CORE model, not just the styles', async () => {
+      const user = userEvent.setup()
+      renderComponent({ version: versionWithSelectedNode })
+
+      await user.type(screen.getByPlaceholderText('Element name'), 'X')
+      await user.click(screen.getByTestId('confirmButton'))
+
+      await waitFor(() => expect(mockUpdateMutateAsync).toHaveBeenCalled())
+
+      const { data, defs } = savedDefs()
+      expect(Object.keys(defs)).toEqual(['TestClassX'])
+      expect(defs.TestClassX.properties).toEqual({ serial: { type: 'string', format: 'uuid' } })
+      expect(data.styles?.nodes[0].data.element.name).toBe('TestClassX')
+      expect(contractErrors('datastructure', data.model)).toEqual([])
+    })
+
+    it('saves an attribute added in the inspector into the CORE model', async () => {
+      const user = userEvent.setup()
+      renderComponent({ version: versionWithSelectedNode })
+
+      await user.click(screen.getByText('Attributes'))
+      await user.click(screen.getByRole('button', { name: /Add Attribute/ }))
+      await user.click(screen.getByTestId('confirmButton'))
+
+      await waitFor(() => expect(mockUpdateMutateAsync).toHaveBeenCalled())
+
+      const { data, defs } = savedDefs()
+      expect(defs.TestClass.properties).toEqual({
+        serial: { type: 'string', format: 'uuid' },
+        neuesAttribut: { type: 'string' },
+      })
+      expect(contractErrors('datastructure', data.model)).toEqual([])
+    })
+
+    it('saves a geometry attribute turned primitive without its CRS', async () => {
+      const user = userEvent.setup()
+      const geometry: FixtureAttribute = {
+        id: 'attr-1',
+        name: 'location',
+        type: 'Point',
+        meta: { gisInfo: { crs: 'EPSG:25832' } },
+      }
+      renderComponent({ version: versionSelecting(geometry) })
+
+      await user.click(screen.getByText('Attributes'))
+      const type = screen.getByText('Type').closest('div') as HTMLElement
+      fireEvent.click(within(type).getByRole('combobox'))
+      fireEvent.click(screen.getByRole('option', { name: 'String' }))
+      await user.click(screen.getByTestId('confirmButton'))
+
+      await waitFor(() => expect(mockUpdateMutateAsync).toHaveBeenCalled())
+
+      // A leftover crs would still satisfy the contract, which does not know the keyword at all.
+      const { data, defs } = savedDefs()
+      expect(defs.TestClass.properties).toEqual({ location: { type: 'string' } })
+      expect(contractErrors('datastructure', data.model)).toEqual([])
+    })
+
+    it('saves a primitive attribute turned geometry with the default CRS', async () => {
+      const user = userEvent.setup()
+      renderComponent({ version: versionSelecting({ id: 'attr-1', name: 'location' }) })
+
+      await user.click(screen.getByText('Attributes'))
+      const type = screen.getByText('Type').closest('div') as HTMLElement
+      fireEvent.click(within(type).getByRole('combobox'))
+      fireEvent.click(screen.getByRole('option', { name: 'Point' }))
+      await user.click(screen.getByTestId('confirmButton'))
+
+      await waitFor(() => expect(mockUpdateMutateAsync).toHaveBeenCalled())
+
+      const { data, defs } = savedDefs()
+      expect(defs.TestClass.properties).toEqual({
+        location: { $ref: 'https://geojson.org/schema/Point.json', crs: 'EPSG:4326' },
+      })
+      expect(contractErrors('datastructure', data.model)).toEqual([])
+    })
+
+    it('saves a cardinality change into the CORE model', async () => {
+      const user = userEvent.setup()
+      renderComponent({ version: versionWithSelectedNode })
+
+      await user.click(screen.getByText('Attributes'))
+      // Radix Select opens on the raw pointer event, which userEvent does not emit in jsdom.
+      const cardinality = screen.getByText('Cardinality').closest('div') as HTMLElement
+      fireEvent.click(within(cardinality).getByRole('combobox'))
+      fireEvent.click(screen.getByRole('option', { name: '0..*' }))
+      await user.click(screen.getByTestId('confirmButton'))
+
+      await waitFor(() => expect(mockUpdateMutateAsync).toHaveBeenCalled())
+
+      const { data, defs } = savedDefs()
+      expect(defs.TestClass.properties?.serial).toEqual({ type: 'array', items: { type: 'string', format: 'uuid' } })
+      // A lower bound of 0 also drops the property from required.
+      expect(defs.TestClass.required).toBeUndefined()
+      expect(contractErrors('datastructure', data.model)).toEqual([])
+    })
+
+    it('saves a class added on the canvas into the CORE model', async () => {
+      const user = userEvent.setup()
+      // The designation is what keeps the export unambiguous once a second, unconnected class exists.
+      const rootNode = cls('elem-1', 'TestClass', [{ id: 'attr-1', name: 'serial', type: 'Uuid' }], { isRoot: true })
+      const versionWithRoot: DatastructureVersion = {
+        ...mockVersionWithModel,
+        styles: { ...mockVersionWithModel.styles!, nodes: [rootNode] as UMLDiagram['nodes'] },
+      }
+      renderComponent({ version: versionWithRoot })
+
+      // The palette hands the element type over in a drag payload; userEvent has no drag-and-drop.
+      const canvas = document.querySelector('.react-flow') as HTMLElement
+      fireEvent.drop(canvas, { dataTransfer: { getData: () => 'class' } })
+
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).toBeEnabled())
+      await user.click(screen.getByTestId('confirmButton'))
+
+      await waitFor(() => expect(mockUpdateMutateAsync).toHaveBeenCalled())
+
+      const { data, defs } = savedDefs()
+      expect(data.styles?.nodes).toHaveLength(2)
+
+      const addedClass = data.styles?.nodes[1].data.element.name
+      expect(addedClass).toMatch(/^NeueKlasse/)
+      expect(Object.keys(defs)).toEqual(['TestClass', addedClass])
+      // The class template seeds one attribute, so the new class is not empty.
+      expect(defs[addedClass!].properties).toEqual({ attribut: { type: 'string' } })
+      expect(contractErrors('datastructure', data.model)).toEqual([])
     })
   })
 })

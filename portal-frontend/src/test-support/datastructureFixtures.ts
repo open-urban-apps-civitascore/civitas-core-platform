@@ -7,7 +7,18 @@
 
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 
-export const cls = (id: string, name: string, attrs: { id: string; name: string; type?: string }[]) => ({
+export interface FixtureAttribute {
+  id: string
+  name: string
+  /** A primitive or geometry name, or `{ id }` to point at another element. */
+  type?: string | { id: string }
+  multiplicity?: string
+  isId?: boolean
+  documentation?: string
+  meta?: { gisInfo: { crs: string } }
+}
+
+export const cls = (id: string, name: string, attrs: FixtureAttribute[], options: { isRoot?: boolean } = {}) => ({
   id: `node-${id}`,
   type: 'class' as const,
   position: { x: 0, y: 0 },
@@ -18,6 +29,22 @@ export const cls = (id: string, name: string, attrs: { id: string; name: string;
       type: 'class' as const,
       attributes: attrs.map(a => ({ visibility: 'public' as const, type: 'String', ...a })),
       operations: [],
+      ...(options.isRoot ? { isRoot: true } : {}),
+    },
+    label: name,
+  },
+})
+
+export const enm = (id: string, name: string, literals: string[]) => ({
+  id: `node-${id}`,
+  type: 'enumeration' as const,
+  position: { x: 0, y: 0 },
+  data: {
+    element: {
+      id,
+      name,
+      type: 'enumeration' as const,
+      literals: literals.map((literal, index) => ({ id: `${id}-l${index}`, name: literal })),
     },
     label: name,
   },
@@ -136,6 +163,126 @@ export const datastructureFixtures: DatastructureFixture[] = [
       'SensorNetwork',
       [cls('station', 'Station', [{ id: 'a1', name: 'id' }]), cls('reading', 'Reading', [{ id: 'a2', name: 'value' }])],
       [rel('1', 'composition', 'reading', 'station', { sourceRole: 'readings', sourceMultiplicity: '*' })],
+    ),
+  },
+
+  // The fixtures above vary structure. Those below vary the constructs a single class can carry.
+  {
+    label: 'every primitive type',
+    diagram: diagram(
+      'Reading',
+      [
+        cls('reading', 'Reading', [
+          { id: 'a1', name: 'label', type: 'String' },
+          { id: 'a2', name: 'count', type: 'Integer' },
+          { id: 'a3', name: 'active', type: 'Boolean' },
+          { id: 'a4', name: 'value', type: 'Number' },
+          { id: 'a5', name: 'day', type: 'Date' },
+          { id: 'a6', name: 'takenAt', type: 'DateTime' },
+          { id: 'a7', name: 'ref', type: 'Uuid' },
+        ]),
+      ],
+      [],
+    ),
+  },
+  {
+    // The editor keeps every geometry attribute of a class on one CRS: only the first attribute's
+    // select is enabled and changing it rewrites the others.
+    label: 'geometry attributes sharing one CRS',
+    diagram: diagram(
+      'Site',
+      [
+        cls('site', 'Site', [
+          { id: 'a1', name: 'location', type: 'Point', meta: { gisInfo: { crs: 'EPSG:25832' } } },
+          { id: 'a2', name: 'outline', type: 'Polygon', meta: { gisInfo: { crs: 'EPSG:25832' } } },
+        ]),
+      ],
+      [],
+    ),
+  },
+  {
+    label: 'every attribute cardinality',
+    diagram: diagram(
+      'Measurement',
+      [
+        cls('measurement', 'Measurement', [
+          { id: 'a1', name: 'optional', multiplicity: '0..1' },
+          { id: 'a2', name: 'exactlyOne', multiplicity: '1' },
+          { id: 'a3', name: 'unset' },
+          { id: 'a4', name: 'many', multiplicity: '0..*' },
+          { id: 'a5', name: 'atLeastOne', multiplicity: '1..*' },
+        ]),
+      ],
+      [],
+    ),
+  },
+  {
+    label: 'primary key',
+    diagram: diagram(
+      'Station',
+      [
+        cls('station', 'Station', [
+          { id: 'a1', name: 'stationId', type: 'Uuid', isId: true },
+          { id: 'a2', name: 'name' },
+        ]),
+      ],
+      [],
+    ),
+  },
+  {
+    label: 'composite primary key',
+    diagram: diagram(
+      'Slot',
+      [
+        cls('slot', 'Slot', [
+          { id: 'a1', name: 'stationId', type: 'Uuid', isId: true },
+          { id: 'a2', name: 'day', type: 'Date', isId: true },
+          { id: 'a3', name: 'value', type: 'Number' },
+        ]),
+      ],
+      [],
+    ),
+  },
+  {
+    label: 'enumeration referenced by an attribute',
+    diagram: diagram(
+      'Device',
+      [
+        cls('device', 'Device', [
+          { id: 'a1', name: 'id' },
+          { id: 'a2', name: 'status', type: { id: 'status' } },
+        ]),
+        enm('status', 'Status', ['ACTIVE', 'INACTIVE']),
+      ],
+      [],
+    ),
+  },
+  {
+    // Beta is reachable as an attribute type but embedded by no edge, so without the designation
+    // both classes would be root candidates and the export would refuse.
+    label: 'explicitly designated root',
+    diagram: diagram(
+      'Catalog',
+      [
+        cls('alpha', 'Alpha', [{ id: 'a1', name: 'beta', type: { id: 'beta' } }], { isRoot: true }),
+        cls('beta', 'Beta', [{ id: 'a2', name: 'value' }]),
+      ],
+      [],
+    ),
+  },
+  {
+    label: 'composition with roles and multiplicities on both ends',
+    diagram: diagram(
+      'Depot',
+      [cls('depot', 'Depot', [{ id: 'a1', name: 'id' }]), cls('bay', 'Bay', [{ id: 'a2', name: 'number' }])],
+      [
+        rel('1', 'composition', 'bay', 'depot', {
+          sourceRole: 'bays',
+          sourceMultiplicity: '1..*',
+          targetRole: 'depot',
+          targetMultiplicity: '1',
+        }),
+      ],
     ),
   },
 ]
