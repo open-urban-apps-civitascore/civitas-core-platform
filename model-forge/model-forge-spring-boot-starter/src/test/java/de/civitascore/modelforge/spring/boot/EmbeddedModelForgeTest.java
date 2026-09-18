@@ -7,8 +7,6 @@ import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
-import de.civitascore.modelforge.contract.ImportArtifactCommand;
-import de.civitascore.modelforge.contract.ImportArtifactResult;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.ImportSmartDataModelCommand;
@@ -60,12 +58,6 @@ class EmbeddedModelForgeTest {
                 public ImportResult importSchema(ImportSchemaCommand command) {
                     var id = new ArtifactId("urn:example:model_forge.artifact");
                     return new ImportResult(id, List.of(id), Map.of());
-                }
-
-                @Override
-                public ImportArtifactResult importArtifact(ImportArtifactCommand command) {
-                    var id = new ArtifactId("urn:example:model_forge.artifact");
-                    return new ImportArtifactResult(id, true, Map.of());
                 }
 
                 @Override

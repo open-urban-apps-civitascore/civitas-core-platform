@@ -1,14 +1,16 @@
 package de.civitascore.portal.model.embedded;
 
 /**
- * What an install did with one contained artifact. Recorded because reference counting on uninstall
- * depends on it — a REUSED artifact was not brought by this package and must never be removed with
- * it.
+ * What an install did with one contained artifact. Recorded because uninstall depends on it — a
+ * REUSED artifact was not brought by this package and must never be removed with it.
  */
 public enum InstalledArtifactAction {
-  /** Newly created by this install. */
+  /** Newly created by this install, as a copy under a URN minted here. */
   CREATED,
 
-  /** Already installed with identical content; this install only linked it. */
+  /**
+   * An existing copy on this instance that this install bound to instead of creating its own — a
+   * prerequisite the package declared, resolved by origin.
+   */
   REUSED
 }

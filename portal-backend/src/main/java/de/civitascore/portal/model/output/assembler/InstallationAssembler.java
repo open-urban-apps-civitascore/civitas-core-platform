@@ -31,6 +31,7 @@ public class InstallationAssembler {
     output.setShellId(line.getShellId());
     output.setUrn(line.getUrn());
     output.setVersionedUrn(line.getVersionedUrn());
+    output.setOrigin(line.getOrigin());
     output.setAction(line.getAction());
     return output;
   }

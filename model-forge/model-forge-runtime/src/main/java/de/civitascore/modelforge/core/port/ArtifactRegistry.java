@@ -2,7 +2,6 @@ package de.civitascore.modelforge.core.port;
 
 import tools.jackson.databind.JsonNode;
 import de.civitascore.modelforge.contract.ArtifactId;
-import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.VersionBump;
 import java.util.List;
 import java.util.Map;
@@ -89,29 +88,6 @@ public interface ArtifactRegistry {
      */
     String storeElement(String name, JsonNode schema, Set<String> refs, Set<String> associationTargets,
                          String explicitVersion, VersionBump bump, String bumpFromVersion);
-
-    /**
-     * Stores an opaque CORE artifact (mapping, pipeline, datasource, datasink, dataset) at the
-     * caller-declared URN, optionally adopting an explicit initial version — the same escape hatch
-     * {@code storeElement}'s {@code explicitVersion} provides, for envelope imports that preserve
-     * an externally managed version identity. The default delegates to the kind's store method and
-     * ignores the explicit version (test doubles keep working); the Postgres registry honours it.
-     *
-     * @return the concrete versioned URN (pin) the write resolved to
-     */
-    default String storeAt(ArtifactKind kind, String urn, JsonNode content, VersionBump bump,
-                            String explicitVersion) {
-        return switch (kind) {
-            case MAPPING -> storeMapping(urn, content, bump);
-            case PIPELINE -> storePipeline(urn, content, bump);
-            case DATA_SOURCE -> storeDataSource(urn, content, bump);
-            case DATA_SINK -> storeDataSink(urn, content, bump);
-            case DATA_SET -> storeDataSet(urn, content, bump);
-            case DATA_STRUCTURE, ELEMENT -> throw new IllegalArgumentException(
-                "storeAt covers the opaque CORE kinds; Elements and DataStructures are stored "
-                + "through the schema paths.");
-        };
-    }
 
     /** @return the concrete versioned URN (pin) the write resolved to */
     String storeMapping(String id, JsonNode mapping, VersionBump bump);

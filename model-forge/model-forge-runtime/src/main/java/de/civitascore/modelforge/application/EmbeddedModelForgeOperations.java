@@ -7,7 +7,6 @@ import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactView;
-import de.civitascore.modelforge.contract.ArtifactContentConflictException;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
 import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
@@ -15,8 +14,6 @@ import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.Diagnostic;
 import de.civitascore.modelforge.contract.DiagnosticSeverity;
-import de.civitascore.modelforge.contract.ImportArtifactCommand;
-import de.civitascore.modelforge.contract.ImportArtifactResult;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.ImportSmartDataModelCommand;
@@ -315,8 +312,40 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     @Override
     public ArtifactWriteResult saveArtifact(SaveArtifactCommand command) {
         String urn = command.artifactId().value();
-        JsonNode content = stampSchemaAndId(command.kind(), urn, command.content());
-        requireValidCoreDocument(command.kind(), urn, content);
+        // Stamp the CORE $schema for the opaque payload kinds (Mapping/Pipeline/DataSource/DataSink)
+        // so the stored document self-describes and satisfies its schema's required:["$schema"].
+        // DataStructure/DataSet keep the JSON-Schema meta-schema $schema they already carry; Element
+        // is never stamped. All non-Element writes flow through here, so this is the single choke point.
+        JsonNode content = command.content();
+        String schemaUri = CoreSchemaValidator.schemaUriToStamp(command.kind());
+        if (schemaUri != null && content != null && content.isObject()) {
+            // Model Forge owns identity + self-description: stamp $schema AND id on EVERY write of an
+            // opaque payload kind (create and re-version), so the host never stamps either. (Create
+            // also stamps id in createArtifact; re-version relies on this.)
+            tools.jackson.databind.node.ObjectNode stamped =
+                (tools.jackson.databind.node.ObjectNode) content.deepCopy();
+            stamped.put("$schema", schemaUri);
+            stamped.put("id", urn);
+            content = stamped;
+        }
+        // Mandatory structural validation: every artifact must satisfy the CORE schema for its kind
+        // (Element excepted — it is an arbitrary JSON Schema validated on import). No more opt-in.
+        List<Diagnostic> violations = coreSchemaValidator.validate(command.kind(), content);
+        if (violations.stream().anyMatch(d -> d.severity() == DiagnosticSeverity.ERROR)) {
+            LOG.warn("Artifact {} ({}) rejected by its CORE schema: {}", urn, command.kind(), violations);
+            throw new ValidationFailedException(
+                "Artifact does not satisfy its CORE schema", violations);
+        }
+        // x-core-ref foreign keys are existence-checked on every write, not just on import: a save
+        // may introduce a new reference, so the target must resolve now too. The check keys off the
+        // content (it only does work when the document actually carries x-core-ref), so it needs no
+        // artifact-kind branch; a lone save has no co-imported corpus beyond the artifact itself.
+        List<Diagnostic> unresolvedRefs = referenceExistenceValidator.checkForeignKeys(
+            content, Set.of(UrnParser.logicalUrn(urn)));
+        if (!unresolvedRefs.isEmpty()) {
+            throw new ValidationFailedException(
+                "Artifact has unresolved x-core-ref foreign keys", unresolvedRefs);
+        }
         var bump = command.versionBump() == null ? VersionBump.PATCH : command.versionBump();
         // Every write returns the concrete versioned URN (pin) the registry assigned INSIDE the
         // write itself — no read-back, so the pin is correct even when the write runs inside a
@@ -361,195 +390,6 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             linkMembersIntoDataSet(command.dataSet(), members);
         }
         return new ArtifactWriteResult(pin, dependenciesOf(pin));
-    }
-
-    /**
-     * Stamps {@code $schema} and {@code id} for the opaque payload kinds — Model Forge owns
-     * identity + self-description on every write (create and re-version), so the host never stamps
-     * either. Kinds without a stamp URI (Element, DataStructure, DataSet keep or carry their own
-     * {@code $schema}) pass through unchanged.
-     */
-    private static JsonNode stampSchemaAndId(ArtifactKind kind, String urn, JsonNode content) {
-        String schemaUri = CoreSchemaValidator.schemaUriToStamp(kind);
-        if (schemaUri == null || content == null || !content.isObject()) {
-            return content;
-        }
-        tools.jackson.databind.node.ObjectNode stamped =
-            (tools.jackson.databind.node.ObjectNode) content.deepCopy();
-        stamped.put("$schema", schemaUri);
-        stamped.put("id", urn);
-        return stamped;
-    }
-
-    /**
-     * Mandatory write-time validation: the document must satisfy the CORE schema for its kind
-     * (Element excepted — an arbitrary JSON Schema validated on import), and every concrete
-     * x-core-ref foreign key must resolve — a write may introduce a new reference, so the target
-     * must exist now too.
-     */
-    private void requireValidCoreDocument(ArtifactKind kind, String urn, JsonNode content) {
-        List<Diagnostic> violations = coreSchemaValidator.validate(kind, content);
-        if (violations.stream().anyMatch(d -> d.severity() == DiagnosticSeverity.ERROR)) {
-            LOG.warn("Artifact {} ({}) rejected by its CORE schema: {}", urn, kind, violations);
-            throw new ValidationFailedException(
-                "Artifact does not satisfy its CORE schema", violations);
-        }
-        List<Diagnostic> unresolvedRefs = referenceExistenceValidator.checkForeignKeys(
-            content, Set.of(UrnParser.logicalUrn(urn)));
-        if (!unresolvedRefs.isEmpty()) {
-            throw new ValidationFailedException(
-                "Artifact has unresolved x-core-ref foreign keys", unresolvedRefs);
-        }
-    }
-
-    @Override
-    public ImportArtifactResult importArtifact(ImportArtifactCommand command) {
-        JsonNode envelope = command.envelope();
-        List<Diagnostic> violations = coreSchemaValidator.validateEnvelope(envelope);
-        if (violations.stream().anyMatch(d -> d.severity() == DiagnosticSeverity.ERROR)) {
-            throw new ValidationFailedException(
-                "Envelope does not satisfy the artifact-envelope schema", violations);
-        }
-        String declared = envelope.path("artifactId").asText(null);
-        String logical = UrnParser.logicalUrn(declared);
-        if (!UrnParser.isUrn(logical)) {
-            throw new ValidationFailedException("artifactId is not a CORE URN",
-                List.of(new Diagnostic(DiagnosticSeverity.ERROR,
-                    "artifactId '" + declared + "' is not a CORE URN.",
-                    "invalid-artifact-id", "/artifactId")));
-        }
-        ArtifactKind kind = kindForEnvelopeImport(envelope.path("artifactType").asText(null), logical);
-        JsonNode content = envelope.path("firstVersion").path("content").path("content");
-        if (!content.isObject()) {
-            throw new ValidationFailedException("Envelope content must be a JSON object",
-                List.of(new Diagnostic(DiagnosticSeverity.ERROR,
-                    "The opaque CORE kinds carry a JSON object as content.",
-                    "invalid-envelope-content", "/firstVersion/content/content")));
-        }
-        requireIdentityAgreement(content, logical);
-        // Turnstile: an already-imported identity with identical content (ignoring the stamped
-        // $schema/id) is idempotently reused; different content is refused — imports never
-        // overwrite, versioning stays an explicit saveArtifact decision.
-        Optional<JsonNode> existing = registry.fetch(logical);
-        if (existing.isPresent()) {
-            if (!comparable(existing.get()).equals(comparable(content))) {
-                throw new ArtifactContentConflictException(logical);
-            }
-            ArtifactId pin = registry.resolveReference(logical)
-                .map(ArtifactId::new)
-                .orElseGet(() -> new ArtifactId(logical));
-            return new ImportArtifactResult(pin, false, dependenciesOf(pin));
-        }
-        JsonNode stamped = stampSchemaAndId(kind, logical, content);
-        requireValidCoreDocument(kind, logical, stamped);
-        // The envelope's firstVersion.version is the explicit-version escape hatch external
-        // imports already use: adopted verbatim for the brand-new artifact.
-        String explicitVersion = envelope.path("firstVersion").path("version").asText(null);
-        String assigned = registry.storeAt(kind, logical, stamped, VersionBump.PATCH, explicitVersion);
-        dependencyGraph.registerFromRegistry(logical);
-        ArtifactId pin = new ArtifactId(
-            assigned != null && !assigned.isBlank() ? assigned : logical);
-        return new ImportArtifactResult(pin, true, dependenciesOf(pin));
-    }
-
-    /**
-     * The artifact kind an envelope imports as: the URN's artifact-type segment decides; the
-     * envelope's {@code artifactType} is a content-format hint that must agree ({@code JSON}
-     * defers to the URN). Schema content ({@code JSON_SCHEMA}/{@code XSD}) is deliberate
-     * follow-up work — those documents import through importSchema / importFromXRepository.
-     */
-    private static ArtifactKind kindForEnvelopeImport(String artifactType, String logicalUrn) {
-        if ("JSON_SCHEMA".equals(artifactType) || "XSD".equals(artifactType)) {
-            // Checked before the URN segment so schema content always gets the pointer to its
-            // door, regardless of which URN the envelope declared.
-            throw new ValidationFailedException(
-                "artifactType '" + artifactType + "' is not envelope-importable yet — schema "
-                    + "content imports through importSchema (JSON_SCHEMA) or "
-                    + "importFromXRepository (XSD)",
-                List.of(new Diagnostic(DiagnosticSeverity.ERROR,
-                    "Schema content imports through importSchema (JSON_SCHEMA) or "
-                        + "importFromXRepository (XSD); this operation covers the opaque CORE kinds.",
-                    "unsupported-envelope-artifact-type", "/artifactType")));
-        }
-        String urnType = UrnParser.artifactTypeFromUrn(logicalUrn);
-        ArtifactKind urnKind = switch (urnType == null ? "" : urnType) {
-            case "mapping" -> ArtifactKind.MAPPING;
-            case "pipeline" -> ArtifactKind.PIPELINE;
-            case "datasource" -> ArtifactKind.DATA_SOURCE;
-            case "datasink" -> ArtifactKind.DATA_SINK;
-            case "dataset" -> ArtifactKind.DATA_SET;
-            default -> null;
-        };
-        if (urnKind == null) {
-            throw new ValidationFailedException("artifactId is not an envelope-importable kind",
-                List.of(new Diagnostic(DiagnosticSeverity.ERROR,
-                    "The artifactId's artifact-type segment ':" + urnType + ":' is not an opaque "
-                        + "CORE kind (mapping, pipeline, datasource, datasink, dataset).",
-                    "invalid-artifact-id", "/artifactId")));
-        }
-        ArtifactKind hinted = switch (artifactType == null ? "" : artifactType) {
-            case "MAPPING" -> ArtifactKind.MAPPING;
-            case "PIPELINE" -> ArtifactKind.PIPELINE;
-            case "DATASOURCE" -> ArtifactKind.DATA_SOURCE;
-            case "DATASINK" -> ArtifactKind.DATA_SINK;
-            case "DATASET" -> ArtifactKind.DATA_SET;
-            case "JSON" -> urnKind;
-            default -> throw new ValidationFailedException(
-                "artifactType '" + artifactType + "' is not envelope-importable",
-                List.of(new Diagnostic(DiagnosticSeverity.ERROR,
-                    "Unknown artifactType '" + artifactType + "'.",
-                    "unsupported-envelope-artifact-type", "/artifactType")));
-        };
-        if (hinted != urnKind) {
-            throw new ValidationFailedException("artifactType does not match the artifactId",
-                List.of(new Diagnostic(DiagnosticSeverity.ERROR,
-                    "artifactType '" + artifactType + "' does not match the artifactId's ':"
-                        + urnType + ":' segment.",
-                    "artifact-type-mismatch", "/artifactType")));
-        }
-        return urnKind;
-    }
-
-    /**
-     * A content document may carry its own identity — {@code id} for the opaque kinds, {@code $id}
-     * for schema-shaped ones — and the envelope specification's own fixtures do. The envelope's
-     * {@code artifactId} stays the single authority, but a document naming a <em>different</em>
-     * identity is an authoring error in the package rather than something to resolve silently: the
-     * stamp would drop the declared value without a trace. Absent passes; present is compared
-     * version-free, so a document pinned to {@code …:1.0.0} agrees with its logical URN.
-     */
-    private static void requireIdentityAgreement(JsonNode content, String logical) {
-        for (String field : List.of("id", "$id")) {
-            String carried = content.path(field).asText(null);
-            if (carried == null || carried.isBlank()) {
-                continue;
-            }
-            if (!logical.equals(UrnParser.logicalUrn(carried))) {
-                throw new ValidationFailedException("Content identity contradicts the envelope",
-                    List.of(new Diagnostic(DiagnosticSeverity.ERROR,
-                        "The content's '" + field + "' is '" + carried + "', which is not the "
-                            + "envelope's artifactId '" + logical + "'.",
-                        "artifact-id-mismatch", "/firstVersion/content/content/" + field)));
-            }
-        }
-    }
-
-    /**
-     * A copy of the document without the registry's identity/self-description stamps and without
-     * the host-authored {@code x-ui-styles} presentation block. UI layout is not content: an
-     * artifact whose stored document differs from the envelope only in layout is reused (the
-     * instance keeps its layout) instead of conflicting.
-     */
-    private static JsonNode comparable(JsonNode document) {
-        if (document instanceof tools.jackson.databind.node.ObjectNode object) {
-            var copy = object.deepCopy();
-            copy.remove("$schema");
-            copy.remove("id");
-            copy.remove("$id");
-            copy.remove("x-ui-styles");
-            return copy;
-        }
-        return document;
     }
 
     /**

@@ -58,6 +58,14 @@ public class InstalledArtifact extends BaseEntity {
   @Column(name = "versioned_urn", length = 1024)
   private String versionedUrn;
 
+  /**
+   * The URN this artifact carried in the package it came from. Traceability only — the identity on
+   * this instance is {@code urn}, minted here. Origin is what prerequisites ("is standard X
+   * installed?"), cross-instance comparison and updates key on.
+   */
+  @Column(name = "origin", length = 1024)
+  private String origin;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "action", nullable = false)
   private InstalledArtifactAction action;

@@ -12,14 +12,14 @@ import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.InstallationInputDTO;
 import de.civitascore.portal.model.input.PackageManifestInputDTO;
 import de.civitascore.portal.model.input.PackageMemberInputDTO;
+import de.civitascore.portal.modelregistry.DataStructureUrns;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.DataStructureRepository;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.InstallationRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
-import java.util.Optional;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -35,30 +35,34 @@ import org.springframework.transaction.annotation.Transactional;
  * releasing stays the existing, separately permissioned action, so an install never grants more
  * than it was asked for.
  *
- * <p>A package fixes the URNs of its artifacts, which is what makes it reproducible across
- * instances — and is also why it can be installed only once per instance. Within a package a member
- * whose identity is already present with identical content is reused rather than duplicated; the
- * same identity with different content is refused.
+ * <p>An installation is a copy, not a shared identity. Every artifact a package ships is created
+ * under a URN this instance mints — the same scheme the editor uses — and the URN the member
+ * carried in the package is recorded on its journal line as its origin. Identities inside the
+ * package therefore only serve to let members refer to one another; on install each reference is
+ * rewritten from the package URN to the minted one before the referring member is stored.
  */
 @Service
 @RequiredArgsConstructor
 public class InstallationService {
 
+  private static final String ID = "$id";
+  private static final String DEFS = "$defs";
+  private static final String REF = "$ref";
+
   private final InstallationRepository installationRepository;
   private final DataStructureService dataStructureService;
   private final DataStructureVersionService dataStructureVersionService;
-  private final DataStructureRepository dataStructureRepository;
-  private final DataStructureVersionRepository dataStructureVersionRepository;
   private final ModelRegistryGateway modelRegistryGateway;
 
   @Transactional
   public Installation install(InstallationInputDTO input) {
     PackageManifestInputDTO manifest = input.getPackageManifest();
+    // A policy, not a technical limit: two copies of the same package on one instance serve
+    // nobody. Updating means installing the new version and uninstalling the old one.
     if (installationRepository.existsByPackageId(manifest.getId())) {
       throw new UniqueConstraintViolationException(
-          ("Package '%s' is already installed on this instance. A package fixes the URNs of its"
-                  + " artifacts, so a second install would collide with the first; updating an"
-                  + " installation is not supported yet.")
+          ("Package '%s' is already installed on this instance; updating an installation is not"
+                  + " supported yet.")
               .formatted(manifest.getId()));
     }
 
@@ -66,13 +70,15 @@ public class InstallationService {
     installation.setPackageId(manifest.getId());
     installation.setPackageVersion(manifest.getVersion());
 
-    // Members are processed in list order. That is enough while data structures are the only kind:
-    // they reference nothing inside the package. The kinds that do reference each other arrive with
-    // the dependency ordering derived from those references, not from this list.
+    // Package URN → minted URN, for every identity this install has created so far. Members are
+    // processed in list order, which is enough while data structures are the only kind: they
+    // reference nothing inside the package. The kinds that do reference each other arrive with
+    // the dependency ordering derived from those references, and read this map to rewrite them.
+    Map<String, String> minted = new LinkedHashMap<>();
     for (PackageMemberInputDTO member : manifest.getMembers()) {
       installation.addArtifact(
           switch (member.getKind()) {
-            case DATASTRUCTURE -> installDataStructure(member);
+            case DATASTRUCTURE -> installDataStructure(member, minted);
             default ->
                 throw new InvalidInputException(
                     "kind",
@@ -97,90 +103,93 @@ public class InstallationService {
   }
 
   /**
-   * Creates the data structure, or resolves it against one already installed. "Identical" means the
-   * portable model: UI layout is instance-authored presentation and is ignored, so a diagram
-   * rearranged in this instance's editor never blocks a reuse.
+   * Creates the shell first, because the minted URN derives from the shell's id — exactly as the
+   * editor does it — then stores the model under that identity. The package's own {@code $id}s are
+   * replaced, not kept: root and every inline {@code $defs} member get the minted URNs, and the
+   * replaced values are remembered so later members can be rewritten to point at the copies.
    */
-  private InstalledArtifact installDataStructure(PackageMemberInputDTO member) {
-    String logicalUrn = requireDataStructureIdentity(member);
+  private InstalledArtifact installDataStructure(
+      PackageMemberInputDTO member, Map<String, String> minted) {
+    String name = displayName(member);
 
-    Optional<DataStructureVersion> installed =
-        dataStructureVersionRepository.findFirstByModelUrnStartingWith(logicalUrn + ":");
-    if (installed.isPresent()) {
-      DataStructureVersion version = installed.get();
-      if (!modelRegistryGateway.isUnchangedIgnoringUiStyles(
-          version.getModelUrn(), member.getContent())) {
-        throw new UniqueConstraintViolationException(
-            ("A data structure for '%s' is already installed with different content. An install"
-                    + " never overwrites; updating an installation is not supported yet.")
-                .formatted(logicalUrn));
-      }
-      return line(member, version, InstalledArtifactAction.REUSED);
-    }
-
-    // No pinned version found. The shell turnstile still applies: a shell without a resolvable
-    // version pin — a half-finished draft in the editor, say — must conflict rather than gain a
-    // twin that points at the same identity.
-    if (dataStructureRepository.existsByModelLogicalUrn(logicalUrn)) {
-      throw new UniqueConstraintViolationException(
-          ("A data structure for '%s' is already present without a resolvable version. Installing"
-                  + " would create a duplicate shell.")
-              .formatted(logicalUrn));
-    }
-    return line(member, create(member), InstalledArtifactAction.CREATED);
-  }
-
-  private DataStructureVersion create(PackageMemberInputDTO member) {
     DataStructureInputDTO structureInput = new DataStructureInputDTO();
-    structureInput.setName(member.getName());
+    structureInput.setName(name);
     structureInput.setDescription(member.getDescription());
-    DataStructure structure = dataStructureService.create(structureInput);
+    structureInput.setCreatedFromDataSource(false);
+    DataStructure shell = dataStructureService.create(structureInput);
+
+    String localUrn = DataStructureUrns.dataStructure(name, shell.getId());
+    minted.put(member.getUrn(), localUrn);
+    Map<String, Object> model = withMintedIdentities(member.getContent(), localUrn, minted);
 
     DataStructureVersionInputDTO versionInput = new DataStructureVersionInputDTO();
-    versionInput.setDataStructureId(structure.getId());
+    versionInput.setDataStructureId(shell.getId());
     versionInput.setDataStructureVersionSource(DataStructureVersionSource.OWN);
     versionInput.setDescription(member.getDescription());
-    versionInput.setModelName(member.getName());
-    versionInput.setModel(member.getContent());
-    return dataStructureVersionService.create(versionInput);
+    versionInput.setModelName(name);
+    versionInput.setModel(model);
+    DataStructureVersion version = dataStructureVersionService.create(versionInput);
+
+    InstalledArtifact line = new InstalledArtifact();
+    line.setArtifactType(InstalledArtifactType.DATA_STRUCTURE);
+    line.setName(name);
+    line.setShellId(shell.getId());
+    line.setUrn(modelRegistryGateway.logicalUrn(version.getModelUrn()));
+    line.setVersionedUrn(version.getModelUrn());
+    line.setOrigin(member.getUrn());
+    line.setAction(InstalledArtifactAction.CREATED);
+    return line;
   }
 
   /**
-   * The member's declared URN, checked to be a data structure identity and to agree with the one
-   * the model carries. The registry types a stored schema from its {@code $id} alone, so a model
-   * without a datastructure URN would silently land as a plain Element; and a model naming a
-   * different identity than its manifest entry is a package that contradicts itself.
+   * A copy of the model with the root {@code $id} and each inline {@code $defs} member's {@code
+   * $id} replaced by minted URNs. Members that are only a {@code $ref} to something existing are
+   * left alone. Only these two levels carry identities the registry would otherwise adopt as its
+   * own; deeper {@code $id}s are not part of the CORE data structure contract.
    */
-  private String requireDataStructureIdentity(PackageMemberInputDTO member) {
-    if (!modelRegistryGateway.isDataStructureUrn(member.getUrn())) {
-      throw new InvalidInputException(
-          "urn",
-          member.getUrn(),
-          "A data structure member must declare a CORE URN of artifact type 'datastructure'.");
+  private static Map<String, Object> withMintedIdentities(
+      Map<String, Object> content, String localUrn, Map<String, String> minted) {
+    Map<String, Object> model = new LinkedHashMap<>(content);
+    rememberOrigin(model.get(ID), localUrn, minted);
+    model.put(ID, localUrn);
+
+    if (model.get(DEFS) instanceof Map<?, ?> defs) {
+      Map<String, Object> rewrittenDefs = new LinkedHashMap<>();
+      defs.forEach(
+          (key, def) -> {
+            String memberName = String.valueOf(key);
+            if (def instanceof Map<?, ?> schema && !schema.containsKey(REF)) {
+              Map<String, Object> copy = new LinkedHashMap<>();
+              schema.forEach((k, v) -> copy.put(String.valueOf(k), v));
+              String elementUrn = DataStructureUrns.elementForMember(localUrn, memberName);
+              rememberOrigin(copy.get(ID), elementUrn, minted);
+              copy.put(ID, elementUrn);
+              rewrittenDefs.put(memberName, copy);
+            } else {
+              rewrittenDefs.put(memberName, def);
+            }
+          });
+      model.put(DEFS, rewrittenDefs);
     }
-    String declared = modelRegistryGateway.logicalUrn(member.getUrn());
-    Object carried = member.getContent().get("$id");
-    if (carried instanceof String id
-        && !id.isBlank()
-        && !declared.equals(modelRegistryGateway.logicalUrn(id))) {
-      throw new InvalidInputException(
-          "$id",
-          member.getUrn(),
-          "The model's '$id' is '%s', which is not the member's urn '%s'."
-              .formatted(id, declared));
-    }
-    return declared;
+    return model;
   }
 
-  private InstalledArtifact line(
-      PackageMemberInputDTO member, DataStructureVersion version, InstalledArtifactAction action) {
-    InstalledArtifact artifact = new InstalledArtifact();
-    artifact.setArtifactType(InstalledArtifactType.DATA_STRUCTURE);
-    artifact.setName(member.getName());
-    artifact.setShellId(version.getDataStructure().getId());
-    artifact.setUrn(modelRegistryGateway.logicalUrn(version.getModelUrn()));
-    artifact.setVersionedUrn(version.getModelUrn());
-    artifact.setAction(action);
-    return artifact;
+  private static void rememberOrigin(
+      Object packageId, String localUrn, Map<String, String> minted) {
+    if (packageId instanceof String origin && !origin.isBlank()) {
+      minted.put(origin, localUrn);
+    }
+  }
+
+  /** The member's name, falling back to the model's title — the URN's name segment needs one. */
+  private static String displayName(PackageMemberInputDTO member) {
+    if (member.getName() != null && !member.getName().isBlank()) {
+      return member.getName();
+    }
+    if (member.getContent().get("title") instanceof String title && !title.isBlank()) {
+      return title;
+    }
+    throw new InvalidInputException(
+        "name", member.getUrn(), "A data structure member needs a name or a model title.");
   }
 }

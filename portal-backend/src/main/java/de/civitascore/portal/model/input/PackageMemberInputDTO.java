@@ -9,8 +9,13 @@ import java.util.Map;
 import lombok.Data;
 
 /**
- * One artifact inside an installable package: what it is, the identity it brings, and the CORE
- * document itself.
+ * One artifact inside an installable package: what it is, the identity it has inside the package,
+ * and the CORE document itself.
+ *
+ * <p>The package identity never becomes an identity here. The install mints a URN of this instance
+ * for every member and records the package URN as the copy's origin; inside the package the URN
+ * only serves to let members refer to one another, and every such reference is rewritten to the
+ * minted URN before the referring member is stored.
  *
  * <p>The install order is not taken from this list — it is derived from the references the members
  * declare, so a package cannot break by listing its members in an inconvenient order.
@@ -23,11 +28,10 @@ public class PackageMemberInputDTO {
 
   @NotBlank(message = "urn is required") @Size(max = 1024, message = "urn must not exceed 1024 characters") @Schema(
       description =
-          "Logical CORE URN this member is installed under"
-              + " (urn:core:<scope>:<owner>:<type>:<domain>:<name>:<disambiguator>). The package has"
-              + " to bring it: without a declared identity the registry mints one, so the same"
-              + " package would resolve to different URNs on every instance and its internal"
-              + " references would not resolve at all.")
+          "The member's identity inside the package, by convention a logical CORE URN"
+              + " (urn:core:<scope>:<owner>:<type>:<domain>:<name>:<disambiguator>). Recorded as"
+              + " the installed copy's origin and used to resolve references between members; the"
+              + " instance mints the URN the copy is installed under.")
   private String urn;
 
   @Schema(description = "Display name, recorded in the install provenance")
@@ -38,6 +42,8 @@ public class PackageMemberInputDTO {
   @NotEmpty(message = "content is required") @Schema(
       description =
           "The CORE document. Do not author '$schema' — the registry stamps it for the opaque"
-              + " kinds. Where the document carries its own identity it must agree with 'urn'.")
+              + " kinds. Identities inside it ('$id' on the root and on '$defs' members) are"
+              + " package-local: the install replaces them with minted URNs and remembers the"
+              + " originals as origin.")
   private Map<String, Object> content;
 }

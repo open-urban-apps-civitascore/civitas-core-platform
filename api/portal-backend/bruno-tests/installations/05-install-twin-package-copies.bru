@@ -1,7 +1,7 @@
 meta {
-  name: Install a package whose member differs under the same URN (refused)
+  name: Install another package with the same member (own copy)
   type: http
-  seq: 6
+  seq: 5
 }
 
 post {
@@ -13,9 +13,9 @@ post {
 body:json {
   {
     "package": {
-      "id": "{{packageId}}_conflict",
+      "id": "{{packageId}}_twin",
       "version": "1.0.0",
-      "title": "Soil moisture conflict (smoke)",
+      "title": "Soil moisture twin (smoke)",
       "members": [
         {
           "kind": "datastructure",
@@ -30,7 +30,6 @@ body:json {
                 "type": "object",
                 "properties": {
                   "tensionKpa": { "type": "number" },
-                  "depthCm": { "type": "integer" },
                   "measuredAt": { "type": "string", "format": "date-time" }
                 },
                 "required": ["tensionKpa", "measuredAt"]
@@ -48,7 +47,17 @@ auth:bearer {
 }
 
 tests {
-  test("should refuse: same identity with different content never overwrites", function() {
-    expect(res.status).to.equal(409);
+  test("should install the twin package", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.packageId).to.equal(bru.getVar('packageId') + "_twin");
+  });
+
+  test("should create its own copy under a fresh URN, sharing only the origin", function() {
+    expect(res.body.artifacts).to.have.lengthOf(1);
+    const line = res.body.artifacts[0];
+    expect(line.action).to.equal("CREATED");
+    expect(line.origin).to.equal(bru.getVar('memberUrn'));
+    expect(line.urn).to.not.equal(bru.getVar('installedUrn'));
+    expect(line.shellId).to.not.equal(bru.getVar('installedShellId'));
   });
 }

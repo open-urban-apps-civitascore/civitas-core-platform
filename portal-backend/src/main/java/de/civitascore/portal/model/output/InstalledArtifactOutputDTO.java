@@ -16,11 +16,14 @@ public class InstalledArtifactOutputDTO {
   /** Id of the shell row, where the artifact type has one. */
   private UUID shellId;
 
-  /** Logical CORE URN — the stable identity other packages resolve against. */
+  /** Logical CORE URN of the copy on this instance, minted by the install. */
   private String urn;
 
-  /** The concrete version this install created or reused. */
+  /** The concrete version this install created or linked. */
   private String versionedUrn;
+
+  /** The URN the artifact carried in the package — where this copy came from. */
+  private String origin;
 
   private InstalledArtifactAction action;
 }
