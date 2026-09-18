@@ -1,0 +1,25 @@
+{
+  "requests" : [ {
+    "id" : "r0-ds",
+    "atomicityGroup" : "r0",
+    "method" : "get",
+    "url" : "Datastreams?$select=id&$top=1&$filter=properties/reference%20eq%20'temp'%20and%20properties/thingReference%20eq%20'A7'%20and%20Thing/Projects/id%20eq%205"
+  }, {
+    "id" : "r0-obs",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-ds",
+    "method" : "post",
+    "url" : "Observations",
+    "body" : {
+      "phenomenonTime" : "2026-09-18T07:00:00Z",
+      "result" : 21.5,
+      "parameters" : {
+        "thingReference" : "A7",
+        "datastreamReference" : "temp"
+      },
+      "Datastream" : {
+        "@iot.id" : "$r0-ds"
+      }
+    }
+  } ]
+}

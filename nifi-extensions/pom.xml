@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>de.civitas-core</groupId>
+	<artifactId>nifi-extensions-parent</artifactId>
+	<version>${revision}</version>
+	<packaging>pom</packaging>
+
+	<name>Civitas NiFi Extensions Parent</name>
+	<description>Parent POM for the NiFi extensions the platform installs into its NiFi deployment</description>
+
+	<licenses>
+		<license>
+			<name>EUPL-1.2</name>
+			<url>https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12</url>
+			<distribution>repo</distribution>
+			<comments>European Union Public License v1.2</comments>
+		</license>
+	</licenses>
+
+	<modules>
+		<module>nifi-frost-processors</module>
+		<module>nifi-frost-nar</module>
+	</modules>
+
+	<properties>
+		<revision>1.0.0</revision>
+
+		<!-- The extension API level, not the JVM the build runs on. Every NiFi 2.x release compiles
+		     to release 21 and the official image runs a JDK 21, so a NAR built to a higher release
+		     fails to load with UnsupportedClassVersionError — and NiFi skips an invalid processor
+		     without a message, which fills the queue in front of it. This stays 21 while the NiFi
+		     baseline is 21, independently of the Java version the rest of the repository uses. -->
+		<maven.compiler.release>21</maven.compiler.release>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+		<!-- Default so the surefire @{argLine} late replacement still resolves when the goal is
+		     invoked directly from the CLI, without jacoco's prepare-agent setting it. -->
+		<argLine />
+
+		<!-- Must track the NiFi version the platform deploys to (apache/nifi:2.9.0). The NAR is
+		     compiled against this API and is installed into that image. -->
+		<nifi.version>2.9.0</nifi.version>
+
+		<jackson.version>2.21.6</jackson.version>
+		<slf4j.version>2.0.18</slf4j.version>
+		<junit.version>5.14.4</junit.version>
+		<!-- The platform line that belongs to the JUnit version above. nifi-mock carries a newer
+		     JUnit into the test classpath, and two lines in one JVM break test discovery, so both
+		     halves are pinned here rather than left to the nearest declaration. -->
+		<junit.platform.version>1.14.4</junit.platform.version>
+		<mockito.version>5.23.0</mockito.version>
+		<jacoco.version>0.8.15</jacoco.version>
+		<spotless.version>3.4.0</spotless.version>
+		<nifi-nar-maven-plugin.version>2.4.0</nifi-nar-maven-plugin.version>
+		<cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<!-- NiFi extension API. 'provided' everywhere: the framework supplies these classes
+			     through the parent NAR, and a second copy inside the NAR would be loaded by a
+			     different classloader and fail every cast across the boundary. -->
+			<dependency>
+				<groupId>org.apache.nifi</groupId>
+				<artifactId>nifi-api</artifactId>
+				<version>${nifi.version}</version>
+				<scope>provided</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.nifi</groupId>
+				<artifactId>nifi-utils</artifactId>
+				<version>${nifi.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.nifi</groupId>
+				<artifactId>nifi-web-client-provider-api</artifactId>
+				<version>${nifi.version}</version>
+				<scope>provided</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.nifi</groupId>
+				<artifactId>nifi-web-client-api</artifactId>
+				<version>${nifi.version}</version>
+				<scope>provided</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.nifi</groupId>
+				<artifactId>nifi-mock</artifactId>
+				<version>${nifi.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<!-- NiFi's own implementation of the web client service. The processor tests drive the
+			     real HTTP path against a loopback endpoint rather than a hand-written double, so
+			     that the request the processor builds is the request a NiFi installation sends. -->
+			<dependency>
+				<groupId>org.apache.nifi</groupId>
+				<artifactId>nifi-web-client-provider-service</artifactId>
+				<version>${nifi.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<!-- The service APIs the standard web client declares its properties with. NiFi supplies
+			     them through the parent NAR at run time, so they are on the test classpath only. -->
+			<dependency>
+				<groupId>org.apache.nifi</groupId>
+				<artifactId>nifi-ssl-context-service-api</artifactId>
+				<version>${nifi.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.nifi</groupId>
+				<artifactId>nifi-proxy-configuration-api</artifactId>
+				<version>${nifi.version}</version>
+				<scope>test</scope>
+			</dependency>
+
+			<dependency>
+				<groupId>com.fasterxml.jackson.core</groupId>
+				<artifactId>jackson-databind</artifactId>
+				<version>${jackson.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.fasterxml.jackson.core</groupId>
+				<artifactId>jackson-core</artifactId>
+				<version>${jackson.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-api</artifactId>
+				<version>${slf4j.version}</version>
+				<scope>provided</scope>
+			</dependency>
+
+			<dependency>
+				<groupId>org.junit.jupiter</groupId>
+				<artifactId>junit-jupiter</artifactId>
+				<version>${junit.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.junit.jupiter</groupId>
+				<artifactId>junit-jupiter-api</artifactId>
+				<version>${junit.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.junit.platform</groupId>
+				<artifactId>junit-platform-commons</artifactId>
+				<version>${junit.platform.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.mockito</groupId>
+				<artifactId>mockito-core</artifactId>
+				<version>${mockito.version}</version>
+				<scope>test</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<build>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<version>3.11.0</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-surefire-plugin</artifactId>
+					<version>3.2.3</version>
+				</plugin>
+				<plugin>
+					<groupId>org.jacoco</groupId>
+					<artifactId>jacoco-maven-plugin</artifactId>
+					<version>${jacoco.version}</version>
+				</plugin>
+				<plugin>
+					<groupId>com.diffplug.spotless</groupId>
+					<artifactId>spotless-maven-plugin</artifactId>
+					<version>${spotless.version}</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.nifi</groupId>
+					<artifactId>nifi-nar-maven-plugin</artifactId>
+					<version>${nifi-nar-maven-plugin.version}</version>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+		<plugins>
+			<plugin>
+				<groupId>com.diffplug.spotless</groupId>
+				<artifactId>spotless-maven-plugin</artifactId>
+				<configuration>
+					<java>
+						<includes>
+							<include>src/main/java/**/*.java</include>
+							<include>src/test/java/**/*.java</include>
+						</includes>
+						<googleJavaFormat/>
+						<licenseHeader>
+							<content>/**
+ * &lt;p&gt;This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+ *
+ * &lt;p&gt;SPDX-License-Identifier: EUPL-1.2
+ *
+ * &lt;p&gt;This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) $YEAR Civitas Connect e. V. and others.
+ *
+ */</content>
+						</licenseHeader>
+						<removeUnusedImports />
+						<importOrder />
+						<formatAnnotations />
+					</java>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>prepare-agent</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+						<configuration>
+							<formats>
+								<format>XML</format>
+								<format>CSV</format>
+								<format>HTML</format>
+							</formats>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.cyclonedx</groupId>
+				<artifactId>cyclonedx-maven-plugin</artifactId>
+				<version>${cyclonedx-maven-plugin.version}</version>
+				<configuration>
+					<outputFormat>json</outputFormat>
+					<schemaVersion>1.5</schemaVersion>
+					<includeBomSerialNumber>true</includeBomSerialNumber>
+					<outputName>nifi-extensions</outputName>
+				</configuration>
+				<executions>
+					<!-- The NAR is a build artifact that leaves the repository and is installed into
+					     an operator's NiFi, so it carries its own bill of materials. -->
+					<execution>
+						<id>bom</id>
+						<phase>package</phase>
+						<goals>
+							<goal>makeBom</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>flatten-maven-plugin</artifactId>
+				<version>1.6.0</version>
+				<configuration>
+					<updatePomFile>true</updatePomFile>
+					<flattenMode>resolveCiFriendliesOnly</flattenMode>
+				</configuration>
+				<executions>
+					<execution>
+						<id>flatten</id>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>flatten</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>flatten.clean</id>
+						<phase>clean</phase>
+						<goals>
+							<goal>clean</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+</project>

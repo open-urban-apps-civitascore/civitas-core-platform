@@ -1,0 +1,36 @@
+{
+  "requests" : [ {
+    "id" : "r0-thing",
+    "atomicityGroup" : "r0",
+    "method" : "get",
+    "url" : "Projects(5)/Things?$select=id&$top=1&$filter=properties/reference%20eq%20'A7'"
+  }, {
+    "id" : "r0-thing-update",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-thing",
+    "method" : "patch",
+    "url" : "Things($r0-thing)",
+    "body" : {
+      "name" : "Station A7",
+      "description" : "Weather station",
+      "properties" : {
+        "reference" : "A7",
+        "referenceName" : "stationsnummer"
+      }
+    }
+  }, {
+    "id" : "r0-thing",
+    "atomicityGroup" : "r0",
+    "if" : "not $r0-thing",
+    "method" : "post",
+    "url" : "Projects(5)/Things",
+    "body" : {
+      "name" : "Station A7",
+      "description" : "Weather station",
+      "properties" : {
+        "reference" : "A7",
+        "referenceName" : "stationsnummer"
+      }
+    }
+  } ]
+}
