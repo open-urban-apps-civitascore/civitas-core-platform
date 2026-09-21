@@ -1,7 +1,6 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.PipelineMapper;
-import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
@@ -102,9 +101,8 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
    * @return the entity with resolved dataset and data source relationships
    * @throws ResourceNotFoundException if the dataset is not found
    * @throws org.springframework.security.access.AccessDeniedException if no scope header is present
-   * @throws DataSourceScopeViolationException if a referenced data source is not usable by this
-   *     dataset's pipelines — it does not exist, is not AVAILABLE, or is not released for the
-   *     dataset's datapool. The three cases are deliberately indistinguishable.
+   * @throws DataSourceScopeViolationException if a referenced data source does not exist or is not
+   *     released for the Dataset's Data pool. The cases are deliberately indistinguishable.
    */
   @Override
   protected Pipeline postConvertToEntity(Pipeline entity, PipelineInputDTO input) {
@@ -293,13 +291,12 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
   }
 
   /**
-   * Whether a referenced DataSource may feed this dataset's pipelines: it must exist, be AVAILABLE,
-   * and be released for the dataset's datapool. A nonexistent id ({@code null} here) is treated the
-   * same as an unusable one so the three cases stay indistinguishable to the caller.
+   * Whether a referenced Data source may feed this Dataset's Pipelines. It must exist and be
+   * released for the Dataset's Data pool. A nonexistent id ({@code null} here) is treated like an
+   * unusable one so the cases stay indistinguishable to the caller.
    */
   private boolean isUsable(DataSource dataSource, DataSet dataSet) {
     return dataSource != null
-        && dataSource.getDataSourceStatus() == DataSourceStatus.AVAILABLE
         && datapoolScopeValidator.isPermitted(dataSource, dataSet.getDataPool());
   }
 
