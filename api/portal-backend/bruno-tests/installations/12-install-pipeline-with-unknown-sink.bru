@@ -1,0 +1,64 @@
+meta {
+  name: Refuse a pipeline whose sink is not in the package
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/installations
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "datapoolId": "{{flowDatapoolId}}",
+    "package": {
+      "id": "{{flowPackageId}}-dangling",
+      "version": "1.0.0",
+      "title": "Pipeline with a dangling sink reference",
+      "members": [
+        {
+          "kind": "dataset",
+          "urn": "{{flowDataSetUrn}}-dangling",
+          "name": "Dangling readings",
+          "description": "Installed by the installations flow",
+          "content": { "openDataAccess": false }
+        },
+        {
+          "kind": "pipeline",
+          "urn": "{{flowPipelineUrn}}-dangling",
+          "name": "Dangling ingest",
+          "content": {
+            "nodes": [
+              { "id": "start", "kind": "start" },
+              { "id": "write", "kind": "sink", "sinkRef": "urn:core:standard:openurbanapps:datasink:environment:not_shipped:1" },
+              { "id": "end", "kind": "end" }
+            ],
+            "edges": [
+              { "id": "e1", "source": "start", "target": "write" },
+              { "id": "e2", "source": "write", "target": "end" }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  A pipeline node may only reference members of its own package; the rewrite has nothing to bind
+  a foreign URN to. Refused before anything is stored, so the dataset created a step earlier is
+  rolled back with it.
+}
+
+tests {
+  test("should refuse: a pipeline may only reference members of its own package", function() {
+    expect(res.status).to.equal(400);
+    expect(JSON.stringify(res.body)).to.have.string("not part of this package");
+  });
+}

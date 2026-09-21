@@ -1,0 +1,180 @@
+meta {
+  name: Install a package up to its sink and pipeline
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/installations
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "datapoolId": "{{flowDatapoolId}}",
+    "package": {
+      "id": "{{flowPackageId}}",
+      "version": "1.0.0",
+      "title": "Soil moisture, end to end",
+      "members": [
+        {
+          "kind": "pipeline",
+          "urn": "{{flowPipelineUrn}}",
+          "name": "Soil moisture ingest",
+          "description": "Installed by the installations flow",
+          "content": {
+            "nodes": [
+              { "id": "start", "kind": "start" },
+              { "id": "read", "kind": "source", "label": "Soil sensor DB", "sourceRef": "{{flowSourceUrn}}" },
+              { "id": "map", "kind": "mapping", "label": "Soil to table", "mappingRef": "{{flowMappingUrn}}" },
+              { "id": "write", "kind": "sink", "label": "PostGIS table", "sinkRef": "{{flowSinkUrn}}" },
+              { "id": "end", "kind": "end" }
+            ],
+            "edges": [
+              { "id": "e1", "source": "start", "target": "read" },
+              { "id": "e2", "source": "read", "target": "map" },
+              { "id": "e3", "source": "map", "target": "write" },
+              { "id": "e4", "source": "write", "target": "end" }
+            ]
+          }
+        },
+        {
+          "kind": "datasink",
+          "urn": "{{flowSinkUrn}}",
+          "name": "Soil moisture table",
+          "content": {
+            "connectionType": "postgis",
+            "tableName": "soil_moisture",
+            "element": "{{flowStructureUrn}}"
+          }
+        },
+        {
+          "kind": "mapping",
+          "urn": "{{flowMappingUrn}}",
+          "name": "Soil to table",
+          "content": {
+            "source": "{{flowStructureUrn}}",
+            "target": "{{flowStructureUrn}}",
+            "fields": {
+              "tensionKpa": { "op": "copy", "sourcePath": "$.tensionKpa" },
+              "measuredAt": { "op": "copy", "sourcePath": "$.measuredAt" }
+            }
+          }
+        },
+        {
+          "kind": "datasource",
+          "urn": "{{flowSourceUrn}}",
+          "name": "Soil sensor DB",
+          "description": "Installed by the installations flow",
+          "content": {
+            "connectionType": "sql",
+            "element": "{{flowStructureUrn}}",
+            "driver": "postgres",
+            "dsn": "jdbc:postgresql://postgis:5432/core",
+            "table": "soil_readings",
+            "columns": ["tensionKpa", "measuredAt"],
+            "user": "core",
+            "password": "not-a-real-password"
+          }
+        },
+        {
+          "kind": "dataset",
+          "urn": "{{flowDataSetUrn}}",
+          "name": "Soil moisture readings",
+          "description": "Installed by the installations flow",
+          "content": { "openDataAccess": false }
+        },
+        {
+          "kind": "datastructure",
+          "urn": "{{flowStructureUrn}}",
+          "name": "Soil moisture",
+          "content": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "{{flowStructureUrn}}",
+            "title": "Soil moisture",
+            "$defs": {
+              "Reading": {
+                "$id": "{{flowElementUrn}}",
+                "type": "object",
+                "properties": {
+                  "tensionKpa": { "type": "number" },
+                  "measuredAt": { "type": "string", "format": "date-time" }
+                },
+                "required": ["tensionKpa", "measuredAt"]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  The whole chain a use case needs to carry data: structure, source, dataset, mapping, sink and
+  pipeline, listed out of order on purpose. The pipeline's node references and the sink's element
+  are package URNs; the install rewrites every one of them to the copy it made. Case 11 proves the
+  chain by staging the dataset.
+}
+
+script:pre-request {
+  const axios = require('axios');
+  const runId = bru.getVar('runId') || Date.now().toString(36);
+  bru.setVar('runId', runId);
+  bru.setVar('flowPackageId', `urn:core:package:openurbanapps:soil_moisture_flow_${runId}`);
+  bru.setVar('flowStructureUrn', `urn:core:standard:openurbanapps:datastructure:environment:soil_moisture_flow:${runId}`);
+  bru.setVar('flowElementUrn', `urn:core:standard:openurbanapps:element:environment:soil_moisture_flow_reading:${runId}`);
+  bru.setVar('flowSourceUrn', `urn:core:standard:openurbanapps:datasource:environment:soil_sensor_db_flow:${runId}`);
+  bru.setVar('flowDataSetUrn', `urn:core:standard:openurbanapps:dataset:environment:soil_moisture_flow:${runId}`);
+  bru.setVar('flowMappingUrn', `urn:core:standard:openurbanapps:mapping:environment:soil_to_table:${runId}`);
+  bru.setVar('flowSinkUrn', `urn:core:standard:openurbanapps:datasink:environment:soil_moisture_table:${runId}`);
+  bru.setVar('flowPipelineUrn', `urn:core:standard:openurbanapps:pipeline:environment:soil_moisture_ingest:${runId}`);
+
+  const res = await axios.post(
+    `${bru.getEnvVar('baseUrl')}/datapools`,
+    { name: `Install flow (chain) ${runId}`, description: 'Created by the installations flow' },
+    { headers: { Authorization: `Bearer ${bru.getVar('accessToken')}` } }
+  );
+  bru.setVar('flowDatapoolId', res.data.id);
+}
+
+script:post-response {
+  if (res.status === 201) {
+    const byType = Object.fromEntries(res.body.artifacts.map(line => [line.artifactType, line]));
+    bru.setVar('flowDataSetId', res.body.dataSetId);
+    bru.setVar('flowPipelineId', byType.PIPELINE && byType.PIPELINE.shellId);
+    bru.setVar('flowSinkId', byType.DATA_SINK && byType.DATA_SINK.shellId);
+  }
+}
+
+tests {
+  test("should install the whole chain", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.packageId).to.equal(bru.getVar('flowPackageId'));
+  });
+
+  test("should record the six members in install order, each with its origin", function() {
+    const lines = res.body.artifacts;
+    expect(lines.map(line => line.artifactType)).to.deep.equal(
+      ["DATA_STRUCTURE", "DATA_SOURCE", "DATA_SET", "MAPPING", "DATA_SINK", "PIPELINE"]);
+    expect(lines.map(line => line.origin)).to.deep.equal([
+      bru.getVar('flowStructureUrn'), bru.getVar('flowSourceUrn'), bru.getVar('flowDataSetUrn'),
+      bru.getVar('flowMappingUrn'), bru.getVar('flowSinkUrn'), bru.getVar('flowPipelineUrn')
+    ]);
+    lines.forEach(line => expect(line.action).to.equal("CREATED"));
+  });
+
+  test("should mint the sink and the pipeline in this instance's namespace, each with a shell", function() {
+    const lines = res.body.artifacts;
+    expect(lines[4].urn).to.have.string("urn:core:platform:civitas:datasink:common:");
+    expect(lines[4].shellId).to.be.a('string');
+    expect(lines[5].urn).to.have.string("urn:core:platform:civitas:pipeline:common:");
+    expect(lines[5].shellId).to.be.a('string');
+    expect(lines[5].versionedUrn).to.be.a('string');
+  });
+}
