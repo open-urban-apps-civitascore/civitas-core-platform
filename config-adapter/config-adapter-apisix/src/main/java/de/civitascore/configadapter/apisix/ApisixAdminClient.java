@@ -11,14 +11,15 @@ package de.civitascore.configadapter.apisix;
 
 import de.civitascore.configadapter.adapter.AbstractSagaCommandHandler.SagaApiException;
 import de.civitascore.configadapter.util.BackoffCalculator;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import de.civitascore.configadapter.util.OkHttpJson;
+import java.net.HttpURLConnection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,13 +29,14 @@ import org.slf4j.LoggerFactory;
  * HTTP mechanics (auth header, etcd {@code value} envelope unwrap, 404 tolerance for idempotent
  * deletes) so the saga handler deals only in route state.
  *
- * <p>The JAX-RS {@link Client} is read through a {@link Supplier} on every call because the handler
- * may swap it after initialization (test seam).
+ * <p>The OkHttp {@link OkHttpClient} is read through a {@link Supplier} on every call because the
+ * handler may swap it after initialization (test seam).
  */
+@SuppressWarnings("PMD.TooManyMethods")
 final class ApisixAdminClient {
 
-  private static final String ROUTES_PATH = "/apisix/admin/routes/";
-  private static final String UPSTREAMS_PATH = "/apisix/admin/upstreams/";
+  private static final String ROUTES_PATH = "apisix/admin/routes/";
+  private static final String UPSTREAMS_PATH = "apisix/admin/upstreams/";
   private static final String X_API_KEY = "X-API-KEY";
 
   /**
@@ -48,11 +50,11 @@ final class ApisixAdminClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(ApisixAdminClient.class);
 
-  private final Supplier<Client> client;
+  private final Supplier<OkHttpClient> client;
   private final String adminApiUrl;
   private final String adminApiKey;
 
-  ApisixAdminClient(Supplier<Client> client, String adminApiUrl, String adminApiKey) {
+  ApisixAdminClient(Supplier<OkHttpClient> client, String adminApiUrl, String adminApiKey) {
     this.client = client;
     this.adminApiUrl = adminApiUrl;
     this.adminApiKey = adminApiKey;
@@ -64,13 +66,12 @@ final class ApisixAdminClient {
    * non-2xx throws.
    */
   Optional<Map<String, Object>> readRoute(String routeId) {
-    try (Response response = request(ROUTES_PATH + routeId).get()) {
-      if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
+    try (Response response = execute(request(ROUTES_PATH + routeId).get().build())) {
+      if (response.code() == HttpURLConnection.HTTP_NOT_FOUND) {
         return Optional.empty();
       }
       checkResponse(response, "GET route");
-      @SuppressWarnings("unchecked")
-      Map<String, Object> responseBody = response.readEntity(Map.class);
+      Map<String, Object> responseBody = OkHttpJson.readJsonMap(response);
       Object value = responseBody.get("value");
       if (responseBody.containsKey("value") && !(value instanceof Map)) {
         // Guard the etcd-envelope unwrap: a 2xx with a non-object `value` (or an unexpected body
@@ -180,7 +181,8 @@ final class ApisixAdminClient {
   }
 
   private void put(String path, Map<String, Object> body, String operationDesc) {
-    try (Response response = request(path).put(Entity.json(body))) {
+    try (Response response =
+        execute(request(path).put(OkHttpJson.jsonBodyUnchecked(body)).build())) {
       checkResponse(response, operationDesc);
     }
   }
@@ -192,8 +194,8 @@ final class ApisixAdminClient {
    * non-2xx still throw. The boolean lets callers detect a wholesale "nothing existed" miss.
    */
   private boolean delete(String path, String operationDesc) {
-    try (Response response = request(path).delete()) {
-      if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
+    try (Response response = execute(request(path).delete().build())) {
+      if (response.code() == HttpURLConnection.HTTP_NOT_FOUND) {
         LOG.info(
             "{} — resource already absent (404): {}",
             Encode.forJava(operationDesc),
@@ -205,22 +207,25 @@ final class ApisixAdminClient {
     }
   }
 
-  private Invocation.Builder request(String path) {
-    return client
-        .get()
-        .target(adminApiUrl)
-        .path(path)
-        .request(MediaType.APPLICATION_JSON)
+  private Request.Builder request(String path) {
+    HttpUrl url = HttpUrl.get(adminApiUrl).newBuilder().addPathSegments(path).build();
+    return new Request.Builder()
+        .url(url)
+        .header("Accept", "application/json")
         .header(X_API_KEY, adminApiKey);
+  }
+
+  private Response execute(Request request) {
+    return OkHttpJson.execute(client.get(), request);
   }
 
   /** Throws {@link SagaApiException} on non-2xx, mirroring the saga handler base contract. */
   private static void checkResponse(Response response, String operationDesc) {
-    int status = response.getStatus();
-    if (status >= 200 && status < 300) {
+    if (response.isSuccessful()) {
       return;
     }
-    String body = response.readEntity(String.class);
-    throw new SagaApiException(operationDesc + " failed: HTTP " + status + " — " + body, status);
+    throw new SagaApiException(
+        operationDesc + " failed: HTTP " + response.code() + " — " + OkHttpJson.readBody(response),
+        response.code());
   }
 }

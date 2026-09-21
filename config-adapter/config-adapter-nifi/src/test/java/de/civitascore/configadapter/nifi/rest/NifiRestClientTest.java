@@ -34,9 +34,8 @@ import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
 import java.util.Map;
+import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +43,7 @@ import org.junit.jupiter.api.Test;
 class NifiRestClientTest {
 
   private WireMockServer server;
-  private Client httpClient;
+  private OkHttpClient httpClient;
   private FakeTokenProvider tokenProvider;
   private NifiRestClient client;
 
@@ -52,7 +51,7 @@ class NifiRestClientTest {
   void setUp() {
     server = new WireMockServer(WireMockConfiguration.options().dynamicPort());
     server.start();
-    httpClient = ClientBuilder.newClient();
+    httpClient = new OkHttpClient();
     tokenProvider = new FakeTokenProvider();
     client =
         new NifiRestClient(
@@ -61,7 +60,8 @@ class NifiRestClientTest {
 
   @AfterEach
   void tearDown() {
-    httpClient.close();
+    httpClient.dispatcher().executorService().shutdown();
+    httpClient.connectionPool().evictAll();
     server.stop();
   }
 

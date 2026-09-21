@@ -91,6 +91,15 @@ if [ "$MODE" = "allowall" ]; then
       "remove": ["X-Allowed-Pool-Ids"]
     }
   }'
+  # In allow-all mode the rego policy's null-permission branch (main.rego, rule 1,
+  # "authenticated_endpoint") returns {allow: true} with no "headers" field. The opa plugin
+  # manages any header named in send_headers_upstream against its OWN decision response — with no
+  # "headers" field there, it clears those header names from the upstream request, silently
+  # undoing proxy-rewrite's wildcard "set" above (proxy-rewrite runs in an earlier phase, so its
+  # header IS present when opa's plugin runs, but opa scrubs it before proxying upstream). Omit
+  # send_headers_upstream here (it requires >=1 items, so it can't just be emptied) so
+  # proxy-rewrite's wildcard is the only thing touching these headers.
+  OPA_SEND_HEADERS_UPSTREAM_JSON=""
 else
   echo "Creating plugin config: full authz (OPA scope filtering)..."
   PROXY_REWRITE='{
@@ -98,6 +107,7 @@ else
       "remove": ["X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids"]
     }
   }'
+  OPA_SEND_HEADERS_UPSTREAM_JSON='"send_headers_upstream": ["X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids"],'
 fi
 
 curl -sf -X PUT "$ADMIN_URL/apisix/admin/plugin_configs/1" \
@@ -128,10 +138,10 @@ curl -sf -X PUT "$ADMIN_URL/apisix/admin/plugin_configs/1" \
       \"opa\": {
         \"host\": \"http://civitas-opa:8181\",
         \"policy\": \"civitas/authz/decision\",
+        $OPA_SEND_HEADERS_UPSTREAM_JSON
         \"with_route\": true,
         \"with_service\": true,
-        \"with_consumer\": false,
-        \"send_headers_upstream\": [\"X-Allowed-Scope-Ids\", \"X-Allowed-Pool-Ids\"]
+        \"with_consumer\": false
       },
       \"proxy-rewrite\": $PROXY_REWRITE,
       \"request-id\": {
