@@ -129,6 +129,7 @@ class DataSetControllerIntegrationTest
   private void seedStageRequirements(Pipeline... pipelines) {
     DataSource dataSource = new DataSource();
     dataSource.setName("stage-datasource-" + System.nanoTime());
+    dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
     dataSource = dataSourceRepository.save(dataSource);
     pipelines[0].getDataSources().add(dataSource);
     pipelineRepository.save(pipelines[0]);

@@ -182,10 +182,12 @@ class GlobalExceptionHandlerTest {
       assertThat(problemDetail.getDetail())
           .as("the reply names no artifact, so the message has to state every condition")
           .contains("exist", "readable", "released")
-          .doesNotContain("urn:core:");
+          .doesNotContain("urn:core:")
+          .doesNotContain("withheld-source-name");
       assertThat(problemDetail.getProperties().toString())
           .as("an artifact added as a further property would disclose it just as well")
-          .doesNotContain("urn:core:");
+          .doesNotContain("urn:core:")
+          .doesNotContain("withheld-source-name");
     }
 
     @Test

@@ -1,9 +1,11 @@
 package de.civitascore.portal.service.validation;
 
 import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
@@ -28,15 +30,16 @@ import org.springframework.stereotype.Component;
  * carry a release. Provisioning configures NiFi, FROST, PostGIS, GeoServer and APISIX, so an
  * artifact that proves unusable afterwards has to be undone through saga compensation.
  *
- * <p>What participates is decided by the flow, not by Data Set membership: the walk starts at each
- * Pipeline's model and follows the references the registry recorded. Pipeline content is never
- * parsed, and a Data Set member no flow reaches does not block it.
+ * <p>What participates is decided by the flow, not by Dataset membership. Data sources come from
+ * the Pipeline's host relation. The registry walk starts at each Pipeline's model and follows its
+ * recorded references. Pipeline content is never parsed, and a Dataset member that no flow reaches
+ * does not block it.
  *
- * <p>Every artifact reached must resolve. One the platform holds a Data Structure Version for must
- * also be readable by the caller and released — that record, not the URN's kind, is what gives it a
- * lifecycle and a scope. One without a record is held to resolvability alone: elements are
- * deliberately reusable, so inheriting a lifecycle would block a shared element on any unrelated
- * draft.
+ * <p>Every Data source must be readable by the caller and AVAILABLE. Every registry artifact must
+ * resolve. An artifact with a Data structure version row must also be readable and released. The
+ * row, not the URN's kind, gives it a lifecycle and a Scope. An artifact without a row is held to
+ * resolvability alone. Elements are reusable, so inheriting a lifecycle would block a shared
+ * element on an unrelated draft.
  *
  * <p>Findings are collected across every flow and reported together.
  */
@@ -62,14 +65,15 @@ public class PipelineClosureValidator {
       return;
     }
     Set<UUID> offending = new LinkedHashSet<>();
-    // One verdict per structure for the whole call: several versions, and several flows, routinely
-    // reach the same structure, and each decision otherwise re-reads the caller's assignments.
-    Map<UUID, Boolean> readability = new HashMap<>();
+    // Keep one verdict per resource for the whole call. Several versions and flows can reach the
+    // same resource, and each decision otherwise reads the caller's Assignments again.
+    Map<UUID, Boolean> structureReadability = new HashMap<>();
+    Map<UUID, Boolean> dataSourceReadability = new HashMap<>();
     for (Pipeline pipeline : pipelines) {
       if (pipeline.getModelUrn() == null || pipeline.getModelUrn().isBlank()) {
         continue;
       }
-      if (flowBlocks(pipeline, readability)) {
+      if (flowBlocks(pipeline, structureReadability, dataSourceReadability)) {
         offending.add(pipeline.getId());
       }
     }
@@ -79,14 +83,16 @@ public class PipelineClosureValidator {
   }
 
   /**
-   * Whether this flow blocks a release. Every reason is logged rather than returned: the reply
-   * names the pipeline only, so the log is where an operator learns which artifact and why.
+   * Whether this flow blocks a release. The reply names only the Pipeline; WARN logs give detail.
    */
-  private boolean flowBlocks(Pipeline pipeline, Map<UUID, Boolean> readability) {
+  private boolean flowBlocks(
+      Pipeline pipeline,
+      Map<UUID, Boolean> structureReadability,
+      Map<UUID, Boolean> dataSourceReadability) {
     ModelRegistryGateway.ArtifactClosure closure =
         modelRegistryGateway.closure(pipeline.getModelUrn(), properties.maxDepth());
 
-    boolean blocks = false;
+    boolean blocks = dataSourcesBlock(pipeline, dataSourceReadability);
     if (closure.truncated()) {
       // Passing here would report "nothing found" for a flow nobody walked to its end.
       log.warn(
@@ -110,11 +116,36 @@ public class PipelineClosureValidator {
     Map<String, List<DataStructureVersion>> governed = governingVersions.governingAll(resolved);
     for (String urn : resolved) {
       List<DataStructureVersion> records = governed.get(urn);
-      if (records != null && governedBlocks(pipeline.getId(), urn, records, readability)) {
+      if (records != null && governedBlocks(pipeline.getId(), urn, records, structureReadability)) {
         blocks = true;
       }
     }
     return blocks;
+  }
+
+  private boolean dataSourcesBlock(Pipeline pipeline, Map<UUID, Boolean> readability) {
+    boolean blocks = false;
+    for (DataSource dataSource : pipeline.getDataSources()) {
+      if (!isReadable(dataSource, readability)) {
+        log.warn(
+            "Closure validation: caller may not read data source {} reached by pipeline {}",
+            dataSource.getId(),
+            pipeline.getId());
+        blocks = true;
+      } else if (dataSource.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
+        log.warn(
+            "Closure validation: data source {} reached by pipeline {} is still a draft",
+            dataSource.getId(),
+            pipeline.getId());
+        blocks = true;
+      }
+    }
+    return blocks;
+  }
+
+  private boolean isReadable(DataSource dataSource, Map<UUID, Boolean> readability) {
+    return readability.computeIfAbsent(
+        dataSource.getId(), dataSourceId -> decideReadable(ScopeType.DATASOURCE, dataSourceId));
   }
 
   /**
@@ -160,9 +191,12 @@ public class PipelineClosureValidator {
   }
 
   private boolean decideReadable(DataStructureVersion version) {
+    return decideReadable(ScopeType.DATASTRUCTURE, version.getDataStructure().getId());
+  }
+
+  private boolean decideReadable(ScopeType scopeType, UUID scopeId) {
     try {
-      scopeAccessAuthorizer.authorizeReferences(
-          ScopeType.DATASTRUCTURE, Set.of(version.getDataStructure().getId()));
+      scopeAccessAuthorizer.authorizeReferences(scopeType, Set.of(scopeId));
       return true;
     } catch (AccessDeniedException denied) {
       return false;

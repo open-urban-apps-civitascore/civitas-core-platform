@@ -7,6 +7,7 @@ import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
@@ -27,6 +28,8 @@ import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
+import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,11 +39,19 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("DataSet Service Integration Tests")
@@ -52,6 +63,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private CatalogRepository catalogRepository;
   @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private LayerRepository layerRepository;
+  @Autowired private ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   @AfterEach
   void cleanup() {
@@ -185,9 +197,9 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   private Pipeline createPipelineForDataSet(DataSet dataSet, String name) {
-    DataSource ds1 = portalData.dataSource();
-    DataSource ds2 = portalData.dataSource();
-    DataSource ds3 = portalData.dataSource();
+    DataSource ds1 = portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
+    DataSource ds2 = portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
+    DataSource ds3 = portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
 
     Pipeline pipeline =
         portalData.pipeline(
@@ -310,6 +322,31 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @Nested
   @DisplayName("Stage DataSet Tests")
   class StageDataSetTests {
+
+    @BeforeEach
+    void establishTenantAuthorizationContext() {
+      RequestContextHolder.setRequestAttributes(
+          new ServletRequestAttributes(new MockHttpServletRequest()));
+      allowedScopesProvider.getObject().setWildcard();
+
+      PrincipalUserDetails principal =
+          PrincipalUserDetails.builder()
+              .userId(UUID.randomUUID())
+              .username("dataset-service-test")
+              .authorities(List.of())
+              .build();
+      SecurityContext context = SecurityContextHolder.createEmptyContext();
+      context.setAuthentication(
+          UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of()));
+      SecurityContextHolder.setContext(context);
+    }
+
+    @AfterEach
+    void clearAuthorizationContext() {
+      SecurityContextHolder.clearContext();
+      RequestContextHolder.resetRequestAttributes();
+    }
+
     @Test
     @Transactional
     @DisplayName("Should mark dataset as ready with pipelines")
