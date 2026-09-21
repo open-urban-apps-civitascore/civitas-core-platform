@@ -9,8 +9,8 @@ vi.mock('next-intl', () => ({
 }))
 
 const portStructure = vi.fn()
-vi.mock('@/app/services/api/frost-sink-ports/clientRequests', () => ({
-  useGetFrostPortStructure: (options: { port?: string }) => portStructure(options),
+vi.mock('@/app/services/api/published-structures/clientRequests', () => ({
+  useGetPublishedStructure: (options: { structureKey?: string }) => portStructure(options),
 }))
 
 beforeEach(() => {

@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent, { UserEvent } from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
@@ -9,6 +10,13 @@ import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureVersion } from '@/types/datastructures'
 
 import { VersionOverview } from './VersionOverview'
+
+// The modeller's toolbar asks the platform which structures it publishes. This test is about the
+// version form, so the request is answered with nothing rather than attempted.
+vi.mock('@/app/services/api/published-structures/clientRequests', () => ({
+  useGetPublishedStructures: () => ({ data: undefined, isLoading: false }),
+  useGetPublishedStructure: () => ({ data: undefined }),
+}))
 
 vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
@@ -169,9 +177,13 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
   const renderComponent = (props = {}) => {
     return render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <VersionOverview {...defaultProps} {...props} />
-      </NextIntlClientProvider>,
+      // The structure tab carries the modeller's toolbar, which reads the structures the platform
+      // publishes — so the tree needs the query client the app provides around it.
+      <QueryClientProvider client={new QueryClient()}>
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <VersionOverview {...defaultProps} {...props} />
+        </NextIntlClientProvider>
+      </QueryClientProvider>,
     )
   }
 

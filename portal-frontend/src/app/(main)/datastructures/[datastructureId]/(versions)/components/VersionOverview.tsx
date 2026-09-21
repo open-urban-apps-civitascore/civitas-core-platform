@@ -232,7 +232,14 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         )
       case 'versionInfo':
       default:
-        return <VersionInfoTab form={form} isReadOnly={isReadOnly} isAvailable={isVersionAvailable} />
+        return (
+          <VersionInfoTab
+            form={form}
+            isReadOnly={isReadOnly}
+            isAvailable={isVersionAvailable}
+            importedStructureUrns={version?.importedStructureUrns ?? []}
+          />
+        )
     }
   }
 

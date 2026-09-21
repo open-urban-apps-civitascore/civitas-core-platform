@@ -40,6 +40,16 @@ export interface UMLEdge extends Edge<UMLEdgeData, UMLRelationshipType> {
   data: UMLEdgeData
 }
 
+/**
+ * A structure of the platform that was loaded into this diagram, pinned at the version it had.
+ * A later version of that structure leaves the diagram untouched, which is why the version is kept
+ * rather than the identity alone.
+ */
+export interface ImportedStructureRef {
+  urn: string
+  name: string
+}
+
 // Diagram state
 export interface UMLDiagram {
   id: string
@@ -54,6 +64,8 @@ export interface UMLDiagram {
   }
   lastModified: Date
   isDirty: boolean
+  /** The published structures loaded into this diagram, in the order they were loaded. */
+  importedStructures?: ImportedStructureRef[]
 }
 
 // Diagram operations
@@ -72,6 +84,7 @@ export type DiagramAction =
   | { type: 'DELETE_NODES'; payload: string[] }
   | { type: 'DELETE_EDGES'; payload: string[] }
   | { type: 'SET_VIEWPORT'; payload: { x: number; y: number; zoom: number } }
+  | { type: 'SET_IMPORTED_STRUCTURES'; payload: ImportedStructureRef[] }
   | { type: 'MARK_CLEAN' }
   | { type: 'MARK_DIRTY' }
   | { type: 'LOAD_DIAGRAM'; payload: UMLDiagram }

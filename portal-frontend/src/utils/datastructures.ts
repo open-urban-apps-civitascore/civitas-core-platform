@@ -91,6 +91,9 @@ export const mapDatastructureVersionFormToApiData = (
     modelName: version.modelName,
     model,
     styles: sessionDiagram,
+    // Derived from the diagram, like the model document: the import happens there, and this makes
+    // the provenance readable without opening the editor.
+    importedStructureUrns: (sessionDiagram?.importedStructures ?? []).map(structure => structure.urn),
   }
 }
 

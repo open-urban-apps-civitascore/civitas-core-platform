@@ -4,6 +4,8 @@ import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.output.summary.DataStructureSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -40,4 +42,10 @@ public class DataStructureVersionOutputDTO extends BaseOutputDTO {
       description = "Whether this version is currently referenced by a data source",
       accessMode = Schema.AccessMode.READ_ONLY)
   private boolean inUse;
+
+  @Schema(
+      description =
+          "Versioned CORE URNs of the published structures this version was built from, each"
+              + " pinned at the version it was loaded at")
+  private List<String> importedStructureUrns = new ArrayList<>();
 }

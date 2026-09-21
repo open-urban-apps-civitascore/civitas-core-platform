@@ -1135,7 +1135,8 @@
       "versionNumber": "Versionsnummer",
       "versionNumberPlaceholder": "Wird beim Speichern des Modells zugewiesen",
       "description": "Versionsbeschreibung",
-      "source": "Quelle"
+      "source": "Quelle",
+      "builtFrom": "Aufgebaut aus"
     },
     "source": {
       "OWN": "Eigene"
@@ -1522,6 +1523,15 @@
       "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",
       "ambiguousRoot": "Das Diagramm hat mehrere mögliche Wurzelklassen ({names}). Markieren Sie die Wurzelklasse in den Klasseneigenschaften oder verbinden Sie die Klassen zu einer Hierarchie.",
       "misdirected": "Die Beziehung zwischen {name1} und {name2} ist falsch herum gezeichnet."
+    },
+    "loadStandard": {
+      "title": "Standard laden",
+      "loaded": "Die Struktur wurde in das Diagramm geladen.",
+      "renamed": "Der Name „{from}\" war vergeben, die geladene Klasse heißt daher „{to}\".",
+      "unreadable": "Die Struktur ist nicht lesbar: sie enthält „{construct}\", das der Editor nicht kennt.",
+      "error": "Die Struktur konnte nicht geladen werden.",
+      "empty": "Keine Senke veröffentlicht eine Struktur",
+      "pinned": "Aufgebaut aus:"
     }
   },
   "datapools": {

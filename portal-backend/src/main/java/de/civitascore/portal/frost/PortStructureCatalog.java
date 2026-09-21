@@ -38,6 +38,9 @@ import java.util.Optional;
  */
 public final class PortStructureCatalog {
 
+  /** The sink these structures belong to, as the structure editor groups them. */
+  public static final String SINK = "FROST";
+
   private PortStructureCatalog() {}
 
   /**

@@ -288,7 +288,23 @@ describe('mapDatastructureVersionFormToApiData', () => {
       modelName: formData.modelName,
       model,
       styles: diagram,
+      importedStructureUrns: [],
     })
+  })
+
+  it('records the published structures the diagram was built from', () => {
+    const formData = createVersionFormData()
+    const imported = [
+      { urn: 'urn:core:platform:civitas:datastructure:frost:ThingTree:0123456789:1.0.0', name: 'ThingTree' },
+      { urn: 'urn:core:platform:civitas:datastructure:frost:Things:9876543210:2.1.0', name: 'Things' },
+    ]
+    const diagram = { ...createVersionDetail().styles!, importedStructures: imported }
+
+    const result = mapDatastructureVersionFormToApiData(formData, diagram, null)
+
+    // Derived from the diagram, like the model document — the pin carries the version, because a
+    // later version of a structure must leave this one untouched.
+    expect(result.importedStructureUrns).toEqual(imported.map(structure => structure.urn))
   })
 })
 

@@ -1148,7 +1148,8 @@
       "versionNumber": "Version Number",
       "versionNumberPlaceholder": "Assigned when the model is saved",
       "description": "Version Description",
-      "source": "Source"
+      "source": "Source",
+      "builtFrom": "Built from"
     },
     "source": {
       "OWN": "Own"
@@ -1535,6 +1536,15 @@
       "noRoot": "No root class can be determined in the diagram — every class is embedded in another one (cyclic structure).",
       "ambiguousRoot": "The diagram has several possible root classes ({names}). Mark the root class in the class properties or connect the classes into a hierarchy.",
       "misdirected": "The relationship between {name1} and {name2} is drawn the wrong way round."
+    },
+    "loadStandard": {
+      "title": "Load standard",
+      "loaded": "The structure was loaded into the diagram.",
+      "renamed": "The name “{from}” was taken, so the loaded class is called “{to}”.",
+      "unreadable": "The structure cannot be read: it holds “{construct}”, which the editor does not know.",
+      "error": "The structure could not be loaded.",
+      "empty": "No sink publishes a structure",
+      "pinned": "Built from:"
     }
   },
   "datapools": {

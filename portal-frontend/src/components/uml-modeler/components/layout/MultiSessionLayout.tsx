@@ -7,6 +7,7 @@ import { JSX, useCallback, useMemo, useState } from 'react'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 
 import { useMultiSessionManager } from '../../hooks/use-multi-session-manager'
+import { useReadOnly } from '../../hooks/use-read-only'
 import { UseMultiSessionReturn } from '../../types/session'
 import { PropertyInspector } from '../inspector/PropertyInspector'
 import { ElementPalette } from '../palette/ElementPalette'
@@ -82,8 +83,11 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
   }, [sessionManager])
 
   const activeSession = sessionManager.getActiveSession()
+  const { isReadOnly } = useReadOnly()
 
-  const shouldShowToolBar = !isControlledExternally || canExportModel || !!onImportFromDatastructure
+  // The load-standard control lives in the toolbar and is offered wherever the diagram can be
+  // changed, so an editable session shows the toolbar even when it owns nothing else.
+  const shouldShowToolBar = !isControlledExternally || canExportModel || !!onImportFromDatastructure || !isReadOnly
 
   return (
     <ActiveDiagramProviderComponent sessionManager={sessionManager}>

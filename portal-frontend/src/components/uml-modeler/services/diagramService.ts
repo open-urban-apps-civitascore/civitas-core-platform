@@ -197,6 +197,14 @@ export const diagramReducer = (state: UMLDiagram, action: DiagramAction): UMLDia
         isDirty: false,
       }
 
+    case 'SET_IMPORTED_STRUCTURES':
+      return {
+        ...state,
+        importedStructures: action.payload,
+        lastModified: new Date(),
+        isDirty: true,
+      }
+
     case 'MARK_DIRTY':
       return {
         ...state,

@@ -11,7 +11,7 @@
 import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
-import { useGetFrostPortStructure } from '@/app/services/api/frost-sink-ports/clientRequests'
+import { useGetPublishedStructure } from '@/app/services/api/published-structures/clientRequests'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -100,7 +100,7 @@ export const FrostPanel: React.FC<FrostPanelProps> = ({ data, onUpdate }) => {
  */
 const PortSummary: React.FC<{ port: FrostSinkPort }> = ({ port }) => {
   const t = useTranslations('pipelineEditor')
-  const structure = useGetFrostPortStructure({ port, isEnabled: true })
+  const structure = useGetPublishedStructure({ structureKey: port, isEnabled: true })
   const model = structure.data?.data
 
   return (
