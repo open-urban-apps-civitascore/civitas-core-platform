@@ -13,8 +13,9 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.AdapterOperation;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.core.Response;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import okhttp3.Response;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +24,7 @@ import org.slf4j.LoggerFactory;
  * Executes FROST entity HTTP requests with the adapter framework's error classification:
  *
  * <ul>
- *   <li>Network errors ({@link ProcessingException}) → {@link RetryableAdapterException} ({@code
+ *   <li>Network errors ({@link IOException}) → {@link RetryableAdapterException} ({@code
  *       NETWORK_ERROR})
  *   <li>HTTP 5xx → {@link RetryableAdapterException} ({@code SERVICE_UNAVAILABLE}) — except FROST's
  *       500 + "Failed to store data." on CREATE, which is a duplicate (UNIQUE constraint) and
@@ -38,10 +39,14 @@ final class FrostHttpExecutor {
   private static final Logger LOG = LoggerFactory.getLogger(FrostHttpExecutor.class);
   private static final String HTTP_STATUS_PREFIX = "HTTP ";
 
-  /** Functional interface for the actual HTTP call (POST/PATCH/DELETE). */
+  /**
+   * Functional interface for the actual HTTP call (POST/PATCH/DELETE). Declares {@link IOException}
+   * so request-body serialization failures (via Jackson) and OkHttp's checked network-failure
+   * exception both flow into the same {@code catch} below.
+   */
   @FunctionalInterface
   interface HttpRequestOperation {
-    Response execute();
+    Response execute() throws IOException;
   }
 
   private FrostHttpExecutor() {}
@@ -60,11 +65,11 @@ final class FrostHttpExecutor {
       handleHttpResponse(response, operation);
 
       if (operation == AdapterOperation.FROST_ENTITY_CREATE
-          && response.getStatus() == Response.Status.CREATED.getStatusCode()) {
-        return FrostUtils.extractIdFromLocation(response.getHeaderString("Location"));
+          && response.code() == HttpURLConnection.HTTP_CREATED) {
+        return FrostUtils.extractIdFromLocation(response.header("Location"));
       }
       return resourceId;
-    } catch (ProcessingException e) {
+    } catch (IOException e) {
       LOG.warn(
           "Network error during {}: {}",
           Encode.forJava(operation.getDescription()),
@@ -81,15 +86,14 @@ final class FrostHttpExecutor {
   }
 
   private static void handleHttpResponse(Response response, AdapterOperation operation)
-      throws RetryableAdapterException, FatalAdapterException {
-    int status = response.getStatus();
-    if (Response.Status.Family.familyOf(status) == Response.Status.Family.SUCCESSFUL
-        || isIdempotentNoOp(status, operation)) {
+      throws RetryableAdapterException, FatalAdapterException, IOException {
+    int status = response.code();
+    if (response.isSuccessful() || isIdempotentNoOp(status, operation)) {
       return;
     }
 
-    String body = response.readEntity(String.class);
-    if (status >= Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
+    String body = readBody(response);
+    if (status >= HttpURLConnection.HTTP_INTERNAL_ERROR) {
       // FROST returns 500 with "Failed to store data." on UNIQUE constraint violations instead of
       // 409 — treated as idempotent success for CREATE operations, same as a real 409.
       if (operation == AdapterOperation.FROST_ENTITY_CREATE
@@ -118,17 +122,22 @@ final class FrostHttpExecutor {
 
   /** Status codes that already represent the desired end state — no error, nothing to do. */
   private static boolean isIdempotentNoOp(int status, AdapterOperation operation) {
-    if (status == Response.Status.CONFLICT.getStatusCode()
+    if (status == HttpURLConnection.HTTP_CONFLICT
         && operation == AdapterOperation.FROST_ENTITY_CREATE) {
       LOG.info("FROST entity already exists (409), treating create as success (idempotent)");
       return true;
     }
-    if (status == Response.Status.NOT_FOUND.getStatusCode()
+    if (status == HttpURLConnection.HTTP_NOT_FOUND
         && operation == AdapterOperation.FROST_ENTITY_DELETE) {
       LOG.info(
           "FROST entity not found (404), treating delete as success (already deleted, idempotent)");
       return true;
     }
     return false;
+  }
+
+  /** Reads the response body for logging/error classification. */
+  private static String readBody(Response response) throws IOException {
+    return response.body().string();
   }
 }

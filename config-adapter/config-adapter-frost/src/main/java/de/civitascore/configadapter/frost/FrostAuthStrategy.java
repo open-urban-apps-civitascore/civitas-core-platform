@@ -10,16 +10,16 @@
 package de.civitascore.configadapter.frost;
 
 import de.civitascore.configadapter.configuration.AdapterConfig;
-import jakarta.ws.rs.client.Invocation;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Objects;
+import okhttp3.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Strategy for authenticating FROST SensorThings API requests. Implementations apply the
- * appropriate authentication header to a JAX-RS request builder.
+ * appropriate authentication header to an OkHttp request builder.
  *
  * <p>Use the factory methods {@link #basicAuth(String, String)} and {@link #apiKey(String, String)}
  * to obtain instances. The strategy is chosen once during adapter initialization and reused for
@@ -35,10 +35,10 @@ interface FrostAuthStrategy {
   /**
    * Applies authentication to the given request builder.
    *
-   * @param builder the JAX-RS request builder
+   * @param builder the OkHttp request builder
    * @return the builder with the authentication header set
    */
-  Invocation.Builder apply(Invocation.Builder builder);
+  Request.Builder apply(Request.Builder builder);
 
   /**
    * Creates a Basic Auth strategy that encodes the given credentials once and reuses the encoded

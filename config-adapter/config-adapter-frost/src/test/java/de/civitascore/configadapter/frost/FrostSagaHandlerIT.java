@@ -17,19 +17,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AppConfig;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import okhttp3.HttpUrl;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import org.apache.commons.configuration2.MapConfiguration;
-import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +43,7 @@ import org.junit.jupiter.api.Test;
 class FrostSagaHandlerIT extends AbstractFrostIT {
 
   private FrostSagaHandler handler;
-  private Client httpClient;
+  private OkHttpClient httpClient;
   private String frostBaseUrl;
   private ObjectMapper objectMapper;
 
@@ -52,7 +51,7 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
   void setUp() {
     frostBaseUrl =
         "http://" + FROST.getHost() + ":" + FROST.getMappedPort(8080) + "/FROST-Server/v1.1";
-    httpClient = ClientBuilder.newClient();
+    httpClient = new OkHttpClient();
     objectMapper = new ObjectMapper();
 
     Map<String, Object> props = new HashMap<>();
@@ -63,14 +62,6 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
 
     handler = new FrostSagaHandler();
     handler.initialize(config);
-
-    Client patchCapableClient =
-        ClientBuilder.newBuilder()
-            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build();
-    handler.setTestClient(patchCapableClient);
   }
 
   @AfterEach
@@ -79,8 +70,26 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
       handler.close();
     }
     if (httpClient != null) {
-      httpClient.close();
+      httpClient.dispatcher().executorService().shutdown();
+      httpClient.connectionPool().evictAll();
     }
+  }
+
+  private HttpUrl url(String path) {
+    return HttpUrl.get(frostBaseUrl).newBuilder().addPathSegments(path).build();
+  }
+
+  private Request.Builder jsonRequest(String path) {
+    return jsonRequest(url(path));
+  }
+
+  private Request.Builder jsonRequest(HttpUrl url) {
+    return new Request.Builder().url(url).header("Accept", "application/json");
+  }
+
+  private RequestBody jsonBody(Object value) throws Exception {
+    return RequestBody.create(
+        objectMapper.writeValueAsString(value), MediaType.get("application/json"));
   }
 
   /**
@@ -89,28 +98,20 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
    * both statuses (older cores still answer 500).
    */
   @Test
-  void frostReturnsHttp409WhenCreatingProjectWithDuplicateName() {
+  void frostReturnsHttp409WhenCreatingProjectWithDuplicateName() throws Exception {
     String projectName = "Duplicate-" + UUID.randomUUID();
     Map<String, Object> projectBody = Map.of("name", projectName, "description", "");
 
-    try (Response first =
-        httpClient
-            .target(frostBaseUrl)
-            .path("Projects")
-            .request(MediaType.APPLICATION_JSON)
-            .post(Entity.json(projectBody))) {
-      assertEquals(201, first.getStatus(), "First create should succeed");
+    Request firstRequest = jsonRequest("Projects").post(jsonBody(projectBody)).build();
+    try (Response first = httpClient.newCall(firstRequest).execute()) {
+      assertEquals(201, first.code(), "First create should succeed");
     }
 
-    try (Response second =
-        httpClient
-            .target(frostBaseUrl)
-            .path("Projects")
-            .request(MediaType.APPLICATION_JSON)
-            .post(Entity.json(projectBody))) {
+    Request secondRequest = jsonRequest("Projects").post(jsonBody(projectBody)).build();
+    try (Response second = httpClient.newCall(secondRequest).execute()) {
       assertEquals(
           409,
-          second.getStatus(),
+          second.code(),
           "FROST returns 409 for duplicate project name on core >= 2.7.0 — if this fails, FROST"
               + " behaviour changed again and the race guard in FrostSagaHandler needs revisiting");
     }
@@ -266,16 +267,16 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
   }
 
   private int countRootThings() throws Exception {
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path("Things")
-            .queryParam("$count", "true")
-            .queryParam("$top", "0")
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
-      assertEquals(200, response.getStatus(), "Failed to count Things");
-      return objectMapper.readTree(response.readEntity(String.class)).get("@iot.count").asInt();
+    HttpUrl url =
+        url("Things")
+            .newBuilder()
+            .addQueryParameter("$count", "true")
+            .addQueryParameter("$top", "0")
+            .build();
+    Request request = jsonRequest(url).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      assertEquals(200, response.code(), "Failed to count Things");
+      return objectMapper.readTree(response.body().string()).get("@iot.count").asInt();
     }
   }
 
@@ -330,23 +331,19 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
   }
 
   private String singleId(String entityPath) throws Exception {
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path(entityPath)
-            .queryParam("$select", "@iot.id")
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
-      assertEquals(200, response.getStatus(), "Failed to read " + entityPath);
-      return objectMapper.readTree(response.readEntity(String.class)).get("@iot.id").asText();
+    HttpUrl url = url(entityPath).newBuilder().addQueryParameter("$select", "@iot.id").build();
+    Request request = jsonRequest(url).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      assertEquals(200, response.code(), "Failed to read " + entityPath);
+      return objectMapper.readTree(response.body().string()).get("@iot.id").asText();
     }
   }
 
-  private String createProject(String name) {
+  private String createProject(String name) throws Exception {
     return createEntity("Projects", Map.of("name", name, "description", "cascade delete test"));
   }
 
-  private String createPlainThing(String projectId, String name) {
+  private String createPlainThing(String projectId, String name) throws Exception {
     return createEntity(
         "Projects(" + projectId + ")/Things",
         Map.of("name", name, "description", "thing without sensor data"));
@@ -356,7 +353,8 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
    * Seeds a Thing with a deep-inserted Datastream and two Observations; the Location lets FROST
    * auto-generate the FeatureOfInterest.
    */
-  private String createThingWithDatastreamAndObservations(String projectId, String name) {
+  private String createThingWithDatastreamAndObservations(String projectId, String name)
+      throws Exception {
     Map<String, Object> thing =
         Map.of(
             "name",
@@ -401,46 +399,34 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
     return createEntity("Projects(" + projectId + ")/Things", thing);
   }
 
-  private String createEntity(String path, Map<String, Object> body) {
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path(path)
-            .request(MediaType.APPLICATION_JSON)
-            .post(Entity.json(body))) {
-      String responseBody = response.readEntity(String.class);
-      assertEquals(201, response.getStatus(), "Failed to create " + path + ": " + responseBody);
-      String location = response.getHeaderString("Location");
+  private String createEntity(String path, Map<String, Object> body) throws Exception {
+    Request request = jsonRequest(path).post(jsonBody(body)).build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      String responseBody = response.body().string();
+      assertEquals(201, response.code(), "Failed to create " + path + ": " + responseBody);
+      String location = response.header("Location");
       return location.substring(location.lastIndexOf('(') + 1, location.lastIndexOf(')'));
     }
   }
 
   private List<String> collectIds(String collectionPath) throws Exception {
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path(collectionPath)
-            .queryParam("$select", "@iot.id")
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
-      assertEquals(200, response.getStatus(), "Failed to list " + collectionPath);
-      JsonNode value = objectMapper.readTree(response.readEntity(String.class)).get("value");
+    HttpUrl url = url(collectionPath).newBuilder().addQueryParameter("$select", "@iot.id").build();
+    Request request = jsonRequest(url).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      assertEquals(200, response.code(), "Failed to list " + collectionPath);
+      JsonNode value = objectMapper.readTree(response.body().string()).get("value");
       List<String> ids = new ArrayList<>();
       value.forEach(node -> ids.add(node.get("@iot.id").asText()));
       return ids;
     }
   }
 
-  private void assertRootEntityStatus(int expectedStatus, String entityPath) {
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path(entityPath)
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
+  private void assertRootEntityStatus(int expectedStatus, String entityPath) throws Exception {
+    Request request = jsonRequest(entityPath).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
       assertEquals(
           expectedStatus,
-          response.getStatus(),
+          response.code(),
           () -> entityPath + " expected HTTP " + expectedStatus + " at server root");
     }
   }

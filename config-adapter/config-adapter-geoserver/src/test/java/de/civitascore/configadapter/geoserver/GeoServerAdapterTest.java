@@ -4,7 +4,7 @@
  * <p>SPDX-License-Identifier: EUPL-1.2
  *
  * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
- * Copyright (c) 2026 Civitas Connect e. V. and others.
+ * Copyright (c) 2012-2025 Civitas Connect e. V. and others.
  *
  */
 package de.civitascore.configadapter.geoserver;
@@ -43,14 +43,11 @@ import de.civitascore.configadapter.model.Payload;
 import de.civitascore.configadapter.model.geoserver.FeatureTypeConfig;
 import de.civitascore.configadapter.model.geoserver.GeoServerConfigValue;
 import de.civitascore.configadapter.model.geoserver.WorkspaceConfig;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import java.io.IOException;
 import java.time.OffsetDateTime;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -289,46 +286,35 @@ class GeoServerAdapterTest {
   @Nested
   class CreateOperations {
 
+    private MockWebServer server;
     private EventPublisher mockPublisher;
-    private Invocation.Builder mockBuilder;
-    private Response mockResponse;
 
     @BeforeEach
-    void setUpMocks() {
-      stubBaseConfig(
+    void setUpMocks() throws IOException {
+      server = new MockWebServer();
+      server.start();
+      stubServerConfig(
+          server,
           "de.civitascore.geo.workspace.created,de.civitascore.geo.featuretype.created,"
               + "de.civitascore.geo.datastore.created");
-
-      Client mockClient = buildMockClient();
-      adapter.setClient(mockClient);
       adapter.initialize(mockConfig);
 
       mockPublisher = mock(EventPublisher.class);
       adapter.setEventPublisher(mockPublisher);
     }
 
-    private Client buildMockClient() {
-      Client mockClient = mock(Client.class);
-      WebTarget mockTarget = mock(WebTarget.class);
-      WebTarget mockPathTarget = mock(WebTarget.class);
-      mockBuilder = mock(Invocation.Builder.class);
-      mockResponse = mock(Response.class);
-
-      when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-      when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-      when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
-      when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-      when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-      return mockClient;
+    @AfterEach
+    void tearDownServer() throws IOException {
+      server.close();
     }
 
     @Test
     void createWorkspaceReturnsSuccess() throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/geoserver/rest/workspaces/myws");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/geoserver/rest/workspaces/myws")
+              .build());
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "workspaces", workspace("myws"));
 
@@ -345,11 +331,13 @@ class GeoServerAdapterTest {
 
     @Test
     void createFeatureTypeReturnsSuccess() throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn(
-              "http://localhost:8080/geoserver/rest/workspaces/myws/datastores/myds/featuretypes/traffic");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader(
+                  "Location",
+                  "http://localhost:8080/geoserver/rest/workspaces/myws/datastores/myds/featuretypes/traffic")
+              .build());
 
       ConfigEvent event =
           createConfigEvent(
@@ -371,8 +359,7 @@ class GeoServerAdapterTest {
     @Test
     void createWithConflictReturnsSuccess()
         throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(409);
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(409).build());
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "workspaces", workspace("existing"));
 
@@ -386,8 +373,7 @@ class GeoServerAdapterTest {
     @Test
     void createConflictResultIncludesResourceNameFromBody()
         throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(409);
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(409).build());
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "workspaces", workspace("myws"));
 
@@ -433,9 +419,7 @@ class GeoServerAdapterTest {
 
     @Test
     void createWithClientErrorThrowsFatalException() {
-      when(mockResponse.getStatus()).thenReturn(400);
-      when(mockResponse.readEntity(String.class)).thenReturn("Bad request");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(400).body("Bad request").build());
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "workspaces", new WorkspaceConfig());
 
@@ -449,9 +433,7 @@ class GeoServerAdapterTest {
 
     @Test
     void createWithServerErrorThrowsRetryableException() {
-      when(mockResponse.getStatus()).thenReturn(503);
-      when(mockResponse.readEntity(String.class)).thenReturn("Service Unavailable");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(503).body("Service Unavailable").build());
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "workspaces", new WorkspaceConfig());
 
@@ -464,9 +446,9 @@ class GeoServerAdapterTest {
     }
 
     @Test
-    void createWithNetworkErrorThrowsRetryableException() {
-      when(mockBuilder.post(any(Entity.class)))
-          .thenThrow(new ProcessingException("Connection refused"));
+    void createWithNetworkErrorThrowsRetryableException() throws IOException {
+      // Torn down before the request is even made: the connection attempt itself fails.
+      server.close();
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "workspaces", workspace("myws"));
 
@@ -482,40 +464,29 @@ class GeoServerAdapterTest {
   @Nested
   class UpdateOperations {
 
+    private MockWebServer server;
     private EventPublisher mockPublisher;
-    private Client mockClient;
-    private WebTarget mockTarget;
-    private WebTarget mockPathTarget;
-    private Invocation.Builder mockBuilder;
-    private Response mockResponse;
 
     @BeforeEach
-    void setUpMocks() {
-      stubBaseConfig("de.civitascore.geo.workspace.updated,de.civitascore.geo.featuretype.updated");
-
-      mockClient = mock(Client.class);
-      mockTarget = mock(WebTarget.class);
-      mockPathTarget = mock(WebTarget.class);
-      mockBuilder = mock(Invocation.Builder.class);
-      mockResponse = mock(Response.class);
-
-      when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-      when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-      when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
-      when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-      when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-      adapter.setClient(mockClient);
+    void setUpMocks() throws IOException {
+      server = new MockWebServer();
+      server.start();
+      stubServerConfig(
+          server, "de.civitascore.geo.workspace.updated,de.civitascore.geo.featuretype.updated");
       adapter.initialize(mockConfig);
 
       mockPublisher = mock(EventPublisher.class);
       adapter.setEventPublisher(mockPublisher);
     }
 
+    @AfterEach
+    void tearDownServer() throws IOException {
+      server.close();
+    }
+
     @Test
     void updateWorkspaceReturnsSuccess() throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(200);
-      when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(200).build());
 
       ConfigEvent event = createConfigEvent(Operation.UPDATE, "workspaces/myws", workspace("myws"));
 
@@ -546,40 +517,29 @@ class GeoServerAdapterTest {
   @Nested
   class DeleteOperations {
 
+    private MockWebServer server;
     private EventPublisher mockPublisher;
-    private Client mockClient;
-    private WebTarget mockTarget;
-    private WebTarget mockPathTarget;
-    private Invocation.Builder mockBuilder;
-    private Response mockResponse;
 
     @BeforeEach
-    void setUpMocks() {
-      stubBaseConfig("de.civitascore.geo.workspace.deleted,de.civitascore.geo.featuretype.deleted");
-
-      mockClient = mock(Client.class);
-      mockTarget = mock(WebTarget.class);
-      mockPathTarget = mock(WebTarget.class);
-      mockBuilder = mock(Invocation.Builder.class);
-      mockResponse = mock(Response.class);
-
-      when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-      when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-      when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
-      when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-      when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-      adapter.setClient(mockClient);
+    void setUpMocks() throws IOException {
+      server = new MockWebServer();
+      server.start();
+      stubServerConfig(
+          server, "de.civitascore.geo.workspace.deleted,de.civitascore.geo.featuretype.deleted");
       adapter.initialize(mockConfig);
 
       mockPublisher = mock(EventPublisher.class);
       adapter.setEventPublisher(mockPublisher);
     }
 
+    @AfterEach
+    void tearDownServer() throws IOException {
+      server.close();
+    }
+
     @Test
     void deleteWorkspaceReturnsSuccess() throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(200);
-      when(mockBuilder.delete()).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(200).build());
 
       ConfigEvent event = createConfigEvent(Operation.DELETE, "workspaces/myws", null);
 
@@ -596,24 +556,18 @@ class GeoServerAdapterTest {
 
     @Test
     void deleteWorkspaceAddsRecurseQueryParam()
-        throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(200);
-      when(mockBuilder.delete()).thenReturn(mockResponse);
+        throws FatalAdapterException, RetryableAdapterException, InterruptedException {
+      server.enqueue(new MockResponse.Builder().code(200).build());
 
       ConfigEvent event = createConfigEvent(Operation.DELETE, "workspaces/myws", null);
       adapter.processConfigEvent("de.civitascore.geo.workspace.deleted", event);
 
-      ArgumentCaptor<String> paramNameCaptor = ArgumentCaptor.forClass(String.class);
-      ArgumentCaptor<Object> paramValueCaptor = ArgumentCaptor.forClass(Object.class);
-      verify(mockPathTarget).queryParam(paramNameCaptor.capture(), paramValueCaptor.capture());
-      assertEquals("recurse", paramNameCaptor.getValue());
-      assertEquals("true", paramValueCaptor.getValue());
+      assertEquals("true", server.takeRequest().getUrl().queryParameter("recurse"));
     }
 
     @Test
     void deleteNotFoundReturnsSuccess() throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(404);
-      when(mockBuilder.delete()).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(404).build());
 
       ConfigEvent event = createConfigEvent(Operation.DELETE, "workspaces/nonexistent", null);
 
@@ -638,61 +592,47 @@ class GeoServerAdapterTest {
 
     @Test
     void deleteFeatureTypeAddsRecurseQueryParam()
-        throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(200);
-      when(mockBuilder.delete()).thenReturn(mockResponse);
+        throws FatalAdapterException, RetryableAdapterException, InterruptedException {
+      server.enqueue(new MockResponse.Builder().code(200).build());
 
       ConfigEvent event =
           createConfigEvent(
               Operation.DELETE, "workspaces/myws/datastores/myds/featuretypes/myft", null);
       adapter.processConfigEvent("de.civitascore.geo.featuretype.deleted", event);
 
-      ArgumentCaptor<String> paramNameCaptor = ArgumentCaptor.forClass(String.class);
-      ArgumentCaptor<Object> paramValueCaptor = ArgumentCaptor.forClass(Object.class);
-      verify(mockPathTarget).queryParam(paramNameCaptor.capture(), paramValueCaptor.capture());
-      assertEquals("recurse", paramNameCaptor.getValue());
-      assertEquals("true", paramValueCaptor.getValue());
+      assertEquals("true", server.takeRequest().getUrl().queryParameter("recurse"));
     }
   }
 
   @Nested
   class ResultPublishing {
 
-    private EventPublisher mockPublisher;
-    private Invocation.Builder mockBuilder;
-    private Response mockResponse;
+    private MockWebServer server;
 
     @BeforeEach
-    void setUpMocks() {
-      stubBaseConfig("de.civitascore.geo.workspace.created");
-
-      Client mockClient = mock(Client.class);
-      WebTarget mockTarget = mock(WebTarget.class);
-      WebTarget mockPathTarget = mock(WebTarget.class);
-      mockBuilder = mock(Invocation.Builder.class);
-      mockResponse = mock(Response.class);
-
-      when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-      when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-      when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
-      when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-      when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-      adapter.setClient(mockClient);
+    void setUpMocks() throws IOException {
+      server = new MockWebServer();
+      server.start();
+      stubServerConfig(server, "de.civitascore.geo.workspace.created");
       adapter.initialize(mockConfig);
+    }
 
-      mockPublisher = mock(EventPublisher.class);
+    @AfterEach
+    void tearDownServer() throws IOException {
+      server.close();
     }
 
     @Test
     void withoutEventPublisherDoesNotPublishResults()
         throws FatalAdapterException, RetryableAdapterException {
+      EventPublisher mockPublisher = mock(EventPublisher.class);
       adapter.setEventPublisher(null);
 
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/geoserver/rest/workspaces/myws");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/geoserver/rest/workspaces/myws")
+              .build());
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "workspaces", workspace("myws"));
 
@@ -704,12 +644,14 @@ class GeoServerAdapterTest {
     @Test
     void withNullResultTopicDoesNotPublishResults()
         throws FatalAdapterException, RetryableAdapterException {
+      EventPublisher mockPublisher = mock(EventPublisher.class);
       adapter.setEventPublisher(mockPublisher);
 
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/geoserver/rest/workspaces/myws");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/geoserver/rest/workspaces/myws")
+              .build());
 
       Metadata metadata =
           new Metadata("msg-001", OffsetDateTime.now(), "test-source", "corr-001", "v1.0.0", null);
@@ -775,30 +717,23 @@ class GeoServerAdapterTest {
   @Nested
   class PathTraversalProtection {
 
-    private Invocation.Builder mockBuilder;
-    private Response mockResponse;
+    private MockWebServer server;
 
     @BeforeEach
-    void setUpMocks() {
-      stubBaseConfig(
+    void setUpMocks() throws IOException {
+      server = new MockWebServer();
+      server.start();
+      stubServerConfig(
+          server,
           "de.civitascore.geo.workspace.created,de.civitascore.geo.workspace.updated,"
               + "de.civitascore.geo.workspace.deleted");
-
-      Client mockClient = mock(Client.class);
-      WebTarget mockTarget = mock(WebTarget.class);
-      WebTarget mockPathTarget = mock(WebTarget.class);
-      mockBuilder = mock(Invocation.Builder.class);
-      mockResponse = mock(Response.class);
-
-      when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-      when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-      when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
-      when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-      when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-      adapter.setClient(mockClient);
       adapter.initialize(mockConfig);
       adapter.setEventPublisher(mock(EventPublisher.class));
+    }
+
+    @AfterEach
+    void tearDownServer() throws IOException {
+      server.close();
     }
 
     @Test
@@ -857,26 +792,30 @@ class GeoServerAdapterTest {
     @Test
     void createAcceptsResourceNameWithUnderscoreAndHyphen()
         throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/geoserver/rest/workspaces/my_ws-1");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/geoserver/rest/workspaces/my_ws-1")
+              .build());
 
       ConfigEvent event =
           createConfigEvent(Operation.CREATE, "workspaces/my_ws-1", workspace("my_ws-1"));
 
       adapter.processConfigEvent("de.civitascore.geo.workspace.created", event);
 
-      verify(mockBuilder).post(any(Entity.class));
+      assertEquals(1, server.getRequestCount());
     }
 
     @Test
     void createAcceptsMultiSegmentSafePath()
         throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/geoserver/rest/workspaces/my_ws/styles/base-style");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader(
+                  "Location",
+                  "http://localhost:8080/geoserver/rest/workspaces/my_ws/styles/base-style")
+              .build());
 
       ConfigEvent event =
           createConfigEvent(
@@ -884,22 +823,23 @@ class GeoServerAdapterTest {
 
       adapter.processConfigEvent("de.civitascore.geo.workspace.created", event);
 
-      verify(mockBuilder).post(any(Entity.class));
+      assertEquals(1, server.getRequestCount());
     }
 
     @Test
     void createStillAcceptsLeadingAndTrailingSlashes()
         throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/geoserver/rest/workspaces/ws");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/geoserver/rest/workspaces/ws")
+              .build());
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "/workspaces/ws/", workspace("ws"));
 
       adapter.processConfigEvent("de.civitascore.geo.workspace.created", event);
 
-      verify(mockBuilder).post(any(Entity.class));
+      assertEquals(1, server.getRequestCount());
     }
 
     private void assertRejectedWithoutHttpCall(
@@ -910,9 +850,7 @@ class GeoServerAdapterTest {
           assertThrows(FatalAdapterException.class, () -> adapter.processConfigEvent(topic, event));
 
       assertEquals(AdapterErrorCode.INVALID_PAYLOAD, exception.getErrorCode());
-      verify(mockBuilder, never()).post(any(Entity.class));
-      verify(mockBuilder, never()).put(any(Entity.class));
-      verify(mockBuilder, never()).delete();
+      assertEquals(0, server.getRequestCount());
     }
   }
 
@@ -922,6 +860,15 @@ class GeoServerAdapterTest {
     when(mockConfig.getProperty("geoserver.topics")).thenReturn(topics);
     when(mockConfig.getProperty("geoserver.url", "http://localhost:8080/geoserver"))
         .thenReturn("http://localhost:8080/geoserver");
+    when(mockConfig.getProperty("geoserver.admin.user")).thenReturn("admin");
+    when(mockConfig.getProperty("geoserver.admin.password")).thenReturn("geoserver");
+  }
+
+  /** Points the adapter's serverUrl at {@code server} instead of the fixed localhost default. */
+  private void stubServerConfig(MockWebServer server, String topics) {
+    when(mockConfig.getProperty("geoserver.topics")).thenReturn(topics);
+    when(mockConfig.getProperty("geoserver.url", "http://localhost:8080/geoserver"))
+        .thenReturn(server.url("/geoserver").toString());
     when(mockConfig.getProperty("geoserver.admin.user")).thenReturn("admin");
     when(mockConfig.getProperty("geoserver.admin.password")).thenReturn("geoserver");
   }
