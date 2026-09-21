@@ -1020,6 +1020,41 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
     }
+
+    @Test
+    @DisplayName("Should exclude datasets with pending DELETE saga by default")
+    void shouldExcludePendingDeleteDatasetsByDefault() {
+      UUID pendingDeleteId = createTestEntity();
+      DataSet pendingDelete = dataSetRepository.findById(pendingDeleteId).orElseThrow();
+      pendingDelete.setPendingSagaType(PendingSagaType.DELETE);
+      dataSetRepository.saveAndFlush(pendingDelete);
+
+      ResponseEntity<RestPage<DataSetOutputDTO>> response = performGetAll();
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getContent())
+          .extracting(DataSetOutputDTO::getId)
+          .doesNotContain(pendingDeleteId);
+    }
+
+    @Test
+    @DisplayName("Should include datasets with pending DELETE saga when opted in")
+    void shouldIncludePendingDeleteDatasetsWhenOptedIn() {
+      UUID pendingDeleteId = createTestEntity();
+      DataSet pendingDelete = dataSetRepository.findById(pendingDeleteId).orElseThrow();
+      pendingDelete.setPendingSagaType(PendingSagaType.DELETE);
+      dataSetRepository.saveAndFlush(pendingDelete);
+
+      ResponseEntity<RestPage<DataSetOutputDTO>> response =
+          performGetAll(Map.of("includePendingDelete", "true"));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getContent())
+          .extracting(DataSetOutputDTO::getId)
+          .contains(pendingDeleteId);
+    }
   }
 
   @Nested
