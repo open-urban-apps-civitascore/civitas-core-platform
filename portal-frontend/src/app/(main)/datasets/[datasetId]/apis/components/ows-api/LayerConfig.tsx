@@ -16,7 +16,6 @@ import { AlertBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
 import { FormItem, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { UMLAttribute, UMLClass } from '@/components/uml-modeler/types/uml'
 import { crsOptions } from '@/const/crs'
 import { cn } from '@/lib/utils'
 import { DataSink } from '@/types/datasinks'
@@ -25,6 +24,7 @@ import { LAYER_TITLE_MAX_LENGTH } from '@/types/layers'
 import { OwsApiFormData } from '@/types/namedApis'
 import { Style } from '@/types/styles'
 import { getEmptyLabelIndex, isNewItem } from '@/utils/common'
+import { getDatastructureFieldOptions } from '@/utils/datastructures'
 
 import { BoundingBoxConfig } from './BoundingBoxConfig'
 
@@ -41,15 +41,6 @@ interface LayerConfigProps {
   onDeleteLayer?: () => Promise<void>
   onTableChange: (dataSinkId: string) => void
 }
-
-const getUmlClass = (
-  datastructures: DatastructureVersion[],
-  datastructureVersionId: string | undefined,
-): UMLClass | undefined =>
-  datastructures.find(d => d.id === datastructureVersionId)?.styles?.nodes[0].data.element as UMLClass | undefined
-
-const toAttributeOptions = (umlClass: UMLClass | undefined) =>
-  umlClass?.attributes?.map((attr: UMLAttribute) => ({ value: attr.name, label: attr.name })) ?? []
 
 export const LayerConfig = (props: LayerConfigProps) => {
   const {
@@ -122,8 +113,10 @@ export const LayerConfig = (props: LayerConfigProps) => {
   const currentDatastructureVersion = postgisDataSinks?.find(dataSink => dataSink.id === tableWatch)?.configuration
     .dataStructureVersion
 
-  const umlClass = getUmlClass(postGisDatastructures, currentDatastructureVersion?.id)
-  const attributeOptions = toAttributeOptions(umlClass)
+  const currentDatastructure = postGisDatastructures.find(
+    datastructure => datastructure.id === currentDatastructureVersion?.id,
+  )
+  const attributeOptions = getDatastructureFieldOptions(currentDatastructure)
 
   const layerErrors = form.formState.errors.layers
   const layerLabels = allLayers.map(layer => layer.title)
