@@ -11,6 +11,7 @@
 import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
+import { useGetFrostPortStructure } from '@/app/services/api/frost-sink-ports/clientRequests'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -25,6 +26,7 @@ import {
 import { FROST_PORT_LOGIC, type FrostSinkPort, isFrostSinkPort, portsOfLogic } from '../../../_constants/frostPorts'
 import type { FrostNodeData } from '../../../_types/nodes'
 import { EntityMetadata } from '../components/EntityMetadata'
+import { PortStructureTree } from '../components/PortStructureTree'
 
 interface FrostPanelProps {
   data: FrostNodeData
@@ -89,18 +91,28 @@ export const FrostPanel: React.FC<FrostPanelProps> = ({ data, onUpdate }) => {
 }
 
 /**
- * What the selected port writes and which references it resolves. The references are rendered as
- * text; #2284 replaces this line with the structure the port publishes.
+ * What the selected port writes, and the structure it publishes: the field names, the data types
+ * and the fields a record must carry.
+ *
+ * The structure comes from the platform. While it is not there — it is still loading, or the
+ * request failed — the panel names the references the port resolves instead of showing nothing:
+ * that much is known here, and a modeller who sees it can start.
  */
 const PortSummary: React.FC<{ port: FrostSinkPort }> = ({ port }) => {
   const t = useTranslations('pipelineEditor')
+  const structure = useGetFrostPortStructure({ port, isEnabled: true })
+  const model = structure.data?.data
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <p className="text-sm">{t(`frostPanel.ports.${port}.description`)}</p>
-      <p className="text-muted-foreground text-xs">
-        <span className="font-medium">{t('frostPanel.expects')}</span> {t(`frostPanel.ports.${port}.expects`)}
-      </p>
+      {model ? (
+        <PortStructureTree model={model} name={port} />
+      ) : (
+        <p className="text-muted-foreground text-xs">
+          <span className="font-medium">{t('frostPanel.expects')}</span> {t(`frostPanel.ports.${port}.expects`)}
+        </p>
+      )}
     </div>
   )
 }

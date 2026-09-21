@@ -1,0 +1,90 @@
+{
+  "$id": "urn:core:platform:civitas:datastructure:frost:Observations:4sntm03fzg",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Observations",
+  "type": "object",
+  "properties": {
+    "observation": {
+      "$ref": "#/$defs/Observation"
+    }
+  },
+  "$defs": {
+    "Observation": {
+      "type": "object",
+      "title": "Observation",
+      "properties": {
+        "result": { },
+        "phenomenonTime": {
+          "type": "string"
+        },
+        "resultTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resultQuality": {
+          "type": "object"
+        },
+        "validTime": {
+          "type": "string"
+        },
+        "parameters": {
+          "$ref": "#/$defs/ObservationParameters"
+        },
+        "FeatureOfInterest": {
+          "$ref": "#/$defs/FeatureOfInterest"
+        }
+      },
+      "required": [
+        "result",
+        "parameters"
+      ]
+    },
+    "ObservationParameters": {
+      "type": "object",
+      "title": "ObservationParameters",
+      "properties": {
+        "reference": {
+          "type": "string",
+          "x-core-primaryKey": true
+        },
+        "thingReference": {
+          "type": "string"
+        },
+        "datastreamReference": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "thingReference",
+        "datastreamReference"
+      ]
+    },
+    "FeatureOfInterest": {
+      "type": "object",
+      "title": "FeatureOfInterest",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "encodingType": {
+          "type": "string"
+        },
+        "feature": {
+          "type": "object"
+        },
+        "properties": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "encodingType",
+        "feature"
+      ]
+    }
+  }
+}

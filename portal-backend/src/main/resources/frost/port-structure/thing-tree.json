@@ -1,0 +1,271 @@
+{
+  "$id": "urn:core:platform:civitas:datastructure:frost:ThingTree:r32e0hmgn1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ThingTree",
+  "type": "object",
+  "properties": {
+    "thing": {
+      "$ref": "#/$defs/Thing"
+    }
+  },
+  "$defs": {
+    "Thing": {
+      "type": "object",
+      "title": "Thing",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "properties": {
+          "$ref": "#/$defs/ThingProperties"
+        },
+        "Locations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Location"
+          }
+        },
+        "Datastreams": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Datastream"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "properties"
+      ]
+    },
+    "ThingProperties": {
+      "type": "object",
+      "title": "ThingProperties",
+      "properties": {
+        "reference": {
+          "type": "string",
+          "x-core-primaryKey": true
+        }
+      },
+      "required": [
+        "reference"
+      ]
+    },
+    "Location": {
+      "type": "object",
+      "title": "Location",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "encodingType": {
+          "type": "string"
+        },
+        "location": {
+          "type": "object"
+        },
+        "properties": {
+          "$ref": "#/$defs/LocationProperties"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "encodingType",
+        "location"
+      ]
+    },
+    "LocationProperties": {
+      "type": "object",
+      "title": "LocationProperties",
+      "properties": {
+        "reference": {
+          "type": "string",
+          "x-core-primaryKey": true
+        }
+      }
+    },
+    "Datastream": {
+      "type": "object",
+      "title": "Datastream",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "observationType": {
+          "type": "string"
+        },
+        "unitOfMeasurement": {
+          "$ref": "#/$defs/UnitOfMeasurement"
+        },
+        "properties": {
+          "$ref": "#/$defs/DatastreamProperties"
+        },
+        "Sensor": {
+          "$ref": "#/$defs/Sensor"
+        },
+        "ObservedProperty": {
+          "$ref": "#/$defs/ObservedProperty"
+        },
+        "Observations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "observationType",
+        "unitOfMeasurement",
+        "properties"
+      ]
+    },
+    "DatastreamProperties": {
+      "type": "object",
+      "title": "DatastreamProperties",
+      "properties": {
+        "reference": {
+          "type": "string",
+          "x-core-primaryKey": true
+        }
+      },
+      "required": [
+        "reference"
+      ]
+    },
+    "UnitOfMeasurement": {
+      "type": "object",
+      "title": "UnitOfMeasurement",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "symbol": {
+          "type": "string"
+        },
+        "definition": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "symbol",
+        "definition"
+      ]
+    },
+    "Sensor": {
+      "type": "object",
+      "title": "Sensor",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "encodingType": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "string"
+        },
+        "properties": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "encodingType",
+        "metadata"
+      ]
+    },
+    "ObservedProperty": {
+      "type": "object",
+      "title": "ObservedProperty",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "definition": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "properties": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "definition",
+        "description"
+      ]
+    },
+    "Observation": {
+      "type": "object",
+      "title": "Observation",
+      "properties": {
+        "result": { },
+        "phenomenonTime": {
+          "type": "string"
+        },
+        "resultTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resultQuality": {
+          "type": "object"
+        },
+        "validTime": {
+          "type": "string"
+        },
+        "FeatureOfInterest": {
+          "$ref": "#/$defs/FeatureOfInterest"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "FeatureOfInterest": {
+      "type": "object",
+      "title": "FeatureOfInterest",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "encodingType": {
+          "type": "string"
+        },
+        "feature": {
+          "type": "object"
+        },
+        "properties": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "encodingType",
+        "feature"
+      ]
+    }
+  }
+}

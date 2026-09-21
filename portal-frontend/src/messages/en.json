@@ -1278,7 +1278,11 @@
           "cost": "6 entities for each record",
           "expects": "properties.reference, Datastreams[].properties.reference"
         }
-      }
+      },
+      "structure": "What a record must carry",
+      "structureHelp": "* marks a field a record must carry. “Reference” marks the field the port finds the entity by.",
+      "required": "Mandatory",
+      "reference": "Reference"
     },
     "geoPersistencePanel": {
       "title": "Geospatial Data Storage",

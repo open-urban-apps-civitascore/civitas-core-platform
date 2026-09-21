@@ -1265,7 +1265,11 @@
           "cost": "6 Entitäten je Datensatz",
           "expects": "properties.reference, Datastreams[].properties.reference"
         }
-      }
+      },
+      "structure": "Was ein Datensatz enthalten muss",
+      "structureHelp": "* kennzeichnet ein Pflichtfeld. „Referenz\" kennzeichnet das Feld, über das der Port die Entität wiederfindet.",
+      "required": "Pflichtfeld",
+      "reference": "Referenz"
     },
     "geoPersistencePanel": {
       "title": "Geodaten-Speicher",
