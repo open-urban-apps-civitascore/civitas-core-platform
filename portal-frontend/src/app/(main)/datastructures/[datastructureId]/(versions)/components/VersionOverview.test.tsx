@@ -960,6 +960,33 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(contractErrors('datastructure', data.model)).toEqual([])
     })
 
+    it('publishes a one-class structure whose root was designated in the inspector', async () => {
+      const user = userEvent.setup()
+      renderComponent({ version: versionWithSelectedNode })
+
+      await user.click(screen.getByRole('checkbox', { name: /Root class/ }))
+      await openStatusDropdown(user)
+      await user.click(screen.getByTestId('statusOption-available'))
+      await user.click(screen.getByTestId('confirmButton'))
+
+      await waitFor(() => expect(mockStatusUpdateMutateAsync).toHaveBeenCalled())
+      expect(mockStatusUpdateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/release`,
+        }),
+      )
+
+      // The field update carries the artifact; the release call itself sends no body.
+      const { data, defs } = savedDefs()
+      expect(data.styles?.nodes[0].data.element.isRoot).toBe(true)
+      expect(Object.keys(defs)).toEqual(['TestClass'])
+
+      const rootId = (defs.TestClass as { $id?: string }).$id
+      expect(rootId).toMatch(/^urn:core:.*:element:.*:TestClass:/)
+      expect((data.model as { $ref?: string }).$ref).toBe(rootId)
+      expect(contractErrors('datastructure', data.model)).toEqual([])
+    })
+
     it('saves a class added on the canvas into the CORE model', async () => {
       const user = userEvent.setup()
       // The designation is what keeps the export unambiguous once a second, unconnected class exists.
