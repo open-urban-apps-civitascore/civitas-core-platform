@@ -11,12 +11,15 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import de.civitascore.portal.util.TestContainerImages;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -25,12 +28,19 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 import tools.jackson.core.type.TypeReference;
@@ -90,6 +100,7 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
   @Autowired private DataSetService dataSetService;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private InfraTestDataFactory data;
+  @Autowired private ObjectProvider<AllowedScopes> allowedScopesProvider;
   private SagaInfraVerifier verifier;
 
   @BeforeAll
@@ -115,14 +126,35 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
     registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
   }
 
+  /**
+   * Stage and release authorize the referenced Data sources, which reads the request-scoped {@link
+   * AllowedScopes}. Calling the service off a web request leaves that scope unbound.
+   */
   @BeforeEach
   void initHelpers() {
     verifier = new SagaInfraVerifier(dataSetRepository, frostExternalUrl);
+
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest()));
+    allowedScopesProvider.getObject().setWildcard();
+
+    PrincipalUserDetails principal =
+        PrincipalUserDetails.builder()
+            .userId(UUID.randomUUID())
+            .username("geo-saga-test")
+            .authorities(List.of())
+            .build();
+    SecurityContext context = SecurityContextHolder.createEmptyContext();
+    context.setAuthentication(
+        UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of()));
+    SecurityContextHolder.setContext(context);
   }
 
   @AfterEach
   void cleanDb() {
     data.cleanAll();
+    SecurityContextHolder.clearContext();
+    RequestContextHolder.resetRequestAttributes();
   }
 
   @AfterAll
