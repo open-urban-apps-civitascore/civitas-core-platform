@@ -1,6 +1,6 @@
 {
   "welcome": {
-    "title": "Willkommen in CIVITAS/CORE V2 Beta",
+    "title": "Willkommen in CIVITAS/CORE V2",
     "subtitle": "Neu hier?",
     "docsButton": "Dokumentation",
     "recommendedWorkflow": {
@@ -1379,7 +1379,7 @@
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
       "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
-      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt.",
+      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datenpool nicht erlaubt.",
       "tableNameConflict": "{names} kann nicht gespeichert werden: Ein Geo-Persistenz-Tabellenname wird bereits von einem anderen Datenspeicher dieses Datensatzes verwendet.",
       "dataSinkInUseError": "{names} kann nicht gespeichert werden: Ein Datenspeicher wird noch von mindestens einem Layer verwendet.",
       "unconfirmedDataLossError": "{names} kann nicht gespeichert werden: Die Änderung verwirft gespeicherte Daten.",

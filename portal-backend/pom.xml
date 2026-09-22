@@ -46,10 +46,7 @@
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
-        <!-- Pinned to this merge request's config-adapter snapshot: the branch changes
-             config-adapter, so portal-backend has to resolve the adapter artifacts built for it
-             rather than another branch's. CI overrides it with -Dconfig-adapter.version. -->
-        <config-adapter.version>1.0.2-MR-788-SNAPSHOT</config-adapter.version>
+        <config-adapter.version>1.0.2-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
         <at.yawk.lz4.version>1.11.2</at.yawk.lz4.version>
         <!-- develop's snapshot, so a flagless build (generate-graph-backend, a fresh clone)
