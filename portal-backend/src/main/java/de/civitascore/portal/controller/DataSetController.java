@@ -83,7 +83,12 @@ public class DataSetController
             @Schema(
                 type = "string",
                 example =
-                    "550e8400-e29b-41d4-a716-446655440000,3fa85f64-5717-4562-b3fc-2c963f66afa6"))
+                    "550e8400-e29b-41d4-a716-446655440000,3fa85f64-5717-4562-b3fc-2c963f66afa6")),
+    @Parameter(
+        name = "includePendingDelete",
+        description = "Include datasets with pendingSagaType DELETE. Defaults to false.",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "boolean", defaultValue = "false", example = "true"))
   })
   /**
    * Retrieves a paginated list of datasets with optional filtering by name, description, or

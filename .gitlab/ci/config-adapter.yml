@@ -33,6 +33,12 @@ setup-version-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+  before_script:
+    # This job runs in .pre, so it is the only point in the pipeline where the cached repository
+    # holds no artifact any later job still needs: build-config-adapter reinstalls them, and the
+    # shards take them from its artifact. Dropping them here keeps the cache from carrying every
+    # version ever built, while the third-party dependencies it exists for stay put.
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core
   script:
     - cd config-adapter
     # Extract base version from pom.xml
@@ -83,6 +89,7 @@ generate-graph-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    policy: pull
   script:
     - cd config-adapter
     # Only generate dependency tree, no compilation needed
@@ -108,6 +115,7 @@ lint-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    policy: pull
   script:
     - cd config-adapter
     - mvn spotless:check -Drevision=$CONFIG_ADAPTER_VERSION
@@ -127,6 +135,7 @@ dependency-prune-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    policy: pull
   script:
     - cd config-adapter
     - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Drevision=$CONFIG_ADAPTER_VERSION -DfailOnWarning=true -DignoreNonCompile=false
@@ -150,6 +159,7 @@ test-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    policy: pull
   script:
     - cd config-adapter
     - mvn $MAVEN_CLI_OPTS test -Drevision=$CONFIG_ADAPTER_VERSION -T 2
@@ -211,6 +221,7 @@ test-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    policy: pull
   script:
     - cd config-adapter
     # Explicit goals keep package, spotless and spotbugs out of this job.
@@ -256,6 +267,9 @@ build-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    # Keeps the default pull-push: this job installs into the local repo, so it is the one
+    # that has to write the cache back. The read-only jobs declare policy: pull instead, or
+    # each would re-upload the whole repository under the shared key.
   script:
     - cd config-adapter
     # The artifacts must land in the local repo, because the integration shards resolve inter-module
@@ -268,8 +282,14 @@ build-config-adapter:
       - config-adapter/*/target/classes/
       - config-adapter/*/target/test-classes/
       - config-adapter/*/target/*.jar
-      # The integration shards resolve inter-module dependencies from here.
-      - .m2/repository/de/civitas-core/
+      # The integration shards resolve inter-module dependencies from here. The cache this job
+      # restores is keyed on config-adapter/pom.xml alone, so it carries every version any MR has
+      # ever installed; only the version built here is needed downstream.
+      - .m2/repository/de/civitas-core/*/$CONFIG_ADAPTER_VERSION/
+    exclude:
+      # Already uploaded from config-adapter-application/target/, and the shade plugin makes it the
+      # largest single file in the archive.
+      - .m2/repository/de/civitas-core/config-adapter-application/*/*.jar
     expire_in: 1 month
 
 # Publish config-adapter artifacts to GitLab Maven repository
@@ -339,6 +359,7 @@ publish-config-adapter:
         - config-adapter/pom.xml
     paths:
       - .m2/repository
+    policy: pull
   script:
     - cd config-adapter
     # Deploy to GitLab Maven repository
