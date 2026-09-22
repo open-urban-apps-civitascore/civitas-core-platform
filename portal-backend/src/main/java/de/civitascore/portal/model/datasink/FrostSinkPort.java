@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * The write logic of a FROST DataSink. A port declares the data model it expects, the write
@@ -34,6 +35,11 @@ public enum FrostSinkPort {
   @JsonValue
   public String label() {
     return label;
+  }
+
+  /** The labels of the closed set, for a message that has to name the choices. */
+  public static List<String> labels() {
+    return Arrays.stream(values()).map(FrostSinkPort::label).toList();
   }
 
   /**

@@ -1,6 +1,7 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
+import de.civitascore.portal.model.datasink.FrostSinkPort;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -366,19 +367,53 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     }
   }
 
+  /** The keys a FROST configuration may carry. */
+  private static final Set<String> FROST_CONFIGURATION_KEYS = Set.of("port", "element");
+
   /**
-   * A FROST configuration is empty (passthrough) or references exactly the mapping's Thing-shaped
-   * target structure — any other key would silently be dropped by the deploy engine.
+   * A FROST configuration holds the port the sink writes through and, when a Mapping feeds it, the
+   * element URN of that Mapping's target structure. Any other key would silently be dropped by the
+   * deploy engine.
+   *
+   * <p>An empty configuration stays valid: the editor creates the node before the modeller picks a
+   * port, and a Data sink that predates the port has none either. What a missing port costs is
+   * decided at publish time — a Dataset does not release without one.
    */
   private void validateFrostConfiguration(Map<String, Object> config) {
     if (config == null || config.isEmpty()) {
       return;
     }
-    if (!config.keySet().equals(Set.of("element"))) {
+    if (!FROST_CONFIGURATION_KEYS.containsAll(config.keySet())) {
       throw new InvalidInputException(
-          "DataSink", "configuration", "FROST sinks accept only an optional element URN");
+          "DataSink",
+          "configuration",
+          "FROST sinks accept only a port and an optional element URN");
     }
-    requireExistingElement(config.get("element"));
+    if (config.containsKey("port")) {
+      requireKnownPort(config.get("port"));
+    }
+    if (config.containsKey("element")) {
+      requireExistingElement(config.get("element"));
+    }
+  }
+
+  /**
+   * The port names the closed set. An unknown one must not reach the deploy engine, where it
+   * becomes a processor property.
+   */
+  private void requireKnownPort(Object port) {
+    if (!(port instanceof String label)) {
+      throw new InvalidInputException(
+          "DataSink", "configuration.port", "The port must be one of: " + FrostSinkPort.labels());
+    }
+    try {
+      FrostSinkPort.of(label);
+    } catch (IllegalArgumentException e) {
+      throw new InvalidInputException(
+          "DataSink",
+          "configuration.port",
+          "Unknown port '" + label + "'. It must be one of: " + FrostSinkPort.labels());
+    }
   }
 
   private void validatePostgisConfiguration(Map<String, Object> config) {
