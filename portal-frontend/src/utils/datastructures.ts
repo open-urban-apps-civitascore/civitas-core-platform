@@ -1,7 +1,9 @@
 import { diagramFromJsonSchema, SchemaImportError } from '@/components/uml-modeler/services/jsonSchemaImportService'
+import { versionToSchemaTree } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_components/mapping-editor/schema/versionTree'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
 import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { DirtyField } from '@/components/uml-modeler/types/session'
+import { SelectOption } from '@/types/common'
 import {
   Datastructure,
   DATASTRUCTURE_STATUS_TYPES,
@@ -157,4 +159,11 @@ export const buildSessionFromVersion = (
     lastModified: diagram?.lastModified || fallbackSession.lastModified,
     created: created || diagram?.lastModified || fallbackSession.created,
   }
+}
+
+export const getDatastructureFieldOptions = (
+  version: Pick<DatastructureVersion, 'model' | 'styles' | 'modelName'> | undefined,
+): SelectOption[] => {
+  const { tree } = versionToSchemaTree(version, version?.modelName ?? '')
+  return tree.fields.map(field => ({ value: field.name, label: field.name }))
 }
