@@ -14,11 +14,29 @@ import com.fasterxml.jackson.databind.JsonNode;
 /**
  * One answer inside a batch response.
  *
- * @param id the identifier of the sub-request FROST answers; it is not unique in a document
+ * @param id the identifier of the sub-request FROST answers; it is not unique in a document, and it
+ *     is null when FROST names no sub-request, which it does for the requests it skips after a
+ *     failure inside an atomicity group and for a document it cannot read
  * @param status the HTTP status of that sub-request
  * @param body the answer body, or null when the sub-request answered without one
  */
 public record SubResponse(String id, int status, JsonNode body) {
+
+  /** Whether the answer names the sub-request it belongs to. */
+  public boolean identified() {
+    return id != null;
+  }
+
+  /**
+   * Whether FROST reports that it did not run the sub-request because its {@code if} did not hold.
+   * The answer is a success, and it stands for a write that never happened.
+   */
+  public boolean skippedByCondition() {
+    return successful()
+        && body != null
+        && body.isTextual()
+        && body.asText().startsWith("Skipped due to");
+  }
 
   /** Whether the status says the sub-request did what it was asked to do. */
   public boolean successful() {

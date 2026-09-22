@@ -38,7 +38,7 @@ public final class ThingsPort implements PortPlanner {
         StaEntities.THING,
         UPDATE,
         BatchMethod.PATCH,
-        FrostUrls.entity("Things", SubRequest.reference(plan.id(LOOKUP))),
+        SubRequest.reference(plan.id(LOOKUP)),
         SubRequest.ifResolved(plan.id(LOOKUP)),
         // SensorThings rejects a navigation member in a PATCH, so the update carries the Thing's
         // own fields only. The create keeps the record as it arrived, which leaves a deep insert

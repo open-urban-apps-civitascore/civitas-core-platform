@@ -3,13 +3,13 @@
     "id" : "r0-thing",
     "atomicityGroup" : "r0",
     "method" : "get",
-    "url" : "Projects(5)/Things?$select=id&$top=1&$filter=properties/reference%20eq%20'A7'"
+    "url" : "Projects(5)/Things?$select=id&$top=1&$filter=properties/reference eq 'A7'"
   }, {
     "id" : "r0-thing-update",
     "atomicityGroup" : "r0",
     "if" : "$r0-thing",
     "method" : "patch",
-    "url" : "Things($r0-thing)",
+    "url" : "$r0-thing",
     "body" : {
       "name" : "Station A7",
       "description" : "Weather station",
@@ -36,13 +36,13 @@
     "id" : "r0-loc",
     "atomicityGroup" : "r0",
     "method" : "get",
-    "url" : "Locations?$select=id&$top=1&$filter=properties/reference%20eq%20'A7'%20and%20properties/thingReference%20eq%20'A7'%20and%20Things/Projects/id%20eq%205"
+    "url" : "$r0-thing/Locations?$select=id&$top=1&$filter=properties/reference eq 'A7'"
   }, {
     "id" : "r0-loc-update",
     "atomicityGroup" : "r0",
     "if" : "$r0-loc",
     "method" : "patch",
-    "url" : "Locations($r0-loc)",
+    "url" : "$r0-loc",
     "body" : {
       "name" : "A7 site",
       "encodingType" : "application/geo+json",
@@ -80,13 +80,13 @@
     "id" : "r0-ds",
     "atomicityGroup" : "r0",
     "method" : "get",
-    "url" : "Datastreams?$select=id&$top=1&$filter=properties/reference%20eq%20'temp'%20and%20properties/thingReference%20eq%20'A7'%20and%20Thing/Projects/id%20eq%205"
+    "url" : "Datastreams?$select=id&$top=1&$filter=properties/reference eq 'temp' and properties/thingReference eq 'A7' and Thing/Projects/id eq 5"
   }, {
     "id" : "r0-ds-update",
     "atomicityGroup" : "r0",
     "if" : "$r0-ds",
     "method" : "patch",
-    "url" : "Datastreams($r0-ds)",
+    "url" : "$r0-ds",
     "body" : {
       "name" : "Air temperature",
       "description" : "Air temperature at A7",
@@ -106,13 +106,13 @@
     "atomicityGroup" : "r0",
     "if" : "$r0-ds",
     "method" : "get",
-    "url" : "Datastreams($r0-ds)/Sensor?$select=id"
+    "url" : "$r0-ds/Sensor?$select=id"
   }, {
     "id" : "r0-ds-sensor-update",
     "atomicityGroup" : "r0",
     "if" : "$r0-ds-sensor",
     "method" : "patch",
-    "url" : "Sensors($r0-ds-sensor)",
+    "url" : "$r0-ds-sensor",
     "body" : {
       "name" : "DS18B20",
       "description" : "Air temperature sensor",
@@ -124,13 +124,13 @@
     "atomicityGroup" : "r0",
     "if" : "$r0-ds",
     "method" : "get",
-    "url" : "Datastreams($r0-ds)/ObservedProperty?$select=id"
+    "url" : "$r0-ds/ObservedProperty?$select=id"
   }, {
     "id" : "r0-ds-op-update",
     "atomicityGroup" : "r0",
     "if" : "$r0-ds-op",
     "method" : "patch",
-    "url" : "ObservedProperties($r0-ds-op)",
+    "url" : "$r0-ds-op",
     "body" : {
       "name" : "Temperature",
       "definition" : "http://dd.eionet.europa.eu/vocabulary/aq/meteoparameter/54",
