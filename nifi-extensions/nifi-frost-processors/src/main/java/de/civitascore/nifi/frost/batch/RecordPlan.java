@@ -48,7 +48,25 @@ public final class RecordPlan {
 
   /** Adds a lookup of a reference the record does not own. An empty result fails the record. */
   public void parentLookup(String entity, String idSuffix, String url) {
-    add(SubRequestRole.PARENT_LOOKUP, entity, idSuffix, BatchMethod.GET, url, null, null);
+    add(SubRequestRole.PARENT_LOOKUP, entity, idSuffix, BatchMethod.GET, url, null, null, null);
+  }
+
+  /**
+   * Adds a lookup of something the record needs but does not write, which runs only under a
+   * condition and names its own reason when it finds nothing — for a precondition FROST would
+   * otherwise report as an unexplained 400.
+   */
+  public void parentLookup(
+      String entity, String idSuffix, String url, String condition, String missReason) {
+    add(
+        SubRequestRole.PARENT_LOOKUP,
+        entity,
+        idSuffix,
+        BatchMethod.GET,
+        url,
+        condition,
+        null,
+        missReason);
   }
 
   /** Adds a lookup of the record's own reference. An empty result lets the create run. */
@@ -58,7 +76,7 @@ public final class RecordPlan {
 
   /** Adds a lookup of the record's own reference that runs only under a condition. */
   public void ownLookup(String entity, String idSuffix, String url, String condition) {
-    add(SubRequestRole.OWN_LOOKUP, entity, idSuffix, BatchMethod.GET, url, condition, null);
+    add(SubRequestRole.OWN_LOOKUP, entity, idSuffix, BatchMethod.GET, url, condition, null, null);
   }
 
   /**
@@ -78,7 +96,7 @@ public final class RecordPlan {
       String condition,
       JsonNode body,
       boolean required) {
-    add(SubRequestRole.WRITE, entity, idSuffix, method, url, condition, body);
+    add(SubRequestRole.WRITE, entity, idSuffix, method, url, condition, body, null);
     if (required) {
       entitiesRequiringWrite.add(entity);
     }
@@ -91,7 +109,8 @@ public final class RecordPlan {
       BatchMethod method,
       String url,
       String condition,
-      JsonNode body) {
+      JsonNode body,
+      String missReason) {
     requests.add(
         new SubRequest(
             id(idSuffix),
@@ -101,7 +120,8 @@ public final class RecordPlan {
             method,
             url,
             condition,
-            body));
+            body,
+            missReason));
   }
 
   public List<SubRequest> requests() {

@@ -89,14 +89,61 @@ entity, and patches it a second time.
 
 ```json
 {"id": "r0-thing", "atomicityGroup": "r0", "method": "get",
- "url": "Projects(5)/Things?$select=id&$top=1&$filter=properties/reference%20eq%20'A7'"}
+ "url": "Projects(5)/Things?$select=id&$top=1&$filter=properties/reference eq 'A7'"}
 {"id": "r0-thing-update", "atomicityGroup": "r0", "if": "$r0-thing",
- "method": "patch", "url": "Things($r0-thing)", "body": {}}
+ "method": "patch", "url": "$r0-thing", "body": {}}
 {"id": "r0-thing", "atomicityGroup": "r0", "if": "not $r0-thing",
  "method": "post", "url": "Projects(5)/Things", "body": {}}
 ```
 
+Every lookup is **scoped to the Dataset**. A reference is local to its Dataset, and two Datasets
+may model the same device under the same one. Things are looked up inside the Dataset's FROST
+project (`Projects(5)/Things`), Datastreams through their Thing's project
+(`Thing/Projects/id eq 5`). Locations belong to no project, so their lookup runs through the Thing
+just resolved: `$r0-thing/Locations?$filter=properties/reference eq 'A7'`. A direct query on
+`/Locations` would find the Location another Dataset wrote, patch it, and leave this Thing without
+one — and FROST then refuses every measurement of that Thing, because it has no position to derive
+a FeatureOfInterest from.
+
+A back-reference in a URL stands at the **start**, where FROST replaces it with the self link of
+the entity: `$r0-thing` becomes `/Things(5)`, and `$r0-ds/Sensor` becomes `/Datastreams(7)/Sensor`.
+Written inside a path segment — `Things($r0-thing)` — it is not replaced at all, and FROST looks
+for an entity whose identifier is the text of the reference. In a body the reference is a JSON
+string of its own, `"$r0-thing"`, which FROST replaces with the identifier value.
+
+The URL of a sub-request carries **no percent-encoding**. FROST decodes the query string of an
+HTTP request, but hands the URL of a batch item to the query parser as it stands, and that parser
+knows a space as a separator and `%20` as three characters of a name. So the separators are
+spaces, and a value inside a filter is quoted with its quotation mark doubled and nothing else
+escaped — which is safe, because the string literal of the grammar ends at the next single
+quotation mark.
+
 Source: [JSON batch requests](https://fraunhoferiosb.github.io/FROST-Server/extensions/JsonBatchRequest.html).
+
+### Which failures are retried
+
+A record goes to `retry` when it may succeed later without a change, and to `failure` when it would
+get the same answer again:
+
+| Case | Relationship |
+|---|---|
+| Transport error, timeout, batch answer 5xx, 408 or 429 | `retry` |
+| Datastream or Thing not found | `retry` |
+| Thing without a Location, so FROST cannot generate a FeatureOfInterest | `retry` |
+| 5xx for one sub-request | `retry` |
+| Validation error, record without a reference, document FROST cannot read | `failure` |
+
+The second and third rows are the case of two Pipelines on one Dataset: measurements may arrive
+before the Pipeline that writes the Things and Datastreams has run. The third one needs a check of
+its own. FROST refuses such a write with a 400 whose reason the batch drops — indistinguishable from
+a broken record — so the `Observations` port asks first, `$r0-ds/Thing/Locations?$top=1`, and the
+write waits for that answer. A measurement that brings its own FeatureOfInterest skips the check.
+
+The retry itself is NiFi's: the flow marks `retry` as a retried relationship with growing back-off
+(see `put_frost_record.json` in the config-adapter), and a record reaches the error sink only once
+the attempts are spent. NiFi retries each FlowFile on its own, so the written records of a batch are
+not sent again. It resets the attributes on every attempt; the `frost.error.*` attributes a record
+carries into the error sink are those of the last one.
 
 ### What the tests prove, and what they do not
 
@@ -105,12 +152,21 @@ document the processor builds and nothing about how a server reads it. `PutFrost
 that gap for the three assumptions that are the batch endpoint's behaviour: it asserts entities in
 FROST, not sub-requests in a document.
 
-- A back-reference in the path of a PATCH, `Things($r0-thing)`, and in a single-valued navigation,
-  `Datastreams($r0-ds)/Sensor` — covered by the upsert tests and the ThingTree test.
-- What a sub-request whose `if` did not hold leaves in the response. The division reads an absent
-  answer as "did not run"; an answer carrying a status would be read the same way, because it is
-  bound by identifier and order together. A defect here shows up as a record on `failure` although
-  its entity was written, which the second-delivery tests would catch.
+- A back-reference as the whole URL of a PATCH, `$r0-thing`, and as the first segment of a
+  single-valued navigation, `$r0-ds/Sensor` — covered by the upsert tests and the ThingTree test.
+  The unit tests pin the two shapes; that FROST resolves them is what the integration test adds.
+- That the URL of a sub-request reaches the query parser undecoded. Every lookup of every port
+  depends on it: a percent-encoded separator makes FROST reject the filter, and the record fails
+  with a parse error instead of finding its entity.
+- What a sub-request whose `if` did not hold leaves in the response. FROST answers it with its
+  identifier, status 200 and the body `"Skipped due to if."`. The division reads that as "did not
+  run" rather than as a write, so an upsert whose two halves were both skipped still reports the
+  record as unwritten.
+- What the rest of an atomicity group leaves in the response after one sub-request of the group
+  failed. FROST answers each of them with status 400 and **no identifier**, and it answers a
+  document it cannot read at all the same way. Those answers bind to no request; they carry the
+  reason for a record that saw no write of its own. Rejecting the whole document over them would
+  lose every record of the batch, written or not.
 
 One assumption stays open: **the batch size a server accepts.** The specification names none, and
 the cap of 100 here is a guard rather than a measurement. The integration test sends three records

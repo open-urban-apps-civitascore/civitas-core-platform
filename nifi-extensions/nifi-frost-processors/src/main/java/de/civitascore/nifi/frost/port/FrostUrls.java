@@ -20,16 +20,18 @@ import java.util.List;
  * block buys: the entity carries {@code thingReference} itself, so the filter is a direct query on
  * the collection and does not depend on a sub-request before it. A back-reference appears only
  * where the identifier of an entity is required, which is the path of a PATCH and of a
- * single-valued navigation.
+ * single-valued navigation. There it is the URL itself, or its first segment — see {@link
+ * de.civitascore.nifi.frost.batch.SubRequest#reference(String)}.
  *
- * <p>The separators are percent-encoded rather than written as spaces. FROST decodes the URL before
- * it parses the filter, so both forms arrive the same, and the encoded one survives a strict URL
- * parser on the way.
+ * <p>The separators are written as spaces. The URL of a batch sub-request reaches the query parser
+ * as it stands: FROST decodes the query string of an HTTP request, but not the URL of a batch item,
+ * and the grammar of the parser knows a space as a separator and {@code %20} as three characters of
+ * a name.
  */
 public final class FrostUrls {
 
-  private static final String AND = "%20and%20";
-  private static final String EQ = "%20eq%20";
+  private static final String AND = " and ";
+  private static final String EQ = " eq ";
 
   /**
    * Answers the identifier alone, and only the first entity, which is the one a reference names.
@@ -48,13 +50,20 @@ public final class FrostUrls {
     return things(projectId) + LOOKUP_OPTIONS + filter(term("properties/reference", reference));
   }
 
-  /** A Location by its reference, scoped to its Thing. */
-  public static String locationLookup(String reference, String thingReference) {
-    return "Locations"
+  /**
+   * A Location by its reference, among the Locations of one Thing. The Thing is named by the
+   * back-reference of its own lookup, so the query cannot reach beyond it.
+   *
+   * <p>A query on the {@code Locations} collection with {@code thingReference} would not be scoped
+   * at all: Locations belong to no project, and a reference is local to its Dataset, so two
+   * Datasets that model the same device share it. The second one would find the first one's
+   * Location, patch it, and leave its own Thing without one.
+   */
+  public static String locationLookup(String thingBackReference, String reference) {
+    return thingBackReference
+        + "/Locations"
         + LOOKUP_OPTIONS
-        + filter(
-            term("properties/reference", reference),
-            term("properties/thingReference", thingReference));
+        + filter(term("properties/reference", reference));
   }
 
   /**
@@ -83,14 +92,21 @@ public final class FrostUrls {
             scope(projectId, "Datastream/Thing/Projects/id"));
   }
 
-  /** One entity of a collection, addressed by an identifier or by a back-reference to one. */
-  public static String entity(String collection, String id) {
-    return collection + "(" + id + ")";
+  /**
+   * One Location of the Thing a Datastream belongs to — whether the Thing has a position at all.
+   * FROST derives the FeatureOfInterest of a measurement from it when the measurement brings none.
+   */
+  public static String positionOfThing(String datastreamBackReference) {
+    return datastreamBackReference + "/Thing/Locations?$select=id&$top=1";
   }
 
-  /** A single-valued navigation of one entity, answering the identifier alone. */
-  public static String navigation(String collection, String id, String navigation) {
-    return entity(collection, id) + "/" + navigation + "?$select=id";
+  /**
+   * A single-valued navigation of the entity a back-reference names, answering the identifier
+   * alone. The reference stands at the start, because that is the only place FROST reads one in a
+   * URL.
+   */
+  public static String navigation(String reference, String navigation) {
+    return reference + "/" + navigation + "?$select=id";
   }
 
   private static String term(String path, String value) {
