@@ -30,12 +30,12 @@ import org.springframework.stereotype.Component;
  * carry a release. Provisioning configures NiFi, FROST, PostGIS, GeoServer and APISIX, so an
  * artifact that proves unusable afterwards has to be undone through saga compensation.
  *
- * <p>What participates is decided by the flow, not by Dataset membership. Data sources come from
- * the Pipeline's host relation. The registry walk starts at each Pipeline's model and follows its
- * recorded references. Pipeline content is never parsed, and a Dataset member that no flow reaches
- * does not block it.
+ * <p>A Pipeline with a stored model participates; one without contributes no flow. Its Data sources
+ * are the ones referenced on the Pipeline itself, and the registry walk starts at its model and
+ * follows the recorded references. Pipeline content is never parsed, and a Dataset member that no
+ * flow reaches does not block it.
  *
- * <p>Every Data source must be readable by the caller and AVAILABLE. Every registry artifact must
+ * <p>Every Data source of a participating Pipeline must be AVAILABLE. Every registry artifact must
  * resolve. An artifact with a Data structure version row must also be readable and released. The
  * row, not the URN's kind, gives it a lifecycle and a Scope. An artifact without a row is held to
  * resolvability alone. Elements are reusable, so inheriting a lifecycle would block a shared
@@ -65,15 +65,14 @@ public class PipelineClosureValidator {
       return;
     }
     Set<UUID> offending = new LinkedHashSet<>();
-    // Keep one verdict per resource for the whole call. Several versions and flows can reach the
-    // same resource, and each decision otherwise reads the caller's Assignments again.
+    // Keep one verdict per structure for the whole call. Several versions and flows can reach the
+    // same structure, and each decision otherwise reads the caller's Assignments again.
     Map<UUID, Boolean> structureReadability = new HashMap<>();
-    Map<UUID, Boolean> dataSourceReadability = new HashMap<>();
     for (Pipeline pipeline : pipelines) {
       if (pipeline.getModelUrn() == null || pipeline.getModelUrn().isBlank()) {
         continue;
       }
-      if (flowBlocks(pipeline, structureReadability, dataSourceReadability)) {
+      if (flowBlocks(pipeline, structureReadability)) {
         offending.add(pipeline.getId());
       }
     }
@@ -85,14 +84,11 @@ public class PipelineClosureValidator {
   /**
    * Whether this flow blocks a release. The reply names only the Pipeline; WARN logs give detail.
    */
-  private boolean flowBlocks(
-      Pipeline pipeline,
-      Map<UUID, Boolean> structureReadability,
-      Map<UUID, Boolean> dataSourceReadability) {
+  private boolean flowBlocks(Pipeline pipeline, Map<UUID, Boolean> structureReadability) {
     ModelRegistryGateway.ArtifactClosure closure =
         modelRegistryGateway.closure(pipeline.getModelUrn(), properties.maxDepth());
 
-    boolean blocks = dataSourcesBlock(pipeline, dataSourceReadability);
+    boolean blocks = dataSourcesBlock(pipeline);
     if (closure.truncated()) {
       // Passing here would report "nothing found" for a flow nobody walked to its end.
       log.warn(
@@ -123,16 +119,15 @@ public class PipelineClosureValidator {
     return blocks;
   }
 
-  private boolean dataSourcesBlock(Pipeline pipeline, Map<UUID, Boolean> readability) {
+  /**
+   * Whether a Data source of this flow blocks a release. The status is a field of an entity the
+   * caller put on the Pipeline, so no permission on the Data source is required to read it: the
+   * picker endpoint already discloses id and name under DATASET_UPDATE.
+   */
+  private boolean dataSourcesBlock(Pipeline pipeline) {
     boolean blocks = false;
     for (DataSource dataSource : pipeline.getDataSources()) {
-      if (!isReadable(dataSource, readability)) {
-        log.warn(
-            "Closure validation: caller may not read data source {} reached by pipeline {}",
-            dataSource.getId(),
-            pipeline.getId());
-        blocks = true;
-      } else if (dataSource.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
+      if (dataSource.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
         log.warn(
             "Closure validation: data source {} reached by pipeline {} is still a draft",
             dataSource.getId(),
@@ -141,11 +136,6 @@ public class PipelineClosureValidator {
       }
     }
     return blocks;
-  }
-
-  private boolean isReadable(DataSource dataSource, Map<UUID, Boolean> readability) {
-    return readability.computeIfAbsent(
-        dataSource.getId(), dataSourceId -> decideReadable(ScopeType.DATASOURCE, dataSourceId));
   }
 
   /**
@@ -191,12 +181,9 @@ public class PipelineClosureValidator {
   }
 
   private boolean decideReadable(DataStructureVersion version) {
-    return decideReadable(ScopeType.DATASTRUCTURE, version.getDataStructure().getId());
-  }
-
-  private boolean decideReadable(ScopeType scopeType, UUID scopeId) {
     try {
-      scopeAccessAuthorizer.authorizeReferences(scopeType, Set.of(scopeId));
+      scopeAccessAuthorizer.authorizeReferences(
+          ScopeType.DATASTRUCTURE, Set.of(version.getDataStructure().getId()));
       return true;
     } catch (AccessDeniedException denied) {
       return false;

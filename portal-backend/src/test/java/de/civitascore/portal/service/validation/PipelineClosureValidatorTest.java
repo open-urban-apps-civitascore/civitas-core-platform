@@ -193,20 +193,16 @@ class PipelineClosureValidatorTest {
     }
 
     @Test
-    @DisplayName("decides a data source's readability once, however many flows use it")
-    void dataSourceReadabilityIsDecidedOncePerCall() {
-      DataSource dataSource = dataSource(DataSourceStatus.AVAILABLE);
-      Pipeline first = pipeline(pipelineId, PIPELINE_URN);
-      first.setDataSources(Set.of(dataSource));
-      Pipeline second = pipeline(UUID.randomUUID(), OTHER_PIPELINE_URN);
-      second.setDataSources(Set.of(dataSource));
+    @DisplayName("reads no Assignment to judge a data source, whatever its status")
+    void dataSourceStatusNeedsNoAuthorization() {
+      Pipeline pipeline = pipeline(pipelineId, PIPELINE_URN);
+      pipeline.setDataSources(Set.of(dataSource(DataSourceStatus.DRAFT)));
       closureOf(PIPELINE_URN, Set.of(), Set.of());
-      closureOf(OTHER_PIPELINE_URN, Set.of(), Set.of());
 
-      validator().validate(List.of(first, second));
+      assertThatThrownBy(() -> validator().validate(List.of(pipeline)))
+          .isInstanceOf(PipelineClosureValidationException.class);
 
-      verify(scopeAccessAuthorizer, times(1))
-          .authorizeReferences(ScopeType.DATASOURCE, Set.of(dataSource.getId()));
+      verify(scopeAccessAuthorizer, never()).authorizeReferences(eq(ScopeType.DATASOURCE), any());
     }
 
     @Test
@@ -301,7 +297,7 @@ class PipelineClosureValidatorTest {
     }
 
     @Test
-    @DisplayName("a released, readable data source passes")
+    @DisplayName("a released data source passes")
     void anAvailableDataSourcePasses() {
       Pipeline pipeline = pipeline(pipelineId, PIPELINE_URN);
       pipeline.setDataSources(Set.of(dataSource(DataSourceStatus.AVAILABLE)));
@@ -486,33 +482,6 @@ class PipelineClosureValidatorTest {
                   assertThat(blockedPipelinesOf(thrown))
                       .as("a draft reason would confirm the structure exists")
                       .containsExactly(pipelineId));
-    }
-
-    @Test
-    @DisplayName("an unreadable data source blocks without disclosing its lifecycle")
-    void unreadableDataSourceBlocksBeforeItsStatusIsExamined() {
-      DataSource dataSource = dataSource(DataSourceStatus.DRAFT);
-      Pipeline pipeline = pipeline(pipelineId, PIPELINE_URN);
-      pipeline.setDataSources(Set.of(dataSource));
-      closureOf(PIPELINE_URN, Set.of(), Set.of());
-      doThrow(new AccessDeniedException("denied"))
-          .when(scopeAccessAuthorizer)
-          .authorizeReferences(ScopeType.DATASOURCE, Set.of(dataSource.getId()));
-
-      List<ILoggingEvent> warnings =
-          captureWarnings(
-              () ->
-                  assertThatThrownBy(() -> validator().validate(List.of(pipeline)))
-                      .isInstanceOf(PipelineClosureValidationException.class)
-                      .hasMessageNotContaining(dataSource.getId().toString()));
-
-      assertThat(warnings)
-          .extracting(ILoggingEvent::getFormattedMessage)
-          .anyMatch(
-              message ->
-                  message.contains(dataSource.getId().toString())
-                      && message.contains("may not read"))
-          .noneMatch(message -> message.contains("still a draft"));
     }
 
     @Test
