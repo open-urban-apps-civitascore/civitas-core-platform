@@ -43,6 +43,15 @@ x-gs-dependencies: &gs_dependencies
   geoserverdb:
     condition: service_healthy
 
+# The probe is the one the images carry; only the start period differs, because the 30s they
+# ship is shorter than a cold start takes on a loaded shared runner.
+x-gs-healthcheck: &gs_healthcheck
+  test: ["CMD-SHELL", "curl -f -s -o /dev/null localhost:8081/actuator/health || exit 1"]
+  start_period: 180s
+  interval: 10s
+  timeout: 5s
+  retries: 5
+
 services:
   # ── Databases ──────────────────────────────────────────────
 
@@ -401,7 +410,7 @@ services:
   # restconfig. Mirrors dev-environment/geoserver/docker-compose.yaml, single-network/ephemeral.
   # The standalone profile removes service discovery and the config server, so every service reads
   # the catalog backend directly. The service name rabbitmq is load-bearing (images resolve it by
-  # bare hostname); each image has a built-in :8081 healthcheck for `up --wait`.
+  # bare hostname); the :8081 probe at x-gs-healthcheck drives `up --wait`.
 
   # pgconfig catalog DB for GeoServer Cloud — separate from postgres-sink (the DATA db the
   # datastore reads). The postgis image auto-creates the PostGIS extension.
@@ -435,6 +444,7 @@ services:
       <<: *gs_common_env
       GEOSERVER_BASE_PATH: /geoserver
     depends_on: *gs_dependencies
+    healthcheck: *gs_healthcheck
     networks:
       default:
         aliases:
@@ -444,6 +454,7 @@ services:
     image: geoservercloud/geoserver-cloud-rest:3.0.1.1
     environment: *gs_common_env
     depends_on: *gs_dependencies
+    healthcheck: *gs_healthcheck
 
   # ── Application ──────────────────────────────────────────
 
