@@ -60,6 +60,26 @@ class FrostMappingCompilerTest {
         "$.properties.reference", new CopyNode("$.ref"));
   }
 
+  /**
+   * The bag of the Observations port's published structure: the measurement's own reference is the
+   * match key, the two that name its Datastream are free attributes beside it.
+   */
+  private static final StaProperties MEASUREMENT =
+      StaProperties.ofObservation(
+          List.of(
+              new KeyAttribute("reference"),
+              new FreeAttribute("thingReference", StaJsonType.ANY),
+              new FreeAttribute("datastreamReference", StaJsonType.ANY)));
+
+  /** A mapping into the Observations port, written against the measurement as the record root. */
+  private static MappingConfig measurementMapping() {
+    return mapping(
+        "$.parameters.thingReference", new CopyNode("$.station"),
+        "$.parameters.datastreamReference", new CopyNode("$.channel"),
+        "$.result", new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.value"), null),
+        "$.phenomenonTime", new CopyNode("$.ts"));
+  }
+
   private static MappingConfig lookupOnlyWithObservationMapping() {
     return mapping(
         "$.properties.reference", new CopyNode("$.ref"),
@@ -198,7 +218,8 @@ class FrostMappingCompilerTest {
     StaProperties properties =
         new StaProperties(
             List.of(new KeyAttribute("reference"), new FreeAttribute("operator", StaJsonType.ANY)),
-            List.of(new KeyAttribute("reference")));
+            List.of(new KeyAttribute("reference")),
+            List.of());
 
     String body =
         compiler
@@ -258,15 +279,72 @@ class FrostMappingCompilerTest {
   }
 
   @Test
-  void compile_intoTheObservationsPort_isRejectedUntilItPublishesAStructure() {
-    // The target vocabulary is rooted at the Thing. A measurement with its reference block at the
-    // root is not addressable, so the port cannot be mapped into yet.
+  void compile_aMeasurementPipeline_rendersTheObservationAlone() throws Exception {
+    assertBodyMatches(
+        "observations-port.json",
+        compiler.compile(measurementMapping(), MEASUREMENT, SinkPort.OBSERVATIONS));
+  }
+
+  @Test
+  void compile_intoTheObservationsPort_rendersTheMeasurementAlone() throws Exception {
+    String body =
+        compiler.compile(measurementMapping(), MEASUREMENT, SinkPort.OBSERVATIONS).plan().body();
+
+    // The record of this port is the measurement, so nothing of the tree above it is written: the
+    // port resolves the Datastream from the references the body carries.
+    assertFalse(body.contains("Datastreams"), body);
+    assertTrue(body.startsWith("{\"result\":"), body);
+    // SensorThings gives the Observation 'parameters' and rejects 'properties' on it.
+    assertTrue(body.contains("\"parameters\":{"), body);
+    assertFalse(body.contains("\"properties\""), body);
+    assertTrue(body.contains("thingReference"), body);
+    assertTrue(body.contains("datastreamReference"), body);
+  }
+
+  @Test
+  void compile_intoTheObservationsPort_withoutTheReferences_isRejected() {
+    MappingConfig mapping =
+        mapping("$.result", new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.value"), null));
+
     FatalAdapterException ex =
         assertThrows(
             FatalAdapterException.class,
-            () -> compiler.compile(thingOnlyMapping(), KEYS, SinkPort.OBSERVATIONS));
+            () -> compiler.compile(mapping, MEASUREMENT, SinkPort.OBSERVATIONS));
 
-    assertTrue(ex.getMessage().contains("Observations port"), ex.getMessage());
+    // Without them the port has nothing to look the Datastream up by, and every measurement would
+    // land on whatever the empty filter matches.
+    assertTrue(ex.getMessage().contains("$.parameters.thingReference"), ex.getMessage());
+    assertTrue(ex.getMessage().contains("$.parameters.datastreamReference"), ex.getMessage());
+  }
+
+  @Test
+  void compile_intoTheObservationsPort_withAThingPath_namesThePortsOwnVocabulary() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(thingOnlyMapping(), MEASUREMENT, SinkPort.OBSERVATIONS));
+
+    // The message speaks the paths the author wrote, not the Thing-rooted ones the catalog keeps
+    // internally — a Thing path here is the wrong port, not a typo.
+    assertTrue(ex.getMessage().contains("'$.name'"), ex.getMessage());
+    assertTrue(ex.getMessage().contains("$.result"), ex.getMessage());
+    assertFalse(ex.getMessage().contains("$.Datastreams[].Observations[]"), ex.getMessage());
+  }
+
+  @Test
+  void compile_intoTheObservationsPort_withoutAMatchKey_isAccepted() throws Exception {
+    // A measurement without a reference of its own is appended rather than upserted, which is what
+    // a time series wants. The Thing ports demand a key; this one must not.
+    StaProperties keyless =
+        StaProperties.ofObservation(
+            List.of(
+                new FreeAttribute("thingReference", StaJsonType.ANY),
+                new FreeAttribute("datastreamReference", StaJsonType.ANY)));
+
+    String body =
+        compiler.compile(measurementMapping(), keyless, SinkPort.OBSERVATIONS).plan().body();
+
+    assertTrue(body.contains("thingReference"), body);
   }
 
   // ─── Body templates ─────────────────────────────────────────────────────────
@@ -389,7 +467,8 @@ class FrostMappingCompilerTest {
     StaProperties properties =
         new StaProperties(
             List.of(new KeyAttribute("reference"), new FreeAttribute("sensor", StaJsonType.ANY)),
-            List.of(new KeyAttribute("reference")));
+            List.of(new KeyAttribute("reference")),
+            List.of());
 
     FrostCompilation compilation =
         compiler.compile(
@@ -500,6 +579,7 @@ class FrostMappingCompilerTest {
     StaProperties props =
         new StaProperties(
             List.of(new KeyAttribute("reference"), new FreeAttribute("owner", StaJsonType.ANY)),
+            List.of(),
             List.of());
     FatalAdapterException ex =
         assertThrows(

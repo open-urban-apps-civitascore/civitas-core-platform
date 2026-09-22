@@ -8,6 +8,8 @@ import {
   isSafeStaKeyName,
   STA_ENTITIES,
   STA_FIXED_TARGET_PATHS,
+  STA_OBSERVATION_PORT_ENTITIES,
+  STA_OBSERVATION_REQUIRED_PATHS,
 } from './staTargetCatalog'
 
 /**
@@ -97,6 +99,67 @@ describe('deriveStaMatchKeys', () => {
     fields: [field('$', 'Thing', 'object', false, children)],
   })
 
+  it('pins the vocabulary of the Observations port at the measurement root', () => {
+    // The port publishes the measurement itself as its structure, so the same fields sit one root
+    // higher than in the Thing-shaped catalog. The engine rebases them before it validates.
+    expect(
+      STA_OBSERVATION_PORT_ENTITIES.map(entity => ({
+        key: entity.key,
+        createPaths: [...entity.createPaths],
+        optionalPaths: [...entity.optionalPaths],
+      })),
+    ).toEqual([
+      {
+        key: 'observation',
+        createPaths: ['$.result'],
+        optionalPaths: ['$.phenomenonTime', '$.resultTime', '$.resultQuality', '$.validTime'],
+      },
+      {
+        key: 'featureOfInterest',
+        createPaths: [
+          '$.FeatureOfInterest.name',
+          '$.FeatureOfInterest.description',
+          '$.FeatureOfInterest.encodingType',
+          '$.FeatureOfInterest.feature',
+        ],
+        optionalPaths: ['$.FeatureOfInterest.properties'],
+      },
+    ])
+    expect([...STA_OBSERVATION_REQUIRED_PATHS]).toEqual([
+      '$.result',
+      '$.parameters.thingReference',
+      '$.parameters.datastreamReference',
+    ])
+  })
+
+  it('reads the measurement bag from parameters, the one entity without a properties bag', () => {
+    const tree: SchemaTree = {
+      name: 'Observations',
+      fields: [
+        field('$', 'Observation', 'object', false, [
+          field('$.result', 'result', 'str', true),
+          field('$.parameters', 'parameters', 'object', false, [
+            { ...field('$.parameters.reference', 'reference', 'str', true), primaryKey: true },
+            field('$.parameters.thingReference', 'thingReference', 'str', true),
+            field('$.parameters.datastreamReference', 'datastreamReference', 'str', true),
+          ]),
+        ]),
+      ],
+    }
+
+    const keys = deriveStaMatchKeys(tree)
+
+    expect(keys.observation).toEqual(['$.parameters.reference'])
+    expect(keys.observationBag).toEqual([
+      '$.parameters.reference',
+      '$.parameters.thingReference',
+      '$.parameters.datastreamReference',
+    ])
+    // Nothing of the Thing shape is there — and the measurement's key must not leak into it.
+    expect(keys.thing).toEqual([])
+    expect(keys.thingBag).toEqual([])
+  })
+
   it('uses the {id}-marked scalar attributes inside the properties bag of Thing and Datastream', () => {
     const tree = thingTree([
       thingProperties([{ ...field('$.properties.stationRef', 'stationRef', 'str', true), primaryKey: true }]),
@@ -115,6 +178,8 @@ describe('deriveStaMatchKeys', () => {
       isFallback: false,
       thingBag: ['$.properties.stationRef'],
       datastreamBag: ['$.Datastreams[].properties.dsRef'],
+      observation: [],
+      observationBag: [],
     })
   })
 
@@ -132,6 +197,8 @@ describe('deriveStaMatchKeys', () => {
       isFallback: true,
       thingBag: ['$.properties.reference'],
       datastreamBag: ['$.Datastreams[].properties.reference'],
+      observation: [],
+      observationBag: [],
     })
   })
 

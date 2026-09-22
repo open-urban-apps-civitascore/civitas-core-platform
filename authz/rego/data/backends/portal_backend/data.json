@@ -209,6 +209,14 @@
     "/v1/datastructures/{id}/versions/{id}/released/meta": {
       "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
     },
+    "_comment_published_structures": "The data structures the platform's sinks publish. Readable by any authenticated user, across tenants and without a permission: they belong to the platform, they are the same for every tenant, and nobody changes them. A modeller needs them before they have a data structure to hold a permission on.",
+    "/v1/published-structures": {
+      "_collection": true,
+      "GET": null
+    },
+    "/v1/published-structures/{id}": {
+      "GET": null
+    },
     "/v1/datapools": {
       "_collection": true,
       "GET": "DATAPOOL_READ",
