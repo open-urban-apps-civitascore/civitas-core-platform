@@ -35,6 +35,10 @@ export const useGetPublishedStructure = ({ structureKey, isEnabled }: { structur
   useDataQuery<Record<string, unknown>>({
     id: structureKey,
     key: 'published-structures',
+    // A cache entry of its own. Both requests read the same path, so without this the two would
+    // share the entry `['published-structures', undefined]` while no structure is selected, and
+    // the document query would answer with the list.
+    queryKey: 'published-structure',
     isEnabled: isEnabled && Boolean(structureKey),
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while fetching the published data structure.',

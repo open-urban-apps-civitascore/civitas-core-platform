@@ -369,6 +369,70 @@ describe('parseDatastructureVersionFormData', () => {
 })
 
 describe('buildSessionFromVersion', () => {
+  it('draws the model when nobody drew a diagram', () => {
+    // A version created over the API, or generated from a Data source, carries a model and no
+    // diagram. Its content is right there, so the canvas must not open empty.
+    const version = createVersionDetail({
+      modelName: 'ThingsPortTarget',
+      styles: null,
+      model: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        title: 'ThingsPortTarget',
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          properties: {
+            type: 'object',
+            properties: { reference: { type: 'string', 'x-core-primaryKey': true } },
+            required: ['reference'],
+          },
+        },
+        required: ['name', 'properties'],
+      },
+    })
+
+    const result = buildSessionFromVersion(version)
+
+    expect(result.diagram.nodes.map(node => node.data.element.name)).toEqual([
+      'ThingsPortTarget',
+      'ThingsPortTargetProperties',
+    ])
+    // Reading a stored model is not a change the modeller made.
+    expect(result.isDirty).toBe(false)
+  })
+
+  it('keeps the drawing when there is one', () => {
+    const drawn = {
+      id: 'diagram-id',
+      name: 'Drawn',
+      nodes: [
+        {
+          id: 'n1',
+          type: 'class',
+          position: { x: 5, y: 5 },
+          data: { element: { id: 'n1', name: 'Drawn', type: 'class', attributes: [], operations: [] }, label: 'Drawn' },
+        },
+      ],
+      edges: [],
+      lastModified: new Date('2024-02-01T10:00:00.000Z'),
+      isDirty: false,
+    }
+    const version = createVersionDetail({ modelName: 'Drawn', styles: drawn as never })
+
+    // The drawing carries the positions the modeller chose; a derived layout would move them.
+    expect(buildSessionFromVersion(version).diagram.nodes).toHaveLength(1)
+  })
+
+  it('leaves the canvas empty for a model it cannot read', () => {
+    const version = createVersionDetail({
+      modelName: 'Alien',
+      styles: null,
+      model: { $defs: { Thing: { type: 'object', title: 'Thing', properties: { when: { type: 'timestamp' } } } } },
+    })
+
+    expect(buildSessionFromVersion(version).diagram.nodes).toHaveLength(0)
+  })
+
   it('prefers explicit sessionId and modelName over diagram values', () => {
     const created = new Date('2024-01-01T10:00:00.000Z')
     const version = createVersionDetail({

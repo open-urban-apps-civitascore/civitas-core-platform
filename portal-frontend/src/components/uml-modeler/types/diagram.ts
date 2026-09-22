@@ -84,7 +84,13 @@ export type DiagramAction =
   | { type: 'DELETE_NODES'; payload: string[] }
   | { type: 'DELETE_EDGES'; payload: string[] }
   | { type: 'SET_VIEWPORT'; payload: { x: number; y: number; zoom: number } }
-  | { type: 'SET_IMPORTED_STRUCTURES'; payload: ImportedStructureRef[] }
+  // One published structure loaded into the diagram. Atomic on purpose: the provider recomputes
+  // every dispatch from the diagram of the current render, so a sequence of actions inside one
+  // handler would have the last one overwrite the ones before it.
+  | {
+      type: 'MERGE_STRUCTURE'
+      payload: { nodes: UMLNode[]; edges: UMLEdge[]; importedStructures: ImportedStructureRef[] }
+    }
   | { type: 'MARK_CLEAN' }
   | { type: 'MARK_DIRTY' }
   | { type: 'LOAD_DIAGRAM'; payload: UMLDiagram }

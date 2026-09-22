@@ -1532,7 +1532,8 @@
       "unreadable": "Die Struktur ist nicht lesbar: sie enthält „{construct}\", das der Editor nicht kennt.",
       "error": "Die Struktur konnte nicht geladen werden.",
       "empty": "Keine Senke veröffentlicht eine Struktur",
-      "pinned": "Aufgebaut aus:"
+      "pinned": "Aufgebaut aus:",
+      "emptyStructure": "Die Struktur enthält keine Klassen, es wurde nichts geladen."
     }
   },
   "datapools": {
