@@ -12,6 +12,7 @@ import { DATASTRUCTURE_STATUS_TYPES, DATASTRUCTURE_VERSION_SOURCE } from '@/type
 
 import {
   buildSessionFromVersion,
+  getDatastructureFieldOptions,
   mapDatastructuresApiToListData,
   mapDatastructureVersionApiToFormData,
   mapDatastructureVersionFormToApiData,
@@ -482,5 +483,84 @@ describe('root designation round-trip through persisted styles', () => {
 
     const rebuilt = session.diagram.nodes.map(node => node.data.element)
     expect(rebuilt.map(element => element.isRoot)).toEqual([true, undefined])
+  })
+})
+
+describe('getDatastructureFieldOptions', () => {
+  const classNode = (id: string, name: string, attributes: string[], isRoot?: boolean) => ({
+    id: `node-${id}`,
+    type: 'class',
+    position: { x: 0, y: 0 },
+    data: {
+      element: {
+        id,
+        name,
+        type: 'class',
+        isRoot,
+        attributes: attributes.map(attribute => ({ id: `${id}-${attribute}`, name: attribute, type: 'String' })),
+        operations: [],
+      },
+      label: name,
+    },
+  })
+
+  const enumNode = (id: string, name: string) => ({
+    id: `node-${id}`,
+    type: 'enumeration',
+    position: { x: 0, y: 0 },
+    data: {
+      element: { id, name, type: 'enumeration', literals: [{ id: `${id}-l`, name: 'LITERAL' }] },
+      label: name,
+    },
+  })
+
+  const diagramOf = (nodes: unknown[], edges: unknown[] = []) =>
+    ({ id: 'diagram-1', name: 'Struct', nodes, edges }) as unknown as UMLDiagram
+
+  const versionOf = (over: Partial<Pick<DatastructureVersion, 'model' | 'styles' | 'modelName'>>) =>
+    ({ model: null, styles: null, modelName: 'Struct', ...over }) as DatastructureVersion
+
+  it('takes the attributes of the root class when an enumeration comes first in the diagram', () => {
+    const styles = diagramOf([enumNode('e1', 'Colour'), classNode('c1', 'Building', ['name', 'geom'])])
+
+    const options = getDatastructureFieldOptions(versionOf({ styles }))
+
+    expect(options).toEqual([
+      { value: 'name', label: 'name' },
+      { value: 'geom', label: 'geom' },
+    ])
+  })
+
+  it('takes the attributes of the designated root when several classes exist', () => {
+    const styles = diagramOf([classNode('c1', 'Address', ['street']), classNode('c2', 'Building', ['name'], true)])
+
+    const options = getDatastructureFieldOptions(versionOf({ styles }))
+
+    expect(options).toEqual([{ value: 'name', label: 'name' }])
+  })
+
+  it('prefers the persisted model over the diagram', () => {
+    const model = {
+      title: 'Building',
+      type: 'object',
+      properties: { modelField: { type: 'string' } },
+    }
+    const styles = diagramOf([classNode('c1', 'Building', ['diagramField'])])
+
+    const options = getDatastructureFieldOptions(versionOf({ model, styles }))
+
+    expect(options).toEqual([{ value: 'modelField', label: 'modelField' }])
+  })
+
+  it('returns no options for a diagram without a unique root', () => {
+    const styles = diagramOf([classNode('c1', 'Address', ['street']), classNode('c2', 'Building', ['name'])])
+
+    expect(getDatastructureFieldOptions(versionOf({ styles }))).toEqual([])
+  })
+
+  it('returns no options for an empty, absent or missing version instead of throwing', () => {
+    expect(getDatastructureFieldOptions(versionOf({ styles: diagramOf([]) }))).toEqual([])
+    expect(getDatastructureFieldOptions(versionOf({}))).toEqual([])
+    expect(getDatastructureFieldOptions(undefined)).toEqual([])
   })
 })
