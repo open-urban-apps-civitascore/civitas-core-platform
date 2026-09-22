@@ -1543,7 +1543,8 @@
       "unreadable": "The structure cannot be read: it holds “{construct}”, which the editor does not know.",
       "error": "The structure could not be loaded.",
       "empty": "No sink publishes a structure",
-      "pinned": "Built from:"
+      "pinned": "Built from:",
+      "emptyStructure": "The structure carries no classes, so nothing was loaded."
     }
   },
   "datapools": {

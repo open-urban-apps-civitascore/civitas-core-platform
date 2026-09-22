@@ -197,10 +197,12 @@ export const diagramReducer = (state: UMLDiagram, action: DiagramAction): UMLDia
         isDirty: false,
       }
 
-    case 'SET_IMPORTED_STRUCTURES':
+    case 'MERGE_STRUCTURE':
       return {
         ...state,
-        importedStructures: action.payload,
+        nodes: [...state.nodes, ...action.payload.nodes],
+        edges: [...state.edges, ...action.payload.edges],
+        importedStructures: action.payload.importedStructures,
         lastModified: new Date(),
         isDirty: true,
       }

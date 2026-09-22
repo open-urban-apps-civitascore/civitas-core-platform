@@ -1,5 +1,5 @@
 import type { UMLNode, UMLNodeData } from '../types/diagram'
-import type { UMLAbstractClass, UMLClass, UMLElementType, UMLEnumeration, UMLInterface } from '../types/uml'
+import type { UMLAbstractClass, UMLClass, UMLElement, UMLElementType, UMLEnumeration, UMLInterface } from '../types/uml'
 import { DEFAULT_NAMES } from './umlTypes'
 
 // Helper function to generate unique IDs
@@ -111,13 +111,12 @@ export const createElement = (elementType: UMLElementType, name?: string) => {
 }
 
 // Create UML node from element template
-export const createUMLNode = (
-  elementType: UMLElementType,
-  position: { x: number; y: number },
-  name?: string,
-): UMLNode => {
-  const element = createElement(elementType, name)
-
+/**
+ * The canvas node of an element. Every producer goes through here — the palette, and the import of
+ * a published structure — so a node a modeller draws and a node that is loaded behave the same:
+ * the same drag handle, the same minimum size.
+ */
+export const umlNodeFor = (element: UMLElement, position: { x: number; y: number }): UMLNode => {
   const nodeData: UMLNodeData = {
     element,
     label: element.name,
@@ -127,7 +126,7 @@ export const createUMLNode = (
 
   return {
     id: element.id,
-    type: elementType,
+    type: element.type,
     position,
     data: nodeData,
     dragHandle: '.node-header',
@@ -140,6 +139,12 @@ export const createUMLNode = (
     },
   }
 }
+
+export const createUMLNode = (
+  elementType: UMLElementType,
+  position: { x: number; y: number },
+  name?: string,
+): UMLNode => umlNodeFor(createElement(elementType, name), position)
 
 // Sample diagram templates for quick start
 export const SAMPLE_DIAGRAMS = {

@@ -25,6 +25,7 @@
  * to keep the new classes clear of what is already there.
  */
 
+import { umlNodeFor } from '../constants/elementTemplates'
 import type { UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
 import type {
   UMLAttribute,
@@ -61,6 +62,9 @@ const primitiveFor = (type: string, format: string | null): UMLType | null => {
   return 'String'
 }
 
+/** What an opaque JSON value is called in the diagram; UML has no type for one. */
+const OPAQUE_TYPE_NAME = 'Json'
+
 const GEOJSON_REF = new RegExp(`^${GEOJSON_REF_BASE}/([A-Za-z]+)\\.json$`)
 
 export interface ImportOptions {
@@ -93,7 +97,7 @@ export interface ImportedSchema {
  * @throws SchemaImportError when the document holds a construct the export never writes
  */
 export const importFromJsonSchema = (document: JsonSchemaObject, options: ImportOptions = {}): ImportedSchema => {
-  const defs = asObject(document.$defs) ?? {}
+  const { defs, rootKey: normalizedRoot } = normalize(document)
   const byUrn = new Map<string, string>()
   const elementByKey = new Map<string, UMLElement>()
 
@@ -113,13 +117,13 @@ export const importFromJsonSchema = (document: JsonSchemaObject, options: Import
     fillElement(elementByKey.get(key)!, asObject(raw)!, key, { defs, byUrn, elementByKey, edges })
   }
 
-  const rootKey = rootKeyOf(document, byUrn)
+  const rootKey = rootKeyOf(document, byUrn) ?? normalizedRoot
   const rootElement = rootKey ? elementByKey.get(rootKey) : undefined
   if (rootElement) rootElement.isRoot = true
 
   const order = [...elementByKey.keys()]
   const positions = layout(order, rootKey, edges, elementByKey, options.origin ?? { x: 0, y: 0 })
-  const nodes = order.map(key => toNode(elementByKey.get(key)!, positions.get(key)!))
+  const nodes = order.map(key => umlNodeFor(elementByKey.get(key)!, positions.get(key)!))
 
   return { nodes, edges, rootElementId: rootElement?.id ?? null }
 }
@@ -275,6 +279,14 @@ const typeOf = (schema: JsonSchemaObject, propertyName: string): UMLType => {
     // degradation the mapping editor applies to it.
     return 'String'
   }
+  if (type === 'object') {
+    // An object that declares properties was lifted into the library before the walk, so anything
+    // still inline here is a free JSON value — a geometry, a measurement's quality, an entity's
+    // own bag. The export
+    // writes the same for a class reference it cannot resolve, so this reads back as an opaque
+    // type rather than as text, and a re-export gives the document it came from.
+    return { id: crypto.randomUUID(), name: OPAQUE_TYPE_NAME, isExternal: true }
+  }
   const primitive = primitiveFor(type, asString(schema.format))
   if (!primitive) {
     throw new SchemaImportError(`the property '${propertyName}' has the unsupported type '${type}'`, type)
@@ -376,12 +388,83 @@ const layout = (
   return positions
 }
 
-const toNode = (element: UMLElement, position: { x: number; y: number }): UMLNode => ({
-  id: element.id,
-  type: element.type,
-  position,
-  data: { element, label: element.name },
-})
+/**
+ * The document's classes, in the one shape the reader works on: a `$defs` library.
+ *
+ * The editor writes that shape, but it is not the only one stored. A model that came in over the
+ * API, or that a Data source generated, often carries its record at the document root and its
+ * nested classes inline. Both say the same thing, so the inline ones are lifted into the library
+ * under `<Parent><Property>` and replaced by a reference — the form the editor writes back on the
+ * next save.
+ */
+const normalize = (document: JsonSchemaObject): { defs: JsonSchemaObject; rootKey: string | null } => {
+  const defs: JsonSchemaObject = { ...(asObject(document.$defs) ?? {}) }
+
+  // A document that designates its record — by a top-level `$ref` or a wrapper — already has its
+  // classes in the library.
+  const designated = rootKeyOf(document, new Map())
+  let rootKey = designated
+
+  if (!designated && asObject(document.properties)) {
+    rootKey = uniqueKey(defs, asString(document.title) ?? 'Record')
+    defs[rootKey] = {
+      type: 'object',
+      title: asString(document.title) ?? rootKey,
+      ...(asString(document.description) ? { description: document.description } : {}),
+      properties: document.properties,
+      ...(Array.isArray(document.required) ? { required: document.required } : {}),
+    }
+  }
+
+  for (const key of Object.keys(defs)) {
+    const member = asObject(defs[key])
+    if (member) defs[key] = liftInlineObjects(member, key, defs)
+  }
+  return { defs, rootKey }
+}
+
+/** Replaces every inline object property of a class by a reference to a lifted class. */
+const liftInlineObjects = (member: JsonSchemaObject, owner: string, defs: JsonSchemaObject): JsonSchemaObject => {
+  const properties = asObject(member.properties)
+  if (!properties) return member
+
+  const lifted: JsonSchemaObject = {}
+  for (const [name, raw] of Object.entries(properties)) {
+    const property = asObject(raw)
+    if (!property) {
+      lifted[name] = raw
+      continue
+    }
+    const items = asString(property.type) === 'array' ? asObject(property.items) : null
+    const shape = items ?? property
+    if (!asObject(shape.properties)) {
+      lifted[name] = raw
+      continue
+    }
+
+    const key = uniqueKey(defs, owner + pascal(name))
+    defs[key] = liftInlineObjects({ title: key, ...shape }, key, defs)
+    lifted[name] = items ? { ...property, items: { $ref: DEFS_REF_PREFIX + key } } : { $ref: DEFS_REF_PREFIX + key }
+  }
+  return { ...member, properties: lifted }
+}
+
+/** A key the library does not hold yet; the suffix follows the one the export uses. */
+const uniqueKey = (defs: JsonSchemaObject, wanted: string): string => {
+  let candidate = wanted
+  let suffix = 1
+  while (candidate in defs) {
+    candidate = `${wanted}_${suffix++}`
+  }
+  return candidate
+}
+
+const pascal = (name: string): string =>
+  name
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('')
 
 /**
  * The member the document designates as its record.

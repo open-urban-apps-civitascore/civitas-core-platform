@@ -1,3 +1,4 @@
+import { diagramFromJsonSchema, SchemaImportError } from '@/components/uml-modeler/services/jsonSchemaImportService'
 import { versionToSchemaTree } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_components/mapping-editor/schema/versionTree'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
 import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
@@ -112,12 +113,40 @@ export const containsNonStatusField = <TData extends FormFields>(fieldsToUpdate:
     key => key !== 'dataStructureStatus' && key !== 'dataStructureVersionStatus',
   )
 
+/**
+ * The diagram of a version, drawn or derived.
+ *
+ * A version has a drawing only where someone drew one. A structure that came in as a document —
+ * over the API, or generated from a Data source — carries a model and no diagram, and would open
+ * on an empty canvas although its content is right there. The model is read into a diagram for
+ * that case, with the layout the standard import uses.
+ *
+ * A model the reader does not understand leaves the canvas empty, as before: showing a guess of a
+ * structure would be worse than showing none.
+ */
+const diagramOfVersion = (versionData: DatastructureVersion | null): UMLDiagram | null => {
+  // A saved diagram carries a node array, even an empty one: a modeller may save a blank canvas,
+  // and that is a drawing too. What a document-born version carries instead is no array at all.
+  const drawn = versionData?.styles
+  if (drawn && Array.isArray(drawn.nodes)) return drawn
+
+  const model = versionData?.model
+  if (!model) return null
+  try {
+    return diagramFromJsonSchema(model, versionData?.modelName ?? undefined)
+  } catch (error) {
+    if (!(error instanceof SchemaImportError)) throw error
+    console.warn('data structure: the stored model cannot be read into a diagram', error)
+    return null
+  }
+}
+
 export const buildSessionFromVersion = (
   versionData: DatastructureVersion | null,
   sessionId?: string,
   created?: Date,
 ) => {
-  const diagram = versionData?.styles || null
+  const diagram = diagramOfVersion(versionData)
   const modelName = versionData?.modelName || null
   const fallbackSession = createEmptySession(modelName || undefined)
 

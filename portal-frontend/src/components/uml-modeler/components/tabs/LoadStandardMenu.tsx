@@ -13,6 +13,7 @@
  * version does not change.
  */
 
+import { useReactFlow } from '@xyflow/react'
 import { Download, Loader2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -42,7 +43,8 @@ import { mergeStructureIntoDiagram } from '../../services/structureMergeService'
 export const LoadStandardMenu: React.FC = () => {
   const t = useTranslations('umlModeler.loadStandard')
   const { isReadOnly } = useReadOnly()
-  const { diagram, dispatch, setRootNode } = useActiveDiagram()
+  const { diagram, dispatch } = useActiveDiagram()
+  const { fitView } = useReactFlow()
 
   const [selected, setSelected] = useState<PublishedStructureSummary | null>(null)
   const selectedKey = selected?.key ?? null
@@ -63,21 +65,45 @@ export const LoadStandardMenu: React.FC = () => {
         urn: source.urn ?? '',
         name: source.name,
       })
-      dispatch({ type: 'SET_NODES', payload: [...diagram.nodes, ...result.nodes] })
-      dispatch({ type: 'SET_EDGES', payload: [...diagram.edges, ...result.edges] })
-      dispatch({ type: 'SET_IMPORTED_STRUCTURES', payload: result.importedStructures })
-      if (result.rootElementId) setRootNode(result.rootElementId)
+      // One action. The provider recomputes every dispatch from the diagram of the current
+      // render, so a second one in this handler would drop what the first one added. The root
+      // flag needs no call of its own either — it is already on the element the merge answers.
+      dispatch({
+        type: 'MERGE_STRUCTURE',
+        payload: {
+          nodes: result.nodes,
+          edges: result.edges,
+          importedStructures: result.importedStructures,
+        },
+      })
+      // The loaded classes are placed clear of what is already drawn, which puts them outside the
+      // view the modeller is looking at. Showing them is the point of the click, so the canvas
+      // moves to them — after the frame in which React Flow learns about them.
+      const loaded = result.nodes.map(node => ({ id: node.id }))
+      requestAnimationFrame(() => {
+        void fitView({ nodes: loaded, padding: 0.2, duration: 400 })
+      })
+
       // A renamed class is not a failure, but the modeller has to learn that the name moved.
       for (const renamed of result.renamed) {
         toast.warning(t('renamed', { from: renamed.from, to: renamed.to }))
       }
+      if (result.nodes.length === 0) {
+        // Nothing was loaded. Saying otherwise would send the modeller looking for classes that
+        // are not there.
+        toast.warning(t('emptyStructure'))
+        return
+      }
       toast.success(t('loaded'))
     },
-    [diagram, dispatch, setRootNode, t],
+    [diagram, dispatch, fitView, t],
   )
 
   useEffect(() => {
     const document = structure.data?.data
+    // Placeholder data is the answer to the previous selection, kept while this one loads. Merging
+    // it would put the wrong structure into the diagram.
+    if (structure.isPlaceholderData) return
     if (!selected || !document || merging.current === selected.key) return
     merging.current = selected.key
     try {
@@ -93,7 +119,7 @@ export const LoadStandardMenu: React.FC = () => {
       setSelected(null)
       merging.current = null
     }
-  }, [selected, structure.data, merge, t])
+  }, [selected, structure.data, structure.isPlaceholderData, merge, t])
 
   if (isReadOnly) return null
 
