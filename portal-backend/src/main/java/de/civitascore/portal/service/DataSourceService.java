@@ -389,15 +389,15 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
 
   @Override
   protected void validateUnrelease(DataSource entity) {
-    validateNotInUse(entity.getId());
+    validateNotInUse(entity.getId(), "unrelease");
   }
 
-  private void validateNotInUse(UUID id) {
+  private void validateNotInUse(UUID id, String operation) {
     if (pipelineRepository.existsByDataSourcesId(id)) {
       throw new ResourceInUseException(
           getEntityName(),
           id,
-          "Cannot unrelease DataSource because it is referenced by a Pipeline.");
+          "Cannot " + operation + " DataSource because it is referenced by a Pipeline.");
     }
   }
 
@@ -545,6 +545,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       throw new InvalidInputException(
           getEntityName(), id, "Cannot delete a released data source. Unrelease it first.");
     }
+    // A draft may be referenced too, and postDelete drops the Model Forge artifact before the
+    // foreign key aborts the commit, which would leave the surviving row pinned to a dead URN.
+    validateNotInUse(id, "delete");
 
     return entity;
   }
