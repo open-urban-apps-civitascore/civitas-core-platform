@@ -27,7 +27,7 @@ export type DataSink = {
   configurationUrn?: string
   /** True once the sink's storage has been provisioned. */
   provisioned?: boolean
-  /** True while a Layer publishes this sink. */
+  /** True while a Layer references this sink. */
   inUseByLayer?: boolean
   createdAt: string
   modifiedAt: string

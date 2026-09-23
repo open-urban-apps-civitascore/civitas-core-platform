@@ -36,8 +36,7 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
   const { selectedNode, pipelineUsingTableName, getSinkLocks } = useActivePipeline()
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
-  // A published layer reads this table's columns, so its data structure must stay as it is.
-  const isDataStructureLocked = getSinkLocks(data.entityId).inUseByLayer
+  const { provisioned: isProvisioned, inUseByLayer: isUsedByLayer } = getSinkLocks(data.entityId)
 
   const conflictingPipeline = selectedNode ? pipelineUsingTableName(selectedNode.id, data.tableName) : null
   const hasInvalidCharacters = data.tableName !== '' && !isValidTableName(data.tableName)
@@ -94,20 +93,22 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
         )}
       </div>
 
-      <div className="space-y-2">
-        <Label>{t('geoPersistencePanel.dataStructureVersion')}</Label>
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full"
-          disabled={isDataStructureLocked}
-          onClick={() => setIsImportModalOpen(true)}
-        >
-          {data.dataStructureVersionId
-            ? t('geoPersistencePanel.changeDataStructure')
-            : t('geoPersistencePanel.importDataStructure')}
-        </Button>
-      </div>
+      {!isProvisioned && (
+        <div className="space-y-2">
+          <Label>{t('geoPersistencePanel.dataStructureVersion')}</Label>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            disabled={isUsedByLayer}
+            onClick={() => setIsImportModalOpen(true)}
+          >
+            {data.dataStructureVersionId
+              ? t('geoPersistencePanel.changeDataStructure')
+              : t('geoPersistencePanel.importDataStructure')}
+          </Button>
+        </div>
+      )}
 
       {data.dataStructureVersionId && (
         <>

@@ -73,7 +73,7 @@ describe('useDataSinkLocks', () => {
     expect(result.current.getSinkLockReason(makeSinkNode('sink-1'))).toBe('provisioned')
   })
 
-  it('locks a layer-published sink node', () => {
+  it('locks a layer-referenced sink node', () => {
     mockDataSinks([{ id: 'sink-1', inUseByLayer: true }])
 
     const { result } = renderHook(() => useDataSinkLocks())

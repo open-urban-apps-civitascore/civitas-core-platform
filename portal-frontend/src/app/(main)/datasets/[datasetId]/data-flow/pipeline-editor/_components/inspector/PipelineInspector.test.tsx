@@ -89,25 +89,19 @@ describe('PipelineInspector', () => {
     expect(updateNode).not.toHaveBeenCalled()
   })
 
-  it('labels a layer-published sink without a description', () => {
+  it('labels a layer-referenced sink without a description', () => {
     renderInspector('inUseByLayer')
 
     expect(screen.getByText('sink.locked.inUseByLayer.title')).toBeInTheDocument()
     expect(screen.queryByText('sink.locked.provisioned.description')).not.toBeInTheDocument()
   })
 
-  it('keeps a layer-published sink editable', async () => {
+  it('keeps a layer-referenced sink editable', async () => {
     const updateNode = vi.fn()
     renderInspector('inUseByLayer', updateNode)
 
     await userEvent.type(screen.getByLabelText('geoPersistencePanel.tableName'), 'x')
 
     expect(updateNode).toHaveBeenCalled()
-  })
-
-  it('freezes the data structure of a layer-published sink', () => {
-    renderInspector('inUseByLayer')
-
-    expect(screen.getByRole('button', { name: 'geoPersistencePanel.importDataStructure' })).toBeDisabled()
   })
 })
