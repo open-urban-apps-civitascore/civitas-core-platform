@@ -142,8 +142,11 @@ const resolveTopLevelProperties = (node: JsonSchema | undefined, defs: Record<st
   return names
 }
 
-/** The single root class the virtual document root references, i.e. the `$defs` key of its one $ref property. */
+/** The single root class the document root designates: the `$defs` key of its root `$ref`. */
 const rootClassOf = (schema: JsonSchema): string | undefined => {
+  // Canonical form: the root carries a bare top-level $ref (a local #/$defs/ pointer) to the root member.
+  if (schema.$ref?.startsWith('#/$defs/')) return schema.$ref.slice('#/$defs/'.length)
+  // Legacy wrapper form: root.properties = { <name>: { $ref: '#/$defs/<root>' } }.
   const ref = Object.values(schema.properties ?? {})
     .map(value => (value as JsonSchema).$ref)
     .find((r): r is string => !!r?.startsWith('#/$defs/'))

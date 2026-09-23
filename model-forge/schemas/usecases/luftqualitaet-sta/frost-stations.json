@@ -1,0 +1,26 @@
+[
+  {
+    "id":       "STN-MS-001",
+    "name":     "Münster Weselerstraße",
+    "operator": "Stadt Münster - Umweltamt",
+    "type":     "traffic",
+    "lat":      51.9565,
+    "lon":      7.6345
+  },
+  {
+    "id":       "STN-MS-002",
+    "name":     "Münster Geist Hintergrund",
+    "operator": "Stadt Münster - Umweltamt",
+    "type":     "background",
+    "lat":      51.9441,
+    "lon":      7.6235
+  },
+  {
+    "id":       "STN-MS-003",
+    "name":     "Münster Hüfferstiftung",
+    "operator": "LANUV NRW",
+    "type":     "background",
+    "lat":      51.9623,
+    "lon":      7.6289
+  }
+]

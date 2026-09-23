@@ -23,9 +23,28 @@ body:json {
 
 script:post-response {
   if (res.body && res.body.id) {
-    bru.setVar('dataSinkId', res.body.id);
+    // Deliberately not dataSinkId: that names the POSTGIS sink the mutation steps below act on,
+    // and overwriting it pointed them at this FROST sink, whose type they then tried to change.
     bru.setVar('frostDataSinkId', res.body.id);
   }
+}
+
+tests {
+  test("DataSink created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Has FROST type", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.dataSinkType).to.equal('FROST');
+    }
+  });
+
+  test("An empty configuration still yields a referencable artifact", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.configurationUrn).to.contain('urn:core:');
+    }
+  });
 }
 
 docs {

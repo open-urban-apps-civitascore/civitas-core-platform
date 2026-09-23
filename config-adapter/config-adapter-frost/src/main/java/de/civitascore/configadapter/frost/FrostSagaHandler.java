@@ -13,13 +13,15 @@ import de.civitascore.configadapter.adapter.AbstractSagaCommandHandler;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import de.civitascore.configadapter.util.OkHttpJson;
+import java.net.HttpURLConnection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.owasp.encoder.Encode;
 
 /**
@@ -73,7 +75,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     log.info("FrostSagaHandler initialized for: {}", Encode.forJava(serverUrl));
   }
 
-  void setTestClient(Client client) {
+  void setTestClient(OkHttpClient client) {
     super.setClient(client);
   }
 
@@ -110,6 +112,11 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     return publicUrl + "/" + projectPath(projectId);
   }
 
+  /** The FROST entity URL for a path relative to {@link #serverUrl}, e.g. {@code Projects(42)}. */
+  private HttpUrl url(String path) {
+    return OkHttpJson.url(serverUrl, path);
+  }
+
   private SagaCommandResult handleCreateProject(SagaCommandMessage command) {
     String datasetName = requireString(command, "datasetName");
     String datasetId = requireString(command, "datasetId");
@@ -143,20 +150,21 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     // public=openDataAccess bypass.)
     body.put(KEY_PUBLIC, false);
 
-    try (Response response =
+    Request request =
         authStrategy
-            .apply(client().target(serverUrl).path("Projects").request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(body))) {
+            .apply(OkHttpJson.jsonRequest(url("Projects")).post(OkHttpJson.jsonBodyUnchecked(body)))
+            .build();
+    try (Response response = execute(request)) {
 
-      int status = response.getStatus();
-      if (status == Response.Status.CONFLICT.getStatusCode()
-          || status == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
+      int status = response.code();
+      if (status == HttpURLConnection.HTTP_CONFLICT
+          || status == HttpURLConnection.HTTP_INTERNAL_ERROR) {
         return handleCreateProjectConflict(command, projectName, response);
       }
 
       checkResponse(response, "CREATE_PROJECT");
 
-      String projectId = FrostUtils.extractIdFromLocation(response.getHeaderString("Location"));
+      String projectId = FrostUtils.extractIdFromLocation(response.header("Location"));
       String baseUrl = projectBaseUrl(projectId);
 
       Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
@@ -185,12 +193,11 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
    */
   private SagaCommandResult handleCreateProjectConflict(
       SagaCommandMessage command, String projectName, Response response) {
-    int status = response.getStatus();
-    String responseBody = response.readEntity(String.class);
+    int status = response.code();
+    String responseBody = readBody(response);
     boolean isDuplicate =
-        status == Response.Status.CONFLICT.getStatusCode()
-            || (responseBody != null
-                && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA));
+        status == HttpURLConnection.HTTP_CONFLICT
+            || responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA);
     if (isDuplicate) {
       log.info(
           "FROST returned {} for CREATE_PROJECT — re-checking for existing project with name"
@@ -229,20 +236,17 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
    */
   private SagaCommandResult findExistingProjectByName(SagaCommandMessage command, String name) {
     String escapedName = name.replace("'", "''");
-    try (Response response =
-        authStrategy
-            .apply(
-                client()
-                    .target(serverUrl)
-                    .path("Projects")
-                    .queryParam("$filter", "name eq '" + escapedName + "'")
-                    .request(MediaType.APPLICATION_JSON))
-            .get()) {
+    HttpUrl url =
+        url("Projects")
+            .newBuilder()
+            .addQueryParameter("$filter", "name eq '" + escapedName + "'")
+            .build();
+    Request request = authStrategy.apply(OkHttpJson.jsonRequest(url).get()).build();
+    try (Response response = execute(request)) {
 
       checkResponse(response, "GET_PROJECTS_BY_NAME");
 
-      @SuppressWarnings("unchecked")
-      Map<String, Object> result = response.readEntity(Map.class);
+      Map<String, Object> result = OkHttpJson.readJsonMap(response);
       @SuppressWarnings("unchecked")
       List<Map<String, Object>> projects = (List<Map<String, Object>>) result.get("value");
 
@@ -291,17 +295,11 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     // Read current state before updating (needed for compensation)
     String previousName;
     String previousDescription;
-    try (Response getResponse =
-        authStrategy
-            .apply(
-                client()
-                    .target(serverUrl)
-                    .path(projectPath(projectId))
-                    .request(MediaType.APPLICATION_JSON))
-            .get()) {
+    Request getRequest =
+        authStrategy.apply(OkHttpJson.jsonRequest(url(projectPath(projectId))).get()).build();
+    try (Response getResponse = execute(getRequest)) {
       checkResponse(getResponse, "GET project for UPDATE_PROJECT");
-      @SuppressWarnings("unchecked")
-      Map<String, Object> currentProject = getResponse.readEntity(Map.class);
+      Map<String, Object> currentProject = OkHttpJson.readJsonMap(getResponse);
       previousName = (String) currentProject.getOrDefault(KEY_NAME, "");
       previousDescription = (String) currentProject.getOrDefault(KEY_DESCRIPTION, "");
     }
@@ -318,14 +316,13 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
             KEY_PUBLIC,
             false);
 
-    try (Response response =
+    Request request =
         authStrategy
             .apply(
-                client()
-                    .target(serverUrl)
-                    .path(projectPath(projectId))
-                    .request(MediaType.APPLICATION_JSON))
-            .method("PATCH", Entity.json(body))) {
+                OkHttpJson.jsonRequest(url(projectPath(projectId)))
+                    .patch(OkHttpJson.jsonBodyUnchecked(body)))
+            .build();
+    try (Response response = execute(request)) {
 
       checkResponse(response, "UPDATE_PROJECT");
 
@@ -392,19 +389,14 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     cleanup.deleteProjectThings(projectId);
     cleanup.deleteProvisionedEntities(provisionedEntities);
 
-    try (Response response =
-        authStrategy
-            .apply(
-                client()
-                    .target(serverUrl)
-                    .path(projectPath(projectId))
-                    .request(MediaType.APPLICATION_JSON))
-            .delete()) {
+    Request request =
+        authStrategy.apply(OkHttpJson.jsonRequest(url(projectPath(projectId))).delete()).build();
+    try (Response response = execute(request)) {
 
       // A 404 means the project is already gone — the exact goal state of a DELETE_PROJECT, in both
       // directions. A forward delete of a dataset whose project a prior run (or a failed saga's
       // compensation) already removed must succeed too, not strand the delete saga on the 404.
-      if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
+      if (response.code() == HttpURLConnection.HTTP_NOT_FOUND) {
         log.info(
             "DELETE_PROJECT: project {} already absent (404) — treating as success. saga={}",
             Encode.forJava(projectId),
@@ -511,14 +503,13 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     // so a compensation must not resurrect a public flag. (No previousPublic is captured anymore.)
     body.put(KEY_PUBLIC, false);
 
-    try (Response response =
+    Request request =
         authStrategy
             .apply(
-                client()
-                    .target(serverUrl)
-                    .path(projectPath(projectId))
-                    .request(MediaType.APPLICATION_JSON))
-            .method("PATCH", Entity.json(body))) {
+                OkHttpJson.jsonRequest(url(projectPath(projectId)))
+                    .patch(OkHttpJson.jsonBodyUnchecked(body)))
+            .build();
+    try (Response response = execute(request)) {
 
       checkResponse(response, "RESTORE_PROJECT");
 

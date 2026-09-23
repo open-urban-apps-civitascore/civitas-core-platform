@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+  "title":   "GeoPoint",
+  "description": "A WGS-84 geographic coordinate with optional elevation. Shared base type used by sensor and observation schemas.",
+  "type": "object",
+  "required": ["lat", "lon"],
+  "properties": {
+    "lat": {
+      "type": "number",
+      "minimum": -90,
+      "maximum":  90,
+      "description": "Latitude in decimal degrees (WGS-84)."
+    },
+    "lon": {
+      "type": "number",
+      "minimum": -180,
+      "maximum":  180,
+      "description": "Longitude in decimal degrees (WGS-84)."
+    },
+    "elevation": {
+      "type": "number",
+      "description": "Elevation above sea level in metres (optional)."
+    }
+  }
+}

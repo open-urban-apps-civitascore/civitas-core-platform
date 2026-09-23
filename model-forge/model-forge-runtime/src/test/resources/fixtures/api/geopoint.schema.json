@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:core:platform:civitas:element:common:GeoPoint:3ak90vqrog:1.0.0",
+  "title": "GeoPoint",
+  "description": "WGS84 coordinate.",
+  "type": "object",
+  "required": ["lat", "lon"],
+  "properties": {
+    "lat": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90
+    },
+    "lon": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:core:platform:civitas:element:taf10-grid:SwitchingAction:1.0.0",
+  "title": "SwitchingAction",
+  "description": "Command request sent to a grid-control service when TAF10 telemetry indicates a load peak, a feed-in peak, or a voltage-band violation.",
+  "type": "object",
+  "required": ["gridNodeId", "requestedAt", "actionType", "reason"],
+  "properties": {
+    "gridNodeId": {
+      "type": "string",
+      "description": "Grid node where the protective action is requested."
+    },
+    "requestedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the measurement that triggered the action."
+    },
+    "actionType": {
+      "type": "string",
+      "enum": ["curtail-pv-feed-in", "shift-controllable-load", "open-switch", "close-switch", "notify-operator"],
+      "description": "Requested protective action."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Human-readable reason for the action."
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"],
+      "default": "high"
+    },
+    "measuredActivePowerPlusW": {
+      "type": "number",
+      "description": "Measured grid import in W at trigger time."
+    },
+    "measuredActivePowerMinusW": {
+      "type": "number",
+      "description": "Measured grid feed-in in W at trigger time."
+    },
+    "measuredVoltageV": {
+      "type": "number",
+      "description": "Measured voltage in V at trigger time."
+    },
+    "targetAssetId": {
+      "type": "string",
+      "description": "Optional controllable asset selected by downstream grid-control logic."
+    }
+  }
+}

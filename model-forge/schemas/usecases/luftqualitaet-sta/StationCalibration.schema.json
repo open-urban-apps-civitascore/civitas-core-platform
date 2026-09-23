@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "urn:core:platform:civitas:element:luftqualitaet:StationCalibration:1.0.0",
+  "title":   "StationCalibration",
+  "description": "Calibration factors for a specific station and validity period. Applied to raw sensor values before forwarding to the SensorThings API.",
+  "type": "object",
+  "properties": {
+    "no2Factor": {
+      "type": "number",
+      "default": 1.0,
+      "description": "Multiplicative calibration factor for NO₂ raw values."
+    },
+    "pm25Factor": {
+      "type": "number",
+      "default": 1.0,
+      "description": "Multiplicative calibration factor for PM2,5 raw values."
+    },
+    "coFactor": {
+      "type": "number",
+      "default": 1.0,
+      "description": "Multiplicative calibration factor for CO raw values."
+    },
+    "validFrom": {
+      "type": "string",
+      "format": "date",
+      "description": "Date from which this calibration is valid (ISO-8601)."
+    },
+    "validUntil": {
+      "type": "string",
+      "format": "date",
+      "description": "Date until which this calibration is valid (ISO-8601). Absent = currently valid."
+    }
+  }
+}

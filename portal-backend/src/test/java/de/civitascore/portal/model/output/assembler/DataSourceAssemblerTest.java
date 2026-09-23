@@ -9,6 +9,7 @@ import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import java.util.UUID;
@@ -26,9 +27,11 @@ class DataSourceAssemblerTest {
   @Mock private DataSourceMapper dataSourceMapper;
   @Mock private ConnectorHandlerRegistry connectorHandlerRegistry;
   @Mock private PipelineRepository pipelineRepository;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
 
   private DataSourceAssembler assembler() {
-    return new DataSourceAssembler(dataSourceMapper, connectorHandlerRegistry, pipelineRepository);
+    return new DataSourceAssembler(
+        dataSourceMapper, connectorHandlerRegistry, pipelineRepository, modelRegistryGateway);
   }
 
   @Nested

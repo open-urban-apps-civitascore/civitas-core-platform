@@ -1,0 +1,11 @@
+{
+  "$schema":        "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource",
+  "id":             "urn:core:platform:civitas:datasource:smartmeter:sml-mqtt:1.0.0",
+  "title":          "Smart Meter SML MQTT",
+  "connectionType": "mqtt",
+  "element":        "urn:core:platform:civitas:element:smartmeter:SMLReading:1.0.0",
+  "urls":           ["mqtt://mosquitto:1883"],
+  "topics":         ["smartmeter/sml/+"],
+  "client_id":      "minifi-sml",
+  "qos":            1
+}

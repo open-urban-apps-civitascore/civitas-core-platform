@@ -17,10 +17,8 @@ import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.model.dataset.SafeNames;
 import de.civitascore.configadapter.model.dataset.WorkspaceNames;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import de.civitascore.configadapter.util.OkHttpJson;
+import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -33,6 +31,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import okhttp3.HttpUrl;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import org.owasp.encoder.Encode;
 
 /**
@@ -145,8 +149,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     log.info("GeoServerSagaHandler initialized for: {}", Encode.forJava(serverUrl));
   }
 
-  void setTestClient(Client client) {
+  void setTestClient(OkHttpClient client) {
     super.setClient(client);
+  }
+
+  /**
+   * The GeoServer REST URL for a path relative to {@link #serverUrl}, e.g. {@code
+   * /rest/workspaces}.
+   */
+  private HttpUrl url(String restPath) {
+    return OkHttpJson.url(serverUrl, restPath);
   }
 
   @Override
@@ -258,17 +270,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private SagaCommandResult handleDeleteWorkspace(SagaCommandMessage command) {
     String workspaceName = resolveWorkspaceName(command);
 
-    try (Response response =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path("/rest/workspaces/" + workspaceName)
-                    .queryParam("recurse", "true")
-                    .request(MediaType.APPLICATION_JSON))
-            .delete()) {
-      int status = response.getStatus();
-      if (status != 200 && status != 404) {
-        String body = truncateBody(response.readEntity(String.class));
+    HttpUrl url =
+        url("/rest/workspaces/" + workspaceName)
+            .newBuilder()
+            .addQueryParameter("recurse", "true")
+            .build();
+    Request request = auth.apply(OkHttpJson.jsonRequest(url).delete()).build();
+    try (Response response = execute(request)) {
+      int status = response.code();
+      if (status != HttpURLConnection.HTTP_OK && status != HttpURLConnection.HTTP_NOT_FOUND) {
+        String body = truncateBody(readBody(response));
         throw new SagaApiException(
             "DELETE_WORKSPACE failed: HTTP " + status + " — " + body, status);
       }
@@ -326,13 +337,13 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
         continue;
       }
       requireSafeName(ftName, "featureType name");
-      try (Response response =
+      HttpUrl url = url(featureTypesPath(workspaceName, datastoreName) + "/" + ftName);
+      Request request =
           auth.apply(
-                  client()
-                      .target(serverUrl)
-                      .path(featureTypesPath(workspaceName, datastoreName) + "/" + ftName)
-                      .request(MediaType.APPLICATION_JSON))
-              .put(Entity.json(Map.of("featureType", ft)))) {
+                  OkHttpJson.jsonRequest(url)
+                      .put(OkHttpJson.jsonBodyUnchecked(Map.of("featureType", ft))))
+              .build();
+      try (Response response = execute(request)) {
         checkResponse(response, "RESTORE_WORKSPACE/featuretype/" + ftName);
       }
     }
@@ -356,18 +367,17 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     // where the WMS layer-by-name lookup fails to resolve/hides the layer and same-named layers
     // across datasets collide. WFS is unaffected either way; WMS needs the isolation.
     int status;
-    try (Response response =
+    Request createRequest =
         auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path("/rest/workspaces")
-                    .request(MediaType.APPLICATION_JSON))
-            .post(
-                Entity.json(
-                    Map.of("workspace", Map.of("name", workspaceName, "isolated", true))))) {
-      status = response.getStatus();
+                OkHttpJson.jsonRequest(url("/rest/workspaces"))
+                    .post(
+                        OkHttpJson.jsonBodyUnchecked(
+                            Map.of("workspace", Map.of("name", workspaceName, "isolated", true)))))
+            .build();
+    try (Response response = execute(createRequest)) {
+      status = response.code();
       if (status != 201) {
-        String body = truncateBody(response.readEntity(String.class));
+        String body = truncateBody(readBody(response));
         if (!alreadyExists(status, body)) {
           throw new SagaApiException(
               "CREATE_WORKSPACE/" + workspaceName + " failed: HTTP " + status + " — " + body,
@@ -377,7 +387,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     }
     // On fresh creation, enable the per-workspace WMS virtual service so a map client (QGIS, …)
     // shows the dataset as the named service (the capabilities root layer) above the layers.
-    if (status == 201) {
+    if (status == HttpURLConnection.HTTP_CREATED) {
       enableWorkspaceWmsService(workspaceName, serviceTitle);
     }
   }
@@ -409,21 +419,21 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     settings.put("enabled", true);
     settings.put("name", serviceName);
     settings.put("title", serviceTitle);
-    try (Response response =
+    HttpUrl url = url("/rest/services/" + service + "/workspaces/" + workspaceName + "/settings");
+    Request request =
         auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(
-                        "/rest/services/" + service + "/workspaces/" + workspaceName + "/settings")
-                    .request(MediaType.APPLICATION_JSON))
-            .put(Entity.json(Map.of(service, settings)))) {
-      if (response.getStatus() != 200 && response.getStatus() != 201) {
+                OkHttpJson.jsonRequest(url)
+                    .put(OkHttpJson.jsonBodyUnchecked(Map.of(service, settings))))
+            .build();
+    try (Response response = execute(request)) {
+      if (response.code() != HttpURLConnection.HTTP_OK
+          && response.code() != HttpURLConnection.HTTP_CREATED) {
         log.warn(
             "Could not enable {} service for workspace {} (status {}); the layer stays reachable,"
                 + " only the workspace service title is unset",
             serviceName,
             Encode.forJava(workspaceName),
-            response.getStatus());
+            response.code());
       }
     }
   }
@@ -444,32 +454,31 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     // The datastore's schema is the workspace name: both derive from datasetId, so GeoServer reads
     // exactly the schema PostGIS created the table in.
     Map<String, Object> datastoreBody = buildDatastoreBody(datastoreName, workspaceName);
-    try (Response createResponse =
+    Request createRequest =
         auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path("/rest/workspaces/" + workspaceName + "/datastores")
-                    .request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(datastoreBody))) {
-      int status = createResponse.getStatus();
-      if (status == 201) {
+                OkHttpJson.jsonRequest(url("/rest/workspaces/" + workspaceName + "/datastores"))
+                    .post(OkHttpJson.jsonBodyUnchecked(datastoreBody)))
+            .build();
+    try (Response createResponse = execute(createRequest)) {
+      int status = createResponse.code();
+      if (status == HttpURLConnection.HTTP_CREATED) {
         return;
       }
       // The body is single-read, so buffer it once and branch on it: an "already exists" signal
       // (409, or a 500 whose body says so) falls through to the PUT; anything else is a real error.
-      String body = truncateBody(createResponse.readEntity(String.class));
+      String body = truncateBody(readBody(createResponse));
       if (!alreadyExists(status, body)) {
         throw new SagaApiException(
             "CREATE_DATASTORE/" + datastoreName + " failed: HTTP " + status + " — " + body, status);
       }
     }
-    try (Response updateResponse =
+    Request updateRequest =
         auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path("/rest/workspaces/" + workspaceName + "/datastores/" + datastoreName)
-                    .request(MediaType.APPLICATION_JSON))
-            .put(Entity.json(datastoreBody))) {
+                OkHttpJson.jsonRequest(
+                        url("/rest/workspaces/" + workspaceName + "/datastores/" + datastoreName))
+                    .put(OkHttpJson.jsonBodyUnchecked(datastoreBody)))
+            .build();
+    try (Response updateResponse = execute(updateRequest)) {
       checkResponse(updateResponse, "CREATE_DATASTORE/update/" + datastoreName);
     }
   }
@@ -481,8 +490,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * schema holding the data.
    */
   private static boolean alreadyExists(int status, String body) {
-    return status == Response.Status.CONFLICT.getStatusCode()
-        || (status == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()
+    return status == HttpURLConnection.HTTP_CONFLICT
+        || (status == HttpURLConnection.HTTP_INTERNAL_ERROR
             && body != null
             && body.toLowerCase(Locale.ROOT).contains("already exists"));
   }
@@ -837,19 +846,24 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       String crs,
       String nativeCrs,
       Map<String, Object> nativeBBox) {
-    try (Response response =
+    HttpUrl url =
+        url(featureTypesPath(workspaceName, datastoreName))
+            .newBuilder()
+            .addQueryParameter("recalculate", recalculateFor(nativeBBox))
+            .build();
+    Request request =
         auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(featureTypesPath(workspaceName, datastoreName))
-                    .queryParam("recalculate", recalculateFor(nativeBBox))
-                    .request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(featureTypePayload(name, nativeName, crs, nativeCrs, nativeBBox)))) {
-      int status = response.getStatus();
-      if (status == 201) {
+                OkHttpJson.jsonRequest(url)
+                    .post(
+                        OkHttpJson.jsonBodyUnchecked(
+                            featureTypePayload(name, nativeName, crs, nativeCrs, nativeBBox))))
+            .build();
+    try (Response response = execute(request)) {
+      int status = response.code();
+      if (status == HttpURLConnection.HTTP_CREATED) {
         return;
       }
-      String body = truncateBody(response.readEntity(String.class));
+      String body = truncateBody(readBody(response));
       if (!alreadyExists(status, body)) {
         throw new SagaApiException(
             "create-featuretype/" + name + " failed: HTTP " + status + " — " + body, status);
@@ -875,32 +889,34 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> nativeBBox) {
     Map<String, Object> payload = featureTypePayload(name, nativeName, crs, nativeCrs, nativeBBox);
     String recalculate = recalculateFor(nativeBBox);
-    try (Response createResponse =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(featureTypesPath(workspaceName, datastoreName))
-                    .queryParam("recalculate", recalculate)
-                    .request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(payload))) {
-      int status = createResponse.getStatus();
-      if (status == 201) {
+    HttpUrl createUrl =
+        url(featureTypesPath(workspaceName, datastoreName))
+            .newBuilder()
+            .addQueryParameter("recalculate", recalculate)
+            .build();
+    Request createRequest =
+        auth.apply(OkHttpJson.jsonRequest(createUrl).post(OkHttpJson.jsonBodyUnchecked(payload)))
+            .build();
+    try (Response createResponse = execute(createRequest)) {
+      int status = createResponse.code();
+      if (status == HttpURLConnection.HTTP_CREATED) {
         return;
       }
-      String body = truncateBody(createResponse.readEntity(String.class));
+      String body = truncateBody(readBody(createResponse));
       if (!alreadyExists(status, body)) {
         throw new SagaApiException(
             "update-featuretype/create/" + name + " failed: HTTP " + status + " — " + body, status);
       }
     }
-    try (Response updateResponse =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(featureTypesPath(workspaceName, datastoreName) + "/" + name)
-                    .queryParam("recalculate", recalculate)
-                    .request(MediaType.APPLICATION_JSON))
-            .put(Entity.json(payload))) {
+    HttpUrl updateUrl =
+        url(featureTypesPath(workspaceName, datastoreName) + "/" + name)
+            .newBuilder()
+            .addQueryParameter("recalculate", recalculate)
+            .build();
+    Request updateRequest =
+        auth.apply(OkHttpJson.jsonRequest(updateUrl).put(OkHttpJson.jsonBodyUnchecked(payload)))
+            .build();
+    try (Response updateResponse = execute(updateRequest)) {
       checkResponse(updateResponse, "update-featuretype/" + name);
     }
   }
@@ -934,30 +950,23 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * #checkResponse}.
    */
   private void upsertStyle(String workspaceName, String name, String sld) {
-    Entity<String> sldEntity = Entity.entity(sld, STYLE_SLD_CONTENT_TYPE);
-    try (Response createResponse =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(stylesPath(workspaceName))
-                    .queryParam("name", name)
-                    .request(MediaType.APPLICATION_JSON))
-            .post(sldEntity)) {
-      if (createResponse.getStatus() == 201) {
+    RequestBody sldBody = RequestBody.create(sld, MediaType.get(STYLE_SLD_CONTENT_TYPE));
+    HttpUrl createUrl =
+        url(stylesPath(workspaceName)).newBuilder().addQueryParameter("name", name).build();
+    Request createRequest = auth.apply(OkHttpJson.jsonRequest(createUrl).post(sldBody)).build();
+    try (Response createResponse = execute(createRequest)) {
+      if (createResponse.code() == HttpURLConnection.HTTP_CREATED) {
         return;
       }
-      if (createResponse.getStatus() != 403) {
+      if (createResponse.code() != HttpURLConnection.HTTP_FORBIDDEN) {
         checkResponse(createResponse, "create-style/" + name);
         return;
       }
     }
-    try (Response updateResponse =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(stylePath(workspaceName, name))
-                    .request(MediaType.APPLICATION_JSON))
-            .put(sldEntity)) {
+    Request updateRequest =
+        auth.apply(OkHttpJson.jsonRequest(url(stylePath(workspaceName, name))).put(sldBody))
+            .build();
+    try (Response updateResponse = execute(updateRequest)) {
       checkResponse(updateResponse, "update-style/" + name);
     }
   }
@@ -987,13 +996,12 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       }
       layerBody.put("styles", Map.of("@class", "linked-hash-set", "style", styleRefs));
     }
-    try (Response response =
+    Request request =
         auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(layerPath(workspaceName, layerName))
-                    .request(MediaType.APPLICATION_JSON))
-            .put(Entity.json(Map.of("layer", layerBody)))) {
+                OkHttpJson.jsonRequest(url(layerPath(workspaceName, layerName)))
+                    .put(OkHttpJson.jsonBodyUnchecked(Map.of("layer", layerBody))))
+            .build();
+    try (Response response = execute(request)) {
       checkResponse(response, "assign-layer-styles/" + layerName);
     }
     verifyLayerStylesApplied(workspaceName, layerName, defaultStyle, alternativeStyles);
@@ -1040,15 +1048,12 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   @SuppressWarnings("unchecked")
   private Map<String, Object> readLayer(String workspaceName, String layerName) {
-    try (Response response =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(layerPath(workspaceName, layerName) + ".json")
-                    .request(MediaType.APPLICATION_JSON))
-            .get()) {
+    Request request =
+        auth.apply(OkHttpJson.jsonRequest(url(layerPath(workspaceName, layerName) + ".json")).get())
+            .build();
+    try (Response response = execute(request)) {
       checkResponse(response, "read-layer/" + layerName);
-      Object layer = response.readEntity(Map.class).get("layer");
+      Object layer = OkHttpJson.readJsonMap(response).get("layer");
       if (!(layer instanceof Map)) {
         throw new IllegalStateException("read-layer/" + layerName + ": unexpected response shape");
       }
@@ -1097,16 +1102,15 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private void deleteFeatureType(
       String workspaceName, String datastoreName, String ftName, String step) {
     requireSafeName(ftName, "featureType name");
-    try (Response response =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(featureTypesPath(workspaceName, datastoreName) + "/" + ftName)
-                    .queryParam("recurse", "true")
-                    .request(MediaType.APPLICATION_JSON))
-            .delete()) {
-      int status = response.getStatus();
-      if (status != 200 && status != 404) {
+    HttpUrl url =
+        url(featureTypesPath(workspaceName, datastoreName) + "/" + ftName)
+            .newBuilder()
+            .addQueryParameter("recurse", "true")
+            .build();
+    Request request = auth.apply(OkHttpJson.jsonRequest(url).delete()).build();
+    try (Response response = execute(request)) {
+      int status = response.code();
+      if (status != HttpURLConnection.HTTP_OK && status != HttpURLConnection.HTTP_NOT_FOUND) {
         checkResponse(response, step + "/delete-featuretype/" + ftName);
       }
     }
@@ -1180,38 +1184,48 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   @SuppressWarnings("unchecked")
   private List<Map<String, Object>> readCurrentFeatureTypes(
       String workspaceName, String datastoreName, String step) {
-    try (Response response =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(
-                        "/rest/workspaces/"
-                            + workspaceName
-                            + "/datastores/"
-                            + datastoreName
-                            + "/featuretypes.json")
-                    .request(MediaType.APPLICATION_JSON))
-            .get()) {
-      int status = response.getStatus();
-      if (status == 404) {
+    HttpUrl url =
+        url(
+            "/rest/workspaces/"
+                + workspaceName
+                + "/datastores/"
+                + datastoreName
+                + "/featuretypes.json");
+    Request request = auth.apply(OkHttpJson.jsonRequest(url).get()).build();
+    try (Response response = execute(request)) {
+      int status = response.code();
+      if (status == HttpURLConnection.HTTP_NOT_FOUND) {
         // Datastore/workspace has no feature types yet — an empty snapshot is correct here.
         return List.of();
       }
-      if (status != 200) {
+      if (status != HttpURLConnection.HTTP_OK) {
         // Auth/server errors must not be mistaken for "zero feature types": that would let the
         // caller proceed with an empty compensation snapshot and lose restore state.
-        String body = truncateBody(response.readEntity(String.class));
+        String body = truncateBody(readBody(response));
         throw new SagaApiException(
             step + "/read-featuretypes failed: HTTP " + status + " — " + body, status);
       }
-      Map<String, Object> result = response.readEntity(Map.class);
-      Map<String, Object> featureTypes =
-          (Map<String, Object>) result.getOrDefault("featureTypes", Map.of());
+      Map<String, Object> result = OkHttpJson.readJsonMap(response);
+      Object value = result.get("featureTypes");
+      // A workspace serving no feature type answers {"featureTypes":""}: GeoServer serialises an
+      // empty collection as an empty string.
+      if (value instanceof String text && text.isEmpty()) {
+        return List.of();
+      }
+      if (!(value instanceof Map<?, ?> featureTypes)) {
+        // Same rule as the non-200 branch: a listing we cannot read is not an empty workspace. An
+        // empty snapshot is not merely lost restore state — compensation deletes every feature type
+        // absent from it, so a wrong empty here unpublishes the dataset's layers.
+        throw new SagaApiException(
+            step + "/read-featuretypes: unexpected featureTypes shape " + typeName(value), status);
+      }
       Object ftList = featureTypes.get("featureType");
       if (ftList instanceof List) {
         return (List<Map<String, Object>>) ftList;
       }
-      return List.of();
+      // Same reasoning: a wrapper without a readable entry list is not an empty workspace either.
+      throw new SagaApiException(
+          step + "/read-featuretypes: unexpected featureType shape " + typeName(ftList), status);
     }
   }
 

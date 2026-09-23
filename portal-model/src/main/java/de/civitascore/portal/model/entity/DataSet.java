@@ -67,6 +67,18 @@ public class DataSet extends BaseDataEntity {
   @Column(name = "version")
   private String version;
 
+  /**
+   * Logical CORE URN of this DataSet's manifest artifact in Model Forge — the manifest its member
+   * artifacts (Pipelines and, transitively, their sources/sinks/mappings/structures) are linked
+   * into. Null until the manifest is created on dataset creation.
+   */
+  @Column(name = "manifest_logical_urn")
+  private String manifestLogicalUrn;
+
+  /** Versioned CORE URN pin of the DataSet manifest's current version. */
+  @Column(name = "manifest_urn")
+  private String manifestUrn;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owner_user_id")
   private User owner;

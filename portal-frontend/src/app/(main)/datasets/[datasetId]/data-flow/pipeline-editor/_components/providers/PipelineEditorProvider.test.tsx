@@ -1,14 +1,15 @@
 import { act, render } from '@testing-library/react'
-import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios'
 import React from 'react'
 import { toast } from 'sonner'
 
+import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
@@ -20,9 +21,13 @@ import { useActivePipeline } from '../../_hooks/use-active-pipeline'
 import { usePipelineSession } from '../../_hooks/use-pipeline-session'
 import {
   buildDataSinkPayloads,
+  buildMappingArtifacts,
+  createMappingSnapshot,
   getRemovedDataSinkIds,
   hasDataSinkChanged,
+  hasMappingChanged,
   isDestructiveDataSinkChange,
+  updateNodeData,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
 import { createEmptyPipeline } from '../../_services/pipelineService'
@@ -50,6 +55,20 @@ vi.mock('@/hooks/use-register-unsaved-changes', () => ({
   useRegisterUnsavedChanges: vi.fn(),
 }))
 
+const mockReadOnly = vi.hoisted(() => ({ isReadOnly: false }))
+
+vi.mock('../../_hooks/use-pipeline-read-only', () => ({
+  useReadOnly: () => mockReadOnly,
+  ReadOnlyProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
+
+const mockDatasetPermissions = vi.hoisted(() => ({ canDeletePipeline: true }))
+
+vi.mock('@/hooks/use-dataset-permissions', () => ({
+  useDatasetPermissions: () => mockDatasetPermissions,
+  useDatasetPermissionsById: () => ({ ...mockDatasetPermissions, isLoading: false }),
+}))
+
 vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useGetPipelines: vi.fn(),
   useCreatePipeline: vi.fn(),
@@ -65,6 +84,11 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useCreateDataSink: vi.fn(),
   useDeleteDataSink: vi.fn(),
   useUpdateDataSink: vi.fn(),
+}))
+
+vi.mock('@/app/services/api/mappings/clientRequests', () => ({
+  useCreateMapping: vi.fn(),
+  useUpdateMapping: vi.fn(),
 }))
 
 // Capture the latest WarningModal props so tests can drive the data-loss dialog (confirm/discard).
@@ -95,10 +119,14 @@ vi.mock('../../_services/payloadBuilderService', () => ({
     model: {},
   }),
   buildDataSinkPayloads: vi.fn().mockReturnValue([]),
+  buildMappingArtifacts: vi.fn().mockReturnValue([]),
   createDataSinkSnapshot: vi.fn().mockReturnValue({}),
+  createMappingSnapshot: vi.fn().mockReturnValue({}),
   getRemovedDataSinkIds: vi.fn().mockReturnValue([]),
   hasDataSinkChanged: vi.fn().mockReturnValue(false),
+  hasMappingChanged: vi.fn().mockReturnValue(true),
   isDestructiveDataSinkChange: vi.fn().mockReturnValue(false),
+  updateNodeData: vi.fn().mockImplementation((pipeline: unknown) => pipeline),
   updateNodeEntityId: vi.fn().mockImplementation((pipeline: unknown) => pipeline),
 }))
 
@@ -180,9 +208,16 @@ beforeEach(() => {
   vi.clearAllMocks()
   contextRef.current = null
 
+  mockReadOnly.isReadOnly = false
+  mockDatasetPermissions.canDeletePipeline = true
+
   vi.mocked(buildDataSinkPayloads).mockReturnValue([])
+  vi.mocked(buildMappingArtifacts).mockReturnValue([])
+  vi.mocked(createMappingSnapshot).mockReturnValue({})
   vi.mocked(getRemovedDataSinkIds).mockReturnValue([])
   vi.mocked(hasDataSinkChanged).mockReturnValue(false)
+  vi.mocked(hasMappingChanged).mockReturnValue(true)
+  vi.mocked(updateNodeData).mockImplementation((pipeline: unknown) => pipeline as never)
   vi.mocked(updateNodeEntityId).mockImplementation((pipeline: unknown) => pipeline as never)
 
   mockCreatePipelineMutateAsync = vi.fn().mockResolvedValue({ data: { id: 'created-id' } })
@@ -234,6 +269,18 @@ beforeEach(() => {
     mutateAsync: vi.fn().mockResolvedValue({}),
     isPending: false,
   } as unknown as ReturnType<typeof useUpdateDataSink>)
+
+  vi.mocked(useCreateMapping).mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ data: { logicalUrn: 'urn:logical', versionedUrn: 'urn:versioned' } }),
+    isPending: false,
+  } as unknown as ReturnType<typeof useCreateMapping>)
+
+  vi.mocked(useUpdateMapping).mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ data: { logicalUrn: 'urn:logical', versionedUrn: 'urn:versioned-2' } }),
+    isPending: false,
+  } as unknown as ReturnType<typeof useUpdateMapping>)
 
   vi.mocked(validatePipelineWithNodeStatus).mockReturnValue({
     isValid: true,
@@ -976,6 +1023,188 @@ describe('PipelineEditorProviderComponent', () => {
       })
     })
 
+    it('creates a mapping artifact via POST when the node has no prior logicalUrn', async () => {
+      const mockCreateMappingMutateAsync = vi
+        .fn()
+        .mockResolvedValue({ data: { logicalUrn: 'urn:logical-1', versionedUrn: 'urn:versioned-1' } })
+      vi.mocked(useCreateMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockCreateMappingMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useCreateMapping>)
+
+      const mappingBody = { source: 'urn:src', target: 'urn:tgt', fields: {}, title: 'Src-to-Tgt', positions: {} }
+      vi.mocked(buildMappingArtifacts).mockReturnValue([
+        { nodeId: 'map-1', logicalUrn: undefined, body: mappingBody as never },
+      ])
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1', nodes: [] },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(mockCreateMappingMutateAsync).toHaveBeenCalledOnce()
+      expect(mockCreateMappingMutateAsync).toHaveBeenCalledWith(mappingBody)
+    })
+
+    it('updates an existing mapping via PUT when the node has a prior logicalUrn', async () => {
+      const mockUpdateMappingMutateAsync = vi
+        .fn()
+        .mockResolvedValue({ data: { logicalUrn: 'urn:logical-1', versionedUrn: 'urn:versioned-2' } })
+      vi.mocked(useUpdateMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockUpdateMappingMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useUpdateMapping>)
+
+      const mappingBody = { source: 'urn:src', target: 'urn:tgt', fields: {}, title: 'Src-to-Tgt', positions: {} }
+      vi.mocked(buildMappingArtifacts).mockReturnValue([
+        { nodeId: 'map-1', logicalUrn: 'urn:logical-1', body: mappingBody as never },
+      ])
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1', nodes: [] },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(mockUpdateMappingMutateAsync).toHaveBeenCalledOnce()
+      expect(mockUpdateMappingMutateAsync).toHaveBeenCalledWith({ logicalUrn: 'urn:logical-1', ...mappingBody })
+    })
+
+    it('does not call updateMapping when an already-created mapping has not changed', async () => {
+      const mockUpdateMappingMutateAsync = vi.fn().mockResolvedValue({})
+      vi.mocked(useUpdateMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockUpdateMappingMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useUpdateMapping>)
+
+      const mappingBody = { source: 'urn:src', target: 'urn:tgt', fields: {}, title: 'Src-to-Tgt', positions: {} }
+      vi.mocked(buildMappingArtifacts).mockReturnValue([
+        { nodeId: 'map-1', logicalUrn: 'urn:logical-1', body: mappingBody as never },
+      ])
+      vi.mocked(hasMappingChanged).mockReturnValue(false)
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1', nodes: [] },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(mockUpdateMappingMutateAsync).not.toHaveBeenCalled()
+    })
+
+    it('creates mapping artifacts before saving the pipeline, so the mappingRef makes it into the CORE model', async () => {
+      const callOrder: string[] = []
+
+      const mockCreateMappingMutateAsync = vi.fn().mockImplementation(async () => {
+        callOrder.push('createMapping')
+        return { data: { logicalUrn: 'urn:logical-1', versionedUrn: 'urn:versioned-1' } }
+      })
+      vi.mocked(useCreateMapping).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockCreateMappingMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useCreateMapping>)
+
+      mockUpdatePipelineMutateAsync.mockImplementation(async () => {
+        callOrder.push('updatePipeline')
+        return {}
+      })
+
+      vi.mocked(buildMappingArtifacts).mockReturnValue([
+        {
+          nodeId: 'map-1',
+          logicalUrn: undefined,
+          body: { source: 'urn:src', target: 'urn:tgt', fields: {}, title: 'Src-to-Tgt', positions: {} } as never,
+        },
+      ])
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1', nodes: [] },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(callOrder).toEqual(['createMapping', 'updatePipeline'])
+      expect(updateNodeData).toHaveBeenCalledWith(expect.anything(), 'map-1', {
+        mappingRef: 'urn:versioned-1',
+        mappingLogicalUrn: 'urn:logical-1',
+      })
+    })
+
+    it('retains refs obtained before a later save step fails, so a retry does not re-POST', async () => {
+      const mockCreateDataSinkMutateAsync = vi
+        .fn()
+        .mockResolvedValue({ data: { id: 'new-dataSink-id', configurationUrn: 'urn:core:sink-config' } })
+      vi.mocked(useCreateDataSink).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockCreateDataSinkMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useCreateDataSink>)
+
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
+        { nodeId: 'persist-node-1', entityId: null, payload: { name: 'sink-1', type: 'postgres' } as never },
+      ])
+
+      // The sink create succeeds and stashes its entityId onto the node (mirrors updateNodeEntityId's
+      // real behavior, driven here via the mock since it is stubbed out for the whole file).
+      const pipelineWithStashedSink = {
+        ...createEmptyPipeline('Test'),
+        id: 'pipeline-1',
+        nodes: [makeGeoPersistenceNode('persist-node-1', 'new-dataSink-id')],
+      }
+      vi.mocked(updateNodeEntityId).mockReturnValue(pipelineWithStashedSink)
+      vi.mocked(updateNodeData).mockReturnValue(pipelineWithStashedSink)
+
+      // The pipeline save itself (after the sink was already created) fails.
+      vi.mocked(useUpdatePipeline).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockRejectedValue(new Error('Pipeline save failed')),
+        isPending: false,
+      } as unknown as ReturnType<typeof useUpdatePipeline>)
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: {
+          ...createEmptyPipeline('Test'),
+          id: 'pipeline-1',
+          nodes: [makeGeoPersistenceNode('persist-node-1')],
+        },
+      })
+      renderProvider(session)
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+      // The sink WAS created — the partial pipeline (with the new entityId stashed) must be
+      // persisted back into the session so a retry sees it and PUTs instead of re-POSTing.
+      expect(contextRef.current?.pipeline?.nodes.find(n => n.id === 'persist-node-1')).toMatchObject({
+        data: expect.objectContaining({ entityId: 'new-dataSink-id' }),
+      })
+    })
+
     it('does not call updateDataSink when dataSink has not changed', async () => {
       const mockUpdateDataSinkMutateAsync = vi.fn().mockResolvedValue({})
       vi.mocked(useUpdateDataSink).mockReturnValue({
@@ -1389,21 +1618,10 @@ describe('PipelineEditorProviderComponent', () => {
     })
 
     it('shows a scope violation toast with the pipeline name on a 422 error', async () => {
-      const axiosError = new AxiosError(
-        'Unprocessable Entity',
-        undefined,
-        { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
-        undefined,
-        {
-          status: 422,
-          statusText: 'Unprocessable Entity',
-          headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
-          data: {
-            detail: 'DataSource "My DS" is not permitted for this datapool',
-            type: 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
-          },
-        },
+      const axiosError = mockApiError(
+        422,
+        'DataSource "My DS" is not permitted for this datapool',
+        'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
       )
       mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
 
@@ -1418,21 +1636,10 @@ describe('PipelineEditorProviderComponent', () => {
     })
 
     it('reports a duplicate table name instead of a generic save failure on a 409 error', async () => {
-      const axiosError = new AxiosError(
-        'Conflict',
-        undefined,
-        { headers: new AxiosHeaders(), method: 'POST', url: '/datasinks' } as InternalAxiosRequestConfig,
-        undefined,
-        {
-          status: 409,
-          statusText: 'Conflict',
-          headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'POST', url: '/datasinks' } as InternalAxiosRequestConfig,
-          data: {
-            detail: "DataSink with configuration.tableName 'roads' and dataSetId 'dataset-1' already exists",
-            type: 'urn:civitas:error:CONFLICT',
-          },
-        },
+      const axiosError = mockApiError(
+        409,
+        "Another POSTGIS DataSink of this dataset already uses tableName 'roads'; they would share one physical table",
+        'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION',
       )
       mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
 
@@ -1448,22 +1655,119 @@ describe('PipelineEditorProviderComponent', () => {
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('header.saveFailed')
     })
 
+    it('shows a not-draft toast instead of a generic save failure on a DATASET_NOT_EDITABLE error', async () => {
+      const axiosError = mockApiError(
+        400,
+        'DataSet must be in DRAFT to modify sub-entities',
+        'urn:civitas:error:DATASET_NOT_EDITABLE',
+      )
+      mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.notDraftError')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
+    })
+
+    it('returns false on a DATASET_NOT_EDITABLE error', async () => {
+      const axiosError = mockApiError(
+        400,
+        'DataSet must be in DRAFT to modify sub-entities',
+        'urn:civitas:error:DATASET_NOT_EDITABLE',
+      )
+      mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+    })
+
+    it('names the pipeline when a destructive sink change was not confirmed', async () => {
+      const axiosError = mockApiError(
+        409,
+        "This change rebuilds the sink's table and discards all stored data; set confirmDataLoss=true to proceed",
+        'urn:civitas:error:RESOURCE_IN_USE',
+      )
+      mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.unconfirmedDataLossError')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
+    })
+
+    it('names the pipeline when a data sink is still referenced by a layer', async () => {
+      const axiosError = mockApiError(
+        409,
+        'DataSink is referenced by one or more Layers',
+        'urn:civitas:error:RESOURCE_IN_USE',
+      )
+      mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.dataSinkInUseError')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
+    })
+
+    it('shows a saga-in-flight toast instead of a generic save failure when a saga is running', async () => {
+      const axiosError = mockApiError(
+        409,
+        'Cannot write while a saga is in-flight: UNRELEASE',
+        'urn:civitas:error:SAGA_IN_FLIGHT',
+      )
+      mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.sagaInFlightError')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
+    })
+
+    it('returns false when a saga is running', async () => {
+      const axiosError = mockApiError(
+        409,
+        'Cannot write while a saga is in-flight: UNRELEASE',
+        'urn:civitas:error:SAGA_IN_FLIGHT',
+      )
+      mockUpdatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+    })
+
     it('returns false on a 422 error', async () => {
-      const axiosError = new AxiosError(
-        'Unprocessable Entity',
-        undefined,
-        { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
-        undefined,
-        {
-          status: 422,
-          statusText: 'Unprocessable Entity',
-          headers: new AxiosHeaders(),
-          config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
-          data: {
-            detail: 'DataSource "My DS" is not permitted for this datapool',
-            type: 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
-          },
-        },
+      const axiosError = mockApiError(
+        422,
+        'DataSource "My DS" is not permitted for this datapool',
+        'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
       )
       mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
 
@@ -1672,6 +1976,149 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       expect(contextRef.current?.activeSessionId).not.toBe('session-1')
+    })
+
+    it('closes the session for a never-saved pipeline even without delete permission', () => {
+      mockDatasetPermissions.canDeletePipeline = false
+
+      const session = makeSession({
+        pipeline: { ...createEmptyPipeline('Test'), id: undefined },
+      })
+      renderProvider(session)
+
+      act(() => {
+        contextRef.current?.deletePipeline()
+      })
+
+      expect(mockDeleteMutate).not.toHaveBeenCalled()
+      expect(contextRef.current?.activeSessionId).not.toBe('session-1')
+    })
+
+    it('does not call the delete mutation when canDeletePipeline is false', () => {
+      mockDatasetPermissions.canDeletePipeline = false
+
+      const session = makeSession({
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-to-delete' },
+      })
+      renderProvider(session)
+
+      act(() => {
+        contextRef.current?.deletePipeline()
+      })
+
+      expect(mockDeleteMutate).not.toHaveBeenCalled()
+    })
+
+    it('does not remove the session when canDeletePipeline is false', () => {
+      mockDatasetPermissions.canDeletePipeline = false
+
+      const session = makeSession({
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-to-delete' },
+      })
+      renderProvider(session)
+
+      act(() => {
+        contextRef.current?.deletePipeline()
+      })
+
+      expect(contextRef.current?.activeSessionId).toBe('session-1')
+    })
+
+    it('shows a not-draft toast when the backend rejects with DATASET_NOT_EDITABLE', () => {
+      const session = makeSession({
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-to-delete' },
+      })
+      renderProvider(session)
+
+      act(() => {
+        contextRef.current?.deletePipeline()
+      })
+
+      const [, { onError }] = mockDeleteMutate.mock.calls[0]
+      const axiosError = mockApiError(400, 'DataSet must be in DRAFT', 'urn:civitas:error:DATASET_NOT_EDITABLE')
+      act(() => {
+        onError(axiosError)
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.notDraftError')
+    })
+
+    it('shows a saga-in-flight toast when the backend rejects because a saga is running', () => {
+      const session = makeSession({
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-to-delete' },
+      })
+      renderProvider(session)
+
+      act(() => {
+        contextRef.current?.deletePipeline()
+      })
+
+      const [, { onError }] = mockDeleteMutate.mock.calls[0]
+      const axiosError = mockApiError(
+        409,
+        'Cannot write while a saga is in-flight: UNRELEASE',
+        'urn:civitas:error:SAGA_IN_FLIGHT',
+      )
+      act(() => {
+        onError(axiosError)
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.sagaInFlightError')
+    })
+
+    it('shows a generic delete-failed toast on an unrecognised error', () => {
+      const session = makeSession({
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-to-delete' },
+      })
+      renderProvider(session)
+
+      act(() => {
+        contextRef.current?.deletePipeline()
+      })
+
+      const [, { onError }] = mockDeleteMutate.mock.calls[0]
+      act(() => {
+        onError(new Error('Network failure'))
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('toolbar.deleteFailed')
+    })
+  })
+
+  describe('status guards', () => {
+    it('saveAllPipelines returns false without API calls when isReadOnly is true', async () => {
+      mockReadOnly.isReadOnly = true
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' },
+      })
+      renderProvider(session)
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+      expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
+      expect(mockCreatePipelineMutateAsync).not.toHaveBeenCalled()
+    })
+
+    it('saveAllPipelines proceeds when isReadOnly is false', async () => {
+      mockReadOnly.isReadOnly = false
+
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1', nodes: [makeNode('n-1')] },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(mockUpdatePipelineMutateAsync).toHaveBeenCalled()
     })
   })
 })

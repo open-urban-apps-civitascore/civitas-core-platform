@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:core:platform:civitas:element:common:Observation:ulhry9fjx6:1.0.0",
+  "title": "Observation",
+  "description": "A normalized urban observation derived from raw sensor telemetry.",
+  "type": "object",
+  "required": ["id", "observedAt", "value", "unit", "reading"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable observation identifier."
+    },
+    "observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "value": {
+      "type": "number"
+    },
+    "unit": {
+      "type": "string"
+    },
+    "reading": {
+      "$ref": "urn:core:platform:civitas:element:common:SensorReading:d28s38wfmi:1.0.0",
+      "description": "The raw sensor reading this observation was derived from."
+    }
+  }
+}

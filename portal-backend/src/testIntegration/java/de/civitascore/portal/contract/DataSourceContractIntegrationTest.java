@@ -7,11 +7,16 @@ import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.security.AllowedScopesFilter;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.json.JSONException;
+import org.json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -26,15 +31,17 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Pins the raw JSONB shape persisted in the {@code data_sources.configuration} column for the SQL
- * and MQTT connectors, and pins the JSONB mutation semantics on PUT and PATCH (Phase 1 of #1391).
+ * Pins the persisted connector-configuration shape for the SQL and MQTT connectors, and pins the
+ * mutation semantics on PUT and PATCH (Phase 1 of #1391). The inline {@code
+ * data_sources.configuration} JSONB column was dropped (V1_2_17); the configuration now lives as a
+ * CORE DataSource artifact in the Model Forge registry, read back here via its {@code
+ * configurationUrn}.
  *
  * <p>This is the Java-only half of the data source contract characterization. The HTTP contract is
  * covered by Bruno collections under {@code api/portal-backend/bruno-api/datasources/contract/};
- * those tests cannot reach into the database, which is why the JSONB-level assertions live here.
+ * those tests cannot reach into the registry, which is why the storage-level assertions live here.
  *
  * <p>The class extends {@link BaseKeycloakIntegrationTest} directly (rather than {@link
  * de.civitascore.portal.controller.BaseDataEntityControllerIntegrationTest}) to avoid inheriting
@@ -53,7 +60,11 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
    */
   private static final CustomComparator JSONB_COMPARATOR =
       new CustomComparator(
-          JSONCompareMode.NON_EXTENSIBLE,
+          // Lenient: the registry payload additionally carries the stamped
+          // $schema/id/connectionType
+          // identity fields, which are not part of the connector-configuration contract pinned
+          // here.
+          JSONCompareMode.LENIENT,
           new Customization(
               "password",
               (actual, expected) -> {
@@ -65,7 +76,9 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @Autowired private PortalTestDataFactory portalData;
 
-  @Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private ModelRegistryGateway modelRegistryGateway;
+
+  @Autowired private DataSourceRepository dataSourceRepository;
 
   @AfterEach
   void cleanUp() {
@@ -98,11 +111,22 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
     return resp.getBody();
   }
 
-  private String readConfigurationColumn(String dataSourceId) {
-    return jdbcTemplate.queryForObject(
-        "SELECT configuration::text FROM data_sources WHERE id = ?::uuid",
-        String.class,
-        dataSourceId);
+  /**
+   * Reads the persisted connector configuration back from the Model Forge registry. The inline
+   * {@code data_sources.configuration} JSONB column was dropped (V1_2_17); the configuration now
+   * lives as a CORE DataSource artifact keyed by the shell's {@code configurationUrn}. The returned
+   * JSON additionally carries the registry-stamped {@code $schema}/{@code id}/{@code
+   * connectionType} (ignored by the lenient comparator).
+   */
+  private String readStoredConfiguration(String dataSourceId) {
+    DataSource dataSource =
+        dataSourceRepository.findById(UUID.fromString(dataSourceId)).orElseThrow();
+    Map<String, Object> content =
+        modelRegistryGateway
+            .fetchPayload(dataSource.getConfigurationUrn())
+            .map(ModelRegistryGateway.RegistryDocument::content)
+            .orElseThrow();
+    return new JSONObject(content).toString();
   }
 
   private String createSqlDataSource(String name, UUID dsvId) {
@@ -161,7 +185,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
       String id =
           createSqlDataSource(
               "contract_sql_persist_create", createAvailableDataStructureVersionId());
-      String actualJson = readConfigurationColumn(id);
+      String actualJson = readStoredConfiguration(id);
       String expected =
           """
           {
@@ -190,7 +214,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
       String id =
           createMqttDataSource(
               "contract_mqtt_persist_create", createAvailableDataStructureVersionId());
-      String actualJson = readConfigurationColumn(id);
+      String actualJson = readStoredConfiguration(id);
       String expected =
           """
           {
@@ -225,7 +249,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
     void sqlPutWithMaskedPasswordPreservesStoredCiphertext() throws Exception {
       UUID dsvId = createAvailableDataStructureVersionId();
       String id = createSqlDataSource("contract_sql_put_mask", dsvId);
-      String originalCiphertext = JsonPath.read(readConfigurationColumn(id), "$.password");
+      String originalCiphertext = JsonPath.read(readStoredConfiguration(id), "$.password");
       assertThat(originalCiphertext)
           .as("create should persist a non-empty ciphertext")
           .isNotEmpty();
@@ -250,7 +274,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
               .formatted(dsvId);
       exchange(HttpMethod.PUT, DATASOURCES_ENDPOINT + "/" + id, putBody);
 
-      String persistedAfterPut = readConfigurationColumn(id);
+      String persistedAfterPut = readStoredConfiguration(id);
       String ciphertextAfterPut = JsonPath.read(persistedAfterPut, "$.password");
       assertThat(ciphertextAfterPut)
           .as("PUT with masked password must not overwrite the stored ciphertext")
@@ -282,7 +306,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
               .formatted(dsvId);
       exchange(HttpMethod.PUT, DATASOURCES_ENDPOINT + "/" + id, putBody);
 
-      String actualJson = readConfigurationColumn(id);
+      String actualJson = readStoredConfiguration(id);
       String expected =
           """
           {
@@ -306,7 +330,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
     void sqlPatchWithConfigurationPreservesStoredCiphertext() throws Exception {
       UUID dsvId = createAvailableDataStructureVersionId();
       String id = createSqlDataSource("contract_sql_patch_cfg", dsvId);
-      String originalCiphertext = JsonPath.read(readConfigurationColumn(id), "$.password");
+      String originalCiphertext = JsonPath.read(readStoredConfiguration(id), "$.password");
       assertThat(originalCiphertext).isNotEmpty();
 
       // PATCH with a configuration body that does NOT carry password.
@@ -325,7 +349,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
           """;
       exchange(HttpMethod.PATCH, DATASOURCES_ENDPOINT + "/" + id, patchBody);
 
-      String ciphertextAfterPatch = JsonPath.read(readConfigurationColumn(id), "$.password");
+      String ciphertextAfterPatch = JsonPath.read(readStoredConfiguration(id), "$.password");
       assertThat(ciphertextAfterPatch)
           .as(
               "PATCH with a configuration body that omits 'password' must preserve the stored "
@@ -340,7 +364,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
     void mqttPatchDescriptionOnlyDoesNotTouchConfiguration() throws Exception {
       UUID dsvId = createAvailableDataStructureVersionId();
       String id = createMqttDataSource("contract_mqtt_patch_desc", dsvId);
-      String configBeforePatch = readConfigurationColumn(id);
+      String configBeforePatch = readStoredConfiguration(id);
 
       String patchBody =
           """
@@ -348,11 +372,14 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
           """;
       exchange(HttpMethod.PATCH, DATASOURCES_ENDPOINT + "/" + id, patchBody);
 
-      String configAfterPatch = readConfigurationColumn(id);
-      // Byte-for-byte equality is fine here: no field in the JSONB depends on description.
-      assertThat(configAfterPatch)
-          .as("PATCH that does not name configuration must leave the JSONB untouched")
-          .isEqualTo(configBeforePatch);
+      String configAfterPatch = readStoredConfiguration(id);
+      // Compare structurally: the registry read does not guarantee a stable key order, and no field
+      // in the stored configuration depends on description.
+      JSONAssert.assertEquals(
+          "PATCH that does not name configuration must leave the stored configuration untouched",
+          configBeforePatch,
+          configAfterPatch,
+          JSONCompareMode.STRICT);
     }
   }
 

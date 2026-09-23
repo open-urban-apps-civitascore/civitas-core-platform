@@ -17,8 +17,7 @@ dev-environment/
 ├── apisix/     # API Gateway + Authorization (OPA, AuthZ Repository)
 ├── frost/      # FROST IoT Server
 ├── geoserver/  # GeoServer OGC Services (OWS)
-├── nifi/       # Apache NiFi (data integration / pipeline engine)
-└── modelatlas/ # Model Atlas
+└── nifi/       # Apache NiFi (data integration / pipeline engine)
 ```
 
 ---

@@ -14,6 +14,12 @@ params:path {
   id: {{sagaDataSourceId}}
 }
 
+script:post-response {
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('sagaDataSourceConfigurationUrn', res.body.configurationUrn);
+  }
+}
+
 tests {
   test("Released or already released", function() {
     const status = res.getStatus();

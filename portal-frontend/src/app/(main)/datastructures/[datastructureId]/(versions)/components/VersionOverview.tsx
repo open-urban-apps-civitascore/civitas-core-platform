@@ -123,7 +123,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const formValues = useWatch({ control: form.control })
   const descriptionWatch = form.watch('description')
-  const versionWatch = form.watch('version')
   const modelNameWatch = form.watch('modelName')
   const sourceWatch = form.watch('dataStructureVersionSource')
 
@@ -132,7 +131,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const completedTabs = useMemo((): DatastructureVersionTab[] => {
     const completed: DatastructureVersionTab[] = []
-    if (versionWatch.length > 0 && descriptionWatch.length > 0 && sourceWatch) completed.push('versionInfo')
+    // The version is assigned by the registry, so completeness rests only on what a user supplies.
+    if (descriptionWatch.length > 0 && sourceWatch) completed.push('versionInfo')
     if (nodesWatch.length > 0 && modelNameWatch) completed.push('structure')
     return completed
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -210,14 +210,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     [pathname, params, router],
   )
 
-  const versionAlreadyExistsError = useMemo(() => {
-    const versionExists = otherVersions.find(otherVersion => otherVersion.version === versionWatch.trim())
-    if (versionExists) {
-      return t('errors.versionAlreadyExists')
-    }
-    return undefined
-  }, [otherVersions, versionWatch, t])
-
   const statusHint = useMemo(() => {
     if (isInUse) return t('messages.isInUseStatusHint')
     if (isLastAvailableVersionInAvailableDatastructure) return t('messages.isLastAvailableVersion')
@@ -226,7 +218,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   // isValid must be read on every render, otherwise RHF's validation does not run
   const { isValid } = form.formState
-  const isConfirmButtonDisabled = !hasUserChanges || !isValid || !!versionAlreadyExistsError || isLoading
+  const isConfirmButtonDisabled = !hasUserChanges || !isValid || isLoading
 
   const renderTabContent = () => {
     switch (subTabValue) {
@@ -240,14 +232,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         )
       case 'versionInfo':
       default:
-        return (
-          <VersionInfoTab
-            form={form}
-            isReadOnly={isReadOnly}
-            versionAlreadyExistsError={versionAlreadyExistsError}
-            isAvailable={isVersionAvailable}
-          />
-        )
+        return <VersionInfoTab form={form} isReadOnly={isReadOnly} isAvailable={isVersionAvailable} />
     }
   }
 

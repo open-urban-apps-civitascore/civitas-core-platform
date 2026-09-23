@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://civitasconnect.digital/core/datasink/v1",
+  "title":   "CORE DataSink",
+  "description": "Configuration for a data sink that receives transformed data from a CORE pipeline. The target is chosen by 'connectionType' (frost | postgis); each variant declares exactly the fields the pipeline engine (config-adapter → NiFi) reads. 'element' references, by versioned CORE URN, the DataStructure describing the output row/entity format — Model Forge records it as a datasink-element dependency edge.",
+  "oneOf": [
+    { "$ref": "#/$defs/FrostDataSink" },
+    { "$ref": "#/$defs/PostgisDataSink" }
+  ],
+  "$defs": {
+    "FrostDataSink": {
+      "type": "object",
+      "title": "FROST DataSink",
+      "description": "Writes to an OGC SensorThings API / FROST-Server. A passthrough sink may carry no configuration; otherwise it references the mapping's Thing-shaped target structure by URN.",
+      "required": ["$schema", "id", "connectionType"],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "enum": [
+            "https://civitasconnect.digital/core/datasink/v1",
+            "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSink"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "description": "Versioned CORE URN of this DataSink.",
+          "pattern": "^urn:core:[^:]+:[^:]+:datasink:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+        },
+        "title":       { "type": "string", "description": "Human-readable display name." },
+        "description": { "type": "string" },
+        "connectionType": { "const": "frost", "description": "OGC SensorThings / FROST-Server target." },
+        "element": {
+          "type": "string",
+          "description": "Versioned CORE URN of the DataStructure describing the Thing-shaped target structure.",
+          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+          "x-core-ref": { "type": "urn:core:type:DataStructure" }
+        }
+      }
+    },
+    "PostgisDataSink": {
+      "type": "object",
+      "title": "PostGIS DataSink",
+      "description": "Writes rows into a PostGIS table.",
+      "required": ["$schema", "id", "connectionType", "tableName", "element"],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "enum": [
+            "https://civitasconnect.digital/core/datasink/v1",
+            "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSink"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "description": "Versioned CORE URN of this DataSink.",
+          "pattern": "^urn:core:[^:]+:[^:]+:datasink:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+        },
+        "title":       { "type": "string", "description": "Human-readable display name." },
+        "description": { "type": "string" },
+        "connectionType": { "const": "postgis", "description": "PostGIS table target." },
+        "tableName": { "type": "string", "description": "Target PostGIS table name." },
+        "element": {
+          "type": "string",
+          "description": "Versioned CORE URN of the DataStructure describing the row format written to the table.",
+          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+          "x-core-ref": { "type": "urn:core:type:DataStructure" }
+        }
+      }
+    }
+  }
+}

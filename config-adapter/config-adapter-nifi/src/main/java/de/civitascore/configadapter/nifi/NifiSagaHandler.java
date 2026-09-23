@@ -19,6 +19,7 @@ import de.civitascore.configadapter.exception.AdapterException;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.auth.OidcClientCredentialsTokenProvider;
@@ -46,8 +47,6 @@ import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.rest.NifiRestClient;
 import de.civitascore.configadapter.util.PayloadConverter;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
@@ -62,7 +61,7 @@ import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-import org.glassfish.jersey.media.multipart.MultiPartFeature;
+import okhttp3.OkHttpClient;
 import org.owasp.encoder.Encode;
 
 /**
@@ -98,6 +97,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   private static final String FIELD_DATA = "data";
   private static final String FIELD_DATA_SOURCE_IDS = "dataSourceIds";
   private static final String FIELD_DATA_SINK_IDS = "dataSinkIds";
+  private static final String FIELD_MAPPINGS = "mappings";
   // Saga-wide variable set by the FROST create/update-project step and propagated into every later
   // step's payload; scopes a FROST flow to the dataset's project.
   private static final String FIELD_PROJECT_ID = "projectId";
@@ -117,7 +117,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   private FlowDeploymentPlanner planner;
   private NifiRestClient nifiClient;
   // Dedicated (cert-validating) client for the Keycloak token endpoint; see oidcTokenProvider().
-  private Client oidcClient;
+  private OkHttpClient oidcClient;
   private NifiRuntimeMonitor runtimeMonitor;
 
   /** No-arg constructor for ServiceLoader discovery. Call {@link #initialize} before use. */
@@ -131,7 +131,6 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   @Override
-  @SuppressWarnings("PMD.CloseResource") // the JAX-RS Client is long-lived; closed in close()
   protected void doInitialize(AdapterConfig config) {
     this.tlsInsecure = Boolean.parseBoolean(getProperty("tls.insecure", "true"));
     if (tlsInsecure) {
@@ -168,9 +167,9 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
         new FlowDeploymentPlanner(new GraphParser(), new NifiFlowBuilder(stages), stages);
 
     if (this.nifiClient == null) {
-      Client jaxrs = client() != null ? client() : createClient();
-      setClient(jaxrs);
-      this.nifiClient = new NifiRestClient(url, oidcTokenProvider(), jaxrs, mqttTruststore);
+      OkHttpClient httpClient = client() != null ? client() : createClient();
+      setClient(httpClient);
+      this.nifiClient = new NifiRestClient(url, oidcTokenProvider(), httpClient, mqttTruststore);
     }
     this.runtimeMonitor =
         new NifiRuntimeMonitor(
@@ -226,7 +225,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
    * client-credentials tokens against the configured OpenID Connect provider (Keycloak), replacing
    * the former single-user login.
    *
-   * <p>It gets its OWN JAX-RS client, deliberately NOT the NiFi client: disabling TLS verification
+   * <p>It gets its OWN HTTP client, deliberately NOT the NiFi client: disabling TLS verification
    * for a self-signed dev NiFi ({@code nifi.tls.insecure=true}) must never also disable it for the
    * Keycloak token endpoint, or the client secret could be posted over an unverified connection.
    */
@@ -244,7 +243,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
               + " NIFI_OIDC_CLIENT_SECRET is provided");
     }
     this.oidcClient =
-        ClientBuilder.newBuilder()
+        new OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .build();
@@ -265,14 +264,15 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   @Override
-  protected Client createClient() {
-    ClientBuilder builder =
-        ClientBuilder.newBuilder()
+  protected OkHttpClient createClient() {
+    OkHttpClient.Builder builder =
+        new OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .register(MultiPartFeature.class);
+            .readTimeout(60, TimeUnit.SECONDS);
     if (tlsInsecure) {
-      builder.sslContext(trustAllContext()).hostnameVerifier((host, session) -> true);
+      builder
+          .sslSocketFactory(trustAllContext().getSocketFactory(), TRUST_ALL_MANAGER)
+          .hostnameVerifier((host, session) -> true);
     }
     return builder.build();
   }
@@ -461,9 +461,10 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
             datasinks,
             projectId,
             datasetId);
+    Map<String, Object> mappings = mappingsCatalog(pipeline.get(FIELD_MAPPINGS));
     PipelineDeploymentRequest request;
     try {
-      request = new PipelineDeploymentRequest(id, graphData, source, sink);
+      request = new PipelineDeploymentRequest(id, graphData, source, sink, mappings);
     } catch (IllegalArgumentException e) {
       // e.g. a blank pipeline id; keep the raw detail internal and publish only the safe
       // external message for the error code.
@@ -489,48 +490,50 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Resolves the pipeline's own datasource: the graph's source node names the entity, the
-   * pipeline's {@code dataSourceIds} confirm the association, and the trigger's dataset-wide {@code
-   * datasources} array is the configuration catalog the id resolves against. Entries in the catalog
-   * that this pipeline does not reference are simply not consulted — other pipelines of the dataset
-   * may use them.
+   * Resolves the pipeline's own datasource: the graph's source node names the entity by its
+   * configuration CORE URN ({@code sourceRef}), the pipeline's {@code dataSourceIds} confirm the
+   * association, and the trigger's dataset-wide {@code datasources} array is the URN-keyed
+   * configuration catalog the ref resolves against. Matching tolerates a version drift between the
+   * pinned ref and the catalog key ({@link CoreUrn#sameArtifact}). Entries in the catalog that this
+   * pipeline does not reference are simply not consulted — other pipelines of the dataset may use
+   * them.
    */
   private static Datasource resolveSource(
       GraphNode sourceNode, List<String> dataSourceIds, List<Datasource> datasources)
       throws FatalAdapterException {
-    String entityId = entityId(sourceNode, "datasource");
+    String sourceRef = requireRef(sourceNode.sourceRef(), sourceNode, "datasource", "sourceRef");
     if (dataSourceIds.isEmpty()) {
-      // Distinct from the id-mismatch below: an empty list means the trigger carries no
+      // Distinct from the ref-mismatch below: an empty list means the trigger carries no
       // per-pipeline association at all — it predates the dataSourceIds contract or the
-      // datasource was never associated with the pipeline. Naming an id mismatch here would
+      // datasource was never associated with the pipeline. Naming a ref mismatch here would
       // send an operator hunting a divergence that does not exist.
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           "pipeline carries no dataSourceIds: the trigger predates per-pipeline associations or"
               + " the datasource is not associated with the pipeline; re-publish the dataset");
     }
-    if (!dataSourceIds.contains(entityId)) {
+    if (!containsUrn(dataSourceIds, sourceRef)) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           "pipeline references datasource '"
-              + entityId
+              + sourceRef
               + "' that is not part of the trigger"
               + " payload");
     }
     return datasources.stream()
-        .filter(ds -> entityId.equals(ds.getId()))
+        .filter(ds -> CoreUrn.sameArtifact(ds.getId(), sourceRef))
         .findFirst()
         .orElseThrow(
             () ->
                 new FatalAdapterException(
                     AdapterErrorCode.NIFI_TEMPLATE_ERROR,
                     "pipeline references datasource '"
-                        + entityId
+                        + sourceRef
                         + "' that is not part of the"
                         + " trigger payload"));
   }
 
-  /** Resolves the pipeline's own datasink — same id-based catalog lookup as the source. */
+  /** Resolves the pipeline's own datasink — same URN-based catalog lookup as the source. */
   private SinkSpec resolveSink(
       GraphNode sinkNode,
       List<String> dataSinkIds,
@@ -538,19 +541,19 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       String projectId,
       String datasetId)
       throws FatalAdapterException {
-    String entityId = entityId(sinkNode, "datasink");
+    String sinkRef = requireRef(sinkNode.sinkRef(), sinkNode, "datasink", "sinkRef");
     if (dataSinkIds.isEmpty()) {
       // Same distinction as resolveSource: no association at all is a different defect than a
-      // diverging id.
+      // diverging ref.
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           "pipeline carries no dataSinkIds: the trigger predates per-pipeline associations or"
               + " the datasink is not associated with the pipeline; re-publish the dataset");
     }
     Map<String, Object> sink =
-        dataSinkIds.contains(entityId)
+        containsUrn(dataSinkIds, sinkRef)
             ? datasinks.stream()
-                .filter(s -> entityId.equals(asString(s.get(FIELD_ID))))
+                .filter(s -> CoreUrn.sameArtifact(asString(s.get(FIELD_ID)), sinkRef))
                 .findFirst()
                 .orElse(null)
             : null;
@@ -558,7 +561,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           "pipeline references datasink '"
-              + entityId
+              + sinkRef
               + "' that is not part of the trigger"
               + " payload");
     }
@@ -572,15 +575,38 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     return stages.sink(type).parseSpec(sink, new SinkResolutionContext(projectId, datasetId));
   }
 
-  /** The graph node's configured entity id — an unconfigured node cannot be resolved. */
-  private static String entityId(GraphNode node, String role) throws FatalAdapterException {
-    Object entityId = node.data().get("entityId");
-    if (entityId instanceof String id && !id.isBlank()) {
-      return id;
+  /** The graph node's configured configuration URN — an unconfigured node cannot be resolved. */
+  private static String requireRef(String ref, GraphNode node, String role, String refField)
+      throws FatalAdapterException {
+    if (ref != null && !ref.isBlank()) {
+      return ref;
     }
     throw new FatalAdapterException(
         AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-        role + " node '" + node.id() + "' carries no entityId; the node is not configured");
+        role + " node '" + node.id() + "' carries no " + refField + "; the node is not configured");
+  }
+
+  /** Whether {@code urns} contains a reference to the same artifact as {@code ref}. */
+  private static boolean containsUrn(List<String> urns, String ref) {
+    return urns.stream().anyMatch(u -> CoreUrn.sameArtifact(u, ref));
+  }
+
+  /**
+   * The pipeline entry's shipped mappings catalog (Mapping CORE URN → mapping document). Absent
+   * yields empty; a present-but-non-object value is a corrupt payload (INVALID_PAYLOAD) rather than
+   * silently coerced to empty, which would later fail the deploy with a misleading "not shipped"
+   * mapping error.
+   */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> mappingsCatalog(Object raw) throws FatalAdapterException {
+    if (raw == null) {
+      return Map.of();
+    }
+    if (!(raw instanceof Map<?, ?> map)) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD, FIELD_MAPPINGS + " must be an object");
+    }
+    return (Map<String, Object>) map;
   }
 
   /**
@@ -738,29 +764,30 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       credentialResolver.close();
     }
     if (oidcClient != null) {
-      oidcClient.close();
+      oidcClient.dispatcher().executorService().shutdown();
+      oidcClient.connectionPool().evictAll();
     }
     super.close();
   }
 
-  private static SSLContext trustAllContext() {
-    try {
-      TrustManager[] trustAll = {
-        new X509TrustManager() {
-          @Override
-          public void checkClientTrusted(X509Certificate[] chain, String type) {}
+  private static final X509TrustManager TRUST_ALL_MANAGER =
+      new X509TrustManager() {
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String type) {}
 
-          @Override
-          public void checkServerTrusted(X509Certificate[] chain, String type) {}
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String type) {}
 
-          @Override
-          public X509Certificate[] getAcceptedIssuers() {
-            return new X509Certificate[0];
-          }
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+          return new X509Certificate[0];
         }
       };
+
+  private static SSLContext trustAllContext() {
+    try {
       SSLContext context = SSLContext.getInstance("TLS");
-      context.init(null, trustAll, new SecureRandom());
+      context.init(null, new TrustManager[] {TRUST_ALL_MANAGER}, new SecureRandom());
       return context;
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException("Failed to build insecure TLS context", e);

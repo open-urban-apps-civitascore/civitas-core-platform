@@ -34,9 +34,8 @@ import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
 import java.util.Map;
+import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +43,7 @@ import org.junit.jupiter.api.Test;
 class NifiRestClientTest {
 
   private WireMockServer server;
-  private Client httpClient;
+  private OkHttpClient httpClient;
   private FakeTokenProvider tokenProvider;
   private NifiRestClient client;
 
@@ -52,7 +51,7 @@ class NifiRestClientTest {
   void setUp() {
     server = new WireMockServer(WireMockConfiguration.options().dynamicPort());
     server.start();
-    httpClient = ClientBuilder.newClient();
+    httpClient = new OkHttpClient();
     tokenProvider = new FakeTokenProvider();
     client =
         new NifiRestClient(
@@ -61,7 +60,8 @@ class NifiRestClientTest {
 
   @AfterEach
   void tearDown() {
-    httpClient.close();
+    httpClient.dispatcher().executorService().shutdown();
+    httpClient.connectionPool().evictAll();
     server.stop();
   }
 
@@ -748,6 +748,65 @@ class NifiRestClientTest {
     // Polled until stopped (two status reads) before the single delete was issued.
     server.verify(2, getRequestedFor(urlPathEqualTo("/nifi-api/process-groups/pg-1")));
     server.verify(1, deleteRequestedFor(urlPathEqualTo("/nifi-api/process-groups/pg-1")));
+  }
+
+  /** One VALID, Running processor so the inspection reports nothing and the bulletin decides. */
+  private void stubHealthyProcessorsForBulletinTests() {
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/processors"))
+            .willReturn(
+                json(
+                    "{ \"processors\": [ { \"id\": \"proc-1\", \"component\": { \"name\":"
+                        + " \"LogMessage\", \"validationStatus\": \"VALID\" },"
+                        + " \"status\": { \"runStatus\": \"Running\" },"
+                        + " \"revision\": { \"version\": 1 } } ] }")));
+  }
+
+  private static com.fasterxml.jackson.databind.JsonNode bulletin(String level, String message)
+      throws Exception {
+    return new com.fasterxml.jackson.databind.ObjectMapper()
+        .readTree(
+            "[ { \"bulletin\": { \"groupId\": \"pg-1\", \"sourceId\": \"proc-1\","
+                + " \"sourceName\": \"LogMessage\", \"level\": \""
+                + level
+                + "\", \"message\": \""
+                + message
+                + "\", \"timestamp\": \"\" } } ]");
+  }
+
+  @Test
+  void recordsReachingTheErrorSinkMakeThePipelineUnhealthy() throws Exception {
+    // NiFi raises the error-sink bulletin at its warn level, which it spells WARNING. Reporting the
+    // pipeline healthy here is what let a flow discard every record while looking fine.
+    stubHealthyProcessorsForBulletinTests();
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus(
+            "pg-1", bulletin("WARNING", "Pipeline record dropped: httpStatus=400 exception="));
+
+    assertEquals(false, status.healthy());
+    assertTrue(status.message().contains("Pipeline record dropped"));
+  }
+
+  @Test
+  void theShortWarnSpellingIsStillTreatedAsAFailure() throws Exception {
+    stubHealthyProcessorsForBulletinTests();
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus("pg-1", bulletin("WARN", "connection refused"));
+
+    assertEquals(false, status.healthy());
+  }
+
+  @Test
+  void aWarningThatNamesNoFailureLeavesThePipelineHealthy() throws Exception {
+    // The level alone must not condemn a pipeline — NiFi warns about plenty of benign things.
+    stubHealthyProcessorsForBulletinTests();
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus("pg-1", bulletin("WARNING", "queue is 80 percent full"));
+
+    assertEquals(true, status.healthy());
   }
 
   private static com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder json(

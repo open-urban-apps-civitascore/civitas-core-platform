@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:core:platform:civitas:element:luftqualitaet:AirQualityRawReading:1.0.0",
+  "title": "AirQualityRawReading",
+  "description": "Raw measurement payload from an urban air-quality monitoring station published to MQTT (topic: luftqualitaet/readings/{stationId}). Contains pollutant measurements plus meteorological context.",
+  "type": "object",
+  "required": ["stationId", "timestamp", "no2", "pm25", "co"],
+  "properties": {
+    "stationId": {
+      "type": "string",
+      "description": "Station identifier; matches StationMasterData.stationId and is used as lookup key."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp of the measurement cycle."
+    },
+    "no2": {
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+      "description": "Nitrogen dioxide (NO2) measurement."
+    },
+    "pm25": {
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+      "description": "Particulate matter PM2.5 measurement."
+    },
+    "co": {
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+      "description": "Carbon monoxide (CO) measurement."
+    },
+    "temperature": {
+      "type": "number",
+      "description": "Ambient temperature in degrees Celsius."
+    },
+    "humidity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Relative humidity in percent."
+    },
+    "location": {
+      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+      "description": "Current GPS position, if the sensor has a GPS module. Overrides the station default location."
+    }
+  }
+}

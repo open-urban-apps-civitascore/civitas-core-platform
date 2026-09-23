@@ -18,50 +18,203 @@ body:json {
   {
     "name": "Saga Test Pipeline",
     "description": "Pipeline for saga workflow test",
-    "dataSourceIds": ["{{sagaDataSourceId}}"],
-    "dataSinkIds": ["{{sagaDataSinkId}}"],
-    "model": {
-      "viewport": { "x": 0, "y": 0, "zoom": 1 },
+    "dataSourceIds": [
+      "{{sagaDataSourceId}}"
+    ],
+    "dataSinkIds": [
+      "{{sagaDataSinkId}}"
+    ],
+    "styles": {
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+      },
       "nodePositions": {
-        "22222222-2222-4000-8000-000000000001": { "x": 360, "y": -40 },
-        "22222222-2222-4000-8000-000000000005": { "x": 320, "y": 80 },
-        "22222222-2222-4000-8000-000000000006": { "x": 540, "y": 80 },
-        "22222222-2222-4000-8000-000000000003": { "x": 740, "y": 80 }
+        "22222222-2222-4000-8000-000000000001": {
+          "x": 360,
+          "y": -40
+        },
+        "22222222-2222-4000-8000-000000000005": {
+          "x": 320,
+          "y": 80
+        },
+        "22222222-2222-4000-8000-000000000006": {
+          "x": 540,
+          "y": 80
+        },
+        "22222222-2222-4000-8000-000000000003": {
+          "x": 740,
+          "y": 80
+        }
       },
       "nodes": [
         {
           "id": "22222222-2222-4000-8000-000000000001",
           "type": "start",
-          "position": { "x": 360, "y": -40 },
-          "data": { "nodeType": "start", "label": "Start", "configured": true, "description": "Entry point of the pipeline. Execution begins here." },
-          "measured": { "width": 32, "height": 32 }
+          "position": {
+            "x": 360,
+            "y": -40
+          },
+          "data": {
+            "nodeType": "start",
+            "label": "Start",
+            "configured": true,
+            "description": "Entry point of the pipeline. Execution begins here."
+          },
+          "measured": {
+            "width": 32,
+            "height": 32
+          }
         },
         {
           "id": "22222222-2222-4000-8000-000000000005",
           "type": "dataSource",
-          "position": { "x": 320, "y": 80 },
-          "data": { "label": "MQTT Source", "configured": true, "entityType": "datasource", "entityId": "{{sagaDataSourceId}}", "entityMetadata": { "connector": "MQTT" } },
-          "measured": { "width": 160, "height": 48 }
+          "position": {
+            "x": 320,
+            "y": 80
+          },
+          "data": {
+            "label": "MQTT Source",
+            "configured": true,
+            "entityType": "datasource",
+            "entityId": "{{sagaDataSourceId}}",
+            "entityMetadata": {
+              "connector": "MQTT"
+            }
+          },
+          "measured": {
+            "width": 160,
+            "height": 48
+          }
         },
         {
           "id": "22222222-2222-4000-8000-000000000006",
           "type": "frost",
-          "position": { "x": 540, "y": 80 },
-          "data": { "label": "Sensor Data Storage", "configured": true, "entityType": "frost", "entityId": "{{sagaDataSinkId}}", "serverName": "Sensor Data Storage", "serverUrl": "", "version": "1.1" },
-          "measured": { "width": 160, "height": 48 }
+          "position": {
+            "x": 540,
+            "y": 80
+          },
+          "data": {
+            "label": "Sensor Data Storage",
+            "configured": true,
+            "entityType": "frost",
+            "entityId": "{{sagaDataSinkId}}",
+            "serverName": "Sensor Data Storage",
+            "serverUrl": "",
+            "version": "1.1"
+          },
+          "measured": {
+            "width": 160,
+            "height": 48
+          }
         },
         {
           "id": "22222222-2222-4000-8000-000000000003",
           "type": "end",
-          "position": { "x": 740, "y": 80 },
-          "data": { "nodeType": "end", "label": "End", "configured": true, "description": "Exit point of the pipeline. Execution completes here." },
-          "measured": { "width": 32, "height": 32 }
+          "position": {
+            "x": 740,
+            "y": 80
+          },
+          "data": {
+            "nodeType": "end",
+            "label": "End",
+            "configured": true,
+            "description": "Exit point of the pipeline. Execution completes here."
+          },
+          "measured": {
+            "width": 32,
+            "height": 32
+          }
         }
       ],
       "edges": [
-        { "id": "22222222-2222-4000-8000-0000000000e1", "source": "22222222-2222-4000-8000-000000000001", "target": "22222222-2222-4000-8000-000000000005", "type": "smoothstep", "data": { "label": "" } },
-        { "id": "22222222-2222-4000-8000-0000000000e2", "source": "22222222-2222-4000-8000-000000000005", "target": "22222222-2222-4000-8000-000000000006", "type": "smoothstep", "data": { "label": "" } },
-        { "id": "22222222-2222-4000-8000-0000000000e3", "source": "22222222-2222-4000-8000-000000000006", "target": "22222222-2222-4000-8000-000000000003", "type": "smoothstep", "data": { "label": "" } }
+        {
+          "id": "22222222-2222-4000-8000-0000000000e1",
+          "source": "22222222-2222-4000-8000-000000000001",
+          "target": "22222222-2222-4000-8000-000000000005",
+          "type": "smoothstep",
+          "data": {
+            "label": ""
+          }
+        },
+        {
+          "id": "22222222-2222-4000-8000-0000000000e2",
+          "source": "22222222-2222-4000-8000-000000000005",
+          "target": "22222222-2222-4000-8000-000000000006",
+          "type": "smoothstep",
+          "data": {
+            "label": ""
+          }
+        },
+        {
+          "id": "22222222-2222-4000-8000-0000000000e3",
+          "source": "22222222-2222-4000-8000-000000000006",
+          "target": "22222222-2222-4000-8000-000000000003",
+          "type": "smoothstep",
+          "data": {
+            "label": ""
+          }
+        }
+      ]
+    },
+    "model": {
+      "nodes": [
+        {
+          "id": "22222222-2222-4000-8000-000000000001",
+          "kind": "start",
+          "label": "Start",
+          "x-ui-position": {
+            "x": 360,
+            "y": -40
+          }
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000005",
+          "kind": "source",
+          "label": "MQTT Source",
+          "x-ui-position": {
+            "x": 320,
+            "y": 80
+          },
+          "sourceRef": "{{sagaDataSourceConfigurationUrn}}"
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000006",
+          "kind": "sink",
+          "label": "Sensor Data Storage",
+          "x-ui-position": {
+            "x": 540,
+            "y": 80
+          },
+          "sinkRef": "{{sagaDataSinkConfigurationUrn}}"
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000003",
+          "kind": "end",
+          "label": "End",
+          "x-ui-position": {
+            "x": 740,
+            "y": 80
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "22222222-2222-4000-8000-0000000000e1",
+          "source": "22222222-2222-4000-8000-000000000001",
+          "target": "22222222-2222-4000-8000-000000000005"
+        },
+        {
+          "id": "22222222-2222-4000-8000-0000000000e2",
+          "source": "22222222-2222-4000-8000-000000000005",
+          "target": "22222222-2222-4000-8000-000000000006"
+        },
+        {
+          "id": "22222222-2222-4000-8000-0000000000e3",
+          "source": "22222222-2222-4000-8000-000000000006",
+          "target": "22222222-2222-4000-8000-000000000003"
+        }
       ]
     }
   }

@@ -52,7 +52,10 @@ public final class CoreUrn {
 
   private static final String SLUG = "[a-z0-9]+(?:-[a-z0-9]+)*";
   private static final String DOMAIN = SLUG + "(?:\\." + SLUG + ")*";
-  private static final String NAME = "[A-Za-z0-9]+";
+  // The registry derives this segment from a schema title and keeps dots, underscores and
+  // hyphens (XOEV identifiers such as Lokation.0002_Bundesland rely on them), so the segment
+  // has to accept them here too; identity is carried by the disambiguator, not the name.
+  private static final String NAME = "[A-Za-z0-9._-]+";
   private static final String DISAMBIGUATOR = "[0-9a-z]{" + DISAMBIGUATOR_LENGTH + "}";
   private static final String VERSION = "\\d+\\.\\d+\\.\\d+";
 
@@ -84,6 +87,43 @@ public final class CoreUrn {
   /** Whether the value is a well-formed CORE URN honouring the platform conventions. */
   public static boolean isValid(String urn) {
     return urn != null && COMPILED_PATTERN.matcher(urn).matches();
+  }
+
+  /**
+   * The logical (version-stripped) form of a CORE URN: the value without its trailing {@code
+   * :<major>.<minor>.<patch>} version segment. A URN that carries no recognizable SemVer tail (an
+   * already-logical URN, or an opaque correlation key) is returned unchanged, so two URNs can be
+   * compared on their logical form even when one is already logical.
+   *
+   * @param urn the URN (nullable)
+   * @return the version-stripped URN, or the input unchanged when it has no version tail
+   */
+  public static String logicalUrn(String urn) {
+    if (urn == null) {
+      return null;
+    }
+    int lastColon = urn.lastIndexOf(':');
+    if (lastColon < 0) {
+      return urn;
+    }
+    return urn.substring(lastColon + 1).matches(VERSION) ? urn.substring(0, lastColon) : urn;
+  }
+
+  /**
+   * Whether two references identify the same artifact, tolerating a version drift between a
+   * pinned-at-authoring-time reference and a resolved-at-publish-time catalog key: equal verbatim,
+   * or equal once both are reduced to their {@link #logicalUrn(String) logical} form. Two nulls (or
+   * a null on either side) never match.
+   *
+   * @param a the first reference (nullable)
+   * @param b the second reference (nullable)
+   * @return whether they name the same artifact
+   */
+  public static boolean sameArtifact(String a, String b) {
+    if (a == null || b == null) {
+      return false;
+    }
+    return a.equals(b) || logicalUrn(a).equals(logicalUrn(b));
   }
 
   /**

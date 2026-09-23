@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:core:platform:civitas:element:taf10-grid:Measurement:1.0.0",
+  "title": "Measurement",
+  "description": "A single electrical measurement with quality indicator and optional raw meter value.",
+  "type": "object",
+  "required": ["value", "unit"],
+  "properties": {
+    "value": {
+      "type": "number",
+      "description": "Measured value in the given physical unit."
+    },
+    "unit": {
+      "type": "string",
+      "description": "Physical unit, e.g. 'W', 'V', 'A', 'Hz'."
+    },
+    "quality": {
+      "type": "string",
+      "enum": ["good", "suspect", "bad", "unknown"],
+      "default": "unknown",
+      "description": "Data quality flag set by the meter gateway or grid sensor."
+    },
+    "rawValue": {
+      "type": "number",
+      "description": "Raw unprocessed value, if available from the meter gateway."
+    }
+  }
+}

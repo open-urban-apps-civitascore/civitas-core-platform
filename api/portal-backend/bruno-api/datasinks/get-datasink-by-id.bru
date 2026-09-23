@@ -15,8 +15,27 @@ params:path {
   id: {{dataSinkId}}
 }
 
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Has the requested id", function() {
+    if (res.getStatus() === 200) {
+      expect(res.body.id).to.equal(bru.getVar('postgisDataSinkId'));
+    }
+  });
+
+  test("Reports its type and configuration", function() {
+    if (res.getStatus() === 200) {
+      expect(res.body.dataSinkType).to.be.a('string');
+      expect(res.body.configuration).to.be.an('object');
+    }
+  });
+}
+
 docs {
   **Precondition:** `dataSetId` and `dataSinkId` are set.
 
-  **Expected Response:** 200 OK, body contains the DataSink with matching `id`, including the `inUse` flag and (for POSTGIS) the inline DataStructureVersion summary.
+  **Expected Response:** 200 OK, body contains the DataSink with matching `id`, including the `inUseByPipeline` and `inUseByLayer` flags and (for POSTGIS) the inline DataStructureVersion summary.
 }

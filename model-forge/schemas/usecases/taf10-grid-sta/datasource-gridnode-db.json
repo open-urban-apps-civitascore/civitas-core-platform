@@ -1,0 +1,11 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource",
+  "id": "urn:core:platform:civitas:datasource:taf10-grid:gridnode-db:1.0.0",
+  "title": "Grid Node Master Data PostgreSQL",
+  "connectionType": "sql",
+  "element": "urn:core:platform:civitas:element:taf10-grid:GridNodeMasterData:1.0.0",
+  "driver": "postgres",
+  "dsn": "jdbc:postgresql://postgres:5432/coredata",
+  "table": "grid_node_master_data",
+  "user": "coreuser"
+}

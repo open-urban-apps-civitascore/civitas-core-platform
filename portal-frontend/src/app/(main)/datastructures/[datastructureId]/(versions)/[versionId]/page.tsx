@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server'
+
 import { getDatastructure } from '@/app/services/api/datastructures/serverRequests'
 import { getDatastructureVersion } from '@/app/services/api/datastructures/versions/serverRequests'
 import { DatastructureApiResponseSchema, DatastructureVersionApiResponseSchema } from '@/types/datastructures'
@@ -10,6 +12,7 @@ interface EditDatastructureVersionPage {
 
 const EditDatastructureVersionPage = async ({ params }: EditDatastructureVersionPage) => {
   const { versionId, datastructureId } = await params
+  const tCommon = await getTranslations('common')
   const datastructureResponse = await getDatastructure(datastructureId)
   const parsedDatastructure = DatastructureApiResponseSchema.safeParse(datastructureResponse.data)
   if (!parsedDatastructure.success) {
@@ -25,7 +28,8 @@ const EditDatastructureVersionPage = async ({ params }: EditDatastructureVersion
 
   return (
     <VersionOverview
-      title={`Version ${parsedVersion.data.version}`}
+      // A version has no number until its model is stored, so the heading names the state instead.
+      title={parsedVersion.data.version ? `Version ${parsedVersion.data.version}` : tCommon('status.DRAFT')}
       datastructure={parsedDatastructure.data}
       version={parsedVersion.data}
       isCreateMode={false}

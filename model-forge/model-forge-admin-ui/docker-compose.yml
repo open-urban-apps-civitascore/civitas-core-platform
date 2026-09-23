@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: model-forge-admin-postgres
+    environment:
+      POSTGRES_DB: model_forge_admin
+      POSTGRES_USER: model_forge
+      POSTGRES_PASSWORD: model_forge
+    ports:
+      # Host port 5439, not 5432: 5432 is the portal Postgres of the main dev stack
+      # (dev-environment/postgres/docker-compose.yml) and 5433 is Keycloak's. Matches
+      # dev-environment/model-forge/docker-compose.yml so both spellings of standalone
+      # mode use the same port.
+      - "5439:5432"
+    volumes:
+      - model_forge_admin_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U model_forge -d model_forge_admin"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  model_forge_admin_data:

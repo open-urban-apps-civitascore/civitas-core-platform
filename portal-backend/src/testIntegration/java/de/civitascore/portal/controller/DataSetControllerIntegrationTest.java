@@ -7,11 +7,17 @@ import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.configuration.CivitasProperties;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
+import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.DataStructure;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -98,10 +104,19 @@ class DataSetControllerIntegrationTest
     return styles;
   }
 
-  /** Helper method to create a sample model map for Pipeline. */
+  /**
+   * Helper method to create a sample CORE Pipeline model map. The stored model is validated against
+   * pipeline.schema.json (top-level {@code nodes}/{@code edges} required; Model Forge stamps {@code
+   * $schema}/{@code id}), so the fixture emits a clean, schema-valid document.
+   */
   private Map<String, Object> createSampleModel() {
     Map<String, Object> model = new HashMap<>();
-    model.put("input", Map.of("type", "kafka"));
+    model.put(
+        "nodes",
+        List.of(
+            Map.of("id", "start-1", "kind", "start", "label", "Start"),
+            Map.of("id", "end-1", "kind", "end", "label", "End")));
+    model.put("edges", List.of(Map.of("id", "edge-1", "source", "start-1", "target", "end-1")));
     return model;
   }
 
@@ -114,6 +129,7 @@ class DataSetControllerIntegrationTest
   private void seedStageRequirements(Pipeline... pipelines) {
     DataSource dataSource = new DataSource();
     dataSource.setName("stage-datasource-" + System.nanoTime());
+    dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
     dataSource = dataSourceRepository.save(dataSource);
     pipelines[0].getDataSources().add(dataSource);
     pipelineRepository.save(pipelines[0]);
@@ -196,23 +212,23 @@ class DataSetControllerIntegrationTest
     pipeline1.setName("test_pipeline_1_" + System.currentTimeMillis());
     pipeline1.setDescription("Test pipeline 1");
     pipeline1.setDataSet(dataSet);
-    pipeline1.setStyles(createSampleStyles());
     pipeline1.getDataSources().add(dataSource1);
     pipeline1.getDataSources().add(dataSource2);
 
-    pipeline1.setModel(createSampleModel());
     pipeline1 = pipelineRepository.save(pipeline1);
+    pipeline1 =
+        portalData.attachPipelineDefinition(pipeline1, createSampleModel(), createSampleStyles());
 
     Pipeline pipeline2 = new Pipeline();
     pipeline2.setName("test_pipeline_2_" + System.currentTimeMillis());
     pipeline2.setDescription("Test pipeline 2");
     pipeline2.setDataSet(dataSet);
-    pipeline2.setStyles(createSampleStyles());
     pipeline2.getDataSources().add(dataSource3);
     pipeline2.getDataSources().add(dataSource4);
 
-    pipeline2.setModel(createSampleModel());
     pipeline2 = pipelineRepository.save(pipeline2);
+    pipeline2 =
+        portalData.attachPipelineDefinition(pipeline2, createSampleModel(), createSampleStyles());
 
     // Create distributions for the dataset
     Distribution distribution1 = new Distribution();
@@ -1005,6 +1021,41 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
     }
+
+    @Test
+    @DisplayName("Should exclude datasets with pending DELETE saga by default")
+    void shouldExcludePendingDeleteDatasetsByDefault() {
+      UUID pendingDeleteId = createTestEntity();
+      DataSet pendingDelete = dataSetRepository.findById(pendingDeleteId).orElseThrow();
+      pendingDelete.setPendingSagaType(PendingSagaType.DELETE);
+      dataSetRepository.saveAndFlush(pendingDelete);
+
+      ResponseEntity<RestPage<DataSetOutputDTO>> response = performGetAll();
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getContent())
+          .extracting(DataSetOutputDTO::getId)
+          .doesNotContain(pendingDeleteId);
+    }
+
+    @Test
+    @DisplayName("Should include datasets with pending DELETE saga when opted in")
+    void shouldIncludePendingDeleteDatasetsWhenOptedIn() {
+      UUID pendingDeleteId = createTestEntity();
+      DataSet pendingDelete = dataSetRepository.findById(pendingDeleteId).orElseThrow();
+      pendingDelete.setPendingSagaType(PendingSagaType.DELETE);
+      dataSetRepository.saveAndFlush(pendingDelete);
+
+      ResponseEntity<RestPage<DataSetOutputDTO>> response =
+          performGetAll(Map.of("includePendingDelete", "true"));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getContent())
+          .extracting(DataSetOutputDTO::getId)
+          .contains(pendingDeleteId);
+    }
   }
 
   @Nested
@@ -1121,7 +1172,9 @@ class DataSetControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:SAGA_IN_FLIGHT");
+      assertThat(response.getBody().getProperties())
+          .containsEntry("pendingSagaType", PendingSagaType.UNRELEASE.name());
       assertThat(dataSetRepository.findById(dataSetId).orElseThrow().getName())
           .isEqualTo(originalName);
     }
@@ -1326,6 +1379,35 @@ class DataSetControllerIntegrationTest
       assertThat(output.getDataSetStatus())
           .as("Status should remain READY")
           .isEqualTo(DataSetStatus.READY);
+    }
+
+    @Test
+    @DisplayName("Should reject /ready/meta while a saga is in flight")
+    void shouldRejectReadyMetaWhileSagaInFlight() {
+      DataSet dataSet = createDataSetWithRelationships();
+      dataSet.setDataSetStatus(DataSetStatus.READY);
+      dataSet.setPendingSagaType(PendingSagaType.CREATE);
+      dataSet = dataSetRepository.save(dataSet);
+      UUID dataSetId = dataSet.getId();
+      String originalName = dataSet.getName();
+
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Updated While Saga Runs");
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSetId + "/ready/meta",
+              org.springframework.http.HttpMethod.PUT,
+              createAuthHeaders(),
+              updateInput);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:SAGA_IN_FLIGHT");
+      assertThat(response.getBody().getProperties())
+          .containsEntry("pendingSagaType", PendingSagaType.CREATE.name());
+      assertThat(dataSetRepository.findById(dataSetId).orElseThrow().getName())
+          .isEqualTo(originalName);
     }
 
     @ParameterizedTest
@@ -1763,19 +1845,19 @@ class DataSetControllerIntegrationTest
       pipeline1.setName("test_pipeline_api1_" + System.currentTimeMillis());
       pipeline1.setDescription("Pipeline 1");
       pipeline1.setDataSet(dataSet);
-      pipeline1.setStyles(createSampleStyles());
-      pipeline1.setModel(createSampleModel());
 
-      pipelineRepository.save(pipeline1);
+      pipeline1 = pipelineRepository.save(pipeline1);
+      pipeline1 =
+          portalData.attachPipelineDefinition(pipeline1, createSampleModel(), createSampleStyles());
 
       Pipeline pipeline2 = new Pipeline();
       pipeline2.setName("test_pipeline_api2_" + System.currentTimeMillis());
       pipeline2.setDescription("Pipeline 2");
       pipeline2.setDataSet(dataSet);
-      pipeline2.setStyles(createSampleStyles());
-      pipeline2.setModel(createSampleModel());
 
-      pipelineRepository.save(pipeline2);
+      pipeline2 = pipelineRepository.save(pipeline2);
+      pipeline2 =
+          portalData.attachPipelineDefinition(pipeline2, createSampleModel(), createSampleStyles());
 
       seedStageRequirements(pipeline1, pipeline2);
 
@@ -1844,6 +1926,152 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
           .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    /**
+     * A dataset whose pipeline reaches a governed data structure two hops out, the shape a real
+     * flow has: the source node names a DataSource, whose element names the structure. The walk,
+     * the pin resolution and the scope check all run against the real registry.
+     */
+    private DataSet dataSetReachingStructure(DataStructureVersionStatus versionStatus) {
+      return dataSetReachingStructure(versionStatus, DataSourceStatus.AVAILABLE);
+    }
+
+    private DataSet dataSetReachingStructure(
+        DataStructureVersionStatus versionStatus, DataSourceStatus sourceStatus) {
+      DataStructure structure =
+          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion version =
+          portalData.attachModel(
+              portalData.dataStructureVersion(
+                  structure, b -> b.dataStructureVersionStatus(versionStatus)),
+              portalData.dataStructureVersionModel("Sensor"));
+
+      DataSource dataSource =
+          portalData.attachSourceConfiguration(
+              portalData.dataSource(
+                  b -> b.connectorType(ConnectorType.MQTT).dataSourceStatus(sourceStatus)),
+              Map.of(
+                  "urls",
+                  List.of("mqtt://mqtt-broker:1883"),
+                  "topics",
+                  List.of("sensors/closure"),
+                  "element",
+                  version.getModelUrn()));
+
+      DataSet dataSet =
+          portalData.dataSet(
+              b ->
+                  b.description("reaches a governed structure").dataSetStatus(DataSetStatus.DRAFT));
+      Pipeline pipeline = portalData.pipeline(dataSet);
+      pipeline.getDataSources().add(dataSource);
+      pipeline = pipelineRepository.save(pipeline);
+      portalData.attachPipelineDefinition(
+          pipeline,
+          Map.of(
+              "nodes",
+              List.of(
+                  Map.of(
+                      "id",
+                      "src-1",
+                      "kind",
+                      "source",
+                      "label",
+                      "Source",
+                      "sourceRef",
+                      dataSource.getConfigurationUrn())),
+              "edges",
+              List.of()),
+          createSampleStyles());
+      return dataSet;
+    }
+
+    @Test
+    @DisplayName("Should stage when the reached data structure is released")
+    void shouldStageWhenReachedStructureIsReleased() {
+      DataSet dataSet = dataSetReachingStructure(DataStructureVersionStatus.AVAILABLE);
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSet.getId() + "/stage",
+              HttpMethod.POST,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("a flow reaching only released artifacts carries a release")
+          .isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+    }
+
+    @Test
+    @DisplayName("Should refuse staging when the reached data structure is still a draft")
+    void shouldRefuseStagingWhenReachedStructureIsDraft() {
+      DataSet dataSet = dataSetReachingStructure(DataStructureVersionStatus.DRAFT);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSet.getId() + "/stage",
+              HttpMethod.POST,
+              createAuthHeaders(),
+              null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getProperties())
+          .as("the reply names the pipeline the caller has to repair")
+          .containsKey("offendingPipelineIds");
+      assertThat(response.getBody().getProperties().toString())
+          .as("an artifact the caller may not read must not be disclosed by the reply")
+          .doesNotContain("urn:core:");
+      assertThat(dataSetRepository.findById(dataSet.getId()).orElseThrow().getDataSetStatus())
+          .as("a refused stage leaves the dataset where it was")
+          .isEqualTo(DataSetStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Should refuse staging when a referenced data source is still a draft")
+    void shouldRefuseStagingWhenReferencedDataSourceIsDraft() {
+      DataSet dataSet =
+          dataSetReachingStructure(DataStructureVersionStatus.AVAILABLE, DataSourceStatus.DRAFT);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSet.getId() + "/stage",
+              HttpMethod.POST,
+              createAuthHeaders(),
+              null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getProperties())
+          .as("the reply names the pipeline the caller has to repair")
+          .containsKey("offendingPipelineIds");
+      assertThat(dataSetRepository.findById(dataSet.getId()).orElseThrow().getDataSetStatus())
+          .as("a refused stage leaves the dataset where it was")
+          .isEqualTo(DataSetStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Should stage a draft-authored pipeline once its data source is released")
+    void shouldStageWhenReferencedDataSourceIsReleased() {
+      DataSet dataSet =
+          dataSetReachingStructure(
+              DataStructureVersionStatus.AVAILABLE, DataSourceStatus.AVAILABLE);
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSet.getId() + "/stage",
+              HttpMethod.POST,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     }
   }
 

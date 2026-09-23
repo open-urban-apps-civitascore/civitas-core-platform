@@ -27,6 +27,7 @@ const eslintConfig = [
   {
     ignores: [
       'src/components/ui/**',
+      'src/generated/**', // machine-generated CORE types: snake_case schema keys + generator-controlled ordering
       'scripts/**',
       'eslint.config.mjs',
       'next-env.d.ts',

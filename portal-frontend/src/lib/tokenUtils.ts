@@ -24,7 +24,10 @@ interface RefreshTokenResult {
 export const refreshAccessToken = async (refreshToken: string): Promise<RefreshTokenResult> => {
   try {
     // Keycloak token endpoint
-    const keycloakIssuer = process.env.KEYCLOAK_ISSUER!
+    // Server-side call: prefer the container-reachable internal issuer when set
+    // (localhost:8080 is unreachable from inside the container); falls back to the
+    // browser issuer for host runs.
+    const keycloakIssuer = process.env.KEYCLOAK_INTERNAL_ISSUER ?? process.env.KEYCLOAK_ISSUER!
     const tokenEndpoint = `${keycloakIssuer}/protocol/openid-connect/token`
 
     const response = await fetch(tokenEndpoint, {

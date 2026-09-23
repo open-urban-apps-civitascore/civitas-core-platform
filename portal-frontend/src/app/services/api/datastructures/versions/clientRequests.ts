@@ -1,6 +1,7 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Method } from 'axios'
 
+import { BREADCRUMB_QUERY_KEY } from '@/app/services/api/breadcrumbs/clientRequests'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
 import { WithId } from '@/types/common'
@@ -26,6 +27,8 @@ export const useDatastructureVersionMutation = <TResponse, TData>({
   method,
   errorMessage,
 }: UseDatastructureVersionMutationInput) => {
+  const queryClient = useQueryClient()
+
   return useMutation<ApiServiceResponse<TResponse>, unknown, MutationFunctionInput<TData>>({
     mutationFn: ({ data, ...options }: MutationFunctionInput<TData>) => {
       return apiRequest<TResponse>({
@@ -35,6 +38,10 @@ export const useDatastructureVersionMutation = <TResponse, TData>({
         data: data,
         errorMessage,
       })
+    },
+    onSuccess: () => {
+      // A version write can change the number the breadcrumb names it by.
+      void queryClient.invalidateQueries({ queryKey: [BREADCRUMB_QUERY_KEY] })
     },
   })
 }

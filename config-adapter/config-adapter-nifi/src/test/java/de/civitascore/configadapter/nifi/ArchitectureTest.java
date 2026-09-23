@@ -49,7 +49,7 @@ class ArchitectureTest {
           .resideInAPackage("..nifi.flow.stage..")
           .should()
           .dependOnClassesThat()
-          .resideInAnyPackage("..nifi.rest..", "jakarta.ws.rs..");
+          .resideInAnyPackage("..nifi.rest..", "okhttp3..");
 
   /** The mapping layer is pure transformation logic — it must not reach into HTTP/REST concerns. */
   @ArchTest
@@ -59,7 +59,7 @@ class ArchitectureTest {
           .resideInAPackage("..nifi.mapping..")
           .should()
           .dependOnClassesThat()
-          .resideInAnyPackage("..nifi.rest..", "jakarta.ws.rs..", "org.glassfish..");
+          .resideInAnyPackage("..nifi.rest..", "okhttp3..");
 
   /**
    * The REST client only deploys a pre-built {@code DeploymentPlan}; parsing and flow assembly are
@@ -83,7 +83,7 @@ class ArchitectureTest {
           .resideInAPackage("..nifi.credentials..")
           .should()
           .dependOnClassesThat()
-          .resideInAnyPackage("..nifi.rest..", "jakarta.ws.rs..");
+          .resideInAnyPackage("..nifi.rest..", "okhttp3..");
 
   /** No package may take part in a dependency cycle. */
   @ArchTest

@@ -30,7 +30,6 @@ import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
-import jakarta.ws.rs.core.Response;
 import java.io.File;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -47,6 +46,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.awaitility.core.ConditionTimeoutException;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
@@ -235,7 +236,9 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   @AfterAll
   static void stopStack() {
     stopNifi();
-    for (GenericContainer<?> container : List.of(frost, frostDb, mosquitto)) {
+    // Arrays.asList (not List.of) tolerates nulls: when Docker is absent startStack aborts via
+    // assumeTrue before these fields are assigned, and List.of would NPE here on teardown.
+    for (GenericContainer<?> container : java.util.Arrays.asList(frost, frostDb, mosquitto)) {
       if (container != null) {
         container.stop();
       }
@@ -507,13 +510,14 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   /** Dumps the NiFi bulletin board when the asynchronous chain does not reach FROST in time. */
   private String bulletins() throws Exception {
     String token = client.authenticate();
-    try (Response response =
-        httpClient
-            .target("https://" + dockerHost + ":" + HOST_PORT + "/nifi-api/flow/bulletin-board")
-            .request()
+    Request request =
+        new Request.Builder()
+            .url("https://" + dockerHost + ":" + HOST_PORT + "/nifi-api/flow/bulletin-board")
             .header("Authorization", "Bearer " + token)
-            .get()) {
-      return response.readEntity(String.class);
+            .get()
+            .build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      return response.body().string();
     }
   }
 
@@ -701,18 +705,17 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         json(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": %s } } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
-            """
-                .formatted(mappingFields()));
+            """);
 
     Datasource source = new Datasource();
     source.setId("mqtt-frost-map");
@@ -722,7 +725,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.handleUnknownProperty("client_id", "civitas-frost-map");
     source.handleUnknownProperty("qos", 1);
 
-    deploy("pipeline-frost-map-mqtt-it", graph, source);
+    deploy("pipeline-frost-map-mqtt-it", graph, source, frostMapping(mappingFields()));
   }
 
   /**
@@ -764,18 +767,17 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         json(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": %s } } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
-            """
-                .formatted(fields));
+            """);
 
     Datasource source = new Datasource();
     source.setId("mqtt-frost-create");
@@ -785,7 +787,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.handleUnknownProperty("client_id", "civitas-frost-create");
     source.handleUnknownProperty("qos", 1);
 
-    deploy("pipeline-frost-create-mqtt-it", graph, source);
+    deploy("pipeline-frost-create-mqtt-it", graph, source, frostMapping(fields));
   }
 
   private static void deploySqlPipeline() throws Exception {
@@ -793,12 +795,12 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         json(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": %s } } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "c", "kind": "cron", "cronExpression": "%s" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
                 { "id": "e2", "source": "c", "target": "src" },
@@ -806,7 +808,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
                 { "id": "e4", "source": "m", "target": "k" },
                 { "id": "e5", "source": "k", "target": "e" } ] }
             """
-                .formatted(CRON_EVERY_SECOND, mappingFields()));
+                .formatted(CRON_EVERY_SECOND));
 
     byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
     String encryptedPassword =
@@ -824,7 +826,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.handleUnknownProperty("table", "frost_input");
     source.handleUnknownProperty("columns", List.of("*"));
 
-    deploy("pipeline-frost-map-sql-it", graph, source);
+    deploy("pipeline-frost-map-sql-it", graph, source, frostMapping(mappingFields()));
   }
 
   /**
@@ -833,24 +835,28 @@ class NifiFrostMappingIT extends AbstractNifiIT {
    * the source array has to be exploded before the entity bodies are rendered.
    */
   private static void deployFanoutPipeline() throws Exception {
+    String fields =
+        """
+        {
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "Gateway with nested readings" },
+          "$.properties.reference": "$.ref",
+          "$.Datastreams[].properties.reference": "$.ref",
+          "$.Datastreams[].Observations[].result":
+              { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
+          "$.Datastreams[].Observations[].phenomenonTime":
+              "$.measurements[].measuredValues[].ts"
+        }
+        """;
     Map<String, Object> graph =
         json(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": {
-                    "$.name": "$.station",
-                    "$.description": { "op": "const", "value": "Gateway with nested readings" },
-                    "$.properties.reference": "$.ref",
-                    "$.Datastreams[].properties.reference": "$.ref",
-                    "$.Datastreams[].Observations[].result":
-                        { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
-                    "$.Datastreams[].Observations[].phenomenonTime":
-                        "$.measurements[].measuredValues[].ts"
-                  } } } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
@@ -866,7 +872,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.handleUnknownProperty("client_id", "civitas-frost-fanout");
     source.handleUnknownProperty("qos", 1);
 
-    deploy("pipeline-frost-fanout-it", graph, source);
+    deploy("pipeline-frost-fanout-it", graph, source, frostMapping(fields));
   }
 
   /**
@@ -874,25 +880,29 @@ class NifiFrostMappingIT extends AbstractNifiIT {
    * — so a single element with an empty key is unusable while its siblings stay resolvable.
    */
   private static void deployPartialPipeline() throws Exception {
+    String fields =
+        """
+        {
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "Partial delivery gateway" },
+          "$.properties.reference": "$.ref",
+          "$.Datastreams[].properties.reference":
+              "$.measurements[].measuredValues[].dsref",
+          "$.Datastreams[].Observations[].result":
+              { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
+          "$.Datastreams[].Observations[].phenomenonTime":
+              "$.measurements[].measuredValues[].ts"
+        }
+        """;
     Map<String, Object> graph =
         json(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": {
-                    "$.name": "$.station",
-                    "$.description": { "op": "const", "value": "Partial delivery gateway" },
-                    "$.properties.reference": "$.ref",
-                    "$.Datastreams[].properties.reference":
-                        "$.measurements[].measuredValues[].dsref",
-                    "$.Datastreams[].Observations[].result":
-                        { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
-                    "$.Datastreams[].Observations[].phenomenonTime":
-                        "$.measurements[].measuredValues[].ts"
-                  } } } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
@@ -908,10 +918,11 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.handleUnknownProperty("client_id", "civitas-frost-partial");
     source.handleUnknownProperty("qos", 1);
 
-    deploy("pipeline-frost-partial-it", graph, source);
+    deploy("pipeline-frost-partial-it", graph, source, frostMapping(fields));
   }
 
-  private static void deploy(String pipelineId, Map<String, Object> graph, Datasource source)
+  private static void deploy(
+      String pipelineId, Map<String, Object> graph, Datasource source, Map<String, Object> mappings)
       throws Exception {
     byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
     try (CredentialResolver resolver = new CredentialResolver(key)) {
@@ -926,9 +937,15 @@ class NifiFrostMappingIT extends AbstractNifiIT {
                   source,
                   new FrostSinkSpec(
                       String.valueOf(projectId),
-                      StaProperties.ofKeys(List.of("reference"), List.of("reference")))));
+                      StaProperties.ofKeys(List.of("reference"), List.of("reference"))),
+                  mappings));
       client.deployFlow(plan);
     }
+  }
+
+  /** A single-entry mappings catalog keyed by {@code map-1} (the graphs' mappingRef). */
+  private static Map<String, Object> frostMapping(String fieldsJson) throws Exception {
+    return json("{ \"map-1\": { \"fields\": " + fieldsJson + " } }");
   }
 
   // ─── FROST fixtures & queries ───────────────────────────────────────────────

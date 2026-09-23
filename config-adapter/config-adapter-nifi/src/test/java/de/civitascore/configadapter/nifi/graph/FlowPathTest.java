@@ -16,7 +16,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphEdge;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -26,13 +25,12 @@ import org.junit.jupiter.api.Test;
  */
 class FlowPathTest {
 
-  private static GraphNode node(String id, String type) {
-    return new GraphNode(id, type, Map.of());
+  private static GraphNode node(String id, String kind) {
+    return new GraphNode(id, kind, null, null, null, null);
   }
 
   private static GraphNode cron(String id, String expression) {
-    return new GraphNode(
-        id, "cron", expression == null ? Map.of() : Map.of("cronExpression", expression));
+    return new GraphNode(id, "cron", null, null, null, expression);
   }
 
   private static GraphEdge edge(String from, String to) {
@@ -55,8 +53,8 @@ class FlowPathTest {
         graph(
             List.of(
                 node("start", "start"),
-                node("src", "dataSource"),
-                node("sink", "frost"),
+                node("src", "source"),
+                node("sink", "sink"),
                 node("end", "end")),
             edge("start", "src"),
             edge("src", "sink"),
@@ -75,10 +73,10 @@ class FlowPathTest {
     PipelineGraph graph =
         graph(
             List.of(
-                node("src", "dataSource"),
+                node("src", "source"),
                 node("m2", "mapping"),
                 node("m1", "mapping"),
-                node("sink", "geoPersistence")),
+                node("sink", "sink")),
             edge("src", "m1"),
             edge("m1", "m2"),
             edge("m2", "sink"));
@@ -95,8 +93,8 @@ class FlowPathTest {
             List.of(
                 node("start", "start"),
                 cron("c", " 0 0 6 * * ? "),
-                node("src", "dataSource"),
-                node("sink", "frost")),
+                node("src", "source"),
+                node("sink", "sink")),
             edge("start", "c"),
             edge("c", "src"),
             edge("src", "sink"));
@@ -108,7 +106,7 @@ class FlowPathTest {
   void toleratesLooseUnknownNode() {
     PipelineGraph graph =
         graph(
-            List.of(node("src", "dataSource"), node("sink", "frost"), node("note", "annotation")),
+            List.of(node("src", "source"), node("sink", "sink"), node("note", "annotation")),
             edge("src", "sink"));
 
     assertEquals("sink", FlowPath.derive(graph).sink().id());
@@ -118,7 +116,7 @@ class FlowPathTest {
 
   @Test
   void missingSourceIsRejected() {
-    PipelineGraph graph = graph(List.of(node("sink", "frost")));
+    PipelineGraph graph = graph(List.of(node("sink", "sink")));
 
     assertEquals(
         "pipeline graph has no datasource node; exactly one wired datasource is required",
@@ -129,7 +127,7 @@ class FlowPathTest {
   void secondSourceIsRejected() {
     PipelineGraph graph =
         graph(
-            List.of(node("s1", "dataSource"), node("s2", "dataSource"), node("sink", "frost")),
+            List.of(node("s1", "source"), node("s2", "source"), node("sink", "sink")),
             edge("s1", "sink"));
 
     assertEquals(
@@ -138,7 +136,7 @@ class FlowPathTest {
 
   @Test
   void missingSinkIsRejected() {
-    PipelineGraph graph = graph(List.of(node("src", "dataSource")));
+    PipelineGraph graph = graph(List.of(node("src", "source")));
 
     assertEquals(
         "pipeline graph has no datasink node; exactly one wired datasink is required",
@@ -149,7 +147,7 @@ class FlowPathTest {
   void secondSinkIsRejectedAcrossSinkKinds() {
     PipelineGraph graph =
         graph(
-            List.of(node("src", "dataSource"), node("k1", "frost"), node("k2", "geoPersistence")),
+            List.of(node("src", "source"), node("k1", "sink"), node("k2", "sink")),
             edge("src", "k1"));
 
     assertEquals(
@@ -162,12 +160,12 @@ class FlowPathTest {
   void sourceWithIncomingDataEdgeIsRejected() {
     PipelineGraph graph =
         graph(
-            List.of(node("src", "dataSource"), node("m", "mapping"), node("sink", "frost")),
+            List.of(node("src", "source"), node("m", "mapping"), node("sink", "sink")),
             edge("m", "src"),
             edge("src", "sink"));
 
     assertEquals(
-        "pipeline graph wires dataSource node 'src' in an unsupported position",
+        "pipeline graph wires source node 'src' in an unsupported position",
         derivationError(graph));
   }
 
@@ -175,13 +173,12 @@ class FlowPathTest {
   void sinkWithOutgoingDataEdgeIsRejected() {
     PipelineGraph graph =
         graph(
-            List.of(node("src", "dataSource"), node("sink", "frost"), node("m", "mapping")),
+            List.of(node("src", "source"), node("sink", "sink"), node("m", "mapping")),
             edge("src", "sink"),
             edge("sink", "m"));
 
     assertEquals(
-        "pipeline graph wires frost node 'sink' in an unsupported position",
-        derivationError(graph));
+        "pipeline graph wires sink node 'sink' in an unsupported position", derivationError(graph));
   }
 
   @Test
@@ -189,17 +186,17 @@ class FlowPathTest {
     PipelineGraph graph =
         graph(
             List.of(
-                node("src", "dataSource"),
+                node("src", "source"),
                 node("m1", "mapping"),
                 node("m2", "mapping"),
-                node("sink", "frost")),
+                node("sink", "sink")),
             edge("src", "m1"),
             edge("src", "m2"),
             edge("m1", "sink"),
             edge("m2", "sink"));
 
     assertEquals(
-        "pipeline graph branches at dataSource node 'src'; a linear source-to-sink flow is"
+        "pipeline graph branches at source node 'src'; a linear source-to-sink flow is"
             + " required",
         derivationError(graph));
   }
@@ -209,10 +206,10 @@ class FlowPathTest {
     PipelineGraph graph =
         graph(
             List.of(
-                node("src", "dataSource"),
+                node("src", "source"),
                 node("m", "mapping"),
                 node("end", "end"),
-                node("sink", "frost")),
+                node("sink", "sink")),
             edge("src", "m"),
             edge("m", "end"));
 
@@ -226,10 +223,10 @@ class FlowPathTest {
     PipelineGraph graph =
         graph(
             List.of(
-                node("src", "dataSource"),
+                node("src", "source"),
                 node("m1", "mapping"),
                 node("m2", "mapping"),
-                node("sink", "frost")),
+                node("sink", "sink")),
             edge("src", "m1"),
             edge("m1", "m2"),
             edge("m2", "m1"));
@@ -241,7 +238,7 @@ class FlowPathTest {
   void unknownNodeKindWiredIntoFlowIsRejected() {
     PipelineGraph graph =
         graph(
-            List.of(node("src", "dataSource"), node("x", "aggregate"), node("sink", "frost")),
+            List.of(node("src", "source"), node("x", "aggregate"), node("sink", "sink")),
             edge("src", "x"),
             edge("x", "sink"));
 
@@ -256,7 +253,7 @@ class FlowPathTest {
   void unwiredMappingIsRejected() {
     PipelineGraph graph =
         graph(
-            List.of(node("src", "dataSource"), node("sink", "frost"), node("m", "mapping")),
+            List.of(node("src", "source"), node("sink", "sink"), node("m", "mapping")),
             edge("src", "sink"));
 
     assertEquals(
@@ -271,8 +268,8 @@ class FlowPathTest {
         graph(
             List.of(
                 node("start", "start"),
-                node("src", "dataSource"),
-                node("sink", "frost"),
+                node("src", "source"),
+                node("sink", "sink"),
                 node("m", "mapping"),
                 node("end", "end")),
             edge("src", "sink"),
@@ -293,9 +290,9 @@ class FlowPathTest {
             List.of(
                 node("start", "start"),
                 cron("c", "0 0 6 * * ?"),
-                node("src", "dataSource"),
+                node("src", "source"),
                 node("m", "mapping"),
-                node("sink", "frost")),
+                node("sink", "sink")),
             edge("start", "c"),
             edge("c", "m"),
             edge("src", "m"),
@@ -313,8 +310,8 @@ class FlowPathTest {
                 node("start", "start"),
                 cron("c1", "0 0 6 * * ?"),
                 cron("c2", "0 0 7 * * ?"),
-                node("src", "dataSource"),
-                node("sink", "frost")),
+                node("src", "source"),
+                node("sink", "sink")),
             edge("start", "c1"),
             edge("start", "c2"),
             edge("c1", "src"),
@@ -333,8 +330,8 @@ class FlowPathTest {
             List.of(
                 node("start", "start"),
                 cron("c", null),
-                node("src", "dataSource"),
-                node("sink", "frost")),
+                node("src", "source"),
+                node("sink", "sink")),
             edge("start", "c"),
             edge("c", "src"),
             edge("src", "sink"));
@@ -346,7 +343,7 @@ class FlowPathTest {
   void detachedCronIsRejected() {
     PipelineGraph graph =
         graph(
-            List.of(cron("c", "0 0 6 * * ?"), node("src", "dataSource"), node("sink", "frost")),
+            List.of(cron("c", "0 0 6 * * ?"), node("src", "source"), node("sink", "sink")),
             edge("src", "sink"));
 
     assertEquals(

@@ -106,6 +106,22 @@ event:
   # Timeout waiting for config-adapter to process event (seconds)
   config-adapter-timeout-seconds: 10
 
+# Model Forge — embedded schema/model registry.
+# Reuses the host spring.datasource; owns a separate `model_forge` schema migrated by its own
+# Flyway instance (does not touch the host db/migration). portal-backend owns workflow/status.
+model-forge:
+  registry:
+    backend: postgres
+    schema: model_forge
+    migration-table: model_forge_schema_history
+    migrations-enabled: true
+  urn:
+    scope: platform
+    owner: civitas
+    domain: common
+  workflow:
+    enabled: false
+
 management:
   endpoints:
     web:
@@ -132,6 +148,14 @@ civitas:
     # Data-plane base URL used to build public preview URLs for named APIs.
     # Form: https://host[:port] — no path, no trailing slash. No default.
     base-url:
+
+# Dataset staging and release
+dataset:
+  closure-validation:
+    # How many reference hops the participating-artifact walk follows out from a pipeline before
+    # staging or releasing a dataset. A flow that reaches further is refused rather than passed
+    # unchecked, so raise this only if real models legitimately nest deeper.
+    max-depth: 10
 
 # Security: paths permitted without authentication
 security:

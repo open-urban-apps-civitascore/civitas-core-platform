@@ -1,6 +1,6 @@
 {
   "welcome": {
-    "title": "Willkommen in CIVITAS/CORE V2 Beta",
+    "title": "Willkommen in CIVITAS/CORE V2",
     "subtitle": "Neu hier?",
     "docsButton": "Dokumentation",
     "recommendedWorkflow": {
@@ -479,7 +479,10 @@
               "updateStyleSuccess": "Stil wurde erfolgreich aktualisiert.",
               "saveStyleError": "Beim Speichern des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
               "deleteStyleSuccess": "Stil wurde erfolgreich gelöscht.",
-              "deleteStyleError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              "deleteStyleError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "styleInUseError": "Dieser Stil wird noch von mindestens einem Layer verwendet. Entferne ihn dort zuerst.",
+              "notDraftError": "Der Datensatz muss im Entwurfsstatus sein, um Änderungen vorzunehmen.",
+              "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut."
             },
             "errors": {
               "name": {
@@ -526,6 +529,7 @@
       "releaseSuccess": "Der Datensatz wurde erfolgreich freigegeben.",
       "unreleaseSuccess": "Die Freigabe des Datensatzes wurde erfolgreich aufgehoben.",
       "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+      "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut.",
       "datasourceScopeViolation": "Der ausgewählte Datenpool ist nicht mit den verwendeten Datenquellen kompatibel. Eine oder mehrere Datenquellen sind für diesen Datenpool nicht freigegeben."
     },
     "warningModal": {
@@ -967,7 +971,7 @@
       "topicSingle": "Es ist nur ein Topic erlaubt.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
-      "inUseStatusChangeError": "Die Datenquelle kann nicht auf Entwurf gesetzt werden, da sie von einer Pipeline oder einem Datensatz verwendet wird.",
+      "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
     "connection": {
@@ -1105,6 +1109,7 @@
     },
     "errors": {
       "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten.",
+      "inUseError": "Diese Datenstruktur wird noch von einer Datenquelle oder einem Datenspeicher verwendet.",
       "creationError": "Beim Anlegen der Datenstruktur ist ein Fehler aufgetreten.",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
@@ -1131,7 +1136,7 @@
     "versionInfo": {
       "title": "Versionsinformationen",
       "versionNumber": "Versionsnummer",
-      "versionNumberPlaceholder": "z. B. 1.0.0",
+      "versionNumberPlaceholder": "Wird beim Speichern des Modells zugewiesen",
       "description": "Versionsbeschreibung",
       "source": "Quelle"
     },
@@ -1147,9 +1152,8 @@
     },
     "errors": {
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
-      "versionAlreadyExists": "Es existiert bereits eine Version mit der gleichen Versionsnummer in dieser Datenstruktur.",
-      "versionFormat": "Die Versionsnummer muss dem Format X.Y.Z folgen (z. B. 1.0.0).",
-      "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}"
+      "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}",
+      "inUseError": "Diese Version wird noch von einer Datenquelle oder einem Datenspeicher verwendet."
     }
   },
   "pipelineEditor": {
@@ -1333,7 +1337,11 @@
       "pipelineSettings": "Pipeline-Einstellungen",
       "deletePipeline": "Pipeline löschen",
       "deleteConfirmTitle": "Pipeline löschen?",
-      "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+      "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "deleteFailed": "Beim Löschen der Pipeline ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+      "discardPipeline": "Pipeline verwerfen",
+      "discardConfirmTitle": "Pipeline wirklich verwerfen?",
+      "discardConfirmDescription": "Sind Sie sicher, dass Sie die Pipeline verwerfen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
     },
     "dataLoss": {
       "title": "Gespeicherte Daten verwerfen und neu erzeugen?",
@@ -1348,8 +1356,12 @@
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
       "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
-      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt.",
-      "tableNameConflict": "{names} kann nicht gespeichert werden: Ein Geo-Persistenz-Tabellenname wird bereits von einem anderen Datenspeicher dieses Datensatzes verwendet."
+      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datenpool nicht erlaubt.",
+      "tableNameConflict": "{names} kann nicht gespeichert werden: Ein Geo-Persistenz-Tabellenname wird bereits von einem anderen Datenspeicher dieses Datensatzes verwendet.",
+      "dataSinkInUseError": "{names} kann nicht gespeichert werden: Ein Datenspeicher wird noch von mindestens einem Layer verwendet.",
+      "unconfirmedDataLossError": "{names} kann nicht gespeichert werden: Die Änderung verwirft gespeicherte Daten.",
+      "notDraftError": "Der Datensatz muss im Entwurfsstatus sein, um Änderungen vorzunehmen.",
+      "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut."
     },
     "tabs": {
       "closeTab": "Tab schließen",

@@ -1,6 +1,6 @@
 {
   "welcome": {
-    "title": "Welcome to CIVITAS/CORE V2 Beta",
+    "title": "Welcome to CIVITAS/CORE V2",
     "subtitle": "New here?",
     "docsButton": "Documentation",
     "recommendedWorkflow": {
@@ -158,30 +158,30 @@
       "action": "Action"
     },
     "noDataPage": {
-      "title": "No groups and roles available",
-      "description": "No group has permissions."
+      "title": "No Groups and Roles available",
+      "description": "No Group has permissions."
     },
     "addGroupModal": {
       "title": "Add Group",
-      "description": "Select a group to assign permissions.",
+      "description": "Select a Group to assign permissions.",
       "tableHeaders": {
         "name": "Name",
         "description": "Description"
       },
-      "selectAll": "Select all groups",
-      "selectGroup": "Select group",
+      "selectAll": "Select all Groups",
+      "selectGroup": "Select Group",
       "selectedGroups": "{number} selected"
     },
     "addRoleModal": {
       "title": "Add Role",
-      "description": "To group {groupName}",
+      "description": "To Group {groupName}",
       "tableHeaders": {
         "name": "Name",
         "description": "Description",
         "roleType": "Type"
       },
-      "selectRole": "Select role",
-      "selectAll": "Select all roles",
+      "selectRole": "Select Role",
+      "selectAll": "Select all Roles",
       "selectedRoles": "{number} selected",
       "roleTypes": {
         "default": "Default",
@@ -190,14 +190,14 @@
     },
     "infoBoxes": {
       "firstBox": "Groups with platform-wide permissions on all Data-related elements have access.",
-      "secondBox": "By removing your own group-role assignment, you may lose your permissions.",
-      "atLeastOne": "At least one role is required"
+      "secondBox": "By removing your own Group-Role assignment, you may lose your permissions.",
+      "atLeastOne": "At least one Role is required"
     },
     "messages": {
       "updateSuccess": "Permissions have been successfully updated.",
-      "groupsWithoutRoles": "Groups without assigned roles have not been saved.",
+      "groupsWithoutRoles": "Groups without assigned Roles have not been saved.",
       "updateErrorNotDraft": "Permissions can only be updated when the Dataset is in draft status.",
-      "updateErrorSagaInFlight": "The dataset is currently being provisioned. Please try again in a moment."
+      "updateErrorSagaInFlight": "The Dataset is currently being provisioned. Please try again in a moment."
     }
   },
   "sidebar": {
@@ -257,7 +257,7 @@
       "subtitle": "The name can be adjusted later.",
       "name": "Name",
       "datapoolSelect": "Data pool",
-      "datapoolSelectPlaceholder": "No data pool",
+      "datapoolSelectPlaceholder": "No Data pool",
       "description": "Description",
       "descriptionHint": "max. 150 characters"
     },
@@ -295,7 +295,7 @@
             "editable": "Edit Groups and Roles"
           },
           "assignments": "Groups and Roles",
-          "noAssignments": "No groups or roles available",
+          "noAssignments": "No Groups or Roles available",
           "groups": "Groups",
           "roles": "Roles",
           "openDataAccess": "Open Data",
@@ -480,7 +480,10 @@
               "updateStyleSuccess": "Style has been successfully updated.",
               "saveStyleError": "An error occurred while saving the style. Please try again.",
               "deleteStyleSuccess": "Style has been successfully deleted.",
-              "deleteStyleError": "An error occurred while deleting the style. Please try again."
+              "deleteStyleError": "An error occurred while deleting the style. Please try again.",
+              "styleInUseError": "This style is still used by at least one layer. Remove it there first.",
+              "notDraftError": "The Dataset must be in draft status to make changes.",
+              "sagaInFlightError": "The Dataset is currently being processed. Please try again later."
             },
             "errors": {
               "name": {
@@ -491,7 +494,7 @@
                 "tooLong": "Slug must be at most 32 characters",
                 "invalidFormat": "Slug may only contain lowercase letters, digits and hyphens, and must not start or end with a hyphen",
                 "reserved": "This slug is reserved and cannot be used",
-                "notUnique": "This slug already exists in this dataset"
+                "notUnique": "This slug already exists in this Dataset"
               },
               "description": {
                 "tooLong": "Description must be at most 150 characters"
@@ -528,6 +531,7 @@
       "releaseSuccess": "Dataset has been successfully released.",
       "unreleaseSuccess": "Dataset has been successfully unreleased.",
       "transitionError": "An error occurred while changing the Dataset status. Please try again.",
+      "sagaInFlightError": "The Dataset is currently being processed. Please try again later.",
       "datasourceScopeViolation": "The selected Data pool is not compatible with the Data sources used by this Dataset. One or more Data sources are not approved for the selected Data pool."
     },
     "warningModal": {
@@ -615,7 +619,7 @@
         "datastructure": "Data structure-related assignments are made at the respective Data structure.",
         "datapool": "Data pool-related assignments are made at the respective Data pool."
       },
-      "disabledHint": "Assigned roles can be viewed after saving the user."
+      "disabledHint": "Assigned Roles can be viewed after saving the user."
     },
     "groupsTab": {
       "title": "Group Membership",
@@ -640,7 +644,7 @@
     "createGroup": "Create Group",
     "search": "Filter...",
     "notFound": "Group not found",
-    "createHint": "Please fill in the base information for activating roles, users and user groups.",
+    "createHint": "Please fill in the base information for activating Roles, users and user Groups.",
     "list": {
       "id": "ID",
       "title": "Name",
@@ -674,16 +678,16 @@
       "scopePlatform": "Platform",
       "addRole": "Add Role",
       "systemRole": "System Role",
-      "dataRole": "Data role",
+      "dataRole": "Data Role",
       "noRoles": "No Roles",
-      "noRolesDescription": "No roles assigned to the group",
-      "removeRole": "Really remove role?",
-      "removeRoleDescription": "This action cannot be undone. Removing this role will affect the group's access permissions.",
-      "assignSystemRole": "Add system role",
-      "assignSystemRoleDescription": "to group {groupName}",
-      "assignDataRole": "Add data role",
-      "assignDataRoleDescription": "to group {groupName}",
-      "dataRolePlatformWarning": "Roles assigned here authorize the group platform-wide (permissions on all Data-related elements of the platform).",
+      "noRolesDescription": "No Roles assigned to the Group",
+      "removeRole": "Really remove Role?",
+      "removeRoleDescription": "This action cannot be undone. Removing this Role will affect the Group's access permissions.",
+      "assignSystemRole": "Add System Role",
+      "assignSystemRoleDescription": "to Group {groupName}",
+      "assignDataRole": "Add Data Role",
+      "assignDataRoleDescription": "to Group {groupName}",
+      "dataRolePlatformWarning": "Roles assigned here authorize the Group platform-wide (permissions on all Data-related elements of the platform).",
       "scopedInfoBanner": {
         "DATASET": "Dataset-related assignments are made at the respective Dataset.",
         "DATASOURCE": "Data source-related assignments are made at the respective Data source.",
@@ -698,8 +702,8 @@
         "scope": "Scope"
       },
       "objectLabels": {
-        "SYSTEM": "System role",
-        "DATA": "Data role"
+        "SYSTEM": "System Role",
+        "DATA": "Data Role"
       },
       "originLabels": {
         "default": "Standard",
@@ -708,10 +712,10 @@
     },
     "users": {
       "assign": "Assign User",
-      "toGroup": "to group",
+      "toGroup": "to Group",
       "assignedAt": "Member since",
       "noUsers": "No Users",
-      "noUsersSub": "No users assigned to this group",
+      "noUsersSub": "No users assigned to this Group",
       "removeUserModal": {
         "title": "Remove User from Group?",
         "description": "This action can not be undone."
@@ -722,19 +726,19 @@
       "updateSuccess": "Group has been successfully updated."
     },
     "errors": {
-      "createError": "An error occurred while creating the group",
-      "updateError": "An error occurred while updating the group",
-      "deleteError": "An error occurred while deleting the group",
-      "groupNameExists": "The group name is already in use. Please, chose another name.",
-      "assignmentSaveError": "Group was created, but role assignments could not be saved"
+      "createError": "An error occurred while creating the Group",
+      "updateError": "An error occurred while updating the Group",
+      "deleteError": "An error occurred while deleting the Group",
+      "groupNameExists": "The Group name is already in use. Please, chose another name.",
+      "assignmentSaveError": "Group was created, but Role assignments could not be saved"
     },
     "warningModal": {
-      "title": "Delete the group?",
+      "title": "Delete the Group?",
       "description": "This action can not be undone."
     },
     "infoModal": {
       "title": "Group can not be deleted",
-      "description": "First, all assignments to users, roles and scopes have to be removed."
+      "description": "First, all assignments to users, Roles and scopes have to be removed."
     }
   },
   "pagination": {
@@ -755,7 +759,7 @@
     "infoBox": "Permissions are predefined and cannot be edited here.",
     "systemPermissions": {
       "title": "System Permissions",
-      "description": "System permissions control access to system-wide functions on the platform.\nThey are grouped into system roles and assigned to groups.",
+      "description": "System permissions control access to system-wide functions on the platform.\nThey are grouped into System Roles and assigned to Groups.",
       "categories": {
         "TENANT_ADMINISTRATION": "Tenant Administration",
         "DATA": "Data Management",
@@ -765,7 +769,7 @@
     },
     "dataPermissions": {
       "title": "Data Permissions",
-      "description": "Data permissions control access to Data-related elements on the platform.\nThey are grouped into data roles and assigned to groups within a specific scope."
+      "description": "Data permissions control access to Data-related elements on the platform.\nThey are grouped into Data Roles and assigned to Groups within a specific scope."
     },
     "actions": {
       "read": "Read",
@@ -845,18 +849,18 @@
       },
       "securityArea": {
         "heading": "Security Area",
-        "description": "Delete role",
+        "description": "Delete Role",
         "note": "Instructions or description of what happens.",
-        "deleteButton": "Delete role"
+        "deleteButton": "Delete Role"
       },
       "deleteConfirmModal": {
-        "title": "Delete role?",
+        "title": "Delete Role?",
         "description": "This action cannot be undone.",
         "confirm": "Delete"
       },
       "infoModal": {
         "title": "Role cannot be deleted",
-        "description": "All assignments to groups and scopes must be removed first."
+        "description": "All assignments to Groups and scopes must be removed first."
       }
     },
     "permissionsTab": {
@@ -893,11 +897,11 @@
         "description": "Description",
         "scope": "Scope"
       },
-      "noGroupsAssigned": "No groups assigned yet.",
+      "noGroupsAssigned": "No Groups assigned yet.",
       "removeAssignment": "Remove assignment",
       "removeModal": {
         "title": "Remove Group Assignment",
-        "description": "Are you sure you want to remove the group \"{groupName}\" from this role? This action cannot be undone.",
+        "description": "Are you sure you want to remove the Group \"{groupName}\" from this Role? This action cannot be undone.",
         "confirm": "Remove"
       },
       "scopeTabs": {
@@ -930,9 +934,9 @@
       }
     },
     "errors": {
-      "createError": "An error occurred while creating the role",
-      "updateError": "An error occurred while updating the role",
-      "deleteError": "An error occurred while deleting the role"
+      "createError": "An error occurred while creating the Role",
+      "updateError": "An error occurred while updating the Role",
+      "deleteError": "An error occurred while deleting the Role"
     },
     "success": {
       "assignmentSuccess": "The assignments have been successfully updated"
@@ -975,8 +979,8 @@
       "topicSingle": "Only one topic is allowed.",
       "creationError": "An error occurred while creating the Data source.",
       "updateError": "An error occurred while updating the Data source.",
-      "inUseStatusChangeError": "The Data source cannot be set to draft because it is used by a pipeline or dataset.",
-      "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
+      "inUseError": "This Data source is still used by a pipeline.",
+      "groupsWithoutRoles": "Groups with no assigned Roles have not been saved."
     },
     "connection": {
       "active": "active",
@@ -1118,8 +1122,9 @@
     },
     "errors": {
       "deletionError": "An error occurred while deleting the Data structure.",
+      "inUseError": "This data structure is still used by a Data source or data storage.",
       "creationError": "An error occurred while creating the Data structure.",
-      "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
+      "groupsWithoutRoles": "Groups with no assigned Roles have not been saved."
     },
     "infoModal": {
       "title": "Data structure can not be deleted",
@@ -1131,7 +1136,7 @@
     },
     "accessManagementTab": {
       "infoBoxes": {
-        "firstBox": "Via the groups-roles-assignments, permissions are assigned to this Data structure to allow the usage in Datasets and Data sources."
+        "firstBox": "Via the Groups-Roles-assignments, permissions are assigned to this Data structure to allow the usage in Datasets and Data sources."
       }
     }
   },
@@ -1144,7 +1149,7 @@
     "versionInfo": {
       "title": "Version Information",
       "versionNumber": "Version Number",
-      "versionNumberPlaceholder": "e. g. 1.0.0",
+      "versionNumberPlaceholder": "Assigned when the model is saved",
       "description": "Version Description",
       "source": "Source"
     },
@@ -1160,8 +1165,7 @@
     },
     "errors": {
       "creationError": "An error occurred while creating the Data structure version.",
-      "versionAlreadyExists": "A version with the same version number already exists in this Data structure.",
-      "versionFormat": "The version number must follow the format X.Y.Z (e. g. 1.0.0).",
+      "inUseError": "This version is still used by a Data source or data storage.",
       "saveInvalidModel": "The version cannot be saved: {reason}"
     }
   },
@@ -1206,7 +1210,7 @@
       "flowEnd": "Pipeline End",
       "flowEndDesc": "Pipeline exit point. Execution ends here.",
       "dataSource": "Data source",
-      "dataSourceDesc": "Select data source.",
+      "dataSourceDesc": "Select Data source.",
       "cron": "Scheduled Trigger",
       "cronDesc": "Run pipeline on schedule",
       "frostServer": "Sensor Data Storage",
@@ -1302,7 +1306,7 @@
         "orphanNode": "{label} is not connected to any other node",
         "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End",
         "duplicateTableName": "The table name \"{tableName}\" is already used in pipeline \"{pipeline}\"",
-        "cronMqttIncompatible": "A CRON trigger cannot be used with an MQTT data source. Use a SQL (pull) source instead.",
+        "cronMqttIncompatible": "A CRON trigger cannot be used with an MQTT Data source. Use a SQL (pull) source instead.",
         "cronSourceConnectorUnknown": "Could not verify the source connector; a CRON trigger only works with a SQL (pull) source, not MQTT.",
         "sqlSourceNoScheduleDefaultPoll": "This SQL source has no CRON node and will poll on the default schedule (every 5 minutes). Add a CRON node to set an explicit schedule.",
         "sqlSourceToFrost": "A SQL source can only write to a FROST sink through a field mapping — add a mapping node or use a SensorThings (MQTT) source.",
@@ -1321,17 +1325,17 @@
         "mappingNotSaved": "{label} has no saved field mapping — open the mapping editor and save it",
         "mappingDataCorrupt": "{label} carries no valid mapping data — delete the node and recreate it",
         "edgeEndpointMissing": "An edge references a node that does not exist — remove the edge",
-        "sourceNodeRequired": "Pipeline has no data source node; exactly one wired data source is required",
+        "sourceNodeRequired": "Pipeline has no Data source node; exactly one wired Data source is required",
         "sinkNodeRequired": "Pipeline has no data storage node (sensor or geospatial data storage); exactly one data storage is required",
-        "multipleSourceNodes": "{label} is an additional data source node; a pipeline supports exactly one",
+        "multipleSourceNodes": "{label} is an additional Data source node; a pipeline supports exactly one",
         "multipleSinkNodes": "{label} is an additional data storage node; a pipeline supports exactly one",
         "nodeUnsupportedPosition": "{label} is wired in an unsupported position",
         "unknownNodeInFlow": "{label} has an unsupported node type and cannot be wired into the data flow",
         "flowBranches": "The data flow branches at {label}; a linear source-to-sink flow is required",
         "flowCycle": "The data flow contains a cycle at {label}",
-        "noDataPath": "There is no data path from the data source to the data storage",
-        "mappingNotOnPath": "{label} is not on the data path between the data source and the data storage",
-        "cronTriggerCapacity": "{label} is an additional schedule trigger on the data source; its trigger port holds at most one",
+        "noDataPath": "There is no data path from the Data source to the data storage",
+        "mappingNotOnPath": "{label} is not on the data path between the Data source and the data storage",
+        "cronTriggerCapacity": "{label} is an additional schedule trigger on the Data source; its trigger port holds at most one",
         "edgeFormIncompatible": "{label} cannot consume {form} from {upstreamLabel}; it accepts: {accepted}",
         "mappingChainStructureMismatch": "The output data structure in mapping node {upstreamLabel} and the input data structure in mapping node {label} are incompatible"
       }
@@ -1346,7 +1350,11 @@
       "pipelineSettings": "Pipeline settings",
       "deletePipeline": "Delete Pipeline",
       "deleteConfirmTitle": "Delete Pipeline?",
-      "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone."
+      "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone.",
+      "deleteFailed": "Failed to delete the pipeline. Please try again.",
+      "discardPipeline": "Discard Pipeline",
+      "discardConfirmTitle": "Discard Pipeline?",
+      "discardConfirmDescription": "Are you sure you want to discard this pipeline? This action cannot be undone."
     },
     "dataLoss": {
       "title": "Discard stored data and rebuild it?",
@@ -1361,8 +1369,12 @@
       "duplicateNames": "Duplicate pipeline names: {names}",
       "saveFailed": "Failed to save: {names}",
       "saveSuccess": "Pipeline \"{name}\" saved successfully",
-      "datasourceScopeViolation": "Cannot save \"{name}\": one or more datasources are not permitted for this datapool.",
-      "tableNameConflict": "Cannot save {names}: a geo persistence table name is already used by another data storage of this dataset."
+      "datasourceScopeViolation": "Cannot save \"{name}\": one or more Data sources are not permitted for this Data pool.",
+      "tableNameConflict": "Cannot save {names}: a geo persistence table name is already used by another data storage of this Dataset.",
+      "dataSinkInUseError": "Cannot save {names}: a data storage is still used by at least one layer.",
+      "unconfirmedDataLossError": "Cannot save {names}: the change would discard stored data.",
+      "notDraftError": "The Dataset must be in draft status to make changes.",
+      "sagaInFlightError": "The Dataset is currently being processed. Please try again later."
     },
     "tabs": {
       "closeTab": "Close tab",
@@ -1536,14 +1548,14 @@
         "basicInfo": "Base Information",
         "accessManagement": "Access",
         "datasets": "Datasets",
-        "datasources": "Data Sources"
+        "datasources": "Data sources"
       },
       "datasourcesTab": {
-        "title": "Shared Data Sources",
-        "subtitle": "Data sources shared with this Datapool. Changes are managed in the respective Data source.",
+        "title": "Shared Data sources",
+        "subtitle": "Data sources shared with this Data pool. Changes are managed in the respective Data source.",
         "noDatasources": "No Data sources shared",
-        "noDatasourcesSubTitle": "No Data sources have been shared with this Datapool yet. Sharing is managed in the respective Data source.",
-        "search": "Search data sources",
+        "noDatasourcesSubTitle": "No Data sources have been shared with this Data pool yet. Sharing is managed in the respective Data source.",
+        "search": "Search Data sources",
         "tableHeaders": {
           "name": "Name",
           "description": "Description",
@@ -1559,8 +1571,8 @@
       "datasetsTab": {
         "title": "Datasets",
         "addDataset": "Create Dataset",
-        "noDatasets": "No datasets available",
-        "noDatasetsSubTitle": "No datasets have been added to this data pool yet.",
+        "noDatasets": "No Datasets available",
+        "noDatasetsSubTitle": "No Datasets have been added to this Data pool yet.",
         "tableHeaders": {
           "name": "Name",
           "contact": "Contact Person",
@@ -1571,16 +1583,16 @@
     },
     "accessManagementTab": {
       "title": "Access to Data pool and Datasets",
-      "subtitle": "Here, permissions for the data pool and optionally for all contained datasets are defined.",
+      "subtitle": "Here, permissions for the Data pool and optionally for all contained Datasets are defined.",
       "infoBoxes": {
-        "firstBox": "Groups that have platform-wide permissions on all data-related elements have access to this Data pool and all contained datasets."
+        "firstBox": "Groups that have platform-wide permissions on all data-related elements have access to this Data pool and all contained Datasets."
       },
       "noDataPage": {
-        "subtitle": "No group has permissions for this data pool or optionally for all contained datasets."
+        "subtitle": "No Group has permissions for this Data pool or optionally for all contained Datasets."
       }
     },
     "errors": {
-      "groupsWithoutRoles": "Groups without assigned roles have not been saved.",
+      "groupsWithoutRoles": "Groups without assigned Roles have not been saved.",
       "createError": "An error occurred while creating the Data pool.",
       "updateError": "An error occurred while updating the Data pool.",
       "deleteError": "An error occurred while deleting the Data pool."

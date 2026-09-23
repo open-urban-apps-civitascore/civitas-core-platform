@@ -20,7 +20,7 @@ body:json {
     "dataSinkType": "POSTGIS",
     "configuration": {
       "tableName": "sensor_observations_rebuilt",
-      "dataStructureVersionId": "{{dataStructureVersionId}}"
+      "element": "{{setupModelUrn}}"
     },
     "confirmDataLoss": true
   }
@@ -30,6 +30,18 @@ script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('dataSinkId', res.body.id);
   }
+}
+
+tests {
+  test("Rebuild accepted once the data loss is confirmed", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Table name changed", function() {
+    if (res.getStatus() === 200) {
+      expect(res.body.configuration.tableName).to.equal('sensor_observations_rebuilt');
+    }
+  });
 }
 
 docs {

@@ -9,9 +9,9 @@
  */
 package de.civitascore.configadapter.geoserver;
 
-import jakarta.ws.rs.client.Invocation;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import okhttp3.Request;
 
 /**
  * Basic Auth strategy for the GeoServer REST API (management/admin endpoints). Credentials are
@@ -28,10 +28,10 @@ interface GeoServerAuth {
   /**
    * Applies Basic Auth to the given request builder.
    *
-   * @param builder the JAX-RS request builder
+   * @param builder the OkHttp request builder
    * @return the builder with the {@code Authorization} header set
    */
-  Invocation.Builder apply(Invocation.Builder builder);
+  Request.Builder apply(Request.Builder builder);
 
   /**
    * Returns a Basic Auth strategy that encodes the given credentials once.

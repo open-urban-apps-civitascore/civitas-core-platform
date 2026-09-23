@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://civitasconnect.digital/core/artifact-envelope/v1",
+  "title": "CORE Artifact Envelope",
+  "description": "Envelope for importing or exchanging CORE artifacts with metadata and one content version.",
+  "type": "object",
+  "required": ["$schema", "artifactId", "artifactType", "firstVersion"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://civitasconnect.digital/core/artifact-envelope/v1"
+    },
+    "artifactId": {
+      "description": "Logical artifact id — the version-free CORE URN; combine it with firstVersion.version for the versioned artifact URN. Exactly 8 non-empty colon-separated segments, matching UrnParser's logical form: urn:core:<scope>:<owner>:<type>:<domain>:<name>:<disambiguator>.",
+      "type": "string",
+      "pattern": "^urn:core(:[^:]+){6}$"
+    },
+    "artifactType": {
+      "description": "Artifact content type as used by the global artifact store.",
+      "type": "string",
+      "enum": ["JSON", "JSON_SCHEMA", "XSD", "MAPPING", "PIPELINE", "DATASOURCE", "DATASINK", "DATASET"]
+    },
+    "groupId": {
+      "description": "Global artifact group.",
+      "type": "string",
+      "enum": ["elements", "mappings", "pipelines", "datasources", "datasinks", "datasets"]
+    },
+    "title": {
+      "description": "Human-readable display name.",
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "properties": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "firstVersion": {
+      "$ref": "#/$defs/ArtifactVersion"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "ArtifactVersion": {
+      "type": "object",
+      "required": ["version", "content"],
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "content": {
+          "$ref": "#/$defs/ArtifactContent"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ArtifactContent": {
+      "type": "object",
+      "required": ["content", "contentType"],
+      "properties": {
+        "contentType": {
+          "type": "string",
+          "enum": ["application/schema+json", "application/json", "application/xml", "text/xml"]
+        },
+        "content": {
+          "description": "Artifact payload. JSON Schema content is normally an object; XSD content is an XML string.",
+          "oneOf": [
+            { "type": "object" },
+            { "type": "string" }
+          ]
+        },
+        "references": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ArtifactReference" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ArtifactReference": {
+      "description": "Artifact reference using the registry exchange field names (groupId/artifactId/version/name) — this is the persistence/exchange boundary, not the CORE domain vocabulary.",
+      "type": "object",
+      "required": ["groupId", "artifactId", "version", "name"],
+      "properties": {
+        "groupId": { "type": "string" },
+        "artifactId": { "type": "string" },
+        "version": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

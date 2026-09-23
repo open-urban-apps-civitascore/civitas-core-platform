@@ -1,0 +1,11 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource",
+  "id": "urn:core:platform:civitas:datasource:luftqualitaet:station-db:1.0.0",
+  "title": "Stationsstammdaten PostgreSQL",
+  "connectionType": "sql",
+  "element": "urn:core:platform:civitas:element:luftqualitaet:StationMasterData:1.0.0",
+  "driver": "postgres",
+  "dsn": "jdbc:postgresql://postgres:5432/coredata",
+  "table": "station_master_data",
+  "user": "coreuser"
+}

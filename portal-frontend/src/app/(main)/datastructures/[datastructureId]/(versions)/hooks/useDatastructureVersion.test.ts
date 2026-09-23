@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { toast } from 'sonner'
 
+import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import {
   useCreateDatastructureVersion,
   useStatusUpdateDatastructureVersion,
@@ -12,8 +13,10 @@ import { DATASTRUCTURE_STATUS_TYPES, type DatastructureVersion } from '@/types/d
 
 import { useDatastructureVersion } from './useDatastructureVersion'
 
+const { mockRefresh } = vi.hoisted(() => ({ mockRefresh: vi.fn() }))
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ refresh: mockRefresh }),
 }))
 
 vi.mock('next-intl', () => ({
@@ -217,9 +220,13 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(saved).toBe(true)
     expect(toast.error).not.toHaveBeenCalled()
 
-    // Alpha is the document root; Beta stays in $defs, unreferenced but preserved.
-    const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
-    expect(payload.data.model).toMatchObject({ properties: { alpha: { $ref: '#/$defs/Alpha' } } })
+    // Saved under a DataStructure URN → the canonical $defs library: Alpha is the document root,
+    // designated by a top-level $ref equal to its own $defs member $id (no inline `properties`).
+    // Beta stays in $defs, unreferenced but preserved.
+    const payload = updateVersion.mutateAsync.mock.calls[0][0] as {
+      data: { model: { $ref?: string; $defs?: Record<string, { $id?: string }> } }
+    }
+    expect(payload.data.model.$ref).toBe(payload.data.model.$defs?.Alpha?.$id)
     expect(payload.data.model.$defs).toHaveProperty('Beta')
   })
 
@@ -235,7 +242,12 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(saved).toBe(true)
     expect(toast.warning).not.toHaveBeenCalled()
     const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
-    expect(payload.data.model).toMatchObject({ properties: { alpha: { $ref: '#/$defs/Alpha' } } })
+    // Saved under a DataStructure URN → the canonical $defs library: the root class Alpha is a $defs
+    // member stamped with its Element URN as $id, designated by a top-level $ref to that same URN
+    // (no inline root `properties`). Model Forge splits the members into Elements on ingest.
+    const model = payload.data.model as { $ref?: string; $defs?: Record<string, { $id?: string }> }
+    expect(model.$defs?.Alpha).toBeDefined()
+    expect(model.$ref).toBe(model.$defs?.Alpha?.$id)
   })
 })
 
@@ -314,5 +326,47 @@ describe('useDatastructureVersion — status-dependent field validation', () => 
     })
 
     expect(hook.result.current.form.getFieldState('description').error).toBeUndefined()
+  })
+})
+
+describe('useDatastructureVersion — a version still in use', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('names the reason when a data source or data storage still uses the version', async () => {
+    const { hook, updateVersion } = setup(version({ styles: validDiagram() }))
+    updateVersion.mutateAsync.mockRejectedValue(
+      mockApiError(
+        409,
+        'Cannot modify DataStructureVersion because it is referenced by one or more DataSources or DataSinks.',
+        'urn:civitas:error:RESOURCE_IN_USE',
+      ),
+    )
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    await act(async () => {
+      await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(toast.error).toHaveBeenCalledWith('datastructureVersions.errors.inUseError')
+  })
+})
+
+describe('useDatastructureVersion — a stored model reaches the surfaces outside the form', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('reloads the route after a draft update assigns a version number', async () => {
+    const { hook } = setup(version({ styles: validDiagram(), version: null }))
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    await act(async () => {
+      await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    // The heading renders on the server, so it needs a reload to show the assigned number.
+    expect(mockRefresh).toHaveBeenCalled()
   })
 })

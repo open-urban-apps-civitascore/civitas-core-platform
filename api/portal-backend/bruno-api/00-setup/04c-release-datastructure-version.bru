@@ -1,0 +1,31 @@
+meta {
+  name: Setup - Release DataStructure Version
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{setupDataStructureId}}
+  versionId: {{setupDataStructureVersionId}}
+}
+
+tests {
+  test("Released", function() {
+    const status = res.getStatus();
+    // 200=released, 400=already released from a previous run (idempotent setup).
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Setup step 04c** — Releases the base version so downstream fixtures reference a released model,
+  which is the real state a DataSink is configured against.
+
+  **Expected Response:** 200 OK. 400 if it was already released.
+}

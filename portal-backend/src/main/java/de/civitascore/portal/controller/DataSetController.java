@@ -1,6 +1,5 @@
 package de.civitascore.portal.controller;
 
-import de.civitascore.portal.mapper.DataSourceMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -8,12 +7,10 @@ import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
-import de.civitascore.portal.model.output.summary.DataSourceSummaryDTO;
 import de.civitascore.portal.repository.specification.DataSetSpec;
 import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.service.DataSetService;
-import de.civitascore.portal.service.DataSourceService;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -55,8 +52,6 @@ public class DataSetController
 
   private final DataSetService dataSetService;
   private final DataSetAssembler dataSetAssembler;
-  private final DataSourceService dataSourceService;
-  private final DataSourceMapper dataSourceMapper;
 
   @Parameters({
     @Parameter(
@@ -83,7 +78,12 @@ public class DataSetController
             @Schema(
                 type = "string",
                 example =
-                    "550e8400-e29b-41d4-a716-446655440000,3fa85f64-5717-4562-b3fc-2c963f66afa6"))
+                    "550e8400-e29b-41d4-a716-446655440000,3fa85f64-5717-4562-b3fc-2c963f66afa6")),
+    @Parameter(
+        name = "includePendingDelete",
+        description = "Include datasets with pendingSagaType DELETE. Defaults to false.",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "boolean", defaultValue = "false", example = "true"))
   })
   /**
    * Retrieves a paginated list of datasets with optional filtering by name, description, or
@@ -177,55 +177,6 @@ public class DataSetController
   }
 
   /**
-   * Lists the data sources this dataset's pipelines may be built from — the input behind the data
-   * source picker in the pipeline editor.
-   *
-   * <p>A data source is usable when it is released for every datapool, or for the datapool this
-   * dataset sits in; a dataset in no datapool therefore sees only the former. The same rule {@code
-   * DataSourceDatapoolScopeValidator} enforces when a pipeline establishes the relationship, so the
-   * picker cannot offer a source that saving would reject.
-   *
-   * <p>Authorized on the <em>dataset</em>, not on the data sources: the caller needs {@code
-   * DATASET_UPDATE} on this dataset, which a DATAPOOL-scoped grant conveys. Reading the data source
-   * administration surface still requires {@code DATASOURCE_READ}, so the response carries id and
-   * name only — no connector configuration.
-   *
-   * <p>A caller without {@code DATASET_UPDATE} on this dataset is rejected upstream with 403. Past
-   * that, the caller's scope headers still apply: a dataset they do not cover — unknown or merely
-   * out of scope — yields 404, so route existence is not leaked.
-   *
-   * @param id the dataset UUID
-   * @return HTTP 200 with the usable data sources, ordered by name
-   */
-  @GetMapping("/{id}/usable-datasources")
-  @Operation(
-      operationId = "getUsableDataSources",
-      summary = "List the data sources this dataset's pipelines may use",
-      description =
-          "Returns the AVAILABLE data sources released either for every datapool or for this"
-              + " dataset's datapool; a dataset in no datapool sees only the former. Requires"
-              + " DATASET_UPDATE on the dataset rather than DATASOURCE_READ, and returns id and name"
-              + " only. Callers lacking that permission are rejected with 403; a dataset outside the"
-              + " caller's X-Allowed-Scope-Ids/X-Allowed-Pool-Ids returns 404.")
-  @ApiResponse(responseCode = "200", description = "Usable data sources returned successfully")
-  @ApiResponse(
-      responseCode = "404",
-      description = "Dataset not found or out of scope",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  public ResponseEntity<List<DataSourceSummaryDTO>> getUsableDataSources(@PathVariable UUID id) {
-    Specification<DataSet> scopedById =
-        applyScopeFilter(ScopeFilteringSpecification.baseEntityById(Set.of(id)));
-    DataSet dataSet =
-        dataSetService
-            .findOne(scopedById)
-            .orElseThrow(() -> new ResourceNotFoundException("DataSet", id));
-    return ResponseEntity.ok(
-        dataSourceService.findUsableIn(dataSet.getDataPool()).stream()
-            .map(dataSourceMapper::toSummary)
-            .toList());
-  }
-
-  /**
    * Updates a dataset in DRAFT status by fully replacing its content.
    *
    * @param id the UUID of the dataset to update
@@ -254,7 +205,25 @@ public class DataSetController
       operationId = "stageDataSet",
       summary = "Stage a dataset",
       description =
-          "Validates the dataset's pipeline configuration and transitions status from DRAFT to READY.")
+          "Validates the dataset's pipeline configuration and the artifacts participating in its"
+              + " flows, then transitions status from DRAFT to READY.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "The dataset is staged",
+      content = @Content(schema = @Schema(implementation = DataSetOutputDTO.class)))
+  @ApiResponse(
+      responseCode = "400",
+      description =
+          "The dataset carries no name, description or Pipeline, or one of its Pipelines has no"
+              + " stored definition",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "422",
+      description =
+          "A pipeline DataSource is out of the dataset's datapool scope, an artifact"
+              + " participating in a pipeline's flow cannot carry a release, or a flow reaches"
+              + " further than the walk is configured to follow",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> stage(@PathVariable UUID id) {
     DataSet ready = dataSetService.stage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(ready);
@@ -266,6 +235,10 @@ public class DataSetController
       operationId = "unstageDataSet",
       summary = "Unstage a dataset",
       description = "Reverts the dataset from READY to DRAFT.")
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> unstage(@PathVariable UUID id) {
     DataSet draft = dataSetService.unstage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(draft);
@@ -273,6 +246,21 @@ public class DataSetController
   }
 
   @Override
+  @ApiResponse(
+      responseCode = "202",
+      description = "The release was accepted; infrastructure is provisioned asynchronously",
+      content = @Content(schema = @Schema(implementation = DataSetOutputDTO.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "422",
+      description =
+          "A pipeline DataSource is out of the dataset's datapool scope, an artifact"
+              + " participating in a pipeline's flow cannot carry a release, or a flow reaches"
+              + " further than the walk is configured to follow",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> release(@PathVariable UUID id) {
     DataSet released = dataSetService.release(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(released);
@@ -349,6 +337,10 @@ public class DataSetController
               + "A dataset that still holds a provisioned sink is torn down asynchronously via a "
               + "DELETE saga and removed once the saga completes. An AVAILABLE dataset cannot be "
               + "deleted directly — unrelease it first (POST /{id}/unrelease).")
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public void delete(@PathVariable UUID id) {
     dataSetService.deleteById(id);
   }

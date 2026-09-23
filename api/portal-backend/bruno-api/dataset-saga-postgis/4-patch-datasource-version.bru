@@ -20,6 +20,12 @@ body:json {
   }
 }
 
+script:post-response {
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('pgDataSourceConfigurationUrn', res.body.configurationUrn);
+  }
+}
+
 tests {
   test("DataSource patched", function() {
     const status = res.getStatus();

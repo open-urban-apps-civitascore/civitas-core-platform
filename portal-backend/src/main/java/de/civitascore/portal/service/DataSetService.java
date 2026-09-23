@@ -10,21 +10,24 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
-import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.service.validation.PipelineClosureValidator;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.SagaInFlightException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -74,6 +77,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
+  private final ModelRegistryGateway modelRegistryGateway;
+  private final PipelineClosureValidator pipelineClosureValidator;
 
   private final DataSetMutationGuard dataSetMutationGuard;
 
@@ -88,7 +93,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       PipelineRuntimeStatusService pipelineRuntimeStatusService,
       ObjectProvider<AllowedScopes> allowedScopesProvider,
       DataSourceDatapoolScopeValidator datapoolScopeValidator,
-      DataSetMutationGuard dataSetMutationGuard) {
+      ModelRegistryGateway modelRegistryGateway,
+      DataSetMutationGuard dataSetMutationGuard,
+      PipelineClosureValidator pipelineClosureValidator) {
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
     this.layerRepository = layerRepository;
@@ -99,7 +106,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     this.pipelineRuntimeStatusService = pipelineRuntimeStatusService;
     this.allowedScopesProvider = allowedScopesProvider;
     this.datapoolScopeValidator = datapoolScopeValidator;
+    this.modelRegistryGateway = modelRegistryGateway;
     this.dataSetMutationGuard = dataSetMutationGuard;
+    this.pipelineClosureValidator = pipelineClosureValidator;
   }
 
   /**
@@ -271,6 +280,18 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       entity.getNamedApis().removeIf(api -> !incomingSlugs.contains(api.getSlug()));
       cleanUpOrphanedOwsLayers(entity);
     }
+
+    // A DataSet is backed by a Model Forge manifest artifact its members are linked into
+    // (pipelines,
+    // and transitively their sources/sinks/mappings/structures). Create it once, on first persist
+    // (when no manifest is pinned yet); its title mirrors the dataset name. Model Forge validates
+    // it.
+    if (entity.getManifestLogicalUrn() == null) {
+      ModelRegistryGateway.ModelPin pin =
+          modelRegistryGateway.createDataSetManifest(entity.getName());
+      entity.setManifestLogicalUrn(pin.logicalUrn());
+      entity.setManifestUrn(pin.versionedUrn());
+    }
     return super.postConvertToEntity(entity, input);
   }
 
@@ -307,8 +328,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * must keep working on a non-DRAFT dataset.
    *
    * @throws DataSetNotEditableException if the dataset is not in DRAFT
-   * @throws ResourceInUseException if a saga is in flight, which a DRAFT dataset still carries
-   *     while an unrelease teardown runs
+   * @throws SagaInFlightException if a saga is in flight, which a DRAFT dataset still carries while
+   *     an unrelease teardown runs
    */
   @Override
   public DataSet update(UUID id, DataSetInputDTO input) {
@@ -327,7 +348,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @param input the update input
    * @return the updated dataset
    * @throws InvalidInputException if the dataset is DRAFT or the input carries {@code namedApis}
-   * @throws ResourceInUseException if a saga is in-flight for this dataset
+   * @throws SagaInFlightException if a saga is in-flight for this dataset
    */
   @Override
   @Transactional
@@ -362,9 +383,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   private DataSet updateMetaOf(DataSet existingEntity, DataSetInputDTO input) {
     UUID id = existingEntity.getId();
     if (existingEntity.getPendingSagaType() != null) {
-      throw new ResourceInUseException(
-          "DataSet",
+      throw new SagaInFlightException(
           id,
+          existingEntity.getPendingSagaType(),
           "Cannot update metadata while a saga is in-flight: "
               + existingEntity.getPendingSagaType());
     }
@@ -428,7 +449,22 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "pipelines", id, "DataSet must have at least one Pipeline with DataSources");
     }
 
+    // A pipeline with no stored flow deploys nothing. NiFi rejects the empty graph at the last
+    // saga step, once every other system is provisioned and has to be torn down again.
+    Pipeline withoutDefinition =
+        dataSet.getPipelines().stream()
+            .filter(p -> StringUtils.isBlank(p.getModelUrn()))
+            .findFirst()
+            .orElse(null);
+    if (withoutDefinition != null) {
+      throw new InvalidInputException(
+          "pipelines",
+          id,
+          "Pipeline '" + withoutDefinition.getName() + "' has no stored definition");
+    }
+
     revalidatePipelineDataSourcesAgainstPool(dataSet);
+    pipelineClosureValidator.validate(dataSet.getPipelines());
 
     dataSet.setDataSetStatus(DataSetStatus.READY);
     return dataSetRepository.save(dataSet);
@@ -440,13 +476,12 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * <p>An in-flight UNRELEASE saga is allowed: after {@link #unrelease} the dataset is already
    * READY while its route/pipeline teardown runs, and the frontend chains unrelease + unstage to go
    * AVAILABLE → DRAFT in one step. The teardown keeps running; its completion callback leaves a
-   * DRAFT dataset untouched. An in-flight CREATE/UPDATE saga is still rejected — READY does not
-   * occur during those.
+   * DRAFT dataset untouched.
    *
    * @param id the dataset ID
    * @return the unstaged dataset
    * @throws InvalidInputException if dataset is not in READY status
-   * @throws ResourceInUseException if a CREATE or UPDATE saga is in-flight
+   * @throws SagaInFlightException if any saga other than UNRELEASE is in-flight
    */
   @Transactional
   public DataSet unstage(UUID id) {
@@ -459,8 +494,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
     PendingSagaType pending = dataSet.getPendingSagaType();
     if (pending != null && pending != PendingSagaType.UNRELEASE) {
-      throw new ResourceInUseException(
-          "DataSet", id, "Cannot unstage while a saga is in-flight: " + pending);
+      throw new SagaInFlightException(
+          id, pending, "Cannot unstage while a saga is in-flight: " + pending);
     }
 
     dataSet.setDataSetStatus(DataSetStatus.DRAFT);
@@ -477,7 +512,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @return the released dataset
    * @throws InvalidInputException if dataset is not in READY status, or if its map surface is only
    *     half configured
-   * @throws ResourceInUseException if a saga is already in-flight
+   * @throws SagaInFlightException if a saga is already in-flight
    */
   @Override
   @Transactional
@@ -493,14 +528,18 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     if (dataSet.getPendingSagaType() != null) {
-      throw new ResourceInUseException(
-          "DataSet",
+      throw new SagaInFlightException(
           id,
+          dataSet.getPendingSagaType(),
           "Cannot release while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
 
     revalidatePipelineDataSourcesAgainstPool(dataSet);
     verifyPublishedSurfacesAreServable(dataSet);
+    // Re-asserted here and not only at staging: this is the transition that provisions
+    // infrastructure, and registry state can drift through routes that do not pass the in-use
+    // guard refusing to unrelease an artifact a flow still reaches.
+    pipelineClosureValidator.validate(dataSet.getPipelines());
 
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
     dataSet.setPendingSagaType(PendingSagaType.CREATE);
@@ -568,7 +607,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @param id the dataset ID
    * @return the dataset in READY status with a pending UNRELEASE saga
    * @throws InvalidInputException if dataset is not AVAILABLE
-   * @throws ResourceInUseException if a saga is already in-flight
+   * @throws SagaInFlightException if a saga is already in-flight
    */
   @Override
   @Transactional
@@ -581,9 +620,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     if (dataSet.getPendingSagaType() != null) {
-      throw new ResourceInUseException(
-          "DataSet",
+      throw new SagaInFlightException(
           id,
+          dataSet.getPendingSagaType(),
           "Cannot unrelease while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
 
@@ -594,6 +633,36 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     sagaPublisher.publishUnreleaseRequested(saved);
 
     return saved;
+  }
+
+  /**
+   * Explicitly adds a reusable artifact (by CORE URN) to this dataset's manifest — the "Beides"
+   * explicit-assignment path, independent of any Pipeline that uses it. Model Forge maintains the
+   * manifest (a {@code dataset-ref} membership edge).
+   *
+   * <p>No route reaches this: the caller's rights are read off the dataset, never off the artifact,
+   * so a route would let a caller pull in an artifact of a dataset they may not read.
+   */
+  @Transactional
+  public void linkMember(UUID datasetId, String memberUrn) {
+    DataSet dataSet = findByIdOrThrow(datasetId);
+    if (dataSet.getManifestLogicalUrn() == null) {
+      throw new InvalidInputException(
+          "DataSet", datasetId, "DataSet has no manifest to link members into");
+    }
+    if (memberUrn == null || memberUrn.isBlank()) {
+      throw new InvalidInputException("member", datasetId, "member artifact URN is required");
+    }
+    modelRegistryGateway.linkToDataSet(dataSet.getManifestLogicalUrn(), memberUrn);
+  }
+
+  /** Explicitly removes an artifact (by CORE URN) from this dataset's manifest. */
+  @Transactional
+  public void unlinkMember(UUID datasetId, String memberUrn) {
+    DataSet dataSet = findByIdOrThrow(datasetId);
+    if (dataSet.getManifestLogicalUrn() != null && memberUrn != null && !memberUrn.isBlank()) {
+      modelRegistryGateway.unlinkFromDataSet(dataSet.getManifestLogicalUrn(), memberUrn);
+    }
   }
 
   /**
@@ -640,9 +709,10 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
             datasetId);
       }
       case DELETE -> {
-        // Teardown of the full infrastructure (including the sink) succeeded; now remove the
-        // entity itself. Returning here skips the save() below — the row no longer exists.
-        deleteWithSinks(dataSet);
+        // Teardown succeeded, so the entity goes now; returning skips the save() below.
+        // A refusal only recorded: a stranded artifact is recoverable, a dataset no later delete
+        // can remove is not.
+        deleteWithSinks(dataSet, false);
         log.info("Saga DELETE completed for dataset {}, entity removed", datasetId);
         return;
       }
@@ -776,14 +846,14 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     if (!dataSet.isProvisioned()) {
-      deleteWithSinks(dataSet);
+      deleteWithSinks(dataSet, true);
       return;
     }
 
     if (dataSet.getPendingSagaType() != null) {
-      throw new ResourceInUseException(
-          "DataSet",
+      throw new SagaInFlightException(
           id,
+          dataSet.getPendingSagaType(),
           "Cannot delete while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
 
@@ -794,30 +864,74 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Removes a dataset together with its DataSinks. A DataSink is owned by the dataset (its {@code
-   * dataset_id} FK is non-null) but the dataset has no cascading collection for it, and a released
-   * sink additionally carries a {@code pipeline_id} FK into one of the cascade-removed pipelines.
-   * Deleting the sinks first — after detaching them from their pipeline — clears both FKs before
-   * the dataset delete cascades into the pipelines, avoiding the FK violation that would otherwise
-   * roll the transaction back.
+   * Removes a dataset together with its DataSinks. A sink carries an FK onto the dataset and, once
+   * released, one onto a pipeline the dataset delete cascades away; removing the sinks first clears
+   * both before that cascade runs.
    *
-   * <p>Going through the repository deliberately bypasses the layer guard that rejects a standalone
-   * {@code DELETE /datasinks/{id}}: that guard protects a sink whose dataset lives on, whereas here
-   * the whole aggregate goes away.
+   * <p>Going through the repository bypasses the layer guard on a standalone sink delete, which
+   * protects a sink whose dataset lives on. Flushing keeps a constraint violation inside this call
+   * rather than at commit.
    *
-   * <p>Flushing here keeps a constraint violation inside this call instead of surfacing it at
-   * commit, after a caller has already logged the removal as done.
+   * <p>The only place a dataset row is removed — a provisioned dataset keeps its row until its
+   * teardown saga reports back — so the registry cleanup belongs here, not in {@code postDelete}.
+   *
+   * @param failOnRefusal whether a refused removal fails the whole delete or is only recorded
    */
-  private void deleteWithSinks(DataSet dataSet) {
-    dataSinkRepository
-        .findByDataSetId(dataSet.getId())
-        .forEach(
-            sink -> {
-              sink.setPipeline(null);
-              dataSinkRepository.delete(sink);
-            });
+  private void deleteWithSinks(DataSet dataSet, boolean failOnRefusal) {
+    UUID datasetId = dataSet.getId();
+    // Read while the rows still exist: the manifest groups a sink rather than owning it, so the
+    // cascade leaves its configuration behind.
+    List<DataSink> sinks = dataSinkRepository.findByDataSetId(dataSet.getId());
+    List<String> sinkConfigurationUrns =
+        sinks.stream()
+            .map(DataSink::getConfigurationLogicalUrn)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+
+    sinks.forEach(
+        sink -> {
+          sink.setPipeline(null);
+          dataSinkRepository.delete(sink);
+        });
     dataSetRepository.delete(dataSet);
     dataSetRepository.flush();
+
+    // The manifest first: its dataset-ref edges carry the pipelines, and each pipeline takes the
+    // mappings no other pipeline uses. The sink configurations they wrote through come last.
+    if (dataSet.getManifestLogicalUrn() != null) {
+      removeOwnedArtifacts(
+          datasetId, List.of(dataSet.getManifestLogicalUrn()), true, failOnRefusal);
+    }
+    removeOwnedArtifacts(datasetId, sinkConfigurationUrns, false, failOnRefusal);
+  }
+
+  /**
+   * Removes registry artifacts a deleted DataSet owned, each taking the artifacts it owns with it
+   * when {@code cascade} is set. The registry refuses one a second DataSet also lists; one only
+   * this DataSet listed is removed and unlinked.
+   *
+   * <p>With {@code failOnRefusal} a refusal rolls the whole delete back, rows included, so the
+   * dataset never disappears while a model it owned survives with nothing left to reach it. Without
+   * it the refusal is only recorded, which is what the teardown saga needs once the infrastructure
+   * is already gone.
+   */
+  private void removeOwnedArtifacts(
+      UUID datasetId, List<String> logicalUrns, boolean cascade, boolean failOnRefusal) {
+    for (String logicalUrn : logicalUrns) {
+      try {
+        modelRegistryGateway.deleteArtifact(logicalUrn, cascade);
+      } catch (RuntimeException e) {
+        if (failOnRefusal) {
+          throw e;
+        }
+        log.error(
+            "Could not remove artifact {} of deleted dataset {}, it is now stranded: {}",
+            Encode.forJava(logicalUrn),
+            datasetId,
+            Encode.forJava(e.getMessage()));
+      }
+    }
   }
 
   /**

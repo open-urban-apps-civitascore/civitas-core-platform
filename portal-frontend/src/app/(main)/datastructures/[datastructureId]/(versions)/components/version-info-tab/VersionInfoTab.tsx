@@ -16,12 +16,11 @@ import { DatastructureVersionFormData } from '@/types/datastructures'
 interface VersionInfoTabProps {
   form: UseFormReturn<DatastructureVersionFormData>
   isReadOnly?: boolean
-  versionAlreadyExistsError?: string
   isAvailable: boolean
 }
 
 export const VersionInfoTab = (props: VersionInfoTabProps) => {
-  const { form, isReadOnly = false, isAvailable, versionAlreadyExistsError } = props
+  const { form, isReadOnly = false, isAvailable } = props
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
 
@@ -39,15 +38,14 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
           </DetailsFieldContainer>
 
           <DetailsFieldContainer className="max-w-300">
+            {/* Assigned by the registry when the model is stored, so it is shown and never typed. */}
             <TextField
               id="version"
               form={form}
               label={t('versionInfo.versionNumber')}
               name="version"
               placeholder={t('versionInfo.versionNumberPlaceholder')}
-              disabled={isReadOnly || isAvailable}
-              required
-              manualError={versionAlreadyExistsError}
+              disabled
             />
           </DetailsFieldContainer>
 

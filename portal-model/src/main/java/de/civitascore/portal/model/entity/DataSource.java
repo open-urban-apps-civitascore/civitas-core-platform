@@ -18,7 +18,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -26,8 +25,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 /**
  * Represents an external data source with its connector configuration and lifecycle status. A data
@@ -61,9 +58,20 @@ public class DataSource extends BaseDataEntity {
   @Column(name = "connector_type")
   private ConnectorType connectorType;
 
-  @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "configuration", columnDefinition = "jsonb")
-  private Map<String, Object> configuration;
+  /**
+   * Stable logical CORE URN of this data source's connector-configuration artifact in Model Forge,
+   * minted once on the first store and reused for every following version. Null until a
+   * configuration is stored.
+   */
+  @Column(name = "configuration_logical_urn")
+  private String configurationLogicalUrn;
+
+  /**
+   * Versioned CORE URN pinning the current connector configuration (sensitive fields encrypted by
+   * the host before storing) in Model Forge. Null while no configuration is stored.
+   */
+  @Column(name = "configuration_urn")
+  private String configurationUrn;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "data_structure_version_id")

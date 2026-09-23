@@ -1,0 +1,28 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
+  "id": "urn:core:platform:civitas:mapping:taf10-grid:gridnode-to-sta-thing:1.0.0",
+  "title": "GridNodeMasterData -> STAThing",
+  "source": "urn:core:platform:civitas:element:taf10-grid:GridNodeMasterData:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:STAThing:1.0.0",
+  "fields": {
+    "name": { "op": "copy", "input": "$.gridNodeName" },
+    "description": {
+      "op": "concat",
+      "inputs": ["$.gridNodeType", "$.gridNodeName"],
+      "separator": " - "
+    },
+    "properties.gridNodeId": { "op": "copy", "input": "$.gridNodeId" },
+    "properties.operator": { "op": "copy", "input": "$.operator" },
+    "properties.transformerId": { "op": "copy", "input": "$.transformerId" },
+    "properties.feederId": { "op": "copy", "input": "$.feederId" },
+    "properties.gridNodeType": { "op": "copy", "input": "$.gridNodeType" },
+
+    "Locations[0].name": { "op": "copy", "input": "$.gridNodeName" },
+    "Locations[0].encodingType": { "op": "const", "value": "application/geo+json" },
+    "Locations[0].location": {
+      "op": "geoPoint",
+      "lon": "$.location.lon",
+      "lat": "$.location.lat"
+    }
+  }
+}

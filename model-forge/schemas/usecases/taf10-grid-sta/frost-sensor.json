@@ -1,0 +1,6 @@
+{
+  "name": "TAF10 Niederspannungsnetz-Messsystem",
+  "description": "TAF10 meter and low-voltage grid telemetry source for active power, feed-in, and voltage",
+  "encodingType": "application/pdf",
+  "metadata": "https://example.org/taf10-grid-datasheet"
+}

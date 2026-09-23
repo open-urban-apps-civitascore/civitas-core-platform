@@ -49,7 +49,6 @@ Content-Type: application/json
 
 {
   "dataStructureVersionSource": "OWN",
-  "version": "1.0.4",
   "description": "Initial version",
   "modelName": "StudentDatabaseModel1",
   "model": {
@@ -90,7 +89,6 @@ Content-Type: application/json
 
 {
   "dataStructureVersionSource": "OWN",
-  "version": "1.0.4",
   "description": "Updated version",
   "modelName": "StudentDatabaseModel1",
   "model": {
@@ -228,7 +226,6 @@ Content-Type: application/json
 
 {
   "dataStructureVersionSource": "OWN",
-  "version": "1.0.1",
   "modelName": "UpdatedModelName",
   "styles": {}
 }

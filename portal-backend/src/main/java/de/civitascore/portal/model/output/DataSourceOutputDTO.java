@@ -32,6 +32,10 @@ public class DataSourceOutputDTO extends BaseOutputDTO {
       description = "The configuration object, structure depends on the connector type")
   private Map<String, Object> configuration;
 
+  @Schema(
+      description = "Versioned CORE URN of this DataSource's configuration artifact in Model Forge")
+  private String configurationUrn;
+
   private DataStructureVersionSummaryDTO dataStructureVersion;
 
   @Schema(

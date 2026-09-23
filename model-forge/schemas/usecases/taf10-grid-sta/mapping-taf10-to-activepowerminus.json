@@ -1,0 +1,17 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
+  "id": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-activepowerminus:1.0.0",
+  "title": "TAF10 Active Power Minus -> STA Observation",
+  "source": "urn:core:platform:civitas:element:taf10-grid:TAF10GridReading:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0",
+  "fields": {
+    "phenomenonTime": { "op": "copy", "input": "$.timestamp" },
+    "resultTime": { "op": "copy", "input": "$.timestamp" },
+    "result": { "op": "copy", "input": "$.activePowerMinus.value" },
+    "resultQuality": { "op": "copy", "input": "$.activePowerMinus.quality" },
+    "parameters.gridNodeId": { "op": "copy", "input": "$.gridNodeId" },
+    "parameters.observedProperty": { "op": "const", "value": "activePowerMinus" },
+    "parameters.unit": { "op": "copy", "input": "$.activePowerMinus.unit" },
+    "Datastream.@iot.id": { "op": "copy", "input": "$.frostDatastreamIds.activePowerMinus" }
+  }
+}

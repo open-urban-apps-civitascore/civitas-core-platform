@@ -24,7 +24,7 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.AllowedScopes;
-import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
+import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashSet;
@@ -91,8 +91,8 @@ class PipelineServiceTest {
   class DataSourceLinkingValidation {
 
     @Test
-    @DisplayName("Should reject linking a DRAFT datasource to a pipeline")
-    void shouldRejectDraftDataSource() {
+    @DisplayName("Should link a DRAFT DataSource to a Pipeline")
+    void shouldLinkDraftDataSource() {
       UUID dataSetId = UUID.randomUUID();
       UUID dataSourceId = UUID.randomUUID();
 
@@ -107,23 +107,19 @@ class PipelineServiceTest {
       input.setDataSetId(dataSetId);
       input.setDataSourceIds(Set.of(dataSourceId));
 
-      Pipeline entity = new Pipeline();
-      entity.setName("test-pipeline");
+      Pipeline entity = pipeline(UUID.randomUUID(), dataSet);
 
       when(pipelineMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
       when(dataSourceRepository.findAllById(Set.of(dataSourceId)))
           .thenReturn(List.of(draftDataSource));
+      when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
+      when(pipelineRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+      when(dataSinkRepository.findByPipelineId(entity.getId())).thenReturn(List.of());
 
-      // A DRAFT source is rejected with the same answer as a nonexistent or out-of-pool one:
-      // naming the lifecycle status would leak it to a caller who may not read the data source.
-      assertThatThrownBy(() -> pipelineService.create(input))
-          .isInstanceOf(DataSourceScopeViolationException.class)
-          .satisfies(
-              ex ->
-                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
-                      .containsExactly(dataSourceId))
-          .hasMessageNotContaining("AVAILABLE status");
+      Pipeline result = pipelineService.create(input);
+
+      assertThat(result.getDataSources()).containsExactly(draftDataSource);
     }
 
     @Test

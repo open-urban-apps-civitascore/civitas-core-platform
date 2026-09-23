@@ -1,0 +1,11 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource",
+  "id": "urn:core:platform:civitas:datasource:luftqualitaet:airquality-mqtt:1.0.0",
+  "title": "Luftqualitaet Messstationen MQTT",
+  "connectionType": "mqtt",
+  "element": "urn:core:platform:civitas:element:luftqualitaet:AirQualityRawReading:1.0.0",
+  "urls": ["mqtt://mosquitto:1883"],
+  "topics": ["luftqualitaet/readings/+"],
+  "client_id": "minifi-airquality",
+  "qos": 1
+}

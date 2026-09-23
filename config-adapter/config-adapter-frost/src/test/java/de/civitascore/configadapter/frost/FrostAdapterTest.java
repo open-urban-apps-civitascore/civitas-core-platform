@@ -32,16 +32,14 @@ import de.civitascore.configadapter.model.Metadata;
 import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.Payload;
 import de.civitascore.configadapter.model.frost.FrostConfigValue;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import mockwebserver3.RecordedRequest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -168,52 +166,47 @@ class FrostAdapterTest {
     adapter.close();
   }
 
+  /** Points the adapter at {@code server} and initializes it with the given subscribed topics. */
+  private void initializeAgainstServer(MockWebServer server, String topics) {
+    when(mockConfig.getProperty("frost.topics")).thenReturn(topics);
+    when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
+        .thenReturn(server.url("/v1.1").toString());
+    when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
+    when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
+    adapter.initialize(mockConfig);
+  }
+
   @Nested
   class CreateEntityOperations {
 
+    private MockWebServer server;
     private EventPublisher mockPublisher;
-    private Invocation.Builder mockBuilder;
-    private Response mockResponse;
 
     @BeforeEach
-    void setUpMocks() {
-      when(mockConfig.getProperty("frost.topics"))
-          .thenReturn(
-              "de.civitascore.data.thing.created,de.civitascore.data.location.created,de.civitascore.data.sensor.created");
-      when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
-          .thenReturn("http://localhost:8080/v1.1");
-      when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
-      when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
-
-      adapter.setClient(mockClient());
-      adapter.initialize(mockConfig);
+    void setUpMocks() throws IOException {
+      server = new MockWebServer();
+      server.start();
+      initializeAgainstServer(
+          server,
+          "de.civitascore.data.thing.created,de.civitascore.data.location.created,de.civitascore.data.sensor.created");
 
       mockPublisher = mock(EventPublisher.class);
       adapter.setEventPublisher(mockPublisher);
     }
 
-    private Client mockClient() {
-      Client mockClient = mock(Client.class);
-      WebTarget mockTarget = mock(WebTarget.class);
-      WebTarget mockPathTarget = mock(WebTarget.class);
-      mockBuilder = mock(Invocation.Builder.class);
-      mockResponse = mock(Response.class);
-
-      when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-      when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-      when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-      when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-      return mockClient;
+    @AfterEach
+    void tearDownServer() throws IOException {
+      server.close();
     }
 
     @Test
     void createThingWithValidConfigReturnsSuccess()
         throws RetryableAdapterException, FatalAdapterException {
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/v1.1/Things(123)");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/v1.1/Things(123)")
+              .build());
 
       Map<String, Object> thingConfig =
           Map.of(
@@ -236,10 +229,11 @@ class FrostAdapterTest {
     @Test
     void createLocationWithGeoJsonReturnsSuccess()
         throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/v1.1/Locations(456)");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/v1.1/Locations(456)")
+              .build());
 
       Map<String, Object> locationConfig =
           Map.of(
@@ -262,10 +256,11 @@ class FrostAdapterTest {
 
     @Test
     void createSensorReturnsSuccess() throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/v1.1/Sensors(789)");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/v1.1/Sensors(789)")
+              .build());
 
       Map<String, Object> sensorConfig =
           Map.of(
@@ -289,8 +284,7 @@ class FrostAdapterTest {
     @Test
     void createWithConflictReturnsSuccess()
         throws RetryableAdapterException, FatalAdapterException {
-      when(mockResponse.getStatus()).thenReturn(409);
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(409).build());
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "Things", Map.of("name", "Existing"));
 
@@ -303,9 +297,8 @@ class FrostAdapterTest {
 
     @Test
     void createWithClientErrorThrowsFatalException() {
-      when(mockResponse.getStatus()).thenReturn(400);
-      when(mockResponse.readEntity(String.class)).thenReturn("{\"error\":\"Invalid entity\"}");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder().code(400).body("{\"error\":\"Invalid entity\"}").build());
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "Things", Map.of());
 
@@ -320,10 +313,11 @@ class FrostAdapterTest {
     @Test
     void createWithFrostFailedToStoreDataReturnsSuccess()
         throws RetryableAdapterException, FatalAdapterException {
-      when(mockResponse.getStatus()).thenReturn(500);
-      when(mockResponse.readEntity(String.class))
-          .thenReturn("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(500)
+              .body("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}")
+              .build());
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "Things", Map.of("name", "Existing"));
 
@@ -336,9 +330,8 @@ class FrostAdapterTest {
 
     @Test
     void createWithServerErrorThrowsRetryableException() {
-      when(mockResponse.getStatus()).thenReturn(500);
-      when(mockResponse.readEntity(String.class)).thenReturn("{\"error\":\"Internal error\"}");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder().code(500).body("{\"error\":\"Internal error\"}").build());
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "Things", Map.of());
 
@@ -351,9 +344,10 @@ class FrostAdapterTest {
     }
 
     @Test
-    void createWithConnectionErrorThrowsRetryableException() {
-      when(mockBuilder.post(any(Entity.class)))
-          .thenThrow(new ProcessingException("Connection refused"));
+    void createWithConnectionErrorThrowsRetryableException() throws IOException {
+      // Torn down before the request is even made: the connection attempt itself fails, exactly
+      // like a real network error.
+      server.close();
 
       ConfigEvent event =
           createConfigEvent(Operation.CREATE, "Things", Map.of("name", "Test Thing"));
@@ -381,45 +375,32 @@ class FrostAdapterTest {
 
     @Test
     void createThingWithBasicAuthSendsAuthorizationHeader()
-        throws FatalAdapterException, RetryableAdapterException {
+        throws FatalAdapterException, RetryableAdapterException, InterruptedException {
       AdapterConfig basicAuthConfig = mock(AdapterConfig.class);
       when(basicAuthConfig.getProperty("frost.topics"))
           .thenReturn("de.civitascore.data.thing.created");
       when(basicAuthConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
-          .thenReturn("http://localhost:8080/v1.1");
+          .thenReturn(server.url("/v1.1").toString());
       when(basicAuthConfig.getProperty("frost.api.key.header", "X-API-Key"))
           .thenReturn("X-API-Key");
       when(basicAuthConfig.getProperty("frost.basic.auth.username")).thenReturn("admin");
       when(basicAuthConfig.getProperty("frost.basic.auth.password")).thenReturn("secret");
 
-      Invocation.Builder basicAuthBuilder = mock(Invocation.Builder.class);
-      Response basicAuthResponse = mock(Response.class);
-      Client basicAuthClient = mock(Client.class);
-      WebTarget basicAuthTarget = mock(WebTarget.class);
-      WebTarget basicAuthPathTarget = mock(WebTarget.class);
-
-      when(basicAuthClient.target(any(String.class))).thenReturn(basicAuthTarget);
-      when(basicAuthTarget.path(any(String.class))).thenReturn(basicAuthPathTarget);
-      when(basicAuthPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(basicAuthBuilder);
-      when(basicAuthBuilder.header(any(String.class), any())).thenReturn(basicAuthBuilder);
-      when(basicAuthResponse.getStatus()).thenReturn(201);
-      when(basicAuthResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/v1.1/Things(42)");
-      when(basicAuthBuilder.post(any(Entity.class))).thenReturn(basicAuthResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/v1.1/Things(42)")
+              .build());
 
       try (FrostAdapter basicAuthAdapter = new FrostAdapter()) {
-        basicAuthAdapter.setClient(basicAuthClient);
         basicAuthAdapter.initialize(basicAuthConfig);
         basicAuthAdapter.setEventPublisher(mockPublisher);
 
         ConfigEvent event = createConfigEvent(Operation.CREATE, "Things", Map.of("name", "Test"));
         basicAuthAdapter.processConfigEvent("de.civitascore.data.thing.created", event);
 
-        ArgumentCaptor<String> headerNameCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Object> headerValueCaptor = ArgumentCaptor.forClass(Object.class);
-        verify(basicAuthBuilder).header(headerNameCaptor.capture(), headerValueCaptor.capture());
-        assertEquals("Authorization", headerNameCaptor.getValue());
-        assertTrue(headerValueCaptor.getValue().toString().startsWith("Basic "));
+        RecordedRequest recorded = server.takeRequest();
+        assertTrue(recorded.getHeaders().get("Authorization").startsWith("Basic "));
       }
     }
   }
@@ -427,51 +408,38 @@ class FrostAdapterTest {
   @Nested
   class UpdateEntityOperations {
 
+    private MockWebServer server;
     private EventPublisher mockPublisher;
-    private Client mockClient;
-    private WebTarget mockTarget;
-    private WebTarget mockPathTarget;
-    private Invocation.Builder mockBuilder;
-    private Response mockResponse;
 
     @BeforeEach
-    void setUpMocks() {
-      when(mockConfig.getProperty("frost.topics"))
-          .thenReturn("de.civitascore.data.thing.updated,de.civitascore.data.location.updated");
-      when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
-          .thenReturn("http://localhost:8080/v1.1");
-      when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
-      when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
-
-      mockClient = mock(Client.class);
-      mockTarget = mock(WebTarget.class);
-      mockPathTarget = mock(WebTarget.class);
-      mockBuilder = mock(Invocation.Builder.class);
-      mockResponse = mock(Response.class);
-
-      when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-      when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-      when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-      when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-      adapter.setClient(mockClient);
-      adapter.initialize(mockConfig);
+    void setUpMocks() throws IOException {
+      server = new MockWebServer();
+      server.start();
+      initializeAgainstServer(
+          server, "de.civitascore.data.thing.updated,de.civitascore.data.location.updated");
 
       mockPublisher = mock(EventPublisher.class);
       adapter.setEventPublisher(mockPublisher);
     }
 
+    @AfterEach
+    void tearDownServer() throws IOException {
+      server.close();
+    }
+
     @Test
     void updateThingWithValidConfigReturnsSuccess()
-        throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(200);
-      when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(mockResponse);
+        throws FatalAdapterException, RetryableAdapterException, InterruptedException {
+      server.enqueue(new MockResponse.Builder().code(200).build());
 
       Map<String, Object> thingConfig = Map.of("description", "Updated description");
 
       ConfigEvent event = createConfigEvent(Operation.UPDATE, "Things/123", thingConfig);
 
       adapter.processConfigEvent("de.civitascore.data.thing.updated", event);
+
+      RecordedRequest recorded = server.takeRequest();
+      assertEquals("PATCH", recorded.getMethod());
 
       ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
       verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
@@ -497,9 +465,8 @@ class FrostAdapterTest {
 
     @Test
     void updateWithClientErrorThrowsFatalException() {
-      when(mockResponse.getStatus()).thenReturn(404);
-      when(mockResponse.readEntity(String.class)).thenReturn("{\"error\":\"Not found\"}");
-      when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder().code(404).body("{\"error\":\"Not found\"}").build());
 
       ConfigEvent event = createConfigEvent(Operation.UPDATE, "Things/999", Map.of("name", "Test"));
 
@@ -515,44 +482,28 @@ class FrostAdapterTest {
   @Nested
   class DeleteEntityOperations {
 
+    private MockWebServer server;
     private EventPublisher mockPublisher;
-    private Client mockClient;
-    private WebTarget mockTarget;
-    private WebTarget mockPathTarget;
-    private Invocation.Builder mockBuilder;
-    private Response mockResponse;
 
     @BeforeEach
-    void setUpMocks() {
-      when(mockConfig.getProperty("frost.topics"))
-          .thenReturn("de.civitascore.data.thing.deleted,de.civitascore.data.location.deleted");
-      when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
-          .thenReturn("http://localhost:8080/v1.1");
-      when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
-      when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
-
-      mockClient = mock(Client.class);
-      mockTarget = mock(WebTarget.class);
-      mockPathTarget = mock(WebTarget.class);
-      mockBuilder = mock(Invocation.Builder.class);
-      mockResponse = mock(Response.class);
-
-      when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-      when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-      when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-      when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-      adapter.setClient(mockClient);
-      adapter.initialize(mockConfig);
+    void setUpMocks() throws IOException {
+      server = new MockWebServer();
+      server.start();
+      initializeAgainstServer(
+          server, "de.civitascore.data.thing.deleted,de.civitascore.data.location.deleted");
 
       mockPublisher = mock(EventPublisher.class);
       adapter.setEventPublisher(mockPublisher);
     }
 
+    @AfterEach
+    void tearDownServer() throws IOException {
+      server.close();
+    }
+
     @Test
     void deleteThingReturnsSuccess() throws RetryableAdapterException, FatalAdapterException {
-      when(mockResponse.getStatus()).thenReturn(200);
-      when(mockBuilder.delete()).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(200).build());
 
       ConfigEvent event = createConfigEvent(Operation.DELETE, "Things/123", null);
 
@@ -581,8 +532,7 @@ class FrostAdapterTest {
 
     @Test
     void deleteNotFoundReturnsSuccess() throws RetryableAdapterException, FatalAdapterException {
-      when(mockResponse.getStatus()).thenReturn(404);
-      when(mockBuilder.delete()).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(404).build());
 
       ConfigEvent event = createConfigEvent(Operation.DELETE, "Things/999", null);
 
@@ -595,9 +545,8 @@ class FrostAdapterTest {
 
     @Test
     void deleteWithOtherClientErrorThrowsFatalException() {
-      when(mockResponse.getStatus()).thenReturn(403);
-      when(mockResponse.readEntity(String.class)).thenReturn("{\"error\":\"Forbidden\"}");
-      when(mockBuilder.delete()).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder().code(403).body("{\"error\":\"Forbidden\"}").build());
 
       ConfigEvent event = createConfigEvent(Operation.DELETE, "Things/999", null);
 
@@ -613,47 +562,31 @@ class FrostAdapterTest {
   @Nested
   class ResultPublishing {
 
-    private EventPublisher mockPublisher;
-    private Client mockClient;
-    private WebTarget mockTarget;
-    private WebTarget mockPathTarget;
-    private Invocation.Builder mockBuilder;
-    private Response mockResponse;
+    private MockWebServer server;
 
     @BeforeEach
-    void setUpMocks() {
-      when(mockConfig.getProperty("frost.topics")).thenReturn("de.civitascore.data.thing.created");
-      when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
-          .thenReturn("http://localhost:8080/v1.1");
-      when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
-      when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
+    void setUpMocks() throws IOException {
+      server = new MockWebServer();
+      server.start();
+      initializeAgainstServer(server, "de.civitascore.data.thing.created");
+    }
 
-      mockClient = mock(Client.class);
-      mockTarget = mock(WebTarget.class);
-      mockPathTarget = mock(WebTarget.class);
-      mockBuilder = mock(Invocation.Builder.class);
-      mockResponse = mock(Response.class);
-
-      when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-      when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-      when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-      when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-      adapter.setClient(mockClient);
-      adapter.initialize(mockConfig);
-
-      mockPublisher = mock(EventPublisher.class);
+    @AfterEach
+    void tearDownServer() throws IOException {
+      server.close();
     }
 
     @Test
     void withoutEventPublisherDoesNotPublishResults()
         throws RetryableAdapterException, FatalAdapterException {
+      EventPublisher mockPublisher = mock(EventPublisher.class);
       adapter.setEventPublisher(null);
 
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/v1.1/Things(123)");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/v1.1/Things(123)")
+              .build());
 
       ConfigEvent event =
           createConfigEvent(Operation.CREATE, "Things", Map.of("name", "Test Thing"));
@@ -666,12 +599,14 @@ class FrostAdapterTest {
     @Test
     void withNullResultTopicDoesNotPublishResults()
         throws FatalAdapterException, RetryableAdapterException {
+      EventPublisher mockPublisher = mock(EventPublisher.class);
       adapter.setEventPublisher(mockPublisher);
 
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/v1.1/Things(123)");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/v1.1/Things(123)")
+              .build());
 
       Metadata metadata =
           new Metadata("msg-123", OffsetDateTime.now(), "test-source", "corr-123", "v1.0.0", null);
@@ -689,48 +624,35 @@ class FrostAdapterTest {
   @Nested
   class ProjectScopedOperations {
 
+    private MockWebServer server;
     private EventPublisher mockPublisher;
-    private Client mockClient;
-    private WebTarget mockTarget;
-    private WebTarget mockPathTarget;
-    private Invocation.Builder mockBuilder;
-    private Response mockResponse;
 
     @BeforeEach
-    void setUpMocks() {
-      when(mockConfig.getProperty("frost.topics"))
-          .thenReturn(
-              "de.civitascore.data.project.created,de.civitascore.data.project.updated,"
-                  + "de.civitascore.data.project.deleted,de.civitascore.data.thing.created");
-      when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
-          .thenReturn("http://localhost:8080/v1.1");
-      when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
-      when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
-
-      mockClient = mock(Client.class);
-      mockTarget = mock(WebTarget.class);
-      mockPathTarget = mock(WebTarget.class);
-      mockBuilder = mock(Invocation.Builder.class);
-      mockResponse = mock(Response.class);
-
-      when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-      when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-      when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-      when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-      adapter.setClient(mockClient);
-      adapter.initialize(mockConfig);
+    void setUpMocks() throws IOException {
+      server = new MockWebServer();
+      server.start();
+      initializeAgainstServer(
+          server,
+          "de.civitascore.data.project.created,de.civitascore.data.project.updated,"
+              + "de.civitascore.data.project.deleted,de.civitascore.data.thing.created");
 
       mockPublisher = mock(EventPublisher.class);
       adapter.setEventPublisher(mockPublisher);
     }
 
+    @AfterEach
+    void tearDownServer() throws IOException {
+      server.close();
+    }
+
     @Test
-    void createProjectReturnsSuccess() throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/v1.1/Projects(1)");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+    void createProjectReturnsSuccess()
+        throws FatalAdapterException, RetryableAdapterException, InterruptedException {
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/v1.1/Projects(1)")
+              .build());
 
       ConfigEvent event =
           createConfigEvent(
@@ -740,9 +662,8 @@ class FrostAdapterTest {
 
       adapter.processConfigEvent("de.civitascore.data.project.created", event);
 
-      ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-      verify(mockTarget).path(pathCaptor.capture());
-      assertEquals("Projects", pathCaptor.getValue());
+      RecordedRequest recorded = server.takeRequest();
+      assertEquals("/v1.1/Projects", recorded.getUrl().encodedPath());
 
       ArgumentCaptor<ConfigResultEvent> resultCaptor =
           ArgumentCaptor.forClass(ConfigResultEvent.class);
@@ -756,11 +677,12 @@ class FrostAdapterTest {
 
     @Test
     void createThingScopedToProjectReturnsSuccess()
-        throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockResponse.getHeaderString("Location"))
-          .thenReturn("http://localhost:8080/v1.1/Things(99)");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+        throws FatalAdapterException, RetryableAdapterException, InterruptedException {
+      server.enqueue(
+          new MockResponse.Builder()
+              .code(201)
+              .addHeader("Location", "http://localhost:8080/v1.1/Things(99)")
+              .build());
 
       ConfigEvent event =
           createConfigEvent(
@@ -770,9 +692,8 @@ class FrostAdapterTest {
 
       adapter.processConfigEvent("de.civitascore.data.thing.created", event);
 
-      ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-      verify(mockTarget).path(pathCaptor.capture());
-      assertEquals("Projects(42)/Things", pathCaptor.getValue());
+      RecordedRequest recorded = server.takeRequest();
+      assertEquals("/v1.1/Projects(42)/Things", recorded.getUrl().encodedPath());
 
       ArgumentCaptor<ConfigResultEvent> resultCaptor =
           ArgumentCaptor.forClass(ConfigResultEvent.class);
@@ -785,9 +706,9 @@ class FrostAdapterTest {
     }
 
     @Test
-    void updateProjectReturnsSuccess() throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(200);
-      when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(mockResponse);
+    void updateProjectReturnsSuccess()
+        throws FatalAdapterException, RetryableAdapterException, InterruptedException {
+      server.enqueue(new MockResponse.Builder().code(200).build());
 
       ConfigEvent event =
           createConfigEvent(
@@ -795,9 +716,9 @@ class FrostAdapterTest {
 
       adapter.processConfigEvent("de.civitascore.data.project.updated", event);
 
-      ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-      verify(mockTarget).path(pathCaptor.capture());
-      assertEquals("Projects(42)", pathCaptor.getValue());
+      RecordedRequest recorded = server.takeRequest();
+      assertEquals("/v1.1/Projects(42)", recorded.getUrl().encodedPath());
+      assertEquals("PATCH", recorded.getMethod());
 
       ArgumentCaptor<ConfigResultEvent> resultCaptor =
           ArgumentCaptor.forClass(ConfigResultEvent.class);
@@ -810,17 +731,17 @@ class FrostAdapterTest {
     }
 
     @Test
-    void deleteProjectReturnsSuccess() throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(200);
-      when(mockBuilder.delete()).thenReturn(mockResponse);
+    void deleteProjectReturnsSuccess()
+        throws FatalAdapterException, RetryableAdapterException, InterruptedException {
+      server.enqueue(new MockResponse.Builder().code(200).build());
 
       ConfigEvent event = createConfigEvent(Operation.DELETE, "Projects/42", null);
 
       adapter.processConfigEvent("de.civitascore.data.project.deleted", event);
 
-      ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-      verify(mockTarget).path(pathCaptor.capture());
-      assertEquals("Projects(42)", pathCaptor.getValue());
+      RecordedRequest recorded = server.takeRequest();
+      assertEquals("/v1.1/Projects(42)", recorded.getUrl().encodedPath());
+      assertEquals("DELETE", recorded.getMethod());
 
       ArgumentCaptor<ConfigResultEvent> resultCaptor =
           ArgumentCaptor.forClass(ConfigResultEvent.class);

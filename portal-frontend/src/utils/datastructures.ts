@@ -1,6 +1,8 @@
+import { versionToSchemaTree } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_components/mapping-editor/schema/versionTree'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
 import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { DirtyField } from '@/components/uml-modeler/types/session'
+import { SelectOption } from '@/types/common'
 import {
   Datastructure,
   DATASTRUCTURE_STATUS_TYPES,
@@ -27,7 +29,9 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
   return datastructures.map(datastructure => {
     const highestVersion: DatastructureVersionSummary | null =
       datastructure.dataStructureVersions.reduce<DatastructureVersionSummary | null>((highest, current) => {
-        if (!highest) return current
+        // A version with no stored model has no number, so it has no place in the ordering.
+        if (!current.version) return highest
+        if (!highest?.version) return current
         return current.version.localeCompare(highest.version, undefined, { numeric: true }) > 0 ? current : highest
       }, null)
     return {
@@ -36,14 +40,14 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       name: datastructure.name,
       description: datastructure.description || '-',
       status: datastructure.dataStructureStatus,
-      versionNumber: highestVersion?.version || null,
+      versionNumber: highestVersion?.version ?? null,
       source: highestVersion?.dataStructureVersionSource || null,
       inUse: datastructure.inUse,
       // add versions field to versions for showing subrows in table
       versions: datastructure.dataStructureVersions.map(version => ({
         id: version.id,
         versionNumber: version.version,
-        name: `Version ${version.version}`,
+        name: version.version ? `Version ${version.version}` : '-',
         description: version.description || '-',
         status: version.dataStructureVersionStatus,
         source: version.dataStructureVersionSource,
@@ -59,7 +63,7 @@ export const mapDatastructureVersionsApiToListData = (
   versions.map(version => ({
     id: version.id,
     versionNumber: version.version,
-    name: `Version ${version.version}`,
+    name: version.version ? `Version ${version.version}` : '-',
     description: version.description || '-',
     status: version.dataStructureVersionStatus,
     source: version.dataStructureVersionSource,
@@ -67,7 +71,7 @@ export const mapDatastructureVersionsApiToListData = (
 
 export const mapDatastructureVersionApiToFormData = (version: DatastructureVersion): DatastructureVersionFormData => ({
   id: version.id,
-  version: version.version,
+  version: version.version ?? '',
   description: version.description || '',
   dataStructureVersionStatus: version.dataStructureVersionStatus,
   dataStructureVersionSource: version.dataStructureVersionSource,
@@ -83,7 +87,6 @@ export const mapDatastructureVersionFormToApiData = (
 ): DatastructureVersionPutData => {
   return {
     id: version.id,
-    version: version.version,
     description: version.description,
     dataStructureVersionSource: version.dataStructureVersionSource,
     dataStructureVersionStatus: version.dataStructureVersionStatus,
@@ -124,4 +127,11 @@ export const buildSessionFromVersion = (
     lastModified: diagram?.lastModified || fallbackSession.lastModified,
     created: created || diagram?.lastModified || fallbackSession.created,
   }
+}
+
+export const getDatastructureFieldOptions = (
+  version: Pick<DatastructureVersion, 'model' | 'styles' | 'modelName'> | undefined,
+): SelectOption[] => {
+  const { tree } = versionToSchemaTree(version, version?.modelName ?? '')
+  return tree.fields.map(field => ({ value: field.name, label: field.name }))
 }

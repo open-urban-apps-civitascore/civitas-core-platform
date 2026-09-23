@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
@@ -16,17 +18,19 @@ import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
-import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
-import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -39,13 +43,31 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayName("DataStructureVersionService Unit Tests")
 class DataStructureVersionServiceTest {
 
+  private static final String MODEL_URN =
+      "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0";
+  private static final String BLOCKER_URN =
+      "urn:core:platform:civitas:datasink:common:Store:4rrb1hifsm";
+
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private DataStructureVersionMapper dataStructureVersionMapper;
   @Mock private DataStructureService dataStructureService;
   @Mock private DataSourceRepository dataSourceRepository;
-  @Mock private DataSinkRepository dataSinkRepository;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
 
   @InjectMocks private DataStructureVersionService dataStructureVersionService;
+
+  @BeforeEach
+  void stubModelStore() {
+    // Model Forge is the version authority: storing a model returns the assigned pin. Lenient so
+    // tests that never store a model (early-throw / no-model paths) don't trip strict stubbing.
+    lenient()
+        .when(modelRegistryGateway.storeModel(any(), any(), any(), any(), any(), any()))
+        .thenReturn(
+            new ModelRegistryGateway.ModelPin(
+                "urn:core:platform:civitas:element:common:test",
+                "urn:core:platform:civitas:element:common:test:1.0.0",
+                "1.0.0"));
+  }
 
   @Nested
   @DisplayName("Unrelease inUse guard")
@@ -71,8 +93,8 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Should block unrelease when version is referenced by a DataSink")
-    void shouldBlockUnreleaseWhenReferencedByDataSink() {
+    @DisplayName("Should block unrelease when the registry still holds a reference")
+    void shouldBlockUnreleaseWhenStillReferenced() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
@@ -81,10 +103,10 @@ class DataStructureVersionServiceTest {
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructure(ds);
+      version.setModelUrn(MODEL_URN);
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
-      when(dataSinkRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
+      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(BLOCKER_URN));
 
       assertThatThrownBy(() -> dataStructureVersionService.unrelease(versionId))
           .isInstanceOf(ResourceInUseException.class);
@@ -146,8 +168,8 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Should block delete when version is referenced by a DataSink")
-    void shouldBlockDeleteWhenReferencedByDataSink() {
+    @DisplayName("Should block delete when the registry still holds a reference")
+    void shouldBlockDeleteWhenStillReferenced() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
       ds.setDataStructureStatus(DataStructureStatus.DRAFT);
@@ -156,11 +178,11 @@ class DataStructureVersionServiceTest {
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setDataStructure(ds);
+      version.setModelUrn(MODEL_URN);
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
-      when(dataSinkRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
+      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(BLOCKER_URN));
 
       assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
           .isInstanceOf(ResourceInUseException.class);
@@ -199,35 +221,40 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
       ds.setId(dataStructureId);
+      ds.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setVersion("1.0.0");
       version.setModelName("OldModel");
-      version.setModel(new HashMap<>(Map.of("title", "Old")));
-      version.setStyles(new HashMap<>(Map.of("color", "blue")));
+      version.setModelUrn("urn:core:platform:civitas:element:common:test:1.0.0");
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructure(ds);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
-      input.setVersion("2.0.0");
       input.setModel(new HashMap<>(Map.of("title", "New")));
       input.setStyles(new HashMap<>(Map.of("color", "red")));
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
-      // Mock mapper does not update entity, so validateUniqueVersion sees the original "1.0.0"
-      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
-              dataStructureId, "1.0.0"))
-          .thenReturn(Set.of(version));
       when(dataStructureVersionRepository.save(any())).thenReturn(version);
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
 
       assertThatNoException()
           .isThrownBy(() -> dataStructureVersionService.updateReleasedMeta(versionId, input));
+
+      // The replaced model is stored as a new registry version under the parent's logical URN.
+      verify(modelRegistryGateway)
+          .storeModel(
+              eq(Optional.of("urn:core:platform:civitas:element:common:test")),
+              any(),
+              eq(Map.of("title", "New")),
+              eq(Map.of("color", "red")),
+              any(),
+              any());
     }
 
     @Test
@@ -239,90 +266,39 @@ class DataStructureVersionServiceTest {
       ds.setId(dataStructureId);
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
 
-      Map<String, Object> originalModel = new HashMap<>(Map.of("title", "Original"));
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setVersion("1.0.0");
       version.setModelName("OldModel");
-      version.setModel(originalModel);
-      version.setStyles(new HashMap<>(Map.of("color", "blue")));
+      version.setModelUrn("urn:core:platform:civitas:element:common:original:1.0.0");
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructure(ds);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
-      input.setVersion("2.0.0");
       input.setModel(new HashMap<>(Map.of("title", "SHOULD_NOT_CHANGE")));
       input.setStyles(new HashMap<>(Map.of("color", "red")));
       input.setModelName("UpdatedModelName");
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
-      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
-              dataStructureId, "1.0.0"))
-          .thenReturn(Set.of(version));
       when(dataStructureVersionRepository.save(any())).thenReturn(version);
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
 
       dataStructureVersionService.updateReleasedMeta(versionId, input);
 
-      // After preProcessUpdateInput, in-use structural fields should be reverted
-      assertThat(input.getModel())
-          .as("Model should be reverted to original")
-          .isEqualTo(originalModel);
-      assertThat(input.getModel())
-          .as("Reverted model must be a copy, not the managed entity's own map reference")
-          .isNotSameAs(originalModel);
-      assertThat(input.getVersion()).as("Version should be reverted").isEqualTo("1.0.0");
-      assertThat(input.getStyles().get("color")).as("Styles should be reverted").isEqualTo("blue");
+      // In-use: the structural payload is neutralized — no registry write, the pin is preserved.
+      verify(modelRegistryGateway, org.mockito.Mockito.never())
+          .storeModel(any(), any(), any(), any(), any(), any());
+      assertThat(input.getModel()).as("In-use model change must be dropped").isNull();
+      assertThat(input.getStyles()).as("In-use styles change must be dropped").isNull();
+      assertThat(version.getModelUrn())
+          .as("The stored content pin stays untouched")
+          .isEqualTo("urn:core:platform:civitas:element:common:original:1.0.0");
       assertThat(input.getModelName())
           .as("ModelName is editable while in use")
           .isEqualTo("UpdatedModelName");
-    }
-
-    @Test
-    @DisplayName(
-        "Should block structural changes via updateReleasedMeta when referenced by a DataSink")
-    void shouldBlockStructuralChangesWhenReferencedByDataSink() {
-      UUID versionId = UUID.randomUUID();
-      UUID dataStructureId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-      ds.setId(dataStructureId);
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-
-      Map<String, Object> originalModel = new HashMap<>(Map.of("title", "Original"));
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setVersion("1.0.0");
-      version.setModel(originalModel);
-      version.setStyles(new HashMap<>(Map.of("color", "blue")));
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-      version.setDataStructure(ds);
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setDataStructureId(dataStructureId);
-      input.setVersion("2.0.0");
-      input.setModel(new HashMap<>(Map.of("title", "SHOULD_NOT_CHANGE")));
-      input.setStyles(new HashMap<>(Map.of("color", "red")));
-
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
-      when(dataSinkRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
-      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
-              dataStructureId, "1.0.0"))
-          .thenReturn(Set.of(version));
-      when(dataStructureVersionRepository.save(any())).thenReturn(version);
-      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
-
-      dataStructureVersionService.updateReleasedMeta(versionId, input);
-
-      assertThat(input.getModel())
-          .as("Model should be reverted when a DataSink references the version")
-          .isEqualTo(originalModel);
-      assertThat(input.getVersion()).as("Version should be reverted").isEqualTo("1.0.0");
-      assertThat(input.getStyles().get("color")).as("Styles should be reverted").isEqualTo("blue");
     }
 
     @Test
@@ -336,7 +312,6 @@ class DataStructureVersionServiceTest {
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setVersion("1.0.0");
 
       assertThatThrownBy(() -> dataStructureVersionService.updateReleasedMeta(versionId, input))
           .isInstanceOf(InvalidInputException.class)
@@ -355,14 +330,13 @@ class DataStructureVersionServiceTest {
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setVersion("1.0.0");
-      version.setModel(new HashMap<>(Map.of("title", "Existing")));
+      version.setModelUrn("urn:core:platform:civitas:element:common:existing:1.0.0");
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructure(ds);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
-      input.setVersion("1.0.0");
       input.setModel(null);
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
@@ -379,7 +353,7 @@ class DataStructureVersionServiceTest {
   class ReleaseModelGuardTests {
 
     @Test
-    @DisplayName("Should block release when version has no model")
+    @DisplayName("Should block release when version has no stored model (no registry pin)")
     void shouldBlockReleaseWhenModelIsNull() {
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
@@ -394,29 +368,13 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Should block release when version model is empty")
-    void shouldBlockReleaseWhenModelIsEmpty() {
-      UUID versionId = UUID.randomUUID();
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setModel(new HashMap<>());
-
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-
-      assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("model");
-    }
-
-    @Test
-    @DisplayName("Should allow release when version carries a model")
+    @DisplayName("Should allow release when version carries a stored model (registry pin)")
     void shouldAllowReleaseWhenModelPresent() {
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setModel(new HashMap<>(Map.of("title", "Observation")));
+      version.setModelUrn("urn:core:platform:civitas:element:common:observation:1.0.0");
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
@@ -426,6 +384,10 @@ class DataStructureVersionServiceTest {
       assertThat(result.getDataStructureVersionStatus())
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
       verify(dataStructureVersionRepository).save(version);
+
+      // Releasing changes status only. Asserted rather than assumed, so adding a registry call here
+      // fails the test instead of silently changing what a release does.
+      verifyNoInteractions(modelRegistryGateway);
     }
 
     @Test
@@ -445,254 +407,174 @@ class DataStructureVersionServiceTest {
   }
 
   @Nested
-  @DisplayName("Unique version validation (preSave guard)")
-  class UniqueVersionTests {
+  @DisplayName("Model store on create/update (Model Forge is the version authority)")
+  class ModelStoreTests {
 
-    private DataStructure buildDataStructure(UUID dsId) {
+    @Test
+    @DisplayName(
+        "Create stores the model in Model Forge and mirrors the assigned pin onto the shell")
+    void createStoresModelAndMirrorsPin() {
+      UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
-      dataStructure.setId(dsId);
+      dataStructure.setId(dataStructureId);
       dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
-      return dataStructure;
-    }
-
-    /**
-     * Build a minimal input DTO to satisfy preProcessCreateInput & postConvertToEntity.
-     * dataStructureId is set via @JsonIgnore field (service layer path).
-     */
-    private DataStructureVersionInputDTO buildInput(UUID dataStructureId, String version) {
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setVersion(version);
-      input.setDataStructureId(dataStructureId);
-      return input;
-    }
-
-    @Test
-    @DisplayName(
-        "Should throw UniqueConstraintViolationException on create when version already exists for the same DataStructure")
-    void shouldRejectDuplicateVersionOnCreate() {
-      UUID dataStructureId = UUID.randomUUID();
-      DataStructure dataStructure = buildDataStructure(dataStructureId);
-
-      DataStructureVersionInputDTO input = buildInput(dataStructureId, "1.0.0");
-
-      // The new entity produced by the mapper (id is null until saved)
-      DataStructureVersion newEntity = new DataStructureVersion();
-      newEntity.setVersion("1.0.0");
-      newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-
-      // Existing entity already stored with the same version in the same DataStructure
-      DataStructureVersion conflictingEntity = new DataStructureVersion();
-      conflictingEntity.setId(UUID.randomUUID());
-      conflictingEntity.setVersion("1.0.0");
-      conflictingEntity.setDataStructure(dataStructure);
-
-      when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
-      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
-      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
-              dataStructureId, "1.0.0"))
-          .thenReturn(Set.of(conflictingEntity));
-
-      assertThatThrownBy(() -> dataStructureVersionService.create(input))
-          .isInstanceOf(UniqueConstraintViolationException.class)
-          .hasMessageContaining("Version must be unique");
-    }
-
-    @Test
-    @DisplayName(
-        "Should throw UniqueConstraintViolationException on update when version string is already used by another version in the same DataStructure")
-    void shouldRejectDuplicateVersionOnUpdate() {
-      UUID dataStructureId = UUID.randomUUID();
-      UUID versionId = UUID.randomUUID();
-      UUID conflictingVersionId = UUID.randomUUID();
-      DataStructure dataStructure = buildDataStructure(dataStructureId);
-
-      DataStructureVersion existingEntity = new DataStructureVersion();
-      existingEntity.setId(versionId);
-      existingEntity.setVersion("1.0.0");
-      existingEntity.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      existingEntity.setDataStructure(dataStructure);
-
-      DataStructureVersion conflictingEntity = new DataStructureVersion();
-      conflictingEntity.setId(conflictingVersionId);
-      conflictingEntity.setVersion("2.0.0");
-      conflictingEntity.setDataStructure(dataStructure);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
-      input.setVersion("2.0.0"); // version already owned by conflictingEntity
-
-      doAnswer(
-              invocation -> {
-                DataStructureVersion entity = invocation.getArgument(0);
-                DataStructureVersionInputDTO dto = invocation.getArgument(1);
-                entity.setVersion(dto.getVersion());
-                return null;
-              })
-          .when(dataStructureVersionMapper)
-          .updateEntity(any(), any());
-      when(dataStructureVersionRepository.findById(versionId))
-          .thenReturn(Optional.of(existingEntity));
-      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
-              dataStructureId, "2.0.0"))
-          .thenReturn(Set.of(conflictingEntity));
-      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
-
-      assertThatThrownBy(() -> dataStructureVersionService.update(versionId, input))
-          .isInstanceOf(UniqueConstraintViolationException.class)
-          .hasMessageContaining("Version must be unique")
-          .hasMessageContaining(conflictingVersionId.toString());
-    }
-
-    @Test
-    @DisplayName(
-        "Should not throw when no other version shares the same version string (unique create)")
-    void shouldAllowCreateWhenVersionIsUnique() {
-      UUID dataStructureId = UUID.randomUUID();
-      DataStructure dataStructure = buildDataStructure(dataStructureId);
-
-      DataStructureVersionInputDTO input = buildInput(dataStructureId, "3.0.0");
+      input.setModel(new HashMap<>(Map.of("title", "Observation")));
+      input.setStyles(new HashMap<>(Map.of("color", "blue")));
 
       DataStructureVersion newEntity = new DataStructureVersion();
-      newEntity.setVersion("3.0.0");
       newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
-      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
-              dataStructureId, "3.0.0"))
-          .thenReturn(Set.of());
-      when(dataStructureVersionRepository.save(any())).thenReturn(newEntity);
+      when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      assertThatNoException().isThrownBy(() -> dataStructureVersionService.create(input));
-      verify(dataStructureVersionRepository)
-          .findAllByDataStructureIdAndVersion(dataStructureId, "3.0.0");
+      DataStructureVersion result = dataStructureVersionService.create(input);
+
+      // Model and styles went to Model Forge (the gateway merges styles as x-ui-styles), and the
+      // assigned version + URN were mirrored onto the shell.
+      verify(modelRegistryGateway)
+          .storeModel(
+              eq(Optional.empty()),
+              any(),
+              eq(Map.of("title", "Observation")),
+              eq(Map.of("color", "blue")),
+              any(),
+              any());
+      assertThat(result.getVersion()).isEqualTo("1.0.0");
+      assertThat(result.getModelUrn())
+          .isEqualTo("urn:core:platform:civitas:element:common:test:1.0.0");
+      assertThat(dataStructure.getModelLogicalUrn())
+          .as("The parent's stable logical URN is minted on the first store")
+          .isEqualTo("urn:core:platform:civitas:element:common:test");
     }
 
     @Test
-    @DisplayName(
-        "Should allow update when the only matching version is the entity itself (self-assignment)")
-    void shouldAllowUpdateWithSameVersionString() {
+    @DisplayName("A version's first model starts a new major")
+    void createStartsANewMajor() {
       UUID dataStructureId = UUID.randomUUID();
-      UUID versionId = UUID.randomUUID();
-      DataStructure dataStructure = buildDataStructure(dataStructureId);
-
-      DataStructureVersion existingEntity = new DataStructureVersion();
-      existingEntity.setId(versionId);
-      existingEntity.setVersion("1.0.0");
-      existingEntity.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      existingEntity.setDataStructure(dataStructure);
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(dataStructureId);
+      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
+      dataStructure.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
-      input.setVersion("1.0.0"); // same as existing — self-assignment
+      input.setModel(new HashMap<>(Map.of("title", "Observation")));
 
-      // Only match is the entity being updated itself
-      when(dataStructureVersionRepository.findById(versionId))
-          .thenReturn(Optional.of(existingEntity));
-      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
-              dataStructureId, "1.0.0"))
-          .thenReturn(Set.of(existingEntity));
-      when(dataStructureVersionRepository.save(any())).thenReturn(existingEntity);
+      DataStructureVersion newEntity = new DataStructureVersion();
+      newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      newEntity.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+
+      when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
+      when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      dataStructureVersionService.create(input);
+
+      verify(modelRegistryGateway)
+          .storeModel(
+              eq(Optional.of("urn:core:platform:civitas:element:common:test")),
+              any(),
+              any(),
+              any(),
+              eq(VersionBump.MAJOR),
+              any());
+    }
+
+    @Test
+    @DisplayName("A model that arrives on a later save still starts a new major")
+    void lateModelStillStartsANewMajor() {
+      UUID versionId = UUID.randomUUID();
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(dataStructureId);
+      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
+      dataStructure.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
+
+      // Created without a diagram, so it holds no model yet — the save below is its first.
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      version.setDataStructure(dataStructure);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setDataStructureId(dataStructureId);
+      input.setModel(new HashMap<>(Map.of("title", "Arrived late")));
+
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
 
-      assertThatNoException()
-          .isThrownBy(() -> dataStructureVersionService.update(versionId, input));
-      verify(dataStructureVersionRepository)
-          .findAllByDataStructureIdAndVersion(dataStructureId, "1.0.0");
+      dataStructureVersionService.update(versionId, input);
+
+      verify(modelRegistryGateway)
+          .storeModel(any(), any(), any(), any(), eq(VersionBump.MAJOR), isNull());
     }
-  }
 
-  @Nested
-  @DisplayName("Release model $id validation")
-  class ReleaseModelIdTests {
-
-    private static final UUID DATA_STRUCTURE_ID =
-        UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
-    // disambiguator 2dmtus8w40 is CoreUrn.disambiguatorFor(DATA_STRUCTURE_ID)
-    private static final String VALID_URN =
-        "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0";
-
-    private DataStructureVersion draftVersionWithModel(Map<String, Object> model) {
-      DataStructure ds = new DataStructure();
-      ds.setId(DATA_STRUCTURE_ID);
+    @Test
+    @DisplayName("Changing a model a version already has advances its minor")
+    void editAdvancesTheMinor() {
+      UUID versionId = UUID.randomUUID();
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(dataStructureId);
+      dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      dataStructure.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
 
       DataStructureVersion version = new DataStructureVersion();
-      version.setId(UUID.randomUUID());
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setDataStructure(ds);
-      version.setModel(model);
-      when(dataStructureVersionRepository.findById(version.getId()))
-          .thenReturn(Optional.of(version));
-      return version;
+      version.setId(versionId);
+      version.setVersion("2.4.0");
+      version.setModelUrn("urn:core:platform:civitas:element:common:test:2.4.0");
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructure(dataStructure);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setDataStructureId(dataStructureId);
+      input.setModel(new HashMap<>(Map.of("title", "Replaced")));
+
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
+      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
+      when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
+
+      dataStructureVersionService.updateReleasedMeta(versionId, input);
+
+      verify(modelRegistryGateway)
+          .storeModel(any(), any(), any(), any(), eq(VersionBump.MINOR), eq("2.4.0"));
     }
 
     @Test
-    @DisplayName("releases when the model carries no $id")
-    void releasesWithoutModelId() {
-      DataStructureVersion version = draftVersionWithModel(new HashMap<>(Map.of("type", "object")));
-      when(dataStructureVersionRepository.save(version)).thenReturn(version);
+    @DisplayName("Create without a model does not touch Model Forge and leaves the version unset")
+    void createWithoutModelSkipsRegistry() {
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(dataStructureId);
+      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
-      dataStructureVersionService.release(version.getId());
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setDataStructureId(dataStructureId);
 
-      assertThat(version.getDataStructureVersionStatus())
-          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
-    }
+      DataStructureVersion newEntity = new DataStructureVersion();
+      newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
-    @Test
-    @DisplayName("releases when the $id disambiguator is derived from the DataStructure id")
-    void releasesWithMatchingModelId() {
-      DataStructureVersion version = draftVersionWithModel(new HashMap<>(Map.of("$id", VALID_URN)));
-      when(dataStructureVersionRepository.save(version)).thenReturn(version);
+      when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
+      when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      dataStructureVersionService.release(version.getId());
+      DataStructureVersion result = dataStructureVersionService.create(input);
 
-      assertThat(version.getDataStructureVersionStatus())
-          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
-    }
-
-    @Test
-    @DisplayName("rejection message does not reveal the expected DataStructure id")
-    void rejectionDoesNotRevealDataStructureId() {
-      DataStructureVersion version =
-          draftVersionWithModel(
-              new HashMap<>(
-                  Map.of(
-                      "$id",
-                      "urn:core:platform:civitas:datastructure:common:WeatherModel:0000000001:1.0.0")));
-
-      assertThatThrownBy(() -> dataStructureVersionService.release(version.getId()))
-          .isInstanceOf(InvalidInputException.class)
-          // anchor to the real rejection so the negative assertions cannot pass vacuously
-          .hasMessageContaining("not a valid CORE URN")
-          .hasMessageNotContaining(DATA_STRUCTURE_ID.toString())
-          .hasMessageNotContaining(CoreUrn.disambiguatorFor(DATA_STRUCTURE_ID));
-    }
-
-    @Test
-    @DisplayName("rejects a malformed $id")
-    void rejectsMalformedModelId() {
-      DataStructureVersion version =
-          draftVersionWithModel(new HashMap<>(Map.of("$id", "not-a-core-urn")));
-
-      assertThatThrownBy(() -> dataStructureVersionService.release(version.getId()))
-          .isInstanceOf(InvalidInputException.class);
-    }
-
-    @Test
-    @DisplayName("rejects an $id whose disambiguator belongs to another DataStructure")
-    void rejectsForeignDisambiguator() {
-      DataStructureVersion version =
-          draftVersionWithModel(
-              new HashMap<>(
-                  Map.of(
-                      "$id",
-                      "urn:core:platform:civitas:datastructure:common:WeatherModel:0000000001:1.0.0")));
-
-      assertThatThrownBy(() -> dataStructureVersionService.release(version.getId()))
-          .isInstanceOf(InvalidInputException.class);
+      verify(modelRegistryGateway, org.mockito.Mockito.never())
+          .storeModel(any(), any(), any(), any(), any(), any());
+      assertThat(result.getVersion()).isNull();
+      assertThat(result.getModelUrn()).isNull();
     }
   }
 }

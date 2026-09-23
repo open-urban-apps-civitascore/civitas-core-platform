@@ -9,9 +9,12 @@ import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.model.output.PipelineOutputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +30,7 @@ class PipelineAssemblerTest {
 
   @Mock private PipelineMapper pipelineMapper;
   @Mock private DataSinkRepository dataSinkRepository;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private DataSourceRepository dataSourceRepository;
 
   @InjectMocks private PipelineAssembler assembler;
@@ -83,5 +87,65 @@ class PipelineAssemblerTest {
 
     assertThat(result.getDataSinkIds()).containsExactly(sinkId);
     assertThat(result.getDataSourceIds()).containsExactly(sourceId);
+  }
+
+  @Test
+  @DisplayName("enrichDto serves model and styles from the registry pin")
+  void enrichDto_servesModelAndStylesFromRegistry() {
+    UUID pipelineId = UUID.randomUUID();
+    Pipeline pipeline = new Pipeline();
+    pipeline.setId(pipelineId);
+    String urn = "urn:core:platform:civitas:pipeline:common:pipe:1.0.0";
+    pipeline.setModelUrn(urn);
+
+    when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of());
+    when(modelRegistryGateway.fetchPayload(urn))
+        .thenReturn(
+            Optional.of(
+                new ModelRegistryGateway.RegistryDocument(
+                    Map.of("nodes", List.of()), Map.of("viewport", Map.of("x", 0)))));
+
+    PipelineOutputDTO result = assembler.enrichDto(new PipelineOutputDTO(), pipeline);
+
+    assertThat(result.getModel()).containsKey("nodes");
+    assertThat(result.getStyles()).containsKey("viewport");
+  }
+
+  @Test
+  @DisplayName("enrichDto leaves model and styles null without a registry pin")
+  void enrichDto_leavesModelNullWithoutPin() {
+    UUID pipelineId = UUID.randomUUID();
+    Pipeline pipeline = new Pipeline();
+    pipeline.setId(pipelineId);
+
+    when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of());
+
+    PipelineOutputDTO result = assembler.enrichDto(new PipelineOutputDTO(), pipeline);
+
+    assertThat(result.getModel()).isNull();
+    assertThat(result.getStyles()).isNull();
+  }
+
+  @Test
+  @DisplayName("toInput carries the registry-stored model and styles forward (PATCH support)")
+  void toInput_carriesModelAndStylesForward() {
+    UUID pipelineId = UUID.randomUUID();
+    Pipeline pipeline = new Pipeline();
+    pipeline.setId(pipelineId);
+    String urn = "urn:core:platform:civitas:pipeline:common:pipe:1.0.0";
+    pipeline.setModelUrn(urn);
+
+    when(pipelineMapper.toInput(pipeline)).thenReturn(new PipelineInputDTO());
+    when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of());
+    when(modelRegistryGateway.fetchPayload(urn))
+        .thenReturn(
+            Optional.of(
+                new ModelRegistryGateway.RegistryDocument(
+                    Map.of("nodes", List.of()), Map.of("zoom", 2))));
+
+    PipelineInputDTO result = assembler.toInput(pipeline);
+
+    assertThat(result.getModel()).containsKey("nodes");
+    assertThat(result.getStyles()).containsEntry("zoom", 2);
   }
 }

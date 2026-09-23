@@ -12,6 +12,7 @@ import {
   useUpdateDatasourceReleased,
 } from '@/app/services/api/datasources/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
+import { DataSourceDraftSchema } from '@/generated/core'
 import { useError } from '@/hooks/use-error'
 import { ConnectorFormToApiSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import { Datapool } from '@/types/datapools'
@@ -183,9 +184,7 @@ export const useDatasourceForm = (
       toast.success(tCommon('success.statusChangeSuccess'))
       return response.data
     } catch (error) {
-      toast.error(
-        isResourceInUseError(error) ? t('errors.inUseStatusChangeError') : tCommon('errors.statusChangeError'),
-      )
+      toast.error(isResourceInUseError(error) ? t('errors.inUseError') : tCommon('errors.statusChangeError'))
       throw error
     }
   }
@@ -228,6 +227,23 @@ export const useDatasourceForm = (
     const configuration = connectorParsed.success
       ? connectorParsed.data.configuration
       : (dirtyValues as Record<string, unknown>).configuration
+
+    // Validate the outbound CORE DataSource document against the generated schema before sending —
+    // the frontend guarantees a schema-valid payload to the (schema-agnostic) backend, mirroring the
+    // pipeline/mapping editor. Model Forge stamps $schema/id; the backend adds connectionType from the
+    // connectorType, so validate that projection ({connectionType, ...connectorConfig}) here.
+    if (dirtyFields.configuration && configuration && parsed.data.connectorType) {
+      const coreDoc = {
+        connectionType: String(parsed.data.connectorType).toLowerCase(),
+        ...(configuration as Record<string, unknown>),
+      }
+      const coreValid = DataSourceDraftSchema.safeParse(coreDoc)
+      if (!coreValid.success) {
+        console.error('DataSource configuration failed CORE schema validation:', coreValid.error.issues, coreDoc)
+        handleFormValidationError(coreValid.error)
+        return false
+      }
+    }
 
     const assignmentsPayload = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
     const areAssignmentsDirty = hasAssignmentChanges(assignedGroups, initialAssignments)

@@ -21,18 +21,29 @@
  * - Composition maps to a `$ref` property on the container (an array `$ref`
  *   for many multiplicities).
  *
- * Root: the document root is the data structure itself, titled after the
- * diagram. Every class is emitted under `$defs`; the single root class — the
- * `isRoot`-designated element or, absent a designation, the one class not
- * embedded by any structural or inheritance edge — is referenced from the
- * document root via a `$ref` property, so the structure's name — not an
- * arbitrary class — is always the top level. An element with no containment
- * edge is still emitted, just unreferenced; a diagram without a unique root,
- * or one whose relations point away from it, throws
- * {@link SchemaExportError} instead of guessing. An empty diagram exports an
- * empty object schema; a diagram consisting of a single enumeration keeps its
- * `enum` at the document root instead.
+ * Output shape: a DataStructure — a JSON-Schema `$defs` library of its member
+ * Elements with NO inline root shape. Every class is emitted under `$defs`. The
+ * single root class — the `isRoot`-designated element or, absent a designation,
+ * the one class not embedded by any structural or inheritance edge — is
+ * designated by a top-level `$ref`; every other element must be reachable from
+ * the root, otherwise (or when no unique root exists) the export throws
+ * {@link SchemaExportError} instead of guessing. An empty diagram exports a
+ * library with no members and no root.
+ *
+ * Two `$ref` forms, chosen by whether `modelUri` is a real DataStructure CORE URN:
+ * - Canonical (save path — `modelUri` is a `urn:core:...:datastructure:...` URN): each `$defs`
+ *   member is stamped with its own Element CORE URN as `$id`, cross-references between members
+ *   (and the top-level `$ref`) point at those URNs, and no local `#/$defs/` pointers survive.
+ *   The URNs are derived deterministically from the DataStructure's own URN — Model Forge does
+ *   NOT mint them; it splits each member into a stable, name-based Element artifact under the URN
+ *   already present in the document.
+ * - Local/preview (no `modelUri`, or a non-DataStructure-URN `modelUri`): `$defs` members carry no
+ *   `$id`, and cross-references (and the top-level `$ref`) use local `#/$defs/<Name>` pointers.
+ *   Model Forge, on ingest of such a document, mints the Element URNs itself and rewrites the local
+ *   refs to them.
  */
+
+import { elementModelUrnForMember, toPascalCaseName } from '@/utils/urn'
 
 import type { UMLDiagram } from '../types/diagram'
 import type { UMLAttribute, UMLElement, UMLEnumeration, UMLRelationship, UMLType } from '../types/uml'
@@ -254,18 +265,26 @@ const buildClassSchema = (
  * prefix-stripping rather than JSON-Pointer evaluation — so instead of `~0`/`~1`-escaping the refs
  * (which those resolvers would not unescape), pointer-special characters are kept out of the keys
  * themselves, making every emitted ref a valid JSON Pointer for standard tooling too.
+ *
+ * Collision detection also covers the key's PascalCase-normalized form (the same normalization
+ * {@link elementModelUrnForMember} applies to derive a member's canonical Element URN): two keys
+ * that are textually distinct but normalize the same way (e.g. `Foo-Bar` and `Foo Bar`, both
+ * `FooBar`) would otherwise stamp the same canonical `$id` on two different `$defs` members —
+ * silently collapsing two distinct classes into one Element on Model Forge's split.
  */
 export const assignDefKeys = (elements: UMLElement[]): Map<string, string> => {
   const defKeyById = new Map<string, string>()
   const usedKeys = new Set<string>()
+  const usedNormalized = new Set<string>()
   for (const element of elements) {
     const key = (element.name || 'Type').replace(/[~/]/g, '-')
     let candidate = key
     let suffix = 1
-    while (usedKeys.has(candidate)) {
+    while (usedKeys.has(candidate) || usedNormalized.has(toPascalCaseName(candidate))) {
       candidate = `${key}_${suffix++}`
     }
     usedKeys.add(candidate)
+    usedNormalized.add(toPascalCaseName(candidate))
     defKeyById.set(element.id, candidate)
   }
   return defKeyById
@@ -300,45 +319,67 @@ export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): Json
   const resolution = resolveRootElement(diagram)
   if (resolution.kind === 'invalid') throw new SchemaExportError(resolution.failure)
 
+  // A DataStructure is a JSON-Schema $defs library of member Elements — no inline root shape. Every
+  // class is a $defs member (stamped with its member Element URN so Model Forge splits it into a
+  // separate Element under a stable, name-based URN). The root class, when the diagram has one, is
+  // designated by a top-level $ref (a local pointer Model Forge rewrites to the member's URN), so a
+  // root-shaped schema can still be derived by clients that need one. An empty diagram yields a
+  // library with no members and no root.
   const schema: JsonSchemaObject = {
     $id: id,
     $schema: JSON_SCHEMA_DIALECT,
     title: diagram.name,
-    type: 'object',
   }
 
-  if (resolution.kind === 'empty') {
-    schema.properties = {}
-    return schema
-  }
+  // When exporting under a real DataStructure CORE URN (the save path), emit the canonical,
+  // split-ready form: each $defs member carries its Element CORE URN as `$id` and cross-references
+  // siblings by that URN (no local "#/$defs/" pointers survive, so the per-member `$id` re-bases
+  // nothing). Model Forge then splits the members into stable, name-based Element artifacts without
+  // minting, and the frontend can validate the document against the generated CORE schema. Without a
+  // URN (e.g. a standalone download/preview) the local "#/$defs/<Name>" form is kept.
+  const isCanonical = /^urn:core:[^:]+:[^:]+:datastructure:/.test(id)
 
-  const rootElement = resolution.root
-  if (resolution.kind === 'enum') {
-    const rootSchema = buildClassSchema(rootElement, diagram, classDefKeyById)
-    Object.assign(schema, rootSchema)
-    // buildClassSchema omits `type` for enumerations, so drop the pre-initialized `type: 'object'`.
-    delete schema.type
-    schema.$id = id
-    schema.$schema = JSON_SCHEMA_DIALECT
-    schema.title = rootElement.name || diagram.name
+  const defs = buildDefs(elements, diagram, classDefKeyById)
+  if (Object.keys(defs).length > 0) schema.$defs = isCanonical ? canonicalizeDefs(defs, id) : defs
 
-    const defs = buildDefs(
-      elements.filter(e => e.id !== rootElement.id),
-      diagram,
-      classDefKeyById,
-    )
-    if (Object.keys(defs).length > 0) {
-      schema.$defs = defs
-    }
-    return schema
+  if (resolution.kind !== 'empty') {
+    const rootDefKey = classDefKeyById.get(resolution.root.id)
+    if (rootDefKey) schema.$ref = isCanonical ? elementModelUrnForMember(id, rootDefKey) : `#/$defs/${rootDefKey}`
   }
-
-  const rootDefKey = classDefKeyById.get(rootElement.id) as string
-  schema.properties = {
-    [sanitizeName(rootElement.name) || rootDefKey]: { $ref: `#/$defs/${rootDefKey}` },
-  }
-  schema.$defs = buildDefs(elements, diagram, classDefKeyById)
   return schema
+}
+
+const DEFS_REF_PREFIX = '#/$defs/'
+
+/**
+ * Turns the local-ref `$defs` library into the canonical split-ready form: stamps each member with
+ * its Element CORE URN as `$id` and rewrites every local `#/$defs/<Name>` reference (in properties,
+ * `allOf`, arrays, …) to that member's Element URN. A cross-ref and the member it points at both
+ * resolve through {@link elementModelUrnForMember} with the same `$defs` key, so they match.
+ */
+const canonicalizeDefs = (defs: JsonSchemaObject, dataStructureUrn: string): JsonSchemaObject => {
+  const out: JsonSchemaObject = {}
+  for (const [key, member] of Object.entries(defs)) {
+    const rewritten = rewriteLocalRefsToUrns(member, dataStructureUrn) as JsonSchemaObject
+    out[key] = { $id: elementModelUrnForMember(dataStructureUrn, key), ...rewritten }
+  }
+  return out
+}
+
+/** Deep-copies {@code node}, replacing every local `#/$defs/<Name>` `$ref` with the member Element URN. */
+const rewriteLocalRefsToUrns = (node: unknown, dataStructureUrn: string): unknown => {
+  if (Array.isArray(node)) return node.map(child => rewriteLocalRefsToUrns(child, dataStructureUrn))
+  if (node && typeof node === 'object') {
+    const out: JsonSchemaObject = {}
+    for (const [k, v] of Object.entries(node as JsonSchemaObject)) {
+      out[k] =
+        k === '$ref' && typeof v === 'string' && v.startsWith(DEFS_REF_PREFIX)
+          ? elementModelUrnForMember(dataStructureUrn, v.slice(DEFS_REF_PREFIX.length))
+          : rewriteLocalRefsToUrns(v, dataStructureUrn)
+    }
+    return out
+  }
+  return node
 }
 
 const buildDefs = (
@@ -347,6 +388,9 @@ const buildDefs = (
   classDefKeyById: Map<string, string>,
 ): JsonSchemaObject => {
   const defs: JsonSchemaObject = {}
+  // Members are emitted WITHOUT a $id: a $id would re-base the subschema so a sibling's local
+  // "#/$defs/<Name>" cross-reference no longer resolves during validation. Model Forge splits each
+  // member into its own Element (minting the URN) and rewrites the local refs to those URNs.
   for (const element of elements) {
     const defKey = classDefKeyById.get(element.id)
     if (!defKey) continue

@@ -7,6 +7,7 @@ import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
@@ -71,12 +72,19 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     return styles;
   }
 
-  /** Helper method to create a sample model map for Pipeline. */
+  /**
+   * Helper method to create a sample CORE Pipeline model map. The stored model is validated against
+   * pipeline.schema.json (top-level {@code nodes}/{@code edges} required; Model Forge stamps {@code
+   * $schema}/{@code id}), so the fixture emits a clean, schema-valid document.
+   */
   private Map<String, Object> createSampleModel() {
     Map<String, Object> model = new HashMap<>();
-    model.put("input", Map.of("type", "kafka"));
-    model.put("pipeline", List.of(Map.of("processor", "transform")));
-    model.put("output", Map.of("type", "frost"));
+    model.put(
+        "nodes",
+        List.of(
+            Map.of("id", "start-1", "kind", "start", "label", "Start"),
+            Map.of("id", "end-1", "kind", "end", "label", "End")));
+    model.put("edges", List.of(Map.of("id", "edge-1", "source", "start-1", "target", "end-1")));
     return model;
   }
 
@@ -178,18 +186,18 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   private Pipeline createPipelineForDataSet(DataSet dataSet, String name) {
-    DataSource ds1 = portalData.dataSource();
-    DataSource ds2 = portalData.dataSource();
-    DataSource ds3 = portalData.dataSource();
+    DataSource ds1 = portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
+    DataSource ds2 = portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
+    DataSource ds3 = portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
 
-    return portalData.pipeline(
-        dataSet,
-        b ->
-            b.name(name + "_" + System.currentTimeMillis())
-                .description("Test pipeline for " + name)
-                .styles(createSampleStyles())
-                .dataSources(new HashSet<>(Set.of(ds1, ds2, ds3)))
-                .model(createSampleModel()));
+    Pipeline pipeline =
+        portalData.pipeline(
+            dataSet,
+            b ->
+                b.name(name + "_" + System.currentTimeMillis())
+                    .description("Test pipeline for " + name)
+                    .dataSources(new HashSet<>(Set.of(ds1, ds2, ds3))));
+    return portalData.attachPipelineDefinition(pipeline, createSampleModel(), createSampleStyles());
   }
 
   private Distribution createDistributionForDataSet(DataSet dataSet, String apiPath) {
@@ -303,6 +311,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @Nested
   @DisplayName("Stage DataSet Tests")
   class StageDataSetTests {
+
     @Test
     @Transactional
     @DisplayName("Should mark dataset as ready with pipelines")

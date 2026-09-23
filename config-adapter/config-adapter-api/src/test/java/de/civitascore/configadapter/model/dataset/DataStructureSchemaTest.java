@@ -316,6 +316,37 @@ class DataStructureSchemaTest {
   }
 
   @Test
+  void ambiguousDefinitionsThrowTheTypedUnresolvableException() {
+    // The inlined form of a multi-element DataStructure without a designated root: several
+    // property-bearing $defs classes, no root shape, no title match. This is the modeller-fixable
+    // defect (designate a root element), so it must surface as the TYPED exception the sink
+    // adapters map to the actionable error code — not as a generic broken-schema error.
+    UnresolvableDataStructureException ex =
+        assertThrows(
+            UnresolvableDataStructureException.class,
+            () ->
+                DataStructureSchema.resolveDefinition(
+                    json(
+                        """
+                        { "title": "OrderStructure",
+                          "$defs": {
+                            "Customer": { "properties": { "id": { "type": "string" } } },
+                            "Address":  { "properties": { "city": { "type": "string" } } } } }
+                        """)));
+    assertTrue(
+        ex.getMessage().contains("designate a root element"),
+        "the error must carry the remedy, was: " + ex.getMessage());
+  }
+
+  @Test
+  void emptyDefinitionsThrowTheTypedUnresolvableException() {
+    assertThrows(
+        UnresolvableDataStructureException.class,
+        () ->
+            DataStructureSchema.resolveDefinition(json("{ \"title\": \"Empty\", \"$defs\": {} }")));
+  }
+
+  @Test
   void geometryCrsByColumnReadsCrsFromGeojsonProperty() {
     Map<String, String> geometryCrs =
         DataStructureSchema.geometryCrsByColumn(

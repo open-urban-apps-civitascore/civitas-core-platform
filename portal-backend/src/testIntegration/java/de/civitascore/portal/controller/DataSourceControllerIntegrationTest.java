@@ -793,37 +793,33 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject linking a DRAFT DataStructureVersion")
-    void shouldRejectLinkingDraftDataStructureVersion() {
+    @DisplayName("Should save a DRAFT DataSource with a DRAFT DataStructureVersion")
+    void shouldSaveDraftDataSourceWithDraftDataStructureVersion() {
       UUID dsvId = createDraftDataStructureVersionId();
       DataSourceInputDTO input = createValidInput();
       input.setDataStructureVersionId(dsvId);
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              String.class);
+      ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody().getDataStructureVersion().getId()).isEqualTo(dsvId);
+      assertThat(performReleaseExpectingError(response.getBody().getId()).getStatusCode())
+          .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
-    @DisplayName("Should reject linking when parent DataStructure is DRAFT")
-    void shouldRejectLinkingWhenParentDataStructureIsDraft() {
+    @DisplayName("Should save a DRAFT DataSource when the parent DataStructure is DRAFT")
+    void shouldSaveDraftDataSourceWithDraftParentDataStructure() {
       UUID dsvId = createDsvWithDraftParentDataStructure();
       DataSourceInputDTO input = createValidInput();
       input.setDataStructureVersionId(dsvId);
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              String.class);
+      ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody().getDataStructureVersion().getId()).isEqualTo(dsvId);
+      assertThat(performReleaseExpectingError(response.getBody().getId()).getStatusCode())
+          .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

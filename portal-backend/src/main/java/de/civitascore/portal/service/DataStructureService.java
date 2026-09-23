@@ -7,7 +7,7 @@ import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
-import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -37,7 +37,7 @@ public class DataStructureService
   private final DataStructureVersionRepository dataStructureVersionRepository;
   private final AssignmentFactory assignmentFactory;
   private final DataSourceRepository dataSourceRepository;
-  private final DataSinkRepository dataSinkRepository;
+  private final ModelRegistryGateway modelRegistryGateway;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -184,12 +184,12 @@ public class DataStructureService
   }
 
   /**
-   * Validates that none of the data structure's versions are in use by a data source or a data sink
-   * before allowing deletion.
+   * Validates that nothing still references any of the data structure's versions before allowing
+   * deletion.
    *
    * @param id the data structure ID to delete
    * @return the data structure entity to be deleted
-   * @throws ResourceInUseException if any version is referenced by a data source or a data sink
+   * @throws ResourceInUseException if any version is still referenced
    */
   @Override
   protected DataStructure preProcessDelete(UUID id) {
@@ -198,20 +198,47 @@ public class DataStructureService
     return dataStructure;
   }
 
+  /**
+   * After the data structure and its versions are deleted, delete the backing model artifact from
+   * Model Forge in the same transaction. No-op when no model was ever stored (logical URN null).
+   *
+   * @param entity the deleted data structure
+   */
+  @Override
+  protected void postDelete(DataStructure entity) {
+    if (entity != null && entity.getModelLogicalUrn() != null) {
+      modelRegistryGateway.deleteModel(entity.getModelLogicalUrn());
+    }
+  }
+
   private void validateNoVersionInUse(DataStructure dataStructure) {
+    Set<DataStructureVersion> versions = dataStructure.getDataStructureVersions();
     Set<UUID> versionIds =
-        dataStructure.getDataStructureVersions().stream()
-            .map(DataStructureVersion::getId)
-            .collect(Collectors.toSet());
+        versions.stream().map(DataStructureVersion::getId).collect(Collectors.toSet());
     if (versionIds.isEmpty()) {
       return;
     }
-    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
-        || dataSinkRepository.existsByDataStructureVersionIdIn(versionIds)) {
+    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)) {
       throw new ResourceInUseException(
           "DataStructure",
           dataStructure.getId(),
-          "Cannot modify DataStructure because one or more of its versions is referenced by a DataSource or DataSink.");
+          "Cannot modify DataStructure because a DataSource is pinned to one of its versions.");
+    }
+    // The registry answers for every reference it holds onto a version's model — a sink's or
+    // source's element, a mapping endpoint, another model, a second data set.
+    List<String> blockers =
+        versions.stream()
+            .map(DataStructureVersion::getModelUrn)
+            .map(modelRegistryGateway::referencesTo)
+            .flatMap(List::stream)
+            .distinct()
+            .toList();
+    if (!blockers.isEmpty()) {
+      throw new ResourceInUseException(
+          "DataStructure",
+          dataStructure.getId(),
+          "Cannot modify DataStructure because one or more of its versions is still referenced.",
+          blockers);
     }
   }
 }

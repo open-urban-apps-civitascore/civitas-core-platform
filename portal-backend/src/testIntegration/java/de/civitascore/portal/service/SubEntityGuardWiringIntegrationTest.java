@@ -22,7 +22,7 @@ import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.model.input.StyleInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.DataSetNotEditableException;
-import de.civitascore.portal.util.ResourceInUseException;
+import de.civitascore.portal.util.SagaInFlightException;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -214,7 +214,7 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
     dataSetRepository.save(draft);
 
     assertThatThrownBy(() -> serviceFor(entityType).update(fixture.id(), fixture.input()))
-        .isInstanceOf(ResourceInUseException.class);
+        .isInstanceOf(SagaInFlightException.class);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -241,7 +241,7 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
     dataSetRepository.save(draft);
 
     assertThatThrownBy(() -> serviceFor(entityType).create(fixture.input()))
-        .isInstanceOf(ResourceInUseException.class);
+        .isInstanceOf(SagaInFlightException.class);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -270,7 +270,7 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
     dataSetRepository.save(draft);
 
     assertThatThrownBy(() -> serviceFor(entityType).deleteById(id))
-        .isInstanceOf(ResourceInUseException.class);
+        .isInstanceOf(SagaInFlightException.class);
   }
 
   @ParameterizedTest(name = "{0}")

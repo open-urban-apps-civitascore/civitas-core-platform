@@ -15,39 +15,43 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import de.civitascore.configadapter.util.PayloadConverter;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import mockwebserver3.RecordedRequest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 class GeoServerSagaHandlerTest {
 
-  private Invocation.Builder mockBuilder;
-  private WebTarget mockTarget;
-  private WebTarget mockPathTarget;
+  private MockWebServer server;
 
   private static final String SLD = "<StyledLayerDescriptor version=\"1.0.0\"/>";
   private static final String SLD_CONTENT_TYPE = "application/vnd.ogc.sld+xml";
+
+  @BeforeEach
+  void startServer() throws IOException {
+    server = new MockWebServer();
+    server.start();
+  }
+
+  @AfterEach
+  void stopServer() throws IOException {
+    server.close();
+  }
 
   @Test
   void adapterNameIsGeoserver() {
@@ -87,11 +91,10 @@ class GeoServerSagaHandlerTest {
   class FineGrainedSteps {
 
     @Test
-    void createWorkspaceStepReturnsWorkspaceEndpoints() {
+    void createWorkspaceStepReturnsWorkspaceEndpoints() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created()); // workspace
+        server.enqueue(ok()); // workspace wms service settings
 
         SagaCommandResult result =
             handler.handle(
@@ -105,40 +108,34 @@ class GeoServerSagaHandlerTest {
         // The workspace is created isolated: reachable only via its virtual OWS services (matching
         // globalServices=false) with its own namespace, so the WMS service resolves its layers for
         // anonymous (APISIX-gated) requests and same-named layers across datasets don't collide.
-        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(1)).post(captor.capture());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> workspace =
-            (Map<String, Object>)
-                ((Map<String, Object>) captor.getValue().getEntity()).get("workspace");
+        RecordedRequest workspaceRequest = server.takeRequest();
+        assertEquals("POST", workspaceRequest.getMethod());
+        assertEquals("/geoserver/rest/workspaces", workspaceRequest.getUrl().encodedPath());
+        Map<String, Object> workspace = asMap(requestBodyAsMap(workspaceRequest).get("workspace"));
         assertEquals("ds_abc", workspace.get("name"));
         assertEquals(Boolean.TRUE, workspace.get("isolated"));
 
         // Only the per-workspace WMS service is enabled (and titled with the workspace name), so
-        // the
-        // workspace shows up as a named service in map clients. WFS is deliberately not enabled per
-        // workspace (flat feature-type list, and a REST-created WFSInfo has a null serviceLevel
-        // that
-        // breaks WFS GetCapabilities).
-        assertTrue(capturedPaths().contains("/rest/services/wms/workspaces/ds_abc/settings"));
-        assertFalse(capturedPaths().contains("/rest/services/wfs/workspaces/ds_abc/settings"));
-        ArgumentCaptor<Entity> putCaptor = ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(1)).put(putCaptor.capture());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> svc =
-            (Map<String, Object>)
-                ((Map<String, Object>) putCaptor.getValue().getEntity()).get("wms");
+        // the workspace shows up as a named service in map clients. WFS is deliberately not enabled
+        // per workspace (flat feature-type list, and a REST-created WFSInfo has a null serviceLevel
+        // that breaks WFS GetCapabilities).
+        RecordedRequest wmsRequest = server.takeRequest();
+        assertEquals("PUT", wmsRequest.getMethod());
+        assertEquals(
+            "/geoserver/rest/services/wms/workspaces/ds_abc/settings",
+            wmsRequest.getUrl().encodedPath());
+        Map<String, Object> svc = asMap(requestBodyAsMap(wmsRequest).get("wms"));
         assertEquals(Boolean.TRUE, svc.get("enabled"));
         assertEquals("ds_abc", svc.get("title"));
+        assertEquals(2, server.getRequestCount());
       }
     }
 
     @Test
-    void titlesWorkspaceServicesWithDatasetName() {
+    void titlesWorkspaceServicesWithDatasetName() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created()); // workspace
+        server.enqueue(ok()); // workspace wms service settings
 
         // With a datasetName in the trigger, the workspace WMS/WFS services are titled with the
         // human-facing dataset name (not the technical workspace name).
@@ -150,22 +147,17 @@ class GeoServerSagaHandlerTest {
                     Map.of("datasetId", "ds-abc", "datasetName", "Bewohnerparkzonen Bielefeld")));
 
         assertEquals("STEP_COMPLETED", result.type());
-        ArgumentCaptor<Entity> putCaptor = ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(1)).put(putCaptor.capture());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> svc =
-            (Map<String, Object>)
-                ((Map<String, Object>) putCaptor.getValue().getEntity()).get("wms");
+        server.takeRequest(); // workspace
+        RecordedRequest wmsRequest = server.takeRequest();
+        Map<String, Object> svc = asMap(requestBodyAsMap(wmsRequest).get("wms"));
         assertEquals("Bewohnerparkzonen Bielefeld", svc.get("title"));
       }
     }
 
     @Test
-    void createDatastoreStepDerivesDatastoreName() {
+    void createDatastoreStepDerivesDatastoreName() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created()); // datastore
 
         SagaCommandResult result =
             handler.handle(
@@ -174,40 +166,37 @@ class GeoServerSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("ds_abc_postgis", result.resultData().get("datastoreName"));
         assertEquals("ds_abc", result.compensationData().get("workspaceName"));
-        verify(mockBuilder, times(1)).post(any(Entity.class));
+        assertEquals(1, server.getRequestCount());
+        assertEquals("POST", server.takeRequest().getMethod());
       }
     }
 
     @Test
-    void updatesDatastoreWhenAlreadyExists() {
+    void updatesDatastoreWhenAlreadyExists() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
         // Datastore already exists (409) → its connection parameters are refreshed via PUT rather
         // than reporting success with stale config.
-        Response conflict = mock(Response.class);
-        when(conflict.getStatus()).thenReturn(409);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
-        Response updated = mock(Response.class);
-        when(updated.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(updated);
+        server.enqueue(new MockResponse.Builder().code(409).build());
+        server.enqueue(ok());
 
         SagaCommandResult result =
             handler.handle(
                 createCommand("EXECUTE_STEP", "CREATE_DATASTORE", Map.of("datasetId", "ds-abc")));
 
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder).put(any(Entity.class));
+        server.takeRequest();
+        assertEquals("PUT", server.takeRequest().getMethod());
       }
     }
 
     @Test
-    void createDatastoreReadsFromTheDatasetSchemaDerivedFromDatasetId() {
+    void createDatastoreReadsFromTheDatasetSchemaDerivedFromDatasetId()
+        throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
         // The datastore's schema connection parameter is the DataSet's dedicated schema, which is
         // the workspace name (both derive from datasetId) — so GeoServer reads from ds_abc, the
         // same schema PostGIS created the table in, instead of public. No sink config carries it.
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created());
 
         SagaCommandResult result =
             handler.handle(
@@ -215,16 +204,15 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("ds_abc_postgis", result.resultData().get("datastoreName"));
-        assertEquals("ds_abc", datastoreConnectionParam("schema"));
+        assertEquals("ds_abc", datastoreConnectionParam(server.takeRequest(), "schema"));
       }
     }
 
     @Test
-    void provisionLayersStepPublishesOneFeatureTypePerLayer() {
+    void provisionLayersStepPublishesOneFeatureTypePerLayer() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created()); // feature type 1
+        server.enqueue(created()); // feature type 2
 
         SagaCommandResult result =
             handler.handle(
@@ -241,7 +229,9 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("ds_abc", result.resultData().get("workspaceName"));
-        verify(mockBuilder, times(2)).post(any(Entity.class));
+        assertEquals(2, server.getRequestCount());
+        assertEquals("POST", server.takeRequest().getMethod());
+        assertEquals("POST", server.takeRequest().getMethod());
       }
     }
 
@@ -249,12 +239,8 @@ class GeoServerSagaHandlerTest {
     void provisionLayersNeverPrunesWhatItWasNotAskedAbout() {
       try (GeoServerSagaHandler handler = createHandler()) {
         // Pruning on the provisioning path would drop live layers of a workspace that a re-release
-        // is only topping up.
-        Response snapshot = snapshotResponse("already_published");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        // is only topping up. PROVISION_LAYERS doesn't read a snapshot at all — no GET is issued.
+        server.enqueue(created());
 
         SagaCommandResult result =
             handler.handle(
@@ -268,7 +254,7 @@ class GeoServerSagaHandlerTest {
                         List.of(Map.of("layerName", "traffic_counts", "crs", "EPSG:4326")))));
 
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(0)).delete();
+        assertEquals(1, server.getRequestCount());
       }
     }
 
@@ -278,13 +264,11 @@ class GeoServerSagaHandlerTest {
         // A re-release republishes the feature types the unrelease left behind. Failing on them
         // makes provision-layers compensate, which drops the workspace and the PostGIS schema the
         // sink-preserving unrelease kept the data in.
-        Response snapshot = snapshotResponse("traffic_counts");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response duplicate = mock(Response.class);
-        when(duplicate.getStatus()).thenReturn(500);
-        when(duplicate.readEntity(String.class))
-            .thenReturn("Resource named 'traffic_counts' already exists in store: 'ds'");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(duplicate);
+        server.enqueue(
+            new MockResponse.Builder()
+                .code(500)
+                .body("Resource named 'traffic_counts' already exists in store: 'ds'")
+                .build());
 
         SagaCommandResult result =
             handler.handle(
@@ -315,16 +299,14 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
-        verify(mockBuilder, times(0)).post(any(Entity.class));
+        assertEquals(0, server.getRequestCount());
       }
     }
 
     @Test
-    void usesSingleSinkTableAsNativeNameWhenLayerOmitsIt() {
+    void usesSingleSinkTableAsNativeNameWhenLayerOmitsIt() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created());
 
         SagaCommandResult result =
             handler.handle(
@@ -346,23 +328,16 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         // A layer without nativeName resolves to the single sink table, not its own layer name.
-        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder).post(captor.capture());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> featureType =
-            (Map<String, Object>)
-                ((Map<String, Object>) captor.getValue().getEntity()).get("featureType");
+        Map<String, Object> featureType = postedFeatureType(server.takeRequest());
         assertEquals("roads", featureType.get("name"));
         assertEquals("traffic", featureType.get("nativeName"));
       }
     }
 
     @Test
-    void derivesNativeCrsFromDataStructureGeometry() {
+    void derivesNativeCrsFromDataStructureGeometry() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created());
 
         SagaCommandResult result =
             handler.handle(
@@ -380,7 +355,7 @@ class GeoServerSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         // Declared SRS from the layer, native CRS read from the geometry in the data structure —
         // the same source PostGIS uses for the column SRID.
-        Map<String, Object> featureType = postedFeatureType();
+        Map<String, Object> featureType = postedFeatureType(server.takeRequest());
         assertEquals("EPSG:4326", featureType.get("srs"));
         assertEquals("EPSG:25832", featureType.get("nativeCRS"));
       }
@@ -388,11 +363,10 @@ class GeoServerSagaHandlerTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void forwardsNativeBoundingBoxTaggedWithNativeCrsAndReprojectsLatLon() {
+    void forwardsNativeBoundingBoxTaggedWithNativeCrsAndReprojectsLatLon()
+        throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created());
 
         SagaCommandResult result =
             handler.handle(
@@ -420,10 +394,11 @@ class GeoServerSagaHandlerTest {
                                     "crs", ""))))));
 
         assertEquals("STEP_COMPLETED", result.type());
+        RecordedRequest request = server.takeRequest();
         // Native box is mapped to GeoServer field names and tagged with the resolved native CRS
         // (the portal box's own crs is ignored — it may be blank).
         Map<String, Object> bbox =
-            (Map<String, Object>) postedFeatureType().get("nativeBoundingBox");
+            (Map<String, Object>) postedFeatureType(request).get("nativeBoundingBox");
         assertEquals(239323.44, bbox.get("minx"));
         assertEquals(4290145.58, bbox.get("miny"));
         assertEquals(761545.65, bbox.get("maxx"));
@@ -431,16 +406,14 @@ class GeoServerSagaHandlerTest {
         assertEquals("EPSG:25832", bbox.get("crs"));
         // With a native box supplied, only the lat/lon box is reprojected — no data-driven
         // recompute.
-        verify(mockPathTarget).queryParam("recalculate", "latlonbbox");
+        assertEquals("latlonbbox", request.getUrl().queryParameter("recalculate"));
       }
     }
 
     @Test
-    void computesBothBoxesFromDataWhenNoNativeBoundingBoxGiven() {
+    void computesBothBoxesFromDataWhenNoNativeBoundingBoxGiven() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created());
 
         SagaCommandResult result =
             handler.handle(
@@ -456,17 +429,16 @@ class GeoServerSagaHandlerTest {
                         List.of(Map.of("layerName", "roads", "crs", "EPSG:4326")))));
 
         assertEquals("STEP_COMPLETED", result.type());
-        assertNull(postedFeatureType().get("nativeBoundingBox"));
-        verify(mockPathTarget).queryParam("recalculate", "nativebbox,latlonbbox");
+        RecordedRequest request = server.takeRequest();
+        assertNull(postedFeatureType(request).get("nativeBoundingBox"));
+        assertEquals("nativebbox,latlonbbox", request.getUrl().queryParameter("recalculate"));
       }
     }
 
     @Test
-    void selectsGeometryByGeometryColumnRefWhenMultiple() {
+    void selectsGeometryByGeometryColumnRefWhenMultiple() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created());
 
         // Two geometry columns with different CRS; geometryColumnRef picks which one is published.
         LinkedHashMap<String, String> geometries = new LinkedHashMap<>();
@@ -491,7 +463,7 @@ class GeoServerSagaHandlerTest {
                                 "geometryColumnRef", "geom_b")))));
 
         assertEquals("STEP_COMPLETED", result.type());
-        assertEquals("EPSG:3857", postedFeatureType().get("nativeCRS"));
+        assertEquals("EPSG:3857", postedFeatureType(server.takeRequest()).get("nativeCRS"));
       }
     }
 
@@ -519,16 +491,14 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_FAILED", result.type());
         assertTrue(result.error().contains("geometryColumnRef"), result.error());
-        verify(mockBuilder, times(0)).post(any(Entity.class));
+        assertEquals(0, server.getRequestCount());
       }
     }
 
     @Test
-    void fallsBackToDeclaredCrsWhenGeometryHasNoCrs() {
+    void fallsBackToDeclaredCrsWhenGeometryHasNoCrs() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created());
 
         // Geometry present but without an explicit crs — PostGIS defaults such a column to
         // EPSG:4326, so the native CRS falls back to the declared CRS (which is EPSG:4326 here).
@@ -549,16 +519,14 @@ class GeoServerSagaHandlerTest {
                         List.of(Map.of("layerName", "roads", "crs", "EPSG:4326")))));
 
         assertEquals("STEP_COMPLETED", result.type());
-        assertEquals("EPSG:4326", postedFeatureType().get("nativeCRS"));
+        assertEquals("EPSG:4326", postedFeatureType(server.takeRequest()).get("nativeCRS"));
       }
     }
 
     @Test
-    void fallsBackToDeclaredCrsWhenNoDataStructure() {
+    void fallsBackToDeclaredCrsWhenNoDataStructure() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created());
 
         // A POSTGIS sink without a data structure (nothing to derive from) → the native CRS mirrors
         // the declared CRS so the layer stays valid under REPROJECT_TO_DECLARED.
@@ -578,7 +546,7 @@ class GeoServerSagaHandlerTest {
                         List.of(Map.of("layerName", "roads", "crs", "EPSG:25832")))));
 
         assertEquals("STEP_COMPLETED", result.type());
-        assertEquals("EPSG:25832", postedFeatureType().get("nativeCRS"));
+        assertEquals("EPSG:25832", postedFeatureType(server.takeRequest()).get("nativeCRS"));
       }
     }
 
@@ -662,15 +630,17 @@ class GeoServerSagaHandlerTest {
   class Styles {
 
     @Test
-    void provisionLayersUploadsStylesAndAssignsDefaultStyle() {
+    void provisionLayersUploadsStylesAndAssignsDefaultStyle() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
-        Response assigned = mock(Response.class);
-        when(assigned.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(assigned);
-        stubLayerReadback(Map.of("defaultStyle", Map.of("name", "ds_abc:civitas_default_point")));
+        server.enqueue(created()); // style upload
+        server.enqueue(created()); // feature type
+        server.enqueue(ok()); // layer PUT (style assignment)
+        server.enqueue(
+            jsonResponse(
+                200,
+                Map.of(
+                    "layer",
+                    Map.of("defaultStyle", Map.of("name", "ds_abc:civitas_default_point")))));
 
         SagaCommandResult result =
             handler.handle(
@@ -693,12 +663,17 @@ class GeoServerSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
 
         // SLD uploaded to .../styles?name=civitas_default_point with the SLD content type.
-        assertTrue(capturedPaths().contains("/rest/workspaces/ds_abc/styles"));
-        verify(mockPathTarget).queryParam("name", "civitas_default_point");
-        assertTrue(postedSldContentType());
+        RecordedRequest styleRequest = server.takeRequest();
+        assertEquals(
+            "/geoserver/rest/workspaces/ds_abc/styles", styleRequest.getUrl().encodedPath());
+        assertEquals("civitas_default_point", styleRequest.getUrl().queryParameter("name"));
+        assertTrue(styleRequest.getHeaders().get("Content-Type").startsWith(SLD_CONTENT_TYPE));
+
+        server.takeRequest(); // feature type creation
 
         // Layer PUT assigns the workspace-qualified default style.
-        Map<String, Object> layer = capturedLayerPutBody();
+        RecordedRequest putRequest = server.takeRequest();
+        Map<String, Object> layer = asMap(requestBodyAsMap(putRequest).get("layer"));
         Map<String, Object> defaultStyle = asMap(layer.get("defaultStyle"));
         assertEquals("ds_abc:civitas_default_point", defaultStyle.get("name"));
         assertEquals("ds_abc", defaultStyle.get("workspace"));
@@ -706,20 +681,22 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void provisionLayersAssignsAlternativeStyles() {
+    void provisionLayersAssignsAlternativeStyles() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
-        Response assigned = mock(Response.class);
-        when(assigned.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(assigned);
-        stubLayerReadback(
-            Map.of(
-                "defaultStyle",
-                Map.of("name", "ds_abc:civitas_default_point"),
-                "styles",
-                Map.of("style", List.of(Map.of("name", "ds_abc:civitas_heat")))));
+        server.enqueue(created()); // style 1
+        server.enqueue(created()); // style 2
+        server.enqueue(created()); // feature type
+        server.enqueue(ok()); // layer PUT
+        server.enqueue(
+            jsonResponse(
+                200,
+                Map.of(
+                    "layer",
+                    Map.of(
+                        "defaultStyle",
+                        Map.of("name", "ds_abc:civitas_default_point"),
+                        "styles",
+                        Map.of("style", List.of(Map.of("name", "ds_abc:civitas_heat")))))));
 
         SagaCommandResult result =
             handler.handle(
@@ -745,7 +722,11 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
 
-        Map<String, Object> layer = capturedLayerPutBody();
+        server.takeRequest(); // style 1
+        server.takeRequest(); // style 2
+        server.takeRequest(); // feature type
+        RecordedRequest putRequest = server.takeRequest();
+        Map<String, Object> layer = asMap(requestBodyAsMap(putRequest).get("layer"));
         Map<String, Object> styles = asMap(layer.get("styles"));
         assertEquals("linked-hash-set", styles.get("@class"));
         @SuppressWarnings("unchecked")
@@ -755,11 +736,9 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void provisionLayersWithoutStylesSkipsStyleCalls() {
+    void provisionLayersWithoutStylesSkipsStyleCalls() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created()); // feature type only
 
         SagaCommandResult result =
             handler.handle(
@@ -774,22 +753,20 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         // Backward-compatible: no SLD upload and no layer PUT when the payload carries no styles.
-        assertTrue(capturedPaths().stream().noneMatch(path -> path.contains("/styles")));
-        verify(mockBuilder, never()).put(any(Entity.class));
+        assertEquals(1, server.getRequestCount());
+        RecordedRequest request = server.takeRequest();
+        assertFalse(request.getUrl().encodedPath().contains("/styles"));
+        assertEquals("POST", request.getMethod());
       }
     }
 
     @Test
-    void styleUpsertUpdatesSldWhenStyleExists() {
+    void styleUpsertUpdatesSldWhenStyleExists() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
         // GeoServer returns 403 (not 409) when a style of that name already exists → upsert via
         // PUT.
-        Response conflict = mock(Response.class);
-        when(conflict.getStatus()).thenReturn(403);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
-        Response updated = mock(Response.class);
-        when(updated.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(updated);
+        server.enqueue(new MockResponse.Builder().code(403).build());
+        server.enqueue(ok());
 
         SagaCommandResult result =
             handler.handle(
@@ -803,9 +780,12 @@ class GeoServerSagaHandlerTest {
                         List.of(Map.of("name", "civitas_default_point", "sldContent", SLD)))));
 
         assertEquals("STEP_COMPLETED", result.type());
-        assertTrue(
-            capturedPaths().contains("/rest/workspaces/ds_abc/styles/civitas_default_point"));
-        verify(mockBuilder).put(any(Entity.class));
+        server.takeRequest(); // failed POST
+        RecordedRequest putRequest = server.takeRequest();
+        assertEquals("PUT", putRequest.getMethod());
+        assertEquals(
+            "/geoserver/rest/workspaces/ds_abc/styles/civitas_default_point",
+            putRequest.getUrl().encodedPath());
       }
     }
 
@@ -827,7 +807,7 @@ class GeoServerSagaHandlerTest {
         assertEquals("STEP_FAILED", result.type());
         // A missing name reads as a missing-field error, not a "contains invalid characters" one.
         assertTrue(result.error().contains("missing the required field: name"), result.error());
-        verify(mockBuilder, never()).post(any(Entity.class));
+        assertEquals(0, server.getRequestCount());
       }
     }
 
@@ -868,10 +848,7 @@ class GeoServerSagaHandlerTest {
       try (GeoServerSagaHandler handler = createHandler()) {
         // Style POST returns a non-201/non-403 status → the step fails (not silently treated as
         // ok).
-        Response error = mock(Response.class);
-        when(error.getStatus()).thenReturn(500);
-        when(error.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(error);
+        server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
         SagaCommandResult result =
             handler.handle(
@@ -892,15 +869,13 @@ class GeoServerSagaHandlerTest {
     @Test
     void layerStyleAssignmentFailsWhenReadbackShowsStyleNotApplied() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
-        Response assigned = mock(Response.class);
-        when(assigned.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(assigned);
+        server.enqueue(created()); // style upload
+        server.enqueue(created()); // feature type
+        server.enqueue(ok()); // layer PUT
         // PUT returns 200 but GeoServer kept the generic style — the read-back must catch the
         // no-op.
-        stubLayerReadback(Map.of("defaultStyle", Map.of("name", "generic")));
+        server.enqueue(
+            jsonResponse(200, Map.of("layer", Map.of("defaultStyle", Map.of("name", "generic")))));
 
         SagaCommandResult result =
             handler.handle(
@@ -926,22 +901,24 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void provisionLayersAssignsAlternativeStylesInOrder() {
+    void provisionLayersAssignsAlternativeStylesInOrder() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
-        Response assigned = mock(Response.class);
-        when(assigned.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(assigned);
-        stubLayerReadback(
-            Map.of(
-                "styles",
+        server.enqueue(created()); // style 1
+        server.enqueue(created()); // style 2
+        server.enqueue(created()); // feature type
+        server.enqueue(ok()); // layer PUT
+        server.enqueue(
+            jsonResponse(
+                200,
                 Map.of(
-                    "style",
-                    List.of(
-                        Map.of("name", "ds_abc:civitas_heat"),
-                        Map.of("name", "ds_abc:civitas_cool")))));
+                    "layer",
+                    Map.of(
+                        "styles",
+                        Map.of(
+                            "style",
+                            List.of(
+                                Map.of("name", "ds_abc:civitas_heat"),
+                                Map.of("name", "ds_abc:civitas_cool")))))));
 
         SagaCommandResult result =
             handler.handle(
@@ -964,7 +941,11 @@ class GeoServerSagaHandlerTest {
                                 List.of("civitas_heat", "civitas_cool"))))));
 
         assertEquals("STEP_COMPLETED", result.type());
-        Map<String, Object> layer = capturedLayerPutBody();
+        server.takeRequest();
+        server.takeRequest();
+        server.takeRequest(); // feature type
+        RecordedRequest putRequest = server.takeRequest();
+        Map<String, Object> layer = asMap(requestBodyAsMap(putRequest).get("layer"));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> styleRefs =
             (List<Map<String, Object>>) asMap(layer.get("styles")).get("style");
@@ -976,14 +957,16 @@ class GeoServerSagaHandlerTest {
     @Test
     void readbackAcceptsSingleAlternativeStyleSerialisedAsObject() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
-        Response assigned = mock(Response.class);
-        when(assigned.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(assigned);
+        server.enqueue(created()); // style upload
+        server.enqueue(created()); // feature type
+        server.enqueue(ok()); // layer PUT
         // GeoServer serialises a lone alternative style as an object, not a one-element array.
-        stubLayerReadback(Map.of("styles", Map.of("style", Map.of("name", "ds_abc:civitas_heat"))));
+        server.enqueue(
+            jsonResponse(
+                200,
+                Map.of(
+                    "layer",
+                    Map.of("styles", Map.of("style", Map.of("name", "ds_abc:civitas_heat"))))));
 
         SagaCommandResult result =
             handler.handle(
@@ -1014,8 +997,7 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
-        verify(mockBuilder, never()).post(any(Entity.class));
-        verify(mockBuilder, never()).put(any(Entity.class));
+        assertEquals(0, server.getRequestCount());
       }
     }
   }
@@ -1026,12 +1008,10 @@ class GeoServerSagaHandlerTest {
     @Test
     void createsWorkspaceDatastoreAndFeatureTypesSuccessfully() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response createResponse = mock(Response.class);
-        when(createResponse.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class)))
-            .thenReturn(createResponse) // workspace
-            .thenReturn(createResponse) // datastore
-            .thenReturn(createResponse); // featuretype
+        server.enqueue(created()); // workspace
+        server.enqueue(ok()); // workspace wms service settings
+        server.enqueue(created()); // datastore
+        server.enqueue(created()); // featuretype
 
         SagaCommandMessage command =
             createCommand(
@@ -1067,15 +1047,8 @@ class GeoServerSagaHandlerTest {
     @Test
     void treatsDuplicateWorkspaceAs409Idempotent() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response conflictResponse = mock(Response.class);
-        when(conflictResponse.getStatus()).thenReturn(409);
-
-        Response createdResponse = mock(Response.class);
-        when(createdResponse.getStatus()).thenReturn(201);
-
-        when(mockBuilder.post(any(Entity.class)))
-            .thenReturn(conflictResponse) // workspace 409 = already exists
-            .thenReturn(createdResponse); // datastore
+        server.enqueue(new MockResponse.Builder().code(409).build()); // workspace 409 = exists
+        server.enqueue(created()); // datastore
 
         SagaCommandMessage command =
             createCommand(
@@ -1090,19 +1063,14 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void treatsDuplicateWorkspaceReportedAsHttp500Idempotent() {
+    void treatsDuplicateWorkspaceReportedAsHttp500Idempotent() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response duplicate = mock(Response.class);
-        when(duplicate.getStatus()).thenReturn(500);
-        when(duplicate.readEntity(String.class))
-            .thenReturn("Workspace 'ds_existing' already exists");
-
-        Response createdResponse = mock(Response.class);
-        when(createdResponse.getStatus()).thenReturn(201);
-
-        when(mockBuilder.post(any(Entity.class)))
-            .thenReturn(duplicate) // workspace already exists, reported as 500
-            .thenReturn(createdResponse); // datastore
+        server.enqueue(
+            new MockResponse.Builder()
+                .code(500)
+                .body("Workspace 'ds_existing' already exists")
+                .build());
+        server.enqueue(created()); // datastore
 
         SagaCommandMessage command =
             createCommand(
@@ -1115,19 +1083,17 @@ class GeoServerSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         // Only a fresh 201 may configure the WMS service — doing it here would overwrite the
         // service title of a workspace that already serves data.
-        assertTrue(
-            capturedPaths().stream().noneMatch(path -> path.contains("/services/wms/")),
-            "an existing workspace must keep its WMS service settings");
+        assertEquals(2, server.getRequestCount());
+        assertFalse(server.takeRequest().getUrl().encodedPath().contains("/services/wms/"));
+        assertFalse(server.takeRequest().getUrl().encodedPath().contains("/services/wms/"));
       }
     }
 
     @Test
     void failsWhenWorkspaceCreationReturnsAnUnrelatedHttp500() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response serverError = mock(Response.class);
-        when(serverError.getStatus()).thenReturn(500);
-        when(serverError.readEntity(String.class)).thenReturn("java.lang.NullPointerException");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(serverError);
+        server.enqueue(
+            new MockResponse.Builder().code(500).body("java.lang.NullPointerException").build());
 
         SagaCommandMessage command =
             createCommand(
@@ -1144,9 +1110,9 @@ class GeoServerSagaHandlerTest {
     @Test
     void createsWorkspaceAndDatastoreButNoFeatureTypesWhenNoLayers() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(created()); // workspace
+        server.enqueue(ok()); // workspace wms service settings
+        server.enqueue(created()); // datastore
 
         SagaCommandMessage command =
             createCommand(
@@ -1158,17 +1124,14 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         // Only workspace + datastore are created when there are no layers to publish.
-        verify(mockBuilder, times(2)).post(any(Entity.class));
+        assertEquals(3, server.getRequestCount());
       }
     }
 
     @Test
     void returnsFailureWhenWorkspaceCreationFails() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response errorResponse = mock(Response.class);
-        when(errorResponse.getStatus()).thenReturn(500);
-        when(errorResponse.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(errorResponse);
+        server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
         SagaCommandMessage command =
             createCommand(
@@ -1186,8 +1149,8 @@ class GeoServerSagaHandlerTest {
     @Test
     void returnsFailureOnNetworkError() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        when(mockBuilder.post(any(Entity.class)))
-            .thenThrow(new ProcessingException("Connection refused"));
+        // Torn down before any request is made: the connection attempt itself fails.
+        server.close();
 
         SagaCommandMessage command =
             createCommand(
@@ -1209,10 +1172,7 @@ class GeoServerSagaHandlerTest {
     @Test
     void returnsFailureWhenSnapshotReadFails() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response errorResponse = mock(Response.class);
-        when(errorResponse.getStatus()).thenReturn(500);
-        when(errorResponse.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.get()).thenReturn(errorResponse);
+        server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
         SagaCommandMessage command =
             createCommand(
@@ -1228,15 +1188,63 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void succeedsWhenTheWorkspaceServesNoFeatureType() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // A workspace with a datastore and no published feature type is a normal state: a dataset
+        // may have a geographic sink and no map layer, and the clean-up step leaves one behind.
+        server.enqueue(emptySnapshotResponse());
+        server.enqueue(created()); // workspace
+        server.enqueue(ok()); // workspace wms service settings
+        server.enqueue(created()); // datastore
+        server.enqueue(created()); // featuretype
+
+        SagaCommandResult result =
+            handler.handle(createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertNull(result.error());
+        assertEquals(List.of(), result.compensationData().get("previousFeatureTypes"));
+      }
+    }
+
+    @Test
+    void failsWhenTheFeatureTypesWrapperCannotBeRead() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // An unreadable listing must not pass as an empty workspace: compensation deletes every
+        // feature type absent from the snapshot, so a wrong empty unpublishes the whole dataset.
+        server.enqueue(unexpectedShapeSnapshotResponse());
+
+        SagaCommandResult result =
+            handler.handle(createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1")));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+      }
+    }
+
+    @Test
+    void failsWhenTheFeatureTypeEntryListCannotBeRead() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // The wrapper is a map, but its entry list is not a list — as unreadable as a bad wrapper.
+        server.enqueue(unexpectedEntryShapeSnapshotResponse());
+
+        SagaCommandResult result =
+            handler.handle(createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1")));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+      }
+    }
+
+    @Test
     void provisionsWorkspaceAndDatastoreWhenMissingThenPublishesLayers() {
       try (GeoServerSagaHandler handler = createHandler()) {
         // Workspace not provisioned yet → the feature-types snapshot read returns 404 (empty).
-        Response notFound = mock(Response.class);
-        when(notFound.getStatus()).thenReturn(404);
-        when(mockBuilder.get()).thenReturn(notFound);
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(new MockResponse.Builder().code(404).build());
+        server.enqueue(created()); // workspace
+        server.enqueue(ok()); // workspace wms service settings
+        server.enqueue(created()); // datastore
+        server.enqueue(created()); // featuretype
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
@@ -1247,22 +1255,17 @@ class GeoServerSagaHandlerTest {
         assertNull(result.error());
         // UPDATE must create the workspace + datastore (not just the feature type) when they don't
         // exist yet — otherwise the feature-type POST would 404 on first-time geo provisioning.
-        verify(mockBuilder, times(3)).post(any(Entity.class));
+        assertEquals(5, server.getRequestCount());
       }
     }
 
     @Test
     void returnsFailureWhenWorkspaceProvisioningFailsOnUpdate() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response notFound = mock(Response.class);
-        when(notFound.getStatus()).thenReturn(404);
-        when(mockBuilder.get()).thenReturn(notFound);
+        server.enqueue(new MockResponse.Builder().code(404).build());
         // The workspace POST fails (not 201/409) → UPDATE must fail, not silently skip
         // provisioning.
-        Response error = mock(Response.class);
-        when(error.getStatus()).thenReturn(500);
-        when(error.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(error);
+        server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
@@ -1277,14 +1280,12 @@ class GeoServerSagaHandlerTest {
     @Test
     void updatesExistingFeatureTypeViaPutOn409() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response snapshot = snapshotResponse("t1");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response conflict = mock(Response.class);
-        when(conflict.getStatus()).thenReturn(409);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
-        Response updated = mock(Response.class);
-        when(updated.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(updated);
+        server.enqueue(snapshotResponse("t1"));
+        server.enqueue(new MockResponse.Builder().code(409).build()); // workspace exists
+        server.enqueue(new MockResponse.Builder().code(409).build()); // datastore exists
+        server.enqueue(ok()); // datastore update PUT
+        server.enqueue(new MockResponse.Builder().code(409).build()); // feature type exists
+        server.enqueue(ok()); // feature type update PUT
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
@@ -1294,22 +1295,19 @@ class GeoServerSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         // Both the existing datastore and the existing feature type return 409 on POST and must be
         // updated via PUT (not silently ignored), so the workspace converges to the desired config.
-        verify(mockBuilder, times(2)).put(any(Entity.class));
+        assertEquals(6, server.getRequestCount());
       }
     }
 
     @Test
     void returnsFailureWhenFeatureTypeUpdateFails() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response snapshot = snapshotResponse("t1");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response conflict = mock(Response.class);
-        when(conflict.getStatus()).thenReturn(409);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
-        Response error = mock(Response.class);
-        when(error.getStatus()).thenReturn(500);
-        when(error.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.put(any(Entity.class))).thenReturn(error);
+        server.enqueue(snapshotResponse("t1"));
+        server.enqueue(new MockResponse.Builder().code(409).build()); // workspace exists
+        server.enqueue(new MockResponse.Builder().code(409).build()); // datastore exists
+        server.enqueue(ok()); // datastore update PUT
+        server.enqueue(new MockResponse.Builder().code(409).build()); // feature type exists
+        server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
@@ -1326,14 +1324,12 @@ class GeoServerSagaHandlerTest {
       try (GeoServerSagaHandler handler = createHandler()) {
         // A delete here would sit in the compensable window, where RESTORE_WORKSPACE cannot undo
         // it.
-        Response snapshot = snapshotResponse("t1", "removed_layer");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response conflict = mock(Response.class);
-        when(conflict.getStatus()).thenReturn(409);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+        server.enqueue(snapshotResponse("t1", "removed_layer"));
+        server.enqueue(new MockResponse.Builder().code(409).build()); // workspace exists
+        server.enqueue(new MockResponse.Builder().code(409).build()); // datastore exists
+        server.enqueue(ok()); // datastore update PUT
+        server.enqueue(new MockResponse.Builder().code(409).build()); // feature type exists
+        server.enqueue(ok()); // feature type update PUT
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
@@ -1341,21 +1337,19 @@ class GeoServerSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(0)).delete();
+        assertNoDeleteRequests();
       }
     }
 
     @Test
     void keepsPublishedFeatureTypesTheUpdateStillAsksFor() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response snapshot = snapshotResponse("t1");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response conflict = mock(Response.class);
-        when(conflict.getStatus()).thenReturn(409);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+        server.enqueue(snapshotResponse("t1"));
+        server.enqueue(new MockResponse.Builder().code(409).build()); // workspace exists
+        server.enqueue(new MockResponse.Builder().code(409).build()); // datastore exists
+        server.enqueue(ok()); // datastore update PUT
+        server.enqueue(new MockResponse.Builder().code(409).build()); // feature type exists
+        server.enqueue(ok()); // feature type update PUT
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
@@ -1363,7 +1357,7 @@ class GeoServerSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(0)).delete();
+        assertEquals(6, server.getRequestCount());
       }
     }
 
@@ -1372,19 +1366,16 @@ class GeoServerSagaHandlerTest {
       try (GeoServerSagaHandler handler = createHandler()) {
         // Otherwise every metadata edit on a released dataset with layers fails, since an update
         // re-publishes all of them.
-        Response snapshot = snapshotResponse("t1");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response conflict = mock(Response.class);
-        when(conflict.getStatus()).thenReturn(409);
-        Response duplicate = mock(Response.class);
-        when(duplicate.getStatus()).thenReturn(500);
-        when(duplicate.readEntity(String.class))
-            .thenReturn("Resource named 't1' already exists in store: 'ds'");
-        // The workspace and datastore POSTs precede the feature type's and share this mock.
-        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict, conflict, duplicate);
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+        server.enqueue(snapshotResponse("t1"));
+        server.enqueue(new MockResponse.Builder().code(409).build()); // workspace precedes it
+        server.enqueue(new MockResponse.Builder().code(409).build()); // datastore precedes it
+        server.enqueue(ok()); // datastore update PUT
+        server.enqueue(
+            new MockResponse.Builder()
+                .code(500)
+                .body("Resource named 't1' already exists in store: 'ds'")
+                .build());
+        server.enqueue(ok()); // feature type update PUT
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
@@ -1392,23 +1383,18 @@ class GeoServerSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        assertTrue(
-            capturedPaths().stream().anyMatch(path -> path.endsWith("/featuretypes/t1")),
-            "the conflict must fall through to the PUT that converges the definition");
       }
     }
 
     @Test
     void failsWhenAFeatureTypePostReturnsAnUnrelatedHttp500() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response snapshot = snapshotResponse("t1");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response conflict = mock(Response.class);
-        when(conflict.getStatus()).thenReturn(409);
-        Response serverError = mock(Response.class);
-        when(serverError.getStatus()).thenReturn(500);
-        when(serverError.readEntity(String.class)).thenReturn("java.lang.NullPointerException");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict, conflict, serverError);
+        server.enqueue(snapshotResponse("t1"));
+        server.enqueue(new MockResponse.Builder().code(409).build()); // workspace exists
+        server.enqueue(new MockResponse.Builder().code(409).build()); // datastore exists
+        server.enqueue(ok()); // datastore update PUT
+        server.enqueue(
+            new MockResponse.Builder().code(500).body("java.lang.NullPointerException").build());
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
@@ -1424,38 +1410,51 @@ class GeoServerSagaHandlerTest {
   class PruneFeatureTypes {
 
     @Test
-    void deletesPublishedFeatureTypesTheDatasetNoLongerHasALayerFor() {
+    void deletesPublishedFeatureTypesTheDatasetNoLongerHasALayerFor() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response snapshot = snapshotResponse("t1", "removed_layer");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(ok);
+        server.enqueue(snapshotResponse("t1", "removed_layer"));
+        server.enqueue(ok()); // delete removed_layer
 
         SagaCommandResult result =
             handler.handle(
                 createCommand("EXECUTE_STEP", "PRUNE_FEATURE_TYPES", updatePayload("t1")));
 
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(1)).delete();
+        assertEquals(2, server.getRequestCount());
+        server.takeRequest();
+        RecordedRequest deleteRequest = server.takeRequest();
+        assertEquals("DELETE", deleteRequest.getMethod());
         assertTrue(
-            capturedPaths().stream().anyMatch(path -> path.endsWith("/featuretypes/removed_layer")),
+            deleteRequest.getUrl().encodedPath().endsWith("/featuretypes/removed_layer"),
             "the stale feature type must be the one deleted");
+      }
+    }
+
+    @Test
+    void deletesNothingWhenTheWorkspaceServesNoFeatureType() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        server.enqueue(emptySnapshotResponse());
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "PRUNE_FEATURE_TYPES", updatePayload("t1")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertNoDeleteRequests();
       }
     }
 
     @Test
     void keepsFeatureTypesTheDatasetStillHasALayerFor() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response snapshot = snapshotResponse("t1");
-        when(mockBuilder.get()).thenReturn(snapshot);
+        server.enqueue(snapshotResponse("t1"));
 
         SagaCommandResult result =
             handler.handle(
                 createCommand("EXECUTE_STEP", "PRUNE_FEATURE_TYPES", updatePayload("t1")));
 
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(0)).delete();
+        assertEquals(1, server.getRequestCount());
       }
     }
 
@@ -1464,13 +1463,9 @@ class GeoServerSagaHandlerTest {
       try (GeoServerSagaHandler handler = createHandler()) {
         // Failing the step would report an applied update as failed; staying silent would leave the
         // layer served with nothing in the portal able to see it.
-        Response snapshot = snapshotResponse("t1", "stuck", "removable");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response locked = mock(Response.class);
-        when(locked.getStatus()).thenReturn(500);
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(locked, ok);
+        server.enqueue(snapshotResponse("t1", "stuck", "removable"));
+        server.enqueue(new MockResponse.Builder().code(500).build());
+        server.enqueue(ok());
 
         SagaCommandResult result =
             handler.handle(
@@ -1478,7 +1473,7 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals(List.of("stuck"), result.resultData().get("staleFeatureTypes"));
-        verify(mockBuilder, times(2)).delete();
+        assertEquals(3, server.getRequestCount());
       }
     }
 
@@ -1486,11 +1481,9 @@ class GeoServerSagaHandlerTest {
     void prunesEveryFeatureTypeWhenTheDatasetHasNoLayersLeft() {
       try (GeoServerSagaHandler handler = createHandler()) {
         // An empty desired set must prune, not be treated as "unknown" and skipped.
-        Response snapshot = snapshotResponse("t1", "t2");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(ok);
+        server.enqueue(snapshotResponse("t1", "t2"));
+        server.enqueue(ok());
+        server.enqueue(ok());
 
         SagaCommandResult result =
             handler.handle(
@@ -1498,7 +1491,7 @@ class GeoServerSagaHandlerTest {
                     "EXECUTE_STEP", "PRUNE_FEATURE_TYPES", Map.of("datasetId", "ds-abc")));
 
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(2)).delete();
+        assertEquals(3, server.getRequestCount());
       }
     }
   }
@@ -1509,9 +1502,7 @@ class GeoServerSagaHandlerTest {
     @Test
     void deletesWorkspaceSuccessfully() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response deleteResponse = mock(Response.class);
-        when(deleteResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(deleteResponse);
+        server.enqueue(ok());
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "DELETE_WORKSPACE", Map.of("workspaceName", "myws"));
@@ -1526,9 +1517,7 @@ class GeoServerSagaHandlerTest {
     @Test
     void derivesWorkspaceFromDatasetIdWhenNotGiven() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response deleteResponse = mock(Response.class);
-        when(deleteResponse.getStatus()).thenReturn(404);
-        when(mockBuilder.delete()).thenReturn(deleteResponse);
+        server.enqueue(new MockResponse.Builder().code(404).build());
 
         // No explicit workspaceName: a 404 (nothing to delete) is idempotent success. This is the
         // path taken when the delete saga's compensate step runs but no GeoServer state exists.
@@ -1544,9 +1533,7 @@ class GeoServerSagaHandlerTest {
     @Test
     void treatsNotFoundAs404Idempotent() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response notFoundResponse = mock(Response.class);
-        when(notFoundResponse.getStatus()).thenReturn(404);
-        when(mockBuilder.delete()).thenReturn(notFoundResponse);
+        server.enqueue(new MockResponse.Builder().code(404).build());
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "DELETE_WORKSPACE", Map.of("workspaceName", "gone"));
@@ -1560,9 +1547,7 @@ class GeoServerSagaHandlerTest {
     @Test
     void returnsCompensationCompletedWhenUsedAsCompensation() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response deleteResponse = mock(Response.class);
-        when(deleteResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(deleteResponse);
+        server.enqueue(ok());
 
         SagaCommandMessage command =
             createCommand("COMPENSATE_STEP", "DELETE_WORKSPACE", Map.of("workspaceName", "myws"));
@@ -1576,10 +1561,7 @@ class GeoServerSagaHandlerTest {
     @Test
     void returnsFailureOnServerError() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response errorResponse = mock(Response.class);
-        when(errorResponse.getStatus()).thenReturn(500);
-        when(errorResponse.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.delete()).thenReturn(errorResponse);
+        server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "DELETE_WORKSPACE", Map.of("workspaceName", "myws"));
@@ -1606,8 +1588,28 @@ class GeoServerSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
-        verify(mockBuilder, times(0)).get();
-        verify(mockBuilder, times(0)).delete();
+        assertEquals(0, server.getRequestCount());
+      }
+    }
+
+    @Test
+    void restoresNothingWhenTheWorkspaceServesNoFeatureType() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // An update of a layerless dataset records an empty snapshot, so compensation has nothing
+        // to delete and nothing to put back.
+        server.enqueue(emptySnapshotResponse());
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_WORKSPACE",
+                Map.of("workspaceName", "myws", "previousFeatureTypes", List.of()));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        assertNull(result.error());
+        assertEquals(1, server.getRequestCount());
       }
     }
 
@@ -1615,11 +1617,8 @@ class GeoServerSagaHandlerTest {
     void restoresPreviousFeatureTypesSuccessfully() {
       try (GeoServerSagaHandler handler = createHandler()) {
         // Snapshot matches the previous state — nothing new to delete, only restore via PUT.
-        Response snapshot = snapshotResponse("traffic_counts");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response putResponse = mock(Response.class);
-        when(putResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResponse);
+        server.enqueue(snapshotResponse("traffic_counts"));
+        server.enqueue(ok());
 
         SagaCommandMessage command =
             createCommand(
@@ -1643,12 +1642,9 @@ class GeoServerSagaHandlerTest {
       try (GeoServerSagaHandler handler = createHandler()) {
         // Snapshot has a feature type ("new_table") absent from the previous state — compensation
         // must delete it, then restore the previous one.
-        Response snapshot = snapshotResponse("traffic_counts", "new_table");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(ok);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+        server.enqueue(snapshotResponse("traffic_counts", "new_table"));
+        server.enqueue(ok()); // delete new_table
+        server.enqueue(ok()); // restore traffic_counts
 
         SagaCommandMessage command =
             createCommand(
@@ -1663,19 +1659,15 @@ class GeoServerSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
-        verify(mockBuilder).delete();
+        assertEquals(3, server.getRequestCount());
       }
     }
 
     @Test
     void returnsCompensationFailureOnRestoreError() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response snapshot = snapshotResponse("traffic_counts");
-        when(mockBuilder.get()).thenReturn(snapshot);
-        Response errorResponse = mock(Response.class);
-        when(errorResponse.getStatus()).thenReturn(500);
-        when(errorResponse.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.put(any(Entity.class))).thenReturn(errorResponse);
+        server.enqueue(snapshotResponse("traffic_counts"));
+        server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
         SagaCommandMessage command =
             createCommand(
@@ -1722,10 +1714,10 @@ class GeoServerSagaHandlerTest {
   private GeoServerSagaHandler createHandler() {
     GeoServerSagaHandler handler = new GeoServerSagaHandler();
     AdapterConfig mockConfig = mock(AdapterConfig.class);
+    String url = server.url("/geoserver").toString();
     when(mockConfig.getProperty("geoserver.url", "http://localhost:8080/geoserver"))
-        .thenReturn("http://geoserver:8080/geoserver");
-    when(mockConfig.getProperty("geoserver.public.url", "http://geoserver:8080/geoserver"))
-        .thenReturn("http://geoserver:8080/geoserver");
+        .thenReturn(url);
+    when(mockConfig.getProperty("geoserver.public.url", url)).thenReturn(url);
     when(mockConfig.getProperty("geoserver.admin.user")).thenReturn("admin");
     when(mockConfig.getProperty("geoserver.admin.password")).thenReturn("geoserver");
     when(mockConfig.getProperty("geoserver.postgis.host", "localhost")).thenReturn("localhost");
@@ -1735,26 +1727,6 @@ class GeoServerSagaHandlerTest {
     when(mockConfig.getProperty("geoserver.postgis.user")).thenReturn("geo_user");
     when(mockConfig.getProperty("geoserver.postgis.password")).thenReturn("secret");
     handler.initialize(mockConfig);
-
-    Client mockClient = mock(Client.class);
-    mockTarget = mock(WebTarget.class);
-    mockPathTarget = mock(WebTarget.class);
-    mockBuilder = mock(Invocation.Builder.class);
-
-    when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-    when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-    when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
-    when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-    when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-    // Lenient default so the best-effort per-workspace WMS/WFS service-settings PUTs (issued after
-    // a
-    // fresh workspace CREATE) don't NPE in tests that don't stub put themselves; tests that assert
-    // specific put behaviour override this.
-    Response okPut = mock(Response.class);
-    when(okPut.getStatus()).thenReturn(200);
-    when(mockBuilder.put(any(Entity.class))).thenReturn(okPut);
-
-    handler.setTestClient(mockClient);
     return handler;
   }
 
@@ -1799,64 +1771,57 @@ class GeoServerSagaHandlerTest {
         "dataStructure", Map.of("properties", properties));
   }
 
-  /** The {@code featureType} object from the captured feature-type POST body. */
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  private Map<String, Object> postedFeatureType() {
-    ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-    verify(mockBuilder, atLeastOnce()).post(captor.capture());
-    for (Entity entity : captor.getAllValues()) {
-      if (entity.getEntity() instanceof Map<?, ?> body && body.get("featureType") instanceof Map) {
-        return (Map<String, Object>) ((Map<String, Object>) body).get("featureType");
-      }
-    }
-    throw new AssertionError("no featureType POST captured");
+  /** The {@code featureType} object from a captured feature-type POST/PUT body. */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> postedFeatureType(RecordedRequest request) {
+    Map<String, Object> body = requestBodyAsMap(request);
+    return (Map<String, Object>) body.get("featureType");
   }
 
-  /** Mocks a 200 {@code featuretypes.json} response listing the given feature type names. */
-  private static Response snapshotResponse(String... names) {
-    List<Map<String, Object>> featureTypes = new java.util.ArrayList<>();
+  /** A 200 {@code featuretypes.json} response listing the given feature type names. */
+  private static MockResponse snapshotResponse(String... names) {
+    List<Map<String, Object>> featureTypes = new ArrayList<>();
     for (String name : names) {
       featureTypes.add(Map.of("name", name));
     }
-    Response response = mock(Response.class);
-    when(response.getStatus()).thenReturn(200);
-    when(response.readEntity(Map.class))
-        .thenReturn(Map.of("featureTypes", Map.of("featureType", featureTypes)));
-    return response;
+    return jsonResponse(200, Map.of("featureTypes", Map.of("featureType", featureTypes)));
   }
 
-  /** Stubs the layer GET that {@code assignLayerStyles} reads back to verify the styles applied. */
-  private void stubLayerReadback(Map<String, Object> layer) {
-    Response readback = mock(Response.class);
-    when(readback.getStatus()).thenReturn(200);
-    when(readback.readEntity(Map.class)).thenReturn(Map.of("layer", layer));
-    when(mockBuilder.get()).thenReturn(readback);
+  private static MockResponse jsonResponse(int code, Map<String, Object> body) {
+    try {
+      return new MockResponse.Builder()
+          .code(code)
+          .body(PayloadConverter.objectMapper().writeValueAsString(body))
+          .build();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
-  /** All REST path segments the handler requested, in call order. */
-  private List<String> capturedPaths() {
-    ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-    verify(mockTarget, atLeastOnce()).path(captor.capture());
-    return captor.getAllValues();
+  /**
+   * The 200 {@code featuretypes.json} response for a workspace that serves no feature type:
+   * GeoServer answers an empty collection with an empty string, not an empty object.
+   */
+  private static MockResponse emptySnapshotResponse() {
+    return jsonResponse(200, Map.of("featureTypes", ""));
   }
 
-  /** True if any POST body carried the SLD content type (i.e. a style upload happened). */
-  @SuppressWarnings("rawtypes")
-  private boolean postedSldContentType() {
-    ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-    verify(mockBuilder, atLeastOnce()).post(captor.capture());
-    return captor.getAllValues().stream()
-        .anyMatch(entity -> SLD_CONTENT_TYPE.equals(entity.getMediaType().toString()));
+  /** A 200 {@code featuretypes.json} response whose {@code featureTypes} has an odd shape. */
+  private static MockResponse unexpectedShapeSnapshotResponse() {
+    return jsonResponse(200, Map.of("featureTypes", List.of("t1")));
   }
 
-  /** The {@code layer} object from the last layer-assignment PUT body. */
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  private Map<String, Object> capturedLayerPutBody() {
-    ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-    verify(mockBuilder, atLeastOnce()).put(captor.capture());
-    List<Entity> puts = captor.getAllValues();
-    Map<String, Object> body = (Map<String, Object>) puts.get(puts.size() - 1).getEntity();
-    return (Map<String, Object>) body.get("layer");
+  /** A 200 {@code featuretypes.json} response whose {@code featureType} is not a list. */
+  private static MockResponse unexpectedEntryShapeSnapshotResponse() {
+    return jsonResponse(200, Map.of("featureTypes", Map.of("featureType", Map.of("name", "t1"))));
+  }
+
+  private static MockResponse created() {
+    return new MockResponse.Builder().code(201).build();
+  }
+
+  private static MockResponse ok() {
+    return new MockResponse.Builder().code(200).build();
   }
 
   @SuppressWarnings("unchecked")
@@ -1864,14 +1829,33 @@ class GeoServerSagaHandlerTest {
     return (Map<String, Object>) value;
   }
 
+  /** Drains every recorded request so far and asserts none of them was a DELETE. */
+  private void assertNoDeleteRequests() {
+    int count = server.getRequestCount();
+    for (int i = 0; i < count; i++) {
+      try {
+        assertFalse("DELETE".equals(server.takeRequest().getMethod()));
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  private static Map<String, Object> requestBodyAsMap(RecordedRequest request) {
+    try {
+      return PayloadConverter.readMap(request.getBody().toByteArray());
+    } catch (IOException e) {
+      throw new java.io.UncheckedIOException(e);
+    }
+  }
+
   /**
-   * The value of a connection parameter (e.g. {@code schema}) from the last datastore POST body.
+   * The value of a connection parameter (e.g. {@code schema}) from a captured datastore POST/PUT
+   * body.
    */
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  private String datastoreConnectionParam(String key) {
-    ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-    verify(mockBuilder, atLeastOnce()).post(captor.capture());
-    Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+  @SuppressWarnings("unchecked")
+  private static String datastoreConnectionParam(RecordedRequest request, String key) {
+    Map<String, Object> body = requestBodyAsMap(request);
     Map<String, Object> dataStore = (Map<String, Object>) body.get("dataStore");
     Map<String, Object> connectionParameters =
         (Map<String, Object>) dataStore.get("connectionParameters");
