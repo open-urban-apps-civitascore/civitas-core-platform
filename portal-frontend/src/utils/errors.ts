@@ -37,13 +37,6 @@ export const isDatapoolScopeViolationError = (error: unknown) => {
   return !!problem && hasErrorType(problem, 'DATASOURCE_SCOPE_VIOLATION')
 }
 
-export const isResourceInUseError = (error: unknown) => {
-  if (!isAxiosError(error)) return false
-  if (error.status !== 409 || !error.response) return false
-  const apiError = error.response.data as ApiError
-  return typeof apiError?.type === 'string' && apiError.type.endsWith('RESOURCE_IN_USE')
-}
-
 export const isTableNameConflictError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
   if (!problem || !hasErrorType(problem, 'UNIQUE_CONSTRAINT_VIOLATION')) return false

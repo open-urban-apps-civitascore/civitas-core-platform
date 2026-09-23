@@ -93,36 +93,6 @@ describe('isDatapoolScopeViolationError', () => {
   })
 })
 
-describe('isResourceInUseError', () => {
-  it('returns true for a 409 error carrying the RESOURCE_IN_USE type', () => {
-    const error = mockApiError(
-      409,
-      'Cannot unrelease DataSource because it is referenced by a Pipeline.',
-      'urn:civitas:error:RESOURCE_IN_USE',
-    )
-    expect(isResourceInUseError(error)).toBe(true)
-  })
-
-  it('returns false for a 409 error with a different error type', () => {
-    const error = mockApiError(409, 'Group with name "x" already exists', 'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION')
-    expect(isResourceInUseError(error)).toBe(false)
-  })
-
-  it('returns false for a 409 error without a type field', () => {
-    const error = mockApiError(409, 'Conflict')
-    expect(isResourceInUseError(error)).toBe(false)
-  })
-
-  it('returns false for non-409 status codes', () => {
-    const error = mockApiError(400, 'Bad request', 'urn:civitas:error:RESOURCE_IN_USE')
-    expect(isResourceInUseError(error)).toBe(false)
-  })
-
-  it('returns false for non-axios errors', () => {
-    expect(isResourceInUseError(new Error('plain error'))).toBe(false)
-  })
-})
-
 const TABLE_NAME_CONFLICT_ON_CREATE =
   "Another POSTGIS DataSink of this dataset already uses tableName 'shared_table'; they would share one physical table"
 
@@ -236,6 +206,15 @@ describe('isResourceInUseError', () => {
 
   it('returns true when a data sink is still referenced by layers', () => {
     const error = mockApiError(409, 'DataSink is referenced by one or more Layers', RESOURCE_IN_USE)
+    expect(isResourceInUseError(error)).toBe(true)
+  })
+
+  it('returns true when a data source unrelease is refused because a pipeline reads from it', () => {
+    const error = mockApiError(
+      409,
+      'Cannot unrelease DataSource because it is referenced by a Pipeline.',
+      RESOURCE_IN_USE,
+    )
     expect(isResourceInUseError(error)).toBe(true)
   })
 
