@@ -112,6 +112,6 @@ describe('the ThingTree structure', () => {
       .find(attribute => attribute.name === 'location')
 
     // A geometry is not a string: reading it as one would change the document on the next save.
-    expect(typeof location?.type).toBe('object')
+    expect(location?.type).toBe('Json')
   })
 })

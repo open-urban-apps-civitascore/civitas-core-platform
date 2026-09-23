@@ -62,9 +62,6 @@ const primitiveFor = (type: string, format: string | null): UMLType | null => {
   return 'String'
 }
 
-/** What an opaque JSON value is called in the diagram; UML has no type for one. */
-const OPAQUE_TYPE_NAME = 'Json'
-
 const GEOJSON_REF = new RegExp(`^${GEOJSON_REF_BASE}/([A-Za-z]+)\\.json$`)
 
 export interface ImportOptions {
@@ -282,10 +279,9 @@ const typeOf = (schema: JsonSchemaObject, propertyName: string): UMLType => {
   if (type === 'object') {
     // An object that declares properties was lifted into the library before the walk, so anything
     // still inline here is a free JSON value — a geometry, a measurement's quality, an entity's
-    // own bag. The export
-    // writes the same for a class reference it cannot resolve, so this reads back as an opaque
-    // type rather than as text, and a re-export gives the document it came from.
-    return { id: crypto.randomUUID(), name: OPAQUE_TYPE_NAME, isExternal: true }
+    // own bag. The export writes Json as exactly this, so a re-export gives the document it came
+    // from.
+    return 'Json'
   }
   const primitive = primitiveFor(type, asString(schema.format))
   if (!primitive) {
