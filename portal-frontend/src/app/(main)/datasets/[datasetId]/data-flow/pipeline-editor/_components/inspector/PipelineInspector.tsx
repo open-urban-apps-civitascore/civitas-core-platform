@@ -10,7 +10,7 @@
  *
  */
 
-import { Lock } from 'lucide-react'
+import { Link, Lock } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
@@ -44,15 +44,17 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
   const { isReadOnly } = useReadOnly()
 
   const lockReason = selectedNode ? getSinkLockReason(selectedNode) : null
+  // An inUseByLayer sink stays editable; only its data structure is frozen, handled in its panel.
+  const isProvisioned = lockReason === 'provisioned'
 
   const handleNodeUpdate = useCallback(
     (data: Partial<PipelineNodeData>) => {
-      if (isReadOnly || lockReason) return
+      if (isReadOnly || isProvisioned) return
       if (selectedNode) {
         updateNode(selectedNode.id, data)
       }
     },
-    [isReadOnly, lockReason, selectedNode, updateNode],
+    [isReadOnly, isProvisioned, selectedNode, updateNode],
   )
 
   // Render the appropriate panel by looking up the node's registry definition.
@@ -66,16 +68,24 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
     const { InspectorPanel, isPanelReadonly } = def
     const panel = <InspectorPanel data={selectedNode.data} onUpdate={handleNodeUpdate} />
 
-    // Editable panels are dimmed and non-interactive in read-only mode and for a locked sink.
-    const isLocked = !isPanelReadonly && (isReadOnly || lockReason !== null)
+    // Editable panels are dimmed and non-interactive in read-only mode and for a provisioned sink.
+    const isLocked = !isPanelReadonly && (isReadOnly || isProvisioned)
 
     return (
       <>
-        {lockReason && (
+        {lockReason === 'provisioned' && (
           <InspectorNotice
             icon={Lock}
-            title={t(`sink.locked.${lockReason}.title`)}
-            description={t(`sink.locked.${lockReason}.description`)}
+            variant="card"
+            title={t('sink.locked.provisioned.title')}
+            description={t('sink.locked.provisioned.description')}
+          />
+        )}
+        {lockReason === 'inUseByLayer' && (
+          <InspectorNotice
+            icon={Link}
+            title={t('sink.locked.inUseByLayer.title')}
+            tooltip={t('sink.locked.inUseByLayer.tooltip')}
           />
         )}
         {isLocked ? (

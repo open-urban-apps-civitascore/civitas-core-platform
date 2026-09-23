@@ -12,12 +12,13 @@ import type { PipelineNode } from '../_types/pipeline'
 
 export interface DataSinkLocks {
   provisioned: boolean
+  inUseByLayer: boolean
 }
 
-const UNLOCKED: DataSinkLocks = { provisioned: false }
+const UNLOCKED: DataSinkLocks = { provisioned: false, inUseByLayer: false }
 
 /** Why a sink node must not be deleted. */
-export type SinkLockReason = 'provisioned'
+export type SinkLockReason = 'provisioned' | 'inUseByLayer'
 
 export interface DataSinkLocksLookup {
   /** Locks of the sink with this backend id; everything false when the id is unknown. */
@@ -32,7 +33,7 @@ export const useDataSinkLocks = (): DataSinkLocksLookup => {
   const locksById = useMemo(() => {
     const map = new Map<string, DataSinkLocks>()
     for (const sink of data?.data ?? []) {
-      map.set(sink.id, { provisioned: sink.provisioned ?? false })
+      map.set(sink.id, { provisioned: sink.provisioned ?? false, inUseByLayer: sink.inUseByLayer ?? false })
     }
     return map
   }, [data?.data])
@@ -42,10 +43,14 @@ export const useDataSinkLocks = (): DataSinkLocksLookup => {
     [locksById],
   )
 
+  // `provisioned` wins because it is the stricter lock.
   const getSinkLockReason = useCallback(
     (node: PipelineNode): SinkLockReason | null => {
       if (!isFrostNodeData(node.data) && !isGeoPersistenceNodeData(node.data)) return null
-      return getSinkLocks(node.data.entityId).provisioned ? 'provisioned' : null
+      const locks = getSinkLocks(node.data.entityId)
+      if (locks.provisioned) return 'provisioned'
+      if (locks.inUseByLayer) return 'inUseByLayer'
+      return null
     },
     [getSinkLocks],
   )

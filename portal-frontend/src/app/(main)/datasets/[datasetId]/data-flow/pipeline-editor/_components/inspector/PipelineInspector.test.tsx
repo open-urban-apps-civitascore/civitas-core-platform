@@ -49,7 +49,10 @@ const renderInspector = (lockReason: SinkLockReason | null, updateNode = vi.fn()
     validationResult: null,
     getSinkLockReason: () => lockReason,
     pipelineUsingTableName: () => null,
-    getSinkLocks: () => ({ provisioned: lockReason === 'provisioned' }),
+    getSinkLocks: () => ({
+      provisioned: lockReason === 'provisioned',
+      inUseByLayer: lockReason === 'inUseByLayer',
+    }),
   } as unknown as ActivePipelineContextValue
 
   render(
@@ -84,5 +87,27 @@ describe('PipelineInspector', () => {
     await userEvent.type(screen.getByLabelText('geoPersistencePanel.tableName'), 'x')
 
     expect(updateNode).not.toHaveBeenCalled()
+  })
+
+  it('labels a layer-published sink without a description', () => {
+    renderInspector('inUseByLayer')
+
+    expect(screen.getByText('sink.locked.inUseByLayer.title')).toBeInTheDocument()
+    expect(screen.queryByText('sink.locked.provisioned.description')).not.toBeInTheDocument()
+  })
+
+  it('keeps a layer-published sink editable', async () => {
+    const updateNode = vi.fn()
+    renderInspector('inUseByLayer', updateNode)
+
+    await userEvent.type(screen.getByLabelText('geoPersistencePanel.tableName'), 'x')
+
+    expect(updateNode).toHaveBeenCalled()
+  })
+
+  it('freezes the data structure of a layer-published sink', () => {
+    renderInspector('inUseByLayer')
+
+    expect(screen.getByRole('button', { name: 'geoPersistencePanel.importDataStructure' })).toBeDisabled()
   })
 })

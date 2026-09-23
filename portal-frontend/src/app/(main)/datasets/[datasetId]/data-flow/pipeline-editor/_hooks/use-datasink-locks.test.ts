@@ -46,22 +46,23 @@ describe('useDataSinkLocks', () => {
     vi.clearAllMocks()
   })
 
-  it('reads the flags of a saved sink', () => {
-    mockDataSinks([{ id: 'sink-1', provisioned: true }])
+  it('reads the locks of a saved sink', () => {
+    mockDataSinks([{ id: 'sink-1', provisioned: true, inUseByLayer: true }])
 
     const { result } = renderHook(() => useDataSinkLocks())
 
-    expect(result.current.getSinkLocks('sink-1')).toEqual({ provisioned: true })
+    expect(result.current.getSinkLocks('sink-1')).toEqual({ provisioned: true, inUseByLayer: true })
   })
 
   it('treats a missing sink and a missing flag as unlocked', () => {
     mockDataSinks([{ id: 'sink-1' }])
+    const unlocked = { provisioned: false, inUseByLayer: false }
 
     const { result } = renderHook(() => useDataSinkLocks())
 
-    expect(result.current.getSinkLocks('sink-1')).toEqual({ provisioned: false })
-    expect(result.current.getSinkLocks('unknown')).toEqual({ provisioned: false })
-    expect(result.current.getSinkLocks(undefined)).toEqual({ provisioned: false })
+    expect(result.current.getSinkLocks('sink-1')).toEqual(unlocked)
+    expect(result.current.getSinkLocks('unknown')).toEqual(unlocked)
+    expect(result.current.getSinkLocks(undefined)).toEqual(unlocked)
   })
 
   it('locks a provisioned sink node', () => {
@@ -72,8 +73,24 @@ describe('useDataSinkLocks', () => {
     expect(result.current.getSinkLockReason(makeSinkNode('sink-1'))).toBe('provisioned')
   })
 
-  it('leaves an unprovisioned sink node unlocked', () => {
-    mockDataSinks([{ id: 'sink-1', provisioned: false }])
+  it('locks a layer-published sink node', () => {
+    mockDataSinks([{ id: 'sink-1', inUseByLayer: true }])
+
+    const { result } = renderHook(() => useDataSinkLocks())
+
+    expect(result.current.getSinkLockReason(makeSinkNode('sink-1'))).toBe('inUseByLayer')
+  })
+
+  it('reports the stricter provisioned lock when both apply', () => {
+    mockDataSinks([{ id: 'sink-1', provisioned: true, inUseByLayer: true }])
+
+    const { result } = renderHook(() => useDataSinkLocks())
+
+    expect(result.current.getSinkLockReason(makeSinkNode('sink-1'))).toBe('provisioned')
+  })
+
+  it('leaves an unlocked sink node unlocked', () => {
+    mockDataSinks([{ id: 'sink-1', provisioned: false, inUseByLayer: false }])
 
     const { result } = renderHook(() => useDataSinkLocks())
 

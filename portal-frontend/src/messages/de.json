@@ -1239,6 +1239,10 @@
         "provisioned": {
           "title": "Bereitgestellt",
           "description": "Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr bearbeitet oder entfernt werden."
+        },
+        "inUseByLayer": {
+          "title": "In Verwendung",
+          "tooltip": "Dieser Datenspeicher wird von API-Layern verwendet. Zum Bearbeiten oder Entfernen müssen zuerst die Layer-Zuordnungen aufgehoben werden."
         }
       }
     },

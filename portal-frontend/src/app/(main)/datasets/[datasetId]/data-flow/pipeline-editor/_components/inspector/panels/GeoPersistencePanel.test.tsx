@@ -38,7 +38,11 @@ const renderPanel = (
   overrides: Partial<GeoPersistenceNodeData> = {},
   onUpdate: (data: Partial<GeoPersistenceNodeData>) => void = vi.fn(),
 ) => {
-  const contextValue = { selectedNode, pipelineUsingTableName } as unknown as ActivePipelineContextValue
+  const contextValue = {
+    selectedNode,
+    pipelineUsingTableName,
+    getSinkLocks: () => ({ provisioned: false, inUseByLayer: false }),
+  } as unknown as ActivePipelineContextValue
 
   render(
     <QueryClientProvider client={new QueryClient()}>

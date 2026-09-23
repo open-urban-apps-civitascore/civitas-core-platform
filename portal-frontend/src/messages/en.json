@@ -1252,6 +1252,10 @@
         "provisioned": {
           "title": "Provisioned",
           "description": "This data storage has been provisioned and can no longer be edited or removed."
+        },
+        "inUseByLayer": {
+          "title": "In use",
+          "tooltip": "This Data storage is used by API layers. To edit or remove it, the layer assignments must be removed first."
         }
       }
     },
