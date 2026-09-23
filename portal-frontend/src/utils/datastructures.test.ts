@@ -307,6 +307,14 @@ describe('mapDatastructureVersionFormToApiData', () => {
     // later version of a structure must leave this one untouched.
     expect(result.importedStructureUrns).toEqual(imported.map(structure => structure.urn))
   })
+
+  it('keeps the stored pins when the save carries no diagram', () => {
+    const pinned = ['urn:core:platform:civitas:datastructure:frost:ThingTree:0123456789:1.0.0']
+
+    const result = mapDatastructureVersionFormToApiData(createVersionFormData(), null, null, pinned)
+
+    expect(result.importedStructureUrns).toEqual(pinned)
+  })
 })
 
 describe('parseDatastructureVersionFormData', () => {

@@ -316,7 +316,12 @@ export const useDatastructureVersion = ({
           }
         }
       }
-      const payload = mapDatastructureVersionFormToApiData(parsed.data, sessionDiagram, model)
+      const payload = mapDatastructureVersionFormToApiData(
+        parsed.data,
+        sessionDiagram,
+        model,
+        version?.importedStructureUrns ?? [],
+      )
 
       if (isCreateMode) {
         // eslint-disable-next-line unused-imports/no-unused-vars

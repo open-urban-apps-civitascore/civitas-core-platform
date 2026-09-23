@@ -1,5 +1,5 @@
-import { diagramFromJsonSchema, SchemaImportError } from '@/components/uml-modeler/services/jsonSchemaImportService'
 import { versionToSchemaTree } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_components/mapping-editor/schema/versionTree'
+import { diagramFromJsonSchema, SchemaImportError } from '@/components/uml-modeler/services/jsonSchemaImportService'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
 import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { DirtyField } from '@/components/uml-modeler/types/session'
@@ -85,6 +85,7 @@ export const mapDatastructureVersionFormToApiData = (
   version: DatastructureVersionFormData,
   sessionDiagram: UMLDiagram | null,
   model: Record<string, unknown> | null,
+  existingImportedStructureUrns: string[] = [],
 ): DatastructureVersionPutData => {
   return {
     id: version.id,
@@ -96,7 +97,10 @@ export const mapDatastructureVersionFormToApiData = (
     styles: sessionDiagram,
     // Derived from the diagram, like the model document: the import happens there, and this makes
     // the provenance readable without opening the editor.
-    importedStructureUrns: (sessionDiagram?.importedStructures ?? []).map(structure => structure.urn),
+    // A save without a diagram changes no content, so it keeps the pins the version has.
+    importedStructureUrns: sessionDiagram
+      ? (sessionDiagram.importedStructures ?? []).map(structure => structure.urn)
+      : existingImportedStructureUrns,
   }
 }
 

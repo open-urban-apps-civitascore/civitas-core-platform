@@ -120,7 +120,9 @@ class PortStructureGeneratorTest {
         .isEqualTo("#/$defs/Datastream");
     assertThat(defs.path("Datastream").path("properties").path("properties").path("$ref").asText())
         .isEqualTo("#/$defs/DatastreamProperties");
-    assertThat(defs.path("DatastreamProperties").path("properties").path("reference")).isNotNull();
+    JsonNode reference = defs.path("DatastreamProperties").path("properties").path("reference");
+    assertThat(reference.isMissingNode()).isFalse();
+    assertThat(reference.path("x-core-primaryKey").asBoolean()).isTrue();
   }
 
   @Test
