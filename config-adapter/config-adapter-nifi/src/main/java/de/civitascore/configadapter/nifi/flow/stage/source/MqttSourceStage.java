@@ -15,6 +15,7 @@ import static de.civitascore.configadapter.nifi.flow.stage.BindingSupport.trimme
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.SourceType;
@@ -25,12 +26,15 @@ import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
+import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -49,6 +53,12 @@ public final class MqttSourceStage implements SourceStage {
   public static final String MQTT_SSL_CONTEXT_SERVICE = "MQTT SSL Context Service";
 
   private static final String MQTT_SSL_CONTEXT_REFERENCE = "${CS:" + MQTT_SSL_CONTEXT_SERVICE + "}";
+
+  /**
+   * With the 10-character disambiguator the client id is 23 characters, the only client-id length a
+   * broker is required to accept [MQTT-3.1.3-5].
+   */
+  private static final String CLIENT_ID_PREFIX = "civitas-core-";
 
   private static final Set<String> PLAINTEXT_SCHEMES = Set.of("tcp", "ws", "mqtt");
   private static final Set<String> TLS_SCHEMES = Set.of("ssl", "mqtts", "wss");
@@ -110,12 +120,13 @@ public final class MqttSourceStage implements SourceStage {
 
   /**
    * Binds an MQTT datasource to ConsumeMQTT, using the portal's connector field names ({@code
-   * urls}/{@code topics} as lists, {@code user}, {@code client_id}, {@code qos}). Broker URI and
-   * Topic Filter are required — without them ConsumeMQTT would fall back to the fragment's demo
-   * broker/topic and silently consume from the wrong source, so a missing value fails the deploy.
+   * urls}/{@code topics} as lists, {@code user}, {@code qos}). Broker URI and Topic Filter are
+   * required — without them ConsumeMQTT would fall back to the fragment's demo broker/topic and
+   * silently consume from the wrong source, so a missing value fails the deploy.
    */
   @Override
-  public void bind(Datasource source, PlanContext out) throws FatalAdapterException {
+  public void bind(Datasource source, String pipelineId, GraphNode sourceNode, PlanContext out)
+      throws FatalAdapterException {
     Map<String, Object> original = source.getAdditionalProperties();
     Map<String, Object> decrypted = credentials.decrypt(original);
     // NiFi's Broker URI accepts a comma-separated list; Topic Filter is a single filter, so one
@@ -143,7 +154,7 @@ public final class MqttSourceStage implements SourceStage {
       out.putSourceProperty("SSL Context Service", MQTT_SSL_CONTEXT_REFERENCE);
     }
     putIfPresent(out::putSourceProperty, "Username", decrypted.get("user"));
-    putIfPresent(out::putSourceProperty, "Client ID", decrypted.get("client_id"));
+    out.putSourceProperty("Client ID", clientId(pipelineId, sourceNode));
     putIfPresent(out::putSourceProperty, "Quality of Service", decrypted.get("qos"));
     bindProtocolVersion(out, decrypted.get("protocol_version"));
     bindSeconds(out, "Connection Timeout", decrypted.get("connect_timeout"));
@@ -190,6 +201,17 @@ public final class MqttSourceStage implements SourceStage {
     truststore
         .sensitiveProperties()
         .forEach((key, value) -> out.putSensitive(MQTT_SSL_CONTEXT_SERVICE, key, value));
+  }
+
+  /**
+   * Name-based on pipeline and node id, because node ids from API clients and the usecase files are
+   * not UUIDs and repeat across pipelines.
+   */
+  private static String clientId(String pipelineId, GraphNode sourceNode) {
+    UUID name =
+        UUID.nameUUIDFromBytes(
+            (pipelineId + ":" + sourceNode.id()).getBytes(StandardCharsets.UTF_8));
+    return CLIENT_ID_PREFIX + CoreUrn.disambiguatorFor(name);
   }
 
   @Override

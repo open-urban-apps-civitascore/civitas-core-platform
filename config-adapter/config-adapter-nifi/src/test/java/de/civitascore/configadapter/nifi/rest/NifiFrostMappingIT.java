@@ -722,7 +722,6 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.setType("MQTT");
     source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
     source.handleUnknownProperty("topics", List.of(TOPIC));
-    source.handleUnknownProperty("client_id", "civitas-frost-map");
     source.handleUnknownProperty("qos", 1);
 
     deploy("pipeline-frost-map-mqtt-it", graph, source, frostMapping(mappingFields()));
@@ -784,7 +783,6 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.setType("MQTT");
     source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
     source.handleUnknownProperty("topics", List.of(CREATABLE_TOPIC));
-    source.handleUnknownProperty("client_id", "civitas-frost-create");
     source.handleUnknownProperty("qos", 1);
 
     deploy("pipeline-frost-create-mqtt-it", graph, source, frostMapping(fields));
@@ -869,7 +867,6 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.setType("MQTT");
     source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
     source.handleUnknownProperty("topics", List.of(FANOUT_TOPIC));
-    source.handleUnknownProperty("client_id", "civitas-frost-fanout");
     source.handleUnknownProperty("qos", 1);
 
     deploy("pipeline-frost-fanout-it", graph, source, frostMapping(fields));
@@ -915,7 +912,6 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.setType("MQTT");
     source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
     source.handleUnknownProperty("topics", List.of(PARTIAL_TOPIC));
-    source.handleUnknownProperty("client_id", "civitas-frost-partial");
     source.handleUnknownProperty("qos", 1);
 
     deploy("pipeline-frost-partial-it", graph, source, frostMapping(fields));

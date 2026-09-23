@@ -119,7 +119,7 @@ public class FlowDeploymentPlanner {
     }
 
     PlanContext out = new PlanContext();
-    sourceStage.bind(source, out);
+    sourceStage.bind(source, request.pipelineId(), path.source(), out);
     bindSink(sinkStage, sink, out);
 
     String processGroupName = "pipeline-" + request.pipelineId();

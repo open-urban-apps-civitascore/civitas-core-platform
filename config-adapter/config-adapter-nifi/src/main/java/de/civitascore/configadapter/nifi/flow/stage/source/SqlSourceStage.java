@@ -27,6 +27,7 @@ import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
+import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -109,7 +110,8 @@ public final class SqlSourceStage implements SourceStage {
    * mis-built.
    */
   @Override
-  public void bind(Datasource source, PlanContext out) throws FatalAdapterException {
+  public void bind(Datasource source, String pipelineId, GraphNode sourceNode, PlanContext out)
+      throws FatalAdapterException {
     Map<String, Object> original = source.getAdditionalProperties();
     Map<String, Object> decrypted = credentials.decrypt(original);
     rejectUnsupportedSqlFields(decrypted);

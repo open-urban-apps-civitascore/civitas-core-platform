@@ -25,6 +25,7 @@ import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSourceW
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.stretchedKey;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -1094,6 +1095,24 @@ class FlowDeploymentPlannerTest {
           "tcp://Broker.Example:1883?q=1", mqtt.path("properties").path("Broker URI").asText());
       assertTrue(mqtt.path("properties").path("SSL Context Service").isNull());
     }
+  }
+
+  // A planner that handed the stage a constant would give every pipeline of one graph the same id.
+  @Test
+  void mqttClientIdDependsOnThePipelineId() throws Exception {
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      assertNotEquals(
+          consumeMqttClientId(resolver, "p-one"), consumeMqttClientId(resolver, "p-two"));
+    }
+  }
+
+  private String consumeMqttClientId(CredentialResolver resolver, String pipelineId)
+      throws Exception {
+    String snapshot =
+        planner(resolver)
+            .plan(req(pipelineId, graphWithMapping(), mqttSource(null), postgisSink()))
+            .snapshotJson();
+    return processorOfType(snapshot, "ConsumeMQTT").path("properties").path("Client ID").asText();
   }
 
   @Test
