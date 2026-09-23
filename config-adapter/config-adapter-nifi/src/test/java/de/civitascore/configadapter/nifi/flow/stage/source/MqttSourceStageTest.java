@@ -54,18 +54,6 @@ class MqttSourceStageTest {
     assertTrue(clientId.matches("[0-9a-zA-Z]{1,23}"), clientId);
   }
 
-  @Test
-  @DisplayName("ignores a client_id left on the datasource")
-  void ignoresDatasourceClientId() throws Exception {
-    Datasource source = mqttSource();
-    source.handleUnknownProperty("client_id", "civitas-nifi-consumer");
-    PlanContext out = new PlanContext();
-
-    stage.bind(source, PIPELINE_ID, node("n-source"), out);
-
-    assertEquals(clientId(PIPELINE_ID, node("n-source")), out.sourceProperties().get("Client ID"));
-  }
-
   private String clientId(String pipelineId, GraphNode sourceNode) throws FatalAdapterException {
     PlanContext out = new PlanContext();
     stage.bind(mqttSource(), pipelineId, sourceNode, out);

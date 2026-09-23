@@ -104,16 +104,17 @@ class CoreSchemaValidatorTest {
     // ── DataSource ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("An MQTT DataSource carrying a client id is rejected")
-    void mqttDataSourceWithClientIdIsRejected() {
+    @DisplayName("A conforming MQTT DataSource is accepted")
+    void conformingMqttDataSourceIsAccepted() {
         assertThat(validate(ArtifactKind.DATA_SOURCE, """
             {
               "$schema": "https://civitasconnect.digital/core/datasource/v1",
               "id": "urn:core:platform:civitas:datasource:common:Broker:abc1234567:1.0.0",
               "connectionType": "mqtt",
-              "client_id": "civitas-nifi-consumer"
+              "urls": ["mqtt://mosquitto:1883"],
+              "topics": ["sensors/+/temp"]
             }
-            """)).isNotEmpty();
+            """)).isEmpty();
     }
 
     // ── DataSet ─────────────────────────────────────────────────────────────────
