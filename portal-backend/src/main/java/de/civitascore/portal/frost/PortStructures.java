@@ -4,6 +4,7 @@ import de.civitascore.portal.frost.PortStructureModel.PortStructure;
 import de.civitascore.portal.model.datasink.FrostSinkPort;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +36,8 @@ public class PortStructures {
     for (PortStructure structure : PortStructureCatalog.all()) {
       loaded.put(structure.port(), read(objectMapper, structure));
     }
-    byPort = Map.copyOf(loaded);
+    // Unmodifiable, and in catalog order: ports() answers the labels in the order they are offered.
+    byPort = Collections.unmodifiableMap(loaded);
   }
 
   /** The model document of a port, or empty when the label names no port. */
