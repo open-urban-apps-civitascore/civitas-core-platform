@@ -315,3 +315,42 @@ describe('importFromJsonSchema', () => {
     expect(() => importFromJsonSchema(dangling)).toThrow(/inherits from outside/)
   })
 })
+
+describe('importFromJsonSchema — designated root and inherited shapes', () => {
+  it('takes a wrapper that names its member by URN as the root, without a class of its own', () => {
+    const urn = 'urn:core:platform:civitas:element:frost:Thing:0123456789:1.0.0'
+    const document: JsonSchemaObject = {
+      type: 'object',
+      title: 'Wrapper',
+      properties: { root: { $ref: urn } },
+      $defs: { Thing: { $id: urn, type: 'object', title: 'Thing', properties: { name: { type: 'string' } } } },
+    }
+
+    const imported = importFromJsonSchema(document)
+
+    expect(imported.nodes.map(n => n.data.element.name)).toEqual(['Thing'])
+    expect(imported.nodes[0].data.element.isRoot).toBe(true)
+  })
+
+  it('lifts an inline object from the own shape of a class that inherits', () => {
+    const document: JsonSchemaObject = {
+      $ref: '#/$defs/Station',
+      $defs: {
+        Base: { type: 'object', title: 'Base', properties: { name: { type: 'string' } } },
+        Station: {
+          type: 'object',
+          title: 'Station',
+          allOf: [
+            { $ref: '#/$defs/Base' },
+            { type: 'object', properties: { position: { type: 'object', properties: { lat: { type: 'number' } } } } },
+          ],
+        },
+      },
+    }
+
+    const imported = importFromJsonSchema(document)
+
+    expect(imported.nodes.map(n => n.data.element.name)).toContain('StationPosition')
+    expect(imported.edges.map(edge => edge.type).sort()).toEqual(['composition', 'inheritance'])
+  })
+})
