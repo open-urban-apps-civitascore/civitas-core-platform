@@ -528,6 +528,11 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
       )
       const port = staMappingIds.get(node.id)
       const isMeasurementPort = port === 'Observations'
+      if (isMeasurementPort && (keys.observationBag === undefined || keys.observation === undefined)) {
+        // Saved before the Observation vocabulary existed: re-saving derives it.
+        errors.push(errorAt(node, 'validation.messages.mappingNotSaved', { label }))
+        return
+      }
       const allowed = isMeasurementPort
         ? new Set([...STA_OBSERVATION_FIXED_TARGET_PATHS, ...keys.observationBag])
         : new Set([...STA_FIXED_TARGET_PATHS, ...keys.thingBag, ...keys.datastreamBag])
