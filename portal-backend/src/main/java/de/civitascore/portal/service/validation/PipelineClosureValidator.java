@@ -82,7 +82,7 @@ public class PipelineClosureValidator {
   }
 
   /**
-   * Whether this flow blocks a release. The reply names only the Pipeline; WARN logs give detail.
+   * Whether this flow blocks a release. The reply names only the Pipeline; the log gives detail.
    */
   private boolean flowBlocks(Pipeline pipeline, Map<UUID, Boolean> structureReadability) {
     ModelRegistryGateway.ArtifactClosure closure =
@@ -120,15 +120,15 @@ public class PipelineClosureValidator {
   }
 
   /**
-   * Whether a Data source of this flow blocks a release. The status is a field of an entity the
-   * caller put on the Pipeline, so no permission on the Data source is required to read it: the
-   * picker endpoint already discloses id and name under DATASET_UPDATE.
+   * Whether a Data source of this flow blocks a release. No permission on the Data source is
+   * required: saving the Pipeline authorized the reference through the Use relationship, and the
+   * reply discloses nothing about the Data source.
    */
   private boolean dataSourcesBlock(Pipeline pipeline) {
     boolean blocks = false;
     for (DataSource dataSource : pipeline.getDataSources()) {
       if (dataSource.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
-        log.warn(
+        log.info(
             "Closure validation: data source {} reached by pipeline {} is still a draft",
             dataSource.getId(),
             pipeline.getId());
@@ -161,7 +161,7 @@ public class PipelineClosureValidator {
       return true;
     }
     if (readable.stream().noneMatch(PipelineClosureValidator::isReleased)) {
-      log.warn(
+      log.info(
           "Closure validation: {} reached by pipeline {} is still a draft",
           Encode.forJava(urn),
           pipelineId);

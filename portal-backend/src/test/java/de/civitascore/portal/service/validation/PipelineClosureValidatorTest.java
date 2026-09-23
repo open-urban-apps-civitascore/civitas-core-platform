@@ -385,7 +385,7 @@ class PipelineClosureValidatorTest {
   @DisplayName("withholding what the caller may not know")
   class Withholding {
 
-    private List<ILoggingEvent> captureWarnings(Runnable validation) {
+    private List<ILoggingEvent> captureLogsAt(Level level, Runnable validation) {
       Logger logger = (Logger) LoggerFactory.getLogger(PipelineClosureValidator.class);
       ListAppender<ILoggingEvent> appender = new ListAppender<>();
       appender.start();
@@ -395,7 +395,7 @@ class PipelineClosureValidatorTest {
       } finally {
         logger.detachAppender(appender);
       }
-      return appender.list.stream().filter(event -> event.getLevel() == Level.WARN).toList();
+      return appender.list.stream().filter(event -> event.getLevel() == level).toList();
     }
 
     @Test
@@ -485,20 +485,21 @@ class PipelineClosureValidatorTest {
     }
 
     @Test
-    @DisplayName("a draft data source is identified in the warning log")
-    void draftDataSourceIsIdentifiedInTheWarningLog() {
+    @DisplayName("a draft data source is identified in the log at INFO")
+    void draftDataSourceIsIdentifiedInTheInfoLog() {
       DataSource dataSource = dataSource(DataSourceStatus.DRAFT);
       Pipeline pipeline = pipeline(pipelineId, PIPELINE_URN);
       pipeline.setDataSources(Set.of(dataSource));
       closureOf(PIPELINE_URN, Set.of(), Set.of());
 
-      List<ILoggingEvent> warnings =
-          captureWarnings(
+      List<ILoggingEvent> infos =
+          captureLogsAt(
+              Level.INFO,
               () ->
                   assertThatThrownBy(() -> validator().validate(List.of(pipeline)))
                       .isInstanceOf(PipelineClosureValidationException.class));
 
-      assertThat(warnings)
+      assertThat(infos)
           .extracting(ILoggingEvent::getFormattedMessage)
           .anyMatch(
               message ->
