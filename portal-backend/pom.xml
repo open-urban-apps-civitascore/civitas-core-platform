@@ -54,6 +54,9 @@
              -Dmodel-forge.version so the backend builds against its own branch's Model Forge. -->
         <model-forge.version>0.1.0-SNAPSHOT</model-forge.version>
         <archunit.version>1.4.2</archunit.version>
+        <!-- Drop once the Spring Boot parent manages Tomcat >= 11.0.25: Boot 4.1.1 pins 11.0.24,
+             affected by GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6 and GHSA-h3x4-894j-xpx5. -->
+        <tomcat.version>11.0.26</tomcat.version>
     </properties>
 
     <dependencyManagement>
@@ -68,6 +71,15 @@
                 <groupId>at.yawk.lz4</groupId>
                 <artifactId>lz4-java</artifactId>
                 <version>${at.yawk.lz4.version}</version>
+            </dependency>
+            <!--
+                Drop once Apache Jena ships libthrift >= 0.24.0 on its 5.x line: jena-arq 5.6.0
+                pins 0.22.0, affected by GHSA-7pwc-h2j2-rjgj and GHSA-8wv5-x4w7-5gww.
+            -->
+            <dependency>
+                <groupId>org.apache.thrift</groupId>
+                <artifactId>libthrift</artifactId>
+                <version>0.24.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

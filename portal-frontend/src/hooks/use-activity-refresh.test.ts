@@ -1,5 +1,5 @@
 import { renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest'
 
 const { signOut, update, getMockSession, setMockSession } = vi.hoisted(() => {
   let mockSession: object | null = null
@@ -24,8 +24,8 @@ const ACTIVITY_DEBOUNCE_MS = 2 * 60 * 1000 // 2 minutes
 const INACTIVITY_TIMEOUT_MS = 55 * 60 * 1000 // 55 minutes (default)
 
 describe('useActivityRefresh', () => {
-  let addEventListenerSpy: ReturnType<typeof vi.spyOn>
-  let removeEventListenerSpy: ReturnType<typeof vi.spyOn>
+  let addEventListenerSpy: MockInstance<typeof document.addEventListener>
+  let removeEventListenerSpy: MockInstance<typeof document.removeEventListener>
 
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: false })

@@ -15,9 +15,16 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -36,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
@@ -81,6 +89,13 @@ class PipelineClosureValidatorTest {
     pipeline.setId(id);
     pipeline.setModelUrn(modelUrn);
     return pipeline;
+  }
+
+  private static DataSource dataSource(DataSourceStatus status) {
+    DataSource dataSource = new DataSource();
+    dataSource.setId(UUID.randomUUID());
+    dataSource.setDataSourceStatus(status);
+    return dataSource;
   }
 
   /** What the registry reports for a flow: everything it reaches, and what it no longer holds. */
@@ -178,6 +193,19 @@ class PipelineClosureValidatorTest {
     }
 
     @Test
+    @DisplayName("reads no Assignment to judge a data source, whatever its status")
+    void dataSourceStatusNeedsNoAuthorization() {
+      Pipeline pipeline = pipeline(pipelineId, PIPELINE_URN);
+      pipeline.setDataSources(Set.of(dataSource(DataSourceStatus.DRAFT)));
+      closureOf(PIPELINE_URN, Set.of(), Set.of());
+
+      assertThatThrownBy(() -> validator().validate(List.of(pipeline)))
+          .isInstanceOf(PipelineClosureValidationException.class);
+
+      verify(scopeAccessAuthorizer, never()).authorizeReferences(eq(ScopeType.DATASOURCE), any());
+    }
+
+    @Test
     @DisplayName("skips a pipeline whose flow has not been authored yet")
     void skipsPipelineWithoutAModel() {
       validator().validate(List.of(pipeline(pipelineId, null)));
@@ -250,6 +278,32 @@ class PipelineClosureValidatorTest {
 
       assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
           .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("a data source still in draft blocks the flow")
+    void aDraftDataSourceBlocks() {
+      DataSource dataSource = dataSource(DataSourceStatus.DRAFT);
+      dataSource.setName("withheld-source-name");
+      Pipeline pipeline = pipeline(pipelineId, PIPELINE_URN);
+      pipeline.setDataSources(Set.of(dataSource));
+      closureOf(PIPELINE_URN, Set.of(), Set.of());
+
+      assertThatThrownBy(() -> validator().validate(List.of(pipeline)))
+          .isInstanceOf(PipelineClosureValidationException.class)
+          .hasMessageNotContaining(dataSource.getId().toString())
+          .hasMessageNotContaining(dataSource.getName())
+          .satisfies(thrown -> assertThat(blockedPipelinesOf(thrown)).containsExactly(pipelineId));
+    }
+
+    @Test
+    @DisplayName("a released data source passes")
+    void anAvailableDataSourcePasses() {
+      Pipeline pipeline = pipeline(pipelineId, PIPELINE_URN);
+      pipeline.setDataSources(Set.of(dataSource(DataSourceStatus.AVAILABLE)));
+      closureOf(PIPELINE_URN, Set.of(), Set.of());
+
+      assertThatCode(() -> validator().validate(List.of(pipeline))).doesNotThrowAnyException();
     }
 
     @Test
@@ -330,6 +384,19 @@ class PipelineClosureValidatorTest {
   @Nested
   @DisplayName("withholding what the caller may not know")
   class Withholding {
+
+    private List<ILoggingEvent> captureLogsAt(Level level, Runnable validation) {
+      Logger logger = (Logger) LoggerFactory.getLogger(PipelineClosureValidator.class);
+      ListAppender<ILoggingEvent> appender = new ListAppender<>();
+      appender.start();
+      logger.addAppender(appender);
+      try {
+        validation.run();
+      } finally {
+        logger.detachAppender(appender);
+      }
+      return appender.list.stream().filter(event -> event.getLevel() == level).toList();
+    }
 
     @Test
     @DisplayName("a withheld artifact is named nowhere in the reply")
@@ -415,6 +482,29 @@ class PipelineClosureValidatorTest {
                   assertThat(blockedPipelinesOf(thrown))
                       .as("a draft reason would confirm the structure exists")
                       .containsExactly(pipelineId));
+    }
+
+    @Test
+    @DisplayName("a draft data source is identified in the log at INFO")
+    void draftDataSourceIsIdentifiedInTheInfoLog() {
+      DataSource dataSource = dataSource(DataSourceStatus.DRAFT);
+      Pipeline pipeline = pipeline(pipelineId, PIPELINE_URN);
+      pipeline.setDataSources(Set.of(dataSource));
+      closureOf(PIPELINE_URN, Set.of(), Set.of());
+
+      List<ILoggingEvent> infos =
+          captureLogsAt(
+              Level.INFO,
+              () ->
+                  assertThatThrownBy(() -> validator().validate(List.of(pipeline)))
+                      .isInstanceOf(PipelineClosureValidationException.class));
+
+      assertThat(infos)
+          .extracting(ILoggingEvent::getFormattedMessage)
+          .anyMatch(
+              message ->
+                  message.contains(dataSource.getId().toString())
+                      && message.contains("still a draft"));
     }
 
     @Test

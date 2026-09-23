@@ -129,6 +129,7 @@ class DataSetControllerIntegrationTest
   private void seedStageRequirements(Pipeline... pipelines) {
     DataSource dataSource = new DataSource();
     dataSource.setName("stage-datasource-" + System.nanoTime());
+    dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
     dataSource = dataSourceRepository.save(dataSource);
     pipelines[0].getDataSources().add(dataSource);
     pipelineRepository.save(pipelines[0]);
@@ -1933,6 +1934,11 @@ class DataSetControllerIntegrationTest
      * the pin resolution and the scope check all run against the real registry.
      */
     private DataSet dataSetReachingStructure(DataStructureVersionStatus versionStatus) {
+      return dataSetReachingStructure(versionStatus, DataSourceStatus.AVAILABLE);
+    }
+
+    private DataSet dataSetReachingStructure(
+        DataStructureVersionStatus versionStatus, DataSourceStatus sourceStatus) {
       DataStructure structure =
           portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
       DataStructureVersion version =
@@ -1944,9 +1950,7 @@ class DataSetControllerIntegrationTest
       DataSource dataSource =
           portalData.attachSourceConfiguration(
               portalData.dataSource(
-                  b ->
-                      b.connectorType(ConnectorType.MQTT)
-                          .dataSourceStatus(DataSourceStatus.AVAILABLE)),
+                  b -> b.connectorType(ConnectorType.MQTT).dataSourceStatus(sourceStatus)),
               Map.of(
                   "urls",
                   List.of("mqtt://mqtt-broker:1883"),
@@ -2025,6 +2029,49 @@ class DataSetControllerIntegrationTest
       assertThat(dataSetRepository.findById(dataSet.getId()).orElseThrow().getDataSetStatus())
           .as("a refused stage leaves the dataset where it was")
           .isEqualTo(DataSetStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Should refuse staging when a referenced data source is still a draft")
+    void shouldRefuseStagingWhenReferencedDataSourceIsDraft() {
+      DataSet dataSet =
+          dataSetReachingStructure(DataStructureVersionStatus.AVAILABLE, DataSourceStatus.DRAFT);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSet.getId() + "/stage",
+              HttpMethod.POST,
+              createAuthHeaders(),
+              null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getProperties())
+          .as("the reply names the pipeline the caller has to repair")
+          .containsKey("offendingPipelineIds");
+      assertThat(dataSetRepository.findById(dataSet.getId()).orElseThrow().getDataSetStatus())
+          .as("a refused stage leaves the dataset where it was")
+          .isEqualTo(DataSetStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Should stage a draft-authored pipeline once its data source is released")
+    void shouldStageWhenReferencedDataSourceIsReleased() {
+      DataSet dataSet =
+          dataSetReachingStructure(
+              DataStructureVersionStatus.AVAILABLE, DataSourceStatus.AVAILABLE);
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSet.getId() + "/stage",
+              HttpMethod.POST,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     }
   }
 
