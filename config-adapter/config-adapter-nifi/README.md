@@ -34,7 +34,7 @@ Any other operation, and any unknown per-pipeline `action`, fails naming the off
 | MQTT (push) | `mqtt` | `STA_ENVELOPE` | Rejected — the source self-triggers on broker messages | Broker URLs, exactly one topic filter |
 | SQL (pull) | `sql`, `postgresql`, `postgres`, `jdbc` | `RECORDS` | Accepted | Table, DSN |
 
-Every MQTT flow connects with its own client id, so flows that share a datasource do not evict each other's broker session. The id is `civitas-core-` plus 10 base36 characters derived from pipeline id and source node id: 23 characters, the same on every deploy of that node.
+Every MQTT flow connects with its own client id, so flows that share a datasource do not evict each other's broker session. The id is `civitascore` plus 10 base36 characters derived from pipeline id and source node id: 21 alphanumeric characters, which every MQTT broker must accept, and the same on every deploy of that node.
 
 A TLS MQTT broker is supported: the flow mints an SSL context service over the truststore that `nifi.mqtt.truststore.*` names — the JVM's own trust store by default, which carries the public root CAs, so a publicly trusted broker certificate needs no configuration. A store with a real password is opened through a deployment-owned Parameter Context the flow declares but never carries a value for; a well-known one (the JDK's `changeit`) through a literal pushed onto the controller service after upload. A SQL source re-reads the whole table on every run and tracks no high-water column, on an explicit cron or the source fragment's built-in schedule.
 

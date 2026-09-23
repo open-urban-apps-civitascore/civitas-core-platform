@@ -35,7 +35,7 @@ class MqttSourceStageTest {
   @Test
   @DisplayName("gives the same client id on every deploy of a source node")
   void clientIdIsStable() throws Exception {
-    assertEquals("civitas-core-78hgpj3wk2", clientId(PIPELINE_ID, node("n-source")));
+    assertEquals("civitascore78hgpj3wk2", clientId(PIPELINE_ID, node("n-source")));
   }
 
   @Test
@@ -47,12 +47,11 @@ class MqttSourceStageTest {
   }
 
   @Test
-  @DisplayName("gives a client id of the length every broker must accept")
-  void clientIdHasBrokerSafeLength() throws Exception {
+  @DisplayName("gives a client id every broker must accept")
+  void clientIdIsBrokerSafe() throws Exception {
     String clientId = clientId(PIPELINE_ID, node("n-source"));
 
-    assertTrue(clientId.startsWith("civitas-core-"), clientId);
-    assertEquals(23, clientId.length(), clientId);
+    assertTrue(clientId.matches("[0-9a-zA-Z]{1,23}"), clientId);
   }
 
   @Test
