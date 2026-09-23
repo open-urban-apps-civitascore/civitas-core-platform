@@ -90,6 +90,18 @@ describe('mergeStructureIntoDiagram', () => {
     expect(existing.nodes[1].data.element.name).toBe('Thing')
   })
 
+  it('keeps the field name of a renamed part', () => {
+    // The part is held under 'detail'. The export derives a missing role from the class name, and
+    // after the rename it would write 'detail_1' — a field the structure does not declare.
+    const existing = diagram([clazz('e1', 'Dataset', true), clazz('e2', 'Detail')])
+
+    const result = mergeStructureIntoDiagram(existing, published('Thing', ['Detail']), source('Thing'))
+
+    const detail = result.nodes.find(candidate => candidate.data.element.name === 'Detail_1')
+    const holding = result.edges.find(edge => edge.data?.relationship.source === detail?.data.element.id)
+    expect(holding?.data?.relationship.sourceRole).toBe('detail')
+  })
+
   it('renames a class that only normalizes to a taken name', () => {
     // Both forms derive the same Element URN, so the registry would fold them into one member.
     const existing = diagram([clazz('e1', 'Dataset', true), clazz('e2', 'Thing Tree')])

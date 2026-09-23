@@ -61,10 +61,9 @@ export const LoadStandardMenu: React.FC = () => {
     (document: Record<string, unknown>, source: PublishedStructureSummary) => {
       // The version is pinned, not the identity: a later version of the structure must leave a
       // Data structure that took an earlier one untouched.
-      const result = mergeStructureIntoDiagram(diagram, document, {
-        urn: source.urn ?? '',
-        name: source.name,
-      })
+      // The menu offers only published structures. A pin without a version would name nothing.
+      if (!source.urn) throw new Error(`the structure '${source.key}' has no published version`)
+      const result = mergeStructureIntoDiagram(diagram, document, { urn: source.urn, name: source.name })
       // One action. The provider recomputes every dispatch from the diagram of the current
       // render, so a second one in this handler would drop what the first one added. The root
       // flag needs no call of its own either — it is already on the element the merge answers.
@@ -100,6 +99,11 @@ export const LoadStandardMenu: React.FC = () => {
   )
 
   useEffect(() => {
+    // A failed request ends the selection; otherwise the menu would wait for it forever.
+    if (selected && structure.isError) {
+      setSelected(null)
+      return
+    }
     const document = structure.data?.data
     // Placeholder data is the answer to the previous selection, kept while this one loads. Merging
     // it would put the wrong structure into the diagram.
@@ -119,7 +123,7 @@ export const LoadStandardMenu: React.FC = () => {
       setSelected(null)
       merging.current = null
     }
-  }, [selected, structure.data, structure.isPlaceholderData, merge, t])
+  }, [selected, structure.data, structure.isPlaceholderData, structure.isError, merge, t])
 
   if (isReadOnly) return null
 
@@ -146,6 +150,8 @@ export const LoadStandardMenu: React.FC = () => {
                   <DropdownMenuItem
                     key={candidate.key}
                     className="hover:cursor-pointer"
+                    // A structure that was not published yet has no version to pin.
+                    disabled={!candidate.urn}
                     onSelect={() => setSelected(candidate)}
                   >
                     {candidate.name}

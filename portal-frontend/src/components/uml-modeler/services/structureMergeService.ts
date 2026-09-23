@@ -47,7 +47,7 @@ export const mergeStructureIntoDiagram = (
   source: ImportedStructureRef,
 ): StructureMergeResult => {
   const imported = importFromJsonSchema(document, { origin: originBelow(diagram) })
-  const renamed = renameTakenNames(diagram, imported.nodes)
+  const renamed = renameTakenNames(diagram, imported.nodes, imported.edges)
 
   const existingRoot = resolveRootElement(diagram)
   const loadedRoot = imported.nodes.find(node => node.data.element.id === imported.rootElementId)
@@ -95,7 +95,11 @@ const originBelow = (diagram: UMLDiagram): { x: number; y: number } => {
  * Renames a loaded class whose name the diagram already carries. The suffix follows the one the
  * export uses for a `$defs` key, so a modeller sees the same form in both places.
  */
-const renameTakenNames = (diagram: UMLDiagram, loaded: UMLNode[]): { from: string; to: string }[] => {
+const renameTakenNames = (
+  diagram: UMLDiagram,
+  loaded: UMLNode[],
+  loadedEdges: UMLEdge[],
+): { from: string; to: string }[] => {
   const taken = new Set<string>()
   for (const node of diagram.nodes ?? []) {
     taken.add(toPascalCaseName(node.data.element.name))
@@ -115,9 +119,24 @@ const renameTakenNames = (diagram: UMLDiagram, loaded: UMLNode[]): { from: strin
       element.name = candidate
       node.data.label = candidate
       renamed.push({ from: original, to: candidate })
+      keepFieldNames(loadedEdges, element.id, original)
     }
   }
   return renamed
+}
+
+/**
+ * Pins the field name a renamed part is held under. The import leaves the role out where the field
+ * name follows from the class name, and the export derives it from the name again — after a rename
+ * it would write another field than the document declared.
+ */
+const keepFieldNames = (edges: UMLEdge[], partId: string, originalName: string) => {
+  for (const edge of edges) {
+    const relationship = edge.data?.relationship
+    if (relationship?.type === 'composition' && relationship.source === partId && !relationship.sourceRole) {
+      relationship.sourceRole = originalName.charAt(0).toLowerCase() + originalName.slice(1)
+    }
+  }
 }
 
 /** A composition that makes the loaded structure a part of the element that is already the root. */
