@@ -41,11 +41,11 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * FROST SensorThings sink in one of two modes. <b>Passthrough</b> (no mapping): the source must
- * deliver the STA envelope itself ({@link PayloadForm#STA_ENVELOPE}, MQTT), consumed by two upsert
- * legs ({@code $.things}/{@code $.observations}). <b>Mapped</b> (record mapping present, {@link
- * MappingSupport#ENVELOPE}): any source works — the compiled {@link FrostEntityPlan} drives one
- * linear upsert chain per record (split → capture → Thing → Datastream → Observation).
+ * FROST SensorThings sink. {@code PutFrostRecord} writes every record through the port of the sink,
+ * with a mapping or without one: a Mapping renders the record into the port structure, and without
+ * a Mapping the record must have that structure already. Either way the sink consumes records
+ * ({@link PayloadForm#RECORDS}), so a source that emits raw JSON — MQTT — gets a ConvertRecord in
+ * front of it, and the split hands the processor one JSON object per record.
  */
 public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
@@ -129,20 +129,20 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
   @Override
   public Set<PayloadForm> acceptedInputs(boolean mappedUpstream) {
-    // With a mapping, the entity bodies are rendered from the mapped record's flat fields — any
-    // record-convertible source works (including SQL). Without one, the find-or-create consumes the
-    // source's envelope
-    // as-is ($.things/$.observations): a source emitting plain records would never match SplitJson
-    // and the flow would silently produce nothing, so passthrough demands the envelope itself.
-    return mappedUpstream ? Set.of(PayloadForm.RECORDS) : Set.of(PayloadForm.STA_ENVELOPE);
+    // Records in both modes. The chain splits a record array ($[*]) and PutFrostRecord reads one
+    // JSON object per FlowFile, so a raw MQTT message has to become a record first — accepting
+    // RECORDS is what makes the flow builder put a ConvertRecord in front. Accepting the raw
+    // envelope instead split a JSON object into its member values, and every message reached the
+    // processor as an array it refused.
+    return Set.of(PayloadForm.RECORDS);
   }
 
   @Override
   public String inputRejectionMessage(boolean mappedUpstream) {
-    // Only reachable in passthrough mode: with a mapping every payload form is RECORDS or
-    // convertible, so no rejection can occur.
-    return "FROST sink without a record mapping requires a source that emits the SensorThings"
-        + " envelope (MQTT); add a record mapping or use an MQTT SensorThings source";
+    // Not reachable today: every payload form is RECORDS or convertible to it. Kept precise for the
+    // day a form appears that is neither.
+    return "FROST sink requires records in the structure of its port; add a record mapping, or use"
+        + " a source whose messages already have that structure";
   }
 
   @Override

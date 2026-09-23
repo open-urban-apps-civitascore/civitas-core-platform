@@ -203,6 +203,9 @@ public class FrostMappingCompiler {
     Map<String, StaTarget> targetsByPath = targetsByPath(properties);
     MappingConfig normalizedMapping = normalizeTargetPaths(mapping);
     validate(normalizedMapping, properties, targetsByPath);
+    if (port != SinkPort.OBSERVATIONS) {
+      requirePortReferences(normalizedMapping, port);
+    }
 
     Map<String, String> flatKeyByPath = new LinkedHashMap<>();
     int index = 0;
@@ -245,10 +248,17 @@ public class FrostMappingCompiler {
       Map<String, StaTarget> targetsByPath)
       throws FatalAdapterException {
     return switch (port) {
-      case THINGS ->
-          renderObject(
-              entityTree(
-                  mapping, StaEntity.THING, properties.thing(), flatKeyByPath, targetsByPath));
+      case THINGS -> {
+        // The port writes the Thing and nothing else. Rendering the Thing alone would drop every
+        // other field of the Mapping without an error, so such a Mapping is refused.
+        if (touches(mapping, StaEntity.LOCATION) || touchesDatastreamTier(mapping)) {
+          throw reject(
+              "the Things port writes the Thing only; map Locations, Datastreams and"
+                  + " measurements into the ThingTree port");
+        }
+        yield renderObject(
+            entityTree(mapping, StaEntity.THING, properties.thing(), flatKeyByPath, targetsByPath));
+      }
       case THING_TREE -> renderObject(portTree(mapping, properties, flatKeyByPath, targetsByPath));
       case OBSERVATIONS ->
           // The target vocabulary is rooted at the Thing, so a Mapping cannot address a measurement
@@ -511,6 +521,31 @@ public class FrostMappingCompiler {
               + " into the observation body");
     }
     requireCompleteCreateSet(mapping, StaEntity.FEATURE_OF_INTEREST);
+  }
+
+  /**
+   * The references the port resolves. The processor finds a Thing and a Datastream by {@code
+   * properties.reference}, whatever match key the target structure declares, so a Mapping that does
+   * not write it deploys a flow that refuses every record.
+   */
+  private void requirePortReferences(MappingConfig mapping, SinkPort port)
+      throws FatalAdapterException {
+    List<String> required = new ArrayList<>(port.requiredTargets());
+    if (port == SinkPort.THING_TREE && touchesDatastreamTier(mapping)) {
+      required.add(StaTargetCatalog.keyPath(StaEntity.DATASTREAM, "reference"));
+    }
+    String missing =
+        required.stream()
+            .filter(target -> !mapping.fields().containsKey(target))
+            .collect(Collectors.joining(", "));
+    if (!missing.isEmpty()) {
+      throw reject(
+          "a mapping into the "
+              + port.label()
+              + " port must map: "
+              + missing
+              + " — the port finds the entities by those references");
+    }
   }
 
   /** Every match-key path of the entity must be mapped once the entity is touched at all. */

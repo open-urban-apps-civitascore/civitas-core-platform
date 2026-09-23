@@ -74,6 +74,12 @@ describe('buildDataSinkPayloads — FROST target structure reference', () => {
     expect(frostPayload(p)?.configuration).toEqual({ element: DSV_URN })
   })
 
+  it('sends the selected port with the target structure', () => {
+    const ported: TestNode = { ...frostNode, data: { ...frostNode.data, port: 'Observations' } }
+    const p = pipeline([mappingNode('map-1', DSV_URN), ported], [{ source: 'map-1', target: 'frost-1' }])
+    expect(frostPayload(p)?.configuration).toEqual({ port: 'Observations', element: DSV_URN })
+  })
+
   it('sends an empty configuration for a passthrough pipeline (no mapping)', () => {
     const source: TestNode = {
       id: 'src-1',
