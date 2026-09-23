@@ -5,7 +5,7 @@ import { FormProvider, useForm } from 'react-hook-form'
 
 import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { STATUS_TYPES } from '@/types/common'
-import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
+import { DataSink, DATASINK_TYPES, PROVISIONING_STATUSES } from '@/types/datasinks'
 import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
 import { LayerFormData } from '@/types/layers'
 import { API_TYPE_QUERY, OwsApiFormData, OwsApiFormSchema } from '@/types/namedApis'
@@ -30,6 +30,7 @@ const mockDataSink: DataSink = {
   datasetId: '00000000-0000-0000-0000-000000000002',
   pipelineId: '00000000-0000-0000-0000-000000000004',
   dataSinkType: DATASINK_TYPES.POSTGIS,
+  provisioningStatus: PROVISIONING_STATUSES.NOT_PROVISIONED,
   configuration: {
     tableName: 'table_1',
     dataStructureVersion: {

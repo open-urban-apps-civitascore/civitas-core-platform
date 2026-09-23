@@ -8,6 +8,7 @@ import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.embedded.ProvisioningStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -145,6 +146,26 @@ class DataSinkControllerIntegrationTest
       assertThat(body.getPipelineId()).isNull();
       assertThat(body.isInUseByPipeline()).isFalse();
       assertThat(body.isInUseByLayer()).isFalse();
+      assertThat(body.getProvisioningStatus()).isEqualTo(ProvisioningStatus.NOT_PROVISIONED);
+    }
+
+    @Test
+    @DisplayName("Should report the provisioning status of a provisioned DataSink")
+    void shouldReportProvisionedStatus() {
+      ensureTestData();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      DataSink sink = new DataSink();
+      sink.setDataSet(dataSet);
+      sink.setDataSinkType(DataSinkType.FROST);
+      sink.setProvisioningStatus(ProvisioningStatus.PROVISIONED);
+      UUID id = dataSinkRepository.save(sink).getId();
+
+      ResponseEntity<DataSinkOutputDTO> response = performGetById(id);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getProvisioningStatus())
+          .isEqualTo(ProvisioningStatus.PROVISIONED);
     }
 
     @Test
@@ -580,6 +601,46 @@ class DataSinkControllerIntegrationTest
           .isInstanceOfSatisfying(
               PostgisConfigurationOutput.class,
               c -> assertThat(c.getTableName()).isEqualTo("renamed_table"));
+    }
+
+    /**
+     * A status a client could reset would skip the data-loss confirmation for a table that exists.
+     */
+    @Test
+    @DisplayName("PATCH cannot reset the provisioning status of a provisioned DataSink")
+    void patchKeepsProvisioningStatus() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      dsv = portalData.attachModel(dsv, portalData.dataStructureVersionModel("PatchStatus"));
+
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      DataSink sink = new DataSink();
+      sink.setDataSet(dataSet);
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      sink.setProvisioningStatus(ProvisioningStatus.PROVISIONED);
+      sink = dataSinkRepository.save(sink);
+      UUID id =
+          portalData
+              .attachSinkConfiguration(
+                  sink, Map.of("tableName", "original_table", "element", dsv.getModelUrn()))
+              .getId();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("provisioningStatus", "NOT_PROVISIONED");
+      patchMap.put(
+          "configuration", Map.of("tableName", "original_table", "element", dsv.getModelUrn()));
+
+      ResponseEntity<DataSinkOutputDTO> response = performPatch(id, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getProvisioningStatus())
+          .isEqualTo(ProvisioningStatus.PROVISIONED);
+      assertThat(dataSinkRepository.findById(id).orElseThrow().getProvisioningStatus())
+          .isEqualTo(ProvisioningStatus.PROVISIONED);
     }
 
     @Test

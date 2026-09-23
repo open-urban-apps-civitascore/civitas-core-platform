@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import de.civitascore.portal.model.datasink.DataSinkConfigurationOutput;
 import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.ProvisioningStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 import lombok.Data;
@@ -24,6 +25,13 @@ public class DataSinkOutputDTO extends BaseOutputDTO {
 
   @Schema(description = "True if any Layer publishes this DataSink")
   private boolean inUseByLayer;
+
+  @Schema(
+      description =
+          "Whether this DataSink's storage physically exists. PROVISIONED once a provisioning saga"
+              + " has completed; a sink never returns to NOT_PROVISIONED.",
+      accessMode = Schema.AccessMode.READ_ONLY)
+  private ProvisioningStatus provisioningStatus;
 
   @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
   @JsonSubTypes({

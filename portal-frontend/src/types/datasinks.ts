@@ -11,6 +11,13 @@ export const DataSinkTypeEnum = enumFromConst(DATASINK_TYPES)
 
 export type DataSinkType = (typeof DATASINK_TYPES)[keyof typeof DATASINK_TYPES]
 
+export const PROVISIONING_STATUSES = {
+  NOT_PROVISIONED: 'NOT_PROVISIONED',
+  PROVISIONED: 'PROVISIONED',
+} as const
+
+export type ProvisioningStatus = (typeof PROVISIONING_STATUSES)[keyof typeof PROVISIONING_STATUSES]
+
 export type DataSink = {
   id: string
   datasetId: string
@@ -25,6 +32,8 @@ export type DataSink = {
    * pipeline node's `sinkRef`. Absent on sinks that carry no configuration (e.g. FROST passthrough).
    */
   configurationUrn?: string
+  /** `PROVISIONED` once the sink's storage physically exists; a sink never returns to `NOT_PROVISIONED`. */
+  provisioningStatus: ProvisioningStatus
   createdAt: string
   modifiedAt: string
 }
