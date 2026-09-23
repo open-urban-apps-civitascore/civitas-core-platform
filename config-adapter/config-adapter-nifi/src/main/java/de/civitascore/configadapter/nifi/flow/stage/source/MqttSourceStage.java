@@ -26,7 +26,6 @@ import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
-import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -125,7 +124,7 @@ public final class MqttSourceStage implements SourceStage {
    * silently consume from the wrong source, so a missing value fails the deploy.
    */
   @Override
-  public void bind(Datasource source, String pipelineId, GraphNode sourceNode, PlanContext out)
+  public void bind(Datasource source, String sourceNodeKey, PlanContext out)
       throws FatalAdapterException {
     Map<String, Object> original = source.getAdditionalProperties();
     Map<String, Object> decrypted = credentials.decrypt(original);
@@ -154,7 +153,7 @@ public final class MqttSourceStage implements SourceStage {
       out.putSourceProperty("SSL Context Service", MQTT_SSL_CONTEXT_REFERENCE);
     }
     putIfPresent(out::putSourceProperty, "Username", decrypted.get("user"));
-    out.putSourceProperty("Client ID", clientId(pipelineId, sourceNode));
+    out.putSourceProperty("Client ID", clientId(sourceNodeKey));
     putIfPresent(out::putSourceProperty, "Quality of Service", decrypted.get("qos"));
     bindProtocolVersion(out, decrypted.get("protocol_version"));
     bindSeconds(out, "Connection Timeout", decrypted.get("connect_timeout"));
@@ -203,14 +202,9 @@ public final class MqttSourceStage implements SourceStage {
         .forEach((key, value) -> out.putSensitive(MQTT_SSL_CONTEXT_SERVICE, key, value));
   }
 
-  /**
-   * Name-based on pipeline and node id, because node ids from API clients and the usecase files are
-   * not UUIDs and repeat across pipelines.
-   */
-  private static String clientId(String pipelineId, GraphNode sourceNode) {
-    UUID name =
-        UUID.nameUUIDFromBytes(
-            (pipelineId + ":" + sourceNode.id()).getBytes(StandardCharsets.UTF_8));
+  /** Hashed, because the key has neither the length nor the characters a client id allows. */
+  private static String clientId(String sourceNodeKey) {
+    UUID name = UUID.nameUUIDFromBytes(sourceNodeKey.getBytes(StandardCharsets.UTF_8));
     return CLIENT_ID_PREFIX + CoreUrn.disambiguatorFor(name);
   }
 

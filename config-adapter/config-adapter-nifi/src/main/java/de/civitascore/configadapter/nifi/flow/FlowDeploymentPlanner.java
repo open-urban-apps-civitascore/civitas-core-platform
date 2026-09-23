@@ -119,7 +119,7 @@ public class FlowDeploymentPlanner {
     }
 
     PlanContext out = new PlanContext();
-    sourceStage.bind(source, request.pipelineId(), path.source(), out);
+    sourceStage.bind(source, sourceNodeKey(request.pipelineId(), path.source()), out);
     bindSink(sinkStage, sink, out);
 
     String processGroupName = "pipeline-" + request.pipelineId();
@@ -193,6 +193,11 @@ public class FlowDeploymentPlanner {
   private static <S extends SinkSpec> void bindSink(
       SinkStage<S> stage, SinkSpec spec, PlanContext out) throws FatalAdapterException {
     stage.bind(stage.specType().cast(spec), out);
+  }
+
+  /** Node ids from API clients and the usecase files repeat across pipelines. */
+  private static String sourceNodeKey(String pipelineId, GraphNode sourceNode) {
+    return pipelineId + ":" + sourceNode.id();
   }
 
   /** The kind of an on-path transform node; the derivation already rejected unknown kinds. */
