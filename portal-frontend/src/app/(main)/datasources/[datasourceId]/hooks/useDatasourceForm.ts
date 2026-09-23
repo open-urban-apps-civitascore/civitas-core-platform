@@ -118,6 +118,13 @@ export const useDatasourceForm = (
   const isInUse = !!datasource.inUse
   const canSetDraft = !isInUse
 
+  // The connector is pinned only on the released path. The backend runs the in-use constraints
+  // inside updateReleasedMeta, which a data source reaches only while it is AVAILABLE; a DRAFT one
+  // still goes through the plain PATCH, and that accepts technical changes from an in-use source.
+  // Gate on the persisted status — the same value handleUpdateValues routes on — so the UI is
+  // neither stricter nor looser than the API.
+  const isConnectorLocked = isInUse && datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
+
   // Zod v4 discriminatedUnion safeParse can throw on stale keys
   const canStage = useMemo(() => {
     try {
@@ -310,6 +317,7 @@ export const useDatasourceForm = (
     isDraftMode,
     canStage,
     canSetDraft,
+    isConnectorLocked,
     statusHint,
     completedTabs,
     submitDatasource,

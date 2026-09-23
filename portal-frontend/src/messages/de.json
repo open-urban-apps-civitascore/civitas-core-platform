@@ -1010,7 +1010,8 @@
       "type": "Typ",
       "typePlaceholder": "Konnektortyp auswählen",
       "connection": "Verbindung",
-      "establishConnection": "Verbindung herstellen"
+      "establishConnection": "Verbindung herstellen",
+      "inUseHint": "Der Konnektor kann nicht geändert werden, da eine Pipeline diese Datenquelle bereits verwendet."
     },
     "dataModel": {
       "placeholder": {

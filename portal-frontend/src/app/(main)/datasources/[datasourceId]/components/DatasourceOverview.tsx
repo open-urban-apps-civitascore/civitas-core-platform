@@ -140,6 +140,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     handleStatusChange,
     canStage,
     canSetDraft,
+    isConnectorLocked,
     statusHint,
     completedTabs,
     submitDatasource,
@@ -228,7 +229,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       case 'basicInfo':
         return <BasicInfoTab form={datasourceForm} isReadOnly={isReadOnly} />
       case 'connector':
-        return <ConnectorTab form={datasourceForm} connectorType={selectedConnectorType} isReadOnly={isReadOnly} />
+        return (
+          <ConnectorTab
+            form={datasourceForm}
+            connectorType={selectedConnectorType}
+            isReadOnly={isReadOnly}
+            isConnectorLocked={isConnectorLocked}
+          />
+        )
       case 'dataStructure':
         return (
           <DatastructureTab

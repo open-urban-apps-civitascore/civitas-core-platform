@@ -51,26 +51,39 @@ describe('useDatasourceForm', () => {
   })
 
   describe('canSetDraft', () => {
-    it('forbids setting an in-use data source back to draft and explains why', async () => {
+    it('forbids setting an in-use data source back to draft and explains why', () => {
       const { result } = renderDatasourceForm(buildDatasource({ inUse: true }))
 
-      await waitFor(() => expect(result.current.canSetDraft).toBe(false))
+      expect(result.current.canSetDraft).toBe(false)
       expect(result.current.statusHint).toBe('datasources.messages.isInUseStatusHint')
     })
 
-    it('allows setting a data source no pipeline uses back to draft', async () => {
+    it('allows setting a data source no pipeline uses back to draft', () => {
       const { result } = renderDatasourceForm(buildDatasource({ inUse: false }))
 
-      await waitFor(() => expect(result.current.canSetDraft).toBe(true))
+      expect(result.current.canSetDraft).toBe(true)
       expect(result.current.statusHint).toBeUndefined()
     })
 
-    it('allows draft for a data source that is already in draft', async () => {
+    it('allows draft for a data source that is already in draft', () => {
       const { result } = renderDatasourceForm(
         buildDatasource({ dataSourceStatus: DATASOURCE_STATUS_TYPES.DRAFT, inUse: false }),
       )
 
-      await waitFor(() => expect(result.current.canSetDraft).toBe(true))
+      expect(result.current.canSetDraft).toBe(true)
+    })
+  })
+
+  describe('isConnectorLocked', () => {
+    it.each([
+      [DATASOURCE_STATUS_TYPES.AVAILABLE, true, true],
+      [DATASOURCE_STATUS_TYPES.AVAILABLE, false, false],
+      [DATASOURCE_STATUS_TYPES.DRAFT, true, false],
+      [DATASOURCE_STATUS_TYPES.DRAFT, false, false],
+    ] as const)('status=%s and inUse=%s locks the connector: %s', (dataSourceStatus, inUse, expected) => {
+      const { result } = renderDatasourceForm(buildDatasource({ dataSourceStatus, inUse }))
+
+      expect(result.current.isConnectorLocked).toBe(expected)
     })
   })
 

@@ -6,6 +6,7 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { FormSelect } from '@/components/form/fields/FormSelect'
 import { FooterElement } from '@/components/form/FooterElement'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
+import { InfoBox } from '@/components/text-box/TextBox'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { CONNECTOR_FIELD_REVALIDATION_RULES, ConnectorType } from '@/types/connectors'
@@ -18,9 +19,10 @@ interface ConnectorTabProps {
   form: UseFormReturn<DatasourceFormDraft>
   connectorType?: ConnectorType
   isReadOnly?: boolean
+  isConnectorLocked?: boolean
 }
 export const ConnectorTab = (props: ConnectorTabProps) => {
-  const { form, connectorType, isReadOnly = false } = props
+  const { form, connectorType, isReadOnly = false, isConnectorLocked = false } = props
   const t = useTranslations('datasources.connectorTab')
   const tCommon = useTranslations('common')
   const connectorTypeOptions: SelectOption[] = Object.keys(CONNECTOR_INPUTS).map(type => ({
@@ -29,6 +31,11 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
   }))
 
   const connectorConfig = useMemo(() => (connectorType ? CONNECTOR_INPUTS[connectorType] : []), [connectorType])
+
+  // A pipeline that already reads from this data source pins its connector — the backend refuses a
+  // connector type or configuration change with 400 (see validateInUseConstraints in
+  // DataSourceService). Lock the fields here so the change is refused before the user types it.
+  const isLocked = isReadOnly || isConnectorLocked
 
   // Cross-field re-validation (e.g. MQTT's `tls` <-> `urls` scheme check) is declared once per
   // connector type in CONNECTOR_FIELD_REVALIDATION_RULES, colocated with the schema that owns the
@@ -61,6 +68,12 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
 
   return (
     <div>
+      {isConnectorLocked && !isReadOnly && (
+        <div className="mb-6">
+          <InfoBox text={t('inUseHint')} />
+        </div>
+      )}
+
       <ContentCard className={cn('h-full overflow-auto mb-6')} footerElement={<FooterElement />}>
         <SubHeader title={t('title1')} className="pb-4  border-b-1" />
 
@@ -73,7 +86,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
           placeholder={t('typePlaceholder')}
           formItemProps={{ className: 'py-6' }}
           required
-          disabled={isReadOnly}
+          disabled={isLocked}
         />
       </ContentCard>
 
@@ -94,7 +107,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
               shouldShowErrors
               required={property.required}
               className="py-3"
-              disabled={isReadOnly}
+              disabled={isLocked}
             />
           ))}
         </ContentCard>
