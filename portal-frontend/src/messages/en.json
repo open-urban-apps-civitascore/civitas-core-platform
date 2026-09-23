@@ -1332,7 +1332,6 @@
         "cronMqttIncompatible": "A CRON trigger cannot be used with an MQTT Data source. Use a SQL (pull) source instead.",
         "cronSourceConnectorUnknown": "Could not verify the source connector; a CRON trigger only works with a SQL (pull) source, not MQTT.",
         "sqlSourceNoScheduleDefaultPoll": "This SQL source has no CRON node and will poll on the default schedule (every 5 minutes). Add a CRON node to set an explicit schedule.",
-        "sqlSourceToFrost": "A SQL source can only write to a FROST sink through a field mapping — add a mapping node or use a SensorThings (MQTT) source.",
         "frostMappingUnknownStaTarget": "{label} maps {path} — not a valid SensorThings target path; allowed are the catalog paths of the Thing-shaped target model (e.g. $.name, $.Datastreams[].name, $.Datastreams[].Observations[].result) plus its match keys",
         "frostMappingMissingMatchKeys": "{label} must map the {entity} match keys: {fields} — they identify the entity during find-or-create",
         "frostMappingNoMatchKeyInStructure": "{label}: the target structure declares no match key for {entity} — mark an attribute with the UML '{id}' flag or add a \"reference\" attribute",
