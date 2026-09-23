@@ -402,7 +402,8 @@ const normalize = (document: JsonSchemaObject): { defs: JsonSchemaObject; rootKe
 
   // A document that designates its record — by a top-level `$ref` or a wrapper — already has its
   // classes in the library.
-  const designated = rootKeyOf(document, new Map())
+  // The wrapper may name its member by the member's URN, so the URNs must be known first.
+  const designated = rootKeyOf(document, memberUrns(defs))
   let rootKey = designated
 
   if (!designated && asObject(document.properties)) {
@@ -423,8 +424,29 @@ const normalize = (document: JsonSchemaObject): { defs: JsonSchemaObject; rootKe
   return { defs, rootKey }
 }
 
+/** The member key of every member that carries an Element URN. */
+const memberUrns = (defs: JsonSchemaObject): Map<string, string> => {
+  const byUrn = new Map<string, string>()
+  for (const [key, raw] of Object.entries(defs)) {
+    const id = asString(asObject(raw)?.$id)
+    if (id) byUrn.set(id, key)
+  }
+  return byUrn
+}
+
 /** Replaces every inline object property of a class by a reference to a lifted class. */
 const liftInlineObjects = (member: JsonSchemaObject, owner: string, defs: JsonSchemaObject): JsonSchemaObject => {
+  if (Array.isArray(member.allOf)) {
+    // A class that inherits keeps its own shape in a branch, and that branch is what the reader
+    // reads. The parent references stay as they are.
+    return {
+      ...member,
+      allOf: member.allOf.map(raw => {
+        const branch = asObject(raw)
+        return branch && !branch.$ref ? liftInlineObjects(branch, owner, defs) : raw
+      }),
+    }
+  }
   const properties = asObject(member.properties)
   if (!properties) return member
 
