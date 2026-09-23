@@ -548,7 +548,7 @@ class FlowDeploymentPlannerTest {
       assertFalse(snapshot.contains("secret"), "FROST secret must not enter the snapshot");
       assertEquals(
           "secret",
-          plan.sensitivePropsByComponent().get("FrostPublish").get("Request Password"),
+          plan.sensitivePropsByComponent().get("FrostPublish").get("Basic Auth Password"),
           "the Basic Auth password must be patched onto FROST processors after upload");
     }
   }
