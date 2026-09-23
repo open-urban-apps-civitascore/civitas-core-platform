@@ -121,6 +121,8 @@ export interface ActivePipelineContextValue {
   getSinkLocks: (entityId: string | undefined) => DataSinkLocks
   /** Why this data sink node must not be deleted, or null when it may be */
   getSinkLockReason: (node: PipelineNode) => SinkLockReason | null
+  /** Lock reason of the first locked node among the selected ones */
+  getSelectionLockReason: (nodes: PipelineNode[]) => SinkLockReason | null
 
   // ===== Session Info =====
   /** ID of the active session */

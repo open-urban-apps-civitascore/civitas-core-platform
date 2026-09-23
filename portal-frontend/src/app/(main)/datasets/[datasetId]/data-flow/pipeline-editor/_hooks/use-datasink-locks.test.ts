@@ -41,6 +41,8 @@ const makeSourceNode = (): PipelineNode =>
     data: { label: 'Source', configured: true, entityType: 'datasource', entityId: 'sink-1' },
   }) as PipelineNode
 
+const select = (node: PipelineNode): PipelineNode => ({ ...node, selected: true })
+
 describe('useDataSinkLocks', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -111,5 +113,39 @@ describe('useDataSinkLocks', () => {
     const { result } = renderHook(() => useDataSinkLocks())
 
     expect(result.current.getSinkLockReason(makeSourceNode())).toBeNull()
+  })
+
+  it('reports why a selected sink node cannot be deleted', () => {
+    mockDataSinks([{ id: 'sink-1', inUseByLayer: true }])
+
+    const { result } = renderHook(() => useDataSinkLocks())
+
+    expect(result.current.getSelectionLockReason([select(makeSinkNode('sink-1'))])).toBe('inUseByLayer')
+  })
+
+  it('ignores a locked sink node that is not selected', () => {
+    mockDataSinks([{ id: 'sink-1', provisioned: true }])
+
+    const { result } = renderHook(() => useDataSinkLocks())
+
+    expect(result.current.getSelectionLockReason([makeSinkNode('sink-1'), select(makeSourceNode())])).toBeNull()
+  })
+
+  it('reports the locked node of a mixed selection', () => {
+    mockDataSinks([{ id: 'sink-1', provisioned: true }])
+
+    const { result } = renderHook(() => useDataSinkLocks())
+
+    expect(result.current.getSelectionLockReason([select(makeSourceNode()), select(makeSinkNode('sink-1'))])).toBe(
+      'provisioned',
+    )
+  })
+
+  it('reports no lock for a deletable selection', () => {
+    mockDataSinks([{ id: 'sink-1' }])
+
+    const { result } = renderHook(() => useDataSinkLocks())
+
+    expect(result.current.getSelectionLockReason([select(makeSinkNode('sink-1'))])).toBeNull()
   })
 })

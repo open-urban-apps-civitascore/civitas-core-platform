@@ -10,6 +10,7 @@ import type {
   IsValidConnection,
   Node,
   NodeTypes,
+  OnBeforeDelete,
   OnConnect,
   OnConnectEnd,
   OnConnectStart,
@@ -35,6 +36,7 @@ export interface CanvasScaffoldProps {
   onConnectStart?: OnConnectStart
   onConnectEnd?: OnConnectEnd
   isValidConnection?: IsValidConnection
+  onBeforeDelete?: OnBeforeDelete
   onDropNode?: (type: string, position: { x: number; y: number }) => void
   /** Fired when a node is clicked (id) or the pane is clicked (null). */
   onSelectionChange?: (nodeId: string | null) => void
@@ -120,6 +122,7 @@ const CanvasInner = (props: CanvasScaffoldProps) => {
         onConnectEnd={props.onConnectEnd}
         onSelectionChange={props.onReactFlowSelectionChange}
         isValidConnection={props.isValidConnection}
+        onBeforeDelete={props.onBeforeDelete}
         onNodeClick={(_, node) => props.onSelectionChange?.(node.id)}
         onPaneClick={() => props.onSelectionChange?.(null)}
         nodesDraggable={canEdit}

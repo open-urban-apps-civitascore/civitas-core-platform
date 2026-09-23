@@ -1257,6 +1257,10 @@
           "title": "In use",
           "tooltip": "This Data storage is used by API layers. To edit or remove it, the layer assignments must be removed first."
         }
+      },
+      "notRemovable": {
+        "provisioned": "Data storage can not be removed. This data storage has been provisioned and can no longer be removed.",
+        "inUseByLayer": "Data storage can not be removed. This data storage is used by API layers. Remove the layer assignments first."
       }
     },
     "frostPanel": {

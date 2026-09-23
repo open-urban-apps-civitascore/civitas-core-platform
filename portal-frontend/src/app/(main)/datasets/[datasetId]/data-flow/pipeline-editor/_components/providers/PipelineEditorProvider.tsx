@@ -132,7 +132,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   const { canDeletePipeline: canDelete } = useDatasetPermissions(datasetQuery.data?.data)
 
-  const { getSinkLocks, getSinkLockReason } = useDataSinkLocks()
+  const { getSinkLocks, getSinkLockReason, getSelectionLockReason } = useDataSinkLocks()
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
@@ -792,6 +792,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       // Data sink locks
       getSinkLocks,
       getSinkLockReason,
+      getSelectionLockReason,
 
       // Session info
       activeSessionId: activeSession?.id || null,
@@ -832,6 +833,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       hasAnyDirtySession,
       getSinkLocks,
       getSinkLockReason,
+      getSelectionLockReason,
     ],
   )
 

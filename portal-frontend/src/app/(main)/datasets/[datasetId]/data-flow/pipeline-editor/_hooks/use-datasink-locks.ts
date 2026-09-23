@@ -24,6 +24,8 @@ export interface DataSinkLocksLookup {
   /** Locks of the sink with this backend id; everything false when the id is unknown. */
   getSinkLocks: (entityId: string | undefined) => DataSinkLocks
   getSinkLockReason: (node: PipelineNode) => SinkLockReason | null
+  /** Lock reason of the first locked node among the selected ones. */
+  getSelectionLockReason: (nodes: PipelineNode[]) => SinkLockReason | null
 }
 
 export const useDataSinkLocks = (): DataSinkLocksLookup => {
@@ -55,5 +57,14 @@ export const useDataSinkLocks = (): DataSinkLocksLookup => {
     [getSinkLocks],
   )
 
-  return { getSinkLocks, getSinkLockReason }
+  const getSelectionLockReason = useCallback(
+    (nodes: PipelineNode[]): SinkLockReason | null =>
+      nodes
+        .filter(node => node.selected)
+        .map(getSinkLockReason)
+        .find(reason => reason !== null) ?? null,
+    [getSinkLockReason],
+  )
+
+  return { getSinkLocks, getSinkLockReason, getSelectionLockReason }
 }
