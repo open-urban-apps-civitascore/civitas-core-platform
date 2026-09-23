@@ -64,6 +64,12 @@ export const LoadStandardMenu: React.FC = () => {
       // The menu offers only published structures. A pin without a version would name nothing.
       if (!source.urn) throw new Error(`the structure '${source.key}' has no published version`)
       const result = mergeStructureIntoDiagram(diagram, document, { urn: source.urn, name: source.name })
+      if (result.nodes.length === 0) {
+        // Nothing was loaded. Saying otherwise would send the modeller looking for classes that
+        // are not there, and a pin for it would record a structure the diagram does not hold.
+        toast.warning(t('emptyStructure'))
+        return
+      }
       // One action. The provider recomputes every dispatch from the diagram of the current
       // render, so a second one in this handler would drop what the first one added. The root
       // flag needs no call of its own either — it is already on the element the merge answers.
@@ -86,12 +92,6 @@ export const LoadStandardMenu: React.FC = () => {
       // A renamed class is not a failure, but the modeller has to learn that the name moved.
       for (const renamed of result.renamed) {
         toast.warning(t('renamed', { from: renamed.from, to: renamed.to }))
-      }
-      if (result.nodes.length === 0) {
-        // Nothing was loaded. Saying otherwise would send the modeller looking for classes that
-        // are not there.
-        toast.warning(t('emptyStructure'))
-        return
       }
       toast.success(t('loaded'))
     },
