@@ -559,9 +559,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         try {
           const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
 
-          // Step 1: Collect the sinks whose node was removed. They are deleted in step 3.5 — the
-          // stored pipeline model still points at them via `sinkRef`, and Model Forge refuses to
-          // delete a referenced artifact.
+          // Step 1: Collect removed sinks. A saved pipeline still references them, so they get deleted in step 3.5.
           const removedDataSinkIds = getRemovedDataSinkIds(currentPipeline, snapshot)
 
           // Step 2: Save data sinks (create new / update changed). Stash the sink's CORE
@@ -626,9 +624,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             currentPipeline = { ...currentPipeline, id: response.data.id }
           }
 
-          // Step 3.5: Delete the sinks collected in step 1. The saved pipeline no longer references
-          // them, so Model Forge accepts the delete. The pipeline is already stored at this point,
-          // so a failure here is reported separately instead of failing the session.
+          // Step 3.5: Delete the sinks from step 1. The saved pipeline no longer references them.
           let hasSinkStillInUse = false
           let hasSinkDeleteFailed = false
           for (const dataSinkId of removedDataSinkIds) {
@@ -696,9 +692,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       if (saveFailedNames.length > 0) {
         toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
       }
-      // A sink that could not be deleted does not make the save fail — the pipeline is already
-      // stored. It only leaves an unused sink behind, which the backend removes with the pipeline or
-      // the dataset.
+      // A failed sink delete does not fail the save: the pipeline is already stored.
       if (sinkStillInUseNames.length > 0) {
         toast.warning(t('header.sinkStillInUse', { names: sinkStillInUseNames.join(', ') }))
       }
