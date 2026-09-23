@@ -7,7 +7,7 @@ import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import messages from '@/messages/de.json'
 import { contractErrors } from '@/test-support/coreContracts'
-import { cls, type FixtureAttribute } from '@/test-support/datastructureFixtures'
+import { cls, datastructureFixtures, type FixtureAttribute } from '@/test-support/datastructureFixtures'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import {
   Datastructure,
@@ -960,7 +960,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(contractErrors('datastructure', data.model)).toEqual([])
     })
 
-    it('publishes a one-class structure whose root was designated in the inspector', async () => {
+    it('saves and publishes a one-class structure whose root was designated in the inspector', async () => {
       const user = userEvent.setup()
       renderComponent({ version: versionWithSelectedNode })
 
@@ -984,6 +984,51 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       const rootId = (defs.TestClass as { $id?: string }).$id
       expect(rootId).toMatch(/^urn:core:.*:element:.*:TestClass:/)
       expect((data.model as { $ref?: string }).$ref).toBe(rootId)
+      expect(contractErrors('datastructure', data.model)).toEqual([])
+    })
+
+    it('saves and publishes four cross-referencing Elements under one root', async () => {
+      const user = userEvent.setup()
+      const members = ['Station', 'Measurement', 'Reading', 'Alert']
+      const crossReferencing = datastructureFixtures.find(
+        fixture => fixture.label === 'four cross-referencing elements under one root',
+      )
+      if (!crossReferencing) throw new Error('fixture missing')
+
+      // The inspector only shows a selected node.
+      const nodes = crossReferencing.diagram.nodes.map((node, index) =>
+        index === 0 ? { ...node, selected: true } : node,
+      )
+      renderComponent({
+        version: { ...mockVersionWithModel, styles: { ...crossReferencing.diagram, nodes } } as DatastructureVersion,
+      })
+
+      // A status change alone sends no model.
+      await user.click(screen.getByRole('checkbox', { name: /Root class/ }))
+      await openStatusDropdown(user)
+      await user.click(screen.getByTestId('statusOption-available'))
+      await user.click(screen.getByTestId('confirmButton'))
+
+      await waitFor(() => expect(mockStatusUpdateMutateAsync).toHaveBeenCalled())
+
+      const { data, defs } = savedDefs()
+      const idOf = (name: string) => (defs[name] as { $id?: string }).$id
+
+      expect(mockUpdateMutateAsync.mock.invocationCallOrder[0]).toBeLessThan(
+        mockStatusUpdateMutateAsync.mock.invocationCallOrder[0],
+      )
+      expect(mockStatusUpdateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/release`,
+        }),
+      )
+
+      expect(Object.keys(defs)).toEqual(members)
+      expect((data.model as { $ref?: string }).$ref).toBe(idOf('Station'))
+      // The saved URNs carry no version segment.
+      for (const name of members) {
+        expect(idOf(name)).toMatch(new RegExp(`:element:common:${name}:[^:]+$`))
+      }
       expect(contractErrors('datastructure', data.model)).toEqual([])
     })
 

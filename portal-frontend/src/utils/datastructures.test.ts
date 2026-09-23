@@ -501,13 +501,44 @@ describe('the exported model survives a save/rehydrate round-trip', () => {
     expect(after).toEqual(before)
   })
 
-  it('keeps the $defs keys and Element URNs stable across the round-trip', () => {
-    const { before, after } = roundTrip(datastructureFixtures[4].diagram)
-    const idsOf = (model: Record<string, unknown>) =>
-      Object.entries((model.$defs ?? {}) as Record<string, { $id?: string }>).map(([key, def]) => [key, def.$id])
+  const idsOf = (model: Record<string, unknown>) =>
+    Object.entries((model.$defs ?? {}) as Record<string, { $id?: string }>).map(([key, def]) => [key, def.$id])
+
+  const refsOf = (model: Record<string, unknown>): string[] => {
+    const refs: string[] = []
+    const walk = (node: unknown) => {
+      if (Array.isArray(node)) return node.forEach(walk)
+      if (!node || typeof node !== 'object') return
+      for (const [key, value] of Object.entries(node)) {
+        if (key === '$ref' && typeof value === 'string') refs.push(value)
+        else walk(value)
+      }
+    }
+    walk(model.$defs)
+    return refs.sort()
+  }
+
+  it.each(datastructureFixtures)('$label keeps its Element identities across the round-trip', ({ diagram }) => {
+    const { before, after } = roundTrip(diagram)
 
     expect(idsOf(after)).toEqual(idsOf(before))
+    expect(refsOf(after)).toEqual(refsOf(before))
     expect(after.$ref).toBe(before.$ref)
+  })
+
+  it('names every member and cross-reference by its Element URN', () => {
+    const { before } = roundTrip(fixtureNamed('four cross-referencing elements under one root'))
+    const urn = (name: string) => `urn:core:platform:civitas:element:common:${name}:abc1234567:1.0.0`
+
+    expect(idsOf(before)).toEqual([
+      ['Station', urn('Station')],
+      ['Measurement', urn('Measurement')],
+      ['Reading', urn('Reading')],
+      ['Alert', urn('Alert')],
+    ])
+    // Measurement appears twice: both Reading and Alert inherit it.
+    expect(refsOf(before)).toEqual([urn('Alert'), urn('Measurement'), urn('Measurement'), urn('Reading')])
+    expect(before.$ref).toBe(urn('Station'))
   })
 
   const fixtureNamed = (label: string) => {

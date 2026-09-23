@@ -10,8 +10,7 @@ import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 export interface FixtureAttribute {
   id: string
   name: string
-  /** A primitive or geometry name, or `{ id }` to point at another element. */
-  type?: string | { id: string }
+  type?: string
   multiplicity?: string
   isId?: boolean
   documentation?: string
@@ -244,27 +243,20 @@ export const datastructureFixtures: DatastructureFixture[] = [
     ),
   },
   {
-    label: 'enumeration referenced by an attribute',
+    label: 'enumeration alongside a class',
     diagram: diagram(
       'Device',
-      [
-        cls('device', 'Device', [
-          { id: 'a1', name: 'id' },
-          { id: 'a2', name: 'status', type: { id: 'status' } },
-        ]),
-        enm('status', 'Status', ['ACTIVE', 'INACTIVE']),
-      ],
+      [cls('device', 'Device', [{ id: 'a1', name: 'id' }]), enm('status', 'Status', ['ACTIVE', 'INACTIVE'])],
       [],
     ),
   },
   {
-    // Beta is reachable as an attribute type but embedded by no edge, so without the designation
-    // both classes would be root candidates and the export would refuse.
+    // No edge embeds either class, so without the designation both would be root candidates.
     label: 'explicitly designated root',
     diagram: diagram(
       'Catalog',
       [
-        cls('alpha', 'Alpha', [{ id: 'a1', name: 'beta', type: { id: 'beta' } }], { isRoot: true }),
+        cls('alpha', 'Alpha', [{ id: 'a1', name: 'code' }], { isRoot: true }),
         cls('beta', 'Beta', [{ id: 'a2', name: 'value' }]),
       ],
       [],
@@ -282,6 +274,25 @@ export const datastructureFixtures: DatastructureFixture[] = [
           targetRole: 'depot',
           targetMultiplicity: '1',
         }),
+      ],
+    ),
+  },
+  {
+    // Station composes Reading and Alert; both inherit Measurement.
+    label: 'four cross-referencing elements under one root',
+    diagram: diagram(
+      'SensorNetwork',
+      [
+        cls('station', 'Station', [{ id: 'a1', name: 'code' }]),
+        cls('measurement', 'Measurement', [{ id: 'a2', name: 'takenAt', type: 'DateTime' }]),
+        cls('reading', 'Reading', [{ id: 'a3', name: 'value', type: 'Number' }]),
+        cls('alert', 'Alert', [{ id: 'a4', name: 'severity' }]),
+      ],
+      [
+        rel('1', 'composition', 'reading', 'station', { sourceRole: 'readings', sourceMultiplicity: '1..*' }),
+        rel('2', 'composition', 'alert', 'station', { sourceRole: 'alerts', sourceMultiplicity: '0..*' }),
+        rel('3', 'inheritance', 'reading', 'measurement'),
+        rel('4', 'inheritance', 'alert', 'measurement'),
       ],
     ),
   },
