@@ -7,6 +7,7 @@ import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
@@ -185,9 +186,9 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   private Pipeline createPipelineForDataSet(DataSet dataSet, String name) {
-    DataSource ds1 = portalData.dataSource();
-    DataSource ds2 = portalData.dataSource();
-    DataSource ds3 = portalData.dataSource();
+    DataSource ds1 = portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
+    DataSource ds2 = portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
+    DataSource ds3 = portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
 
     Pipeline pipeline =
         portalData.pipeline(
@@ -310,6 +311,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @Nested
   @DisplayName("Stage DataSet Tests")
   class StageDataSetTests {
+
     @Test
     @Transactional
     @DisplayName("Should mark dataset as ready with pipelines")

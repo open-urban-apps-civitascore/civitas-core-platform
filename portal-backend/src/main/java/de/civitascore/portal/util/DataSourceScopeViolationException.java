@@ -30,11 +30,11 @@ public class DataSourceScopeViolationException extends RuntimeException {
 
   /**
    * For a DataSource a pipeline may not reference, where "not usable" deliberately covers a
-   * nonexistent id, a non-AVAILABLE one and a pool-confined one alike.
+   * nonexistent id and a pool-confined one alike.
    *
-   * <p>Naming which of the three applies would let a caller authorized only on the dataset probe
-   * the DataSource table for existence and lifecycle status, since referencing no longer requires a
-   * permission on the DataSource itself. The message states all three conditions instead.
+   * <p>Naming which case applies would let a caller authorized only on the Dataset probe the Data
+   * source table for existence, since referencing does not require a permission on the Data source
+   * itself. The message states both conditions instead.
    *
    * @param offendingDataSourceIds the referenced ids that are not usable
    * @return the exception to throw
@@ -44,7 +44,7 @@ public class DataSourceScopeViolationException extends RuntimeException {
     return new DataSourceScopeViolationException(
         offendingDataSourceIds,
         "One or more DataSources cannot be used by this Dataset's pipelines. Each referenced"
-            + " DataSource must exist, be AVAILABLE, and be released for the Dataset's datapool: "
+            + " DataSource must exist and be released for the Dataset's datapool: "
             + offendingDataSourceIds);
   }
 

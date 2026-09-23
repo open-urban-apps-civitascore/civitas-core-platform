@@ -135,16 +135,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     return super.update(id, input);
   }
 
-  /**
-   * Links the data structure version to the data source after DTO-to-entity conversion. Validates
-   * that the referenced version is in AVAILABLE status and its parent data structure is also
-   * AVAILABLE.
-   *
-   * @param entity the data source entity
-   * @param input the data source input DTO
-   * @return the entity with the data structure version relationship set
-   * @throws InvalidInputException if the data structure version is not linkable
-   */
+  /** Links the authorized data structure version after DTO-to-entity conversion. */
   @Override
   protected DataSource postConvertToEntity(DataSource entity, DataSourceInputDTO input) {
     if (input.getDataStructureVersionId() != null) {
@@ -392,20 +383,21 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
           getEntityName(), entity.getId(), "Data structure version must be set before releasing");
     }
 
+    validateDataStructureVersionAvailable(entity.getDataStructureVersion());
     validateConfiguration(entity);
   }
 
   @Override
   protected void validateUnrelease(DataSource entity) {
-    validateNotInUse(entity.getId());
+    validateNotInUse(entity.getId(), "unrelease");
   }
 
-  private void validateNotInUse(UUID id) {
+  private void validateNotInUse(UUID id, String operation) {
     if (pipelineRepository.existsByDataSourcesId(id)) {
       throw new ResourceInUseException(
           getEntityName(),
           id,
-          "Cannot unrelease DataSource because it is referenced by a Pipeline.");
+          "Cannot " + operation + " DataSource because it is referenced by a Pipeline.");
     }
   }
 
@@ -514,7 +506,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       entity.setConnectorType(input.getConnectorType());
     }
     if (input.getDataStructureVersionId() != null) {
-      entity.setDataStructureVersion(resolveAuthorizedVersion(input.getDataStructureVersionId()));
+      DataStructureVersion version = resolveAuthorizedVersion(input.getDataStructureVersionId());
+      validateDataStructureVersionAvailable(version);
+      entity.setDataStructureVersion(version);
     }
     if (input.getConfiguration() != null) {
       ConnectorType type = entity.getConnectorType();
@@ -551,6 +545,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       throw new InvalidInputException(
           getEntityName(), id, "Cannot delete a released data source. Unrelease it first.");
     }
+    // A draft may be referenced too, and postDelete drops the Model Forge artifact before the
+    // foreign key aborts the commit, which would leave the surviving row pinned to a dead URN.
+    validateNotInUse(id, "delete");
 
     return entity;
   }
@@ -669,22 +666,21 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     } catch (AccessDeniedException e) {
       throw new ResourceNotFoundException(getEntityName(), versionId);
     }
-    validateDataStructureVersionLinkable(dsv);
     return dsv;
   }
 
-  private void validateDataStructureVersionLinkable(DataStructureVersion dsv) {
+  private void validateDataStructureVersionAvailable(DataStructureVersion dsv) {
     if (dsv.getDataStructureVersionStatus() != DataStructureVersionStatus.AVAILABLE) {
       throw new InvalidInputException(
           getEntityName(),
           dsv.getId(),
-          "DataStructureVersion must be in AVAILABLE status to be linked to a DataSource");
+          "DataStructureVersion must be in AVAILABLE status for an AVAILABLE DataSource");
     }
     if (dsv.getDataStructure().getDataStructureStatus() != DataStructureStatus.AVAILABLE) {
       throw new InvalidInputException(
           getEntityName(),
           dsv.getId(),
-          "The parent DataStructure must be in AVAILABLE status to be linked to a DataSource");
+          "The parent DataStructure must be in AVAILABLE status for an AVAILABLE DataSource");
     }
   }
 
