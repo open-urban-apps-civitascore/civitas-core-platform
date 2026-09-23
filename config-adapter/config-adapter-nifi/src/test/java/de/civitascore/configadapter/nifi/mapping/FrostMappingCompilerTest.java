@@ -347,6 +347,60 @@ class FrostMappingCompilerTest {
     assertTrue(body.contains("thingReference"), body);
   }
 
+  @Test
+  void compile_intoTheThingsPort_rendersAThingOnlyMapping() throws Exception {
+    String body = compiler.compile(thingOnlyMapping(), KEYS, SinkPort.THINGS).plan().body();
+
+    assertFalse(body.contains("Datastreams"), body);
+  }
+
+  @Test
+  void compile_intoTheThingsPort_rejectsAMeasurement() {
+    // The port writes the Thing only. Rendering the Thing alone would drop the measurement without
+    // an error, and the Pipeline would deploy and write nothing of it.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(lookupOnlyWithObservationMapping(), KEYS, SinkPort.THINGS));
+
+    assertTrue(ex.getMessage().contains("Things port writes the Thing only"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withAnotherThingKey_stillRequiresTheReferenceThePortResolves() {
+    // The processor finds the Thing by properties.reference, whatever key the structure declares.
+    StaProperties keys = StaProperties.ofKeys(List.of("stationId"), List.of("reference"));
+    MappingConfig mapping =
+        mapping(
+            "$.name", new CopyNode("$.station"),
+            "$.description", new CopyNode("$.desc"),
+            "$.properties.stationId", new CopyNode("$.ref"));
+
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(mapping, keys, SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("$.properties.reference"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withAnotherDatastreamKey_stillRequiresTheDatastreamReference() {
+    StaProperties keys = StaProperties.ofKeys(List.of("reference"), List.of("code"));
+    MappingConfig mapping =
+        mapping(
+            "$.properties.reference", new CopyNode("$.ref"),
+            "$.datastreams[].properties.code", new CopyNode("$.ref"),
+            "$.datastreams[].observations[].result", new CopyNode("$.temp"));
+
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(mapping, keys, SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("$.Datastreams[].properties.reference"), ex.getMessage());
+  }
+
   // ─── Body templates ─────────────────────────────────────────────────────────
 
   @Test

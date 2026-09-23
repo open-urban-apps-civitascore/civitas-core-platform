@@ -793,17 +793,13 @@ const validateEdgeCompatibility: ValidationRule = {
       const accepted = acceptedInputs({ mappedUpstream: hasMappedUpstream })
       if (isFormAccepted(offered, accepted)) return
 
-      // The only conflict reachable today is a records source feeding an unmapped FROST sink —
-      // keep the adapter's actionable wording for it instead of the generic form message.
       errors.push(
-        downstream.type === PIPELINE_NODE_TYPES.Frost && !hasMappedUpstream
-          ? errorAt(downstream, 'validation.messages.sqlSourceToFrost')
-          : errorAt(downstream, 'validation.messages.edgeFormIncompatible', {
-              label: nodeLabel(downstream),
-              upstreamLabel: nodeLabel(upstream),
-              form: offered,
-              accepted: accepted.join(', '),
-            }),
+        errorAt(downstream, 'validation.messages.edgeFormIncompatible', {
+          label: nodeLabel(downstream),
+          upstreamLabel: nodeLabel(upstream),
+          form: offered,
+          accepted: accepted.join(', '),
+        }),
       )
     })
 

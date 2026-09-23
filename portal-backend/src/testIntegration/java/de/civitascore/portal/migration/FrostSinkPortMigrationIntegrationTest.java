@@ -6,8 +6,11 @@ import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.datasink.FrostSinkPort;
 import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
@@ -42,8 +45,9 @@ class FrostSinkPortMigrationIntegrationTest extends BaseKeycloakIntegrationTest 
   @Test
   @DisplayName("Gives a sink that predates the port the ThingTree port, and the schema accepts it")
   void migratesASinkWithoutAPort() {
-    DataSink sink = frostSink(Map.of("tableName", "sensors"));
-    // The seed must be what an installation carries today: no port at all.
+    // A FROST sink without a Mapping stores no field of its own. The seed must be what an
+    // installation carries today: no port at all.
+    DataSink sink = frostSink(Map.of());
     assertThat(configurationOf(sink.getId())).doesNotContainKey("port");
 
     migration.run(null);
@@ -53,7 +57,6 @@ class FrostSinkPortMigrationIntegrationTest extends BaseKeycloakIntegrationTest 
     // The connection type is the host's to supply; without it the stored document does not satisfy
     // the schema, and the write above would have thrown.
     assertThat(configuration).containsEntry("connectionType", "frost");
-    assertThat(configuration).containsEntry("tableName", "sensors");
   }
 
   @Test
@@ -75,7 +78,7 @@ class FrostSinkPortMigrationIntegrationTest extends BaseKeycloakIntegrationTest 
   @Test
   @DisplayName("Runs twice without writing a second version")
   void isIdempotent() {
-    DataSink sink = frostSink(Map.of("tableName", "sensors"));
+    DataSink sink = frostSink(Map.of());
 
     migration.run(null);
     String afterFirst =
@@ -94,9 +97,15 @@ class FrostSinkPortMigrationIntegrationTest extends BaseKeycloakIntegrationTest 
     DataSink sink =
         factory.dataSink(
             dataSet, pipeline, candidate -> candidate.setDataSinkType(DataSinkType.POSTGIS));
+    DataStructureVersion version =
+        factory.attachModel(
+            factory.dataStructureVersion(
+                factory.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE)),
+                b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)),
+            factory.dataStructureVersionModel("Roads"));
     sink =
         factory.attachSinkConfiguration(
-            sink, Map.of("tableName", "roads", "geometryColumn", "geom"));
+            sink, Map.of("tableName", "roads", "element", version.getModelUrn()));
 
     migration.run(null);
 
