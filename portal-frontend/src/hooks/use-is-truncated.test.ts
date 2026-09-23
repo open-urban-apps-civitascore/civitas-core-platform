@@ -10,10 +10,16 @@ const disconnectMock = vi.fn()
 
 vi.stubGlobal(
   'ResizeObserver',
-  vi.fn((callback: () => void) => {
-    resizeCallback = callback
-    return { observe: observeMock, disconnect: disconnectMock, unobserve: vi.fn() }
-  }),
+  vi.fn(
+    class {
+      observe = observeMock
+      disconnect = disconnectMock
+      unobserve = vi.fn()
+      constructor(callback: () => void) {
+        resizeCallback = callback
+      }
+    },
+  ),
 )
 
 const createMockElement = (scrollWidth: number, clientWidth: number) => ({ scrollWidth, clientWidth }) as HTMLElement
