@@ -10,6 +10,7 @@
  *
  */
 
+import { Lock } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
@@ -21,6 +22,7 @@ import { useActivePipeline } from '../../_hooks/use-active-pipeline'
 import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import type { PipelineNodeData } from '../../_types/nodes'
 import { InspectorHeader } from './components/InspectorHeader'
+import { InspectorNotice } from './components/InspectorNotice'
 import { ValidationPanel } from './validation'
 
 // ============================================================================
@@ -37,17 +39,20 @@ interface PipelineInspectorProps {
 
 export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
-  const { selectedNode, selectedEdge, updateNode, shouldShowValidationPanel, validationResult } = useActivePipeline()
+  const { selectedNode, selectedEdge, updateNode, shouldShowValidationPanel, validationResult, getSinkLockReason } =
+    useActivePipeline()
   const { isReadOnly } = useReadOnly()
+
+  const lockReason = selectedNode ? getSinkLockReason(selectedNode) : null
 
   const handleNodeUpdate = useCallback(
     (data: Partial<PipelineNodeData>) => {
-      if (isReadOnly) return
+      if (isReadOnly || lockReason) return
       if (selectedNode) {
         updateNode(selectedNode.id, data)
       }
     },
-    [isReadOnly, selectedNode, updateNode],
+    [isReadOnly, lockReason, selectedNode, updateNode],
   )
 
   // Render the appropriate panel by looking up the node's registry definition.
@@ -61,14 +66,26 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
     const { InspectorPanel, isPanelReadonly } = def
     const panel = <InspectorPanel data={selectedNode.data} onUpdate={handleNodeUpdate} />
 
-    // Display-only panels stay fully legible. Editable panels are dimmed and made
-    // non-interactive in read-only mode; handleNodeUpdate additionally no-ops as a safeguard.
-    if (isPanelReadonly || !isReadOnly) return panel
+    // Editable panels are dimmed and non-interactive in read-only mode and for a locked sink.
+    const isLocked = !isPanelReadonly && (isReadOnly || lockReason !== null)
 
     return (
-      <div className="pointer-events-none opacity-60" aria-disabled>
-        {panel}
-      </div>
+      <>
+        {lockReason && (
+          <InspectorNotice
+            icon={Lock}
+            title={t(`sink.locked.${lockReason}.title`)}
+            description={t(`sink.locked.${lockReason}.description`)}
+          />
+        )}
+        {isLocked ? (
+          <div className="pointer-events-none opacity-60" aria-disabled>
+            {panel}
+          </div>
+        ) : (
+          panel
+        )}
+      </>
     )
   }
 

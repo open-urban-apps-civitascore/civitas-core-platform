@@ -7,6 +7,7 @@
 
 import type { Connection } from '@xyflow/react'
 
+import type { DataSinkLocks, SinkLockReason } from '../_hooks/use-datasink-locks'
 import type { PipelineReducerAction } from '../_services/pipelineService'
 import type { ValidationResultWithNodeStatus } from '../_services/validationService'
 import type { PipelineNodeData } from './nodes'
@@ -114,6 +115,12 @@ export interface ActivePipelineContextValue {
   isSavingAll: boolean
   /** Whether any session has unsaved changes */
   hasAnyDirtySession: boolean
+
+  // ===== Data Sink Locks =====
+  /** Locks of a saved data sink, looked up by its entityId */
+  getSinkLocks: (entityId: string | undefined) => DataSinkLocks
+  /** Why this data sink node must not be deleted, or null when it may be */
+  getSinkLockReason: (node: PipelineNode) => SinkLockReason | null
 
   // ===== Session Info =====
   /** ID of the active session */

@@ -81,6 +81,7 @@ vi.mock('@/app/services/api/datasets/clientRequests', () => ({
 }))
 
 vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
+  useGetDataSinks: vi.fn(() => ({ data: undefined })),
   useCreateDataSink: vi.fn(),
   useDeleteDataSink: vi.fn(),
   useUpdateDataSink: vi.fn(),

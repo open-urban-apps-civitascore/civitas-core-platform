@@ -48,12 +48,19 @@ interface PipelineCanvasProps {
  */
 export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
-  const { pipeline, dispatch, addNode, addEdge, validateConnection, hideValidationPanel } = useActivePipeline()
+  const { pipeline, dispatch, addNode, addEdge, validateConnection, hideValidationPanel, getSinkLockReason } =
+    useActivePipeline()
   const { isReadOnly } = useReadOnly()
   const canEdit = !isReadOnly
 
   const nodeTypes = useMemo(() => pipelineNodeTypes, [])
   const edgeTypes = useMemo(() => pipelineEdgeTypes, [])
+
+  // `deletable` is a React Flow prop, not pipeline state, so it is set at the canvas boundary.
+  const nodes = useMemo(
+    () => pipeline?.nodes.map(node => ({ ...node, deletable: getSinkLockReason(node) === null })) ?? [],
+    [pipeline?.nodes, getSinkLockReason],
+  )
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => dispatch({ type: 'NODE_CHANGES', payload: changes }),
@@ -98,7 +105,7 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
 
   return (
     <CanvasScaffold
-      nodes={pipeline.nodes}
+      nodes={nodes}
       edges={pipeline.edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}

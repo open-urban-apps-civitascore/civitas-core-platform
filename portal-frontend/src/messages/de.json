@@ -1234,6 +1234,14 @@
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
       "anonymousName": "Anonyme Datenquelle"
     },
+    "sink": {
+      "locked": {
+        "provisioned": {
+          "title": "Bereitgestellt",
+          "description": "Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr bearbeitet oder entfernt werden."
+        }
+      }
+    },
     "frostPanel": {
       "details": "Sensordaten-Speicher Details",
       "serverName": "Servername",

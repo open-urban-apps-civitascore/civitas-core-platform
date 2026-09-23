@@ -1247,6 +1247,14 @@
       "noPermission": "No permission to read datasources",
       "anonymousName": "Anonymous Data Source"
     },
+    "sink": {
+      "locked": {
+        "provisioned": {
+          "title": "Provisioned",
+          "description": "This data storage has been provisioned and can no longer be edited or removed."
+        }
+      }
+    },
     "frostPanel": {
       "details": "Sensor Data Storage Details",
       "serverName": "Server Name",

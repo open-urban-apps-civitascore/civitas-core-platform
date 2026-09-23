@@ -42,6 +42,7 @@ import {
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
+import { useDataSinkLocks } from '../../_hooks/use-datasink-locks'
 import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import { tableNameOwnerOutsideNode, tableNameOwnersOutsideSession } from '../../_services/dataSinkNameService'
 import {
@@ -130,6 +131,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const { isReadOnly } = useReadOnly()
 
   const { canDeletePipeline: canDelete } = useDatasetPermissions(datasetQuery.data?.data)
+
+  const { getSinkLocks, getSinkLockReason } = useDataSinkLocks()
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
@@ -792,6 +795,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       isSavingAll,
       hasAnyDirtySession,
 
+      // Data sink locks
+      getSinkLocks,
+      getSinkLockReason,
+
       // Session info
       activeSessionId: activeSession?.id || null,
     }),
@@ -829,6 +836,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       saveAllPipelines,
       isSavingAll,
       hasAnyDirtySession,
+      getSinkLocks,
+      getSinkLockReason,
     ],
   )
 
