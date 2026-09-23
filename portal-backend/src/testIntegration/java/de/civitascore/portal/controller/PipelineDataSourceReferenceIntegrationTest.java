@@ -192,8 +192,8 @@ class PipelineDataSourceReferenceIntegrationTest extends BaseKeycloakIntegration
   }
 
   @Test
-  @DisplayName("Answers identically for a nonexistent, a DRAFT and an out-of-pool source")
-  void rejectionsAreIndistinguishable() {
+  @DisplayName("Accepts a DRAFT source but rejects nonexistent and out-of-pool sources identically")
+  void draftIsAcceptedWhileRejectionsAreIndistinguishable() {
     DataPool pool = dataPool();
     UUID dataSetId = draftDataSet(pool).getId();
 
@@ -206,12 +206,12 @@ class PipelineDataSourceReferenceIntegrationTest extends BaseKeycloakIntegration
     ResponseEntity<String> draftRef = createPipelineReferencing(dataSetId, draft.getId());
     ResponseEntity<String> foreign = createPipelineReferencing(dataSetId, otherPool.getId());
 
-    // Same status and same wording: a caller authorized only on the dataset must not learn whether
-    // an id exists, nor what lifecycle status it has.
+    assertThat(draftRef.getStatusCode().value()).isEqualTo(201);
+
+    // Same status and same wording: a caller authorized only on the Dataset must not learn whether
+    // an unusable ID exists.
     assertThat(missing.getStatusCode().value()).isEqualTo(422);
-    assertThat(draftRef.getStatusCode().value()).isEqualTo(422);
     assertThat(foreign.getStatusCode().value()).isEqualTo(422);
-    assertThat(detailOf(draftRef)).isEqualTo(detailOf(missing));
     assertThat(detailOf(foreign)).isEqualTo(detailOf(missing));
   }
 

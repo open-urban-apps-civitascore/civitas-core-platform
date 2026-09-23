@@ -151,6 +151,41 @@ class DataSourceServiceTest {
   class ReleaseTests {
 
     @Test
+    @DisplayName("Should reject release when the DataStructureVersion is DRAFT")
+    void shouldRejectReleaseWithDraftDataStructureVersion() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = createMqttDataSource(id);
+      entity
+          .getDataStructureVersion()
+          .setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+
+      assertThatThrownBy(() -> dataSourceService.release(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DataStructureVersion")
+          .hasMessageContaining("AVAILABLE");
+    }
+
+    @Test
+    @DisplayName("Should reject release when the parent DataStructure is DRAFT")
+    void shouldRejectReleaseWithDraftParentDataStructure() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = createMqttDataSource(id);
+      entity
+          .getDataStructureVersion()
+          .getDataStructure()
+          .setDataStructureStatus(DataStructureStatus.DRAFT);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+
+      assertThatThrownBy(() -> dataSourceService.release(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("parent DataStructure")
+          .hasMessageContaining("AVAILABLE");
+    }
+
+    @Test
     @DisplayName("Should release valid MQTT data source")
     void shouldReleaseValidMqttDataSource() {
       UUID id = UUID.randomUUID();
@@ -467,6 +502,31 @@ class DataSourceServiceTest {
       // the caller cannot distinguish an existing-but-forbidden version from a non-existent one.
       assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("Should reject changing an AVAILABLE DataSource to a DRAFT version")
+    void shouldRejectDraftVersionOnUpdateReleasedMeta() {
+      UUID id = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      DataStructureVersion dsv = createDataStructureVersion();
+      dsv.setId(dsvId);
+      dsv.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setDataStructureVersionId(dsvId);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      stubNotInUse(id);
+      when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DataStructureVersion")
+          .hasMessageContaining("AVAILABLE");
     }
 
     @Test
@@ -930,8 +990,8 @@ class DataSourceServiceTest {
   class DataStructureVersionLinkingTests {
 
     @Test
-    @DisplayName("Should reject linking a DRAFT DataStructureVersion")
-    void shouldRejectLinkingDraftDataStructureVersion() {
+    @DisplayName("Should link a DRAFT DataStructureVersion to a DRAFT DataSource")
+    void shouldLinkDraftDataStructureVersion() {
       UUID dsvId = UUID.randomUUID();
       DataStructureVersion dsv = createDataStructureVersion();
       dsv.setId(dsvId);
@@ -950,15 +1010,16 @@ class DataSourceServiceTest {
 
       when(dataSourceMapper.toEntity(any())).thenReturn(entity);
       when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
+      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      assertThatThrownBy(() -> dataSourceService.create(input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("AVAILABLE status");
+      DataSource result = dataSourceService.create(input);
+
+      assertThat(result.getDataStructureVersion()).isSameAs(dsv);
     }
 
     @Test
-    @DisplayName("Should reject linking when parent DataStructure is DRAFT")
-    void shouldRejectLinkingWhenParentDataStructureIsDraft() {
+    @DisplayName("Should link a version whose parent DataStructure is DRAFT")
+    void shouldLinkVersionWithDraftParentDataStructure() {
       UUID dsvId = UUID.randomUUID();
       DataStructureVersion dsv = createDataStructureVersion();
       dsv.setId(dsvId);
@@ -977,10 +1038,11 @@ class DataSourceServiceTest {
 
       when(dataSourceMapper.toEntity(any())).thenReturn(entity);
       when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
+      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      assertThatThrownBy(() -> dataSourceService.create(input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("parent DataStructure");
+      DataSource result = dataSourceService.create(input);
+
+      assertThat(result.getDataStructureVersion()).isSameAs(dsv);
     }
 
     @Test
@@ -1583,8 +1645,10 @@ class DataSourceServiceTest {
   private DataStructureVersion createDataStructureVersion() {
     DataStructureVersion dsv = new DataStructureVersion();
     dsv.setId(UUID.randomUUID());
+    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     DataStructure parent = new DataStructure();
     parent.setId(UUID.randomUUID());
+    parent.setDataStructureStatus(DataStructureStatus.AVAILABLE);
     dsv.setDataStructure(parent);
     return dsv;
   }
