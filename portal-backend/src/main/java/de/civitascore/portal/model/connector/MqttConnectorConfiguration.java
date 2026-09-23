@@ -36,10 +36,6 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
           "'topics' must contain exactly one topic filter; use wildcards (+, #) for multiple topics")
   private List<String> topics;
 
-  @JsonProperty("client_id")
-  @Schema(description = "MQTT client identifier.", example = "civitas-client-1")
-  private String clientId;
-
   @Schema(
       description = "QoS level: 0 = at most once, 1 = at least once, 2 = exactly once.",
       example = "1")
@@ -72,10 +68,6 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
 
   @Schema(description = "Broker username.", example = "mqttuser")
   private String user;
-
-  public void setClientId(String clientId) {
-    this.clientId = normalizeBlank(clientId);
-  }
 
   public void setConnectTimeout(String connectTimeout) {
     this.connectTimeout = normalizeBlank(connectTimeout);

@@ -6,6 +6,5 @@
   "element": "urn:core:platform:civitas:element:luftqualitaet:AirQualityRawReading:1.0.0",
   "urls": ["mqtt://mosquitto:1883"],
   "topics": ["luftqualitaet/readings/+"],
-  "client_id": "minifi-airquality",
   "qos": 1
 }

@@ -141,12 +141,10 @@ class MqttConnectorConfigurationTest {
     void shouldNormalizeBlankOptionalStringsToNull() {
       MqttConnectorConfiguration config = new MqttConnectorConfiguration();
 
-      config.setClientId("   ");
       config.setConnectTimeout("");
       config.setKeepalive(" ");
       config.setUser("\t");
 
-      assertThat(config.getClientId()).isNull();
       assertThat(config.getConnectTimeout()).isNull();
       assertThat(config.getKeepalive()).isNull();
       assertThat(config.getUser()).isNull();
@@ -163,7 +161,6 @@ class MqttConnectorConfigurationTest {
       Map<String, Object> map = new LinkedHashMap<>();
       map.put("urls", List.of("tcp://broker:1883"));
       map.put("topics", List.of("sensors/#"));
-      map.put("client_id", "my-client");
       map.put("qos", 2);
       map.put("protocol_version", "5");
       map.put("connect_timeout", "5s");
@@ -177,7 +174,6 @@ class MqttConnectorConfigurationTest {
 
       assertThat(config.getUrls()).containsExactly("tcp://broker:1883");
       assertThat(config.getTopics()).isEqualTo(List.of("sensors/#"));
-      assertThat(config.getClientId()).isEqualTo("my-client");
       assertThat(config.getQos()).isEqualTo(2);
       assertThat(config.getProtocolVersion()).isEqualTo("5");
       assertThat(config.getConnectTimeout()).isEqualTo("5s");
@@ -209,7 +205,6 @@ class MqttConnectorConfigurationTest {
       map.put("urls", List.of("tcp://broker:1883"));
       map.put("topics", List.of("sensors/#"));
       map.put("qos", 1);
-      map.put("client_id", "");
       map.put("connect_timeout", "   ");
       map.put("keepalive", " ");
       map.put("user", "\t");
@@ -218,7 +213,6 @@ class MqttConnectorConfigurationTest {
       MqttConnectorConfiguration config =
           MAPPER.convertValue(map, MqttConnectorConfiguration.class);
 
-      assertThat(config.getClientId()).isNull();
       assertThat(config.getConnectTimeout()).isNull();
       assertThat(config.getKeepalive()).isNull();
       assertThat(config.getUser()).isNull();
@@ -251,7 +245,6 @@ class MqttConnectorConfigurationTest {
       MqttConnectorConfiguration config = new MqttConnectorConfiguration();
       config.setUrls(List.of("tcp://broker:1883"));
       config.setTopics(List.of("sensors/#"));
-      config.setClientId("my-client");
       config.setQos(2);
       config.setProtocolVersion("5");
       config.setConnectTimeout("5s");
@@ -264,7 +257,6 @@ class MqttConnectorConfigurationTest {
 
       assertThat(map.get("urls")).isEqualTo(List.of("tcp://broker:1883"));
       assertThat(map.get("topics")).isEqualTo(List.of("sensors/#"));
-      assertThat(map.get("client_id")).isEqualTo("my-client");
       assertThat(map.get("qos")).isEqualTo(2);
       assertThat(map.get("protocol_version")).isEqualTo("5");
       assertThat(map.get("connect_timeout")).isEqualTo("5s");
