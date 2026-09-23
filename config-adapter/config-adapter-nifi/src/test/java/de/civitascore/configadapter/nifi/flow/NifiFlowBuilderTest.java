@@ -667,10 +667,9 @@ class NifiFlowBuilderTest {
   }
 
   @Test
-  void frostSinkWithSqlSourceIsRejected() {
-    // FROST consumes the STA envelope an MQTT source delivers; a SQL source emits plain records
-    // that
-    // SplitJson would never match, so the combination is rejected rather than silently empty.
+  void frostSinkWithoutPortIsRejected() {
+    // A SQL source is accepted without a mapping (its records must have the port structure), but a
+    // FROST sink without a port cannot be built.
     FlowBuildSpec spec =
         new FlowBuildSpec(
             "pipeline-frost-sql",
@@ -688,7 +687,8 @@ class NifiFlowBuilderTest {
                 Map.of("Database Connection URL", "jdbc:postgresql://s/in")),
             null,
             null);
-    assertThrows(FatalAdapterException.class, () -> builder.build(spec));
+    FatalAdapterException ex = assertThrows(FatalAdapterException.class, () -> builder.build(spec));
+    assertTrue(ex.getMessage().contains("requires the 'Port' property"), ex.getMessage());
   }
 
   @Test
@@ -815,11 +815,12 @@ class NifiFlowBuilderTest {
 
   @Test
   void buildsFrostSubFlowWithoutDbcp() throws Exception {
-    // ConsumeMQTT + SplitJson + PutFrostRecord + LogMessage. The generated find-or-create graph
-    // needed twenty-one processors for the same Pipeline.
+    // ConsumeMQTT + ConvertRecord + SplitJson + PutFrostRecord + LogMessage. The generated
+    // find-or-create graph needed twenty-one processors for the same Pipeline.
     JsonNode flow = build(frostSink());
 
-    assertEquals(4, flow.get("flowContents").get("processors").size());
+    assertEquals(5, flow.get("flowContents").get("processors").size());
+    assertEquals(1, countProcessors(flow, "ConvertRecord"), "raw MQTT JSON becomes records");
     // The web client carries the transport; a FROST sink needs no database connection pool.
     for (JsonNode service : flow.get("flowContents").get("controllerServices")) {
       assertFalse(service.path("type").asText().contains("DBCP"), "no connection pool for FROST");

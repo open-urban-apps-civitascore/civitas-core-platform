@@ -432,27 +432,46 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
-  void sqlToFrostWithoutMappingIsRejected() throws Exception {
-    // Without a mapping the find-or-create consumes the source's envelope as-is; a SQL source emits
-    // plain records, so the combination is rejected — with the hint that a mapping unlocks it
+  void sqlToFrostWithoutMappingIsPlanned() throws Exception {
+    // Without a mapping the records must already have the structure of the port. A SQL source
+    // emits records, so no ConvertRecord is added, and the split hands one record to the writer.
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
-      FatalAdapterException ex =
-          assertThrows(
-              FatalAdapterException.class,
-              () ->
-                  planner(resolver)
-                      .plan(
-                          req(
-                              "p-sql-frost-nomap",
-                              graphWithoutMapping(),
-                              sqlSource(null),
-                              new FrostSinkSpec("1", SinkPort.THING_TREE, null))));
-      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
-      assertTrue(
-          ex.getMessage()
-              .contains(
-                  "FROST sink without a record mapping requires a source that emits the"
-                      + " SensorThings envelope (MQTT)"));
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  req(
+                      "p-sql-frost-nomap",
+                      graphWithoutMapping(),
+                      sqlSource(null),
+                      new FrostSinkSpec("1", SinkPort.THING_TREE, null)))
+              .snapshotJson();
+      assertFalse(snapshot.contains("ConvertRecord"), "SQL already emits records");
+      processorOfType(snapshot, "PutFrostRecord");
+    }
+  }
+
+  @Test
+  void mqttToFrostWithoutMappingConvertsToRecords() throws Exception {
+    // MQTT delivers raw JSON: without a mapping the flow still converts it to records, so that the
+    // split hands PutFrostRecord one JSON object per record and never the whole message.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  req(
+                      "p-mqtt-frost-nomap",
+                      graphWithoutMapping(),
+                      mqttSource(null),
+                      new FrostSinkSpec("1", SinkPort.THING_TREE, null)))
+              .snapshotJson();
+      processorOfType(snapshot, "ConvertRecord");
+      assertEquals(
+          "$[*]",
+          processorOfType(snapshot, "SplitJson")
+              .path("properties")
+              .path("JsonPath Expression")
+              .asText(),
+          "the record-writer array is split into records");
     }
   }
 
