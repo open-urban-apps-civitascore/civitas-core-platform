@@ -25,6 +25,7 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.embedded.ProvisioningStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -1626,6 +1627,36 @@ class DataSetServiceTest {
       ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
       verify(dataSetRepository).save(saved.capture());
       assertThat(saved.getValue().isProvisioned()).isTrue();
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+        value = PendingSagaType.class,
+        names = {"CREATE", "UPDATE"})
+    @DisplayName("provisioning saga: marks every sink of the dataset provisioned")
+    void provisioningSagaMarksEverySinkProvisioned(PendingSagaType sagaType) {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(sagaType);
+      DataSink postgis = new DataSink();
+      postgis.setDataSinkType(DataSinkType.POSTGIS);
+      DataSink frost = new DataSink();
+      frost.setDataSinkType(DataSinkType.FROST);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(postgis, frost));
+
+      createService()
+          .handleSagaCompleted(
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
+
+      assertThat(List.of(postgis, frost))
+          .extracting(DataSink::getProvisioningStatus)
+          .containsOnly(ProvisioningStatus.PROVISIONED);
+      verify(dataSinkRepository).save(postgis);
+      verify(dataSinkRepository).save(frost);
     }
 
     @Test

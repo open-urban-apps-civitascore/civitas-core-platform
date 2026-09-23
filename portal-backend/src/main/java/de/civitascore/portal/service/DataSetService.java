@@ -7,6 +7,7 @@ import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.embedded.ProvisioningStatus;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
@@ -952,9 +953,16 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * FROST is provisioned only for datasets carrying a FROST sink, so a project id is no longer a
    * reliable proxy. Never resets it: the flag survives an unrelease and is only dropped when the
    * row is removed on DELETE.
+   *
+   * <p>Each sink is marked as well. A completed saga provisioned every sink it was sent, and the
+   * mutation guard keeps the sinks of an AVAILABLE dataset from changing in between.
    */
   private void markProvisioned(DataSet dataSet) {
     dataSet.setProvisioned(true);
+    for (DataSink sink : dataSinkRepository.findByDataSetId(dataSet.getId())) {
+      sink.setProvisioningStatus(ProvisioningStatus.PROVISIONED);
+      dataSinkRepository.save(sink);
+    }
   }
 
   /**

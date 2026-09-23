@@ -13,6 +13,7 @@ import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.embedded.ProvisioningStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
@@ -31,6 +32,7 @@ import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
@@ -67,6 +69,7 @@ class DataSetControllerIntegrationTest
 
   @Autowired protected PortalTestDataFactory portalData;
   @Autowired private DataSetRepository dataSetRepository;
+  @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DistributionRepository distributionRepository;
   @Autowired private UserRepository userRepository;
@@ -2147,10 +2150,11 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("CREATE saga marks the dataset provisioned")
+    @DisplayName("CREATE saga marks the dataset and its sinks provisioned")
     void createSagaMarksProvisioned() {
       DataSet dataSet = createReleasedDataSet();
       UUID dataSetId = dataSet.getId();
+      UUID sinkId = portalData.dataSink(dataSet).getId();
 
       SagaResultPayload result =
           new SagaResultPayload(
@@ -2159,6 +2163,8 @@ class DataSetControllerIntegrationTest
 
       DataSet persisted = dataSetRepository.findById(dataSetId).orElseThrow();
       assertThat(persisted.isProvisioned()).isTrue();
+      assertThat(dataSinkRepository.findById(sinkId).orElseThrow().getProvisioningStatus())
+          .isEqualTo(ProvisioningStatus.PROVISIONED);
     }
   }
 
