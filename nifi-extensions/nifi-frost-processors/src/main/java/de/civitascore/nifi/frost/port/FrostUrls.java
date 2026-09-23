@@ -49,12 +49,13 @@ public final class FrostUrls {
   }
 
   /** A Location by its reference, scoped to its Thing. */
-  public static String locationLookup(String reference, String thingReference) {
+  public static String locationLookup(String projectId, String reference, String thingReference) {
     return "Locations"
         + LOOKUP_OPTIONS
         + filter(
             term("properties/reference", reference),
-            term("properties/thingReference", thingReference));
+            term("properties/thingReference", thingReference),
+            scope(projectId, "Things/Projects/id"));
   }
 
   /**
