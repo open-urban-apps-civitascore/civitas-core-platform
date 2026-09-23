@@ -51,7 +51,7 @@ public final class ThingTreePort implements PortPlanner {
 
     ObjectNode location = StaEntities.firstOf(record, "Locations", StaEntities.LOCATION);
     if (location != null) {
-      planLocation(location, plan, thingReference);
+      planLocation(location, plan, projectId, thingReference);
     }
 
     ObjectNode datastream = StaEntities.firstOf(record, "Datastreams", StaEntities.DATASTREAM);
@@ -91,7 +91,8 @@ public final class ThingTreePort implements PortPlanner {
         true);
   }
 
-  private void planLocation(ObjectNode location, RecordPlan plan, String thingReference) {
+  private void planLocation(
+      ObjectNode location, RecordPlan plan, String projectId, String thingReference) {
     // A Thing has one current Location, and the mapped shape carries one. Without a reference of
     // its own the Location takes the Thing's, which keeps the lookup a direct query instead of a
     // navigation into a collection whose order nothing fixes.
@@ -104,7 +105,9 @@ public final class ThingTreePort implements PortPlanner {
         body, ReferenceBlock.PROPERTIES, ReferenceBlock.THING_REFERENCE, thingReference);
 
     plan.ownLookup(
-        StaEntities.LOCATION, LOCATION, FrostUrls.locationLookup(reference, thingReference));
+        StaEntities.LOCATION,
+        LOCATION,
+        FrostUrls.locationLookup(projectId, reference, thingReference));
     plan.write(
         StaEntities.LOCATION,
         LOCATION_UPDATE,

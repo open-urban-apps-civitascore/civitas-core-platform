@@ -36,7 +36,7 @@
     "id" : "r0-loc",
     "atomicityGroup" : "r0",
     "method" : "get",
-    "url" : "Locations?$select=id&$top=1&$filter=properties/reference%20eq%20'A7'%20and%20properties/thingReference%20eq%20'A7'"
+    "url" : "Locations?$select=id&$top=1&$filter=properties/reference%20eq%20'A7'%20and%20properties/thingReference%20eq%20'A7'%20and%20Things/Projects/id%20eq%205"
   }, {
     "id" : "r0-loc-update",
     "atomicityGroup" : "r0",
