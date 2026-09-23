@@ -47,7 +47,7 @@ include:
 
 # Setup job to determine version from git for all jobs
 setup-version:
-  image: alpine:latest
+  image: alpine:3.24.2
   stage: .pre
   variables:
     GIT_DEPTH: 0 # Full clone required for git describe to find tags in history
