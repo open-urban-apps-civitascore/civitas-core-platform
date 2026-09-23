@@ -14,9 +14,9 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <!-- Aligned with the target host `portal-backend` and the sibling `portal-model`
-         (both on 4.1.0) in the civitas-core-platform mono-repo. -->
-    <version>4.1.0</version>
+    <!-- Tracks `portal-backend`, the only consumer. Model Forge has its own parent
+         rather than the mono-repo one, so this has to be raised with it. -->
+    <version>4.1.1</version>
     <relativePath/>
   </parent>
 
