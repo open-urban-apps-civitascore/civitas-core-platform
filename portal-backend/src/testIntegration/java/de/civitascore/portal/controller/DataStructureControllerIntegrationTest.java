@@ -1047,12 +1047,13 @@ class DataStructureControllerIntegrationTest
       assertThat(response.getBody().getDataStructureVersions())
           .extracting(
               DataStructureVersionUsageSummaryDTO::getId,
+              DataStructureVersionUsageSummaryDTO::getDataStructureId,
               DataStructureVersionUsageSummaryDTO::isInUse,
               DataStructureVersionUsageSummaryDTO::isInUseByReleased)
           .containsExactlyInAnyOrder(
-              tuple(releasedUse.getId(), true, true),
-              tuple(draftUse.getId(), true, false),
-              tuple(unused.getId(), false, false));
+              tuple(releasedUse.getId(), ds.getId(), true, true),
+              tuple(draftUse.getId(), ds.getId(), true, false),
+              tuple(unused.getId(), ds.getId(), false, false));
     }
 
     @Test

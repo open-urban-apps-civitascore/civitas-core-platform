@@ -35,6 +35,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 @DisplayName("DataSource Controller Integration Tests")
@@ -509,6 +510,24 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<Void> response = performDelete(id);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should refuse to delete a DRAFT data source that a Pipeline references")
+    void shouldRefuseDeletingDraftDataSourceReferencedByPipeline() {
+      UUID id = createTestEntity();
+      linkDataSourceToDataSetViaStatus(
+          dataSourceRepository.findById(id).orElseThrow(), DataSetStatus.DRAFT);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      // The foreign key also answers 409, so only the problem type shows the guard ran before
+      // postDelete dropped the Model Forge artifact.
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
+      assertThat(dataSourceRepository.existsById(id)).isTrue();
     }
 
     @Test

@@ -986,6 +986,49 @@ class DataSourceServiceTest {
                   assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
                       .containsExactly(id));
     }
+
+    @Test
+    @DisplayName(
+        "Should reject narrowing the scope to exclude a pool it feeds when only drafts use it")
+    void shouldRejectNarrowingScopeExcludingLinkedPoolWhenInUseByDraftsOnly() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setDatapoolScopeType(DatapoolScopeType.ALL);
+
+      DataPool poolA = new DataPool();
+      poolA.setId(UUID.randomUUID());
+      DataSet draftDataSet = new DataSet();
+      draftDataSet.setId(UUID.randomUUID());
+      draftDataSet.setDataPool(poolA);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSet(draftDataSet);
+      pipeline.setDataSources(new HashSet<>(Set.of(entity)));
+
+      DataPool poolB = new DataPool();
+      poolB.setId(UUID.randomUUID());
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(poolB.getId()));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setDatapoolScope(scope);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(artifactUsageLookup.of(entity)).thenReturn(IN_USE_BY_DRAFTS);
+      when(dataPoolRepository.findAllById(List.of(poolB.getId()))).thenReturn(List.of(poolB));
+      when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(id));
+      verify(dataSourceRepository, never()).save(any());
+    }
   }
 
   @Nested
@@ -1006,6 +1049,39 @@ class DataSourceServiceTest {
       assertThatThrownBy(() -> dataSourceService.deleteById(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("released");
+    }
+
+    @Test
+    @DisplayName("Should refuse to delete a DRAFT data source that a Pipeline references")
+    void shouldRefuseDeletingDraftDataSourceReferencedByPipeline() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = createMqttDataSource(id);
+
+      when(dataSourceRepository.existsById(id)).thenReturn(true);
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(true);
+
+      assertThatThrownBy(() -> dataSourceService.deleteById(id))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("referenced by a Pipeline");
+      verify(dataSourceRepository, never()).deleteById(id);
+      verify(modelRegistryGateway, never()).deletePayload(any());
+    }
+
+    @Test
+    @DisplayName("Should delete a DRAFT data source that no Pipeline references")
+    void shouldDeleteDraftDataSourceNotReferencedByPipeline() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = createMqttDataSource(id);
+
+      when(dataSourceRepository.existsById(id)).thenReturn(true);
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(false);
+
+      dataSourceService.deleteById(id);
+
+      verify(dataSourceRepository).deleteById(id);
+      verify(modelRegistryGateway).deletePayload(entity.getConfigurationLogicalUrn());
     }
 
     @Test
