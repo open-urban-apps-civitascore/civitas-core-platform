@@ -13,7 +13,6 @@ import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { downloadJsonSchema, SchemaExportError } from '../../services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '../../services/modelUploadService'
 import { rootFailureMessage } from '../../services/rootFailureMessage'
-import { LoadStandardMenu } from './LoadStandardMenu'
 
 interface ToolbarProps {
   onSave?: () => void
@@ -140,8 +139,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             ]}
           />
         )}
-
-        <LoadStandardMenu />
 
         {canExportModel && (
           <Button
