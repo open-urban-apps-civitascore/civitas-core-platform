@@ -59,8 +59,7 @@ class DataStructureAssemblerTest {
             DataStructureVersionUsageSummaryDTO::isInUse,
             DataStructureVersionUsageSummaryDTO::isInUseByReleased)
         .containsExactlyInAnyOrder(
-            tuple(releasedUse.getId(), true, true),
-            tuple(draftUse.getId(), true, false));
+            tuple(releasedUse.getId(), true, true), tuple(draftUse.getId(), true, false));
     assertThat(dto.isInUse()).isTrue();
     assertThat(dto.isInUseByReleased()).isTrue();
   }

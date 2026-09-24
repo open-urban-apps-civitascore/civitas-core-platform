@@ -164,7 +164,8 @@ public class ArtifactUsageLookup {
     if (dataStructure.getDataStructureVersions() != null) {
       dataStructure
           .getDataStructureVersions()
-          .forEach(version -> usageByVersion.put(version.getId(), ofVersion(dataStructure, version)));
+          .forEach(
+              version -> usageByVersion.put(version.getId(), ofVersion(dataStructure, version)));
     }
     return usageByVersion;
   }
