@@ -10,7 +10,6 @@ export const defaultFormUser: User = {
   lastName: '',
   title: 'MR',
   email: '',
-  active: true,
   groups: [],
   phone: null,
 }

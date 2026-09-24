@@ -157,7 +157,6 @@ export const useDatastructure = ({
       if (datastructure.dataStructureStatus === STATUS_TYPES.AVAILABLE)
         response = await updateReleasedDatastructure.mutateAsync({
           ...values,
-          createdFromDataSource: datastructure.createdFromDataSource,
           ...assignmentsPatch,
         })
       else

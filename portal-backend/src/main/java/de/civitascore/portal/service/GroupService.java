@@ -12,7 +12,6 @@ import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentGroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
-import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -77,24 +76,6 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
     return save(group);
   }
 
-  /**
-   * Override deleteById to validate child groups before publishing to Keycloak.
-   * EventPublishingService.deleteById does not call preProcessDelete, so we perform the validation
-   * here.
-   */
-  @Override
-  @Transactional
-  public void deleteById(UUID id) {
-    Group group = findByIdOrThrow(id);
-    if (!group.getChildGroups().isEmpty()) {
-      throw new ResourceInUseException(
-          "Group",
-          group.getId(),
-          "Cannot delete Group because it has child groups. Remove or reassign child groups first.");
-    }
-    super.deleteById(id);
-  }
-
   @Override
   protected ConfigValue toConfigValuePostSave(
       Group entity, GroupInputDTO input, ConfigValue preSaveConfigValue) {
@@ -124,10 +105,6 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
     }
 
     groupConfig.setName(entity.getName());
-
-    if (entity.getParentGroup() != null && entity.getParentGroup().getExternalId() != null) {
-      groupConfig.setParentId(entity.getParentGroup().getExternalId());
-    }
 
     if (entity.getMembers() != null) {
       // Members are Keycloak user UUIDs (externalIds). A member normally always has one (user

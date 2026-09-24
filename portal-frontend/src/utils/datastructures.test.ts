@@ -8,7 +8,7 @@ import type {
   DatastructureVersionFormData,
   DatastructureVersionSummary,
 } from '@/types/datastructures'
-import { DATASTRUCTURE_STATUS_TYPES, DATASTRUCTURE_VERSION_SOURCE } from '@/types/datastructures'
+import { DATASTRUCTURE_STATUS_TYPES } from '@/types/datastructures'
 
 import {
   buildSessionFromVersion,
@@ -27,7 +27,6 @@ const createVersion = (versionNumber: string, dataStructureId = 'ds1'): Version 
   version: versionNumber,
   description: `Test Description ${versionNumber}`,
   dataStructureVersionStatus: 'DRAFT',
-  dataStructureVersionSource: 'OWN',
   dataStructureId,
   createdAt: new Date().toISOString(),
   modifiedAt: new Date().toISOString(),
@@ -37,7 +36,6 @@ const createDatastructure = (versions: string[], datastructureId = 'ds1'): Datas
   id: datastructureId,
   name: `Datastructure ${datastructureId}`,
   description: 'Datastructure Description',
-  createdFromDataSource: false,
   dataStructureStatus: 'DRAFT',
   inUse: false,
   dataStructureVersions: versions.map(version => createVersion(version, datastructureId)),
@@ -51,7 +49,6 @@ const createVersionSummary = (overrides?: Partial<DatastructureVersionSummary>):
   version: '1.0',
   description: 'Version Description',
   dataStructureVersionStatus: 'DRAFT',
-  dataStructureVersionSource: 'OWN',
   dataStructureId: 'ds1',
   createdAt: new Date().toISOString(),
   modifiedAt: new Date().toISOString(),
@@ -63,7 +60,6 @@ const createVersionDetail = (overrides?: Partial<DatastructureVersion>): Datastr
   version: '1.0',
   description: 'Version Description',
   dataStructureVersionStatus: 'DRAFT',
-  dataStructureVersionSource: 'OWN',
   modelName: 'Test Model',
   model: { $id: 'http://civitas.org/model/test', type: 'object', properties: {} },
   styles: {
@@ -88,7 +84,6 @@ const createVersionFormData = (overrides?: Partial<DatastructureVersionFormData>
   version: '1.0.0',
   description: 'Version Description',
   dataStructureVersionStatus: 'DRAFT',
-  dataStructureVersionSource: 'OWN',
   modelName: 'Test Model',
   nodes: [],
   edges: [],
@@ -108,7 +103,6 @@ describe('mapDatastructuresApiToListData', () => {
       name: datastructure.name,
       description: datastructure.description,
       status: datastructure.dataStructureStatus,
-      source: datastructure.dataStructureVersions[0].dataStructureVersionSource,
       versionNumber: '1.0',
       inUse: datastructure.inUse,
     })
@@ -123,7 +117,6 @@ describe('mapDatastructuresApiToListData', () => {
       id: datastructure.id,
       name: datastructure.name,
       description: datastructure.description as string,
-      source: expectedVersions[0].dataStructureVersionSource,
       status: datastructure.dataStructureStatus,
       versionNumber: expectedVersions[0].version,
       versions: [
@@ -131,7 +124,6 @@ describe('mapDatastructuresApiToListData', () => {
           id: expectedVersions[0].id,
           name: `Version ${expectedVersions[0].version}`,
           description: expectedVersions[0].description as string,
-          source: expectedVersions[0].dataStructureVersionSource,
           status: expectedVersions[0].dataStructureVersionStatus,
           versionNumber: expectedVersions[0].version,
           versions: [],
@@ -241,7 +233,6 @@ describe('mapDatastructureVersionsApiToListData', () => {
         name: `Version ${versions[0].version}`,
         description: versions[0].description,
         status: versions[0].dataStructureVersionStatus,
-        source: versions[0].dataStructureVersionSource,
       },
     ])
   })
@@ -266,7 +257,6 @@ describe('mapDatastructureVersionApiToFormData', () => {
       version: version.version,
       description: version.description,
       dataStructureVersionStatus: version.dataStructureVersionStatus,
-      dataStructureVersionSource: version.dataStructureVersionSource,
       modelName: version.modelName,
       nodes: version.styles?.nodes ?? [],
       edges: version.styles?.edges ?? [],
@@ -296,7 +286,6 @@ describe('mapDatastructureVersionFormToApiData', () => {
     expect(result).toEqual({
       id: formData.id,
       description: formData.description,
-      dataStructureVersionSource: formData.dataStructureVersionSource,
       dataStructureVersionStatus: formData.dataStructureVersionStatus,
       modelName: formData.modelName,
       model,
@@ -551,7 +540,6 @@ describe('root designation round-trip through persisted styles', () => {
         id: 'v1',
         version: '1.0.0',
         description: '',
-        dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
         dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
         modelName: 'Struct',
         nodes: diagram.nodes,

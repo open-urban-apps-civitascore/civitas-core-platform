@@ -58,12 +58,6 @@ public class DataSet extends BaseDataEntity {
   @Builder.Default
   private Set<Pipeline> pipelines = new HashSet<>();
 
-  @Column(name = "identifier")
-  private String identifier;
-
-  @Column(name = "version")
-  private String version;
-
   /**
    * Logical CORE URN of this DataSet's manifest artifact in Model Forge — the manifest its member
    * artifacts (Pipelines and, transitively, their sources/sinks/mappings/structures) are linked

@@ -56,7 +56,6 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
   const t = useTranslations('datasources.dataModel.importModal')
   const tCommon = useTranslations('common')
   const tDatastructures = useTranslations('datastructures')
-  const tVersion = useTranslations('datastructureVersions')
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
   const [sorting, setSorting] = useState<SortingState>([])
@@ -160,16 +159,6 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
       meta: {
         style: {
           minWidth: '200px',
-        },
-      },
-    }),
-    columnHelper.accessor('source', {
-      header: tDatastructures('tableHeaders.source'),
-      cell: info => (info.getValue() ? tVersion(`source.${info.getValue()}`) : '-'),
-      meta: {
-        style: {
-          width: '10%',
-          minWidth: '100px',
         },
       },
     }),

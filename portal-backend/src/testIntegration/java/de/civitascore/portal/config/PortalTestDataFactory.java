@@ -4,7 +4,6 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
-import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
@@ -205,8 +204,7 @@ public class PortalTestDataFactory {
         User.builder()
             .firstName("First" + seq)
             .lastName("Last" + seq)
-            .email("user-" + seq + "@test.local")
-            .active(true);
+            .email("user-" + seq + "@test.local");
     customizer.accept(builder);
     return userRepository.save(builder.build());
   }
@@ -349,7 +347,6 @@ public class PortalTestDataFactory {
     var builder =
         DataStructureVersion.builder()
             .version("1.0." + seq)
-            .dataStructureVersionSource(DataStructureVersionSource.OWN)
             .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
             .dataStructure(dataStructure);
     customizer.accept(builder);

@@ -41,7 +41,6 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       description: datastructure.description || '-',
       status: datastructure.dataStructureStatus,
       versionNumber: highestVersion?.version ?? null,
-      source: highestVersion?.dataStructureVersionSource || null,
       inUse: datastructure.inUse,
       inUseByReleased: datastructure.inUseByReleased,
       // add versions field to versions for showing subrows in table
@@ -51,7 +50,6 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
         name: version.version ? `Version ${version.version}` : '-',
         description: version.description || '-',
         status: version.dataStructureVersionStatus,
-        source: version.dataStructureVersionSource,
         inUseByReleased: version.inUseByReleased,
         versions: [],
       })),
@@ -68,7 +66,6 @@ export const mapDatastructureVersionsApiToListData = (
     name: version.version ? `Version ${version.version}` : '-',
     description: version.description || '-',
     status: version.dataStructureVersionStatus,
-    source: version.dataStructureVersionSource,
     inUseByReleased: version.inUseByReleased,
   }))
 
@@ -77,7 +74,6 @@ export const mapDatastructureVersionApiToFormData = (version: DatastructureVersi
   version: version.version ?? '',
   description: version.description || '',
   dataStructureVersionStatus: version.dataStructureVersionStatus,
-  dataStructureVersionSource: version.dataStructureVersionSource,
   modelName: version.modelName,
   nodes: version.styles?.nodes || [],
   edges: version.styles?.edges || [],
@@ -92,7 +88,6 @@ export const mapDatastructureVersionFormToApiData = (
   return {
     id: version.id,
     description: version.description,
-    dataStructureVersionSource: version.dataStructureVersionSource,
     dataStructureVersionStatus: version.dataStructureVersionStatus,
     modelName: version.modelName,
     model,

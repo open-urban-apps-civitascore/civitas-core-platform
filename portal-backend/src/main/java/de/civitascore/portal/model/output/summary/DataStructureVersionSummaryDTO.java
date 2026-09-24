@@ -1,6 +1,5 @@
 package de.civitascore.portal.model.output.summary;
 
-import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -18,7 +17,6 @@ public class DataStructureVersionSummaryDTO extends BaseSummaryDTO {
   protected LocalDateTime modifiedAt;
 
   private DataStructureVersionStatus dataStructureVersionStatus;
-  private DataStructureVersionSource dataStructureVersionSource;
 
   private String description;
   private String version;

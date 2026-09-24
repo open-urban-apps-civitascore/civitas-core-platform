@@ -34,7 +34,6 @@ export type DataSink = {
 }
 
 export type PostgisDataSinkPayload = {
-  id: string | null
   dataSinkType: typeof DATASINK_TYPES.POSTGIS
   configuration: {
     tableName: string
@@ -51,7 +50,6 @@ export type PostgisDataSinkPayload = {
 }
 
 export type FrostDataSinkPayload = {
-  id: string | null
   dataSinkType: typeof DATASINK_TYPES.FROST
   /**
    * Empty for a passthrough pipeline; a mapped pipeline references its final mapping's Thing-shaped

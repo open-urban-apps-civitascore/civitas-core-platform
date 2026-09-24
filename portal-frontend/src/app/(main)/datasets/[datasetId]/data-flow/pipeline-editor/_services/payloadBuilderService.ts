@@ -306,18 +306,19 @@ export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[]
     // `element` is the versioned CORE URN of the sink's target structure (a Model-Forge soft reference,
     // not a raw version id). POSTGIS uses its own data structure, FROST the mapping's target.
     let payload: DataSinkPayload | null = null
+    let entityId: string | null = null
     if (isGeoPersistenceNodeData(node.data) && node.data.dataStructureVersionId != null) {
+      entityId = node.data.entityId ?? null
       const { tableName, dataStructureUrn } = node.data
       if (!dataStructureUrn) throw new MissingDataStructureUrnError(node.id)
       payload = {
-        id: node.data.entityId ?? null,
         dataSinkType: DATASINK_TYPES.POSTGIS,
         configuration: { tableName, element: dataStructureUrn },
       }
     } else if (isFrostNodeData(node.data)) {
+      entityId = node.data.entityId ?? null
       const elementUrn = mappingTargetElementBefore(pipeline, node.id)
       payload = {
-        id: node.data.entityId ?? null,
         dataSinkType: DATASINK_TYPES.FROST,
         // The port is what the sink writes. A save without it would overwrite a stored port, and
         // the Dataset would not publish.
@@ -340,7 +341,7 @@ export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[]
       throw new DataSinkDocumentValidationError(node.id, parsed.error.issues)
     }
 
-    return [{ nodeId: node.id, entityId: payload.id, payload }]
+    return [{ nodeId: node.id, entityId, payload }]
   })
 }
 
@@ -381,7 +382,7 @@ const mappingTargetElementBefore = (pipeline: Pipeline, sinkNodeId: string): str
 export interface DataSinkSnapshotEntry {
   /** The backend data sink ID at snapshot time, or null for unsaved nodes */
   entityId: string | null
-  /** JSON-stringified payload config (dataSinkType + configuration, excluding `id`) */
+  /** JSON-stringified payload (dataSinkType + configuration) */
   configJson: string
 }
 
@@ -398,10 +399,9 @@ export const createDataSinkSnapshot = (pipeline: Pipeline): DataSinkSnapshot => 
   const payloads = buildDataSinkPayloads(pipeline)
   const snapshot: DataSinkSnapshot = {}
   for (const { nodeId, entityId, payload } of payloads) {
-    const { id: _id, ...comparable } = payload
     snapshot[nodeId] = {
       entityId,
-      configJson: JSON.stringify(comparable),
+      configJson: JSON.stringify(payload),
     }
   }
   return snapshot
@@ -415,8 +415,7 @@ export const hasDataSinkChanged = (nodeId: string, payload: DataSinkPayload, sna
   const entry = snapshot[nodeId]
   if (!entry) return true // new node, not in snapshot
 
-  const { id: _id, ...comparable } = payload
-  return JSON.stringify(comparable) !== entry.configJson
+  return JSON.stringify(payload) !== entry.configJson
 }
 
 /**
@@ -434,7 +433,7 @@ export const isDestructiveDataSinkChange = (
   const entry = snapshot[nodeId]
   if (!entry || entry.entityId == null) return false // new sink, no table to lose
 
-  const previous = JSON.parse(entry.configJson) as Omit<DataSinkPayload, 'id'>
+  const previous = JSON.parse(entry.configJson) as DataSinkPayload
   return elementOf(payload) !== elementOf(previous) || tableNameOf(payload) !== tableNameOf(previous)
 }
 

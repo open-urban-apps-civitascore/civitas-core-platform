@@ -48,7 +48,6 @@ POST {{baseUrl}}/datastructures/:dataStructureId/versions
 Content-Type: application/json
 
 {
-  "dataStructureVersionSource": "OWN",
   "description": "Initial version",
   "modelName": "StudentDatabaseModel1",
   "model": {
@@ -88,7 +87,6 @@ PUT {{baseUrl}}/datastructures/:dataStructureId/versions/:id
 Content-Type: application/json
 
 {
-  "dataStructureVersionSource": "OWN",
   "description": "Updated version",
   "modelName": "StudentDatabaseModel1",
   "model": {
@@ -225,7 +223,6 @@ PUT {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/released/met
 Content-Type: application/json
 
 {
-  "dataStructureVersionSource": "OWN",
   "modelName": "UpdatedModelName",
   "styles": {}
 }

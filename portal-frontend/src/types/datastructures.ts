@@ -27,19 +27,10 @@ export type DatastructureTab = 'basicInfo' | 'versions' | 'accessManagement'
 
 export type DatastructureVersionTab = 'structure' | 'versionInfo'
 
-export const DATASTRUCTURE_VERSION_SOURCE = {
-  OWN: 'OWN',
-} as const
-
 export const UMLModelStylesPayloadSchema = z.object({
   viewport: z.object({ x: z.number(), y: z.number(), zoom: z.number() }).optional(),
   nodePositions: z.record(z.string(), z.object({ x: z.number(), y: z.number() })),
 })
-
-export const DatastructureVersionSourceEnum = enumFromConst(DATASTRUCTURE_VERSION_SOURCE)
-
-export type DatastructureVersionSource =
-  (typeof DATASTRUCTURE_VERSION_SOURCE)[keyof typeof DATASTRUCTURE_VERSION_SOURCE]
 
 // DATASTRUCTURE VERSIONS
 
@@ -50,7 +41,6 @@ export const DatastructureVersionApiResponseSchema = z.object({
   version: z.string().nullable(),
   description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
-  dataStructureVersionSource: DatastructureVersionSourceEnum,
   modelName: z.string().nullable(),
   // Versioned CORE URN of this version's model (DataStructure) artifact in Model Forge.
   modelUrn: z.string().nullable().optional(),
@@ -71,7 +61,6 @@ export const DatastructureVersionSummaryApiResponseSchema = z.object({
   version: z.string().nullable(),
   description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
-  dataStructureVersionSource: DatastructureVersionSourceEnum,
   createdAt: z.string(),
   modifiedAt: z.string(),
   dataStructureId: z.string(),
@@ -87,7 +76,6 @@ export const DatastructureVersionFormDraftSchema = z.object({
   id: z.string(),
   version: versionSchema,
   description: z.string().trim(),
-  dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum,
   modelName: z.string().trim().nullable(),
   nodes: z.array(z.custom<UMLNode>()),
@@ -104,7 +92,6 @@ export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormD
 
 export const DatastructureVersionCreateSchema = z.object({
   description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
-  dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum.optional(),
   modelName: z.string().trim().nullable().optional(),
   model: z.record(z.string(), z.unknown()).nullable().optional(),
@@ -125,7 +112,6 @@ export type DatastructureVersionsListData = {
   name: string
   description: string
   status: DatastructureStatusType
-  source: DatastructureVersionSource
   versionNumber: string | null
   inUseByReleased?: boolean
 }
@@ -137,7 +123,6 @@ export const DatastructureApiResponseSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   dataStructureStatus: DatastructureStatusEnum,
-  createdFromDataSource: z.boolean(),
   assignments: z.array(AssignmentSchema).optional(),
   inUse: z.boolean().optional(),
   inUseByReleased: z.boolean().optional(),
@@ -199,7 +184,6 @@ export const DatastructureCreateDataSchema = z.object({
     .trim()
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
-  createdFromDataSource: z.boolean(),
   description: z
     .string()
     .trim()
@@ -212,7 +196,6 @@ export type DatastructureCreateFormData = z.infer<typeof DatastructureCreateForm
 export type DatastructureCreateData = z.infer<typeof DatastructureCreateDataSchema>
 
 export type DatastructurePutData = DatastructureFormDraft & {
-  createdFromDataSource: boolean
   assignments?: AssignmentScopedInput[]
 }
 export type DatastructurePatchData = Partial<DatastructureCreateData> & WithId
@@ -224,7 +207,6 @@ export type DatastructuresListData = {
   name: string
   description: string
   status: DatastructureStatusType
-  source: DatastructureVersionSource | null
   versionNumber: string | null
   versions: DatastructuresListData[]
   inUse?: boolean

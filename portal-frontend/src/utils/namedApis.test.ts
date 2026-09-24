@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { STATUS_TYPES } from '@/types/common'
 import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
-import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
+import { DatastructureVersion } from '@/types/datastructures'
 import { LayerFormData } from '@/types/layers'
 
 import { getNativeCRSFromDataSink, mapFormLayerToPayload } from './namedApis'
@@ -19,7 +19,6 @@ const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   geometryColumnRef: 'geom',
   nativeCRS: 'EPSG:4326',
   crs: 'EPSG:4326',
-  bboxAutoCalculate: false,
   nativeBoundingBox: { minX: '-180', minY: '-90', maxX: '180', maxY: '90', crs: 'EPSG:4326' },
   latLonBoundingBox: { minX: '-180', minY: '-90', maxX: '180', maxY: '90', crs: 'EPSG:4326' },
   defaultStyleId: null,
@@ -39,7 +38,6 @@ const makeDataSink = (): DataSink => ({
       version: '1.0.0',
       description: null,
       dataStructureVersionStatus: STATUS_TYPES.AVAILABLE,
-      dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
       dataStructureId: '00000000-0000-0000-0000-000000000050',
       createdAt: '2026-01-01T00:00:00',
       modifiedAt: '2026-01-01T00:00:00',
@@ -54,7 +52,6 @@ const makeDatastructureVersion = (model: DatastructureVersion['model'] = null): 
   version: '1.0.0',
   description: null,
   dataStructureVersionStatus: STATUS_TYPES.AVAILABLE,
-  dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
   modelName: null,
   model,
   styles: null,
@@ -132,12 +129,6 @@ describe('mapFormLayerToPayload', () => {
         nativeBoundingBox: { minX: 'not-a-number', minY: '-90', maxX: '180', maxY: '90', crs: 'EPSG:4326' },
       }),
     ])
-    expect(result.latLonBoundingBox).toBeNull()
-  })
-
-  it('sets nativeBoundingBox and latLonBoundingBox to null when bboxAutoCalculate is true', () => {
-    const [result] = mapFormLayerToPayload([makeLayer({ bboxAutoCalculate: true })])
-    expect(result.nativeBoundingBox).toBeNull()
     expect(result.latLonBoundingBox).toBeNull()
   })
 

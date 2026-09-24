@@ -16,9 +16,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class DataSetOutputDTO extends BaseOutputDTO {
 
-  @Schema(example = "traffic-count-2025")
-  private String identifier;
-
   @Schema(example = "Traffic Count 2025")
   private String name;
 
@@ -27,9 +24,6 @@ public class DataSetOutputDTO extends BaseOutputDTO {
 
   @Schema(example = "DRAFT")
   private DataSetStatus dataSetStatus;
-
-  @Schema(example = "1.0.0")
-  private String version;
 
   private List<PipelineSummaryDTO> pipelines = new ArrayList<>();
 

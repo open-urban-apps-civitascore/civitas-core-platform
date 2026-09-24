@@ -101,18 +101,6 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
               className="min-h-[100px] resize-none"
             />
           </DetailsFieldContainer>
-
-          <DetailsFieldContainer className="max-w-300">
-            <TextField
-              id="dataStructureVersionSource"
-              form={form}
-              label={t('versionInfo.source')}
-              name="dataStructureVersionSource"
-              placeholder={t('source.OWN')}
-              disabled={true}
-              required
-            />
-          </DetailsFieldContainer>
         </form>
       </Form>
     </ContentCard>

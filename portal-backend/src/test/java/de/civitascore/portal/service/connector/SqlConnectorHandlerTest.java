@@ -126,8 +126,7 @@ class SqlConnectorHandlerTest {
       assertThat(result.get("driver")).isEqualTo("postgres");
       assertThat(result.get("dsn")).isEqualTo("postgres://host/db");
       assertThat(result.get("table")).isEqualTo("users");
-      assertThat(result.get("conn_max_idle")).isEqualTo(5);
-      assertThat(result.get("conn_max_open")).isEqualTo(0);
+      assertThat(result).doesNotContainKey("conn_max_idle");
     }
 
     @Test

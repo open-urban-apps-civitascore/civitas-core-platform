@@ -195,14 +195,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
             "password": "${nonEmptyString}",
             "table": "events",
             "columns": ["*"],
-            "where": null,
-            "prefix": null,
-            "suffix": null,
-            "init_statement": null,
-            "conn_max_idle": 2,
-            "conn_max_open": 0,
-            "conn_max_idle_time": null,
-            "conn_max_life_time": null
+            "where": null
           }
           """;
       assertPersistedJsonbMatches(expected, actualJson);

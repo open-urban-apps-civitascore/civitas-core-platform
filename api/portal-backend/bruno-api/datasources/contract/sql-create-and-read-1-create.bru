@@ -56,13 +56,6 @@ tests {
   });
   test("Unsubmitted SQL fields default to null/zero, surfaced as expert-mode keys", function() {
     expect(res.body.configuration).to.have.property('where', null);
-    expect(res.body.configuration).to.have.property('prefix', null);
-    expect(res.body.configuration).to.have.property('suffix', null);
-    expect(res.body.configuration).to.have.property('init_statement', null);
-    expect(res.body.configuration).to.have.property('conn_max_idle_time', null);
-    expect(res.body.configuration).to.have.property('conn_max_life_time', null);
-    expect(res.body.configuration.conn_max_idle).to.equal(2);
-    expect(res.body.configuration.conn_max_open).to.equal(0);
   });
 }
 
@@ -76,8 +69,7 @@ docs {
   - The submitted password is preserved server-side (pinned at the JSONB
     layer by `DataSourceContractIntegrationTest$PersistedShapeOnCreate`)
     and masked in the response as `"********"`.
-  - Unsubmitted scalar fields default to `null`. The two integer fields
-    (`conn_max_idle`, `conn_max_open`) default to `2` and `0` respectively.
+  - Unsubmitted scalar fields default to `null`.
 
   Paired follow-ups:
   - `sql-create-and-read-2-read.bru` — GETs the resource by id and asserts

@@ -21,7 +21,6 @@ import { useError } from '@/hooks/use-error'
 import { STATUS_TYPES } from '@/types/common'
 import {
   DATASTRUCTURE_STATUS_TYPES,
-  DATASTRUCTURE_VERSION_SOURCE,
   DatastructureStatusType,
   DatastructureVersion,
   DatastructureVersionCreateData,
@@ -58,7 +57,6 @@ export const defaultDatastructureVersionFormData: DatastructureVersionFormData =
   id: '',
   version: '',
   description: '',
-  dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
   dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
   modelName: null,
   nodes: [],
@@ -340,8 +338,7 @@ export const useDatastructureVersion = ({
   }
 
   const dirtyFields = form.formState.dirtyFields
-  const hasMetadataChanges =
-    dirtyFields.description || dirtyFields.dataStructureVersionSource || dirtyFields.dataStructureVersionStatus
+  const hasMetadataChanges = dirtyFields.description || dirtyFields.dataStructureVersionStatus
   const hasModelChanges =
     activeSession?.isDirty === true || (!!initialSession?.id && activeSessionId !== initialSession?.id)
   const hasUserChanges = hasMetadataChanges || hasModelChanges

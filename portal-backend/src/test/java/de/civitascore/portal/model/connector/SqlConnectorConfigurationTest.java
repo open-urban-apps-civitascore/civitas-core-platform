@@ -175,14 +175,7 @@ class SqlConnectorConfigurationTest {
       map.put("columns", List.of("id", "name"));
       map.put("where", "id > ?");
       map.put("args_mapping", "- this.id");
-      map.put("prefix", "SET search_path TO myschema;");
-      map.put("suffix", "LIMIT 100");
       map.put("init_files", "[\"init.sql\"]");
-      map.put("init_statement", "CREATE TABLE IF NOT EXISTS ...");
-      map.put("conn_max_idle_time", "5m");
-      map.put("conn_max_life_time", "1h");
-      map.put("conn_max_idle", 5);
-      map.put("conn_max_open", 10);
       map.put("user", "admin");
       map.put("password", "secret");
 
@@ -195,28 +188,6 @@ class SqlConnectorConfigurationTest {
       assertThat(config.getTable()).isEqualTo("users");
       assertThat(config.getColumns()).isEqualTo(List.of("id", "name"));
       assertThat(config.getWhere()).isEqualTo("id > ?");
-      assertThat(config.getPrefix()).isEqualTo("SET search_path TO myschema;");
-      assertThat(config.getSuffix()).isEqualTo("LIMIT 100");
-      assertThat(config.getInitStatement()).isEqualTo("CREATE TABLE IF NOT EXISTS ...");
-      assertThat(config.getConnMaxIdleTime()).isEqualTo("5m");
-      assertThat(config.getConnMaxLifeTime()).isEqualTo("1h");
-      assertThat(config.getConnMaxIdle()).isEqualTo(5);
-      assertThat(config.getConnMaxOpen()).isEqualTo(10);
-    }
-
-    @Test
-    @DisplayName("Should use default values for conn_max_idle and conn_max_open")
-    void shouldUseDefaultValues() {
-      Map<String, Object> map = new LinkedHashMap<>();
-      map.put("driver", "mysql");
-      map.put("dsn", "mysql://localhost/db");
-      map.put("table", "orders");
-
-      SqlConnectorConfiguration config = MAPPER.convertValue(map, SqlConnectorConfiguration.class);
-
-      assertThat(config.getDriver()).isEqualTo("mysql");
-      assertThat(config.getConnMaxIdle()).isEqualTo(2);
-      assertThat(config.getConnMaxOpen()).isEqualTo(0);
     }
 
     @Test
@@ -263,13 +234,6 @@ class SqlConnectorConfigurationTest {
       config.setTable("users");
       config.setColumns(List.of("*"));
       config.setWhere("active = true");
-      config.setPrefix("SET search_path TO public;");
-      config.setSuffix("LIMIT 50");
-      config.setInitStatement("SELECT 1");
-      config.setConnMaxIdleTime("5m");
-      config.setConnMaxLifeTime("1h");
-      config.setConnMaxIdle(3);
-      config.setConnMaxOpen(10);
       config.setUser("user");
       config.setPassword("secret");
 
@@ -280,13 +244,6 @@ class SqlConnectorConfigurationTest {
       assertThat(map.get("table")).isEqualTo("users");
       assertThat(map.get("columns")).isEqualTo(List.of("*"));
       assertThat(map.get("where")).isEqualTo("active = true");
-      assertThat(map.get("prefix")).isEqualTo("SET search_path TO public;");
-      assertThat(map.get("suffix")).isEqualTo("LIMIT 50");
-      assertThat(map.get("init_statement")).isEqualTo("SELECT 1");
-      assertThat(map.get("conn_max_idle_time")).isEqualTo("5m");
-      assertThat(map.get("conn_max_life_time")).isEqualTo("1h");
-      assertThat(map.get("conn_max_idle")).isEqualTo(3);
-      assertThat(map.get("conn_max_open")).isEqualTo(10);
       assertThat(map.get("user")).isEqualTo("user");
       assertThat(map.get("password")).isEqualTo("secret");
     }

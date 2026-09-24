@@ -126,7 +126,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const formValues = useWatch({ control: form.control })
   const descriptionWatch = form.watch('description')
   const modelNameWatch = form.watch('modelName')
-  const sourceWatch = form.watch('dataStructureVersionSource')
 
   const statusWatch = form.watch('dataStructureVersionStatus')
   const nodesWatch = form.watch('nodes')
@@ -134,7 +133,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const completedTabs = useMemo((): DatastructureVersionTab[] => {
     const completed: DatastructureVersionTab[] = []
     // The version is assigned by the registry, so completeness rests only on what a user supplies.
-    if (descriptionWatch.length > 0 && sourceWatch) completed.push('versionInfo')
+    if (descriptionWatch.length > 0) completed.push('versionInfo')
     if (nodesWatch.length > 0 && modelNameWatch) completed.push('structure')
     return completed
     // eslint-disable-next-line react-hooks/exhaustive-deps
