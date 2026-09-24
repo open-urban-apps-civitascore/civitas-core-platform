@@ -276,10 +276,7 @@ public class DataStructureVersionService
           "dataStructureVersionStatus", id, "DataStructureVersion is already in DRAFT status");
     }
 
-    ArtifactUsageLookup.ArtifactUsage usage = artifactUsageLookup.of(version);
-    if (usage.inUseByReleased()) {
-      throw usage.unreleaseRefusal("DataStructureVersion", id);
-    }
+    artifactUsageLookup.of(version).requireNoReleasedReferrer(getEntityName(), id);
     validateExistenceOfOtherReleasedVersion(
         version,
         "Cannot unrelease this DataStructureVersion because it is the only released version of a released DataStructure. Please unrelease the DataStructure first.");

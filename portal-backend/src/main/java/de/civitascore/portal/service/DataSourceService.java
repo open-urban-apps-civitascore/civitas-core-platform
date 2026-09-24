@@ -390,10 +390,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
 
   @Override
   protected void validateUnrelease(DataSource entity) {
-    ArtifactUsageLookup.ArtifactUsage usage = artifactUsageLookup.of(entity);
-    if (usage.inUseByReleased()) {
-      throw usage.unreleaseRefusal(getEntityName(), entity.getId());
-    }
+    artifactUsageLookup.of(entity).requireNoReleasedReferrer(getEntityName(), entity.getId());
   }
 
   private void validateNotInUse(UUID id) {

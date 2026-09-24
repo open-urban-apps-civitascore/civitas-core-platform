@@ -1,6 +1,8 @@
 package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -28,6 +30,7 @@ import de.civitascore.portal.repository.ReferrerReleaseState;
 import de.civitascore.portal.service.ArtifactUsageLookup.ArtifactUsage;
 import de.civitascore.portal.service.ArtifactUsageLookup.ReferrerKind;
 import de.civitascore.portal.service.ArtifactUsageLookup.ReleasedReferrer;
+import de.civitascore.portal.util.ResourceInUseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -424,6 +427,44 @@ class ArtifactUsageLookupTest {
       assertThat(usageByVersion.get(draft.getId()).inUse()).isTrue();
       assertThat(usageByVersion.get(draft.getId()).inUseByReleased()).isFalse();
       assertThat(usageByVersion.get(unused.getId()).inUse()).isFalse();
+    }
+  }
+
+  @Nested
+  @DisplayName("Unrelease refusal")
+  class UnreleaseRefusal {
+
+    @Test
+    @DisplayName("Passes when only drafts reference the artifact")
+    void noReleasedReferrer_passes() {
+      ArtifactUsage usage = new ArtifactUsage(true, List.of());
+
+      assertThatCode(() -> usage.requireNoReleasedReferrer("DataStructure", UUID.randomUUID()))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("Refuses naming the first released referrer and blocks on all of them")
+    void releasedReferrer_refuses() {
+      UUID id = UUID.randomUUID();
+      ArtifactUsage usage =
+          new ArtifactUsage(
+              true,
+              List.of(
+                  new ReleasedReferrer(ReferrerKind.DATA_SINK, SINK_URN),
+                  new ReleasedReferrer(ReferrerKind.PIPELINE, PIPELINE_URN)));
+
+      assertThatThrownBy(() -> usage.requireNoReleasedReferrer("DataStructure", id))
+          .isInstanceOfSatisfying(
+              ResourceInUseException.class,
+              refusal -> {
+                assertThat(refusal.getResourceType()).isEqualTo("DataStructure");
+                assertThat(refusal.getResourceId()).isEqualTo(id);
+                assertThat(refusal.getBlockedBy()).containsExactly(SINK_URN, PIPELINE_URN);
+              })
+          .hasMessage(
+              "Cannot unrelease DataStructure because it is referenced by a Data sink of a"
+                  + " released Dataset.");
     }
   }
 }

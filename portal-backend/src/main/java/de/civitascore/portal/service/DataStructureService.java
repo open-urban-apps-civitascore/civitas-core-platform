@@ -181,10 +181,7 @@ public class DataStructureService
 
   @Override
   protected void validateUnrelease(DataStructure entity) {
-    ArtifactUsageLookup.ArtifactUsage usage = artifactUsageLookup.of(entity);
-    if (usage.inUseByReleased()) {
-      throw usage.unreleaseRefusal("DataStructure", entity.getId());
-    }
+    artifactUsageLookup.of(entity).requireNoReleasedReferrer(getEntityName(), entity.getId());
   }
 
   /**

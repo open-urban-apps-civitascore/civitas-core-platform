@@ -88,11 +88,16 @@ public class ArtifactUsageLookup {
     }
 
     /**
-     * The refusal of an unrelease, naming what the first released referrer is. The referrers' ids
-     * go to the log only.
+     * Refuses the unrelease of the artifact while a released entity references it.
+     *
+     * @throws ResourceInUseException if there is a released referrer; its message names what the
+     *     first one is, and the referrers' ids go to the log only
      */
-    public ResourceInUseException unreleaseRefusal(String resourceType, UUID resourceId) {
-      return new ResourceInUseException(
+    public void requireNoReleasedReferrer(String resourceType, UUID resourceId) {
+      if (!inUseByReleased()) {
+        return;
+      }
+      throw new ResourceInUseException(
           resourceType,
           resourceId,
           "Cannot unrelease "
@@ -161,12 +166,9 @@ public class ArtifactUsageLookup {
   /** How each version of a Data structure is used, keyed by version id. */
   public Map<UUID, ArtifactUsage> ofEachVersion(DataStructure dataStructure) {
     Map<UUID, ArtifactUsage> usageByVersion = new LinkedHashMap<>();
-    if (dataStructure.getDataStructureVersions() != null) {
-      dataStructure
-          .getDataStructureVersions()
-          .forEach(
-              version -> usageByVersion.put(version.getId(), ofVersion(dataStructure, version)));
-    }
+    dataStructure
+        .getDataStructureVersions()
+        .forEach(version -> usageByVersion.put(version.getId(), ofVersion(dataStructure, version)));
     return usageByVersion;
   }
 
@@ -191,8 +193,7 @@ public class ArtifactUsageLookup {
     releasedReferrers.addAll(releasedAmong(registryReferrers, true));
 
     boolean inUse =
-        !releasedReferrers.isEmpty()
-            || !registryReferrers.isEmpty()
+        !registryReferrers.isEmpty()
             || dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(version.getId()));
     return new ArtifactUsage(inUse, releasedReferrers);
   }
@@ -288,7 +289,7 @@ public class ArtifactUsageLookup {
     }
     Set<String> released = new LinkedHashSet<>();
     for (ReleasedReferrer user : releasedAmong(mappingsByUser.keySet(), false)) {
-      released.addAll(mappingsByUser.getOrDefault(user.reference(), Set.of()));
+      released.addAll(mappingsByUser.get(user.reference()));
     }
     return released.stream()
         .map(mapping -> new ReleasedReferrer(ReferrerKind.MAPPING, mapping))

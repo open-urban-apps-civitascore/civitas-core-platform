@@ -39,12 +39,10 @@ public class DataStructureAssembler
   @Override
   public DataStructureOutputDTO enrichDto(DataStructureOutputDTO dto, DataStructure entity) {
     Map<UUID, ArtifactUsage> usageByVersion = artifactUsageLookup.ofEachVersion(entity);
-    if (entity.getDataStructureVersions() != null) {
-      dto.setDataStructureVersions(
-          entity.getDataStructureVersions().stream()
-              .map(version -> toVersionRow(version, usageByVersion.get(version.getId())))
-              .toList());
-    }
+    dto.setDataStructureVersions(
+        entity.getDataStructureVersions().stream()
+            .map(version -> toVersionRow(version, usageByVersion.get(version.getId())))
+            .toList());
     ArtifactUsage usage = ArtifactUsage.anyOf(usageByVersion.values());
     dto.setInUse(usage.inUse());
     dto.setInUseByReleased(usage.inUseByReleased());
