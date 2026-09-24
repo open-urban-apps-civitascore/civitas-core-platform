@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { CONTRACT_URIS, contractErrors, readContract } from '@/test-support/coreContracts'
 import type { ContractOperation } from '@/test-support/mappingFixtures'
-import { mappingFixtures, sourceTree as fixtureSourceTree } from '@/test-support/mappingFixtures'
+import { mappingFixtures, nestedFixtures, sourceTree as fixtureSourceTree } from '@/test-support/mappingFixtures'
 
 import type { MappingConfig, SchemaTree, ValueNode } from './_types'
 import {
@@ -343,17 +343,15 @@ describe('mapping editor compile', () => {
   })
 })
 
+const documentOf = (fields: Record<string, ValueNode>) => ({
+  $schema: CONTRACT_URIS.mapping,
+  id: 'urn:core:platform:civitas:mapping:common:M:abcdef1234:1.0.0',
+  source: 'urn:core:platform:civitas:datastructure:common:S:abcdef1234:1.0.0',
+  target: 'urn:core:platform:civitas:datastructure:common:T:abcdef1234:1.0.0',
+  fields,
+})
+
 describe('The operation the Mapping editor offers', () => {
-  const MAPPING_URN = 'urn:core:platform:civitas:mapping:common:M:abcdef1234:1.0.0'
-
-  const documentOf = (fields: Record<string, ValueNode>) => ({
-    $schema: CONTRACT_URIS.mapping,
-    id: MAPPING_URN,
-    source: 'urn:core:platform:civitas:datastructure:common:S:abcdef1234:1.0.0',
-    target: 'urn:core:platform:civitas:datastructure:common:T:abcdef1234:1.0.0',
-    fields,
-  })
-
   const expectedOperation: Record<ContractOperation, ValueNode> = {
     copy: '$.name',
     concat: { op: 'concat', separator: '-', inputs: ['$.id', '$.suffix'] },
@@ -419,5 +417,50 @@ describe('The operation the Mapping editor offers', () => {
     ]
 
     expect(findNodeConfigErrors(patternNodes, patternEdges).blockingCount).toBe(1)
+  })
+})
+
+describe('nested operations', () => {
+  const dateChain: ValueNode = {
+    op: 'format',
+    input: { op: 'toDate', input: '$.day', pattern: 'yyyy-MM-dd' },
+    pattern: 'yyyy-MM-dd',
+  }
+
+  const expectedFields: Record<string, Record<string, ValueNode>> = {
+    'three levels': {
+      '$.fullCode': { op: 'concat', separator: '-', inputs: [dateChain, '$.suffix'] },
+    },
+    'both fixed inputs of geoPoint': {
+      '$.geometry': {
+        op: 'geoPoint',
+        lon: { op: 'toFloat', input: '$.longitude' },
+        lat: { op: 'toFloat', input: '$.latitude' },
+      },
+    },
+    'one transform chain feeding two target fields': { '$.printed': dateChain, '$.text': dateChain },
+  }
+
+  it.each(nestedFixtures)('$label compiles to a nested CORE operation', fixture => {
+    expect(compileCanvas(fixture.nodes, fixture.edges).fields).toEqual(expectedFields[fixture.label])
+  })
+
+  it.each(nestedFixtures)('$label produces a contract-valid mapping document', fixture => {
+    const { fields } = compileCanvas(fixture.nodes, fixture.edges)
+    expect(contractErrors('mapping', documentOf(fields))).toEqual([])
+  })
+
+  it.each(nestedFixtures)('$label is unchanged after rehydration', fixture => {
+    const compiled = compileCanvas(fixture.nodes, fixture.edges)
+    const built = decompileConfig({ ...compiled }, fixtureSourceTree, fixture.targetTree)
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(compiled.fields)
+  })
+
+  it('restores a transform chain feeding two target fields as one set of nodes', () => {
+    const shared = nestedFixtures.find(fixture => fixture.label === 'one transform chain feeding two target fields')!
+    const compiled = compileCanvas(shared.nodes, shared.edges)
+
+    const built = decompileConfig({ ...compiled }, fixtureSourceTree, shared.targetTree)
+    expect(built.nodes.filter(node => node.type === 'transform')).toHaveLength(2)
   })
 })
