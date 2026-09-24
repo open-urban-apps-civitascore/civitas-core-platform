@@ -48,6 +48,40 @@ describe('diagramSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  it('keeps a Json attribute and the pins of the structures the diagram was built from', () => {
+    const pins = [
+      { urn: 'urn:core:platform:civitas:datastructure:frost:ThingTree:0123456789:1.0.0', name: 'ThingTree' },
+    ]
+    const diagram = {
+      id: 'diagram-1',
+      name: 'Loaded',
+      nodes: [
+        {
+          id: 'node-1',
+          type: 'class',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'node-1',
+              name: 'Observation',
+              type: 'class',
+              attributes: [{ id: 'a1', name: 'resultQuality', type: 'Json', multiplicity: '0..1' }],
+              operations: [],
+            },
+            label: 'Observation',
+          },
+        },
+      ],
+      edges: [],
+      importedStructures: pins,
+    }
+
+    const result = UMLDiagramSchema.safeParse(diagram)
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data.importedStructures).toEqual(pins)
+  })
+
   it('strips extra and transient react-flow fields from nodes and edges', () => {
     const diagramWithTransientFields = {
       id: 'diagram-1',
