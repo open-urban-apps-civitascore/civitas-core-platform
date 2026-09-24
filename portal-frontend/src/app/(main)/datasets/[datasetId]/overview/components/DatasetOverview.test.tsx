@@ -98,6 +98,7 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useGetPipelines: () => ({ data: { data: [] } }),
+  useDeletePipeline: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('@/app/services/api/datasources/clientRequests', () => ({

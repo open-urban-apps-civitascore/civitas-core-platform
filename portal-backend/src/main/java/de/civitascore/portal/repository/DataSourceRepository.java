@@ -1,5 +1,6 @@
 package de.civitascore.portal.repository;
 
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import java.util.Collection;
 import java.util.List;
@@ -44,4 +45,19 @@ public interface DataSourceRepository extends NamedEntityRepository<DataSource, 
   boolean existsByDataStructureVersionIdIn(@Param("versionIds") Collection<UUID> versionIds);
 
   boolean existsByScopedDataPools_Id(UUID datapoolId);
+
+  /** The data sources with the given status that are pinned to any of the given versions. */
+  @Query(
+      "SELECT ds.id FROM DataSource ds"
+          + " WHERE ds.dataStructureVersion.id IN :versionIds AND ds.dataSourceStatus = :status")
+  List<UUID> findIdsByDataStructureVersionIdInAndStatus(
+      @Param("versionIds") Collection<UUID> versionIds, @Param("status") DataSourceStatus status);
+
+  /** Whether each data source has the given status, keyed by its configuration's logical URN. */
+  @Query(
+      "SELECT new de.civitascore.portal.repository.ReferrerReleaseState(ds.configurationLogicalUrn,"
+          + " CASE WHEN ds.dataSourceStatus = :status THEN true ELSE false END)"
+          + " FROM DataSource ds WHERE ds.configurationLogicalUrn IN :urns")
+  List<ReferrerReleaseState> findReleaseStatesByConfigurationLogicalUrnIn(
+      @Param("urns") Collection<String> urns, @Param("status") DataSourceStatus status);
 }

@@ -9,7 +9,7 @@ import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.model.output.DatapoolScopeOutputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.service.ArtifactUsageLookup;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import java.util.List;
@@ -29,7 +29,7 @@ public class DataSourceAssembler implements BaseAssembler<DataSource, DataSource
 
   private final DataSourceMapper dataSourceMapper;
   private final ConnectorHandlerRegistry connectorHandlerRegistry;
-  private final PipelineRepository pipelineRepository;
+  private final ArtifactUsageLookup artifactUsageLookup;
   private final ModelRegistryGateway modelRegistryGateway;
 
   /** {@inheritDoc} Delegates to the {@link DataSourceMapper} for basic field mapping. */
@@ -39,13 +39,15 @@ public class DataSourceAssembler implements BaseAssembler<DataSource, DataSource
   }
 
   /**
-   * {@inheritDoc} Sets the {@code inUse} flag, populates the {@code datapoolScope} from the
-   * entity's scope type and associated Datapools, and serves the configuration from the registry
-   * pin.
+   * {@inheritDoc} Sets the {@code inUse} and {@code inUseByReleased} flags, populates the {@code
+   * datapoolScope} from the entity's scope type and associated Datapools, and serves the
+   * configuration from the registry pin.
    */
   @Override
   public DataSourceOutputDTO enrichDto(DataSourceOutputDTO dto, DataSource entity) {
-    dto.setInUse(pipelineRepository.existsByDataSourcesId(entity.getId()));
+    ArtifactUsageLookup.ArtifactUsage usage = artifactUsageLookup.of(entity);
+    dto.setInUse(usage.inUse());
+    dto.setInUseByReleased(usage.inUseByReleased());
     dto.setDatapoolScope(buildDatapoolScopeOutput(entity));
     dto.setConfiguration(fetchConfiguration(entity));
     dto.setConfigurationUrn(entity.getConfigurationUrn());

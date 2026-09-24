@@ -41,6 +41,8 @@ public class DataStructureVersionService
 
   private final ModelRegistryGateway modelRegistryGateway;
 
+  private final ArtifactUsageLookup artifactUsageLookup;
+
   @Override
   protected DataStructureVersionRepository getRepository() {
     return dataStructureVersionRepository;
@@ -102,14 +104,16 @@ public class DataStructureVersionService
 
   /**
    * Validates and constrains update input based on the version's current state. If the version is
-   * still referenced, structural fields (model, styles) are locked and only description and
-   * modelName may change — the input's model/styles are nulled so no new registry version is stored
-   * and the existing pin is preserved. A released version that is not in use may have its model
-   * replaced but never cleared — it must always retain a non-empty model.
+   * released and a released entity references it, structural fields (model, styles) are locked and
+   * only description and modelName may change — the input's model/styles are nulled so no new
+   * registry version is stored and the existing pin is preserved. A released version that no
+   * released entity references may have its model replaced but never cleared — it must always
+   * retain a non-empty model.
    *
    * @param input the update input
    * @param existingEntity the current version entity
-   * @return the preprocessed input with restricted fields neutralized if in use
+   * @return the preprocessed input, its structural fields neutralized while a released entity
+   *     references the version
    * @throws InvalidInputException if an update to a released version would clear its model
    */
   @Override
@@ -118,15 +122,10 @@ public class DataStructureVersionService
     boolean isReleased =
         existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT;
 
-    if (isReleased && isInUse(existingEntity.getId())) {
-      // Version is in use: block all structural changes, allow only description and modelName.
-      // An absent model means "content unchanged" — no registry write happens, the version keeps
-      // its stored pin (modelUrn/version stay untouched; they are not mapped from the input).
+    if (isReleased && artifactUsageLookup.of(existingEntity).inUseByReleased()) {
       input.setModel(null);
       input.setStyles(null);
     } else if (isReleased && (input.getModel() == null || input.getModel().isEmpty())) {
-      // Released but not in use: the model may be replaced, but never cleared — a released
-      // version must always retain a non-empty model, so the full update must carry one.
       throw new InvalidInputException(
           "model",
           existingEntity.getId(),
@@ -259,6 +258,7 @@ public class DataStructureVersionService
    * @return the unreleased version
    * @throws InvalidInputException if version is already DRAFT or if unreleasing would leave a
    *     released DataStructure without released versions
+   * @throws ResourceInUseException if a released entity references the version
    */
   @Transactional
   public DataStructureVersion unrelease(UUID id) {
@@ -270,7 +270,7 @@ public class DataStructureVersionService
           "dataStructureVersionStatus", id, "DataStructureVersion is already in DRAFT status");
     }
 
-    validateNotInUse(id);
+    artifactUsageLookup.of(version).requireNoReleasedReferrer(getEntityName(), id);
     validateExistenceOfOtherReleasedVersion(
         version,
         "Cannot unrelease this DataStructureVersion because it is the only released version of a released DataStructure. Please unrelease the DataStructure first.");
@@ -315,16 +315,6 @@ public class DataStructureVersionService
           "Cannot modify DataStructureVersion because it is still referenced.",
           blockers);
     }
-  }
-
-  /**
-   * A version is in use while a data source is pinned to it (a host FK) or the registry still holds
-   * a reference onto its model. Asking the registry for its own deletion verdict keeps this answer
-   * and the delete from disagreeing, and covers every reference that refuses one.
-   */
-  private boolean isInUse(UUID versionId) {
-    return dataSourceRepository.existsByDataStructureVersionId(versionId)
-        || modelRegistryGateway.isReferenced(modelUrnOf(versionId));
   }
 
   private String modelUrnOf(UUID versionId) {

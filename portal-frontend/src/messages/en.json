@@ -310,9 +310,24 @@
             "addButton": "Add pipeline",
             "unknownError": "Unknown error.",
             "pipelineError": "Pipeline error",
+            "activeLabel": "Active",
             "errorLabel": "Error",
             "errorDetails": "Error details for {name}",
-            "errorToast": "Pipeline \"{name}\": {message}"
+            "errorToast": "Pipeline \"{name}\": {message}",
+            "menuLabel": "Actions for {name}",
+            "actions": {
+              "open": "Open",
+              "delete": "Delete"
+            },
+            "deleteConfirm": {
+              "title": "Delete Pipeline",
+              "description": "Do you really want to delete the pipeline \"{name}\"? This action cannot be undone.",
+              "confirm": "Delete"
+            },
+            "messages": {
+              "deleteSuccess": "Pipeline has been successfully deleted.",
+              "deleteError": "An error occurred while deleting the pipeline. Please try again."
+            }
           },
           "apis": {
             "title": "APIs",
@@ -328,6 +343,7 @@
               "CUSTOM": "Custom API"
             },
             "card": {
+              "menuLabel": "Actions for {name}",
               "actions": {
                 "edit": "Edit",
                 "view": "Open",
