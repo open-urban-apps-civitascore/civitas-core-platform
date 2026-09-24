@@ -30,7 +30,6 @@ const mockDataSink: DataSink = {
   datasetId: '00000000-0000-0000-0000-000000000002',
   pipelineId: '00000000-0000-0000-0000-000000000004',
   dataSinkType: DATASINK_TYPES.POSTGIS,
-  provisioned: false,
   configuration: {
     tableName: 'table_1',
     dataStructureVersion: {

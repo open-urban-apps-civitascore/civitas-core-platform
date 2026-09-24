@@ -25,8 +25,6 @@ export type DataSink = {
    * pipeline node's `sinkRef`. Absent on sinks that carry no configuration (e.g. FROST passthrough).
    */
   configurationUrn?: string
-  /** True once the sink's storage physically exists; never reset to false. */
-  provisioned: boolean
   createdAt: string
   modifiedAt: string
 }

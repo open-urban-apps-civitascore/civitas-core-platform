@@ -32,7 +32,6 @@ const makeDataSink = (): DataSink => ({
   datasetId: '00000000-0000-0000-0000-000000000020',
   pipelineId: '00000000-0000-0000-0000-000000000030',
   dataSinkType: DATASINK_TYPES.POSTGIS,
-  provisioned: false,
   configuration: {
     tableName: 'my_table',
     dataStructureVersion: {
