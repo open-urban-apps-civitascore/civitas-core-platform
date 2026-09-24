@@ -1511,20 +1511,23 @@
       "title": "Importieren",
       "file": "Diagramm importieren",
       "fromPlatform": "aus der Plattform",
-      "fromFile": "aus Datei",
+      "fromFile": "Aus Datei …",
+      "standard": "Standardstruktur",
       "success": "Diagramm erfolgreich importiert",
+      "added": "Die Datei wurde zum Diagramm hinzugefügt.",
       "fileError": "Fehler beim Importieren der Datei.",
       "overwriteModal": {
-        "title": "Bestehende Strukturdefinition ersetzen?",
-        "description": "Beim Import werden alle bestehenden Klassen, Attribute und Beziehungen in der Strukturdefinition ersetzt. Diese Aktion kann nicht rückgängig gemacht werden.",
+        "title": "Bestehende Strukturdefinition ersetzen oder ergänzen?",
+        "description": "Die Datei kann die bestehenden Klassen, Attribute und Beziehungen ersetzen oder neben ihnen hinzugefügt werden. Beim Ersetzen geht die bestehende Strukturdefinition verloren; das kann nicht rückgängig gemacht werden.",
+        "add": "Hinzufügen",
         "confirm": "Struktur ersetzen"
       },
       "errors": {
         "FILE_TOO_LARGE": "Die Datei ist zu groß (maximal 5 MB erlaubt).",
         "INVALID_JSON": "Die Datei enthält kein gültiges JSON.",
         "INVALID_DATASTRUCTURE_DOCUMENT": "Die Datei enthält keine gültige Datenstruktur.",
-        "MISSING_UI_STYLES": "Die Datei enthält keine Layoutdaten für die Darstellung der Struktur.",
-        "INVALID_DIAGRAM_SCHEMA": "Die Diagrammdaten in der Datei sind ungültig."
+        "INVALID_DIAGRAM_SCHEMA": "Die Diagrammdaten in der Datei sind ungültig.",
+        "UNREADABLE_MODEL": "Das Modell in der Datei ist nicht lesbar."
       }
     },
     "save": {
@@ -1546,7 +1549,6 @@
       "misdirected": "Die Beziehung zwischen {name1} und {name2} ist falsch herum gezeichnet."
     },
     "loadStandard": {
-      "title": "Standard laden",
       "loaded": "Die Struktur wurde in das Diagramm geladen.",
       "renamed": "Der Name „{from}\" war vergeben, die geladene Klasse heißt daher „{to}\".",
       "unreadable": "Die Struktur ist nicht lesbar: sie enthält „{construct}\", das der Editor nicht kennt.",

@@ -13,6 +13,7 @@ import {
   downloadDiagramFile,
   MAX_IMPORT_FILE_SIZE_BYTES,
   readDiagramFile,
+  readImportFile,
 } from './diagramFileService'
 import { SchemaExportError } from './jsonSchemaExportService'
 
@@ -323,16 +324,30 @@ describe('diagramFileService', () => {
       })
     })
 
-    it('rejects with MISSING_UI_STYLES when valid CORE document lacks x-ui-styles', async () => {
+    it('derives the diagram from the model when the document was never drawn', async () => {
+      // A structure from the API, from a Data source or from a sink port carries no layout. Refusing
+      // it would leave the modeller nothing to work with; the model says what the classes are.
       const exportedDoc = buildDiagramExport(sampleDiagram)
       const { 'x-ui-styles': _styles, ...docWithoutStyles } = exportedDoc
 
       const file = new File([JSON.stringify(docWithoutStyles)], 'no-styles.json', { type: 'application/json' })
 
-      await expect(readDiagramFile(file)).rejects.toMatchObject({
-        name: 'DiagramImportError',
-        code: 'MISSING_UI_STYLES',
-      })
+      const { diagram, document } = await readImportFile(file)
+      expect(diagram.nodes.map(node => node.data.element.name)).toEqual(['RootClass'])
+      expect(diagram.isDirty).toBe(true)
+      expect(document).toEqual(docWithoutStyles)
+    })
+
+    it('keeps the pins of the published structures through export and import', async () => {
+      const pins = [
+        { urn: 'urn:core:platform:civitas:datastructure:frost:ThingTree:0123456789:1.0.0', name: 'ThingTree' },
+      ]
+      const exportedDoc = buildDiagramExport({ ...sampleDiagram, importedStructures: pins })
+      const file = new File([JSON.stringify(exportedDoc)], 'pinned.json', { type: 'application/json' })
+
+      const diagram = await readDiagramFile(file)
+
+      expect(diagram.importedStructures).toEqual(pins)
     })
 
     it('rejects with INVALID_DIAGRAM_SCHEMA when x-ui-styles contains orphan edges', async () => {

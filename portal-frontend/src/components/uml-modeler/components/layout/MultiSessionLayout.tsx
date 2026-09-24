@@ -8,18 +8,20 @@ import { toast } from 'sonner'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 
 import { useMultiSessionManager } from '../../hooks/use-multi-session-manager'
-import { useReadOnly } from '../../hooks/use-read-only'
 import {
   buildDiagramExport,
   buildDiagramFileName,
   DiagramExportError,
   DiagramImportError,
+  type DiagramImportFile,
   downloadDiagramFile,
-  readDiagramFile,
+  readImportFile,
 } from '../../services/diagramFileService'
 import { DEFAULT_DIAGRAM_NAME } from '../../services/diagramService'
 import { SchemaExportError } from '../../services/jsonSchemaExportService'
+import { SchemaImportError } from '../../services/jsonSchemaImportService'
 import { rootFailureMessage } from '../../services/rootFailureMessage'
+import { mergeStructureIntoDiagram } from '../../services/structureMergeService'
 import type { UMLDiagram } from '../../types/diagram'
 import type { DirtyField, UseMultiSessionReturn } from '../../types/session'
 import { PropertyInspector } from '../inspector/PropertyInspector'
@@ -28,6 +30,7 @@ import { ActiveDiagramProviderComponent } from '../providers/ActiveDiagramProvid
 import { TabBar } from '../tabs/TabBar'
 import { TabContent } from '../tabs/TabContent'
 import { Toolbar } from '../tabs/Toolbar'
+import { ImportChoiceModal } from './ImportChoiceModal'
 
 interface MultiSessionLayoutProps {
   className?: string
@@ -69,7 +72,8 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
   const isControlledExternally = !!externalSessionManager
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false)
   const [isOverwriteModalOpen, setIsOverwriteModalOpen] = useState(false)
-  const [pendingImportDiagram, setPendingImportDiagram] = useState<UMLDiagram | null>(null)
+  const [pendingImport, setPendingImport] = useState<DiagramImportFile | null>(null)
+  const tLoad = useTranslations('umlModeler.loadStandard')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const activeSessionId = useMemo(() => sessionManager.activeSessionId || '', [sessionManager.activeSessionId])
@@ -115,11 +119,12 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
   }, [sessionManager])
 
   const activeSession = sessionManager.getActiveSession()
-  const { isReadOnly } = useReadOnly()
 
-  // The load-standard control lives in the toolbar and is offered wherever the diagram can be
-  // changed, so an editable session shows the toolbar even when it owns nothing else.
-  const shouldShowToolBar = !isControlledExternally || canExportModel || !!onImportFromDatastructure || !isReadOnly
+  // The toolbar says which published structures the diagram was built from, so a diagram with pins
+  // shows it even when it owns nothing else.
+  const hasImportedStructures = (activeSession?.diagram.importedStructures?.length ?? 0) > 0
+  const shouldShowToolBar =
+    !isControlledExternally || canExportModel || !!onImportFromDatastructure || hasImportedStructures
 
   const applyImportedDiagram = useCallback(
     (importedDiagram: UMLDiagram) => {
@@ -148,6 +153,55 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     [sessionManager, t],
   )
 
+  /**
+   * Adds the file's classes beside the ones the diagram has, the way a standard structure is loaded:
+   * a taken name gets a suffix, and the file's root becomes a part of the diagram's root. The layout
+   * of the file is not kept — its classes are placed below what is drawn.
+   */
+  const addImportedDocument = useCallback(
+    (imported: DiagramImportFile) => {
+      const currentActiveSession = sessionManager.getActiveSession()
+      if (!currentActiveSession) return
+
+      let result
+      try {
+        result = mergeStructureIntoDiagram(
+          currentActiveSession.diagram,
+          imported.document,
+          imported.diagram.importedStructures ?? [],
+        )
+      } catch (error) {
+        if (!(error instanceof SchemaImportError)) throw error
+        toast.error(tLoad('unreadable', { construct: error.construct }))
+        return
+      }
+      if (result.nodes.length === 0) {
+        toast.warning(tLoad('emptyStructure'))
+        return
+      }
+
+      sessionManager.setSession(currentActiveSession.id, {
+        ...currentActiveSession,
+        diagram: {
+          ...currentActiveSession.diagram,
+          nodes: [...currentActiveSession.diagram.nodes, ...result.nodes],
+          edges: [...currentActiveSession.diagram.edges, ...result.edges],
+          importedStructures: result.importedStructures,
+          isDirty: true,
+          lastModified: new Date(),
+        },
+        isDirty: true,
+        dirtyFields: new Set<DirtyField>([...currentActiveSession.dirtyFields, 'model']),
+        lastModified: new Date(),
+      })
+      for (const renamed of result.renamed) {
+        toast.warning(tLoad('renamed', { from: renamed.from, to: renamed.to }))
+      }
+      toast.success(t('import.added'))
+    },
+    [sessionManager, t, tLoad],
+  )
+
   const handleImportClick = useCallback(() => {
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -161,15 +215,15 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
       if (!file) return
 
       try {
-        const importedDiagram = await readDiagramFile(file)
+        const imported = await readImportFile(file)
         const currentActiveSession = sessionManager.getActiveSession()
         const hasExistingNodes = (currentActiveSession?.diagram.nodes.length || 0) > 0
 
         if (hasExistingNodes) {
-          setPendingImportDiagram(importedDiagram)
+          setPendingImport(imported)
           setIsOverwriteModalOpen(true)
         } else {
-          applyImportedDiagram(importedDiagram)
+          applyImportedDiagram(imported.diagram)
         }
       } catch (error) {
         if (!(error instanceof DiagramImportError)) {
@@ -276,24 +330,20 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
         onDiscard={handleDiscardCloseSession}
         onConfirm={handleConfirmCloseSession}
       />
-      <WarningModal
-        title={t('import.overwriteModal.title')}
-        description={t('import.overwriteModal.description')}
-        confirmButtonTitle={t('import.overwriteModal.confirm')}
-        open={isOverwriteModalOpen}
-        onOpenChange={open => {
-          setIsOverwriteModalOpen(open)
-          if (!open) setPendingImportDiagram(null)
-        }}
-        onDiscard={() => {
+      <ImportChoiceModal
+        isOpen={isOverwriteModalOpen}
+        onCancel={() => {
           setIsOverwriteModalOpen(false)
-          setPendingImportDiagram(null)
+          setPendingImport(null)
         }}
-        onConfirm={() => {
-          if (pendingImportDiagram) {
-            applyImportedDiagram(pendingImportDiagram)
-            setPendingImportDiagram(null)
-          }
+        onAdd={() => {
+          if (pendingImport) addImportedDocument(pendingImport)
+          setPendingImport(null)
+          setIsOverwriteModalOpen(false)
+        }}
+        onReplace={() => {
+          if (pendingImport) applyImportedDiagram(pendingImport.diagram)
+          setPendingImport(null)
           setIsOverwriteModalOpen(false)
         }}
       />

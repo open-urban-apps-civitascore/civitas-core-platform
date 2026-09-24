@@ -1,20 +1,22 @@
 'use client'
 
 /**
- * LoadStandardMenu Component
+ * ImportMenu Component
  *
- * Loads a structure the platform publishes into the diagram that is open.
+ * The one way into the diagram from outside: a file, or a structure the platform publishes.
  *
- * The menu has two levels: the sinks that publish structures, and the structures of the sink. Both
- * come from the platform, so a sink that begins to publish, and a structure a sink adds, appear
- * here without a change in this file.
+ * The file is read by the caller, which owns the file input and the question whether the file
+ * replaces the diagram or is added to it. A standard structure is always added, and this menu loads
+ * and merges it itself. Its submenu has two levels: the sinks that publish structures, and the
+ * structures of the sink. Both come from the platform, so a sink that begins to publish, and a
+ * structure a sink adds, appear here without a change in this file.
  *
  * It is not offered on a released version: an import writes into the diagram, and a released
  * version does not change.
  */
 
 import { useReactFlow } from '@xyflow/react'
-import { Download, Loader2 } from 'lucide-react'
+import { Loader2, Upload } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -29,6 +31,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -40,8 +43,14 @@ import { useReadOnly } from '../../hooks/use-read-only'
 import { SchemaImportError } from '../../services/jsonSchemaImportService'
 import { mergeStructureIntoDiagram } from '../../services/structureMergeService'
 
-export const LoadStandardMenu: React.FC = () => {
+interface ImportMenuProps {
+  /** Opens the file dialog. Without it the menu offers the standard structures only. */
+  onImportFile?: () => void
+}
+
+export const ImportMenu: React.FC<ImportMenuProps> = ({ onImportFile }) => {
   const t = useTranslations('umlModeler.loadStandard')
+  const tModeler = useTranslations('umlModeler')
   const { isReadOnly } = useReadOnly()
   const { diagram, dispatch } = useActiveDiagram()
   const { fitView } = useReactFlow()
@@ -133,34 +142,58 @@ export const LoadStandardMenu: React.FC = () => {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 px-2" title={t('title')} disabled={isLoading}>
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-          <span className="ml-1 text-xs">{t('title')}</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 text-xs font-normal text-gray-700 hover:text-gray-900"
+          title={tModeler('import.title')}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+          ) : (
+            <Upload className="h-3.5 w-3.5 mr-1 text-gray-600" />
+          )}
+          <span>{tModeler('import.title')}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {groups.length === 0 ? (
-          <DropdownMenuItem disabled>{t('empty')}</DropdownMenuItem>
-        ) : (
-          groups.map(group => (
-            <DropdownMenuSub key={group.sink}>
-              <DropdownMenuSubTrigger>{group.sink}</DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                {group.structures.map(candidate => (
-                  <DropdownMenuItem
-                    key={candidate.key}
-                    className="hover:cursor-pointer"
-                    // A structure that was not published yet has no version to pin.
-                    disabled={!candidate.urn}
-                    onSelect={() => setSelected(candidate)}
-                  >
-                    {candidate.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          ))
+      <DropdownMenuContent align="end">
+        {onImportFile && (
+          <>
+            <DropdownMenuItem className="hover:cursor-pointer" onSelect={onImportFile}>
+              {tModeler('import.fromFile')}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
         )}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>{tModeler('import.standard')}</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {groups.length === 0 ? (
+              <DropdownMenuItem disabled>{t('empty')}</DropdownMenuItem>
+            ) : (
+              groups.map(group => (
+                <DropdownMenuSub key={group.sink}>
+                  <DropdownMenuSubTrigger>{group.sink}</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {group.structures.map(candidate => (
+                      <DropdownMenuItem
+                        key={candidate.key}
+                        className="hover:cursor-pointer"
+                        // A structure that was not published yet has no version to pin.
+                        disabled={!candidate.urn}
+                        onSelect={() => setSelected(candidate)}
+                      >
+                        {candidate.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              ))
+            )}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       </DropdownMenuContent>
     </DropdownMenu>
   )

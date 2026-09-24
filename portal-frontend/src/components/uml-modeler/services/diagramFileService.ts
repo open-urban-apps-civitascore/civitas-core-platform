@@ -4,6 +4,7 @@ import { buildDataStructureLogicalUrn } from '@/utils/urn'
 import type { UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
 import type { UMLElement } from '../types/uml'
 import { UMLDiagramSchema } from './diagramSchema'
+import { diagramFromJsonSchema, SchemaImportError } from './jsonSchemaImportService'
 import { buildUMLModelPayload } from './modelUploadService'
 
 export const MAX_IMPORT_FILE_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -12,8 +13,8 @@ export type DiagramImportErrorCode =
   | 'FILE_TOO_LARGE'
   | 'INVALID_JSON'
   | 'INVALID_DATASTRUCTURE_DOCUMENT'
-  | 'MISSING_UI_STYLES'
   | 'INVALID_DIAGRAM_SCHEMA'
+  | 'UNREADABLE_MODEL'
 
 export class DiagramImportError extends Error {
   readonly code: DiagramImportErrorCode
@@ -120,6 +121,11 @@ export const cleanDiagramForExport = (diagram: UMLDiagram): Record<string, unkno
     }
   }
 
+  // The published structures the diagram was built from: a file carries its provenance like a save.
+  if (diagram.importedStructures?.length) {
+    result.importedStructures = diagram.importedStructures.map(({ urn, name }) => ({ urn, name }))
+  }
+
   return result
 }
 
@@ -175,6 +181,20 @@ export const downloadDiagramFile = (document: Record<string, unknown>, filename:
   URL.revokeObjectURL(url)
 }
 
+/** A read import file: the diagram to show, and the document it came from, for a merge. */
+export interface DiagramImportFile {
+  diagram: UMLDiagram
+  document: Record<string, unknown>
+}
+
+/**
+ * Reads, parses, and validates an uploaded CORE DataStructure file.
+ *
+ * @see readImportFile
+ * @throws DiagramImportError with specific error codes for each failure category.
+ */
+export const readDiagramFile = async (file: File): Promise<UMLDiagram> => (await readImportFile(file)).diagram
+
 /**
  * Reads, parses, and validates an uploaded CORE DataStructure file.
  *
@@ -182,11 +202,15 @@ export const downloadDiagramFile = (document: Record<string, unknown>, filename:
  * 1. Stage 1: Validates the root CORE JSON document envelope via DataStructureSchema.
  * 2. Stage 2: Validates the embedded UML diagram in 'x-ui-styles' via UMLDiagramSchema.
  *
+ * A document without 'x-ui-styles' was not drawn: it came from the API, from a Data source, or it is
+ * a structure the platform publishes. Its diagram is derived from the model, with the layout the
+ * standard import uses — the same thing the editor does when it opens such a version.
+ *
  * Generates a fresh diagram ID while preserving all nodes, coordinates, and relationships.
  *
  * @throws DiagramImportError with specific error codes for each failure category.
  */
-export const readDiagramFile = async (file: File): Promise<UMLDiagram> => {
+export const readImportFile = async (file: File): Promise<DiagramImportFile> => {
   if (file.size > MAX_IMPORT_FILE_SIZE_BYTES) {
     throw new DiagramImportError(
       'FILE_TOO_LARGE',
@@ -233,12 +257,11 @@ export const readDiagramFile = async (file: File): Promise<UMLDiagram> => {
 
   const doc = parsed as Record<string, unknown>
   const uiStyles = doc['x-ui-styles']
+  const docTitle = typeof doc.title === 'string' && doc.title.trim().length > 0 ? doc.title.trim() : undefined
+  const fileTitle = file.name ? file.name.replace(/\.[^/.]+$/, '').trim() : undefined
 
   if (!uiStyles || typeof uiStyles !== 'object' || Array.isArray(uiStyles)) {
-    throw new DiagramImportError(
-      'MISSING_UI_STYLES',
-      "Document is missing the 'x-ui-styles' extension property containing diagram layout data.",
-    )
+    return { diagram: derivedDiagram(doc, docTitle || fileTitle), document: doc }
   }
 
   // Stage 2: Validate diagram structure in x-ui-styles
@@ -253,8 +276,6 @@ export const readDiagramFile = async (file: File): Promise<UMLDiagram> => {
 
   const validDiagram = diagramValidation.data
 
-  const docTitle = typeof doc.title === 'string' && doc.title.trim().length > 0 ? doc.title.trim() : undefined
-  const fileTitle = file.name ? file.name.replace(/\.[^/.]+$/, '').trim() : undefined
   const diagramName =
     validDiagram.name?.trim().length > 0 ? validDiagram.name.trim() : docTitle || fileTitle || 'Imported Diagram'
 
@@ -309,5 +330,23 @@ export const readDiagramFile = async (file: File): Promise<UMLDiagram> => {
     }
   }
 
-  return importedDiagram
+  // The published structures the diagram was built from. Without them the next save would record no
+  // provenance for classes that came from one.
+  if (validDiagram.importedStructures?.length) {
+    importedDiagram.importedStructures = validDiagram.importedStructures
+  }
+
+  return { diagram: importedDiagram, document: doc }
+}
+
+/** The diagram of a document nobody drew, read from its model. */
+const derivedDiagram = (doc: Record<string, unknown>, name: string | undefined): UMLDiagram => {
+  try {
+    return { ...diagramFromJsonSchema(doc, name || 'Imported Diagram'), isDirty: true }
+  } catch (error) {
+    if (!(error instanceof SchemaImportError)) throw error
+    throw new DiagramImportError('UNREADABLE_MODEL', `The model cannot be read: ${error.message}`, {
+      construct: error.construct,
+    })
+  }
 }

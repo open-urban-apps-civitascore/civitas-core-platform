@@ -40,11 +40,15 @@ export interface StructureMergeResult {
 /**
  * Reads the document and merges it into the diagram. Answers the whole node and edge set, so the
  * caller applies one change rather than a sequence the editor would have to undo piecewise.
+ *
+ * The pins are what the document was built from: the published structure itself when a standard is
+ * loaded, the pins a file carries when a file is added. A file of its own has no registry version to
+ * pin, so it can bring none.
  */
 export const mergeStructureIntoDiagram = (
   diagram: UMLDiagram,
   document: JsonSchemaObject,
-  source: ImportedStructureRef,
+  pins: ImportedStructureRef | readonly ImportedStructureRef[],
 ): StructureMergeResult => {
   const imported = importFromJsonSchema(document, { origin: originBelow(diagram) })
   const renamed = renameTakenNames(diagram, imported.nodes, imported.edges)
@@ -52,7 +56,7 @@ export const mergeStructureIntoDiagram = (
   const existingRoot = resolveRootElement(diagram)
   const loadedRoot = imported.nodes.find(node => node.data.element.id === imported.rootElementId)
 
-  const importedStructures = pin(diagram, source)
+  const importedStructures = pin(diagram, Array.isArray(pins) ? pins : [pins])
   if (existingRoot.kind === 'empty') {
     return { ...imported, renamed, importedStructures }
   }
@@ -74,12 +78,15 @@ export const mergeStructureIntoDiagram = (
 }
 
 /**
- * The diagram's pins with this one added. The same version loaded twice adds nothing: the classes
- * it brought are already there, under their own names.
+ * The diagram's pins with these added. The same version loaded twice adds nothing: the classes it
+ * brought are already there, under their own names.
  */
-const pin = (diagram: UMLDiagram, source: ImportedStructureRef): ImportedStructureRef[] => {
-  const pinned = diagram.importedStructures ?? []
-  return pinned.some(candidate => candidate.urn === source.urn) ? pinned : [...pinned, source]
+const pin = (diagram: UMLDiagram, added: readonly ImportedStructureRef[]): ImportedStructureRef[] => {
+  const pinned = [...(diagram.importedStructures ?? [])]
+  for (const source of added) {
+    if (!pinned.some(candidate => candidate.urn === source.urn)) pinned.push(source)
+  }
+  return pinned
 }
 
 /** Where the loaded classes start: clear of everything already drawn. */

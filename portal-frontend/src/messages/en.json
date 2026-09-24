@@ -1524,20 +1524,23 @@
       "title": "Import",
       "file": "Import diagram",
       "fromPlatform": "from the platform",
-      "fromFile": "from file",
+      "fromFile": "From file …",
+      "standard": "Standard structure",
       "success": "Diagram imported successfully",
+      "added": "The file was added to the diagram.",
       "fileError": "Failed to import file.",
       "overwriteModal": {
-        "title": "Replace existing structure definition?",
-        "description": "Importing will replace all existing classes, attributes, and relationships in the structure definition. This action cannot be undone.",
+        "title": "Replace or extend the existing structure definition?",
+        "description": "The file can replace the existing classes, attributes and relationships, or be added beside them. Replacing removes the existing structure definition; this cannot be undone.",
+        "add": "Add",
         "confirm": "Replace structure"
       },
       "errors": {
         "FILE_TOO_LARGE": "The file is too large (maximum 5 MB allowed).",
         "INVALID_JSON": "The file does not contain valid JSON.",
         "INVALID_DATASTRUCTURE_DOCUMENT": "The file does not contain a valid data structure.",
-        "MISSING_UI_STYLES": "The file does not contain layout data to display the structure.",
-        "INVALID_DIAGRAM_SCHEMA": "The diagram data in the file is invalid."
+        "INVALID_DIAGRAM_SCHEMA": "The diagram data in the file is invalid.",
+        "UNREADABLE_MODEL": "The model in the file cannot be read."
       }
     },
     "save": {
@@ -1559,7 +1562,6 @@
       "misdirected": "The relationship between {name1} and {name2} is drawn the wrong way round."
     },
     "loadStandard": {
-      "title": "Load standard",
       "loaded": "The structure was loaded into the diagram.",
       "renamed": "The name “{from}” was taken, so the loaded class is called “{to}”.",
       "unreadable": "The structure cannot be read: it holds “{construct}”, which the editor does not know.",
