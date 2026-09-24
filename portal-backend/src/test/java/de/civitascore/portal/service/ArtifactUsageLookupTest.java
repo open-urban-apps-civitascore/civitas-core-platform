@@ -442,6 +442,8 @@ class ArtifactUsageLookupTest {
           .thenReturn(List.of(new ReferrerReleaseState(SINK_URN, true)));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(draft.getId())))
           .thenReturn(true);
+      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(unused.getId())))
+          .thenReturn(false);
 
       Map<UUID, ArtifactUsage> usageByVersion = lookup.ofEachVersion(structure);
 
