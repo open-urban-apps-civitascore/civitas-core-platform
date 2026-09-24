@@ -69,4 +69,16 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
    * @return true if at least one dataset is assigned
    */
   boolean existsByDataPoolId(UUID dataPoolId);
+
+  /** Whether each dataset is released, keyed by its manifest's logical URN. */
+  @Query(
+      "SELECT new de.civitascore.portal.repository.ReferrerReleaseState(d.manifestLogicalUrn,"
+          + " CASE WHEN d.dataSetStatus ="
+          + " de.civitascore.portal.model.embedded.DataSetStatus.AVAILABLE"
+          + " OR d.pendingSagaType ="
+          + " de.civitascore.portal.model.embedded.PendingSagaType.UNRELEASE"
+          + " THEN true ELSE false END)"
+          + " FROM DataSet d WHERE d.manifestLogicalUrn IN :urns")
+  List<ReferrerReleaseState> findReleaseStatesByManifestLogicalUrnIn(
+      @Param("urns") Collection<String> urns);
 }

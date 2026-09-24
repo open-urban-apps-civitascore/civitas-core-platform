@@ -1190,11 +1190,54 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       version = portalData.attachModel(version, portalData.dataStructureVersionModel("InUse"));
       inUseVersionId = version.getId();
 
+      pinDataSource(version, DataSourceStatus.AVAILABLE);
+    }
+
+    private void pinDataSource(DataStructureVersion version, DataSourceStatus status) {
       DataSource dataSource = new DataSource();
       dataSource.setName("ds_referencing_" + UUID.randomUUID().toString().substring(0, 8));
-      dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
+      dataSource.setDataSourceStatus(status);
       dataSource.setDataStructureVersion(version);
       dataSourceRepository.save(dataSource);
+    }
+
+    @Test
+    @DisplayName("Should report inUseByReleased=false and accept a model change when a draft pins")
+    void shouldAcceptModelChangeWhenOnlyADraftPins() {
+      DataStructureVersion draftPinned = new DataStructureVersion();
+      draftPinned.setDataStructure(
+          dataStructureRepository.findById(inUseDataStructureId).orElseThrow());
+      draftPinned.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      draftPinned.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      draftPinned.setModelName("Draft pinned");
+      draftPinned = dataStructureVersionRepository.save(draftPinned);
+      draftPinned =
+          portalData.attachModel(draftPinned, portalData.dataStructureVersionModel("Before"));
+      pinDataSource(draftPinned, DataSourceStatus.DRAFT);
+      String path = "/datastructures/" + inUseDataStructureId + "/versions/" + draftPinned.getId();
+
+      ResponseEntity<DataStructureVersionOutputDTO> read =
+          restTemplate.exchange(
+              path,
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+      assertThat(read.getBody()).isNotNull();
+      assertThat(read.getBody().isInUse()).isTrue();
+      assertThat(read.getBody().isInUseByReleased()).isFalse();
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setModel(portalData.dataStructureVersionModel("After"));
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      ResponseEntity<DataStructureVersionOutputDTO> updated =
+          restTemplate.exchange(
+              path + "/released/meta",
+              HttpMethod.PUT,
+              new HttpEntity<>(input, createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(updated.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(updated.getBody().getModel()).containsEntry("title", "After");
     }
 
     @Test
@@ -1246,6 +1289,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().isInUse())
           .as("inUse should be true when a DataSource references this version")
+          .isTrue();
+      assertThat(response.getBody().isInUseByReleased())
+          .as("inUseByReleased should be true when an AVAILABLE DataSource pins this version")
           .isTrue();
     }
 

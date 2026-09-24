@@ -1,5 +1,6 @@
 package de.civitascore.portal.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,6 +43,7 @@ class DataStructureServiceTest {
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private DataSourceRepository dataSourceRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private ArtifactUsageLookup artifactUsageLookup;
 
   @InjectMocks private DataStructureService dataStructureService;
 
@@ -49,72 +51,51 @@ class DataStructureServiceTest {
   @DisplayName("Unrelease inUse guard")
   class UnreleaseInUseTests {
 
-    @Test
-    @DisplayName("Should block unrelease when any version is in use")
-    void shouldBlockUnreleaseWhenVersionInUse() {
-      UUID dsId = UUID.randomUUID();
-      UUID versionId = UUID.randomUUID();
-
+    private DataStructure releasedStructure(UUID dsId) {
       DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
+      version.setId(UUID.randomUUID());
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
 
       DataStructure ds = new DataStructure();
       ds.setId(dsId);
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       ds.setDataStructureVersions(Set.of(version));
-
-      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
-      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
-          .thenReturn(true);
-
-      assertThatThrownBy(() -> dataStructureService.unrelease(dsId))
-          .isInstanceOf(ResourceInUseException.class);
+      return ds;
     }
 
     @Test
-    @DisplayName("Should block unrelease when the registry still holds a reference")
-    void shouldBlockUnreleaseWhenVersionStillReferenced() {
+    @DisplayName("Should block unrelease when a released entity references a version")
+    void shouldBlockUnreleaseWhenInUseByReleased() {
       UUID dsId = UUID.randomUUID();
-      UUID versionId = UUID.randomUUID();
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-      version.setModelUrn(MODEL_URN);
-
-      DataStructure ds = new DataStructure();
-      ds.setId(dsId);
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-      ds.setDataStructureVersions(Set.of(version));
+      DataStructure ds = releasedStructure(dsId);
 
       when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
-      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
-          .thenReturn(false);
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(BLOCKER_URN));
+      when(artifactUsageLookup.of(ds))
+          .thenReturn(
+              new ArtifactUsageLookup.ArtifactUsage(
+                  true,
+                  List.of(
+                      new ArtifactUsageLookup.ReleasedReferrer(
+                          ArtifactUsageLookup.ReferrerKind.DATA_SINK, BLOCKER_URN))));
 
       assertThatThrownBy(() -> dataStructureService.unrelease(dsId))
-          .isInstanceOf(ResourceInUseException.class);
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("a Data sink of a released Dataset")
+          .satisfies(
+              ex ->
+                  assertThat(((ResourceInUseException) ex).getBlockedBy())
+                      .containsExactly(BLOCKER_URN));
     }
 
     @Test
-    @DisplayName("Should allow unrelease when no version is in use")
-    void shouldAllowUnreleaseWhenNoVersionInUse() {
+    @DisplayName("Should allow unrelease when only drafts reference a version")
+    void shouldAllowUnreleaseWhenInUseByDraftsOnly() {
       UUID dsId = UUID.randomUUID();
-      UUID versionId = UUID.randomUUID();
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-
-      DataStructure ds = new DataStructure();
-      ds.setId(dsId);
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-      ds.setDataStructureVersions(Set.of(version));
+      DataStructure ds = releasedStructure(dsId);
 
       when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
-      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
-          .thenReturn(false);
+      when(artifactUsageLookup.of(ds))
+          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(true, List.of()));
       when(dataStructureRepository.save(ds)).thenReturn(ds);
 
       dataStructureService.unrelease(dsId);
