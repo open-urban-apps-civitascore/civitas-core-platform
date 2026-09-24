@@ -1,0 +1,183 @@
+{
+    "createdAt": "2026-06-15T17:28:07.025692",
+    "dataStructure": {
+        "id": "06db5b8e-6fbf-4c9f-952c-bc11c5a10a53",
+        "name": "test"
+    },
+    "dataStructureVersionSource": "OWN",
+    "dataStructureVersionStatus": "DRAFT",
+    "description": "1",
+    "id": "ed280509-0755-4666-ad47-9d6b13931894",
+    "inUse": false,
+    "model": {
+        "$id": "http://civitas.org/model/06db5b8e-6fbf-4c9f-952c-bc11c5a10a53/1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Untitled Diagram",
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string"
+            },
+            "klasse": {
+                "$ref": "#/$defs/Klasse"
+            }
+        },
+        "required": [
+            "name",
+            "klasse"
+        ],
+        "$defs": {
+            "Klasse": {
+                "type": "object",
+                "title": "Klasse",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "anzahlPersonen": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "name",
+                    "anzahlPersonen"
+                ]
+            }
+        }
+    },
+    "modelName": "Untitled Diagram",
+    "modifiedAt": "2026-06-15T17:32:54.260365758",
+    "styles": {
+        "id": "2d85ead8-fc04-4741-95e3-9b53f0f5f5d3",
+        "name": "Untitled Diagram",
+        "nodes": [
+            {
+                "id": "04cc5323-0d8f-4780-bc45-4307c1797f4d",
+                "type": "class",
+                "position": {
+                    "x": 182,
+                    "y": 28.5
+                },
+                "data": {
+                    "element": {
+                        "id": "04cc5323-0d8f-4780-bc45-4307c1797f4d",
+                        "name": "Schule",
+                        "type": "class",
+                        "attributes": [
+                            {
+                                "id": "cc497a21-9adb-48b0-82b8-c7ce1f52c8d5",
+                                "name": "name",
+                                "type": "String",
+                                "visibility": "private"
+                            }
+                        ],
+                        "operations": [
+                            {
+                                "id": "264fe990-9f5f-4ba4-8105-21b08ad2711e",
+                                "name": "operation",
+                                "visibility": "public",
+                                "parameters": [],
+                                "returnType": "void"
+                            }
+                        ]
+                    },
+                    "label": "NeueKlasse",
+                    "isSelected": false,
+                    "isDirty": true
+                },
+                "dragHandle": ".node-header",
+                "style": {
+                    "border": "2px solid #333",
+                    "borderRadius": "8px",
+                    "background": "#fff",
+                    "minWidth": 150,
+                    "minHeight": 80
+                },
+                "measured": {
+                    "width": 161,
+                    "height": 116
+                },
+                "selected": false,
+                "dragging": false
+            },
+            {
+                "id": "98173487-88b7-42ca-8381-c940c471f376",
+                "type": "class",
+                "position": {
+                    "x": 392.5,
+                    "y": 138
+                },
+                "data": {
+                    "element": {
+                        "id": "98173487-88b7-42ca-8381-c940c471f376",
+                        "name": "Klasse",
+                        "type": "class",
+                        "attributes": [
+                            {
+                                "id": "6b410530-f4b3-4496-aa99-72b65e15963b",
+                                "name": "name",
+                                "type": "String",
+                                "visibility": "private"
+                            },
+                            {
+                                "id": "c4b331b9-dd06-4ff3-9bd2-db1f894a3467",
+                                "name": "anzahlPersonen",
+                                "type": "Integer",
+                                "visibility": "private",
+                                "isId": false
+                            }
+                        ],
+                        "operations": [
+                            {
+                                "id": "96262a5c-2e3c-4ebc-87b7-8ede3b236117",
+                                "name": "operation",
+                                "visibility": "public",
+                                "parameters": [],
+                                "returnType": "void"
+                            }
+                        ]
+                    },
+                    "label": "NeueKlasse2",
+                    "isSelected": false,
+                    "isDirty": true
+                },
+                "dragHandle": ".node-header",
+                "style": {
+                    "border": "2px solid #333",
+                    "borderRadius": "8px",
+                    "background": "#fff",
+                    "minWidth": 150,
+                    "minHeight": 80
+                },
+                "measured": {
+                    "width": 205,
+                    "height": 138
+                },
+                "selected": false,
+                "dragging": false
+            }
+        ],
+        "edges": [
+            {
+                "id": "0b417220-7456-4305-b6bb-5c39fecd0bcf",
+                "type": "composition",
+                "source": "04cc5323-0d8f-4780-bc45-4307c1797f4d",
+                "target": "98173487-88b7-42ca-8381-c940c471f376",
+                "data": {
+                    "relationship": {
+                        "id": "007d141c-3b7e-47cc-9c11-1a977372dac5",
+                        "type": "composition",
+                        "source": "04cc5323-0d8f-4780-bc45-4307c1797f4d",
+                        "target": "98173487-88b7-42ca-8381-c940c471f376"
+                    },
+                    "label": "",
+                    "isSelected": false,
+                    "isDirty": true
+                }
+            }
+        ],
+        "lastModified": "2026-06-15T15:32:50.110Z",
+        "isDirty": true
+    },
+    "version": "1"
+}

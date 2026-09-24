@@ -5,9 +5,12 @@ interface StructureDefinitionTabProps {
   isReadOnly: boolean
   isAvailable: boolean
   modelSessionManager: UseMultiSessionReturn
+  dataStructureName?: string
+  versionName?: string | null
+  datastructureId?: string
 }
 export const StructureDefinitionTab = (props: StructureDefinitionTabProps) => {
-  const { isReadOnly, isAvailable, modelSessionManager } = props
+  const { isReadOnly, isAvailable, modelSessionManager, dataStructureName, versionName, datastructureId } = props
 
   return (
     <UmlModeler
@@ -15,6 +18,9 @@ export const StructureDefinitionTab = (props: StructureDefinitionTabProps) => {
       modelSessionManager={modelSessionManager}
       isMultiSessionMode={false}
       canExportModel={false}
+      dataStructureName={dataStructureName}
+      versionName={versionName}
+      datastructureId={datastructureId}
     />
   )
 }
