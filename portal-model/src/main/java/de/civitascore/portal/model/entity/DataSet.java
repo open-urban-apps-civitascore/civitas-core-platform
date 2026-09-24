@@ -185,7 +185,8 @@ public class DataSet extends BaseDataEntity {
    * completion regardless of which sinks the dataset has, and left untouched by unrelease — the
    * sinks survive it. (There is no reset path: the row is removed on DELETE-saga completion.)
    * Distinguishes "never released, nothing provisioned yet" from "infrastructure exists, holds
-   * data" so a delete knows a teardown saga is required.
+   * data" so a delete knows a teardown saga is required. It cannot be derived from the sink flags:
+   * the teardown also drops resources of sinks deleted since the release, which have no row left.
    */
   @Column(name = "provisioned", nullable = false)
   private boolean provisioned = false;
