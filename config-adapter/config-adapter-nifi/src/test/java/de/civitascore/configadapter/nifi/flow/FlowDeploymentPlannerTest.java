@@ -1106,6 +1106,14 @@ class FlowDeploymentPlannerTest {
     }
   }
 
+  // A planner key that varied per deploy would open a new broker session on every redeploy.
+  @Test
+  void mqttClientIdIsTheSameOnEveryDeploy() throws Exception {
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      assertEquals(consumeMqttClientId(resolver, "p-one"), consumeMqttClientId(resolver, "p-one"));
+    }
+  }
+
   private String consumeMqttClientId(CredentialResolver resolver, String pipelineId)
       throws Exception {
     String snapshot =
