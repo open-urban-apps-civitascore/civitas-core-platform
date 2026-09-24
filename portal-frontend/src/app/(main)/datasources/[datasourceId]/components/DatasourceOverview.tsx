@@ -1,8 +1,8 @@
 'use client'
 
 import { RowSelectionState } from '@tanstack/react-table'
-import { useTranslations } from 'next-intl'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useGetDatapools } from '@/app/services/api/datapools/clientRequests'
