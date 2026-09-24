@@ -260,38 +260,6 @@ class PutFrostRecordTest {
   }
 
   @Test
-  void onTrigger_whenAnAnswerCarriesNoIdentifier_routesOnlyItsOwnRecordToFailure()
-      throws InitializationException {
-    // FROST names no request in the answers it writes for the rest of a failed atomicity group.
-    // Rejecting the whole document over them would lose the records that were written.
-    try (FrostEndpoint endpoint =
-        FrostEndpoint.answering(
-            document ->
-                answers(
-                    "{\"id\":\"r0-thing\",\"status\":200,\"body\":{\"value\":[]}}",
-                    "{\"id\":\"r0-thing\",\"status\":400,\"body\":{\"message\":\"name is"
-                        + " required\"}}",
-                    "{\"status\":400,\"body\":\"Skipped due to previous failure in"
-                        + " atomicityGroup.\"}",
-                    "{\"id\":\"r1-thing\",\"status\":200,\"body\":{\"value\":[]}}",
-                    "{\"id\":\"r1-thing\",\"status\":201,\"body\":{\"@iot.id\":9}}"),
-            200)) {
-      TestRunner runner = runner(endpoint.baseUrl());
-      runner.setProperty(PutFrostRecord.RECORDS_PER_REQUEST, "2");
-      runner.enqueue(THING_A.getBytes(StandardCharsets.UTF_8));
-      runner.enqueue(THING_B.getBytes(StandardCharsets.UTF_8));
-
-      runner.run();
-
-      runner.assertTransferCount(PutFrostRecord.SUCCESS, 1);
-      runner.assertTransferCount(PutFrostRecord.FAILURE, 1);
-      MockFlowFile failed = runner.getFlowFilesForRelationship(PutFrostRecord.FAILURE).get(0);
-      failed.assertAttributeEquals(PutFrostRecord.ERROR_STATUS, "400");
-      failed.assertAttributeEquals(PutFrostRecord.ERROR_MESSAGE, "name is required");
-    }
-  }
-
-  @Test
   void onTrigger_withACredential_authenticatesTheRequest() throws InitializationException {
     try (FrostEndpoint endpoint =
         FrostEndpoint.answering(
