@@ -272,16 +272,17 @@ export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[]
   return pipeline.nodes.flatMap<DataSinkNodePayload>(node => {
     // The deploy engine derives a sink's target structure from the mapping's Thing-shaped target,
     // referenced by versioned CORE URN (the backend's *Configuration.element, a Model-Forge soft
-    // reference — not a raw version id). A passthrough pipeline (no mapping) has no element.
+    // reference — not a raw version id). Without a mapping, a POSTGIS sink uses its own data structure.
     const elementUrn = mappingTargetElementBefore(pipeline, node.id)
 
     let payload: DataSinkPayload | null = null
     if (isGeoPersistenceNodeData(node.data) && node.data.dataStructureVersionId != null) {
+      const postgisElementUrn = elementUrn ?? node.data.dataStructureUrn
       payload = {
         id: node.data.entityId ?? null,
         dataSinkType: DATASINK_TYPES.POSTGIS,
-        configuration: elementUrn
-          ? { tableName: node.data.tableName, element: elementUrn }
+        configuration: postgisElementUrn
+          ? { tableName: node.data.tableName, element: postgisElementUrn }
           : { tableName: node.data.tableName },
       }
     } else if (isFrostNodeData(node.data)) {

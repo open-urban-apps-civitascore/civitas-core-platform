@@ -134,6 +134,8 @@ export interface GeoPersistenceNodeData extends BasePipelineNodeData {
    * "datastructureId/versionId" composite key of the selected data structure version
    */
   dataStructureVersionId?: string
+  /** Versioned CORE URN of the selected data structure version */
+  dataStructureUrn?: string
 }
 
 // ============================================================================

@@ -132,7 +132,10 @@ describe('DataModelImportModal', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select datastructure Version 1.0' }))
     fireEvent.click(screen.getByTestId('confirmButton'))
 
-    expect(mockOnSelectVersion).toHaveBeenCalledWith({ 'ds-1/v-1': true })
+    expect(mockOnSelectVersion).toHaveBeenCalledWith(
+      { 'ds-1/v-1': true },
+      { datastructureId: 'ds-1', name: 'Available DS', version: '1.0' },
+    )
   })
 
   it('calls onSelectVersion with empty selection when a saved version is removed', () => {
@@ -146,7 +149,9 @@ describe('DataModelImportModal', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select datastructure Version 1.0' }))
     fireEvent.click(screen.getByTestId('confirmButton'))
 
-    expect(mockOnSelectVersion).toHaveBeenCalledWith({})
+    const [selection, selectedVersion] = mockOnSelectVersion.mock.calls[0]
+    expect(selection).toEqual({})
+    expect(selectedVersion).toBeUndefined()
   })
 
   it('calls onOpenChange on cancel', () => {

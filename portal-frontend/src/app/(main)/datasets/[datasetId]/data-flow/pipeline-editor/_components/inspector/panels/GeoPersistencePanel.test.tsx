@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+
+import { buildDataStructureUrn } from '@/utils/urn'
 
 import { ActivePipelineContext } from '../../../_hooks/use-active-pipeline'
 import type { ActivePipelineContextValue } from '../../../_types/context'
@@ -16,12 +18,29 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
+const mockHasPermission = vi.fn().mockReturnValue(false)
 vi.mock('@/hooks/use-permissions', () => ({
-  usePermissions: () => ({ hasPermission: () => false, hasScopedPermission: () => false }),
+  usePermissions: () => ({
+    hasPermission: (...args: unknown[]) => mockHasPermission(...args),
+    hasScopedPermission: () => false,
+  }),
 }))
 
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   useGetDataset: () => ({ data: undefined }),
+}))
+
+const mockUseGetDatastructures = vi.fn().mockReturnValue({ data: undefined, isFetching: false })
+vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
+  useGetDatastructures: (...args: unknown[]) => mockUseGetDatastructures(...args),
+}))
+
+vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
+  useGetDatastructureVersion: () => ({ data: undefined }),
+}))
+
+vi.mock('@/hooks/use-query-params', () => ({
+  useQueryParams: () => ({ getApiRequestParams: () => new URLSearchParams() }),
 }))
 
 const nodeData: GeoPersistenceNodeData = {
@@ -100,5 +119,85 @@ describe('GeoPersistencePanel', () => {
     renderPanel(() => null)
 
     expect(screen.getByLabelText('geoPersistencePanel.tableName')).toHaveAttribute('maxlength', '63')
+  })
+})
+
+describe('GeoPersistencePanel data structure selection', () => {
+  const DATASTRUCTURE_ID = '6f1c2b8e-3a4d-4e5f-9a0b-1c2d3e4f5a6b'
+  const FIRST_VERSION_ID = '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d'
+  const SECOND_VERSION_ID = '1b2c3d4e-5f6a-4b7c-9d8e-0f1a2b3c4d5e'
+
+  const datastructure = {
+    id: DATASTRUCTURE_ID,
+    name: 'Test Structure',
+    description: 'Test description',
+    dataStructureStatus: 'AVAILABLE' as const,
+    dataStructureVersions: [
+      {
+        id: FIRST_VERSION_ID,
+        version: '1.0.0',
+        description: 'First version',
+        dataStructureVersionStatus: 'AVAILABLE' as const,
+        dataStructureVersionSource: null,
+      },
+      {
+        id: SECOND_VERSION_ID,
+        version: '2.0.0',
+        description: 'Second version',
+        dataStructureVersionStatus: 'AVAILABLE' as const,
+        dataStructureVersionSource: null,
+      },
+    ],
+    createdAt: '2024-01-01',
+    modifiedAt: '2024-01-01',
+  }
+
+  beforeEach(() => {
+    mockHasPermission.mockReturnValue(true)
+    mockUseGetDatastructures.mockReturnValue({ data: { data: [datastructure], totalElements: 1 }, isFetching: false })
+  })
+
+  afterEach(() => {
+    mockHasPermission.mockReturnValue(false)
+  })
+
+  const selectVersion = async (openButtonLabel: string, versionLabel: string) => {
+    await userEvent.click(screen.getByRole('button', { name: openButtonLabel }))
+    await userEvent.click(within(screen.getByTestId('expanderCell')).getByRole('button'))
+    await userEvent.click(screen.getByRole('checkbox', { name: `Select datastructure ${versionLabel}` }))
+    await userEvent.click(screen.getByTestId('confirmButton'))
+  }
+
+  it('stores the data structure URN of the selected version on the node', async () => {
+    const onUpdate = vi.fn()
+    renderPanel(() => null, {}, onUpdate)
+
+    await selectVersion('geoPersistencePanel.importDataStructure', 'Version 1.0.0')
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      dataStructureVersionId: `${DATASTRUCTURE_ID}/${FIRST_VERSION_ID}`,
+      dataStructureUrn: buildDataStructureUrn('Test Structure', DATASTRUCTURE_ID, '1.0.0'),
+      configured: true,
+    })
+  })
+
+  it('replaces the data structure URN when another version is selected', async () => {
+    const onUpdate = vi.fn()
+    renderPanel(
+      () => null,
+      {
+        dataStructureVersionId: `${DATASTRUCTURE_ID}/${FIRST_VERSION_ID}`,
+        dataStructureUrn: buildDataStructureUrn('Test Structure', DATASTRUCTURE_ID, '1.0.0'),
+      },
+      onUpdate,
+    )
+
+    await selectVersion('geoPersistencePanel.changeDataStructure', 'Version 2.0.0')
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      dataStructureVersionId: `${DATASTRUCTURE_ID}/${SECOND_VERSION_ID}`,
+      dataStructureUrn: buildDataStructureUrn('Test Structure', DATASTRUCTURE_ID, '2.0.0'),
+      configured: true,
+    })
   })
 })

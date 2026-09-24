@@ -37,7 +37,8 @@ export type PostgisDataSinkPayload = {
     /**
      * Versioned CORE URN of the DataStructure whose rows are written to the table (the backend's
      * PostgisConfiguration.element, a Model-Forge soft reference — the same resolution FROST uses,
-     * not the raw version id). Required by the backend; absent only when no mapping feeds the sink.
+     * not the raw version id). Required by the backend. Without a mapping it is the node's own data
+     * structure
      */
     element?: string
   }
