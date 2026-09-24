@@ -1,6 +1,5 @@
 package de.civitascore.portal.service;
 
-import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
@@ -40,6 +39,9 @@ import org.springframework.stereotype.Component;
  * released, so a DRAFT artifact has no released referrer and is answered without classifying one. A
  * Mapping has no row and no status, so it counts as released when a Pipeline or Dataset that
  * references it does.
+ *
+ * <p>A Dataset counts as released until its unrelease saga completes, because a failed saga
+ * restores it to AVAILABLE.
  *
  * <p>A referrer the platform keeps no row for counts as released: the unrelease it guards then
  * fails closed.
@@ -145,9 +147,7 @@ public class ArtifactUsageLookup {
       return new ArtifactUsage(inUse, List.of());
     }
     List<ReleasedReferrer> released =
-        pipelineRepository
-            .findIdsByDataSourceIdAndDataSetStatus(dataSource.getId(), DataSetStatus.AVAILABLE)
-            .stream()
+        pipelineRepository.findIdsByDataSourceIdWithReleasedDataSet(dataSource.getId()).stream()
             .map(pipelineId -> new ReleasedReferrer(ReferrerKind.PIPELINE, pipelineId.toString()))
             .toList();
     return new ArtifactUsage(true, released);
@@ -229,17 +229,14 @@ public class ArtifactUsageLookup {
                 releasedRows(
                     ReferrerKind.PIPELINE,
                     identity(urns),
-                    found ->
-                        pipelineRepository.findReleaseStatesByModelLogicalUrnIn(
-                            found, DataSetStatus.AVAILABLE)));
+                    found -> pipelineRepository.findReleaseStatesByModelLogicalUrnIn(found)));
         case DATA_SINK ->
             released.addAll(
                 releasedRows(
                     ReferrerKind.DATA_SINK,
                     identity(urns),
                     found ->
-                        dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(
-                            found, DataSetStatus.AVAILABLE)));
+                        dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(found)));
         case DATA_SOURCE ->
             released.addAll(
                 releasedRows(
@@ -253,9 +250,7 @@ public class ArtifactUsageLookup {
                 releasedRows(
                     ReferrerKind.DATA_SET,
                     identity(urns),
-                    found ->
-                        dataSetRepository.findReleaseStatesByManifestLogicalUrnIn(
-                            found, DataSetStatus.AVAILABLE)));
+                    found -> dataSetRepository.findReleaseStatesByManifestLogicalUrnIn(found)));
         case DATA_STRUCTURE, ELEMENT -> structureReferrers.addAll(urns);
         case MAPPING -> released.addAll(followMappings ? releasedMappings(urns) : unknown(urns));
         default -> released.addAll(unknown(urns));

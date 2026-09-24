@@ -1,6 +1,5 @@
 package de.civitascore.portal.repository;
 
-import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSink;
 import java.util.Collection;
@@ -32,11 +31,15 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
 
   boolean existsByDataSetIdAndDataSinkType(UUID dataSetId, DataSinkType dataSinkType);
 
-  /** Whether each sink's Dataset has the given status, keyed by the sink's logical URN. */
+  /** Whether each sink's Dataset is released, keyed by the sink's logical URN. */
   @Query(
       "SELECT new de.civitascore.portal.repository.ReferrerReleaseState(s.configurationLogicalUrn,"
-          + " CASE WHEN s.dataSet.dataSetStatus = :status THEN true ELSE false END)"
+          + " CASE WHEN s.dataSet.dataSetStatus ="
+          + " de.civitascore.portal.model.embedded.DataSetStatus.AVAILABLE"
+          + " OR s.dataSet.pendingSagaType ="
+          + " de.civitascore.portal.model.embedded.PendingSagaType.UNRELEASE"
+          + " THEN true ELSE false END)"
           + " FROM DataSink s WHERE s.configurationLogicalUrn IN :urns")
   List<ReferrerReleaseState> findReleaseStatesByConfigurationLogicalUrnIn(
-      @Param("urns") Collection<String> urns, @Param("status") DataSetStatus status);
+      @Param("urns") Collection<String> urns);
 }

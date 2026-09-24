@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -13,7 +12,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
@@ -56,6 +54,8 @@ class ArtifactUsageLookupTest {
       "urn:core:platform:civitas:pipeline:common:Other:5dd6ee7ff8";
   private static final String SINK_URN =
       "urn:core:platform:civitas:datasink:common:Store:4rrb1hifsm";
+  private static final String DATA_SET_URN =
+      "urn:core:platform:civitas:dataset:common:Readings:7pp2kd9sle";
   private static final String MAPPING_URN =
       "urn:core:platform:civitas:mapping:common:Map:5tt3mnq2wa";
   private static final String ELEMENT_URN =
@@ -121,7 +121,7 @@ class ArtifactUsageLookupTest {
 
       assertThat(usage.inUse()).isTrue();
       assertThat(usage.inUseByReleased()).isFalse();
-      verify(pipelineRepository, never()).findIdsByDataSourceIdAndDataSetStatus(any(), any());
+      verify(pipelineRepository, never()).findIdsByDataSourceIdWithReleasedDataSet(any());
     }
 
     @Test
@@ -131,8 +131,7 @@ class ArtifactUsageLookupTest {
       DataSource dataSource = dataSource(DataSourceStatus.AVAILABLE);
       UUID pipelineId = UUID.randomUUID();
       when(pipelineRepository.existsByDataSourcesId(dataSource.getId())).thenReturn(true);
-      when(pipelineRepository.findIdsByDataSourceIdAndDataSetStatus(
-              dataSource.getId(), DataSetStatus.AVAILABLE))
+      when(pipelineRepository.findIdsByDataSourceIdWithReleasedDataSet(dataSource.getId()))
           .thenReturn(List.of(pipelineId));
 
       ArtifactUsage usage = lookup.of(dataSource);
@@ -147,8 +146,7 @@ class ArtifactUsageLookupTest {
     void availableUsedByDraftsOnly_isNotInUseByReleased() {
       DataSource dataSource = dataSource(DataSourceStatus.AVAILABLE);
       when(pipelineRepository.existsByDataSourcesId(dataSource.getId())).thenReturn(true);
-      when(pipelineRepository.findIdsByDataSourceIdAndDataSetStatus(
-              dataSource.getId(), DataSetStatus.AVAILABLE))
+      when(pipelineRepository.findIdsByDataSourceIdWithReleasedDataSet(dataSource.getId()))
           .thenReturn(List.of());
 
       ArtifactUsage usage = lookup.of(dataSource);
@@ -165,7 +163,7 @@ class ArtifactUsageLookupTest {
       ArtifactUsage usage = lookup.of(dataSource);
 
       assertThat(usage.inUse()).isFalse();
-      verify(pipelineRepository, never()).findIdsByDataSourceIdAndDataSetStatus(any(), any());
+      verify(pipelineRepository, never()).findIdsByDataSourceIdWithReleasedDataSet(any());
     }
   }
 
@@ -237,8 +235,7 @@ class ArtifactUsageLookupTest {
     void referencedBySinkOfReadyDataset_isNotInUseByReleased() {
       DataStructureVersion version = releasedVersion();
       when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
-      when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(
-              Set.of(SINK_URN), DataSetStatus.AVAILABLE))
+      when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(Set.of(SINK_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(SINK_URN, false)));
 
       ArtifactUsage usage = lookup.of(version);
@@ -252,8 +249,7 @@ class ArtifactUsageLookupTest {
     void referencedBySinkOfAvailableDataset_isInUseByReleased() {
       DataStructureVersion version = releasedVersion();
       when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
-      when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(
-              Set.of(SINK_URN), DataSetStatus.AVAILABLE))
+      when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(Set.of(SINK_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(SINK_URN, true)));
 
       ArtifactUsage usage = lookup.of(version);
@@ -268,9 +264,23 @@ class ArtifactUsageLookupTest {
       DataStructureVersion version = releasedVersion();
       when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(MAPPING_URN));
       when(modelRegistryGateway.referencesTo(MAPPING_URN)).thenReturn(List.of(PIPELINE_URN));
-      when(pipelineRepository.findReleaseStatesByModelLogicalUrnIn(
-              Set.of(PIPELINE_URN), DataSetStatus.AVAILABLE))
+      when(pipelineRepository.findReleaseStatesByModelLogicalUrnIn(Set.of(PIPELINE_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(PIPELINE_URN, true)));
+
+      ArtifactUsage usage = lookup.of(version);
+
+      assertThat(usage.releasedReferrers())
+          .containsExactly(new ReleasedReferrer(ReferrerKind.MAPPING, MAPPING_URN));
+    }
+
+    @Test
+    @DisplayName("A mapping counts as released when a released dataset references it")
+    void mappingUsedByReleasedDataSet_isInUseByReleased() {
+      DataStructureVersion version = releasedVersion();
+      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(MAPPING_URN));
+      when(modelRegistryGateway.referencesTo(MAPPING_URN)).thenReturn(List.of(DATA_SET_URN));
+      when(dataSetRepository.findReleaseStatesByManifestLogicalUrnIn(Set.of(DATA_SET_URN)))
+          .thenReturn(List.of(new ReferrerReleaseState(DATA_SET_URN, true)));
 
       ArtifactUsage usage = lookup.of(version);
 
@@ -284,8 +294,7 @@ class ArtifactUsageLookupTest {
       DataStructureVersion version = releasedVersion();
       when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(MAPPING_URN));
       when(modelRegistryGateway.referencesTo(MAPPING_URN)).thenReturn(List.of(PIPELINE_URN));
-      when(pipelineRepository.findReleaseStatesByModelLogicalUrnIn(
-              Set.of(PIPELINE_URN), DataSetStatus.AVAILABLE))
+      when(pipelineRepository.findReleaseStatesByModelLogicalUrnIn(Set.of(PIPELINE_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(PIPELINE_URN, false)));
 
       ArtifactUsage usage = lookup.of(version);
@@ -315,8 +324,7 @@ class ArtifactUsageLookupTest {
     void referrerWithoutRow_countsAsReleased() {
       DataStructureVersion version = releasedVersion();
       when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(PIPELINE_URN));
-      when(pipelineRepository.findReleaseStatesByModelLogicalUrnIn(
-              Set.of(PIPELINE_URN), DataSetStatus.AVAILABLE))
+      when(pipelineRepository.findReleaseStatesByModelLogicalUrnIn(Set.of(PIPELINE_URN)))
           .thenReturn(List.of());
 
       ArtifactUsage usage = lookup.of(version);
@@ -331,8 +339,7 @@ class ArtifactUsageLookupTest {
       DataStructureVersion version = releasedVersion();
       when(modelRegistryGateway.referencesTo(MODEL_URN))
           .thenReturn(List.of(PIPELINE_URN, OTHER_PIPELINE_URN));
-      when(pipelineRepository.findReleaseStatesByModelLogicalUrnIn(
-              any(), eq(DataSetStatus.AVAILABLE)))
+      when(pipelineRepository.findReleaseStatesByModelLogicalUrnIn(any()))
           .thenReturn(
               List.of(
                   new ReferrerReleaseState(PIPELINE_URN, false),
@@ -342,7 +349,7 @@ class ArtifactUsageLookupTest {
 
       assertThat(usage.releasedReferrers())
           .containsExactly(new ReleasedReferrer(ReferrerKind.PIPELINE, OTHER_PIPELINE_URN));
-      verify(pipelineRepository, times(1)).findReleaseStatesByModelLogicalUrnIn(any(), any());
+      verify(pipelineRepository, times(1)).findReleaseStatesByModelLogicalUrnIn(any());
     }
   }
 
@@ -382,8 +389,7 @@ class ArtifactUsageLookupTest {
       structure.setDataStructureVersions(Set.of(released, draft));
 
       when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
-      when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(
-              Set.of(SINK_URN), DataSetStatus.AVAILABLE))
+      when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(Set.of(SINK_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(SINK_URN, true)));
 
       ArtifactUsage usage = lookup.of(structure);
@@ -415,8 +421,7 @@ class ArtifactUsageLookupTest {
       structure.setDataStructureVersions(Set.of(released, draft, unused));
 
       when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
-      when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(
-              Set.of(SINK_URN), DataSetStatus.AVAILABLE))
+      when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(Set.of(SINK_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(SINK_URN, true)));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(draft.getId())))
           .thenReturn(true);

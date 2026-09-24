@@ -8,6 +8,7 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
@@ -83,6 +84,19 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
     return dataSetRepository.save(reloaded);
   }
 
+  private DataSet dataSetWithManifestUrn(String manifestLogicalUrn) {
+    DataSet dataSet = portalData.dataSet();
+    dataSet.setManifestLogicalUrn(manifestLogicalUrn);
+    return dataSetRepository.save(dataSet);
+  }
+
+  private DataSet unreleasing(DataSet dataSet) {
+    DataSet reloaded = dataSetRepository.findById(dataSet.getId()).orElseThrow();
+    reloaded.setDataSetStatus(DataSetStatus.READY);
+    reloaded.setPendingSagaType(PendingSagaType.UNRELEASE);
+    return dataSetRepository.save(reloaded);
+  }
+
   @Nested
   @DisplayName("Release-state queries")
   class Queries {
@@ -114,15 +128,15 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
 
       assertThat(
               dataSetRepository.findReleaseStatesByManifestLogicalUrnIn(
-                  Set.of(released.getManifestLogicalUrn()), DataSetStatus.AVAILABLE))
+                  Set.of(released.getManifestLogicalUrn())))
           .containsExactly(new ReferrerReleaseState(released.getManifestLogicalUrn(), true));
       assertThat(
               pipelineRepository.findReleaseStatesByModelLogicalUrnIn(
-                  Set.of(pipeline.getModelLogicalUrn()), DataSetStatus.AVAILABLE))
+                  Set.of(pipeline.getModelLogicalUrn())))
           .containsExactly(new ReferrerReleaseState(pipeline.getModelLogicalUrn(), true));
       assertThat(
               dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(
-                  Set.of(sink.getConfigurationLogicalUrn()), DataSetStatus.AVAILABLE))
+                  Set.of(sink.getConfigurationLogicalUrn())))
           .containsExactly(new ReferrerReleaseState(sink.getConfigurationLogicalUrn(), true));
       assertThat(
               dataSourceRepository.findReleaseStatesByConfigurationLogicalUrnIn(
@@ -144,9 +158,7 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
       portalData.pipeline(draft, b -> b.dataSources(Set.of(source)));
       Pipeline releasedPipeline = portalData.pipeline(released, b -> b.dataSources(Set.of(source)));
 
-      assertThat(
-              pipelineRepository.findIdsByDataSourceIdAndDataSetStatus(
-                  source.getId(), DataSetStatus.AVAILABLE))
+      assertThat(pipelineRepository.findIdsByDataSourceIdWithReleasedDataSet(source.getId()))
           .containsExactly(releasedPipeline.getId());
     }
 
@@ -227,6 +239,68 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(usageOf(source).releasedReferrers())
           .extracting(ArtifactUsageLookup.ReleasedReferrer::kind)
           .containsExactly(ReferrerKind.MAPPING);
+    }
+  }
+
+  @Nested
+  @DisplayName("Dataset in the middle of an unrelease")
+  class InFlightUnrelease {
+
+    // Checked on the query because Model Forge reports no Dataset as a referrer to drive the
+    // lookup.
+    @Test
+    @DisplayName("a dataset counts as released while AVAILABLE or being unreleased, not when READY")
+    void dataSetReleaseState_includesUnreleaseInFlight() {
+      DataSet available = dataSetWithManifestUrn("urn:core:platform:civitas:dataset:common:A:1a");
+      DataSet ready = dataSetWithManifestUrn("urn:core:platform:civitas:dataset:common:R:1a");
+      DataSet unreleasing = dataSetWithManifestUrn("urn:core:platform:civitas:dataset:common:U:1a");
+      withStatus(available, DataSetStatus.AVAILABLE);
+      withStatus(ready, DataSetStatus.READY);
+      unreleasing(unreleasing);
+
+      assertThat(
+              dataSetRepository.findReleaseStatesByManifestLogicalUrnIn(
+                  Set.of(
+                      available.getManifestLogicalUrn(),
+                      ready.getManifestLogicalUrn(),
+                      unreleasing.getManifestLogicalUrn())))
+          .containsExactlyInAnyOrder(
+              new ReferrerReleaseState(available.getManifestLogicalUrn(), true),
+              new ReferrerReleaseState(ready.getManifestLogicalUrn(), false),
+              new ReferrerReleaseState(unreleasing.getManifestLogicalUrn(), true));
+    }
+
+    @Test
+    @DisplayName("a sink of a dataset being unreleased keeps its version released-used")
+    void sinkOfUnreleasingDataSet_isReleased() {
+      DataStructureVersion version = releasedVersion("Reading");
+      DataSet dataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.AVAILABLE));
+      DataSink sink = portalData.dataSink(dataSet, portalData.pipeline(dataSet));
+      portalData.attachSinkConfiguration(sink, Map.of("element", version.getModelUrn()));
+      unreleasing(dataSet);
+
+      assertThat(usageOf(version).releasedReferrers())
+          .extracting(ArtifactUsageLookup.ReleasedReferrer::kind)
+          .containsExactly(ReferrerKind.DATA_SINK);
+    }
+
+    @Test
+    @DisplayName("a pipeline of a dataset being unreleased keeps its data source released-used")
+    void pipelineOfUnreleasingDataSet_keepsDataSourceReleased() {
+      DataSource source =
+          portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
+      DataSet dataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.AVAILABLE));
+      Pipeline pipeline = portalData.pipeline(dataSet, b -> b.dataSources(Set.of(source)));
+      unreleasing(dataSet);
+
+      ArtifactUsage usage =
+          transactionTemplate.execute(
+              status -> lookup.of(dataSourceRepository.findById(source.getId()).orElseThrow()));
+
+      assertThat(usage.releasedReferrers())
+          .containsExactly(
+              new ArtifactUsageLookup.ReleasedReferrer(
+                  ReferrerKind.PIPELINE, pipeline.getId().toString()));
     }
   }
 
