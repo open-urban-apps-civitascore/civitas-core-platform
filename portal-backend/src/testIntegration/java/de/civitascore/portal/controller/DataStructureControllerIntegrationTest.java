@@ -952,7 +952,31 @@ class DataStructureControllerIntegrationTest
                       .modelName("InUse Model"));
 
       portalData.dataSource(
+          b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE).dataStructureVersion(version));
+    }
+
+    @Test
+    @DisplayName("Should unrelease a data structure whose versions only drafts reference")
+    void shouldUnreleaseWhenOnlyDraftsReference() {
+      DataStructure ds =
+          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion version =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      portalData.dataSource(
           b -> b.dataSourceStatus(DataSourceStatus.DRAFT).dataStructureVersion(version));
+
+      ResponseEntity<DataStructureOutputDTO> response =
+          exchange(
+              ENDPOINT + "/" + ds.getId() + "/unrelease",
+              HttpMethod.POST,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().isInUse()).isTrue();
+      assertThat(response.getBody().isInUseByReleased()).isFalse();
     }
 
     @Test
@@ -990,6 +1014,9 @@ class DataStructureControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().isInUse())
           .as("inUse should be true when a DataSource references a version")
+          .isTrue();
+      assertThat(response.getBody().isInUseByReleased())
+          .as("inUseByReleased should be true when an AVAILABLE DataSource pins a version")
           .isTrue();
     }
 

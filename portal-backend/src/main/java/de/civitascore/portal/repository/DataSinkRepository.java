@@ -1,12 +1,15 @@
 package de.civitascore.portal.repository;
 
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSink;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data JPA repository for {@link DataSink} entities. */
@@ -32,4 +35,12 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
   // A sink names the version's model in its registry-stored configuration ("element" field) rather
   // than in a relational column, so the in-use guard asks Model Forge what would refuse the model's
   // deletion (ModelRegistryGateway#isReferenced) instead of querying this table.
+
+  /** Whether each sink's Dataset has the given status, keyed by the sink's logical URN. */
+  @Query(
+      "SELECT new de.civitascore.portal.repository.ReferrerReleaseState(s.configurationLogicalUrn,"
+          + " CASE WHEN s.dataSet.dataSetStatus = :status THEN true ELSE false END)"
+          + " FROM DataSink s WHERE s.configurationLogicalUrn IN :urns")
+  List<ReferrerReleaseState> findReleaseStatesByConfigurationLogicalUrnIn(
+      @Param("urns") Collection<String> urns, @Param("status") DataSetStatus status);
 }

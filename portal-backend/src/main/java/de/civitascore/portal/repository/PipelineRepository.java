@@ -1,12 +1,16 @@
 package de.civitascore.portal.repository;
 
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.Pipeline;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data JPA repository for {@link Pipeline} entities. */
@@ -54,4 +58,19 @@ public interface PipelineRepository extends BaseRepository<Pipeline, UUID> {
    */
   @EntityGraph(attributePaths = {"dataSet", "dataSet.dataPool", "dataSources", "runtimeStatus"})
   List<Pipeline> findByDataSourcesId(UUID dataSourceId);
+
+  /** The pipelines referencing the given datasource whose Dataset has the given status. */
+  @Query(
+      "SELECT p.id FROM Pipeline p JOIN p.dataSources ds"
+          + " WHERE ds.id = :dataSourceId AND p.dataSet.dataSetStatus = :status")
+  List<UUID> findIdsByDataSourceIdAndDataSetStatus(
+      @Param("dataSourceId") UUID dataSourceId, @Param("status") DataSetStatus status);
+
+  /** Whether each pipeline's Dataset has the given status, keyed by the pipeline's logical URN. */
+  @Query(
+      "SELECT new de.civitascore.portal.repository.ReferrerReleaseState(p.modelLogicalUrn,"
+          + " CASE WHEN p.dataSet.dataSetStatus = :status THEN true ELSE false END)"
+          + " FROM Pipeline p WHERE p.modelLogicalUrn IN :urns")
+  List<ReferrerReleaseState> findReleaseStatesByModelLogicalUrnIn(
+      @Param("urns") Collection<String> urns, @Param("status") DataSetStatus status);
 }

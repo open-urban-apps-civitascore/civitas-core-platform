@@ -2,13 +2,9 @@ package de.civitascore.portal.model.output.assembler;
 
 import de.civitascore.portal.mapper.DataStructureMapper;
 import de.civitascore.portal.model.entity.DataStructure;
-import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
-import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.DataSourceRepository;
-import java.util.Set;
+import de.civitascore.portal.service.ArtifactUsageLookup;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -22,8 +18,7 @@ public class DataStructureAssembler
     implements BaseAssembler<DataStructure, DataStructureOutputDTO, UUID> {
 
   private final DataStructureMapper dataStructureMapper;
-  private final DataSourceRepository dataSourceRepository;
-  private final ModelRegistryGateway modelRegistryGateway;
+  private final ArtifactUsageLookup artifactUsageLookup;
 
   /** {@inheritDoc} Delegates to the {@link DataStructureMapper} for basic field mapping. */
   @Override
@@ -31,24 +26,12 @@ public class DataStructureAssembler
     return dataStructureMapper.toOutput(entity);
   }
 
-  /**
-   * {@inheritDoc} Sets the {@code inUse} flag from whether anything still references one of this
-   * structure's versions.
-   */
+  /** {@inheritDoc} Sets the {@code inUse} and {@code inUseByReleased} flags. */
   @Override
   public DataStructureOutputDTO enrichDto(DataStructureOutputDTO dto, DataStructure entity) {
-    Set<DataStructureVersion> versions = entity.getDataStructureVersions();
-    Set<UUID> versionIds =
-        versions.stream().map(DataStructureVersion::getId).collect(Collectors.toSet());
-    if (!versionIds.isEmpty()) {
-      // The registry answers for every reference it holds onto a version's model; the host FK
-      // covers a data source pinned to the version, which the registry does not record.
-      dto.setInUse(
-          dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
-              || versions.stream()
-                  .map(DataStructureVersion::getModelUrn)
-                  .anyMatch(modelRegistryGateway::isReferenced));
-    }
+    ArtifactUsageLookup.ArtifactUsage usage = artifactUsageLookup.of(entity);
+    dto.setInUse(usage.inUse());
+    dto.setInUseByReleased(usage.inUseByReleased());
     return dto;
   }
 

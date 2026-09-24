@@ -28,7 +28,16 @@ public class DataStructureOutputDTO extends BaseOutputDTO {
   private List<DataStructureVersionSummaryDTO> dataStructureVersions = new ArrayList<>();
 
   @Schema(
-      description = "Whether this data structure is currently referenced",
+      description =
+          "Whether anything references one of this data structure's versions, released or draft."
+              + " While true, it cannot be deleted",
       accessMode = Schema.AccessMode.READ_ONLY)
   private boolean inUse;
+
+  @Schema(
+      description =
+          "Whether a released entity references one of this data structure's versions. While"
+              + " true, it cannot be unreleased",
+      accessMode = Schema.AccessMode.READ_ONLY)
+  private boolean inUseByReleased;
 }

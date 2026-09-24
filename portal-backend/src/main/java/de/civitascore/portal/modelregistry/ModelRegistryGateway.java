@@ -233,6 +233,20 @@ public class ModelRegistryGateway {
   }
 
   /**
+   * The CORE artifact-type segment of a URN, such as {@code "pipeline"} or {@code "element"}.
+   *
+   * @return the segment, or null when {@code urn} is not a CORE URN
+   */
+  public String artifactType(String urn) {
+    return UrnParser.artifactTypeFromUrn(urn);
+  }
+
+  /** The logical URN of the Data structure that an Element or Data structure URN belongs to. */
+  public String dataStructureUrnOf(String urn) {
+    return groupingUrnOf(logicalUrn(urn));
+  }
+
+  /**
    * The versioned CORE URNs of a given artifact type that {@code urn} depends on, read from Model
    * Forge's dependency graph. This is the envelope-level way for host orchestration to learn, e.g.,
    * which Mappings a pipeline references — <b>without ever parsing the pipeline's content</b> (the
