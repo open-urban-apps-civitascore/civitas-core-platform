@@ -839,6 +839,23 @@ describe('DatasetOverview', () => {
       expect(toast.error).not.toHaveBeenCalled()
     })
 
+    it('reports the refusal when the closure only fails at release, after staging succeeded', async () => {
+      mockStageDataset.mockResolvedValueOnce(undefined)
+      mockReleaseDataset.mockRejectedValueOnce(
+        mockApiError(422, 'Pipeline closure validation failed', PIPELINE_CLOSURE_INVALID),
+      )
+
+      await releaseDraftDataset()
+
+      await waitFor(() => {
+        expect(mockStageDataset).toHaveBeenCalledWith('test-id')
+        expect(mockReleaseDataset).toHaveBeenCalledWith('test-id')
+      })
+      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
+      expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
     it('falls back to the transition toast for any other failure', async () => {
       mockStageDataset.mockRejectedValueOnce(mockApiError(500, 'Boom'))
 

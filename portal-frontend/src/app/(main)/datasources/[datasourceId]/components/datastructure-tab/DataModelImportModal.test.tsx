@@ -217,6 +217,33 @@ describe('DataModelImportModal', () => {
     expect(calledParams.get('dataStructureStatus')).toBeNull()
   })
 
+  it('hides a version that has no stored model, so nothing model-less can be imported', () => {
+    const withModelLessVersion = {
+      ...mixedDatastructures[0],
+      dataStructureVersions: [
+        ...mixedDatastructures[0].dataStructureVersions,
+        {
+          id: 'v-4',
+          version: null,
+          description: 'Draft without a stored model',
+          dataStructureVersionStatus: 'DRAFT' as const,
+          dataStructureVersionSource: null,
+        },
+      ],
+    }
+    mockUseGetDatastructures.mockReturnValue({
+      data: { data: [withModelLessVersion], totalElements: 1 },
+      isFetching: false,
+    })
+    render(<DataModelImportModal {...defaultProps} />)
+
+    fireEvent.click(screen.getByTestId('expanderCell').querySelector('button')!)
+
+    expect(screen.getByRole('checkbox', { name: 'Select datastructure Version 1.0' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Select datastructure Version 2.0' })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Select datastructure -' })).toBeNull()
+  })
+
   it('offers a draft data structure', () => {
     mockUseGetDatastructures.mockReturnValue({
       data: { data: [mixedDatastructures[1]], totalElements: 1 },

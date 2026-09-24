@@ -68,7 +68,12 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
     params: apiParams,
   })
 
-  const datastructures = mapDatastructuresApiToListData(datastructuresData?.data || [])
+  const selectableDatastructures = (datastructuresData?.data || []).map(datastructure => ({
+    ...datastructure,
+    dataStructureVersions: datastructure.dataStructureVersions.filter(version => version.version !== null),
+  }))
+
+  const datastructures = mapDatastructuresApiToListData(selectableDatastructures)
 
   const rowCount = datastructuresData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize)
