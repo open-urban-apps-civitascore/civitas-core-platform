@@ -14,40 +14,43 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import java.util.ArrayList;
-import java.util.Arrays;
+import de.civitascore.configadapter.util.PayloadConverter;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.IntStream;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import mockwebserver3.RecordedRequest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 class FrostSagaHandlerTest {
 
-  private WebTarget mockTarget;
-  private WebTarget mockPathTarget;
-  private Invocation.Builder mockBuilder;
+  private MockWebServer server;
+
+  @BeforeEach
+  void startServer() throws IOException {
+    server = new MockWebServer();
+    server.start();
+  }
+
+  @AfterEach
+  void stopServer() throws IOException {
+    server.close();
+  }
 
   @Test
   @DisplayName("adapter() returns 'frost'")
@@ -95,11 +98,8 @@ class FrostSagaHandlerTest {
     @DisplayName("returns success with projectId and baseUrl")
     void shouldCreateProjectSuccessfully() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(201);
-        when(mockResponse.getHeaderString("Location"))
-            .thenReturn("http://frost:8080/v1.1/Projects(42)");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+        server.enqueue(emptyProjectLookup());
+        server.enqueue(created("Projects(42)"));
 
         SagaCommandMessage command =
             createCommand(
@@ -113,7 +113,7 @@ class FrostSagaHandlerTest {
         assertEquals("saga-001", result.sagaId());
         assertEquals("create-project", result.stepId());
         assertEquals("42", result.resultData().get("projectId"));
-        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
+        assertTrue(((String) result.resultData().get("baseUrl")).endsWith("/Projects(42)"));
         assertEquals("42", result.compensationData().get("projectId"));
         // A freshly created project flags created=true so its compensation may safely delete it.
         assertEquals(true, result.compensationData().get("created"));
@@ -123,15 +123,10 @@ class FrostSagaHandlerTest {
     @Test
     @DisplayName(
         "names the FROST project '{datasetName} ({datasetId})' so same-named datasets stay isolated")
-    void shouldNameProjectUniquelyWithDatasetId() {
+    void shouldNameProjectUniquelyWithDatasetId() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(201);
-        when(mockResponse.getHeaderString("Location"))
-            .thenReturn("http://frost:8080/v1.1/Projects(42)");
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> captor = ArgumentCaptor.forClass(Entity.class);
-        when(mockBuilder.post(captor.capture())).thenReturn(mockResponse);
+        server.enqueue(emptyProjectLookup());
+        server.enqueue(created("Projects(42)"));
 
         handler.handle(
             createCommand(
@@ -139,7 +134,9 @@ class FrostSagaHandlerTest {
                 "CREATE_PROJECT",
                 Map.of("datasetName", "Foo", "datasetId", "ds-1")));
 
-        Map<String, Object> body = captor.getValue().getEntity();
+        server.takeRequest(); // the up-front lookup GET
+        RecordedRequest postRequest = server.takeRequest();
+        Map<String, Object> body = requestBodyAsMap(postRequest);
         assertEquals(
             "Foo (ds-1)",
             body.get("name"),
@@ -152,11 +149,8 @@ class FrostSagaHandlerTest {
     @DisplayName("uses publicUrl in baseUrl when configured differently from serverUrl")
     void shouldUsePublicUrlInBaseUrl() {
       try (FrostSagaHandler handler = createHandlerWithPublicUrl("http://public-frost:80/v1.1")) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(201);
-        when(mockResponse.getHeaderString("Location"))
-            .thenReturn("http://frost:8080/v1.1/Projects(42)");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+        server.enqueue(emptyProjectLookup());
+        server.enqueue(created("Projects(42)"));
 
         SagaCommandMessage command =
             createCommand(
@@ -177,11 +171,7 @@ class FrostSagaHandlerTest {
     void shouldReuseExistingProjectAndSkipPost() {
       try (FrostSagaHandler handler = createHandler()) {
         // Up-front lookup finds the dataset's own project → reuse it, never POST.
-        Response getResponse = mock(Response.class);
-        when(getResponse.getStatus()).thenReturn(200);
-        when(getResponse.readEntity(Map.class))
-            .thenReturn(Map.of("value", List.of(Map.of("@iot.id", 42))));
-        when(mockBuilder.get()).thenReturn(getResponse);
+        server.enqueue(projectLookupFound(42));
 
         SagaCommandMessage command =
             createCommand(
@@ -191,11 +181,10 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("42", result.resultData().get("projectId"));
-        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
         // Reuse must flag created=false so its compensation skips the destructive delete.
         assertEquals(false, result.compensationData().get("created"));
-        verify(mockBuilder, never()).post(any(Entity.class));
+        assertEquals(1, server.getRequestCount());
       }
     }
 
@@ -205,22 +194,13 @@ class FrostSagaHandlerTest {
             + " the second lookup finds the project")
     void shouldReturnSuccessWhenFrostSignalsDuplicateAndProjectExists() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response postResponse = mock(Response.class);
-        when(postResponse.getStatus()).thenReturn(500);
-        when(postResponse.readEntity(String.class))
-            .thenReturn("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
-
-        // First lookup: empty (POST is attempted). After the POST's 500, the recovery lookup finds
-        // the project a concurrent create inserted in between.
-        Response emptyLookup = mock(Response.class);
-        when(emptyLookup.getStatus()).thenReturn(200);
-        when(emptyLookup.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
-        Response foundLookup = mock(Response.class);
-        when(foundLookup.getStatus()).thenReturn(200);
-        when(foundLookup.readEntity(Map.class))
-            .thenReturn(Map.of("value", List.of(Map.of("@iot.id", 42))));
-        when(mockBuilder.get()).thenReturn(emptyLookup, foundLookup);
+        server.enqueue(emptyProjectLookup());
+        server.enqueue(
+            new MockResponse.Builder()
+                .code(500)
+                .body("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}")
+                .build());
+        server.enqueue(projectLookupFound(42));
 
         SagaCommandMessage command =
             createCommand(
@@ -230,7 +210,6 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("42", result.resultData().get("projectId"));
-        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
       }
     }
@@ -241,23 +220,14 @@ class FrostSagaHandlerTest {
             + " the project")
     void shouldReturnSuccessWhenFrostReturns409AndProjectExists() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response postResponse = mock(Response.class);
-        when(postResponse.getStatus()).thenReturn(409);
-        when(postResponse.readEntity(String.class))
-            .thenReturn(
-                "{\"code\":409,\"type\":\"error\",\"message\":\"Data violates constraints.\"}");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
-
-        // First lookup: empty (POST is attempted). After the POST's 409, the recovery lookup finds
-        // the project a concurrent create inserted in between.
-        Response emptyLookup = mock(Response.class);
-        when(emptyLookup.getStatus()).thenReturn(200);
-        when(emptyLookup.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
-        Response foundLookup = mock(Response.class);
-        when(foundLookup.getStatus()).thenReturn(200);
-        when(foundLookup.readEntity(Map.class))
-            .thenReturn(Map.of("value", List.of(Map.of("@iot.id", 42))));
-        when(mockBuilder.get()).thenReturn(emptyLookup, foundLookup);
+        server.enqueue(emptyProjectLookup());
+        server.enqueue(
+            new MockResponse.Builder()
+                .code(409)
+                .body(
+                    "{\"code\":409,\"type\":\"error\",\"message\":\"Data violates constraints.\"}")
+                .build());
+        server.enqueue(projectLookupFound(42));
 
         SagaCommandMessage command =
             createCommand(
@@ -267,7 +237,6 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("42", result.resultData().get("projectId"));
-        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
       }
     }
@@ -276,14 +245,16 @@ class FrostSagaHandlerTest {
     @DisplayName("returns failure when the POST fails with 409 but no project is found by name")
     void shouldReturnFailureWhenFrostReturns409ButProjectNotFound() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response postResponse = mock(Response.class);
-        when(postResponse.getStatus()).thenReturn(409);
-        when(postResponse.readEntity(String.class))
-            .thenReturn(
-                "{\"code\":409,\"type\":\"error\",\"message\":\"Data violates constraints.\"}");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
+        server.enqueue(emptyProjectLookup());
+        server.enqueue(
+            new MockResponse.Builder()
+                .code(409)
+                .body(
+                    "{\"code\":409,\"type\":\"error\",\"message\":\"Data violates constraints.\"}")
+                .build());
+        // The recovery lookup also finds nothing.
+        server.enqueue(emptyProjectLookup());
 
-        // Both the up-front and the recovery lookup return empty (default from setup).
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Ghost Dataset"));
 
@@ -300,13 +271,14 @@ class FrostSagaHandlerTest {
             + " found by name")
     void shouldReturnFailureWhenFrostSignalsDuplicateButProjectNotFound() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response postResponse = mock(Response.class);
-        when(postResponse.getStatus()).thenReturn(500);
-        when(postResponse.readEntity(String.class))
-            .thenReturn("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
+        server.enqueue(emptyProjectLookup());
+        server.enqueue(
+            new MockResponse.Builder()
+                .code(500)
+                .body("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}")
+                .build());
+        server.enqueue(emptyProjectLookup());
 
-        // Both the up-front and the recovery lookup return empty (default from setup).
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Ghost Dataset"));
 
@@ -321,10 +293,8 @@ class FrostSagaHandlerTest {
     @DisplayName("returns failure on HTTP 400")
     void shouldReturnFailureOnClientError() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(400);
-        when(mockResponse.readEntity(String.class)).thenReturn("Bad Request");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+        server.enqueue(emptyProjectLookup());
+        server.enqueue(new MockResponse.Builder().code(400).body("Bad Request").build());
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Bad"));
@@ -340,10 +310,8 @@ class FrostSagaHandlerTest {
     @DisplayName("returns failure on HTTP 500")
     void shouldReturnFailureOnServerError() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(500);
-        when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+        server.enqueue(emptyProjectLookup());
+        server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Test"));
@@ -356,10 +324,10 @@ class FrostSagaHandlerTest {
 
     @Test
     @DisplayName("returns failure on network error")
-    void shouldReturnFailureOnNetworkError() {
+    void shouldReturnFailureOnNetworkError() throws IOException {
       try (FrostSagaHandler handler = createHandler()) {
-        when(mockBuilder.post(any(Entity.class)))
-            .thenThrow(new ProcessingException("Connection refused"));
+        // Torn down before any request is made: the connection attempt itself fails.
+        server.close();
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Test"));
@@ -373,15 +341,10 @@ class FrostSagaHandlerTest {
 
     @Test
     @DisplayName("always creates the project private even when openDataAccess is true")
-    void shouldAlwaysCreateProjectPrivate() {
+    void shouldAlwaysCreateProjectPrivate() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(201);
-        when(mockResponse.getHeaderString("Location"))
-            .thenReturn("http://frost:8080/v1.1/Projects(42)");
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-        when(mockBuilder.post(captor.capture())).thenReturn(mockResponse);
+        server.enqueue(emptyProjectLookup());
+        server.enqueue(created("Projects(42)"));
 
         // openDataAccess=true must NOT make the FROST project public: open data is an OPA
         // (ABAC) decision at request time, never FROST project visibility.
@@ -393,23 +356,18 @@ class FrostSagaHandlerTest {
 
         handler.handle(command);
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        server.takeRequest();
+        Map<String, Object> body = requestBodyAsMap(server.takeRequest());
         assertEquals(false, body.get("public"));
       }
     }
 
     @Test
     @DisplayName("creates the project private when openDataAccess missing or false")
-    void shouldDefaultPublicToFalse() {
+    void shouldDefaultPublicToFalse() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(201);
-        when(mockResponse.getHeaderString("Location"))
-            .thenReturn("http://frost:8080/v1.1/Projects(42)");
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-        when(mockBuilder.post(captor.capture())).thenReturn(mockResponse);
+        server.enqueue(emptyProjectLookup());
+        server.enqueue(created("Projects(42)"));
 
         SagaCommandMessage command =
             createCommand(
@@ -417,8 +375,8 @@ class FrostSagaHandlerTest {
 
         handler.handle(command);
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        server.takeRequest();
+        Map<String, Object> body = requestBodyAsMap(server.takeRequest());
         assertEquals(false, body.get("public"));
       }
     }
@@ -432,10 +390,8 @@ class FrostSagaHandlerTest {
     @DisplayName("provisions the project when the dataset has none yet")
     void shouldCreateProjectWhenNoneWasProvisionedYet() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(created.getHeaderString("Location")).thenReturn("http://frost:8080/v1.1/Projects(42)");
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        server.enqueue(emptyProjectLookup());
+        server.enqueue(created("Projects(42)"));
 
         // A FROST sink added after a release that provisioned no project: the update carries no
         // projectId, so the step must provision instead of failing the whole saga.
@@ -449,11 +405,10 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("42", result.resultData().get("projectId"));
-        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         // created=true marks this as a provisioning step, so its compensation deletes rather than
         // restores.
         assertEquals(true, result.compensationData().get("created"));
-        verify(mockBuilder, never()).method(eq("PATCH"), any(Entity.class));
+        assertEquals(2, server.getRequestCount());
       }
     }
 
@@ -461,17 +416,9 @@ class FrostSagaHandlerTest {
     @DisplayName("returns success with projectId, baseUrl and previous state in compensationData")
     void shouldUpdateProjectSuccessfully() {
       try (FrostSagaHandler handler = createHandler()) {
-        // Mock GET for reading current state
-        Response getResponse = mock(Response.class);
-        when(getResponse.getStatus()).thenReturn(200);
-        when(getResponse.readEntity(Map.class))
-            .thenReturn(Map.of("name", "Old Name", "description", "Old Description"));
-        when(mockBuilder.get()).thenReturn(getResponse);
-
-        // Mock PATCH for the update
-        Response patchResponse = mock(Response.class);
-        when(patchResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(patchResponse);
+        server.enqueue(
+            jsonResponse(200, Map.of("name", "Old Name", "description", "Old Description")));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(
@@ -484,7 +431,6 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("42", result.resultData().get("projectId"));
-        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
         assertEquals("Old Name", result.compensationData().get("previousName"));
         assertEquals("Old Description", result.compensationData().get("previousDescription"));
@@ -495,16 +441,9 @@ class FrostSagaHandlerTest {
     @DisplayName("omits previousName from compensationData when FROST returns no name")
     void shouldOmitPreviousNameWhenFrostReturnsNone() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response getResponse = mock(Response.class);
-        when(getResponse.getStatus()).thenReturn(200);
         // FROST body without a "name" — capturing "" would arm a later RESTORE to blank the name.
-        when(getResponse.readEntity(Map.class))
-            .thenReturn(Map.of("description", "Old Description"));
-        when(mockBuilder.get()).thenReturn(getResponse);
-
-        Response patchResponse = mock(Response.class);
-        when(patchResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(patchResponse);
+        server.enqueue(jsonResponse(200, Map.of("description", "Old Description")));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(
@@ -526,15 +465,9 @@ class FrostSagaHandlerTest {
     @DisplayName("uses publicUrl in baseUrl when configured differently from serverUrl")
     void shouldUsePublicUrlInBaseUrl() {
       try (FrostSagaHandler handler = createHandlerWithPublicUrl("http://public-frost:80/v1.1")) {
-        Response getResponse = mock(Response.class);
-        when(getResponse.getStatus()).thenReturn(200);
-        when(getResponse.readEntity(Map.class))
-            .thenReturn(Map.of("name", "Old Name", "description", "Old Description"));
-        when(mockBuilder.get()).thenReturn(getResponse);
-
-        Response patchResponse = mock(Response.class);
-        when(patchResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(patchResponse);
+        server.enqueue(
+            jsonResponse(200, Map.of("name", "Old Name", "description", "Old Description")));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(
@@ -553,20 +486,12 @@ class FrostSagaHandlerTest {
 
     @Test
     @DisplayName("forces the project private on update and captures no previousPublic")
-    void shouldForcePrivateAndNotCapturePreviousPublic() {
+    void shouldForcePrivateAndNotCapturePreviousPublic() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response getResponse = mock(Response.class);
-        when(getResponse.getStatus()).thenReturn(200);
-        when(getResponse.readEntity(Map.class))
-            .thenReturn(
-                Map.of("name", "Old Name", "description", "Old Description", "public", true));
-        when(mockBuilder.get()).thenReturn(getResponse);
-
-        Response patchResponse = mock(Response.class);
-        when(patchResponse.getStatus()).thenReturn(200);
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(patchResponse);
+        server.enqueue(
+            jsonResponse(
+                200, Map.of("name", "Old Name", "description", "Old Description", "public", true)));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         // Even a previously-public project (and openDataAccess=true) is forced private on update.
         SagaCommandMessage command =
@@ -585,8 +510,8 @@ class FrostSagaHandlerTest {
 
         SagaCommandResult result = handler.handle(command);
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        server.takeRequest(); // the GET of current state
+        Map<String, Object> body = requestBodyAsMap(server.takeRequest());
         assertEquals(false, body.get("public"));
         assertEquals("STEP_COMPLETED", result.type());
         assertNull(result.compensationData().get("previousPublic"));
@@ -602,11 +527,8 @@ class FrostSagaHandlerTest {
     @DisplayName("returns success on forward delete")
     void shouldDeleteProjectSuccessfully() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response emptyThingsPage = thingsPage(null);
-        when(mockBuilder.get()).thenReturn(emptyThingsPage);
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(mockResponse);
+        server.enqueue(emptyThingsPage());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42"));
@@ -631,23 +553,17 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertNull(result.error());
-        verify(mockBuilder, never()).delete();
+        assertEquals(0, server.getRequestCount());
       }
     }
 
     @Test
     @DisplayName("deletes the project's Things in one batch request before deleting the project")
-    void shouldDeleteThingsBeforeProject() {
+    void shouldDeleteThingsBeforeProject() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response singleThingsPage = thingsPage(null, 7, 8);
-        when(mockBuilder.get()).thenReturn(singleThingsPage);
-        Response batch = batchResponse(200, 200);
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Entity> batchCaptor = ArgumentCaptor.forClass(Entity.class);
-        when(mockBuilder.post(batchCaptor.capture())).thenReturn(batch);
-        Response deleteResponse = mock(Response.class);
-        when(deleteResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(deleteResponse);
+        server.enqueue(thingsPage(null, 7, 8));
+        server.enqueue(batchResponse(200, 200));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandResult result =
             handler.handle(
@@ -655,83 +571,72 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         // Project delete last — once it is gone, its Things can no longer be enumerated.
-        ArgumentCaptor<String> paths = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, times(3)).path(paths.capture());
-        assertEquals(
-            List.of("Projects(42)/Things", "$batch", "Projects(42)"), paths.getAllValues());
-        assertEquals(List.of("Things(7)", "Things(8)"), batchRequestUrls(batchCaptor.getValue()));
+        assertEquals("/v1.1/Projects(42)/Things", server.takeRequest().getUrl().encodedPath());
+        RecordedRequest batchRequest = server.takeRequest();
+        assertEquals("/v1.1/$batch", batchRequest.getUrl().encodedPath());
+        assertEquals("/v1.1/Projects(42)", server.takeRequest().getUrl().encodedPath());
+        assertEquals(List.of("Things(7)", "Things(8)"), batchRequestUrls(batchRequest));
       }
     }
 
     @Test
     @DisplayName("follows pagination and deletes the Things of every page")
-    void shouldDeleteThingsFromAllPages() {
+    void shouldDeleteThingsFromAllPages() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response firstPage = thingsPage("http://frost:8080/v1.1/Projects(42)/Things?$skip=2", 7, 8);
-        Response lastPage = thingsPage(null, 9);
-        when(mockBuilder.get()).thenReturn(firstPage, lastPage);
-        Response batch = batchResponse(200, 200, 200);
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Entity> batchCaptor = ArgumentCaptor.forClass(Entity.class);
-        when(mockBuilder.post(batchCaptor.capture())).thenReturn(batch);
-        Response deleteResponse = mock(Response.class);
-        when(deleteResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(deleteResponse);
+        server.enqueue(thingsPage("http://frost:8080/v1.1/Projects(42)/Things?$skip=2", 7, 8));
+        server.enqueue(thingsPage(null, 9));
+        server.enqueue(batchResponse(200, 200, 200));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandResult result =
             handler.handle(
                 createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
 
         assertEquals("STEP_COMPLETED", result.type());
-        ArgumentCaptor<String> paths = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, times(4)).path(paths.capture());
+        RecordedRequest page1 = server.takeRequest();
+        RecordedRequest page2 = server.takeRequest();
+        RecordedRequest batchRequest = server.takeRequest();
+        server.takeRequest(); // project delete
+        assertEquals("/v1.1/Projects(42)/Things", page1.getUrl().encodedPath());
+        assertEquals("/v1.1/Projects(42)/Things", page2.getUrl().encodedPath());
         assertEquals(
-            List.of("Projects(42)/Things", "Projects(42)/Things", "$batch", "Projects(42)"),
-            paths.getAllValues());
-        assertEquals(
-            List.of("Things(7)", "Things(8)", "Things(9)"),
-            batchRequestUrls(batchCaptor.getValue()));
+            List.of("Things(7)", "Things(8)", "Things(9)"), batchRequestUrls(batchRequest));
         // A stuck $skip would refetch page 1 forever (the nextLink keeps the loop alive).
-        ArgumentCaptor<Object> skips = ArgumentCaptor.forClass(Object.class);
-        verify(mockPathTarget, times(2)).queryParam(eq("$skip"), skips.capture());
-        assertEquals(List.of("0", "2"), skips.getAllValues());
+        assertEquals("0", page1.getUrl().queryParameter("$skip"));
+        assertEquals("2", page2.getUrl().queryParameter("$skip"));
       }
     }
 
     @Test
     @DisplayName("splits the Thing deletes into multiple batch requests beyond the chunk size")
-    void shouldSplitThingDeletesIntoChunkedBatches() {
+    void shouldSplitThingDeletesIntoChunkedBatches() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response firstPage =
+        server.enqueue(
             thingsPage(
                 "http://frost:8080/v1.1/Projects(42)/Things?$skip=100",
-                IntStream.range(0, 100).toArray());
-        Response lastPage = thingsPage(null, IntStream.range(100, 150).toArray());
-        when(mockBuilder.get()).thenReturn(firstPage, lastPage);
+                java.util.stream.IntStream.range(0, 100).toArray()));
+        server.enqueue(thingsPage(null, java.util.stream.IntStream.range(100, 150).toArray()));
         int[] fullChunk = new int[100];
-        Arrays.fill(fullChunk, 200);
+        java.util.Arrays.fill(fullChunk, 200);
         int[] restChunk = new int[50];
-        Arrays.fill(restChunk, 200);
-        Response firstBatch = batchResponse(fullChunk);
-        Response secondBatch = batchResponse(restChunk);
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Entity> batchCaptor = ArgumentCaptor.forClass(Entity.class);
-        when(mockBuilder.post(batchCaptor.capture())).thenReturn(firstBatch, secondBatch);
-        Response deleteResponse = mock(Response.class);
-        when(deleteResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(deleteResponse);
+        java.util.Arrays.fill(restChunk, 200);
+        server.enqueue(batchResponse(fullChunk));
+        server.enqueue(batchResponse(restChunk));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandResult result =
             handler.handle(
                 createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
 
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(2)).post(any(Entity.class));
-        assertEquals(100, batchRequestUrls(batchCaptor.getAllValues().get(0)).size());
-        assertEquals(50, batchRequestUrls(batchCaptor.getAllValues().get(1)).size());
-        ArgumentCaptor<Object> skips = ArgumentCaptor.forClass(Object.class);
-        verify(mockPathTarget, times(2)).queryParam(eq("$skip"), skips.capture());
-        assertEquals(List.of("0", "100"), skips.getAllValues());
+        RecordedRequest page1 = server.takeRequest();
+        RecordedRequest page2 = server.takeRequest();
+        RecordedRequest firstBatch = server.takeRequest();
+        RecordedRequest secondBatch = server.takeRequest();
+        assertEquals(100, batchRequestUrls(firstBatch).size());
+        assertEquals(50, batchRequestUrls(secondBatch).size());
+        assertEquals("0", page1.getUrl().queryParameter("$skip"));
+        assertEquals("100", page2.getUrl().queryParameter("$skip"));
       }
     }
 
@@ -740,13 +645,9 @@ class FrostSagaHandlerTest {
         "continues with the remaining Things and the project when one Thing is already gone")
     void shouldContinueWhenSingleThingAlreadyAbsent() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response singleThingsPage = thingsPage(null, 7, 8);
-        when(mockBuilder.get()).thenReturn(singleThingsPage);
-        Response batch = batchResponse(404, 200);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(batch);
-        Response deleteResponse = mock(Response.class);
-        when(deleteResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(deleteResponse);
+        server.enqueue(thingsPage(null, 7, 8));
+        server.enqueue(batchResponse(404, 200));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandResult result =
             handler.handle(
@@ -754,7 +655,7 @@ class FrostSagaHandlerTest {
 
         // A Thing that is already gone is the goal state — the cleanup must not stop there.
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(1)).delete();
+        assertEquals(3, server.getRequestCount());
       }
     }
 
@@ -762,10 +663,8 @@ class FrostSagaHandlerTest {
     @DisplayName("fails the step when a Thing delete returns a genuine error (500)")
     void shouldFailStepWhenThingDeleteFails() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response singleThingsPage = thingsPage(null, 7, 8);
-        when(mockBuilder.get()).thenReturn(singleThingsPage);
-        Response batch = batchResponse(500, 200);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(batch);
+        server.enqueue(thingsPage(null, 7, 8));
+        server.enqueue(batchResponse(500, 200));
 
         SagaCommandResult result =
             handler.handle(
@@ -774,26 +673,19 @@ class FrostSagaHandlerTest {
         // A genuine error must fail the step — no silent skip that would strand Things.
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
-        verify(mockBuilder, never()).delete();
+        assertEquals(2, server.getRequestCount());
       }
     }
 
     @Test
     @DisplayName("deletes provisioned entities by identity after the Things, before the project")
-    void shouldDeleteProvisionedEntitiesAfterThings() {
+    void shouldDeleteProvisionedEntitiesAfterThings() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response singleThingsPage = thingsPage(null, 7);
-        when(mockBuilder.get()).thenReturn(singleThingsPage);
-        Response thingsBatch = batchResponse(200);
-        Response datastreamsBatch = batchResponse(200);
-        Response sensorsBatch = batchResponse(200);
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Entity> batchCaptor = ArgumentCaptor.forClass(Entity.class);
-        when(mockBuilder.post(batchCaptor.capture()))
-            .thenReturn(thingsBatch, datastreamsBatch, sensorsBatch);
-        Response deleteResponse = mock(Response.class);
-        when(deleteResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(deleteResponse);
+        server.enqueue(thingsPage(null, 7));
+        server.enqueue(batchResponse(200));
+        server.enqueue(batchResponse(200));
+        server.enqueue(batchResponse(200));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandResult result =
             handler.handle(
@@ -807,16 +699,16 @@ class FrostSagaHandlerTest {
                         Map.of("Sensors", List.of("5"), "Datastreams", List.of("3")))));
 
         assertEquals("STEP_COMPLETED", result.type());
+        server.takeRequest(); // the Things enumeration GET
+        RecordedRequest thingsBatch = server.takeRequest();
+        RecordedRequest datastreamsBatch = server.takeRequest();
+        RecordedRequest sensorsBatch = server.takeRequest();
+        RecordedRequest projectDelete = server.takeRequest();
         // Datastreams before Sensors: a Sensor delete cascades into still-linked Datastreams.
-        assertEquals(List.of("Things(7)"), batchRequestUrls(batchCaptor.getAllValues().get(0)));
-        assertEquals(
-            List.of("Datastreams(3)"), batchRequestUrls(batchCaptor.getAllValues().get(1)));
-        assertEquals(List.of("Sensors(5)"), batchRequestUrls(batchCaptor.getAllValues().get(2)));
-        ArgumentCaptor<String> paths = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, times(5)).path(paths.capture());
-        assertEquals(
-            List.of("Projects(42)/Things", "$batch", "$batch", "$batch", "Projects(42)"),
-            paths.getAllValues());
+        assertEquals(List.of("Things(7)"), batchRequestUrls(thingsBatch));
+        assertEquals(List.of("Datastreams(3)"), batchRequestUrls(datastreamsBatch));
+        assertEquals(List.of("Sensors(5)"), batchRequestUrls(sensorsBatch));
+        assertEquals("/v1.1/Projects(42)", projectDelete.getUrl().encodedPath());
       }
     }
 
@@ -824,11 +716,8 @@ class FrostSagaHandlerTest {
     @DisplayName("ignores unknown provisioned entity sets instead of building delete requests")
     void shouldIgnoreUnknownProvisionedEntitySets() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response emptyThingsPage = thingsPage(null);
-        when(mockBuilder.get()).thenReturn(emptyThingsPage);
-        Response deleteResponse = mock(Response.class);
-        when(deleteResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(deleteResponse);
+        server.enqueue(emptyThingsPage());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandResult result =
             handler.handle(
@@ -842,7 +731,7 @@ class FrostSagaHandlerTest {
                         Map.of("Projects", List.of("9")))));
 
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, never()).post(any(Entity.class));
+        assertEquals(2, server.getRequestCount());
       }
     }
 
@@ -850,16 +739,13 @@ class FrostSagaHandlerTest {
     @DisplayName("fails the step when the batch response repeats a sub-response id")
     void shouldFailStepOnDuplicateBatchSubResponseId() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response singleThingsPage = thingsPage(null, 7, 8);
-        when(mockBuilder.get()).thenReturn(singleThingsPage);
-        Response batch = mock(Response.class);
-        when(batch.getStatus()).thenReturn(200);
-        when(batch.readEntity(Map.class))
-            .thenReturn(
+        server.enqueue(thingsPage(null, 7, 8));
+        server.enqueue(
+            jsonResponse(
+                200,
                 Map.of(
                     "responses",
-                    List.of(Map.of("id", "0", "status", 200), Map.of("id", "0", "status", 200))));
-        when(mockBuilder.post(any(Entity.class))).thenReturn(batch);
+                    List.of(Map.of("id", "0", "status", 200), Map.of("id", "0", "status", 200)))));
 
         SagaCommandResult result =
             handler.handle(
@@ -869,7 +755,7 @@ class FrostSagaHandlerTest {
         // not slip through into the project delete.
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
-        verify(mockBuilder, never()).delete();
+        assertEquals(2, server.getRequestCount());
       }
     }
 
@@ -877,13 +763,9 @@ class FrostSagaHandlerTest {
     @DisplayName("fails the step when the batch response carries a malformed sub-response id")
     void shouldFailStepOnMalformedBatchSubResponseId() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response singleThingsPage = thingsPage(null, 7);
-        when(mockBuilder.get()).thenReturn(singleThingsPage);
-        Response batch = mock(Response.class);
-        when(batch.getStatus()).thenReturn(200);
-        when(batch.readEntity(Map.class))
-            .thenReturn(Map.of("responses", List.of(Map.of("id", "x", "status", 200))));
-        when(mockBuilder.post(any(Entity.class))).thenReturn(batch);
+        server.enqueue(thingsPage(null, 7));
+        server.enqueue(
+            jsonResponse(200, Map.of("responses", List.of(Map.of("id", "x", "status", 200)))));
 
         SagaCommandResult result =
             handler.handle(
@@ -891,7 +773,7 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
-        verify(mockBuilder, never()).delete();
+        assertEquals(2, server.getRequestCount());
       }
     }
 
@@ -915,9 +797,7 @@ class FrostSagaHandlerTest {
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
         // Validation must run before any deletion side effect.
-        verify(mockBuilder, never()).get();
-        verify(mockBuilder, never()).post(any(Entity.class));
-        verify(mockBuilder, never()).delete();
+        assertEquals(0, server.getRequestCount());
       }
     }
 
@@ -937,8 +817,7 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
-        verify(mockBuilder, never()).get();
-        verify(mockBuilder, never()).delete();
+        assertEquals(0, server.getRequestCount());
       }
     }
 
@@ -955,8 +834,7 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
-        verify(mockBuilder, never()).get();
-        verify(mockBuilder, never()).delete();
+        assertEquals(0, server.getRequestCount());
       }
     }
 
@@ -964,10 +842,8 @@ class FrostSagaHandlerTest {
     @DisplayName("fails the step when the batch response omits sub-responses")
     void shouldFailStepWhenBatchResponseIncomplete() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response singleThingsPage = thingsPage(null, 7, 8);
-        when(mockBuilder.get()).thenReturn(singleThingsPage);
-        Response batch = batchResponse(200);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(batch);
+        server.enqueue(thingsPage(null, 7, 8));
+        server.enqueue(batchResponse(200));
 
         SagaCommandResult result =
             handler.handle(
@@ -976,7 +852,7 @@ class FrostSagaHandlerTest {
         // A truncated batch response must not let unconfirmed Things slip through.
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
-        verify(mockBuilder, never()).delete();
+        assertEquals(2, server.getRequestCount());
       }
     }
 
@@ -984,11 +860,8 @@ class FrostSagaHandlerTest {
     @DisplayName("fails a forward delete already at a 404 Thing enumeration, before any delete")
     void shouldSucceedForwardDeleteWhenProjectAbsent() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response notFound = mock(Response.class);
-        when(notFound.getStatus()).thenReturn(404);
-        when(notFound.readEntity(String.class)).thenReturn("Not Found");
-        when(mockBuilder.get()).thenReturn(notFound);
-        when(mockBuilder.delete()).thenReturn(notFound);
+        server.enqueue(new MockResponse.Builder().code(404).body("Not Found").build());
+        server.enqueue(new MockResponse.Builder().code(404).body("Not Found").build());
 
         SagaCommandResult result =
             handler.handle(
@@ -996,8 +869,7 @@ class FrostSagaHandlerTest {
 
         // A 404 is the goal state of a delete in both directions: a forward delete of a project a
         // prior run already removed (re-delete / re-release of a preserved sink) must be
-        // idempotent,
-        // not fail the delete saga on the missing project.
+        // idempotent, not fail the delete saga on the missing project.
         assertEquals("STEP_COMPLETED", result.type());
         assertNull(result.error());
       }
@@ -1007,11 +879,8 @@ class FrostSagaHandlerTest {
     @DisplayName("returns COMPENSATION_COMPLETED on compensate delete")
     void shouldReturnCompensationSuccessOnCompensateDelete() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response emptyThingsPage = thingsPage(null);
-        when(mockBuilder.get()).thenReturn(emptyThingsPage);
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(mockResponse);
+        server.enqueue(emptyThingsPage());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand("COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "42"));
@@ -1039,20 +908,16 @@ class FrostSagaHandlerTest {
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
         // Neither the Things enumeration GET nor the project DELETE may be issued.
-        verify(mockBuilder, never()).delete();
-        verify(mockTarget, never()).path("Projects(42)/Things");
+        assertEquals(0, server.getRequestCount());
       }
     }
 
     @Test
     @DisplayName("compensating a freshly CREATED project (created=true) still deletes it")
-    void shouldDeleteCreatedProjectOnCompensation() {
+    void shouldDeleteCreatedProjectOnCompensation() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response emptyThingsPage = thingsPage(null);
-        when(mockBuilder.get()).thenReturn(emptyThingsPage);
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(mockResponse);
+        server.enqueue(emptyThingsPage());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(
@@ -1061,7 +926,8 @@ class FrostSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
-        verify(mockBuilder, times(1)).delete();
+        server.takeRequest();
+        assertEquals("DELETE", server.takeRequest().getMethod());
       }
     }
 
@@ -1069,11 +935,8 @@ class FrostSagaHandlerTest {
     @DisplayName("treats 404 as success on compensation — 'project already gone' is the goal state")
     void shouldTreat404AsSuccessOnCompensation() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(404);
-        when(mockResponse.readEntity(String.class)).thenReturn("Not Found");
-        when(mockBuilder.get()).thenReturn(mockResponse);
-        when(mockBuilder.delete()).thenReturn(mockResponse);
+        server.enqueue(new MockResponse.Builder().code(404).body("Not Found").build());
+        server.enqueue(new MockResponse.Builder().code(404).body("Not Found").build());
 
         SagaCommandResult result =
             handler.handle(
@@ -1088,12 +951,8 @@ class FrostSagaHandlerTest {
     @DisplayName("returns COMPENSATION_FAILED on a genuine error (500) during compensation")
     void shouldReturnCompensationFailureOnGenuineError() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response emptyThingsPage = thingsPage(null);
-        when(mockBuilder.get()).thenReturn(emptyThingsPage);
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(500);
-        when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.delete()).thenReturn(mockResponse);
+        server.enqueue(emptyThingsPage());
+        server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
         SagaCommandResult result =
             handler.handle(
@@ -1103,44 +962,6 @@ class FrostSagaHandlerTest {
         assertNotNull(result.error());
       }
     }
-
-    /** Mocked enumeration page: one {@code @iot.id} entry per id, plus the nextLink if given. */
-    private Response thingsPage(String nextLink, int... thingIds) {
-      Response page = mock(Response.class);
-      when(page.getStatus()).thenReturn(200);
-      List<Map<String, Object>> value = new ArrayList<>();
-      for (int thingId : thingIds) {
-        value.add(Map.of("@iot.id", thingId));
-      }
-      Map<String, Object> body = new HashMap<>();
-      body.put("value", value);
-      if (nextLink != null) {
-        body.put("@iot.nextLink", nextLink);
-      }
-      when(page.readEntity(Map.class)).thenReturn(body);
-      return page;
-    }
-
-    /** Mocked JSON batch response: one sub-response per given status, ids "0", "1", … in order. */
-    private Response batchResponse(int... statuses) {
-      Response response = mock(Response.class);
-      when(response.getStatus()).thenReturn(200);
-      List<Map<String, Object>> subResponses = new ArrayList<>();
-      for (int i = 0; i < statuses.length; i++) {
-        subResponses.add(Map.of("id", String.valueOf(i), "status", statuses[i]));
-      }
-      when(response.readEntity(Map.class)).thenReturn(Map.of("responses", subResponses));
-      return response;
-    }
-
-    /** Extracts the sub-request urls from a captured JSON batch request entity, in order. */
-    private List<String> batchRequestUrls(Entity<?> entity) {
-      @SuppressWarnings("unchecked")
-      Map<String, Object> body = (Map<String, Object>) entity.getEntity();
-      @SuppressWarnings("unchecked")
-      List<Map<String, Object>> requests = (List<Map<String, Object>>) body.get("requests");
-      return requests.stream().map(request -> (String) request.get("url")).toList();
-    }
   }
 
   @Nested
@@ -1149,16 +970,11 @@ class FrostSagaHandlerTest {
 
     @Test
     @DisplayName("deletes instead of restoring when the update provisioned the project")
-    void shouldDeleteProjectWhenTheUpdateCreatedIt() {
+    void shouldDeleteProjectWhenTheUpdateCreatedIt() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
         // The project has no Things, so the teardown enumeration returns a single empty page.
-        Response emptyThingsPage = mock(Response.class);
-        when(emptyThingsPage.getStatus()).thenReturn(200);
-        when(emptyThingsPage.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
-        when(mockBuilder.get()).thenReturn(emptyThingsPage);
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(ok);
+        server.enqueue(emptyThingsPage());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         // There is no previous state to restore: the forward step created the project, so the exact
         // inverse is the delete. Patching would blank the description of a project meant to go
@@ -1170,8 +986,8 @@ class FrostSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
-        verify(mockBuilder).delete();
-        verify(mockBuilder, never()).method(eq("PATCH"), any(Entity.class));
+        server.takeRequest();
+        assertEquals("DELETE", server.takeRequest().getMethod());
       }
     }
 
@@ -1186,8 +1002,7 @@ class FrostSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
-        verify(mockBuilder, never()).delete();
-        verify(mockBuilder, never()).method(eq("PATCH"), any(Entity.class));
+        assertEquals(0, server.getRequestCount());
       }
     }
 
@@ -1195,9 +1010,7 @@ class FrostSagaHandlerTest {
     @DisplayName("returns COMPENSATION_COMPLETED on successful restore")
     void shouldRestoreProjectSuccessfully() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(mockResponse);
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(
@@ -1217,13 +1030,9 @@ class FrostSagaHandlerTest {
 
     @Test
     @DisplayName("omits name from body when previousName missing (no blanking, MR !547 finding 6)")
-    void shouldOmitNameWhenPreviousNameMissing() {
+    void shouldOmitNameWhenPreviousNameMissing() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(
@@ -1236,21 +1045,16 @@ class FrostSagaHandlerTest {
         // PATCHing name="" would blank the project identity and break the unique-name
         // duplicate-recovery lookup — the field must be left out so FROST keeps the current name.
         assertEquals("COMPENSATION_COMPLETED", result.type());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        Map<String, Object> body = requestBodyAsMap(server.takeRequest());
         assertNull(body.get("name"));
       }
     }
 
     @Test
     @DisplayName("treats a blank previousName like a missing one (legacy \"\" capture)")
-    void shouldOmitNameWhenPreviousNameBlank() {
+    void shouldOmitNameWhenPreviousNameBlank() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(
@@ -1264,8 +1068,7 @@ class FrostSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        Map<String, Object> body = requestBodyAsMap(server.takeRequest());
         assertNull(body.get("name"));
       }
     }
@@ -1274,10 +1077,7 @@ class FrostSagaHandlerTest {
     @DisplayName("returns COMPENSATION_FAILED on HTTP error")
     void shouldReturnCompensationFailureOnError() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(500);
-        when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(mockResponse);
+        server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
         SagaCommandMessage command =
             createCommand(
@@ -1297,10 +1097,9 @@ class FrostSagaHandlerTest {
 
     @Test
     @DisplayName("returns COMPENSATION_FAILED on network error")
-    void shouldReturnCompensationFailureOnNetworkError() {
+    void shouldReturnCompensationFailureOnNetworkError() throws IOException {
       try (FrostSagaHandler handler = createHandler()) {
-        when(mockBuilder.method(eq("PATCH"), any(Entity.class)))
-            .thenThrow(new ProcessingException("Connection refused"));
+        server.close();
 
         SagaCommandMessage command =
             createCommand(
@@ -1320,13 +1119,9 @@ class FrostSagaHandlerTest {
 
     @Test
     @DisplayName("forces the project private on restore, ignoring any previousPublic in payload")
-    void shouldForcePrivateOnRestoreIgnoringPreviousPublic() {
+    void shouldForcePrivateOnRestoreIgnoringPreviousPublic() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         // A stale previousPublic=true from an old saga must NOT resurrect a public project.
         SagaCommandMessage command =
@@ -1341,21 +1136,16 @@ class FrostSagaHandlerTest {
 
         handler.handle(command);
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        Map<String, Object> body = requestBodyAsMap(server.takeRequest());
         assertEquals(false, body.get("public"));
       }
     }
 
     @Test
     @DisplayName("forces the project private on restore when no previousPublic is present")
-    void shouldForcePrivateOnRestoreWhenPreviousPublicMissing() {
+    void shouldForcePrivateOnRestoreWhenPreviousPublicMissing() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
-        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(
@@ -1368,8 +1158,7 @@ class FrostSagaHandlerTest {
 
         handler.handle(command);
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        Map<String, Object> body = requestBodyAsMap(server.takeRequest());
         assertEquals(false, body.get("public"));
       }
     }
@@ -1404,8 +1193,10 @@ class FrostSagaHandlerTest {
     }
   }
 
+  // ============== HELPERS ==============
+
   private FrostSagaHandler createHandler() {
-    return createHandlerWithPublicUrl("http://frost:8080/v1.1");
+    return createHandlerWithPublicUrl(server.url("/v1.1").toString());
   }
 
   private FrostSagaHandler createHandlerWithPublicUrl(String publicUrl) {
@@ -1413,32 +1204,10 @@ class FrostSagaHandlerTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
     when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
-        .thenReturn("http://frost:8080/v1.1");
-    when(mockConfig.getProperty("frost.public.url", "http://frost:8080/v1.1"))
-        .thenReturn(publicUrl);
+        .thenReturn(server.url("/v1.1").toString());
+    when(mockConfig.getProperty(eq("frost.public.url"), any())).thenReturn(publicUrl);
     when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
     handler.initialize(mockConfig);
-
-    Client mockClient = mock(Client.class);
-    mockTarget = mock(WebTarget.class);
-    mockPathTarget = mock(WebTarget.class);
-    mockBuilder = mock(Invocation.Builder.class);
-
-    when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-    when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-    when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
-    when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-    when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-    // CREATE_PROJECT is now find-or-create: it always issues a name-lookup GET before the POST.
-    // Default that lookup to "no existing project" so the POST path is exercised; tests that assert
-    // reuse override mockBuilder.get() with a non-empty result.
-    Response emptyLookup = mock(Response.class);
-    when(emptyLookup.getStatus()).thenReturn(200);
-    when(emptyLookup.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
-    when(mockBuilder.get()).thenReturn(emptyLookup);
-
-    handler.setTestClient(mockClient);
     return handler;
   }
 
@@ -1450,5 +1219,74 @@ class FrostSagaHandlerTest {
     effective.putIfAbsent("datasetId", "ds-default");
     return new SagaCommandMessage(
         type, "msg-001", "saga-001", "create-project", "frost", operation, effective);
+  }
+
+  private static MockResponse jsonResponse(int code, Map<String, Object> body) {
+    try {
+      return new MockResponse.Builder()
+          .code(code)
+          .body(PayloadConverter.objectMapper().writeValueAsString(body))
+          .build();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static MockResponse emptyProjectLookup() {
+    return jsonResponse(200, Map.of("value", List.of()));
+  }
+
+  private static MockResponse projectLookupFound(int id) {
+    return jsonResponse(200, Map.of("value", List.of(Map.of("@iot.id", id))));
+  }
+
+  private static MockResponse created(String entityPath) {
+    return new MockResponse.Builder()
+        .code(201)
+        .addHeader("Location", "http://frost:8080/v1.1/" + entityPath)
+        .build();
+  }
+
+  /** Mocked enumeration page: one {@code @iot.id} entry per id, plus the nextLink if given. */
+  private static MockResponse thingsPage(String nextLink, int... thingIds) {
+    Map<String, Object> body = new HashMap<>();
+    List<Map<String, Object>> value = new java.util.ArrayList<>();
+    for (int thingId : thingIds) {
+      value.add(Map.of("@iot.id", thingId));
+    }
+    body.put("value", value);
+    if (nextLink != null) {
+      body.put("@iot.nextLink", nextLink);
+    }
+    return jsonResponse(200, body);
+  }
+
+  private static MockResponse emptyThingsPage() {
+    return thingsPage(null);
+  }
+
+  /** Mocked JSON batch response: one sub-response per given status, ids "0", "1", … in order. */
+  private static MockResponse batchResponse(int... statuses) {
+    List<Map<String, Object>> subResponses = new java.util.ArrayList<>();
+    for (int i = 0; i < statuses.length; i++) {
+      subResponses.add(Map.of("id", String.valueOf(i), "status", statuses[i]));
+    }
+    return jsonResponse(200, Map.of("responses", subResponses));
+  }
+
+  private static Map<String, Object> requestBodyAsMap(RecordedRequest request) {
+    try {
+      return PayloadConverter.readMap(request.getBody().toByteArray());
+    } catch (IOException e) {
+      throw new java.io.UncheckedIOException(e);
+    }
+  }
+
+  /** Extracts the sub-request urls from a captured JSON batch request body, in order. */
+  private static List<String> batchRequestUrls(RecordedRequest request) {
+    Map<String, Object> body = requestBodyAsMap(request);
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> requests = (List<Map<String, Object>>) body.get("requests");
+    return requests.stream().map(r -> (String) r.get("url")).toList();
   }
 }

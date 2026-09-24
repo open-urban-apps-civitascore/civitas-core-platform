@@ -23,11 +23,10 @@ import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.InstantSource;
+import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,20 +36,21 @@ class OidcClientCredentialsTokenProviderTest {
   private static final String TOKEN_PATH = "/realms/civitas/protocol/openid-connect/token";
 
   private WireMockServer server;
-  private Client httpClient;
+  private OkHttpClient httpClient;
   private MutableClock clock;
 
   @BeforeEach
   void setUp() {
     server = new WireMockServer(WireMockConfiguration.options().dynamicPort());
     server.start();
-    httpClient = ClientBuilder.newClient();
+    httpClient = new OkHttpClient();
     clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
   }
 
   @AfterEach
   void tearDown() {
-    httpClient.close();
+    httpClient.dispatcher().executorService().shutdown();
+    httpClient.connectionPool().evictAll();
     server.stop();
   }
 

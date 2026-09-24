@@ -51,8 +51,7 @@
 		<cloudevents.version>3.0.0</cloudevents.version>
 		<slf4j.version>2.0.18</slf4j.version>
 		<jackson.version>2.21.6</jackson.version>
-		<jakarta.ws.rs.version>3.1.0</jakarta.ws.rs.version>
-		<jersey.version>3.1.12</jersey.version>
+		<okhttp.version>5.3.2</okhttp.version>
 		<commons.configuration2.version>2.15.1</commons.configuration2.version>
 		<junit.version>5.14.4</junit.version>
 		<mockito.version>5.23.0</mockito.version>
@@ -128,31 +127,17 @@
 				<scope>import</scope>
 			</dependency>
 
-			<!-- JAX-RS / Jersey -->
+			<!-- OkHttp -->
 			<dependency>
-				<groupId>jakarta.ws.rs</groupId>
-				<artifactId>jakarta.ws.rs-api</artifactId>
-				<version>${jakarta.ws.rs.version}</version>
+				<groupId>com.squareup.okhttp3</groupId>
+				<artifactId>okhttp-jvm</artifactId>
+				<version>${okhttp.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>org.glassfish.jersey.core</groupId>
-				<artifactId>jersey-client</artifactId>
-				<version>${jersey.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.glassfish.jersey.inject</groupId>
-				<artifactId>jersey-hk2</artifactId>
-				<version>${jersey.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.glassfish.jersey.media</groupId>
-				<artifactId>jersey-media-json-jackson</artifactId>
-				<version>${jersey.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.glassfish.jersey.media</groupId>
-				<artifactId>jersey-media-multipart</artifactId>
-				<version>${jersey.version}</version>
+				<groupId>com.squareup.okhttp3</groupId>
+				<artifactId>mockwebserver3</artifactId>
+				<version>${okhttp.version}</version>
+				<scope>test</scope>
 			</dependency>
 
 			<!-- Apache Commons -->
@@ -370,6 +355,7 @@
 						<ignoredNonTestScopedDependency>io.cloudevents:*</ignoredNonTestScopedDependency>
 						<ignoredNonTestScopedDependency>org.apache.kafka:*</ignoredNonTestScopedDependency>
 						<ignoredNonTestScopedDependency>org.keycloak:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>com.squareup.okio:okio-jvm</ignoredNonTestScopedDependency>
 					</ignoredNonTestScopedDependencies>
 					<!-- The used-undeclared check is off: compiling against a starter's or aggregator's
 					     transitive closure is deliberate here, so every finding is a false positive. -->
