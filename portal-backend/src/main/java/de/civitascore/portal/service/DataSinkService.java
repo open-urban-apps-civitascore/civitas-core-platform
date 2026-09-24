@@ -122,15 +122,15 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   /**
    * A change to {@code tableName} or the referenced {@code element} rebuilds the sink's backing
    * storage on the next release, discarding all stored data — for POSTGIS a table drop+recreate (no
-   * ALTER TABLE), for FROST a re-provisioning of the target entities. If the parent dataset has
-   * been provisioned (storage actually exists), such a change requires explicit {@code
+   * ALTER TABLE), for FROST a re-provisioning of the target entities. If this sink has been
+   * provisioned (its storage actually exists), such a change requires explicit {@code
    * confirmDataLoss=true}; otherwise the update is rejected with 409. The current configuration is
    * read back from the Model Forge registry (the sink no longer stores it on the entity). Comparing
    * the {@code element} URN alone is sufficient because it is a versioned CORE URN whose content is
    * immutable — a different model always yields a different URN.
    */
   private void requireDataLossConfirmation(DataSinkInputDTO input, DataSink existingEntity) {
-    if (input.isConfirmDataLoss() || !existingEntity.getDataSet().isProvisioned()) {
+    if (input.isConfirmDataLoss() || !existingEntity.isProvisioned()) {
       return;
     }
 
