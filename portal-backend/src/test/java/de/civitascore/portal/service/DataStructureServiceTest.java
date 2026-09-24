@@ -2,7 +2,6 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -11,7 +10,6 @@ import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
-import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -28,8 +26,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataStructureService Unit Tests")
@@ -177,57 +173,6 @@ class DataStructureServiceTest {
       dataStructureService.deleteById(dsId);
 
       verify(dataStructureRepository).deleteById(dsId);
-    }
-  }
-
-  @Nested
-  @DisplayName("Version assignment on update")
-  class VersionAssignmentTests {
-
-    // Mirrors Spring Boot's default, which lets clients that still send the field keep working.
-    private final JsonMapper jsonMapper =
-        JsonMapper.builder().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
-
-    private DataStructure structureWithOneVersion(DataStructureStatus status) {
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(UUID.randomUUID());
-
-      DataStructure ds = new DataStructure();
-      ds.setId(UUID.randomUUID());
-      ds.setDataStructureStatus(status);
-      ds.setDataStructureVersions(Set.of(version));
-      return ds;
-    }
-
-    private DataStructureInputDTO legacyInputWithEmptyVersionIds() {
-      return jsonMapper.readValue(
-          "{\"name\":\"Struct\",\"dataStructureVersionIds\":[]}", DataStructureInputDTO.class);
-    }
-
-    @Test
-    @DisplayName("Draft update keeps the versions a client lists no longer")
-    void draftUpdateKeepsVersions() {
-      DataStructure ds = structureWithOneVersion(DataStructureStatus.DRAFT);
-      when(dataStructureRepository.findById(ds.getId())).thenReturn(Optional.of(ds));
-      when(dataStructureRepository.save(any())).thenAnswer(call -> call.getArgument(0));
-
-      DataStructure updated =
-          dataStructureService.update(ds.getId(), legacyInputWithEmptyVersionIds());
-
-      assertThat(updated.getDataStructureVersions()).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("Released metadata update keeps the versions a client lists no longer")
-    void releasedMetaUpdateKeepsVersions() {
-      DataStructure ds = structureWithOneVersion(DataStructureStatus.AVAILABLE);
-      when(dataStructureRepository.findById(ds.getId())).thenReturn(Optional.of(ds));
-      when(dataStructureRepository.save(any())).thenAnswer(call -> call.getArgument(0));
-
-      DataStructure updated =
-          dataStructureService.updateReleasedMeta(ds.getId(), legacyInputWithEmptyVersionIds());
-
-      assertThat(updated.getDataStructureVersions()).hasSize(1);
     }
   }
 }

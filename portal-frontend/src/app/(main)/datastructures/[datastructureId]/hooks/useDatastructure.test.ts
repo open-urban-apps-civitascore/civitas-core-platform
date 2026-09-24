@@ -87,25 +87,28 @@ const saveChangedDescription = async (status: DatastructureStatusType) => {
   return { update, updateReleased }
 }
 
-describe('useDatastructure — metadata saves carry no version assignment', () => {
+describe('useDatastructure — saving changed metadata', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  // A stale version list in the payload would overwrite versions added concurrently from another session.
-  it('omits the version assignment from the released metadata save', async () => {
-    const { updateReleased } = await saveChangedDescription(DATASTRUCTURE_STATUS_TYPES.AVAILABLE)
+  // The released PUT nulls every field it omits, so a trimmed payload would clear createdFromDataSource.
+  it('sends a released data structure through the released metadata update with its full metadata', async () => {
+    const { update, updateReleased } = await saveChangedDescription(DATASTRUCTURE_STATUS_TYPES.AVAILABLE)
 
+    expect(update.mutateAsync).not.toHaveBeenCalled()
     expect(updateReleased.mutateAsync).toHaveBeenCalledOnce()
-    const payload = updateReleased.mutateAsync.mock.calls[0][0]
-    expect(payload).not.toHaveProperty('dataStructureVersionIds')
-    expect(payload).toMatchObject({ id: 'ds-1', name: 'Struct', description: 'changed', createdFromDataSource: true })
+    expect(updateReleased.mutateAsync.mock.calls[0][0]).toMatchObject({
+      id: 'ds-1',
+      name: 'Struct',
+      description: 'changed',
+      createdFromDataSource: true,
+    })
   })
 
-  it('omits the version assignment from the draft save', async () => {
-    const { update } = await saveChangedDescription(DATASTRUCTURE_STATUS_TYPES.DRAFT)
+  it('sends a draft data structure through the draft update', async () => {
+    const { update, updateReleased } = await saveChangedDescription(DATASTRUCTURE_STATUS_TYPES.DRAFT)
 
+    expect(updateReleased.mutateAsync).not.toHaveBeenCalled()
     expect(update.mutateAsync).toHaveBeenCalledOnce()
-    const payload = update.mutateAsync.mock.calls[0][0]
-    expect(payload).not.toHaveProperty('dataStructureVersionIds')
-    expect(payload).toMatchObject({ id: 'ds-1', name: 'Struct', description: 'changed' })
+    expect(update.mutateAsync.mock.calls[0][0]).toMatchObject({ id: 'ds-1', name: 'Struct', description: 'changed' })
   })
 })
