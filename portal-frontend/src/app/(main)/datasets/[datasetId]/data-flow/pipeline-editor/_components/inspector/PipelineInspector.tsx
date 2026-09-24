@@ -73,7 +73,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
 
     return (
       <>
-        {lockReason === 'provisioned' && (
+        {lockReason === 'provisioned' && !isReadOnly && (
           <InspectorNotice
             icon={Lock}
             variant="card"

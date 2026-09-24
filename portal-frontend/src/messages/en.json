@@ -1251,7 +1251,7 @@
       "locked": {
         "provisioned": {
           "title": "Provisioned",
-          "description": "This data storage has been provisioned and can no longer be edited or removed."
+          "description": "This Data storage has been provisioned and can no longer be edited or removed."
         },
         "inUseByLayer": {
           "title": "In use",
@@ -1259,8 +1259,8 @@
         }
       },
       "notRemovable": {
-        "provisioned": "Data storage can not be removed. This data storage has been provisioned and can no longer be removed.",
-        "inUseByLayer": "Data storage can not be removed. This data storage is used by API layers. Remove the layer assignments first."
+        "provisioned": "Data storage can not be removed. This Data storage has been provisioned and can no longer be removed.",
+        "inUseByLayer": "Data storage can not be removed. This Data storage is used by API layers. Remove the layer assignments first."
       }
     },
     "frostPanel": {

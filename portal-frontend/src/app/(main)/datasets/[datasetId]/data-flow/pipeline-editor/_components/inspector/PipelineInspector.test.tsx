@@ -40,7 +40,7 @@ const nodeData: GeoPersistenceNodeData = {
 
 const selectedNode = { id: 'geo-1', type: 'geoPersistence', position: { x: 0, y: 0 }, data: nodeData } as PipelineNode
 
-const renderInspector = (lockReason: SinkLockReason | null, updateNode = vi.fn()) => {
+const renderInspector = (lockReason: SinkLockReason | null, updateNode = vi.fn(), isReadOnly = false) => {
   const contextValue = {
     selectedNode,
     selectedEdge: null,
@@ -57,7 +57,7 @@ const renderInspector = (lockReason: SinkLockReason | null, updateNode = vi.fn()
 
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <ReadOnlyProvider isReadOnly={false}>
+      <ReadOnlyProvider isReadOnly={isReadOnly}>
         <ActivePipelineContext.Provider value={contextValue}>
           <PipelineInspector />
         </ActivePipelineContext.Provider>
@@ -94,6 +94,18 @@ describe('PipelineInspector', () => {
 
     expect(screen.getByText('sink.locked.inUseByLayer.title')).toBeInTheDocument()
     expect(screen.queryByText('sink.locked.provisioned.description')).not.toBeInTheDocument()
+  })
+
+  it('hides the hint of a provisioned sink in a read-only pipeline', () => {
+    renderInspector('provisioned', vi.fn(), true)
+
+    expect(screen.queryByText('sink.locked.provisioned.title')).not.toBeInTheDocument()
+  })
+
+  it('keeps the hint of a layer-referenced sink in a read-only pipeline', () => {
+    renderInspector('inUseByLayer', vi.fn(), true)
+
+    expect(screen.getByText('sink.locked.inUseByLayer.title')).toBeInTheDocument()
   })
 
   it('keeps a layer-referenced sink editable', async () => {

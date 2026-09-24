@@ -34,7 +34,7 @@ const selectedSinkNode = {
   data: nodeData,
 } as PipelineNode
 
-const renderCanvas = (lockReason: SinkLockReason | null, dispatch = vi.fn()) => {
+const renderCanvas = (lockReason: SinkLockReason | null, dispatch = vi.fn(), isReadOnly = false) => {
   const contextValue = {
     pipeline: { id: 'pipeline-1', name: 'Test', nodes: [selectedSinkNode], edges: [] },
     dispatch,
@@ -47,7 +47,7 @@ const renderCanvas = (lockReason: SinkLockReason | null, dispatch = vi.fn()) => 
   } as unknown as ActivePipelineContextValue
 
   render(
-    <ReadOnlyProvider isReadOnly={false}>
+    <ReadOnlyProvider isReadOnly={isReadOnly}>
       <ActivePipelineContext.Provider value={contextValue}>
         <PipelineCanvas />
       </ActivePipelineContext.Provider>
@@ -100,6 +100,14 @@ describe('PipelineCanvas', () => {
       await userEvent.keyboard('{Delete}')
 
       expect(toast.error).toHaveBeenCalledWith('sink.notRemovable.provisioned')
+    })
+
+    it('shows no toast in a read-only pipeline', async () => {
+      renderCanvas('provisioned', vi.fn(), true)
+
+      await userEvent.keyboard('{Delete}')
+
+      expect(toast.error).not.toHaveBeenCalled()
     })
   })
 
