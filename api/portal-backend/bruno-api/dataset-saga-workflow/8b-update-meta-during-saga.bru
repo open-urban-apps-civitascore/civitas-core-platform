@@ -29,6 +29,8 @@ tests {
 
   test("If rejected, error indicates saga in-flight", function() {
     if (res.getStatus() === 409) {
+      expect(res.body.type).to.equal('urn:civitas:error:SAGA_IN_FLIGHT');
+      expect(res.body.pendingSagaType).to.equal('CREATE');
       expect(res.body.detail).to.include('saga is in-flight');
     }
   });
@@ -43,7 +45,7 @@ docs {
 
   **Precondition:** `sagaDataSetId` is set; dataset was just released; CREATE saga is expected to be in-flight.
 
-  **Expected Response:** 409 Conflict with `RESOURCE_IN_USE` error code. 200 OK if saga already completed.
+  **Expected Response:** 409 Conflict with `SAGA_IN_FLIGHT` error code and `pendingSagaType: CREATE`. 200 OK if saga already completed.
 
   **System Impact:**
 

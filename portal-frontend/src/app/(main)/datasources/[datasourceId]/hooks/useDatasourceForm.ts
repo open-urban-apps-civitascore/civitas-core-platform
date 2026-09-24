@@ -31,6 +31,7 @@ import {
 } from '@/types/datasources'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { getConnectorDefaults } from '@/utils/connectors'
+import { isResourceInUseError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 export const useDatasourceForm = (
@@ -177,7 +178,7 @@ export const useDatasourceForm = (
       toast.success(tCommon('success.statusChangeSuccess'))
       return response.data
     } catch (error) {
-      toast.error(tCommon('errors.statusChangeError'))
+      toast.error(isResourceInUseError(error) ? t('errors.inUseError') : tCommon('errors.statusChangeError'))
       throw error
     }
   }

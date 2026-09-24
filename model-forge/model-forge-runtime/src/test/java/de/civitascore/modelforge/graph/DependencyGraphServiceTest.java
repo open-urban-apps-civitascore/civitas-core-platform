@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -164,6 +165,34 @@ class DependencyGraphServiceTest {
         assertThat(graph.getTransitiveDependencies(A, 2)).containsExactlyInAnyOrder(B, C);
         assertThat(graph.getTransitiveDependencies(A, 3)).containsExactlyInAnyOrder(B, C, D);
         assertThat(graph.getTransitiveDependencies(A, Integer.MAX_VALUE)).containsExactlyInAnyOrder(B, C, D);
+    }
+
+    @Test
+    void boundedWalk_reportsWhetherTheBoundCutItShort() {
+        // A → B → C → D
+        graph.register(A_V, Set.of(B_V));
+        graph.register(B_V, Set.of(C_V));
+        graph.register(C_V, Set.of(D_V));
+
+        assertThat(graph.getTransitiveDependenciesBounded(A, 2).truncated())
+            .as("D lies one hop past the bound, so the answer describes part of the chain")
+            .isTrue();
+        assertThat(graph.getTransitiveDependenciesBounded(A, 3).truncated())
+            .as("the whole chain fits, so nothing was left behind")
+            .isFalse();
+        assertThat(graph.getTransitiveDependenciesBounded(A, 3).visited())
+            .containsExactlyInAnyOrder(B, C, D);
+    }
+
+    @Test
+    void boundedWalk_aCycleWithinTheBoundIsNotTruncation() {
+        // A → B → A: everything reachable is reached, however deep the walk may go
+        graph.register(A_V, Set.of(B_V));
+        graph.register(B_V, Set.of(A_V));
+
+        assertThat(graph.getTransitiveDependenciesBounded(A, 5).truncated()).isFalse();
+        assertThat(graph.getTransitiveDependenciesBounded(A, 5).visited())
+            .containsExactlyInAnyOrder(A, B);
     }
 
     @Test
@@ -359,11 +388,9 @@ class DependencyGraphServiceTest {
     @Test
     void rebuild_indexesEveryArtifactTypeFromDurableReferences() {
         ArtifactRegistry registry = mock(ArtifactRegistry.class);
-        when(registry.listAllUrns()).thenReturn(List.of(MAPPING_L, DS_L));
-        when(registry.resolveReference(MAPPING_L)).thenReturn(Optional.of(MAPPING_V));
-        when(registry.resolveReference(DS_L)).thenReturn(Optional.of(DS_V));
-        when(registry.fetchArtifactRefUrns(MAPPING_V)).thenReturn(List.of(A_V));   // mapping → element A
-        when(registry.fetchArtifactRefUrns(DS_V)).thenReturn(List.of(A_V, B_V));   // datastructure → A, B
+        when(registry.referenceEdgesByVersion()).thenReturn(Map.of(
+            MAPPING_V, List.of(A_V),          // mapping → element A
+            DS_V, List.of(A_V, B_V)));        // datastructure → A, B
         var g = new DependencyGraphService(registry);
 
         g.rebuild();
@@ -373,6 +400,46 @@ class DependencyGraphServiceTest {
         // A is now depended on by both the mapping and the datastructure — cross-type dependents.
         assertThat(g.getDependents(A_V)).containsExactlyInAnyOrder(MAPPING_V, DS_V);
         assertThat(g.getDependents(B_V)).containsExactly(DS_V);
+    }
+
+    private static final String READING_V1 = "urn:core:platform:civitas:element:common:Reading:d28s38wfmi:1.0.0";
+    private static final String READING_V2 = "urn:core:platform:civitas:element:common:Reading:d28s38wfmi:2.0.0";
+
+    @Test
+    void rebuild_supersededVersionKeepsItsOwnEdges() {
+        ArtifactRegistry registry = mock(ArtifactRegistry.class);
+        // Both versions exist, so a query for either reaches the logical fallback in
+        // getDependencies instead of short-circuiting on an unknown version.
+        when(registry.resolveReference(READING_V1)).thenReturn(Optional.of(READING_V1));
+        when(registry.resolveReference(READING_V2)).thenReturn(Optional.of(READING_V2));
+        when(registry.referenceEdgesByVersion()).thenReturn(Map.of(
+            DS_V, List.of(READING_V1),      // the grouping pins the superseded version
+            READING_V1, List.of(C_V)));     // ... which is the only way to the leaf
+        var g = new DependencyGraphService(registry);
+
+        g.rebuild();
+
+        assertThat(g.getDependencies(READING_V1)).containsExactly(C_V);
+        assertThat(g.getTransitiveDependencies(DS_V, Integer.MAX_VALUE))
+            .containsExactlyInAnyOrder(READING_V1, C_V);
+        assertThat(g.getDependencies(READING_V2))
+            .as("the current version declares nothing and must not inherit version 1's edges")
+            .isEmpty();
+    }
+
+    @Test
+    void rebuild_dropsANodeTheRegistryNoLongerReports() {
+        ArtifactRegistry registry = mock(ArtifactRegistry.class);
+        when(registry.referenceEdgesByVersion()).thenReturn(Map.of(DS_V, List.of(A_V)));
+        var g = new DependencyGraphService(registry);
+        g.register(MAPPING_V, Set.of(B_V));
+
+        g.rebuild();
+
+        // A rebuild replaces the graph rather than merging into it.
+        assertThat(g.getDependencies(MAPPING_V)).isEmpty();
+        assertThat(g.getDependents(B_V)).isEmpty();
+        assertThat(g.getDependencies(DS_V)).containsExactly(A_V);
     }
 
     @Test

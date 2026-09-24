@@ -25,7 +25,6 @@ import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
-import jakarta.ws.rs.core.Response;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -40,6 +39,8 @@ import java.util.List;
 import java.util.Map;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
@@ -499,17 +500,15 @@ class NifiDataFlowIT extends AbstractNifiIT {
   /** Queries the NiFi bulletin board for a WARN bulletin emitted by the LogMessage error sink. */
   private boolean errorSinkRaisedABulletin() throws Exception {
     String token = client.authenticate();
-    try (Response response =
-        httpClient
-            .target("https://" + dockerHost + ":" + HOST_PORT + "/nifi-api/flow/bulletin-board")
-            .request()
+    Request request =
+        new Request.Builder()
+            .url("https://" + dockerHost + ":" + HOST_PORT + "/nifi-api/flow/bulletin-board")
             .header("Authorization", "Bearer " + token)
-            .get()) {
+            .get()
+            .build();
+    try (Response response = httpClient.newCall(request).execute()) {
       JsonNode bulletins =
-          mapper
-              .readTree(response.readEntity(String.class))
-              .path("bulletinBoard")
-              .path("bulletins");
+          mapper.readTree(response.body().string()).path("bulletinBoard").path("bulletins");
       for (JsonNode entry : bulletins) {
         JsonNode bulletin = entry.path("bulletin");
         if (bulletin.path("sourceName").asText().contains("LogMessage")

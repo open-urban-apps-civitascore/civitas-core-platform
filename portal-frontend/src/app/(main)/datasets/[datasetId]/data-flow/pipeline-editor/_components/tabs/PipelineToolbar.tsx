@@ -47,6 +47,14 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
 
   const [shouldShowDeleteConfirm, setShouldShowDeleteConfirm] = useState(false)
 
+  const isUnsaved = !pipeline?.id
+  const canDiscard = canDelete || isUnsaved
+  const pipelineRemovalLabel = isUnsaved ? t('toolbar.discardPipeline') : t('toolbar.deletePipeline')
+  const pipelineRemovalConfirmTitle = isUnsaved ? t('toolbar.discardConfirmTitle') : t('toolbar.deleteConfirmTitle')
+  const pipelineRemovalConfirmDescription = isUnsaved
+    ? t('toolbar.discardConfirmDescription')
+    : t('toolbar.deleteConfirmDescription')
+
   /**
    * Handle validate button click.
    * Runs validation - results are shown in inspector panel.
@@ -81,7 +89,7 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
               {isDirty && <span className="text-xs text-muted-foreground">{t('toolbar.unsavedChanges')}</span>}
 
               {/* Gear icon with dropdown menu */}
-              {canDelete && (
+              {canDiscard && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={t('toolbar.pipelineSettings')}>
@@ -95,7 +103,7 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
                       disabled={isDeleting}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      {t('toolbar.deletePipeline')}
+                      {pipelineRemovalLabel}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -119,9 +127,9 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
       <WarningModal
         open={shouldShowDeleteConfirm}
         onOpenChange={setShouldShowDeleteConfirm}
-        title={t('toolbar.deleteConfirmTitle')}
-        description={t('toolbar.deleteConfirmDescription')}
-        confirmButtonTitle={t('toolbar.deletePipeline')}
+        title={pipelineRemovalConfirmTitle}
+        description={pipelineRemovalConfirmDescription}
+        confirmButtonTitle={pipelineRemovalLabel}
         onConfirm={handleDeleteConfirm}
         onDiscard={() => setShouldShowDeleteConfirm(false)}
         isLoading={isDeleting}

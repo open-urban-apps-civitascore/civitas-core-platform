@@ -99,6 +99,7 @@ export const WithoutCard: Story = {
 export const WithCustomTitle: Story = {
   args: {
     confirmButtonType: 'button',
+    onConfirmClick: fn(),
     confirmButtonTitle: 'Confirm',
   },
 }

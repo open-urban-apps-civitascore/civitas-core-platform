@@ -6,9 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -22,11 +20,10 @@ import java.util.concurrent.locks.ReentrantLock;
  * it mirrors those per-type rows, so every artifact kind's relations are navigable, not just
  * Elements'.
  *
- * <p>Nodes are <strong>versioned</strong> URNs and edges are kept verbatim
- * (a pinned {@code …:1.0.0} or the {@code …:latest} token). A query by a logical or
- * {@code …:latest} URN — and a {@code latest} edge target — is resolved to the target's
- * current version at read time (via {@code ArtifactRegistry.resolveReference}); a
- * pinned URN is used as-is.
+ * <p>Nodes are <strong>versioned</strong> URNs, one per version that holds references, and edges
+ * are kept verbatim (a pinned {@code …:1.0.0} or the {@code …:latest} token). A query by a logical
+ * or {@code …:latest} URN — and a {@code latest} edge target — is resolved to the target's current
+ * version at read time (via {@code ArtifactRegistry.resolveReference}); a pinned URN is used as-is.
  *
  *   A → B  means: artifact A references artifact B  (A depends on B)
  */
@@ -59,9 +56,8 @@ public class DependencyGraphService {
      * kind. The full reference graph — including cycles — is retained, so the graph survives a
      * restart unchanged.
      *
-     * <p>Runs all per-artifact reads in parallel using virtual threads to avoid blocking the
-     * startup thread on large registries. Also rebuilds the XSD namespace→URN index
-     * (required before xs:import resolution).
+     * <p>Keyed per version, from {@link ArtifactRegistry#referenceEdgesByVersion()}. Also rebuilds
+     * the XSD namespace→URN index (required before xs:import resolution).
      */
     public void rebuild() {
         // Clear both maps atomically under the lock so a concurrent register()/remove() cannot
@@ -77,36 +73,39 @@ public class DependencyGraphService {
         // rebuildNamespaceIndex already parallelises internally
         registry.rebuildNamespaceIndex();
 
-        List<String> allUrns = registry.listAllUrns();
-        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            var futures = allUrns.stream()
-                .map(urn -> CompletableFuture.runAsync(() -> registerFromRegistry(urn), executor))
-                .toList();
-            CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
-                .exceptionally(ex -> { log.warn("Dependency graph rebuild partially failed: {}", ex.getMessage()); return null; })
-                .join();
+        Map<String, List<String>> edges = registry.referenceEdgesByVersion();
+        int rowsRead = edges.values().stream().mapToInt(List::size).sum();
+        graphLock.lock();
+        try {
+            edges.forEach(this::registerLocked);
+        } finally {
+            graphLock.unlock();
         }
 
-        log.info("Dependency graph built from artifact_reference: {} node(s), {} edge(s) ({} artifact(s) scanned)",
+        // Registration is the only step between the rows read and the nodes held.
+        if (dependencies.size() != edges.size()) {
+            log.warn("Dependency graph indexed {} of the {} version(s) read",
+                dependencies.size(), edges.size());
+        }
+        log.info("Dependency graph built from artifact_reference: {} node(s), {} edge(s) from {} row(s)",
             dependencies.size(),
             dependencies.values().stream().mapToInt(Set::size).sum(),
-            allUrns.size());
+            rowsRead);
     }
 
     /**
      * Register (or refresh) an artifact's outgoing edges from its durable {@code artifact_reference}
-     * rows — the single sync primitive shared by {@link #rebuild()} and every write path, for every
-     * artifact type. The artifact is registered under its <em>current</em> versioned URN (resolved
-     * from the logical URN), so a version bump lands on the right node; the reference targets are the
-     * verbatim persisted URNs (pinned or {@code latest}).
+     * rows — the sync primitive every write path shares, for every artifact type.
+     *
+     * <p>A URN that names a version is registered under that version. A logical or {@code latest}
+     * URN resolves to the current one. A write therefore has to pass the pin it was given back:
+     * a version written onto a line that is not the newest never becomes current, and resolving
+     * would index a different version than the one just stored.
      */
     public void registerFromRegistry(String urn) {
-        String logical = UrnParser.logicalUrn(urn);
-        // Resolve via the logical URN so a version bump registers under the new current version,
-        // not whatever (possibly stale) pinned version the caller passed in.
-        String current = registry.resolveReference(logical).orElse(logical);
-        Set<String> refs = new LinkedHashSet<>(registry.fetchArtifactRefUrns(current));
-        register(current, refs);
+        String node = resolveToVersioned(urn);
+        Set<String> refs = new LinkedHashSet<>(registry.fetchArtifactRefUrns(node));
+        register(node, refs);
     }
 
     /**
@@ -131,7 +130,7 @@ public class DependencyGraphService {
      * Forward/reverse edge update for {@code fromUrn}. The caller <strong>must</strong>
      * hold {@link #graphLock} so the forward and reverse maps stay consistent.
      */
-    private void registerLocked(String fromUrn, Set<String> toUrns) {
+    private void registerLocked(String fromUrn, Collection<String> toUrns) {
         Set<String> refs = new LinkedHashSet<>(toUrns);   // verbatim (pinned :version or :latest)
 
         // Remove old reverse entries for this exact node (re-registration replaces its edges).
@@ -190,6 +189,9 @@ public class DependencyGraphService {
      * Direct incoming references (schemas that depend on this schema). Unions the dependents that
      * pin this exact version, those that track it via {@code :latest}, and those that reference the
      * logical URN — so a {@code latest} reference counts as a dependent of the current version.
+     *
+     * <p>Includes referrers whose declaring version is superseded — not the rule deletion applies,
+     * which counts a referrer's current version only and reads the durable rows.
      */
     public Set<String> getDependents(String urn) {
         String node = resolveToVersioned(urn);
@@ -210,7 +212,7 @@ public class DependencyGraphService {
      * {@code Integer.MAX_VALUE} walks the full transitive closure. Cycle-safe via the visited set.
      */
     public Set<String> getTransitiveDependencies(String urn, int maxDepth) {
-        return transitive(urn, maxDepth, this::getDependencies);
+        return transitiveVisited(urn, maxDepth, this::getDependencies);
     }
 
     /**
@@ -218,23 +220,52 @@ public class DependencyGraphService {
      * {@code urn}, reachable within {@code maxDepth} hops. Same bounds and cycle-safety.
      */
     public Set<String> getTransitiveDependents(String urn, int maxDepth) {
-        return transitive(urn, maxDepth, this::getDependents);
+        return transitiveVisited(urn, maxDepth, this::getDependents);
     }
 
-    private static Set<String> transitive(String urn, int maxDepth, java.util.function.Function<String, Set<String>> direct) {
+    /**
+     * What a depth-bounded walk reached, and whether the bound stopped it short: {@code truncated}
+     * is true when an artifact the walk never reached lies immediately beyond it.
+     */
+    public record BoundedWalk(Set<String> visited, boolean truncated) {
+        public BoundedWalk {
+            // Order-preserving copy: the closure contract promises the walk's discovery order.
+            visited = Collections.unmodifiableSet(new LinkedHashSet<>(visited));
+        }
+    }
+
+    /**
+     * {@link #getTransitiveDependencies} plus whether the bound cut the walk short — what a caller
+     * needs to tell an exhausted closure from a truncated one.
+     */
+    public BoundedWalk getTransitiveDependenciesBounded(String urn, int maxDepth) {
+        return transitive(urn, maxDepth, this::getDependencies);
+    }
+
+    private static Set<String> transitiveVisited(String urn, int maxDepth, java.util.function.Function<String, Set<String>> direct) {
+        return transitive(urn, maxDepth, direct).visited();
+    }
+
+    private static BoundedWalk transitive(String urn, int maxDepth, java.util.function.Function<String, Set<String>> direct) {
         Set<String> visited = new LinkedHashSet<>();
-        if (maxDepth <= 0) return Collections.unmodifiableSet(visited);
+        if (maxDepth <= 0) {
+            return new BoundedWalk(Collections.unmodifiableSet(visited), !direct.apply(urn).isEmpty());
+        }
         Set<String> frontier = new LinkedHashSet<>(direct.apply(urn)); // level 1
+        Set<String> beyond = new LinkedHashSet<>();
         for (int level = 1; level <= maxDepth && !frontier.isEmpty(); level++) {
             Set<String> nextFrontier = new LinkedHashSet<>();
             for (String node : frontier) {
-                if (visited.add(node) && level < maxDepth) {
-                    nextFrontier.addAll(direct.apply(node));
+                if (visited.add(node)) {
+                    // The last level is visited but not expanded; collect its references so the
+                    // bound can report what it left behind.
+                    (level < maxDepth ? nextFrontier : beyond).addAll(direct.apply(node));
                 }
             }
             frontier = nextFrontier;
         }
-        return Collections.unmodifiableSet(visited);
+        beyond.removeAll(visited);
+        return new BoundedWalk(Collections.unmodifiableSet(visited), !beyond.isEmpty());
     }
 
     /**

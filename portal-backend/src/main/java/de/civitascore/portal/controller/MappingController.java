@@ -65,12 +65,19 @@ public class MappingController {
   }
 
   @GetMapping
-  @Operation(summary = "Fetch a Mapping artifact's content by (logical or versioned) CORE URN")
-  public ResponseEntity<Map<String, Object>> get(
-      @PathVariable UUID dataSetId, @RequestParam("urn") String urn) {
+  @Operation(
+      summary = "Fetch a Mapping artifact's content by CORE URN, or list this DataSet's mappings",
+      description =
+          "With urn, returns that mapping's content. Without urn, returns the URNs of every mapping"
+              + " of this DataSet — the only way to find one that no pipeline names.")
+  public ResponseEntity<Object> get(
+      @PathVariable UUID dataSetId, @RequestParam(value = "urn", required = false) String urn) {
+    if (urn == null || urn.isBlank()) {
+      return ResponseEntity.ok(Map.of("mappings", mappingService.list(dataSetId)));
+    }
     return mappingService
         .get(dataSetId, urn)
-        .map(ResponseEntity::ok)
+        .<ResponseEntity<Object>>map(ResponseEntity::ok)
         .orElseGet(() -> ResponseEntity.notFound().build());
   }
 
@@ -78,14 +85,12 @@ public class MappingController {
   @Operation(
       summary = "Delete a Mapping artifact by its (logical or versioned) CORE URN",
       description =
-          "Without force=true the delete is rejected while another artifact (e.g. a pipeline's"
-              + " mappingRef) still references the mapping; force=true unlinks it from any DataSets"
-              + " and deletes regardless.")
+          "Rejected while another artifact still references the mapping — a pipeline's mappingRef,"
+              + " for instance. Remove that reference at the artifact holding it first; deleting a"
+              + " mapping a pipeline still uses would leave the pipeline pointing at nothing.")
   public ResponseEntity<Void> delete(
-      @PathVariable UUID dataSetId,
-      @RequestParam("urn") String urn,
-      @RequestParam(value = "force", defaultValue = "false") boolean force) {
-    mappingService.delete(dataSetId, urn, force);
+      @PathVariable UUID dataSetId, @RequestParam("urn") String urn) {
+    mappingService.delete(dataSetId, urn);
     return ResponseEntity.noContent().build();
   }
 

@@ -35,10 +35,26 @@ class ArtifactRepository {
             .list();
     }
 
-    /** Every artifact's logical URN, of every type, ordered by name. */
-    List<String> listAllLogicalUrns() {
-        return jdbc.sql("select logical_urn from model_forge.artifact order by name")
-            .query(String.class)
+    /**
+     * The stored versions of the given artifacts, each row carrying its artifact's current-version
+     * pointer — everything needed to decide, without a second query, which of a set of reference
+     * URNs resolves.
+     *
+     * <p>Filtered on {@code logical_urn}, which is unique, so this reads the requested artifacts
+     * rather than scanning every version row. An artifact holding no version contributes no row,
+     * which is what makes it unresolvable.
+     *
+     * @param logicalUrns the logical URNs to report versions for; must not be empty
+     */
+    List<ArtifactVersionIdentity> findVersionIdentities(List<String> logicalUrns) {
+        return jdbc.sql("""
+                select a.logical_urn, a.current_version, v.version
+                  from model_forge.artifact a
+                  join model_forge.artifact_version v on v.artifact_id = a.id
+                 where a.logical_urn in (:logicalUrns)
+                """)
+            .param("logicalUrns", logicalUrns)
+            .query(ArtifactVersionIdentity.class)
             .list();
     }
 

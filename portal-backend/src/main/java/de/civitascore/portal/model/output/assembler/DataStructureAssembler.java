@@ -32,8 +32,8 @@ public class DataStructureAssembler
   }
 
   /**
-   * {@inheritDoc} Sets the {@code inUse} flag based on whether any data source or data sink
-   * references one of this structure's versions.
+   * {@inheritDoc} Sets the {@code inUse} flag from whether anything still references one of this
+   * structure's versions.
    */
   @Override
   public DataStructureOutputDTO enrichDto(DataStructureOutputDTO dto, DataStructure entity) {
@@ -41,13 +41,13 @@ public class DataStructureAssembler
     Set<UUID> versionIds =
         versions.stream().map(DataStructureVersion::getId).collect(Collectors.toSet());
     if (!versionIds.isEmpty()) {
-      // Sink references live in the registry (tracked by Model Forge via each version's model URN);
-      // the source dimension stays a host FK query.
+      // The registry answers for every reference it holds onto a version's model; the host FK
+      // covers a data source pinned to the version, which the registry does not record.
       dto.setInUse(
           dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
               || versions.stream()
                   .map(DataStructureVersion::getModelUrn)
-                  .anyMatch(modelRegistryGateway::isReferencedBySink));
+                  .anyMatch(modelRegistryGateway::isReferenced));
     }
     return dto;
   }

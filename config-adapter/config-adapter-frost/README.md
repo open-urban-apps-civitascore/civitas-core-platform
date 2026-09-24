@@ -120,5 +120,4 @@ mvn test -pl config-adapter-frost      # unit tests, no Docker
 mvn verify -pl config-adapter-frost    # adds integration tests, requires Docker
 ```
 
-Integration tests run against FROST-Server and PostGIS containers started by Testcontainers. They need
-`--add-opens java.base/java.net=ALL-UNNAMED`, which the module's failsafe configuration supplies.
+Integration tests run against FROST-Server and PostGIS containers started by Testcontainers.

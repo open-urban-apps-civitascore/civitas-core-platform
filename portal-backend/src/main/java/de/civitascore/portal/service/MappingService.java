@@ -6,6 +6,7 @@ import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -115,22 +116,16 @@ public class MappingService {
   }
 
   /**
-   * Deletes a Mapping artifact of this DataSet by its (logical or versioned) CORE URN. Without
-   * {@code force} the delete is rejected by Model Forge while another artifact still references the
-   * mapping (e.g. a pipeline's {@code mappingRef}); with {@code force} it is deleted regardless of
-   * who references it. Deleting a mapping that a pipeline still references leaves that pipeline
-   * pointing at nothing, so callers should delete referencing pipelines first (or pass {@code
-   * force}).
+   * Deletes a Mapping artifact of this DataSet by its (logical or versioned) CORE URN. Model Forge
+   * rejects the delete while another artifact still references the mapping — a pipeline's {@code
+   * mappingRef}, for instance — and the caller removes that reference at its own artifact first. A
+   * pipeline deleted on its own takes with it the mappings no other pipeline uses.
    *
    * @throws ResourceNotFoundException when the mapping is not a member of this DataSet
    */
-  public void delete(UUID dataSetId, String urn, boolean force) {
+  public void delete(UUID dataSetId, String urn) {
     requireMemberOfDataSet(manifestUrnOrThrow(dataSetId), urn);
-    if (force) {
-      registry.deleteArtifact(urn, false, true);
-    } else {
-      registry.deletePayload(urn);
-    }
+    registry.deletePayload(urn);
   }
 
   /**
@@ -175,6 +170,23 @@ public class MappingService {
     if (!isMemberOfDataSet(manifestUrn, urn)) {
       throw new ResourceNotFoundException(ENTITY_NAME, urn);
     }
+  }
+
+  /**
+   * The logical URNs of this DataSet's mappings.
+   *
+   * <p>A mapping has no host row and is addressed by its URN alone, so without this a mapping that
+   * no pipeline names cannot be found, and the delete that would clear it has no address to aim at.
+   *
+   * @throws ResourceNotFoundException when the DataSet has no manifest
+   */
+  public List<String> list(UUID dataSetId) {
+    return registry
+        .dependencyUrnsOfType(manifestUrnOrThrow(dataSetId), MAPPING_ARTIFACT_TYPE)
+        .stream()
+        .map(registry::logicalUrn)
+        .distinct()
+        .toList();
   }
 
   /**

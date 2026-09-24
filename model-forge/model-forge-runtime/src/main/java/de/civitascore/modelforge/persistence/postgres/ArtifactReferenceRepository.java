@@ -4,7 +4,10 @@ import de.civitascore.modelforge.urn.UrnParser;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -75,6 +78,9 @@ class ArtifactReferenceRepository {
      * dangle). A grouping edge ({@code datastructure-ref}) protects its member exactly like a hard
      * dependency does. Only the artifact's own versions (self-references, e.g. cycles inside one
      * document) are exempt — a document cannot block its own deletion.
+     *
+     * <p>Only a referrer's current version counts. A reference held by a superseded version records
+     * what that version declared and does not constrain its target.
      */
     List<String> blockingDependents(String targetLogicalUrn) {
         return jdbc.sql("""
@@ -82,6 +88,7 @@ class ArtifactReferenceRepository {
                   from model_forge.artifact_reference r
                   join model_forge.artifact_version fv on fv.id = r.from_version_id
                   join model_forge.artifact a          on a.id = fv.artifact_id
+                                                      and fv.version = a.current_version
                  where r.target_artifact_id = (select id from model_forge.artifact
                                                 where logical_urn = :logical)
                    and a.logical_urn <> :logical
@@ -97,20 +104,34 @@ class ArtifactReferenceRepository {
      * non-DataSet references that unconditionally block deletion (referential integrity). DataSet
      * membership is handled separately by the count-based deletion policy (see
      * {@link #dataSetMemberships} and the deletion-policy concept).
+     *
+     * <p>{@code targetVersion} restricts the answer to the references holding that one version — a
+     * Data Sink writing into version 1 leaves version 2 free. A reference naming no version follows
+     * whichever is current and so holds every one. {@code null} asks for the artifact as a whole,
+     * which is the question a delete asks.
      */
-    List<String> nonDataSetBlockingDependents(String targetLogicalUrn) {
+    List<String> nonDataSetBlockingDependents(String targetLogicalUrn, String targetVersion) {
         return jdbc.sql("""
                 select distinct a.logical_urn
                   from model_forge.artifact_reference r
                   join model_forge.artifact_version fv on fv.id = r.from_version_id
                   join model_forge.artifact a          on a.id = fv.artifact_id
+                                                      and fv.version = a.current_version
                  where r.target_artifact_id = (select id from model_forge.artifact
                                                 where logical_urn = :logical)
                    and a.logical_urn <> :logical
                    and r.reference_type <> 'dataset-ref'
+                   and (cast(:targetVersion as text) is null
+                     or r.target_version_id is null
+                     or r.target_version_id = (select av.id
+                                                 from model_forge.artifact_version av
+                                                 join model_forge.artifact ta on ta.id = av.artifact_id
+                                                where ta.logical_urn = :logical
+                                                  and av.version = cast(:targetVersion as text)))
                  order by a.logical_urn
                 """)
             .param("logical", targetLogicalUrn)
+            .param("targetVersion", targetVersion)
             .query(String.class)
             .list();
     }
@@ -134,6 +155,37 @@ class ArtifactReferenceRepository {
                  order by a.logical_urn
                 """)
             .param("logical", targetLogicalUrn)
+            .query(String.class)
+            .list();
+    }
+
+    /**
+     * Target URNs of the artifacts the given one owns — the set a cascading delete may take with it.
+     * Ownership is carried by the edge rather than the target's kind, so an artifact reached only
+     * through its owner is owned and one that is merely grouped is not. An unresolved reference
+     * contributes nothing.
+     *
+     * <p>Each member is returned as the owner pinned it, so a caller asking about one version of the
+     * owner learns which version of the member it holds. A null {@code ownerVersion} reads the
+     * owner's current version.
+     */
+    List<String> ownedMemberUrns(String ownerLogicalUrn, String ownerVersion) {
+        return jdbc.sql("""
+                select distinct r.target_urn
+                  from model_forge.artifact_reference r
+                  join model_forge.artifact_version fv on fv.id = r.from_version_id
+                  join model_forge.artifact a          on a.id = fv.artifact_id
+                  join model_forge.artifact ta         on ta.id = r.target_artifact_id
+                 where a.logical_urn = :logical
+                   and fv.version = coalesce(cast(:ownerVersion as text), a.current_version)
+                   and ta.logical_urn <> :logical
+                   and (r.reference_type = 'datastructure-ref'
+                     or (r.reference_type = 'pipeline-node' and r.reference_name = 'mapping')
+                     or (r.reference_type = 'dataset-ref'   and r.reference_name in ('pipeline', 'mapping')))
+                 order by r.target_urn
+                """)
+            .param("logical", ownerLogicalUrn)
+            .param("ownerVersion", ownerVersion)
             .query(String.class)
             .list();
     }
@@ -163,6 +215,31 @@ class ArtifactReferenceRepository {
             .param("v", fromVersionId)
             .query(String.class)
             .list();
+    }
+
+    /** One row of {@link #edgesByVersion}: the versioned URN that holds the edge, and its target. */
+    private record VersionEdge(String fromUrn, String targetUrn) {}
+
+    /** {@link #targetUrns} for every version at once, keyed by versioned URN, in stored order. */
+    Map<String, List<String>> edgesByVersion() {
+        List<VersionEdge> rows = jdbc.sql("""
+                select a.logical_urn, fv.version, r.target_urn
+                  from model_forge.artifact_reference r
+                  join model_forge.artifact_version fv on fv.id = r.from_version_id
+                  join model_forge.artifact a          on a.id = fv.artifact_id
+                 order by a.logical_urn, fv.version, r.sort_order nulls last, r.target_urn
+                """)
+            .query((rs, n) -> new VersionEdge(
+                UrnParser.withVersion(rs.getString("logical_urn"), rs.getString("version")),
+                rs.getString("target_urn")))
+            .list();
+
+        // Ordered by the grouping key, so a version's rows arrive contiguously.
+        Map<String, List<String>> edges = new LinkedHashMap<>();
+        for (VersionEdge row : rows) {
+            edges.computeIfAbsent(row.fromUrn(), k -> new ArrayList<>()).add(row.targetUrn());
+        }
+        return edges;
     }
 
     /**

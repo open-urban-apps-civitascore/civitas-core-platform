@@ -21,15 +21,9 @@ import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import java.io.ByteArrayInputStream;
+import de.civitascore.configadapter.util.OkHttpJson;
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -40,10 +34,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Supplier;
-import org.glassfish.jersey.media.multipart.FormDataMultiPart;
-import org.glassfish.jersey.media.multipart.MultiPartFeature;
-import org.glassfish.jersey.media.multipart.file.StreamDataBodyPart;
+import okhttp3.HttpUrl;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,7 +61,7 @@ public class NifiRestClient implements AutoCloseable {
 
   private final String baseUrl;
   private final NifiTokenProvider tokenProvider;
-  private final Client client;
+  private final OkHttpClient client;
   private final ObjectMapper mapper = new ObjectMapper();
 
   /**
@@ -86,14 +82,14 @@ public class NifiRestClient implements AutoCloseable {
    *
    * @param baseUrl the NiFi base URL (e.g. {@code https://nifi:8443})
    * @param tokenProvider supplies (and refreshes) the OIDC bearer token sent to NiFi
-   * @param client the JAX-RS client to use
+   * @param client the OkHttp client to use
    * @param mqttTruststore the configured MQTT trust anchor, named in truststore-password
    *     diagnostics
    */
   public NifiRestClient(
       String baseUrl,
       NifiTokenProvider tokenProvider,
-      Client client,
+      OkHttpClient client,
       MqttTruststoreConfig mqttTruststore) {
     this.baseUrl = baseUrl;
     this.tokenProvider = tokenProvider;
@@ -368,13 +364,13 @@ public class NifiRestClient implements AutoCloseable {
    */
   String getRootProcessGroupId() throws FatalAdapterException, RetryableAdapterException {
     try (Response response =
-        sendAuthorized(() -> authorized(target(API + "/process-groups/root")).get())) {
-      if (response.getStatus() != 403) {
+        sendAuthorized(() -> execute(authorized(API + "/process-groups/root").get().build()))) {
+      if (response.code() != HttpURLConnection.HTTP_FORBIDDEN) {
         check(response, "root process group");
         return requireId(
             readTree(response, "root process group").path("id").asText(), "root process group");
       }
-    } catch (ProcessingException e) {
+    } catch (IOException e) {
       throw network("root process group", e);
     }
     LOG.info("NiFi denied root process-group access (403) — provisioning service-account policies");
@@ -447,13 +443,14 @@ public class NifiRestClient implements AutoCloseable {
   private Optional<JsonNode> getPolicy(String action, String resource)
       throws FatalAdapterException, RetryableAdapterException {
     try (Response response =
-        sendAuthorized(() -> authorized(target(API + "/policies/" + action + resource)).get())) {
-      if (response.getStatus() == 404) {
+        sendAuthorized(
+            () -> execute(authorized(API + "/policies/" + action + resource).get().build()))) {
+      if (response.code() == HttpURLConnection.HTTP_NOT_FOUND) {
         return Optional.empty();
       }
       check(response, "read access policy");
       return Optional.of(readTree(response, "read access policy"));
-    } catch (ProcessingException e) {
+    } catch (IOException e) {
       throw network("read access policy", e);
     }
   }
@@ -508,12 +505,9 @@ public class NifiRestClient implements AutoCloseable {
     component.put("action", action);
     component.putArray("users").add(mapper.createObjectNode().put("id", userId));
     try (Response response =
-        sendAuthorized(
-            () ->
-                authorized(target(API + "/policies"))
-                    .post(Entity.entity(body.toString(), MediaType.APPLICATION_JSON)))) {
+        sendAuthorized(() -> execute(authorized(API + "/policies").post(jsonBody(body)).build()))) {
       check(response, "create access policy");
-    } catch (ProcessingException e) {
+    } catch (IOException e) {
       throw network("create access policy", e);
     }
   }
@@ -533,47 +527,37 @@ public class NifiRestClient implements AutoCloseable {
 
   String uploadSnapshot(String rootId, String pgName, String snapshotJson)
       throws FatalAdapterException, RetryableAdapterException {
-    WebTarget target =
-        target(API + "/process-groups/" + rootId + "/process-groups/upload")
-            .register(MultiPartFeature.class);
     byte[] body = snapshotJson.getBytes(StandardCharsets.UTF_8);
     try (Response response =
-        sendAuthorized(() -> postUploadMultipart(target, rootId, pgName, body))) {
+        sendAuthorized(() -> execute(uploadMultipartRequest(rootId, pgName, body)))) {
       check(response, "upload snapshot");
       return requireId(
-          mapper.readTree(response.readEntity(String.class)).path("id").asText(),
+          readTree(response, "uploaded process group").path("id").asText(),
           "uploaded process group");
-    } catch (ProcessingException e) {
-      throw network("upload snapshot", e);
     } catch (IOException e) {
-      throw new FatalAdapterException(AdapterErrorCode.NIFI_FLOW_ERROR, e, "upload snapshot");
+      throw network("upload snapshot", e);
     }
   }
 
   /**
-   * Builds a FRESH multipart body for each call. The snapshot stream is single-use, so the {@link
-   * #sendAuthorized} 401-replay must rebuild it — replaying the original, already-consumed stream
-   * would upload an empty body.
+   * Builds a FRESH multipart body for each call, from the snapshot bytes rather than a stream — the
+   * {@link #sendAuthorized} 401-replay rebuilds the request, so a body that could only be written
+   * once would upload empty on retry.
    */
-  private Response postUploadMultipart(
-      WebTarget target, String rootId, String pgName, byte[] body) {
-    try (FormDataMultiPart multipart = new FormDataMultiPart()) {
-      multipart.field("id", rootId);
-      multipart.field("groupName", pgName);
-      multipart.field("positionX", "0");
-      multipart.field("positionY", "0");
-      multipart.field("clientId", CLIENT_ID);
-      multipart.bodyPart(
-          new StreamDataBodyPart(
-              "file",
-              new ByteArrayInputStream(body),
-              pgName + ".json",
-              MediaType.APPLICATION_JSON_TYPE));
-      return authorized(target).post(Entity.entity(multipart, multipart.getMediaType()));
-    } catch (IOException e) {
-      // FormDataMultiPart.close() (in-memory body) — surface as a transient transport error.
-      throw new ProcessingException("upload multipart", e);
-    }
+  private Request uploadMultipartRequest(String rootId, String pgName, byte[] body) {
+    RequestBody multipart =
+        new MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("id", rootId)
+            .addFormDataPart("groupName", pgName)
+            .addFormDataPart("positionX", "0")
+            .addFormDataPart("positionY", "0")
+            .addFormDataPart("clientId", CLIENT_ID)
+            .addFormDataPart("file", pgName + ".json", RequestBody.create(body, OkHttpJson.JSON))
+            .build();
+    return authorized(API + "/process-groups/" + rootId + "/process-groups/upload")
+        .post(multipart)
+        .build();
   }
 
   void patchSensitiveProperties(String pgId, Map<String, Map<String, String>> sensitiveByComponent)
@@ -940,18 +924,18 @@ public class NifiRestClient implements AutoCloseable {
     disableControllerServices(group.id());
     awaitControllerServicesState(group.id(), "DISABLED", true);
 
+    HttpUrl deleteUrl =
+        url(API + "/process-groups/" + group.id())
+            .newBuilder()
+            .addQueryParameter("version", String.valueOf(version))
+            .addQueryParameter("clientId", CLIENT_ID)
+            .build();
     try (Response response =
-        sendAuthorized(
-            () ->
-                authorized(
-                        target(API + "/process-groups/" + group.id())
-                            .queryParam("version", version)
-                            .queryParam("clientId", CLIENT_ID))
-                    .delete())) {
-      if (response.getStatus() != 404) {
+        sendAuthorized(() -> execute(authorized(deleteUrl).delete().build()))) {
+      if (response.code() != HttpURLConnection.HTTP_NOT_FOUND) {
         check(response, "delete process group");
       }
-    } catch (ProcessingException e) {
+    } catch (IOException e) {
       throw network("delete process group", e);
     }
   }
@@ -1056,13 +1040,13 @@ public class NifiRestClient implements AutoCloseable {
    * the drop it cleans up after, which the caller reports from inside its {@code try}.
    */
   private void releaseDropRequest(String request) {
-    try (Response response = sendAuthorized(() -> authorized(target(request)).delete())) {
-      int status = response.getStatus();
+    try (Response response = sendAuthorized(() -> execute(authorized(request).delete().build()))) {
+      int status = response.code();
       if (status < 200 || status >= 300) {
         LOG.warn(
             "Could not release NiFi drop request (HTTP {}) — NiFi expires it on its own", status);
       }
-    } catch (ProcessingException | FatalAdapterException | RetryableAdapterException e) {
+    } catch (IOException | FatalAdapterException | RetryableAdapterException e) {
       LOG.warn("Could not release NiFi drop request: {}", e.getMessage());
     }
   }
@@ -1071,10 +1055,10 @@ public class NifiRestClient implements AutoCloseable {
 
   private JsonNode getJson(String path, String description)
       throws FatalAdapterException, RetryableAdapterException {
-    try (Response response = sendAuthorized(() -> authorized(target(path)).get())) {
+    try (Response response = sendAuthorized(() -> execute(authorized(path).get().build()))) {
       check(response, description);
       return readTree(response, description);
-    } catch (ProcessingException e) {
+    } catch (IOException e) {
       throw network(description, e);
     }
   }
@@ -1082,11 +1066,14 @@ public class NifiRestClient implements AutoCloseable {
   /**
    * Parses a JSON response body, mapping malformed JSON to a fatal error. An empty body yields an
    * empty object (not {@code null}), so callers' {@code path(...)} chains degrade to a clean
-   * "returned no id" error instead of a {@link NullPointerException}.
+   * "returned no id" error instead of a {@link NullPointerException}. A non-JSON {@link
+   * IOException} (e.g. the connection dropping mid-read) is left undeclared-here, to propagate as
+   * the network error the caller's outer catch already classifies it as.
    */
-  private JsonNode readTree(Response response, String description) throws FatalAdapterException {
+  private JsonNode readTree(Response response, String description)
+      throws FatalAdapterException, IOException {
     try {
-      JsonNode node = mapper.readTree(response.readEntity(String.class));
+      JsonNode node = mapper.readTree(response.body().string());
       return node == null ? mapper.createObjectNode() : node;
     } catch (JsonProcessingException e) {
       throw new FatalAdapterException(AdapterErrorCode.NIFI_FLOW_ERROR, e, description);
@@ -1095,16 +1082,17 @@ public class NifiRestClient implements AutoCloseable {
 
   /**
    * POSTs without a body and returns the parsed response. NiFi's async-request endpoints take no
-   * body, but Jersey still needs an entity to carry the content type, hence the empty one.
+   * body, but a POST still needs one to carry the content type, hence the empty one.
    */
   private JsonNode post(String path, String description)
       throws FatalAdapterException, RetryableAdapterException {
     try (Response response =
         sendAuthorized(
-            () -> authorized(target(path)).post(Entity.entity("", MediaType.APPLICATION_JSON)))) {
+            () ->
+                execute(authorized(path).post(RequestBody.create("", OkHttpJson.JSON)).build()))) {
       check(response, description);
       return readTree(response, description);
-    } catch (ProcessingException e) {
+    } catch (IOException e) {
       throw network(description, e);
     }
   }
@@ -1112,14 +1100,22 @@ public class NifiRestClient implements AutoCloseable {
   private void put(String path, JsonNode body, String description)
       throws FatalAdapterException, RetryableAdapterException {
     try (Response response =
-        sendAuthorized(
-            () ->
-                authorized(target(path))
-                    .put(Entity.entity(body.toString(), MediaType.APPLICATION_JSON)))) {
+        sendAuthorized(() -> execute(authorized(path).put(jsonBody(body)).build()))) {
       check(response, description);
-    } catch (ProcessingException e) {
+    } catch (IOException e) {
       throw network(description, e);
     }
+  }
+
+  /** Serializes a JSON node to a request body. */
+  private static RequestBody jsonBody(JsonNode body) {
+    return RequestBody.create(body.toString(), OkHttpJson.JSON);
+  }
+
+  /** Builds the request. Declares {@link IOException} so the checked network failure propagates. */
+  @FunctionalInterface
+  private interface RequestSupplier {
+    Response get() throws IOException;
   }
 
   /**
@@ -1127,15 +1123,15 @@ public class NifiRestClient implements AutoCloseable {
    * refreshes the token once and replays it — the replayed request rebuilds the {@code
    * Authorization} header from the refreshed {@link #token}.
    */
-  private Response sendAuthorized(Supplier<Response> request)
-      throws FatalAdapterException, RetryableAdapterException {
+  private Response sendAuthorized(RequestSupplier request)
+      throws FatalAdapterException, RetryableAdapterException, IOException {
     Response response = request.get();
-    if (response.getStatus() == 401) {
+    if (response.code() == HttpURLConnection.HTTP_UNAUTHORIZED) {
       response.close();
       LOG.info("NiFi returned 401 — refreshing token and retrying once");
       this.token = tokenProvider.refreshToken();
       response = request.get();
-      if (response.getStatus() == 401) {
+      if (response.code() == HttpURLConnection.HTTP_UNAUTHORIZED) {
         response.close();
         // A freshly-refreshed Keycloak token is still rejected. This is transient while NiFi's OIDC
         // filter is still initialising at boot (kept retryable so a redelivery succeeds), but if it
@@ -1152,17 +1148,29 @@ public class NifiRestClient implements AutoCloseable {
     return response;
   }
 
-  private WebTarget target(String path) {
-    return client.target(baseUrl + path);
+  private HttpUrl url(String path) {
+    return HttpUrl.get(baseUrl + path);
   }
 
-  private Invocation.Builder authorized(WebTarget target) {
-    return target.request(MediaType.APPLICATION_JSON).header("Authorization", "Bearer " + token);
+  private Request.Builder authorized(HttpUrl url) {
+    return new Request.Builder()
+        .url(url)
+        .header("Accept", "application/json")
+        .header("Authorization", "Bearer " + token);
+  }
+
+  private Request.Builder authorized(String path) {
+    return authorized(url(path));
+  }
+
+  /** Executes an HTTP request, letting OkHttp's checked {@link IOException} propagate. */
+  private Response execute(Request request) throws IOException {
+    return client.newCall(request).execute();
   }
 
   private void check(Response response, String description)
       throws FatalAdapterException, RetryableAdapterException {
-    int status = response.getStatus();
+    int status = response.code();
     if (status >= 200 && status < 300) {
       return;
     }
@@ -1181,8 +1189,8 @@ public class NifiRestClient implements AutoCloseable {
 
   private static String safeBody(Response response) {
     try {
-      return response.hasEntity() ? response.readEntity(String.class) : "";
-    } catch (ProcessingException | IllegalStateException e) {
+      return response.body().string();
+    } catch (IOException e) {
       LOG.warn("Could not read NiFi error response body: {}", e.getMessage());
       return "<unreadable response body>";
     }
@@ -1212,13 +1220,14 @@ public class NifiRestClient implements AutoCloseable {
     return version.asLong();
   }
 
-  private static RetryableAdapterException network(String description, ProcessingException e) {
+  private static RetryableAdapterException network(String description, IOException e) {
     return new RetryableAdapterException(
         AdapterErrorCode.NETWORK_ERROR, "nifi", description + ": " + e.getMessage());
   }
 
   @Override
   public void close() {
-    client.close();
+    client.dispatcher().executorService().shutdown();
+    client.connectionPool().evictAll();
   }
 }
