@@ -1,6 +1,6 @@
 'use client'
 
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
 
@@ -12,14 +12,13 @@ import {
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
 import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
-import { BasicTooltip } from '@/components/tooltip/Tooltip'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { PipelineBasicInfo } from '@/types/datasets'
 import { DATASINK_TYPES } from '@/types/datasinks'
-import { formatDate } from '@/utils/formatDate'
+
+import { PipelineCard } from './PipelineCard'
 
 const getPipelineBadges = (dto: PipelineOutputDTO, datasourceConnectors: Map<string, string>): string[] => {
   const nodes = dto.styles?.nodes ?? []
@@ -49,11 +48,11 @@ interface PipelineListProps {
   datasetId: string
   pipelines: PipelineBasicInfo[]
   canCreatePipeline: boolean
+  canDeletePipeline: boolean
 }
 
-export const PipelineList = ({ datasetId, pipelines, canCreatePipeline }: PipelineListProps) => {
+export const PipelineList = ({ datasetId, pipelines, canCreatePipeline, canDeletePipeline }: PipelineListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.pipelines')
-  const locale = useLocale()
   const { hasPermission } = usePermissions()
   const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
   const { data: pipelinesData } = useGetPipelines(datasetId)
@@ -104,50 +103,17 @@ export const PipelineList = ({ datasetId, pipelines, canCreatePipeline }: Pipeli
       </div>
 
       {pipelines.length > 0 ? (
-        <ul className="mt-4 grid grid-cols-[auto_auto] justify-start gap-x-12 gap-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
           {pipelines.map(pipeline => (
-            <li key={pipeline.id} className="contents" data-testid={`pipelineRow-${pipeline.id}`}>
-              <GuardedLink
-                href={`/datasets/${datasetId}/data-flow/pipeline-editor?pipeline=${pipeline.id}`}
-                className="text-primary hover:underline text-sm font-normal self-center"
-              >
-                {pipeline.name}
-              </GuardedLink>
-              <div className="flex items-center gap-2 self-center" data-testid={`pipelineRowBadges-${pipeline.id}`}>
-                {pipeline.runtimeStatus?.state === 'ERROR' && (
-                  <BasicTooltip
-                    tooltipContent={
-                      <div className="space-y-2 text-left text-sm">
-                        <p>{pipeline.runtimeStatus.message ?? t('pipelineError')}</p>
-                        {pipeline.runtimeStatus.occurredAt && (
-                          <p>{formatDate(pipeline.runtimeStatus.occurredAt, locale)}</p>
-                        )}
-                        {pipeline.runtimeStatus.sanitizedStacktrace && (
-                          <pre className="max-h-48 max-w-[480px] overflow-auto whitespace-pre-wrap text-xs">
-                            {pipeline.runtimeStatus.sanitizedStacktrace}
-                          </pre>
-                        )}
-                      </div>
-                    }
-                  >
-                    <button
-                      type="button"
-                      aria-label={t('errorDetails', { name: pipeline.name })}
-                      className="text-destructive"
-                    >
-                      <Badge variant="destructive">{t('errorLabel')}</Badge>
-                    </button>
-                  </BasicTooltip>
-                )}
-                {(badgesByPipelineId.get(pipeline.id) ?? []).map(label => (
-                  <Badge key={label} variant="secondary">
-                    {label}
-                  </Badge>
-                ))}
-              </div>
-            </li>
+            <PipelineCard
+              key={pipeline.id}
+              datasetId={datasetId}
+              pipeline={pipeline}
+              badges={badgesByPipelineId.get(pipeline.id) ?? []}
+              canDelete={canDeletePipeline}
+            />
           ))}
-        </ul>
+        </div>
       ) : (
         <p className="mt-4 text-sm font-normal">{t('empty')}</p>
       )}

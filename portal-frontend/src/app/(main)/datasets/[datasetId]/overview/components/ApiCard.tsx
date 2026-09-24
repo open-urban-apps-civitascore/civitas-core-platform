@@ -123,7 +123,7 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
                 size="icon"
                 className="h-8 w-8 shrink-0"
                 data-testid={`apiCardMenu-${api.slug}`}
-                aria-label={api.name}
+                aria-label={t('menuLabel', { name: api.name })}
                 onClick={suppressCardNavigation}
               >
                 <MoreVertical className="h-4 w-4" />
