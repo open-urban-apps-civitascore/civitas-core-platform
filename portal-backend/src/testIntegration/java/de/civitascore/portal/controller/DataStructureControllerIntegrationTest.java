@@ -1,6 +1,7 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
@@ -17,6 +18,7 @@ import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
+import de.civitascore.portal.model.output.summary.DataStructureVersionUsageSummaryDTO;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.List;
@@ -1018,6 +1020,39 @@ class DataStructureControllerIntegrationTest
       assertThat(response.getBody().isInUseByReleased())
           .as("inUseByReleased should be true when an AVAILABLE DataSource pins a version")
           .isTrue();
+    }
+
+    @Test
+    @DisplayName("Should report inUse and inUseByReleased on each version row")
+    void shouldReportUsageOnEachVersionRow() {
+      DataStructure ds =
+          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion releasedUse =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      DataStructureVersion draftUse =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      DataStructureVersion unused =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.DRAFT));
+      portalData.dataSource(
+          b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE).dataStructureVersion(releasedUse));
+      portalData.dataSource(
+          b -> b.dataSourceStatus(DataSourceStatus.DRAFT).dataStructureVersion(draftUse));
+
+      ResponseEntity<DataStructureOutputDTO> response = performGetById(ds.getId());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDataStructureVersions())
+          .extracting(
+              DataStructureVersionUsageSummaryDTO::getId,
+              DataStructureVersionUsageSummaryDTO::isInUse,
+              DataStructureVersionUsageSummaryDTO::isInUseByReleased)
+          .containsExactlyInAnyOrder(
+              tuple(releasedUse.getId(), true, true),
+              tuple(draftUse.getId(), true, false),
+              tuple(unused.getId(), false, false));
     }
 
     @Test

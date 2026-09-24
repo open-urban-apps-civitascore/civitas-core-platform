@@ -29,6 +29,7 @@ import de.civitascore.portal.service.ArtifactUsageLookup.ArtifactUsage;
 import de.civitascore.portal.service.ArtifactUsageLookup.ReferrerKind;
 import de.civitascore.portal.service.ArtifactUsageLookup.ReleasedReferrer;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -386,6 +387,43 @@ class ArtifactUsageLookupTest {
 
       assertThat(usage.inUseByReleased()).isTrue();
       verify(modelRegistryGateway, never()).referencesTo(draft.getModelUrn());
+    }
+
+    @Test
+    @DisplayName("Each version is answered by its own referrers")
+    void ofEachVersion_answersEachVersionSeparately() {
+      DataStructure structure = new DataStructure();
+      structure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      DataStructureVersion released = new DataStructureVersion();
+      released.setId(UUID.randomUUID());
+      released.setModelUrn(MODEL_URN);
+      released.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      released.setDataStructure(structure);
+      DataStructureVersion draft = new DataStructureVersion();
+      draft.setId(UUID.randomUUID());
+      draft.setModelUrn("urn:core:platform:civitas:element:common:Reading:8kq2n4p1vd:2.0.0");
+      draft.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      draft.setDataStructure(structure);
+      DataStructureVersion unused = new DataStructureVersion();
+      unused.setId(UUID.randomUUID());
+      unused.setModelUrn("urn:core:platform:civitas:element:common:Reading:8kq2n4p1vd:3.0.0");
+      unused.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      unused.setDataStructure(structure);
+      structure.setDataStructureVersions(Set.of(released, draft, unused));
+
+      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
+      when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(
+              Set.of(SINK_URN), DataSetStatus.AVAILABLE))
+          .thenReturn(List.of(new ReferrerReleaseState(SINK_URN, true)));
+      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(draft.getId())))
+          .thenReturn(true);
+
+      Map<UUID, ArtifactUsage> usageByVersion = lookup.ofEachVersion(structure);
+
+      assertThat(usageByVersion.get(released.getId()).inUseByReleased()).isTrue();
+      assertThat(usageByVersion.get(draft.getId()).inUse()).isTrue();
+      assertThat(usageByVersion.get(draft.getId()).inUseByReleased()).isFalse();
+      assertThat(usageByVersion.get(unused.getId()).inUse()).isFalse();
     }
   }
 }

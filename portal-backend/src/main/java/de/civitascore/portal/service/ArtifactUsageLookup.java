@@ -72,14 +72,19 @@ public class ArtifactUsageLookup {
    */
   public record ArtifactUsage(boolean inUse, List<ReleasedReferrer> releasedReferrers) {
 
-    private static final ArtifactUsage UNUSED = new ArtifactUsage(false, List.of());
-
     public ArtifactUsage {
       releasedReferrers = List.copyOf(releasedReferrers);
     }
 
     public boolean inUseByReleased() {
       return !releasedReferrers.isEmpty();
+    }
+
+    /** The usage of several artifacts taken together; unused when there are none. */
+    public static ArtifactUsage anyOf(Collection<ArtifactUsage> usages) {
+      return new ArtifactUsage(
+          usages.stream().anyMatch(ArtifactUsage::inUse),
+          usages.stream().flatMap(usage -> usage.releasedReferrers().stream()).distinct().toList());
     }
 
     /**
@@ -145,61 +150,56 @@ public class ArtifactUsageLookup {
 
   /** How one Data structure version is used. */
   public ArtifactUsage of(DataStructureVersion version) {
-    return ofVersions(version.getDataStructure(), List.of(version));
+    return ofVersion(version.getDataStructure(), version);
   }
 
   /** How a Data structure is used: through any of its versions. */
   public ArtifactUsage of(DataStructure dataStructure) {
-    return ofVersions(dataStructure, dataStructure.getDataStructureVersions());
+    return ArtifactUsage.anyOf(ofEachVersion(dataStructure).values());
   }
 
-  private ArtifactUsage ofVersions(
-      DataStructure dataStructure, Collection<DataStructureVersion> versions) {
-    if (versions == null || versions.isEmpty()) {
-      return ArtifactUsage.UNUSED;
+  /** How each version of a Data structure is used, keyed by version id. */
+  public Map<UUID, ArtifactUsage> ofEachVersion(DataStructure dataStructure) {
+    Map<UUID, ArtifactUsage> usageByVersion = new LinkedHashMap<>();
+    if (dataStructure.getDataStructureVersions() != null) {
+      dataStructure
+          .getDataStructureVersions()
+          .forEach(version -> usageByVersion.put(version.getId(), ofVersion(dataStructure, version)));
     }
-    Set<UUID> versionIds = idsOf(versions);
-    List<DataStructureVersion> released =
+    return usageByVersion;
+  }
+
+  private ArtifactUsage ofVersion(DataStructure dataStructure, DataStructureVersion version) {
+    boolean released =
         dataStructure.getDataStructureStatus() == DataStructureStatus.AVAILABLE
-            ? versions.stream()
-                .filter(
-                    v -> v.getDataStructureVersionStatus() == DataStructureVersionStatus.AVAILABLE)
-                .toList()
-            : List.of();
-    if (released.isEmpty()) {
-      return new ArtifactUsage(isReferenced(versionIds, versions), List.of());
+            && version.getDataStructureVersionStatus() == DataStructureVersionStatus.AVAILABLE;
+    if (!released) {
+      return new ArtifactUsage(isReferenced(version), List.of());
     }
 
     List<String> registryReferrers =
-        released.stream()
-            .map(DataStructureVersion::getModelUrn)
-            .map(modelRegistryGateway::referencesTo)
-            .flatMap(List::stream)
-            .distinct()
-            .toList();
+        modelRegistryGateway.referencesTo(version.getModelUrn()).stream().distinct().toList();
     List<ReleasedReferrer> releasedReferrers = new ArrayList<>();
     dataSourceRepository
-        .findIdsByDataStructureVersionIdInAndStatus(idsOf(released), DataSourceStatus.AVAILABLE)
+        .findIdsByDataStructureVersionIdInAndStatus(
+            Set.of(version.getId()), DataSourceStatus.AVAILABLE)
         .forEach(
             id ->
                 releasedReferrers.add(
                     new ReleasedReferrer(ReferrerKind.DATA_SOURCE, id.toString())));
     releasedReferrers.addAll(releasedAmong(registryReferrers, true));
 
-    if (!releasedReferrers.isEmpty() || !registryReferrers.isEmpty()) {
-      return new ArtifactUsage(true, releasedReferrers);
-    }
-    List<DataStructureVersion> drafts =
-        versions.stream().filter(version -> !released.contains(version)).toList();
-    return new ArtifactUsage(isReferenced(versionIds, drafts), List.of());
+    boolean inUse =
+        !releasedReferrers.isEmpty()
+            || !registryReferrers.isEmpty()
+            || dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(version.getId()));
+    return new ArtifactUsage(inUse, releasedReferrers);
   }
 
-  /** Whether a data source is pinned to any of the versions or the registry holds a reference. */
-  private boolean isReferenced(Set<UUID> versionIds, Collection<DataStructureVersion> registryOf) {
-    return dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
-        || registryOf.stream()
-            .map(DataStructureVersion::getModelUrn)
-            .anyMatch(modelRegistryGateway::isReferenced);
+  /** Whether a data source is pinned to the version or the registry holds a reference. */
+  private boolean isReferenced(DataStructureVersion version) {
+    return dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(version.getId()))
+        || modelRegistryGateway.isReferenced(version.getModelUrn());
   }
 
   /**
@@ -336,11 +336,5 @@ public class ArtifactUsageLookup {
     Map<String, String> identity = new LinkedHashMap<>();
     urns.forEach(urn -> identity.put(urn, urn));
     return identity;
-  }
-
-  private static Set<UUID> idsOf(Collection<DataStructureVersion> versions) {
-    Set<UUID> ids = new LinkedHashSet<>();
-    versions.forEach(version -> ids.add(version.getId()));
-    return ids;
   }
 }
