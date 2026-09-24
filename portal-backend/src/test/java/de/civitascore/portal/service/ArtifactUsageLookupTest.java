@@ -77,9 +77,6 @@ class ArtifactUsageLookupTest {
     lenient()
         .when(modelRegistryGateway.artifactType(anyString()))
         .thenAnswer(inv -> inv.<String>getArgument(0).split(":")[4]);
-    lenient()
-        .when(modelRegistryGateway.dataStructureUrnOf(anyString()))
-        .thenAnswer(inv -> inv.<String>getArgument(0).replace(":element:", ":datastructure:"));
   }
 
   private static DataSource dataSource(DataSourceStatus status) {
@@ -308,14 +305,34 @@ class ArtifactUsageLookupTest {
     void elementOfReleasedStructure_isInUseByReleased() {
       DataStructureVersion version = releasedVersion();
       when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(ELEMENT_URN));
+      when(modelRegistryGateway.hostModelUrnsOf(ELEMENT_URN))
+          .thenReturn(Set.of(ELEMENT_URN, STRUCTURE_URN));
       when(dataStructureRepository.findReleaseStatesByModelLogicalUrnIn(
-              Set.of(STRUCTURE_URN), DataStructureStatus.AVAILABLE))
+              Set.of(ELEMENT_URN, STRUCTURE_URN), DataStructureStatus.AVAILABLE))
           .thenReturn(List.of(new ReferrerReleaseState(STRUCTURE_URN, true)));
 
       ArtifactUsage usage = lookup.of(version);
 
       assertThat(usage.releasedReferrers())
           .containsExactly(new ReleasedReferrer(ReferrerKind.DATA_STRUCTURE, ELEMENT_URN));
+    }
+
+    // Without this a DRAFT host found under one candidate URN would still block the unrelease.
+    @Test
+    @DisplayName("An element whose only host row is DRAFT is not released")
+    void elementOfDraftStructure_isNotReleased() {
+      DataStructureVersion version = releasedVersion();
+      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(ELEMENT_URN));
+      when(modelRegistryGateway.hostModelUrnsOf(ELEMENT_URN))
+          .thenReturn(Set.of(ELEMENT_URN, STRUCTURE_URN));
+      when(dataStructureRepository.findReleaseStatesByModelLogicalUrnIn(
+              Set.of(ELEMENT_URN, STRUCTURE_URN), DataStructureStatus.AVAILABLE))
+          .thenReturn(List.of(new ReferrerReleaseState(ELEMENT_URN, false)));
+
+      ArtifactUsage usage = lookup.of(version);
+
+      assertThat(usage.inUse()).isTrue();
+      assertThat(usage.inUseByReleased()).isFalse();
     }
 
     // Without this the unrelease would pass for a referrer the platform cannot judge.

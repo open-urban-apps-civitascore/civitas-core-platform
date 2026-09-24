@@ -240,6 +240,66 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
           .extracting(ArtifactUsageLookup.ReleasedReferrer::kind)
           .containsExactly(ReferrerKind.MAPPING);
     }
+
+    @Test
+    @DisplayName(
+        "a structure referencing a version from a nested element releases it only when AVAILABLE")
+    void structureReferencingFromNestedElement_followsItsStatus() {
+      DataStructureVersion version = releasedVersion("Reading");
+      Map<String, Object> model = portalData.dataStructureVersionModel("NestedHost");
+      model.put("properties", Map.of("id", Map.of("type", "string")));
+      model.put(
+          "$defs",
+          Map.of(
+              "Measurement",
+              Map.of(
+                  "type",
+                  "object",
+                  "properties",
+                  Map.of("reading", Map.of("$ref", version.getModelUrn())))));
+      DataStructure referrer = structureWithModel(DataStructureStatus.DRAFT, model);
+
+      assertThat(usageOf(version).inUse()).isTrue();
+      assertThat(usageOf(version).inUseByReleased()).isFalse();
+
+      withStatus(referrer, DataStructureStatus.AVAILABLE);
+
+      assertThat(usageOf(version).releasedReferrers())
+          .extracting(ArtifactUsageLookup.ReleasedReferrer::kind)
+          .containsExactly(ReferrerKind.DATA_STRUCTURE);
+    }
+
+    @Test
+    @DisplayName(
+        "a structure referencing a version from its root element releases it only when AVAILABLE")
+    void structureReferencingFromRootElement_followsItsStatus() {
+      DataStructureVersion version = releasedVersion("Reading");
+      Map<String, Object> model = portalData.dataStructureVersionModel("RootHost");
+      model.put("properties", Map.of("reading", Map.of("$ref", version.getModelUrn())));
+      DataStructure referrer = structureWithModel(DataStructureStatus.DRAFT, model);
+
+      assertThat(usageOf(version).inUse()).isTrue();
+      assertThat(usageOf(version).inUseByReleased()).isFalse();
+
+      withStatus(referrer, DataStructureStatus.AVAILABLE);
+
+      assertThat(usageOf(version).releasedReferrers())
+          .extracting(ArtifactUsageLookup.ReleasedReferrer::kind)
+          .containsExactly(ReferrerKind.DATA_STRUCTURE);
+    }
+  }
+
+  private DataStructure structureWithModel(DataStructureStatus status, Map<String, Object> model) {
+    DataStructure structure = portalData.dataStructure(b -> b.dataStructureStatus(status));
+    DataStructureVersion version = portalData.dataStructureVersion(structure);
+    portalData.attachModel(version, model);
+    return dataStructureRepository.findById(structure.getId()).orElseThrow();
+  }
+
+  private DataStructure withStatus(DataStructure structure, DataStructureStatus status) {
+    DataStructure reloaded = dataStructureRepository.findById(structure.getId()).orElseThrow();
+    reloaded.setDataStructureStatus(status);
+    return dataStructureRepository.save(reloaded);
   }
 
   @Nested

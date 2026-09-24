@@ -17,6 +17,7 @@ import de.civitascore.portal.util.ResourceInUseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -257,13 +258,13 @@ public class ArtifactUsageLookup {
       }
     }
     if (!structureReferrers.isEmpty()) {
-      Map<String, String> hostByReferrer = new LinkedHashMap<>();
+      Map<String, Set<String>> hostsByReferrer = new LinkedHashMap<>();
       structureReferrers.forEach(
-          urn -> hostByReferrer.put(urn, modelRegistryGateway.dataStructureUrnOf(urn)));
+          urn -> hostsByReferrer.put(urn, modelRegistryGateway.hostModelUrnsOf(urn)));
       released.addAll(
           releasedRows(
               ReferrerKind.DATA_STRUCTURE,
-              hostByReferrer,
+              hostsByReferrer,
               found ->
                   dataStructureRepository.findReleaseStatesByModelLogicalUrnIn(
                       found, DataStructureStatus.AVAILABLE)));
@@ -292,22 +293,30 @@ public class ArtifactUsageLookup {
   }
 
   /**
-   * The referrers whose host row is released, plus those with no host row.
+   * The referrers with a released host row, plus those with no host row at all.
    *
-   * @param hostByReferrer each referrer's URN mapped to the logical URN its host row is found by
+   * @param hostsByReferrer each referrer's URN mapped to the logical URNs its host row may be found
+   *     by
    */
   private List<ReleasedReferrer> releasedRows(
       ReferrerKind kind,
-      Map<String, String> hostByReferrer,
+      Map<String, Set<String>> hostsByReferrer,
       Function<Collection<String>, List<ReferrerReleaseState>> lookup) {
+    Set<String> allHosts = new HashSet<>();
+    hostsByReferrer.values().forEach(allHosts::addAll);
     Map<String, Boolean> releasedByHost = new HashMap<>();
-    for (ReferrerReleaseState state : lookup.apply(Set.copyOf(hostByReferrer.values()))) {
+    for (ReferrerReleaseState state : lookup.apply(allHosts)) {
       releasedByHost.merge(state.logicalUrn(), state.released(), Boolean::logicalOr);
     }
     List<ReleasedReferrer> released = new ArrayList<>();
-    hostByReferrer.forEach(
-        (referrer, host) -> {
-          Boolean state = releasedByHost.get(host);
+    hostsByReferrer.forEach(
+        (referrer, hosts) -> {
+          Boolean state =
+              hosts.stream()
+                  .map(releasedByHost::get)
+                  .filter(Objects::nonNull)
+                  .reduce(Boolean::logicalOr)
+                  .orElse(null);
           if (state == null) {
             released.addAll(unknown(List.of(referrer)));
           } else if (state) {
@@ -329,9 +338,9 @@ public class ArtifactUsageLookup {
         .toList();
   }
 
-  private static Map<String, String> identity(List<String> urns) {
-    Map<String, String> identity = new LinkedHashMap<>();
-    urns.forEach(urn -> identity.put(urn, urn));
+  private static Map<String, Set<String>> identity(List<String> urns) {
+    Map<String, Set<String>> identity = new LinkedHashMap<>();
+    urns.forEach(urn -> identity.put(urn, Set.of(urn)));
     return identity;
   }
 }
