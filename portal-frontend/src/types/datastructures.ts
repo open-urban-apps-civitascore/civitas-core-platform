@@ -176,7 +176,6 @@ export const DatastructureCreateDataSchema = z.object({
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
   createdFromDataSource: z.boolean(),
   description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
-  dataStructureVersionIds: z.array(z.string()).optional(),
   assignments: z.array(AssignmentSchema).optional(),
 })
 
