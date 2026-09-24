@@ -33,8 +33,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Answers, for a Data source, a Data structure or a Data structure version, whether anything
- * references it and whether a released entity does. The first decides the delete; the second
- * decides the unrelease and which fields a released artifact may still change.
+ * references it and whether a released entity does. The first is only reported; the second decides
+ * the unrelease and which fields a released artifact may still change.
  *
  * <p>Only direct referrers are judged. Releasing an entity requires everything it references to be
  * released, so a DRAFT artifact has no released referrer and is answered without classifying one. A
@@ -91,7 +91,7 @@ public class ArtifactUsageLookup {
      * Refuses the unrelease of the artifact while a released entity references it.
      *
      * @throws ResourceInUseException if there is a released referrer; its message names what the
-     *     first one is, and the referrers' ids go to the log only
+     *     first one is
      */
     public void requireNoReleasedReferrer(String resourceType, UUID resourceId) {
       if (!inUseByReleased()) {
@@ -113,7 +113,7 @@ public class ArtifactUsageLookup {
    * A released entity that references the artifact.
    *
    * @param kind what the referrer is
-   * @param reference its id or CORE URN; logged, never returned to a caller
+   * @param reference its id or CORE URN
    */
   public record ReleasedReferrer(ReferrerKind kind, String reference) {}
 
@@ -198,7 +198,7 @@ public class ArtifactUsageLookup {
     return new ArtifactUsage(inUse, releasedReferrers);
   }
 
-  /** Whether a data source is pinned to the version or the registry holds a reference. */
+  /** A Data source pins a version by a portal column, which the model registry does not see. */
   private boolean isReferenced(DataStructureVersion version) {
     return dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(version.getId()))
         || modelRegistryGateway.isReferenced(version.getModelUrn());

@@ -106,13 +106,14 @@ public class DataStructureVersionService
    * Validates and constrains update input based on the version's current state. If the version is
    * released and a released entity references it, structural fields (model, styles) are locked and
    * only description and modelName may change — the input's model/styles are nulled so no new
-   * registry version is stored and the existing pin is preserved. A released version that is not in
-   * use may have its model replaced but never cleared — it must always retain a non-empty model. A
-   * reference from a draft does not lock it.
+   * registry version is stored and the existing pin is preserved. A released version that no
+   * released entity references may have its model replaced but never cleared — it must always
+   * retain a non-empty model.
    *
    * @param input the update input
    * @param existingEntity the current version entity
-   * @return the preprocessed input with restricted fields neutralized if in use
+   * @return the preprocessed input, its structural fields neutralized while a released entity
+   *     references the version
    * @throws InvalidInputException if an update to a released version would clear its model
    */
   @Override
@@ -122,16 +123,9 @@ public class DataStructureVersionService
         existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT;
 
     if (isReleased && artifactUsageLookup.of(existingEntity).inUseByReleased()) {
-      // Released work depends on this version: block all structural changes, allow only description
-      // and modelName.
-      // An absent model means "content unchanged" — no registry write happens, the version keeps
-      // its stored pin (modelUrn/version stay untouched; they are not mapped from the input).
       input.setModel(null);
       input.setStyles(null);
     } else if (isReleased && (input.getModel() == null || input.getModel().isEmpty())) {
-      // Released and no released work depends on it: the model may be replaced, but never cleared —
-      // a released
-      // version must always retain a non-empty model, so the full update must carry one.
       throw new InvalidInputException(
           "model",
           existingEntity.getId(),

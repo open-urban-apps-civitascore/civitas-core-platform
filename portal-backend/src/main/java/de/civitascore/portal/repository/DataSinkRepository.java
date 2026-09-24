@@ -32,10 +32,6 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
 
   boolean existsByDataSetIdAndDataSinkType(UUID dataSetId, DataSinkType dataSinkType);
 
-  // A sink names the version's model in its registry-stored configuration ("element" field) rather
-  // than in a relational column, so the in-use guard asks Model Forge what would refuse the model's
-  // deletion (ModelRegistryGateway#isReferenced) instead of querying this table.
-
   /** Whether each sink's Dataset has the given status, keyed by the sink's logical URN. */
   @Query(
       "SELECT new de.civitascore.portal.repository.ReferrerReleaseState(s.configurationLogicalUrn,"

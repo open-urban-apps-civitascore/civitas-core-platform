@@ -198,7 +198,7 @@ public class ModelRegistryGateway {
   /**
    * Whether anything outside the model still references it — a DataSource or DataSink carrying one
    * of its Elements, a Mapping naming one as an endpoint, another model associating with one, or
-   * membership of a second DataSet. Gates the delete and the unrelease of a DataStructure alike.
+   * membership of a second DataSet.
    *
    * @param modelUrn versioned or logical CORE URN of the model; null/blank yields {@code false}
    * @return true while at least one reference stands in the way of deleting the model
