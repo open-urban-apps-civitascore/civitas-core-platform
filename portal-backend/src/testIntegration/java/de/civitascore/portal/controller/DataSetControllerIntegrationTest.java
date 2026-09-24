@@ -13,7 +13,6 @@ import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
-import de.civitascore.portal.model.embedded.ProvisioningStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
@@ -2163,8 +2162,7 @@ class DataSetControllerIntegrationTest
 
       DataSet persisted = dataSetRepository.findById(dataSetId).orElseThrow();
       assertThat(persisted.isProvisioned()).isTrue();
-      assertThat(dataSinkRepository.findById(sinkId).orElseThrow().getProvisioningStatus())
-          .isEqualTo(ProvisioningStatus.PROVISIONED);
+      assertThat(dataSinkRepository.findById(sinkId).orElseThrow().isProvisioned()).isTrue();
     }
   }
 

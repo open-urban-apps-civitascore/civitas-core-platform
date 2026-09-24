@@ -1,7 +1,6 @@
 package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.DataSinkType;
-import de.civitascore.portal.model.embedded.ProvisioningStatus;
 import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -70,9 +69,8 @@ public class DataSink extends DataSetOwnedEntity {
    * Set by a completed provisioning saga and never reset: the resource survives an unrelease, and
    * the row goes when the sink or its dataset is deleted.
    */
-  @Enumerated(EnumType.STRING)
-  @Column(name = "provisioning_status", nullable = false, length = 20)
-  @NotNull private ProvisioningStatus provisioningStatus = ProvisioningStatus.NOT_PROVISIONED;
+  @Column(name = "provisioned", nullable = false)
+  private boolean provisioned = false;
 
   /** A Layer's {@code datasink_id} is non-null, so layers cannot outlive their sink. */
   @OneToMany(

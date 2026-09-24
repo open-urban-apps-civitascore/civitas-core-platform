@@ -8,7 +8,6 @@ import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
-import de.civitascore.portal.model.embedded.ProvisioningStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -146,26 +145,25 @@ class DataSinkControllerIntegrationTest
       assertThat(body.getPipelineId()).isNull();
       assertThat(body.isInUseByPipeline()).isFalse();
       assertThat(body.isInUseByLayer()).isFalse();
-      assertThat(body.getProvisioningStatus()).isEqualTo(ProvisioningStatus.NOT_PROVISIONED);
+      assertThat(body.isProvisioned()).isFalse();
     }
 
     @Test
-    @DisplayName("Should report the provisioning status of a provisioned DataSink")
-    void shouldReportProvisionedStatus() {
+    @DisplayName("Should report a provisioned DataSink as provisioned")
+    void shouldReportProvisionedFlag() {
       ensureTestData();
       DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
       DataSink sink = new DataSink();
       sink.setDataSet(dataSet);
       sink.setDataSinkType(DataSinkType.FROST);
-      sink.setProvisioningStatus(ProvisioningStatus.PROVISIONED);
+      sink.setProvisioned(true);
       UUID id = dataSinkRepository.save(sink).getId();
 
       ResponseEntity<DataSinkOutputDTO> response = performGetById(id);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getProvisioningStatus())
-          .isEqualTo(ProvisioningStatus.PROVISIONED);
+      assertThat(response.getBody().isProvisioned()).isTrue();
     }
 
     @Test
@@ -604,11 +602,11 @@ class DataSinkControllerIntegrationTest
     }
 
     /**
-     * A status a client could reset would skip the data-loss confirmation for a table that exists.
+     * A flag a client could reset would skip the data-loss confirmation for a table that exists.
      */
     @Test
-    @DisplayName("PATCH cannot reset the provisioning status of a provisioned DataSink")
-    void patchKeepsProvisioningStatus() {
+    @DisplayName("PATCH cannot reset the provisioned flag of a DataSink")
+    void patchKeepsProvisionedFlag() {
       ensureTestData();
       var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
       DataStructureVersion dsv =
@@ -620,7 +618,7 @@ class DataSinkControllerIntegrationTest
       DataSink sink = new DataSink();
       sink.setDataSet(dataSet);
       sink.setDataSinkType(DataSinkType.POSTGIS);
-      sink.setProvisioningStatus(ProvisioningStatus.PROVISIONED);
+      sink.setProvisioned(true);
       sink = dataSinkRepository.save(sink);
       UUID id =
           portalData
@@ -629,7 +627,7 @@ class DataSinkControllerIntegrationTest
               .getId();
 
       Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("provisioningStatus", "NOT_PROVISIONED");
+      patchMap.put("provisioned", false);
       patchMap.put(
           "configuration", Map.of("tableName", "original_table", "element", dsv.getModelUrn()));
 
@@ -637,10 +635,8 @@ class DataSinkControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getProvisioningStatus())
-          .isEqualTo(ProvisioningStatus.PROVISIONED);
-      assertThat(dataSinkRepository.findById(id).orElseThrow().getProvisioningStatus())
-          .isEqualTo(ProvisioningStatus.PROVISIONED);
+      assertThat(response.getBody().isProvisioned()).isTrue();
+      assertThat(dataSinkRepository.findById(id).orElseThrow().isProvisioned()).isTrue();
     }
 
     @Test

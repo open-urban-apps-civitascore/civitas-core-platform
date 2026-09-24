@@ -7,7 +7,6 @@ import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
-import de.civitascore.portal.model.embedded.ProvisioningStatus;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
@@ -960,7 +959,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   private void markProvisioned(DataSet dataSet) {
     dataSet.setProvisioned(true);
     for (DataSink sink : dataSinkRepository.findByDataSetId(dataSet.getId())) {
-      sink.setProvisioningStatus(ProvisioningStatus.PROVISIONED);
+      sink.setProvisioned(true);
       dataSinkRepository.save(sink);
     }
   }

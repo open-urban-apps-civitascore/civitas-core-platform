@@ -25,7 +25,7 @@ public class DataSinkInputDTO extends DataSetOwnedInputDTO {
   @Schema(
       description =
           "Acknowledges that this update rebuilds the sink's table and discards all stored data."
-              + " Required (true) when tableName or the referenced element changes on a sink"
-              + " whose provisioningStatus is PROVISIONED; ignored otherwise.")
+              + " Required (true) when tableName or the referenced element changes on a"
+              + " provisioned sink; ignored otherwise.")
   private boolean confirmDataLoss;
 }

@@ -2,7 +2,6 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
-import de.civitascore.portal.model.embedded.ProvisioningStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -131,8 +130,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
    * immutable — a different model always yields a different URN.
    */
   private void requireDataLossConfirmation(DataSinkInputDTO input, DataSink existingEntity) {
-    if (input.isConfirmDataLoss()
-        || existingEntity.getProvisioningStatus() != ProvisioningStatus.PROVISIONED) {
+    if (input.isConfirmDataLoss() || !existingEntity.isProvisioned()) {
       return;
     }
 

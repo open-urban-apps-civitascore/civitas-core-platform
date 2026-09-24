@@ -17,7 +17,6 @@ import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
-import de.civitascore.portal.model.embedded.ProvisioningStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -738,8 +737,7 @@ class DataSinkServiceTest {
       sink.setId(UUID.randomUUID());
       sink.setDataSet(ds);
       sink.setDataSinkType(DataSinkType.POSTGIS);
-      sink.setProvisioningStatus(
-          provisioned ? ProvisioningStatus.PROVISIONED : ProvisioningStatus.NOT_PROVISIONED);
+      sink.setProvisioned(provisioned);
       sink.setConfigurationUrn(STORED_VERSIONED_URN);
       lenient()
           .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
@@ -766,8 +764,7 @@ class DataSinkServiceTest {
       sink.setId(UUID.randomUUID());
       sink.setDataSet(ds);
       sink.setDataSinkType(DataSinkType.FROST);
-      sink.setProvisioningStatus(
-          provisioned ? ProvisioningStatus.PROVISIONED : ProvisioningStatus.NOT_PROVISIONED);
+      sink.setProvisioned(provisioned);
       sink.setConfigurationUrn(STORED_VERSIONED_URN);
       lenient()
           .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))

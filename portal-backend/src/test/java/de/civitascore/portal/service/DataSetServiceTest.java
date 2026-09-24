@@ -25,7 +25,6 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
-import de.civitascore.portal.model.embedded.ProvisioningStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -1652,9 +1651,7 @@ class DataSetServiceTest {
               new SagaResultPayload(
                   id.toString(), null, null, null, null, null, null, null, null, null));
 
-      assertThat(List.of(postgis, frost))
-          .extracting(DataSink::getProvisioningStatus)
-          .containsOnly(ProvisioningStatus.PROVISIONED);
+      assertThat(List.of(postgis, frost)).extracting(DataSink::isProvisioned).containsOnly(true);
       verify(dataSinkRepository).save(postgis);
       verify(dataSinkRepository).save(frost);
     }

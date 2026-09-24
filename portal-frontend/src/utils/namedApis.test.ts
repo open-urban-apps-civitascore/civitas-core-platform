@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { STATUS_TYPES } from '@/types/common'
-import { DataSink, DATASINK_TYPES, PROVISIONING_STATUSES } from '@/types/datasinks'
+import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
 import { LayerFormData } from '@/types/layers'
 
@@ -32,7 +32,7 @@ const makeDataSink = (): DataSink => ({
   datasetId: '00000000-0000-0000-0000-000000000020',
   pipelineId: '00000000-0000-0000-0000-000000000030',
   dataSinkType: DATASINK_TYPES.POSTGIS,
-  provisioningStatus: PROVISIONING_STATUSES.NOT_PROVISIONED,
+  provisioned: false,
   configuration: {
     tableName: 'my_table',
     dataStructureVersion: {
