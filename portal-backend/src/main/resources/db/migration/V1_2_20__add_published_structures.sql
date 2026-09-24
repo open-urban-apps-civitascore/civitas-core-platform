@@ -8,7 +8,9 @@
 -- changed; the stored artifact cannot be compared directly, because the registry splits it into
 -- its member Elements and stamps its own self-description on it.
 
-CREATE TABLE published_structures
+-- IF NOT EXISTS: this migration was numbered 1.2.19 before develop took that number, and a
+-- development database may hold the table already.
+CREATE TABLE IF NOT EXISTS published_structures
 (
     id            UUID                        NOT NULL,
     created_at    TIMESTAMP WITHOUT TIME ZONE NOT NULL,
