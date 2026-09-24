@@ -53,10 +53,7 @@ public final class MqttSourceStage implements SourceStage {
 
   private static final String MQTT_SSL_CONTEXT_REFERENCE = "${CS:" + MQTT_SSL_CONTEXT_SERVICE + "}";
 
-  /**
-   * Alphanumeric only: with the 10-character disambiguator the client id stays within the 23
-   * characters of [0-9a-zA-Z] that every broker must accept [MQTT-3.1.3-5].
-   */
+  /** Alphanumeric only, to stay within the client ids every broker must accept [MQTT-3.1.3-5]. */
   private static final String CLIENT_ID_PREFIX = "civitascore";
 
   private static final Set<String> PLAINTEXT_SCHEMES = Set.of("tcp", "ws", "mqtt");
