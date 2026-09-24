@@ -16,18 +16,28 @@ package de.civitascore.nifi.frost.batch;
  * @param entity the entity that failed, or null when the record was written
  * @param status the HTTP status of the failing sub-request, or 0 when no sub-request ran
  * @param message the reason FROST gave, or the reason this processor derived
+ * @param retryable whether the same record may succeed later without a change: a parent another
+ *     Pipeline has not written yet, or a server that could not answer. A record that is wrong
+ *     itself is not retryable — sending it again gives the same answer.
  */
-public record RecordOutcome(int recordIndex, String entity, int status, String message) {
+public record RecordOutcome(
+    int recordIndex, String entity, int status, String message, boolean retryable) {
 
   /** The longest reason kept. A FROST stack trace must not become a FlowFile attribute. */
   private static final int MESSAGE_LIMIT = 1024;
 
   public static RecordOutcome written(int recordIndex) {
-    return new RecordOutcome(recordIndex, null, 0, null);
+    return new RecordOutcome(recordIndex, null, 0, null, false);
   }
 
+  /** A record that will fail the same way again: the error sink is its place. */
   public static RecordOutcome failed(int recordIndex, String entity, int status, String message) {
-    return new RecordOutcome(recordIndex, entity, status, truncate(message));
+    return new RecordOutcome(recordIndex, entity, status, truncate(message), false);
+  }
+
+  /** A record that failed for a reason outside it, and may succeed when it comes again. */
+  public static RecordOutcome retry(int recordIndex, String entity, int status, String message) {
+    return new RecordOutcome(recordIndex, entity, status, truncate(message), true);
   }
 
   public boolean successful() {

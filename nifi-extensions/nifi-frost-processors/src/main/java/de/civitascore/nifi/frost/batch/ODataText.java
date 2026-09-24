@@ -9,51 +9,35 @@
  */
 package de.civitascore.nifi.frost.batch;
 
-import java.nio.charset.StandardCharsets;
-
 /**
  * Renders record values into the URL of a sub-request. Every value that reaches a {@code $filter}
- * or a path segment passes through here: a reference carrying a quotation mark must not end the
- * literal and start a new filter term.
+ * passes through here: a reference carrying a quotation mark must not end the literal and start a
+ * new filter term.
+ *
+ * <p>The value is <b>not</b> percent-encoded. A sub-request URL of a batch document never passes a
+ * URL decoder — FROST decodes the query string of an HTTP request, but hands the URL of a batch
+ * item to the query parser as it stands — so an escape would reach the comparison as its own
+ * characters and the filter would look for a value nobody stored.
+ *
+ * <p>One character stays out of reach: a value carrying a {@code ?} splits the sub-request URL at
+ * the wrong place, and FROST answers that sub-request with a path error. The record then goes to
+ * the error sink, which is the outcome an unmatchable reference has to have anyway.
  */
 public final class ODataText {
-
-  /** The characters a percent-encoded value may keep, per RFC 3986 "unreserved". */
-  private static final String UNRESERVED =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-
-  private static final char[] HEX = "0123456789ABCDEF".toCharArray();
 
   private ODataText() {}
 
   /**
    * An OData string literal, quoted and safe to interpolate into a {@code $filter}. The quotation
-   * mark is doubled first, which is how OData escapes it, and the result is percent-encoded
-   * afterwards: FROST decodes the URL before it parses the filter, so {@code %27%27} arrives as the
-   * doubled quote the literal needs, and no input can close the literal early.
+   * mark is doubled, which is how OData escapes it, so no input can close the literal early. Every
+   * other character stays as it is: the literal of the grammar ends at the next single quotation
+   * mark, which leaves the separators of the query — {@code &}, {@code ,}, {@code ;} — and a space
+   * without meaning inside it.
    */
   public static String literal(String value) {
     if (value == null) {
       throw new IllegalArgumentException("a filter literal must not be null");
     }
-    return "'" + percentEncode(value.replace("'", "''")) + "'";
-  }
-
-  /**
-   * Percent-encodes a value for use inside a URL query. Everything outside the unreserved set is
-   * encoded, so a reference containing {@code &}, {@code ?}, {@code #} or a space cannot change the
-   * shape of the sub-request URL.
-   */
-  public static String percentEncode(String value) {
-    StringBuilder encoded = new StringBuilder(value.length());
-    for (byte raw : value.getBytes(StandardCharsets.UTF_8)) {
-      int octet = raw & 0xFF;
-      if (octet < 0x80 && UNRESERVED.indexOf((char) octet) >= 0) {
-        encoded.append((char) octet);
-      } else {
-        encoded.append('%').append(HEX[octet >> 4]).append(HEX[octet & 0x0F]);
-      }
-    }
-    return encoded.toString();
+    return "'" + value.replace("'", "''") + "'";
   }
 }

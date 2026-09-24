@@ -23,6 +23,8 @@ import java.util.Objects;
  * @param url the service-relative URL, already encoded
  * @param condition the {@code if} expression, or null when the request always runs
  * @param body the request body, or null for a GET
+ * @param missReason what a parent lookup reports when it finds nothing, or null for the generic "no
+ *     entity matches the reference"; ignored for every other role
  */
 public record SubRequest(
     String id,
@@ -32,7 +34,8 @@ public record SubRequest(
     BatchMethod method,
     String url,
     String condition,
-    JsonNode body) {
+    JsonNode body,
+    String missReason) {
 
   public SubRequest {
     Objects.requireNonNull(id, "id");
@@ -58,7 +61,17 @@ public record SubRequest(
     return "not $" + id;
   }
 
-  /** A back-reference usable where the identifier of an entity is required. */
+  /**
+   * A back-reference to the entity a request resolved.
+   *
+   * <p>It reaches FROST in one of two places. In a URL it must stand at the <b>start</b>: FROST
+   * anchors the pattern there and replaces the reference with the self link of the entity, so
+   * {@code $r0-thing} becomes {@code /Things(5)} and {@code $r0-ds/Sensor} becomes {@code
+   * /Datastreams(7)/Sensor}. Written anywhere else in a URL — {@code Things($r0-thing)} — it stays
+   * as it is and FROST looks for an entity whose identifier is the text of the reference. In a body
+   * it is a JSON string of its own, {@code "$r0-thing"}, which FROST replaces with the identifier
+   * value.
+   */
   public static String reference(String id) {
     return "$" + id;
   }

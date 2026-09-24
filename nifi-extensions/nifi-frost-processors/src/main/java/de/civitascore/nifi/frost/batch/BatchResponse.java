@@ -23,6 +23,11 @@ public record BatchResponse(List<SubResponse> responses) {
   /**
    * Reads a batch response body.
    *
+   * <p>An answer without an identifier is kept. FROST omits the identifier for the sub-requests it
+   * skips after a failure inside an atomicity group, and for the one answer it writes when it
+   * cannot read the document at all. Rejecting the whole document over those would throw away every
+   * answer that does carry its reason.
+   *
    * @throws IllegalArgumentException when the body is not a batch response. A FROST server without
    *     the JSON batch extension answers the same URL with an entity document, and reading that as
    *     an empty response list would report every record as written.
@@ -34,12 +39,13 @@ public record BatchResponse(List<SubResponse> responses) {
     }
     List<SubResponse> responses = new ArrayList<>(answers.size());
     for (JsonNode answer : answers) {
-      JsonNode id = answer.get("id");
       JsonNode status = answer.get("status");
-      if (id == null || status == null) {
-        throw new IllegalArgumentException("a batch answer carries no id or no status");
+      if (status == null || !status.isNumber()) {
+        throw new IllegalArgumentException("a batch answer carries no status");
       }
-      responses.add(new SubResponse(id.asText(), status.asInt(), answer.get("body")));
+      JsonNode id = answer.get("id");
+      String identifier = id == null || id.isNull() ? null : id.asText();
+      responses.add(new SubResponse(identifier, status.asInt(), answer.get("body")));
     }
     return new BatchResponse(responses);
   }

@@ -111,6 +111,35 @@ class ThingTreePortTest {
   }
 
   @Test
+  void plan_withATree_readsANestedEntityThroughTheBackReferenceOfItsDatastream() {
+    JsonNode requests = BatchDocuments.of(SinkPort.THING_TREE, TREE).get("requests");
+
+    // The reference stands at the start of the URL, which is the only place FROST reads one, and
+    // the navigation follows it: $r0-ds/Sensor becomes /Datastreams(7)/Sensor.
+    JsonNode sensorLookup = requestWithUrl(requests, "$r0-ds/Sensor?$select=id");
+    assertEquals("get", sensorLookup.get("method").asText());
+  }
+
+  @Test
+  void plan_withATree_looksTheLocationUpAmongTheLocationsOfItsThing() {
+    JsonNode requests = BatchDocuments.of(SinkPort.THING_TREE, TREE).get("requests");
+
+    // The Location collection belongs to no project, and a reference is local to its Dataset: two
+    // Datasets modelling the same device share it. A direct query on /Locations found the first
+    // Dataset's Location, patched it, and left the second Dataset's Thing without one — and
+    // FROST then could not generate a FeatureOfInterest for any measurement of that Thing.
+    JsonNode lookup =
+        requestWithUrl(
+            requests, "$r0-thing/Locations?$select=id&$top=1&$filter=properties/reference eq 'A7'");
+    assertEquals("get", lookup.get("method").asText());
+    for (JsonNode request : requests) {
+      assertFalse(
+          request.path("url").asText().startsWith("Locations?"),
+          "a Location lookup must not query the unscoped collection: " + request);
+    }
+  }
+
+  @Test
   void plan_withoutADatastream_endsAfterTheMetadata() {
     String metadataOnly =
         """
@@ -119,6 +148,15 @@ class ThingTreePortTest {
     JsonNode requests = BatchDocuments.of(SinkPort.THING_TREE, metadataOnly).get("requests");
 
     assertEquals(3, requests.size());
+  }
+
+  private static JsonNode requestWithUrl(JsonNode requests, String url) {
+    for (JsonNode request : requests) {
+      if (url.equals(request.path("url").asText())) {
+        return request;
+      }
+    }
+    throw new AssertionError("no request carries the url " + url);
   }
 
   private static JsonNode requestWith(JsonNode requests, String condition) {

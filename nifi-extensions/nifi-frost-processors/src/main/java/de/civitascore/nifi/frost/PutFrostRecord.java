@@ -180,8 +180,11 @@ public class PutFrostRecord extends AbstractProcessor {
       new Relationship.Builder()
           .name("retry")
           .description(
-              "The request did not complete, or FROST answered that it could not answer now. The"
-                  + " record is unchanged and can be sent again.")
+              "The record may succeed when it comes again: the request did not complete, FROST"
+                  + " answered with a server error, or a parent the record refers to — a"
+                  + " Datastream, or the Location of its Thing — is not there yet, because the"
+                  + " Pipeline that writes it has not run. The record is unchanged; the error"
+                  + " attributes say why it was retried.")
           .build();
 
   private static final List<PropertyDescriptor> PROPERTIES =
@@ -301,10 +304,24 @@ public class PutFrostRecord extends AbstractProcessor {
       RecordOutcome outcome = outcomes.get(entry.getKey());
       if (outcome == null || outcome.successful()) {
         session.transfer(entry.getValue(), SUCCESS);
+        continue;
+      }
+      FlowFile described =
+          fail(session, entry.getValue(), outcome.entity(), outcome.status(), outcome.message());
+      if (outcome.retryable()) {
+        // NiFi retries the relationship with growing back-off and sends the record to the error
+        // sink once the attempts are spent. It resets the attributes on every attempt, so the ones
+        // set here are those of the last attempt — the one the error sink shows.
+        getLogger()
+            .warn(
+                "Retrying record {}: {} {} {}",
+                entry.getKey(),
+                outcome.entity(),
+                outcome.status(),
+                outcome.message());
+        session.transfer(session.penalize(described), RETRY);
       } else {
-        session.transfer(
-            fail(session, entry.getValue(), outcome.entity(), outcome.status(), outcome.message()),
-            FAILURE);
+        session.transfer(described, FAILURE);
       }
     }
   }
@@ -341,7 +358,17 @@ public class PutFrostRecord extends AbstractProcessor {
       FrostBatchClient.BatchExchange exchange) {
     if (exchange.retryable()) {
       getLogger().warn("FROST answered the batch request with {}", exchange.status());
-      transferAll(session, flowFiles, RETRY, true);
+      for (FlowFile flowFile : List.copyOf(flowFiles)) {
+        session.transfer(
+            session.penalize(
+                fail(
+                    session,
+                    flowFile,
+                    "Batch",
+                    exchange.status(),
+                    "FROST could not answer the batch request")),
+            RETRY);
+      }
       return;
     }
     String reason = exchange.body() == null ? "" : exchange.body().toString();
