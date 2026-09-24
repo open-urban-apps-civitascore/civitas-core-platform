@@ -188,7 +188,7 @@ export type CompletionStepParam = 'access-management' | 'data-flow' | 'apis'
 export type CompletionStepData = {
   title: string
   description?: string
-  isCompleted: CheckedState
+  isCompleted?: CheckedState
   buttons: {
     text: string
     routeParam: CompletionStepParam
