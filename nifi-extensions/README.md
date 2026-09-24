@@ -39,6 +39,18 @@ mvn -q package -DskipTests
 cp nifi-frost-nar/target/nifi-frost-nar-*.nar ../dev-environment/nifi/extensions/
 ```
 
+## Install into a deployed NiFi
+
+The CI packages the NARs into the image `nifi-extensions`, tagged with the NAR version. It is never
+run: an init container of the NiFi pod copies the NARs into a volume, and NiFi reads that volume as
+a custom NAR library directory (`components/nifi` in the
+[deployment repository](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-deployment)).
+The NiFi image stays the one Apache publishes.
+
+The version pinned there must be the bundle version the flow names — `put_frost_record.json` in the
+config-adapter. NiFi resolves a component by its bundle coordinate, and a version it does not find
+is a component it does not load.
+
 **Install the NAR before a flow that uses it is deployed.** NiFi accepts a process group holding a
 component it does not know, marks it invalid and never says so; the Pipeline then looks healthy and
 writes nothing.
