@@ -23,6 +23,7 @@
         <!-- Must track the NiFi version the flows are deployed to (apache/nifi:2.9.0), so the
              compiler's emitted RecordPath is parse-checked against the same grammar that runs it. -->
         <nifi-record-path.version>2.9.0</nifi-record-path.version>
+        <nifi-expression-language.version>2.9.0</nifi-expression-language.version>
     </properties>
 
     <dependencies>
@@ -159,6 +160,15 @@
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-record-path</artifactId>
             <version>${nifi-record-path.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- NiFi's own Expression Language parser: lets the tests assert that a value accepted as
+             literal comes out of NiFi's evaluation unchanged. -->
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-expression-language</artifactId>
+            <version>${nifi-expression-language.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

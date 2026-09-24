@@ -118,22 +118,15 @@ class NifiFlowBuilderTest {
   }
 
   /**
-   * A TLS MQTT spec: the processor references the SSL Context Service, and the trust anchor arrives
-   * as controller-service properties.
+   * A TLS MQTT spec: the processor references the SSL Context Service, whose trust anchor the
+   * builder's MQTT stage supplies.
    */
-  private static FlowBuildSpec mqttTlsSpec(MqttTruststoreConfig truststore) {
-    return mqttTlsSpec(truststore.sslContextProperties());
-  }
-
-  private static FlowBuildSpec mqttTlsSpec(Map<String, String> truststoreProperties) {
+  private static FlowBuildSpec mqttTlsSpec() {
     FlowBuildSpec plain = mqttToPostgis(mapping());
     Map<String, String> tlsProperties = new LinkedHashMap<>(plain.sourceProperties());
     tlsProperties.put("Broker URI", "ssl://mqtt:8883");
     tlsProperties.put(
         "SSL Context Service", "${CS:" + MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE + "}");
-    Map<String, Map<String, String>> serviceProperties =
-        new LinkedHashMap<>(plain.controllerServiceProperties());
-    serviceProperties.put(MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE, truststoreProperties);
     return new FlowBuildSpec(
         plain.processGroupName(),
         plain.sourceType(),
@@ -141,14 +134,14 @@ class NifiFlowBuilderTest {
         plain.sinkType(),
         plain.sinkProperties(),
         plain.transforms(),
-        serviceProperties,
+        plain.controllerServiceProperties(),
         plain.sourceCron(),
         plain.sinkPreRegion());
   }
 
   @Test
   void mqttTlsAddsOneJvmTruststoreSslContextServiceAndReferencesIt() throws Exception {
-    FlowBuildSpec tls = mqttTlsSpec(MqttTruststoreConfig.nodeTruststore());
+    FlowBuildSpec tls = mqttTlsSpec();
 
     JsonNode flow = build(tls);
     JsonNode services = flow.path("flowContents").path("controllerServices");
@@ -189,7 +182,7 @@ class NifiFlowBuilderTest {
         new MqttTruststoreConfig(
             "/opt/mqtt-tls/truststore.p12", "PKCS12", "", MqttTruststoreConfig.NO_PASSWORD, "");
     NifiFlowBuilder passwordless = NifiTestFixtures.flowBuilder(truststore);
-    FlowBuildSpec tls = mqttTlsSpec(truststore);
+    FlowBuildSpec tls = mqttTlsSpec();
 
     JsonNode flow = mapper.readTree(passwordless.build(tls));
 

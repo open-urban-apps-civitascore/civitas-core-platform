@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.nifi.flow.stage;
 
+import de.civitascore.configadapter.nifi.mapping.NifiExpressionLanguage;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -45,8 +46,17 @@ public final class PlanContext {
         .put(key, value);
   }
 
+  /**
+   * Collects a secret for the post-upload push. It bypasses the {@link BuildContext}, so the
+   * literal check happens here.
+   *
+   * @throws de.civitascore.configadapter.nifi.mapping.UnsafePropertyValueException if the value
+   *     holds an Expression Language or parameter reference
+   */
   public void putSensitive(String componentFriendlyName, String key, String value) {
-    sensitive.computeIfAbsent(componentFriendlyName, k -> new LinkedHashMap<>()).put(key, value);
+    sensitive
+        .computeIfAbsent(componentFriendlyName, k -> new LinkedHashMap<>())
+        .put(key, NifiExpressionLanguage.requireLiteral(key, value));
   }
 
   public Map<String, String> sourceProperties() {

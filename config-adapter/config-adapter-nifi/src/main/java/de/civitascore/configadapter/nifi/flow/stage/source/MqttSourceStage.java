@@ -170,11 +170,12 @@ public final class MqttSourceStage implements SourceStage {
   }
 
   /**
-   * Binds the trust anchor. A password parameter contributes only its <em>name</em> to the snapshot
-   * — the value lives in NiFi, supplied by the deployment, so no truststore secret passes through
-   * the adapter. A literal password (the JDK store's {@code changeit}) instead goes the post-upload
-   * sensitive route, never into the snapshot. A missing anchor fails the deploy instead of falling
-   * back to plaintext or to NiFi's node truststore.
+   * Checks the trust anchor and collects its literal password. A password parameter contributes
+   * only its <em>name</em> to the snapshot, applied with the other truststore properties in {@link
+   * #registerControllerServices} — the value lives in NiFi, supplied by the deployment, so no
+   * truststore secret passes through the adapter. A literal password (the JDK store's {@code
+   * changeit}) instead goes the post-upload sensitive route, never into the snapshot. A missing
+   * anchor fails the deploy instead of falling back to plaintext or to NiFi's node truststore.
    */
   private void bindTruststore(PlanContext out) throws FatalAdapterException {
     if (truststore.path().isEmpty() || truststore.type().isEmpty()) {
@@ -191,10 +192,6 @@ public final class MqttSourceStage implements SourceStage {
               + "' needs nifi.mqtt.truststore.parameter-context");
     }
     truststore
-        .sslContextProperties()
-        .forEach(
-            (key, value) -> out.putControllerServiceProperty(MQTT_SSL_CONTEXT_SERVICE, key, value));
-    truststore
         .sensitiveProperties()
         .forEach((key, value) -> out.putSensitive(MQTT_SSL_CONTEXT_SERVICE, key, value));
   }
@@ -209,6 +206,10 @@ public final class MqttSourceStage implements SourceStage {
   public void registerControllerServices(BuildContext ctx) throws FatalAdapterException {
     if (tlsRequested(ctx)) {
       ctx.addControllerService(Fragment.MQTT_SSL_CONTEXT_SERVICE, MQTT_SSL_CONTEXT_SERVICE);
+      for (Map.Entry<String, String> property : truststore.sslContextProperties().entrySet()) {
+        ctx.setControllerServiceExpression(
+            MQTT_SSL_CONTEXT_SERVICE, property.getKey(), property.getValue());
+      }
     }
   }
 

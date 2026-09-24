@@ -17,6 +17,7 @@ import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
 import de.civitascore.configadapter.nifi.flow.stage.TransformStage;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
+import de.civitascore.configadapter.nifi.mapping.NifiExpressionLanguage;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.ReplacementStrategy;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.util.ArrayList;
@@ -132,7 +133,7 @@ public final class RecordMappingStage implements TransformStage {
     Processor guard =
         ctx.loadProcessor(
             Fragment.ROUTE_ON_ATTRIBUTE, "unmatched", discriminator(FORK_GUARD_DISCRIMINATOR));
-    BuildContext.setProp(guard, FORK_GUARD_FAILURE_PROPERTY, NO_RECORDS);
+    BuildContext.setExpression(guard, FORK_GUARD_FAILURE_PROPERTY, NO_RECORDS);
     BuildContext.removeAutoTerminated(guard, "unmatched");
     return guard;
   }
@@ -157,7 +158,9 @@ public final class RecordMappingStage implements TransformStage {
     stale.forEach(props::remove);
     props.put(STRATEGY_PROPERTY, strategy.nifiValue());
     for (UpdateRecordProperty property : mappingProperties) {
-      props.put(property.recordPath(), property.value());
+      props.put(
+          property.recordPath(),
+          NifiExpressionLanguage.requireLiteral(property.recordPath(), property.value()));
     }
   }
 }

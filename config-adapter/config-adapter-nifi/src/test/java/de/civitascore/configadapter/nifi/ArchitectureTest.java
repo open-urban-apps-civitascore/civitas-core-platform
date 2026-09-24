@@ -16,6 +16,11 @@ import com.tngtech.archunit.core.importer.ImportOption.DoNotIncludeTests;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
+import de.civitascore.configadapter.nifi.flow.stage.Processor;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
+import de.civitascore.configadapter.nifi.flow.stage.transform.RecordMappingStage;
 
 /** Architecture constraints for the NiFi adapter. */
 @AnalyzeClasses(
@@ -89,4 +94,30 @@ class ArchitectureTest {
   @ArchTest
   static final ArchRule noPackageCycles =
       slices().matching("de.civitascore.configadapter.nifi.(*)..").should().beFreeOfCycles();
+
+  /**
+   * The unchecked setters are the only way platform EL reaches a property, so a new caller must be
+   * a reviewed decision; tenant text through them would reopen the environment-variable leak.
+   */
+  @ArchTest
+  static final ArchRule onlyPlatformExpressionStagesSetUncheckedProcessorProperties =
+      noClasses()
+          .that()
+          .doNotBelongToAnyOf(BuildContext.class, FrostSinkStage.class, RecordMappingStage.class)
+          .should()
+          .callMethod(
+              BuildContext.class, "setExpression", Processor.class, String.class, String.class);
+
+  @ArchTest
+  static final ArchRule onlyTheMqttTruststoreSetsUncheckedControllerServiceProperties =
+      noClasses()
+          .that()
+          .doNotBelongToAnyOf(MqttSourceStage.class)
+          .should()
+          .callMethod(
+              BuildContext.class,
+              "setControllerServiceExpression",
+              String.class,
+              String.class,
+              String.class);
 }
