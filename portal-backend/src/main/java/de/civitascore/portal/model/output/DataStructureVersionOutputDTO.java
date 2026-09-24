@@ -37,7 +37,16 @@ public class DataStructureVersionOutputDTO extends BaseOutputDTO {
   private Map<String, Object> model;
 
   @Schema(
-      description = "Whether this version is currently referenced by a data source",
+      description =
+          "Whether anything references this version, released or draft. While true, it cannot be"
+              + " deleted",
       accessMode = Schema.AccessMode.READ_ONLY)
   private boolean inUse;
+
+  @Schema(
+      description =
+          "Whether a released entity references this version. While true, it cannot be"
+              + " unreleased and its model is locked",
+      accessMode = Schema.AccessMode.READ_ONLY)
+  private boolean inUseByReleased;
 }

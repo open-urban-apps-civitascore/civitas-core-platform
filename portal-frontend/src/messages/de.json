@@ -309,9 +309,24 @@
             "addButton": "Pipeline hinzufügen",
             "unknownError": "Unbekannter Fehler.",
             "pipelineError": "Pipelinefehler",
+            "activeLabel": "Aktiv",
             "errorLabel": "Fehler",
             "errorDetails": "Fehlerdetails für {name}",
-            "errorToast": "Pipeline „{name}“: {message}"
+            "errorToast": "Pipeline „{name}“: {message}",
+            "menuLabel": "Aktionen für {name}",
+            "actions": {
+              "open": "Öffnen",
+              "delete": "Löschen"
+            },
+            "deleteConfirm": {
+              "title": "Pipeline löschen",
+              "description": "Möchtest du die Pipeline „{name}“ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+              "confirm": "Löschen"
+            },
+            "messages": {
+              "deleteSuccess": "Pipeline wurde erfolgreich gelöscht.",
+              "deleteError": "Beim Löschen der Pipeline ist ein Fehler aufgetreten. Bitte versuche es erneut."
+            }
           },
           "apis": {
             "title": "APIs",
@@ -327,6 +342,7 @@
               "CUSTOM": "Custom API"
             },
             "card": {
+              "menuLabel": "Aktionen für {name}",
               "actions": {
                 "edit": "Bearbeiten",
                 "view": "Öffnen",

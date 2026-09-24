@@ -38,6 +38,7 @@ public class DataStructureService
   private final AssignmentFactory assignmentFactory;
   private final DataSourceRepository dataSourceRepository;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final ArtifactUsageLookup artifactUsageLookup;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -180,7 +181,7 @@ public class DataStructureService
 
   @Override
   protected void validateUnrelease(DataStructure entity) {
-    validateNoVersionInUse(entity);
+    artifactUsageLookup.of(entity).requireNoReleasedReferrer(getEntityName(), entity.getId());
   }
 
   /**
