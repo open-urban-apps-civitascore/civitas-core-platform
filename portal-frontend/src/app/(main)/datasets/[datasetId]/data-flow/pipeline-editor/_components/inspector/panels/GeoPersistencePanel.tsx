@@ -31,6 +31,7 @@ interface GeoPersistencePanelProps {
 
 export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, onUpdate }) => {
   const t = useTranslations('pipelineEditor')
+  const tStatus = useTranslations('common.status')
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canReadDatastructures } = useDatasetPermissionsById(datasetId)
   const { selectedNode, pipelineUsingTableName } = useActivePipeline()
@@ -39,7 +40,11 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
   const conflictingPipeline = selectedNode ? pipelineUsingTableName(selectedNode.id, data.tableName) : null
   const hasInvalidCharacters = data.tableName !== '' && !isValidTableName(data.tableName)
 
-  const { name: dataStructureName, versionNumber } = useDatastructureVersionInfo(data.dataStructureVersionId)
+  const {
+    name: dataStructureName,
+    versionNumber,
+    status: dataStructureVersionStatus,
+  } = useDatastructureVersionInfo(data.dataStructureVersionId)
 
   const handleTableNameChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,6 +112,10 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
             items={[
               { label: t('geoPersistencePanel.dataStructureName'), value: dataStructureName },
               { label: t('geoPersistencePanel.versionNumber'), value: versionNumber },
+              {
+                label: t('geoPersistencePanel.status'),
+                value: dataStructureVersionStatus ? tStatus(dataStructureVersionStatus) : undefined,
+              },
             ]}
           />
           {canReadDatastructures && parseCompositeKey(data.dataStructureVersionId) && (

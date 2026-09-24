@@ -129,6 +129,14 @@
       "AVAILABLE": "Verfügbar",
       "READY": "Fertig"
     },
+    "inUse": {
+      "columnHeader": "Verwendung",
+      "tooltip": "Wird derzeit verwendet. Die Bearbeitung ist eingeschränkt und das Löschen nicht möglich."
+    },
+    "draftBlockedModal": {
+      "title": "Status kann nicht auf Entwurf gesetzt werden",
+      "description": "Dieses datenbezogene Element wird derzeit verwendet und kann daher nicht auf Entwurf gesetzt werden."
+    },
     "exitModal": {
       "title": "Vor dem Beenden speichern?",
       "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
@@ -536,6 +544,10 @@
       "title": "Datensatz löschen?",
       "description": "Diese Aktion kann nicht rückgängig gemacht werden. Dies wird den Datensatz und alle zugehörigen Daten dauerhaft löschen.",
       "confirm": "Löschen"
+    },
+    "releaseBlockedModal": {
+      "title": "Dataset kann nicht freigegeben werden",
+      "description": "Dieses Dataset verwendet datenbezogene Elemente, die sich noch im Status Entwurf befinden. Alle erforderlichen Elemente müssen zunächst auf Verfügbar gesetzt werden."
     }
   },
   "users": {
@@ -1144,7 +1156,6 @@
       "createSuccess": "Die Version der Datenstruktur wurde erfolgreich angelegt.",
       "updateSuccess": "Die Version der Datenstruktur wurde erfolgreich aktualisiert.",
       "isAvailableModelHint": "Die Versionsinformationen und die Strukturdefinition können nicht bearbeitet werden, da diese Version bereits den Status 'Verfügbar' hat.",
-      "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Version bereits verwendet wird.",
       "isLastAvailableVersion": "Kann nicht auf Entwurf gesetzt werden, da dies die letzte verfügbare Version einer verfügbaren Datenstruktur ist. Setzen Sie zuerst die Datenstruktur auf Entwurf."
     },
     "errors": {
@@ -1252,7 +1263,8 @@
       "details": "Datenstruktur-Details",
       "dataStructureName": "Datenstruktur",
       "versionNumber": "Version",
-      "anonymousDataStructure": "Anonyme Datenstruktur"
+      "anonymousDataStructure": "Anonyme Datenstruktur",
+      "status": "Status"
     },
     "mappingPanel": {
       "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
@@ -1266,7 +1278,10 @@
       "selectDatastructure": "Datenstruktur auswählen…",
       "inputDatastructure": "Eingangs-Datenstruktur",
       "outputDatastructure": "Ausgangs-Datenstruktur",
-      "openMappingEditor": "Mapping-Editor öffnen"
+      "openMappingEditor": "Mapping-Editor öffnen",
+      "details": "Referenzierte Datenstrukturen",
+      "inputStatus": "Status Eingangs-Datenstruktur",
+      "outputStatus": "Status Ausgangs-Datenstruktur"
     },
     "entitySelector": {
       "selectEntity": "Entität auswählen...",

@@ -197,28 +197,33 @@ describe('DataModelImportModal', () => {
     expect(screen.getByTestId('confirmButton')).toBeDisabled()
   })
 
-  it('passes dataStructureStatus=AVAILABLE to the API and filters DRAFT versions client-side', () => {
-    // Backend returns only AVAILABLE datastructures (filtered by query param),
-    // but versions still need client-side filtering
-    const availableDatastructures = [mixedDatastructures[0]]
+  it('offers draft versions alongside available ones, so a draft consumer can reference one', () => {
     mockUseGetDatastructures.mockReturnValue({
-      data: { data: availableDatastructures, totalElements: 1 },
+      data: { data: [mixedDatastructures[0]], totalElements: 1 },
       isFetching: false,
     })
     render(<DataModelImportModal {...defaultProps} />)
 
-    // Verify the API was called with dataStructureStatus param
-    const calledParams = mockGetApiRequestParams.mock.results[0].value as URLSearchParams
-    expect(calledParams).toBeInstanceOf(URLSearchParams)
-
-    // Available datastructure should be shown
-    expect(screen.getByText('Available DS')).toBeInTheDocument()
-    expect(screen.getByTestId('expanderCell')).toBeInTheDocument()
-    // Expand the available datastructure to see versions
     fireEvent.click(screen.getByTestId('expanderCell').querySelector('button')!)
-    // Only available versions should be shown (draft versions filtered client-side)
-    expect(screen.getByText('Version 1.0')).toBeInTheDocument()
+
     expect(screen.getByRole('checkbox', { name: 'Select datastructure Version 1.0' })).toBeInTheDocument()
-    expect(screen.queryByText('Version 2.0')).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Select datastructure Version 2.0' })).toBeInTheDocument()
+  })
+
+  it('does not narrow the request to available data structures', () => {
+    render(<DataModelImportModal {...defaultProps} />)
+
+    const calledParams = mockGetApiRequestParams.mock.results[0].value as URLSearchParams
+    expect(calledParams.get('dataStructureStatus')).toBeNull()
+  })
+
+  it('offers a draft data structure', () => {
+    mockUseGetDatastructures.mockReturnValue({
+      data: { data: [mixedDatastructures[1]], totalElements: 1 },
+      isFetching: false,
+    })
+    render(<DataModelImportModal {...defaultProps} />)
+
+    expect(screen.getByText('Draft DS')).toBeInTheDocument()
   })
 })

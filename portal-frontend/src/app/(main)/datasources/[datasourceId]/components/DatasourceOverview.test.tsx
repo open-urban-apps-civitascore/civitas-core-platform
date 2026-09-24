@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
@@ -82,6 +83,7 @@ const mockForm = {
 }
 
 const mockSubmitDatasource = vi.fn()
+const mockHandleStatusChange = vi.fn()
 
 vi.mock('../hooks/useDatasourceForm', () => ({
   useDatasourceForm: () => ({
@@ -89,7 +91,7 @@ vi.mock('../hooks/useDatasourceForm', () => ({
     readyConnectorType: 'MQTT',
     dataSourceStatus: 'DRAFT',
     hasStatusChanged: false,
-    handleStatusChange: vi.fn(),
+    handleStatusChange: mockHandleStatusChange,
     canStage: false,
     completedTabs: [],
     submitDatasource: mockSubmitDatasource,
@@ -215,6 +217,7 @@ const datasource = {
   modifiedAt: '2024-01-01',
   dataStructureVersion: null,
   inUse: false,
+  inUseByReleased: false,
   datapoolScope: { type: DATAPOOL_SCOPE_TYPES.NONE },
 }
 
@@ -436,6 +439,55 @@ describe('DatasourceOverview', () => {
         render(<DatasourceOverview {...availableProps} />)
         expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       })
+    })
+  })
+
+  describe('In Use by Released', () => {
+    const inUseDatasource = {
+      ...datasource,
+      dataSourceStatus: 'AVAILABLE' as const,
+      inUse: true,
+      inUseByReleased: true,
+    }
+
+    beforeEach(() => {
+      mockCurrentUser([PERMISSION_NAMES.DATASOURCE_UPDATE, PERMISSION_NAMES.DATASOURCE_RELEASE])
+    })
+
+    it('shows the indicator only when a released entity references the data source', () => {
+      render(<DatasourceOverview {...defaultProps} datasource={inUseDatasource} />)
+      expect(screen.getByTestId('inUseIndicator')).toBeInTheDocument()
+    })
+
+    it('hides the indicator when only a draft entity references the data source', () => {
+      render(<DatasourceOverview {...defaultProps} datasource={{ ...inUseDatasource, inUseByReleased: false }} />)
+      expect(screen.queryByTestId('inUseIndicator')).not.toBeInTheDocument()
+    })
+
+    const selectDraft = async () => {
+      const user = userEvent.setup()
+      await user.click(screen.getByTestId('statusDropdown'))
+      await user.click(await screen.findByTestId('statusOption-draft'))
+    }
+
+    it('refuses the Draft selection and explains why', async () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      render(<DatasourceOverview {...defaultProps} datasource={inUseDatasource} />)
+
+      await selectDraft()
+
+      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
+      expect(mockHandleStatusChange).not.toHaveBeenCalled()
+    })
+
+    it('applies the Draft selection when no released entity references the data source', async () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      render(<DatasourceOverview {...defaultProps} datasource={{ ...inUseDatasource, inUseByReleased: false }} />)
+
+      await selectDraft()
+
+      expect(screen.queryByTestId('infoModal')).not.toBeInTheDocument()
+      expect(mockHandleStatusChange).toHaveBeenCalledWith('DRAFT')
     })
   })
 })

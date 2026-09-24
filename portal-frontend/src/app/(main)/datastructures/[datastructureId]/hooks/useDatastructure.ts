@@ -3,8 +3,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -82,8 +82,7 @@ export const useDatastructure = ({
   const descriptionWatch = form.watch('description')
 
   const isDraftMode = datastructureStatus === DATASTRUCTURE_STATUS_TYPES.DRAFT
-  const isInUse = !!datastructure.inUse
-  const canSetDraft = !isInUse
+  const canSetDraft = !datastructure.inUseByReleased
 
   const hasAvailableVersion = useMemo(
     () =>

@@ -145,6 +145,18 @@ describe('mapDatastructuresApiToListData', () => {
     expect(result[0]).toMatchObject(expectedResult)
   })
 
+  it('carries the released-referrer flag onto the structure row and each version row', () => {
+    const datastructure: Datastructure = createDatastructure(['1.0', '2.0'])
+    datastructure.inUseByReleased = true
+    datastructure.dataStructureVersions[0].inUseByReleased = true
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result[0].inUseByReleased).toBe(true)
+    expect(result[0].versions[0].inUseByReleased).toBe(true)
+    expect(result[0].versions[1].inUseByReleased).toBeUndefined()
+  })
+
   it('selects the highest numeric version', () => {
     const datastructure: Datastructure = createDatastructure(['1.0', '1.1', '2.0'])
 

@@ -1,14 +1,15 @@
 'use client'
 
 import { RowSelectionState } from '@tanstack/react-table'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useGetDatapools } from '@/app/services/api/datapools/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
+import { InfoModal } from '@/components/modals/info-modal/InfoModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import PageEditControls from '@/components/page-edit-controls/PageEditControls'
@@ -147,6 +148,15 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+  const [isDraftBlockedModalOpen, setIsDraftBlockedModalOpen] = useState(false)
+
+  const handleStatusSelect = (newStatus: DatasourceStatusType) => {
+    if (newStatus === DATASOURCE_STATUS_TYPES.DRAFT && datasource.inUseByReleased) {
+      setIsDraftBlockedModalOpen(true)
+      return
+    }
+    handleStatusChange(newStatus)
+  }
 
   const hasUnsavedChanges =
     datasourceForm.formState.isDirty || areAssignmentsDirty || areDatapoolsDirty || hasStatusChanged
@@ -238,7 +248,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             }
             onSelectDatastructureVersion={handleSelectDatastructureVersion}
             isReadOnly={isReadOnly}
-            isDatasourceInUse={datasource.inUse}
+            isDatasourceInUseByReleased={datasource.inUseByReleased}
           />
         )
       case 'datapools':
@@ -279,9 +289,10 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         }}
         customElement={
           <PageEditControls<DatasourceStatusType>
+            isInUseByReleased={datasource.inUseByReleased}
             statusProps={{
               status: dataSourceStatus,
-              onStatusChange: handleStatusChange,
+              onStatusChange: handleStatusSelect,
               statusOptions: Object.values(DATASOURCE_STATUS_TYPES),
               canStage,
               canRelease,
@@ -320,6 +331,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         onOpenChange={setIsExitModalOpen}
         onDiscard={handleDiscardAndExit}
         onConfirm={handleSaveAndExit}
+      />
+
+      <InfoModal
+        open={isDraftBlockedModalOpen}
+        title={tCommon('draftBlockedModal.title')}
+        description={tCommon('draftBlockedModal.description')}
+        onOpenChange={setIsDraftBlockedModalOpen}
+        onClose={() => setIsDraftBlockedModalOpen(false)}
       />
 
       <AddDatapoolModal

@@ -58,6 +58,11 @@ export const isResourceInUseError = (error: unknown) => {
   return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && problem.detail.includes('is referenced by')
 }
 
+export const isPipelineClosureInvalidError = (error: unknown) => {
+  const problem = problemWithStatus(error, 422)
+  return !!problem && hasErrorType(problem, 'PIPELINE_CLOSURE_INVALID')
+}
+
 export const isUnconfirmedDataLossError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
   return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && problem.detail.includes('confirmDataLoss')

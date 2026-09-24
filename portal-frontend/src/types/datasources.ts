@@ -66,6 +66,7 @@ export const DatasourceApiResponseSchema = z.object({
   configuration: z.record(z.string(), z.unknown()).nullable(),
   dataStructureVersion: DatastructureVersionSummaryApiResponseSchema.nullable(),
   inUse: z.boolean(),
+  inUseByReleased: z.boolean(),
   datapoolScope: DatapoolScopeSchema,
   // Versioned CORE URN of this DataSource's configuration artifact in Model Forge; used as the
   // pipeline node's `sourceRef`. Absent on drafts that have no configuration yet.

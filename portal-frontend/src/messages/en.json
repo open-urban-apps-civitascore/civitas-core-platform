@@ -130,6 +130,14 @@
       "AVAILABLE": "Available",
       "READY": "Ready"
     },
+    "inUse": {
+      "columnHeader": "Usage",
+      "tooltip": "Currently in use. Editing is restricted and deletion is not possible."
+    },
+    "draftBlockedModal": {
+      "title": "Status cannot be changed to Draft",
+      "description": "This data-related element is currently in use and therefore cannot be set to Draft."
+    },
     "exitModal": {
       "title": "Save before exiting?",
       "description": "There is unsaved information. \"Discard\" cannot be undone.",
@@ -538,6 +546,10 @@
       "title": "Delete Dataset?",
       "description": "This action cannot be undone. This will permanently delete the Dataset and all associated data.",
       "confirm": "Delete"
+    },
+    "releaseBlockedModal": {
+      "title": "Dataset cannot be released",
+      "description": "This Dataset uses data-related elements that are still in Draft. Set all required entities to Available before releasing the Dataset."
     }
   },
   "users": {
@@ -1157,7 +1169,6 @@
       "createSuccess": "The version of the Data structure has been successfully created.",
       "updateSuccess": "The version of the data has been successfully updated.",
       "isAvailableModelHint": "The version information and the structure definition can not be edited since this version already has the status 'Available'.",
-      "isInUseStatusHint": "Can not be set to draft since this version is already in use.",
       "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available Data structure. Set the Data structure to draft first."
     },
     "errors": {
@@ -1265,7 +1276,8 @@
       "details": "Data Structure Details",
       "dataStructureName": "Data Structure",
       "versionNumber": "Version",
-      "anonymousDataStructure": "Anonymous Data Structure"
+      "anonymousDataStructure": "Anonymous Data Structure",
+      "status": "Status"
     },
     "mappingPanel": {
       "hint": "Define your data transformation mapping using YAML or JSON format.",
@@ -1279,7 +1291,10 @@
       "selectDatastructure": "Select datastructure…",
       "inputDatastructure": "Input datastructure",
       "outputDatastructure": "Output datastructure",
-      "openMappingEditor": "Open mapping editor"
+      "openMappingEditor": "Open mapping editor",
+      "details": "Referenced Data Structures",
+      "inputStatus": "Input datastructure status",
+      "outputStatus": "Output datastructure status"
     },
     "entitySelector": {
       "selectEntity": "Select an entity...",

@@ -7,6 +7,7 @@ import {
   isNameConflictError,
   isNotDraftError,
   isPermissionsError,
+  isPipelineClosureInvalidError,
   isResourceInUseError,
   isSagaInFlightError,
   isTableNameConflictError,
@@ -274,5 +275,24 @@ describe('isUnconfirmedDataLossError', () => {
 
   it('returns false for non-axios errors', () => {
     expect(isUnconfirmedDataLossError(new Error('plain error'))).toBe(false)
+  })
+})
+
+const PIPELINE_CLOSURE_INVALID = 'urn:civitas:error:PIPELINE_CLOSURE_INVALID'
+
+describe('isPipelineClosureInvalidError', () => {
+  it('returns true for a 422 closure rejection', () => {
+    const error = mockApiError(422, 'Pipeline closure validation failed', PIPELINE_CLOSURE_INVALID)
+    expect(isPipelineClosureInvalidError(error)).toBe(true)
+  })
+
+  it('returns false for a 422 error with a different type', () => {
+    const error = mockApiError(422, 'Scope violation', 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION')
+    expect(isPipelineClosureInvalidError(error)).toBe(false)
+  })
+
+  it('returns false for another status carrying the same type', () => {
+    const error = mockApiError(409, 'Pipeline closure validation failed', PIPELINE_CLOSURE_INVALID)
+    expect(isPipelineClosureInvalidError(error)).toBe(false)
   })
 })
