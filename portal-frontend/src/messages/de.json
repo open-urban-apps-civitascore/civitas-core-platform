@@ -1496,22 +1496,43 @@
     }
   },
   "umlModeler": {
+    "modelNamePlaceholder": "Modellname",
     "closeTabModal": {
       "title": "Modell wirklich verwerfen?",
       "description": "Diese Aktion löscht das Modell. Sie kann nicht rückgängig gemacht werden."
     },
     "import": {
       "title": "Importieren",
+      "file": "Diagramm importieren",
       "fromPlatform": "aus der Plattform",
-      "fromFile": "aus Datei"
+      "fromFile": "aus Datei",
+      "success": "Diagramm erfolgreich importiert",
+      "fileError": "Fehler beim Importieren der Datei.",
+      "overwriteModal": {
+        "title": "Bestehende Strukturdefinition ersetzen?",
+        "description": "Beim Import werden alle bestehenden Klassen, Attribute und Beziehungen in der Strukturdefinition ersetzt. Diese Aktion kann nicht rückgängig gemacht werden.",
+        "confirm": "Struktur ersetzen"
+      },
+      "errors": {
+        "FILE_TOO_LARGE": "Die Datei ist zu groß (maximal 5 MB erlaubt).",
+        "INVALID_JSON": "Die Datei enthält kein gültiges JSON.",
+        "INVALID_DATASTRUCTURE_DOCUMENT": "Die Datei enthält keine gültige Datenstruktur.",
+        "MISSING_UI_STYLES": "Die Datei enthält keine Layoutdaten für die Darstellung der Struktur.",
+        "INVALID_DIAGRAM_SCHEMA": "Die Diagrammdaten in der Datei sind ungültig."
+      }
     },
     "save": {
       "success": "Modell erfolgreich gespeichert",
       "error": "Modell konnte nicht gespeichert werden. Bitte versuchen Sie es erneut."
     },
     "export": {
+      "title": "Exportieren",
+      "file": "Diagramm exportieren",
       "success": "Diagramm erfolgreich exportiert",
-      "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut."
+      "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut.",
+      "errors": {
+        "INVALID_URN": "Aus dem Namen der Datenstruktur lässt sich keine gültige CORE-URN bilden. Der Name muss mindestens einen Buchstaben oder eine Ziffer enthalten."
+      }
     },
     "rootValidation": {
       "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",

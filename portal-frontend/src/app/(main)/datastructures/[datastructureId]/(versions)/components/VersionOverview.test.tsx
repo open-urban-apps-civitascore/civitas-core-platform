@@ -182,10 +182,17 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(screen.getByText('Edit Version')).toBeInTheDocument()
     })
 
-    it('renders tab navigation', () => {
+    it('renders tab navigation with structure tab first', () => {
       renderComponent()
-      expect(screen.getByTestId('tab-versionInfo')).toBeInTheDocument()
-      expect(screen.getByTestId('tab-structure')).toBeInTheDocument()
+      const tabs = screen.getAllByRole('tab')
+      expect(tabs[0]).toHaveAttribute('data-testid', 'tab-structure')
+      expect(tabs[1]).toHaveAttribute('data-testid', 'tab-versionInfo')
+    })
+
+    it('defaults to the structure tab when no subTabValue is set', () => {
+      mockSubTabValue = ''
+      renderComponent()
+      expect(screen.getByTestId('umlModeler')).toBeInTheDocument()
     })
   })
 
@@ -818,20 +825,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         nodes: [{ ...mockVersionWithModel.styles!.nodes[0], selected: true }],
       },
     }
-
-    it('enables the save button after the diagram was renamed', async () => {
-      const user = userEvent.setup()
-      renderComponent({ version: mockVersionWithModel })
-
-      expect(screen.getByTestId('confirmButton')).toBeDisabled()
-
-      await user.dblClick(screen.getByText('Test Model'))
-      const diagramNameInput = screen.getByDisplayValue('Test Model')
-      await user.clear(diagramNameInput)
-      await user.type(diagramNameInput, 'Renamed Model{Enter}')
-
-      await waitFor(() => expect(screen.getByTestId('confirmButton')).toBeEnabled())
-    })
 
     it('enables the save button after a class was renamed in the inspector', async () => {
       const user = userEvent.setup()

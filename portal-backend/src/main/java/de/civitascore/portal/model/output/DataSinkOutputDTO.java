@@ -25,6 +25,13 @@ public class DataSinkOutputDTO extends BaseOutputDTO {
   @Schema(description = "True if any Layer publishes this DataSink")
   private boolean inUseByLayer;
 
+  @Schema(
+      description =
+          "True if this DataSink's storage physically exists. Set once a provisioning saga has"
+              + " completed; never reset to false.",
+      accessMode = Schema.AccessMode.READ_ONLY)
+  private boolean provisioned;
+
   @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
   @JsonSubTypes({
     @JsonSubTypes.Type(value = FrostConfigurationOutput.class, name = "FROST"),
