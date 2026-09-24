@@ -17,7 +17,7 @@ params:path {
 body:json {
   {
     "dataSinkType": "FROST",
-    "configuration": {}
+    "configuration": { "port": "ThingTree" }
   }
 }
 
@@ -48,7 +48,7 @@ docs {
 
   Creates the FROST DataSink the pipeline's `frost` graph node references. The deploy derives the pipeline's sink from the wired sink node in the graph — there is **no implicit FROST default**, so a pipeline without a referenced FROST sink entity is rejected by the adapter.
 
-  FROST sinks carry no configuration of their own — provisioning happens via the FROST adapter on dataset release.
+  A FROST sink carries its port, the write logic the deploy engine builds the flow for; without one the Dataset does not deploy. The project is provisioned via the FROST adapter on dataset release.
 
   **Skip this step if 0h already found a FROST sink** (`sagaDataSinkId` set) — a repeated POST creates a duplicate.
 

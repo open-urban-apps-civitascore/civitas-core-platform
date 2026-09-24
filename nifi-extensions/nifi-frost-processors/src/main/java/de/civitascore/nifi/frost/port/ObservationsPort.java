@@ -26,8 +26,11 @@ import java.util.Optional;
 public final class ObservationsPort implements PortPlanner {
 
   private static final String PARENT = "ds";
+  private static final String POSITION = "ds-loc";
   private static final String LOOKUP = "obs";
   private static final String UPDATE = "obs-update";
+
+  private static final String FEATURE_OF_INTEREST = "FeatureOfInterest";
 
   @Override
   public void plan(ObjectNode record, RecordPlan plan, String projectId) {
@@ -49,6 +52,22 @@ public final class ObservationsPort implements PortPlanner {
         PARENT,
         FrostUrls.datastreamLookup(projectId, datastreamReference, thingReference));
 
+    // The request the writes wait for: the Datastream, or — when the measurement brings no
+    // FeatureOfInterest — the position FROST derives one from. Without that check FROST refuses
+    // the write with a 400 whose reason the batch drops, and a Thing whose Location the master
+    // data has not written yet would look like a broken record instead of an early one.
+    String gate = PARENT;
+    if (!record.has(FEATURE_OF_INTEREST)) {
+      plan.parentLookup(
+          StaEntities.LOCATION,
+          POSITION,
+          FrostUrls.positionOfThing(SubRequest.reference(plan.id(PARENT))),
+          SubRequest.ifResolved(plan.id(PARENT)),
+          "the Thing of the Datastream has no Location yet, so FROST cannot generate the"
+              + " FeatureOfInterest of the measurement");
+      gate = POSITION;
+    }
+
     Optional<String> ownReference =
         ReferenceBlock.read(record, ReferenceBlock.PARAMETERS, ReferenceBlock.REFERENCE);
     if (ownReference.isEmpty()) {
@@ -60,7 +79,7 @@ public final class ObservationsPort implements PortPlanner {
           // The append is the only write, so it can carry the condition that the parent resolved.
           // The upsert below cannot: 'if' names one request, and there the condition has to be the
           // Observation lookup.
-          SubRequest.ifResolved(plan.id(PARENT)),
+          SubRequest.ifResolved(plan.id(gate)),
           observation(record, plan),
           true);
       return;
@@ -71,13 +90,13 @@ public final class ObservationsPort implements PortPlanner {
         LOOKUP,
         FrostUrls.observationLookup(
             projectId, ownReference.get(), datastreamReference, thingReference),
-        SubRequest.ifResolved(plan.id(PARENT)));
+        SubRequest.ifResolved(plan.id(gate)));
 
     plan.write(
         StaEntities.OBSERVATION,
         UPDATE,
         BatchMethod.PATCH,
-        FrostUrls.entity("Observations", SubRequest.reference(plan.id(LOOKUP))),
+        SubRequest.reference(plan.id(LOOKUP)),
         SubRequest.ifResolved(plan.id(LOOKUP)),
         StaEntities.withoutNavigation(record),
         true);

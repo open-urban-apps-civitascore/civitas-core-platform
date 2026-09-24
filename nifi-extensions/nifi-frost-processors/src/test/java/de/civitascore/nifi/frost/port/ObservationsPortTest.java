@@ -63,7 +63,8 @@ class ObservationsPortTest {
     JsonNode requests =
         BatchDocuments.of(SinkPort.OBSERVATIONS, APPENDED, APPENDED).get("requests");
 
-    assertEquals(4, requests.size());
+    // Per record: the Datastream, the position of its Thing, the append.
+    assertEquals(6, requests.size());
     assertEquals(2, count(requests, "post"));
     assertEquals(0, count(requests, "patch"));
   }
@@ -74,9 +75,44 @@ class ObservationsPortTest {
     // leave one measurement. The lookup that decides this is in the batch itself.
     JsonNode requests = BatchDocuments.of(SinkPort.OBSERVATIONS, UPSERTED).get("requests");
 
-    assertEquals(2, count(requests, "get"));
-    assertEquals("$r0-obs", requests.get(2).get("if").asText());
-    assertEquals("not $r0-obs", requests.get(3).get("if").asText());
+    // The Datastream, the position of its Thing, the measurement itself.
+    assertEquals(3, count(requests, "get"));
+    assertEquals("$r0-obs", requests.get(3).get("if").asText());
+    assertEquals("not $r0-obs", requests.get(4).get("if").asText());
+  }
+
+  @Test
+  void plan_withoutAFeatureOfInterest_waitsForThePositionOfTheThing() {
+    // FROST derives the FeatureOfInterest from the Location of the Thing. Without one it refuses
+    // the write with a 400 whose reason the batch drops, so the port asks first — and the append
+    // waits for that answer, not only for the Datastream.
+    JsonNode requests = BatchDocuments.of(SinkPort.OBSERVATIONS, APPENDED).get("requests");
+
+    JsonNode position = requests.get(1);
+    assertEquals("r0-ds-loc", position.get("id").asText());
+    assertEquals("$r0-ds/Thing/Locations?$select=id&$top=1", position.get("url").asText());
+    assertEquals("$r0-ds", position.get("if").asText());
+    assertEquals("$r0-ds-loc", requests.get(2).get("if").asText());
+  }
+
+  @Test
+  void plan_withAFeatureOfInterest_needsNoPositionOfTheThing() {
+    String withFeature =
+        """
+        {
+          "result": 21.5,
+          "parameters": { "thingReference": "A7", "datastreamReference": "temp" },
+          "FeatureOfInterest": {
+            "name": "Garden", "description": "The garden", "encodingType": "application/geo+json",
+            "feature": { "type": "Point", "coordinates": [8.4, 49.0] }
+          }
+        }
+        """;
+    JsonNode requests = BatchDocuments.of(SinkPort.OBSERVATIONS, withFeature).get("requests");
+
+    // The measurement brings its own, so the Location of the Thing does not matter.
+    assertEquals(2, requests.size());
+    assertEquals("$r0-ds", requests.get(1).get("if").asText());
   }
 
   @Test

@@ -106,7 +106,7 @@ class PutFrostRecordTest {
   }
 
   @Test
-  void onTrigger_whenTheParentReferenceMisses_routesTheRecordToFailure()
+  void onTrigger_whenTheParentReferenceMisses_routesTheRecordToRetry()
       throws InitializationException {
     try (FrostEndpoint endpoint =
         FrostEndpoint.answering(
@@ -120,9 +120,38 @@ class PutFrostRecordTest {
 
       runner.run();
 
-      MockFlowFile failed = runner.getFlowFilesForRelationship(PutFrostRecord.FAILURE).get(0);
-      failed.assertAttributeEquals(PutFrostRecord.ERROR_ENTITY, "Datastream");
-      failed.assertAttributeEquals(PutFrostRecord.ERROR_STATUS, "404");
+      // The Pipeline that writes the Datastream may not have run yet. NiFi retries the record with
+      // growing back-off; only when the attempts are spent does it reach the error sink.
+      runner.assertTransferCount(PutFrostRecord.FAILURE, 0);
+      MockFlowFile retried = runner.getFlowFilesForRelationship(PutFrostRecord.RETRY).get(0);
+      retried.assertAttributeEquals(PutFrostRecord.ERROR_ENTITY, "Datastream");
+      retried.assertAttributeEquals(PutFrostRecord.ERROR_STATUS, "404");
+      assertTrue(retried.isPenalized());
+    }
+  }
+
+  @Test
+  void onTrigger_whenAWriteIsRefused_routesTheRecordToFailure() throws InitializationException {
+    try (FrostEndpoint endpoint =
+        FrostEndpoint.answering(
+            document ->
+                answers(
+                    "{\"id\":\"r0-thing\",\"status\":200,\"body\":{\"value\":[]}}",
+                    "{\"id\":\"r0-thing\",\"status\":400,\"body\":{\"message\":\"name is"
+                        + " required\"}}"),
+            200)) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.enqueue(THING_A.getBytes(StandardCharsets.UTF_8));
+
+      runner.run();
+
+      // A record FROST refuses as it is gets the same answer every time; retrying it only delays
+      // the error sink.
+      runner.assertTransferCount(PutFrostRecord.RETRY, 0);
+      runner
+          .getFlowFilesForRelationship(PutFrostRecord.FAILURE)
+          .get(0)
+          .assertAttributeEquals(PutFrostRecord.ERROR_MESSAGE, "name is required");
     }
   }
 
@@ -170,6 +199,38 @@ class PutFrostRecordTest {
 
       runner.assertTransferCount(PutFrostRecord.SUCCESS, 0);
       runner.assertTransferCount(PutFrostRecord.FAILURE, 1);
+    }
+  }
+
+  @Test
+  void onTrigger_whenAnAnswerCarriesNoIdentifier_routesOnlyItsOwnRecordToFailure()
+      throws InitializationException {
+    // FROST names no request in the answers it writes for the rest of a failed atomicity group.
+    // Rejecting the whole document over them would lose the records that were written.
+    try (FrostEndpoint endpoint =
+        FrostEndpoint.answering(
+            document ->
+                answers(
+                    "{\"id\":\"r0-thing\",\"status\":200,\"body\":{\"value\":[]}}",
+                    "{\"id\":\"r0-thing\",\"status\":400,\"body\":{\"message\":\"name is"
+                        + " required\"}}",
+                    "{\"status\":400,\"body\":\"Skipped due to previous failure in"
+                        + " atomicityGroup.\"}",
+                    "{\"id\":\"r1-thing\",\"status\":200,\"body\":{\"value\":[]}}",
+                    "{\"id\":\"r1-thing\",\"status\":201,\"body\":{\"@iot.id\":9}}"),
+            200)) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(PutFrostRecord.RECORDS_PER_REQUEST, "2");
+      runner.enqueue(THING_A.getBytes(StandardCharsets.UTF_8));
+      runner.enqueue(THING_B.getBytes(StandardCharsets.UTF_8));
+
+      runner.run();
+
+      runner.assertTransferCount(PutFrostRecord.SUCCESS, 1);
+      runner.assertTransferCount(PutFrostRecord.FAILURE, 1);
+      MockFlowFile failed = runner.getFlowFilesForRelationship(PutFrostRecord.FAILURE).get(0);
+      failed.assertAttributeEquals(PutFrostRecord.ERROR_STATUS, "400");
+      failed.assertAttributeEquals(PutFrostRecord.ERROR_MESSAGE, "name is required");
     }
   }
 

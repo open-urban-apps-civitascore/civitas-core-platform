@@ -51,7 +51,7 @@ public final class ThingTreePort implements PortPlanner {
 
     ObjectNode location = StaEntities.firstOf(record, "Locations", StaEntities.LOCATION);
     if (location != null) {
-      planLocation(location, plan, projectId, thingReference);
+      planLocation(location, plan, thingReference);
     }
 
     ObjectNode datastream = StaEntities.firstOf(record, "Datastreams", StaEntities.DATASTREAM);
@@ -77,7 +77,7 @@ public final class ThingTreePort implements PortPlanner {
         StaEntities.THING,
         THING_UPDATE,
         BatchMethod.PATCH,
-        FrostUrls.entity("Things", SubRequest.reference(plan.id(THING))),
+        SubRequest.reference(plan.id(THING)),
         SubRequest.ifResolved(plan.id(THING)),
         body,
         true);
@@ -91,11 +91,11 @@ public final class ThingTreePort implements PortPlanner {
         true);
   }
 
-  private void planLocation(
-      ObjectNode location, RecordPlan plan, String projectId, String thingReference) {
+  private void planLocation(ObjectNode location, RecordPlan plan, String thingReference) {
     // A Thing has one current Location, and the mapped shape carries one. Without a reference of
-    // its own the Location takes the Thing's, which keeps the lookup a direct query instead of a
-    // navigation into a collection whose order nothing fixes.
+    // its own the Location takes the Thing's. The lookup runs through the Thing just resolved or
+    // created — the Location collection belongs to no project, so a direct query would find the
+    // Location another Dataset wrote for the same device.
     String reference =
         ReferenceBlock.read(location, ReferenceBlock.PROPERTIES, ReferenceBlock.REFERENCE)
             .orElse(thingReference);
@@ -107,12 +107,12 @@ public final class ThingTreePort implements PortPlanner {
     plan.ownLookup(
         StaEntities.LOCATION,
         LOCATION,
-        FrostUrls.locationLookup(projectId, reference, thingReference));
+        FrostUrls.locationLookup(SubRequest.reference(plan.id(THING)), reference));
     plan.write(
         StaEntities.LOCATION,
         LOCATION_UPDATE,
         BatchMethod.PATCH,
-        FrostUrls.entity("Locations", SubRequest.reference(plan.id(LOCATION))),
+        SubRequest.reference(plan.id(LOCATION)),
         SubRequest.ifResolved(plan.id(LOCATION)),
         body,
         true);
@@ -150,17 +150,16 @@ public final class ThingTreePort implements PortPlanner {
         StaEntities.DATASTREAM,
         DATASTREAM_UPDATE,
         BatchMethod.PATCH,
-        FrostUrls.entity("Datastreams", SubRequest.reference(plan.id(DATASTREAM))),
+        SubRequest.reference(plan.id(DATASTREAM)),
         SubRequest.ifResolved(plan.id(DATASTREAM)),
         body,
         true);
 
-    planNestedUpdate(datastream, plan, StaEntities.SENSOR, "Sensors", SENSOR, SENSOR_UPDATE);
+    planNestedUpdate(datastream, plan, StaEntities.SENSOR, SENSOR, SENSOR_UPDATE);
     planNestedUpdate(
         datastream,
         plan,
         StaEntities.OBSERVED_PROPERTY,
-        "ObservedProperties",
         OBSERVED_PROPERTY,
         OBSERVED_PROPERTY_UPDATE);
 
@@ -189,7 +188,6 @@ public final class ThingTreePort implements PortPlanner {
       ObjectNode datastream,
       RecordPlan plan,
       String navigation,
-      String collection,
       String lookupSuffix,
       String updateSuffix) {
     if (!(datastream.get(navigation) instanceof ObjectNode nested)) {
@@ -198,13 +196,13 @@ public final class ThingTreePort implements PortPlanner {
     plan.ownLookup(
         navigation,
         lookupSuffix,
-        FrostUrls.navigation("Datastreams", SubRequest.reference(plan.id(DATASTREAM)), navigation),
+        FrostUrls.navigation(SubRequest.reference(plan.id(DATASTREAM)), navigation),
         SubRequest.ifResolved(plan.id(DATASTREAM)));
     plan.write(
         navigation,
         updateSuffix,
         BatchMethod.PATCH,
-        FrostUrls.entity(collection, SubRequest.reference(plan.id(lookupSuffix))),
+        SubRequest.reference(plan.id(lookupSuffix)),
         SubRequest.ifResolved(plan.id(lookupSuffix)),
         StaEntities.withoutNavigation(nested),
         false);

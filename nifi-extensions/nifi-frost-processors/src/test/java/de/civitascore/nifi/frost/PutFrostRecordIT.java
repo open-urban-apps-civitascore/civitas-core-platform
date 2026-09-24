@@ -178,7 +178,7 @@ class PutFrostRecordIT {
   }
 
   @Test
-  void observationsPort_whenTheDatastreamIsUnknown_routesTheRecordToFailure() throws Exception {
+  void observationsPort_whenTheDatastreamIsUnknown_routesTheRecordToRetry() throws Exception {
     TestRunner runner = runner("Observations");
 
     runner.enqueue(
@@ -186,11 +186,38 @@ class PutFrostRecordIT {
             .getBytes(StandardCharsets.UTF_8));
     runner.run();
 
-    // The port writes its own entity only. A parent it cannot resolve is a defect of the data, and
-    // the record goes to the error sink instead of provoking a Datastream nobody modelled.
+    // The port writes its own entity only, and does not provoke a Datastream nobody modelled. But
+    // the Pipeline that writes it may not have run yet, so the record is retried — NiFi sends it
+    // to the error sink only once the attempts are spent.
     runner.assertTransferCount(PutFrostRecord.SUCCESS, 0);
-    MockFlowFile failed = runner.getFlowFilesForRelationship(PutFrostRecord.FAILURE).get(0);
-    failed.assertAttributeEquals(PutFrostRecord.ERROR_ENTITY, "Datastream");
+    runner.assertTransferCount(PutFrostRecord.FAILURE, 0);
+    MockFlowFile retried = runner.getFlowFilesForRelationship(PutFrostRecord.RETRY).get(0);
+    retried.assertAttributeEquals(PutFrostRecord.ERROR_ENTITY, "Datastream");
+  }
+
+  @Test
+  void observationsPort_aMeasurementBeforeItsMasterData_isWrittenOnceTheMasterDataArrives()
+      throws Exception {
+    String thingReference = "IT-OBS-LATE-THING";
+    String datastreamReference = "IT-OBS-LATE-DS";
+    TestRunner runner = runner("Observations");
+    byte[] measurement =
+        observation(thingReference, datastreamReference, null, 3.5)
+            .getBytes(StandardCharsets.UTF_8);
+
+    runner.enqueue(measurement);
+    runner.run();
+    runner.assertTransferCount(PutFrostRecord.RETRY, 1);
+
+    // The master data arrives. TestRunner does not re-queue a retried FlowFile the way NiFi does,
+    // so the same record is sent again by hand — which is what the framework retry amounts to.
+    long datastreamId = provisionDatastream(thingReference, datastreamReference);
+    runner.clearTransferState();
+    runner.enqueue(measurement);
+    runner.run();
+
+    runner.assertTransferCount(PutFrostRecord.SUCCESS, 1);
+    assertEquals(1, frost.count("/Datastreams(" + datastreamId + ")/Observations"));
   }
 
   @Test

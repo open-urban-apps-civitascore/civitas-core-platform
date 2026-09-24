@@ -3,19 +3,25 @@
     "id" : "r0-ds",
     "atomicityGroup" : "r0",
     "method" : "get",
-    "url" : "Datastreams?$select=id&$top=1&$filter=properties/reference%20eq%20'temp'%20and%20properties/thingReference%20eq%20'A7'%20and%20Thing/Projects/id%20eq%205"
+    "url" : "Datastreams?$select=id&$top=1&$filter=properties/reference eq 'temp' and properties/thingReference eq 'A7' and Thing/Projects/id eq 5"
   }, {
-    "id" : "r0-obs",
+    "id" : "r0-ds-loc",
     "atomicityGroup" : "r0",
     "if" : "$r0-ds",
     "method" : "get",
-    "url" : "Observations?$select=id&$top=1&$filter=parameters/reference%20eq%20'm-1'%20and%20Datastream/properties/reference%20eq%20'temp'%20and%20Datastream/properties/thingReference%20eq%20'A7'%20and%20Datastream/Thing/Projects/id%20eq%205"
+    "url" : "$r0-ds/Thing/Locations?$select=id&$top=1"
+  }, {
+    "id" : "r0-obs",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-ds-loc",
+    "method" : "get",
+    "url" : "Observations?$select=id&$top=1&$filter=parameters/reference eq 'm-1' and Datastream/properties/reference eq 'temp' and Datastream/properties/thingReference eq 'A7' and Datastream/Thing/Projects/id eq 5"
   }, {
     "id" : "r0-obs-update",
     "atomicityGroup" : "r0",
     "if" : "$r0-obs",
     "method" : "patch",
-    "url" : "Observations($r0-obs)",
+    "url" : "$r0-obs",
     "body" : {
       "phenomenonTime" : "2026-09-18T07:00:00Z",
       "result" : 21.5,
