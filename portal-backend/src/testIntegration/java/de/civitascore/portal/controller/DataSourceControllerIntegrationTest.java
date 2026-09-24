@@ -35,6 +35,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 @DisplayName("DataSource Controller Integration Tests")
@@ -512,6 +513,24 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should refuse to delete a DRAFT data source that a Pipeline references")
+    void shouldRefuseDeletingDraftDataSourceReferencedByPipeline() {
+      UUID id = createTestEntity();
+      linkDataSourceToDataSetViaStatus(
+          dataSourceRepository.findById(id).orElseThrow(), DataSetStatus.DRAFT);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      // The foreign key also answers 409, so only the problem type shows the guard ran before
+      // postDelete dropped the Model Forge artifact.
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
+      assertThat(dataSourceRepository.existsById(id)).isTrue();
+    }
+
+    @Test
     @DisplayName("Should fail to delete non-existent data source")
     void shouldFailToDeleteNonExistent() {
       ResponseEntity<Void> response = performDelete(UUID.randomUUID());
@@ -942,6 +961,7 @@ class DataSourceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().isInUse()).isFalse();
+      assertThat(response.getBody().isInUseByReleased()).isFalse();
     }
 
     @Test
@@ -955,6 +975,7 @@ class DataSourceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().isInUse()).isTrue();
+      assertThat(response.getBody().isInUseByReleased()).isFalse();
     }
 
     @Test
@@ -967,6 +988,7 @@ class DataSourceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().isInUse()).isTrue();
+      assertThat(response.getBody().isInUseByReleased()).isFalse();
     }
 
     @Test
@@ -979,6 +1001,7 @@ class DataSourceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().isInUse()).isTrue();
+      assertThat(response.getBody().isInUseByReleased()).isTrue();
     }
   }
 
@@ -1159,10 +1182,10 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject connector type change when in use")
+    @DisplayName("Should reject connector type change when an AVAILABLE DataSet uses it")
     void shouldRejectConnectorTypeChangeWhenInUse() {
       DataSource dataSource = createAvailableDataSource();
-      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.READY);
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
 
       Map<String, Object> metaUpdate = Map.of("name", "updated-name", "connectorType", "SQL");
 
@@ -1174,6 +1197,31 @@ class DataSourceControllerIntegrationTest
               String.class);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should accept a configuration change when only a DRAFT DataSet uses it")
+    void shouldAcceptConfigurationChangeWhenInUseByDraftDataSetOnly() {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.DRAFT);
+
+      Map<String, Object> newConfig =
+          Map.of(
+              "urls", List.of("tcp://new-broker:1883"),
+              "topics", List.of("new/topic"),
+              "qos", 2);
+
+      ResponseEntity<DataSourceOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              Map.of("name", dataSource.getName(), "configuration", newConfig),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getConfiguration().get("urls"))
+          .isEqualTo(List.of("tcp://new-broker:1883"));
     }
 
     @Test
@@ -1221,14 +1269,14 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should return 409 when unreleasing a DataSource in use by a READY DataSet")
-    void shouldReturn409WhenInUseByReadyDataSet() {
+    @DisplayName("Should unrelease a DataSource a READY DataSet uses")
+    void shouldUnreleaseWhenInUseByReadyDataSet() {
       DataSource dataSource = createAvailableDataSource();
       linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.READY);
 
-      ResponseEntity<String> response = performUnreleaseExpectingError(dataSource.getId());
+      ResponseEntity<DataSourceOutputDTO> response = performUnrelease(dataSource.getId());
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
@@ -1243,15 +1291,15 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName(
-        "Should return 409 when unreleasing a DataSource referenced by a Pipeline in a DRAFT DataSet")
-    void shouldReturn409WhenInUseByDraftDataSet() {
+    @DisplayName("Should unrelease a DataSource a Pipeline in a DRAFT DataSet references")
+    void shouldUnreleaseWhenInUseByDraftDataSet() {
       DataSource dataSource = createAvailableDataSource();
       linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.DRAFT);
 
-      ResponseEntity<String> response = performUnreleaseExpectingError(dataSource.getId());
+      ResponseEntity<DataSourceOutputDTO> response = performUnrelease(dataSource.getId());
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDataSourceStatus()).isEqualTo(DataSourceStatus.DRAFT);
     }
   }
 
