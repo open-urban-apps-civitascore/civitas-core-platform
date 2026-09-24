@@ -146,7 +146,6 @@ export const DatastructureFormDraftSchema = z.object({
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
   description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   dataStructureStatus: DatastructureStatusEnum,
-  dataStructureVersionIds: z.array(z.string()),
 })
 
 export const DatastructureFormAvailableSchema = DatastructureFormDraftSchema.extend({
