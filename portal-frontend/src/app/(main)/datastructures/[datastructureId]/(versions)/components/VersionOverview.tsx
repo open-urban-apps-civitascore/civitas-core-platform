@@ -35,12 +35,12 @@ import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
 
 const tabs: Tab<DatastructureVersionTab>[] = [
   {
-    value: 'versionInfo',
-    label: 'datastructureVersions.tabs.versionInfo',
-  },
-  {
     value: 'structure',
     label: 'datastructureVersions.tabs.structure',
+  },
+  {
+    value: 'versionInfo',
+    label: 'datastructureVersions.tabs.versionInfo',
   },
 ]
 
@@ -222,22 +222,25 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const renderTabContent = () => {
     switch (subTabValue) {
-      case 'structure':
-        return (
-          <StructureDefinitionTab
-            isReadOnly={isReadOnly}
-            modelSessionManager={modelSessionManager}
-            isAvailable={isVersionAvailable}
-          />
-        )
       case 'versionInfo':
-      default:
         return (
           <VersionInfoTab
             form={form}
             isReadOnly={isReadOnly}
             isAvailable={isVersionAvailable}
             importedStructureUrns={version?.importedStructureUrns ?? []}
+          />
+        )
+      case 'structure':
+      default:
+        return (
+          <StructureDefinitionTab
+            isReadOnly={isReadOnly}
+            modelSessionManager={modelSessionManager}
+            isAvailable={isVersionAvailable}
+            dataStructureName={datastructure.name}
+            versionName={version?.version}
+            datastructureId={datastructure.id}
           />
         )
     }
