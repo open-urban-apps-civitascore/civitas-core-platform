@@ -1,7 +1,11 @@
 import type { Edge, Node } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 
-import type { MappingConfig, SchemaTree } from './_types'
+import { CONTRACT_URIS, contractErrors, readContract } from '@/test-support/coreContracts'
+import type { ContractOperation } from '@/test-support/mappingFixtures'
+import { mappingFixtures, sourceTree as fixtureSourceTree } from '@/test-support/mappingFixtures'
+
+import type { MappingConfig, SchemaTree, ValueNode } from './_types'
 import {
   compileCanvas,
   decompileConfig,
@@ -9,7 +13,8 @@ import {
   SOURCE_NODE_ID,
   TARGET_NODE_ID,
 } from './compile'
-import { concatInputPorts, transformDef } from './transforms'
+import { findNodeConfigErrors } from './status'
+import { concatInputPorts, mappingRegistry, transformDef } from './transforms'
 
 const sourceTree: SchemaTree = {
   name: 'src',
@@ -335,5 +340,84 @@ describe('mapping editor compile', () => {
     const recompiled = compileCanvas(built.nodes, built.edges)
     expect(recompiled.fields).toEqual(compiled.fields)
     expect(Object.keys(recompiled.positions).sort()).toEqual(Object.keys(compiled.positions).sort())
+  })
+})
+
+describe('The operation the Mapping editor offers', () => {
+  const MAPPING_URN = 'urn:core:platform:civitas:mapping:common:M:abcdef1234:1.0.0'
+
+  const documentOf = (fields: Record<string, ValueNode>) => ({
+    $schema: CONTRACT_URIS.mapping,
+    id: MAPPING_URN,
+    source: 'urn:core:platform:civitas:datastructure:common:S:abcdef1234:1.0.0',
+    target: 'urn:core:platform:civitas:datastructure:common:T:abcdef1234:1.0.0',
+    fields,
+  })
+
+  const expectedOperation: Record<ContractOperation, ValueNode> = {
+    copy: '$.name',
+    concat: { op: 'concat', separator: '-', inputs: ['$.id', '$.suffix'] },
+    const: { op: 'const', value: 'fixed', valueType: 'String' },
+    toString: { op: 'toString', input: '$.id' },
+    toInt: { op: 'toInt', input: '$.id' },
+    toFloat: { op: 'toFloat', input: '$.id' },
+    toDate: { op: 'toDate', input: '$.day', pattern: 'yyyy-MM-dd' },
+    format: { op: 'format', input: '$.when', pattern: 'yyyy-MM-dd' },
+    geoPoint: { op: 'geoPoint', lon: '$.longitude', lat: '$.latitude' },
+  }
+
+  it.each(mappingFixtures)('$operation compiles to its CORE operation', fixture => {
+    const { fields } = compileCanvas(fixture.nodes, fixture.edges)
+    expect(fields[fixture.targetPath]).toEqual(expectedOperation[fixture.operation])
+  })
+
+  it.each(mappingFixtures)('$operation produces a contract-valid mapping document', fixture => {
+    const { fields } = compileCanvas(fixture.nodes, fixture.edges)
+    expect(contractErrors('mapping', documentOf(fields))).toEqual([])
+  })
+
+  it.each(mappingFixtures)('$operation is unchanged after rehydration', fixture => {
+    const compiled = compileCanvas(fixture.nodes, fixture.edges)
+    const built = decompileConfig({ ...compiled }, fixtureSourceTree, fixture.targetTree)
+
+    const restored = built.nodes.find(node => node.type === 'transform')
+    expect(restored?.data.defType).toBe(fixture.operation === 'copy' ? undefined : fixture.operation)
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(compiled.fields)
+  })
+
+  it('compiles a direct edge to the bare path, not a copy object', () => {
+    const copy = mappingFixtures.find(fixture => fixture.operation === 'copy')!
+    const { fields } = compileCanvas(copy.nodes, copy.edges)
+    expect(typeof fields[copy.targetPath]).toBe('string')
+  })
+
+  it('offers the same operations the mapping contract defines', () => {
+    const defs = readContract('mapping').$defs as Record<string, { properties?: { op?: { const?: string } } }>
+    const defined = Object.values(defs)
+      .map(def => def.properties?.op?.const)
+      .filter(Boolean)
+      .sort()
+
+    // 'copy' is the direct edge, it is not offered in the palette.
+    expect([...Object.keys(mappingRegistry.byType), 'copy'].sort()).toEqual(defined)
+  })
+
+  it.each(['toDate', 'toDateTime', 'format'] as const)('reports an emptied %s pattern as a config error', op => {
+    const def = transformDef(op)
+    const patternNodes: Node[] = [
+      ...nodes.slice(0, 2),
+      {
+        id: op,
+        type: 'transform',
+        position: { x: 300, y: 40 },
+        data: { defType: op, config: { pattern: '' }, inputs: def.inputs, outputs: def.outputs },
+      },
+    ]
+    const patternEdges: Edge[] = [
+      { id: 'p1', source: SOURCE_NODE_ID, sourceHandle: '$.name', target: op, targetHandle: 'in' },
+      { id: 'p2', source: op, sourceHandle: 'out', target: TARGET_NODE_ID, targetHandle: '$.title' },
+    ]
+
+    expect(findNodeConfigErrors(patternNodes, patternEdges).blockingCount).toBe(1)
   })
 })
