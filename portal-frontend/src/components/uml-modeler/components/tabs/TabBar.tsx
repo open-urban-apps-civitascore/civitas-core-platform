@@ -1,9 +1,13 @@
 'use client'
 
-import { Plus, X } from 'lucide-react'
+import { Download, Plus, Upload, X } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useCallback, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
+
 import { useReadOnly } from '../../hooks/use-read-only'
+import { DEFAULT_DIAGRAM_NAME } from '../../services/diagramService'
 import type { DiagramSession } from '../../types/session'
 
 interface TabProps {
@@ -17,31 +21,45 @@ interface TabProps {
 
 const Tab: React.FC<TabProps> = props => {
   const { session, isActive, onSelect, onClose, onRename, isModelerReadOnly } = props
+  const t = useTranslations('umlModeler')
+  const isDefaultOrEmpty = !session.name || session.name === DEFAULT_DIAGRAM_NAME
+  const displayName = isDefaultOrEmpty ? '' : session.name
+
   const [isEditing, setIsEditing] = useState(false)
-  const [editName, setEditName] = useState(session.name)
+  const [editName, setEditName] = useState(displayName)
 
   const handleDoubleClick = useCallback(() => {
     setIsEditing(true)
-    setEditName(session.name)
-  }, [session.name])
+    setEditName(displayName)
+  }, [displayName])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter') {
-        onRename(session.id, editName.trim() || session.name)
+        const trimmed = editName.trim()
+        if (trimmed) {
+          onRename(session.id, trimmed)
+        } else {
+          setEditName(displayName)
+        }
         setIsEditing(false)
       } else if (e.key === 'Escape') {
-        setEditName(session.name)
+        setEditName(displayName)
         setIsEditing(false)
       }
     },
-    [session.id, session.name, editName, onRename],
+    [session.id, displayName, editName, onRename],
   )
 
   const handleBlur = useCallback(() => {
-    onRename(session.id, editName.trim() || session.name)
+    const trimmed = editName.trim()
+    if (trimmed) {
+      onRename(session.id, trimmed)
+    } else {
+      setEditName(displayName)
+    }
     setIsEditing(false)
-  }, [session.id, session.name, editName, onRename])
+  }, [session.id, displayName, editName, onRename])
 
   const handleClose = useCallback(
     (e: React.MouseEvent) => {
@@ -71,6 +89,7 @@ const Tab: React.FC<TabProps> = props => {
           <input
             type="text"
             value={editName}
+            placeholder={t('modelNamePlaceholder')}
             onChange={isModelerReadOnly ? undefined : e => setEditName(e.target.value)}
             onKeyDown={isModelerReadOnly ? undefined : handleKeyDown}
             onBlur={isModelerReadOnly ? undefined : handleBlur}
@@ -79,7 +98,11 @@ const Tab: React.FC<TabProps> = props => {
           />
         ) : (
           <span className="text-sm truncate flex items-center">
-            {session.name}
+            {displayName ? (
+              <span>{displayName}</span>
+            ) : (
+              <span className="text-gray-400 italic">{t('modelNamePlaceholder')}</span>
+            )}
             {session.isDirty && <span className="ml-1 text-blue-500">•</span>}
           </span>
         )}
@@ -107,6 +130,8 @@ interface TabBarProps {
   onCloseSession: (sessionId: string) => void
   onRenameSession: (sessionId: string, newName: string) => void
   onCreateSession: () => void
+  onImportClick?: () => void
+  onExportClick?: () => void
 }
 
 export const TabBar: React.FC<TabBarProps> = props => {
@@ -118,25 +143,30 @@ export const TabBar: React.FC<TabBarProps> = props => {
     onCloseSession,
     onRenameSession,
     onCreateSession,
+    onImportClick,
+    onExportClick,
   } = props
+  const t = useTranslations('umlModeler')
   const { isReadOnly: isModelerReadOnly } = useReadOnly()
   const canCreateSession = isMultiSessionMode
   return (
-    <div className="flex items-center bg-gray-50 border-b border-gray-200 overflow-hidden">
+    <div className="flex items-center bg-gray-50 border-b border-gray-200 overflow-hidden min-h-[38px]">
       {/* Scrollable Tabs Container */}
-      <div className="flex overflow-x-auto scrollbar-hide">
-        {sessions.map(session => (
-          <Tab
-            key={session.id}
-            session={session}
-            isActive={session.id === activeSessionId}
-            onSelect={onSelectSession}
-            onClose={onCloseSession}
-            onRename={onRenameSession}
-            isModelerReadOnly={isModelerReadOnly}
-          />
-        ))}
-      </div>
+      {isMultiSessionMode && (
+        <div className="flex overflow-x-auto scrollbar-hide">
+          {sessions.map(session => (
+            <Tab
+              key={session.id}
+              session={session}
+              isActive={session.id === activeSessionId}
+              onSelect={onSelectSession}
+              onClose={onCloseSession}
+              onRename={onRenameSession}
+              isModelerReadOnly={isModelerReadOnly}
+            />
+          ))}
+        </div>
+      )}
 
       {/* New Tab Button */}
       {!isModelerReadOnly && canCreateSession && (
@@ -151,6 +181,36 @@ export const TabBar: React.FC<TabBarProps> = props => {
 
       {/* Fill remaining space */}
       <div className="flex-1 bg-gray-50" />
+
+      {/* Actions (Import & Export) */}
+      <div className="flex items-center gap-1 px-2">
+        {onImportClick && !isModelerReadOnly && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onImportClick}
+            className="h-8 px-2 text-xs font-normal text-gray-700 hover:text-gray-900"
+            title={t('import.file')}
+          >
+            <Upload className="h-3.5 w-3.5 mr-1 text-gray-600" />
+            <span>{t('import.title')}</span>
+          </Button>
+        )}
+        {onExportClick && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onExportClick}
+            className="h-8 px-2 text-xs font-normal text-gray-700 hover:text-gray-900"
+            title={t('export.file')}
+          >
+            <Download className="h-3.5 w-3.5 mr-1 text-gray-600" />
+            <span>{t('export.title')}</span>
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
