@@ -9,8 +9,10 @@
 #
 # The start-dev.sh script handles this automatically.
 
-# Pinned: eclipse-temurin:25-jre-alpine (2026-08-21). Update digest on base image updates.
-FROM eclipse-temurin:25-jre-alpine@sha256:3137541deb3cac6626b5d9a4a2187bc0d6a34312f858bd2c67dd01e732e6b682
+# Pinned: eclipse-temurin:25-jre-alpine (2026-09-24), Alpine 3.24.2. Update digest on base image updates.
+# Bumps libexpat to 2.8.4-r0 (CVE-2026-76641, CVE-2026-66046, CVE-2026-76956, CVE-2026-76957)
+# and openssl/libssl3/libcrypto3 to 3.5.8-r0 (CVE-2026-14456).
+FROM eclipse-temurin:25-jre-alpine@sha256:2ca9adf44f5c29d28ecd26cf92d75cc0c66b7f32bfd839a4439e363a8b428af8
 
 WORKDIR /app
 
