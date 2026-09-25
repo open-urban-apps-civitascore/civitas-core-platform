@@ -396,11 +396,6 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   }
 
   @Override
-  protected UUID getEntityId(User entity) {
-    return entity.getId();
-  }
-
-  @Override
   protected void updateExternalId(User entity, String externalId) {
     if (externalId != null && !externalId.isBlank()) {
       entity.setExternalId(externalId);

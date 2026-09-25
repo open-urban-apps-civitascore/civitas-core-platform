@@ -12,6 +12,7 @@ import de.civitascore.portal.service.event.BaseEventPublishingIntegrationTest;
 import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.Optional;
+import org.hibernate.Hibernate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -65,6 +66,15 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     groupRepository.deleteAll();
   }
 
+  private List<Assignment> assignmentsOf(Group group) {
+    return txTemplate.execute(
+        status ->
+            assignmentRepository.findAll().stream()
+                .filter(a -> a.getGroup().getId().equals(group.getId()))
+                .peek(a -> Hibernate.initialize(a.getRole()))
+                .toList());
+  }
+
   @Test
   @DisplayName("Should create group with Tenant Admin assignment")
   void shouldCreateGroupWithRoleAssignment() {
@@ -73,7 +83,7 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     assertThat(group.getName()).isEqualTo(TEST_GROUP_NAME);
     assertThat(group.getDescription()).isEqualTo("Init test admin group");
 
-    List<Assignment> assignments = assignmentRepository.findAllByGroupId(group.getId());
+    List<Assignment> assignments = assignmentsOf(group);
     assertThat(assignments).hasSize(1);
     assertThat(assignments.getFirst().getRole().getName()).isEqualTo("Tenant Admin");
     assertThat(assignments.getFirst().getScopeType()).isNull();
@@ -86,7 +96,7 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     Group group = groupRepository.findByName(TEST_SCOPED_GROUP_NAME).orElseThrow();
     assertThat(group.getDescription()).isEqualTo("Init test data architect group");
 
-    List<Assignment> assignments = assignmentRepository.findAllByGroupId(group.getId());
+    List<Assignment> assignments = assignmentsOf(group);
     assertThat(assignments).hasSize(1);
     assertThat(assignments.getFirst().getRole().getName()).isEqualTo("Data Architect");
     assertThat(assignments.getFirst().getScopeType()).isEqualTo(ScopeType.TENANT);

@@ -153,11 +153,6 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
   }
 
   @Override
-  protected UUID getEntityId(Group entity) {
-    return entity.getId();
-  }
-
-  @Override
   protected GroupRepository getRepository() {
     return groupRepository;
   }

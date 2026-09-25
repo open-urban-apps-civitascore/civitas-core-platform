@@ -85,8 +85,6 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "routeId", ignore = true)
   NamedApi toNamedApiEntity(NamedApiInputDTO dto);
 
-  NamedApiInputDTO toNamedApiInputDto(NamedApi entity);
-
   // previewUrl is built by DataSetAssembler since it depends on configuration.
   @Mapping(target = "previewUrl", ignore = true)
   NamedApiOutputDTO toNamedApiOutputDto(NamedApi entity);

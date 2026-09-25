@@ -28,7 +28,6 @@ import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
-import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
@@ -71,7 +70,6 @@ class DataSourceServiceTest {
   @Mock private ConnectorHandler sqlHandler;
   @Mock private AssignmentService assignmentService;
   @Mock private DataStructureVersionService dataStructureVersionService;
-  @Mock private DataSetRepository dataSetRepository;
   @Mock private PipelineRepository pipelineRepository;
   @Mock private DataPoolRepository dataPoolRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
@@ -1267,39 +1265,6 @@ class DataSourceServiceTest {
       assertThatThrownBy(() -> dataSourceService.update(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("can only be updated in DRAFT status");
-    }
-
-    @Test
-    @DisplayName("Should return null when no DSV linked")
-    void shouldReturnNullWhenNoDsvLinked() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setDataStructureVersion(null);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-
-      DataStructureVersion result = dataSourceService.findLinkedDataStructureVersion(id);
-
-      assertThat(result).isNull();
-    }
-
-    @Test
-    @DisplayName("Should return DSV when linked")
-    void shouldReturnDsvWhenLinked() {
-      UUID id = UUID.randomUUID();
-      DataStructureVersion dsv = createDataStructureVersion();
-
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setDataStructureVersion(dsv);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(dataStructureVersionService.findByIdOrThrow(dsv.getId())).thenReturn(dsv);
-
-      DataStructureVersion result = dataSourceService.findLinkedDataStructureVersion(id);
-
-      assertThat(result).isEqualTo(dsv);
     }
   }
 

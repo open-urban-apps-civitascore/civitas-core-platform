@@ -632,36 +632,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Explicitly adds a reusable artifact (by CORE URN) to this dataset's manifest — the "Beides"
-   * explicit-assignment path, independent of any Pipeline that uses it. Model Forge maintains the
-   * manifest (a {@code dataset-ref} membership edge).
-   *
-   * <p>No route reaches this: the caller's rights are read off the dataset, never off the artifact,
-   * so a route would let a caller pull in an artifact of a dataset they may not read.
-   */
-  @Transactional
-  public void linkMember(UUID datasetId, String memberUrn) {
-    DataSet dataSet = findByIdOrThrow(datasetId);
-    if (dataSet.getManifestLogicalUrn() == null) {
-      throw new InvalidInputException(
-          "DataSet", datasetId, "DataSet has no manifest to link members into");
-    }
-    if (memberUrn == null || memberUrn.isBlank()) {
-      throw new InvalidInputException("member", datasetId, "member artifact URN is required");
-    }
-    modelRegistryGateway.linkToDataSet(dataSet.getManifestLogicalUrn(), memberUrn);
-  }
-
-  /** Explicitly removes an artifact (by CORE URN) from this dataset's manifest. */
-  @Transactional
-  public void unlinkMember(UUID datasetId, String memberUrn) {
-    DataSet dataSet = findByIdOrThrow(datasetId);
-    if (dataSet.getManifestLogicalUrn() != null && memberUrn != null && !memberUrn.isBlank()) {
-      modelRegistryGateway.unlinkFromDataSet(dataSet.getManifestLogicalUrn(), memberUrn);
-    }
-  }
-
-  /**
    * Handles a completed saga result. Updates infrastructure fields and transitions state based on
    * the saga type that was pending.
    */

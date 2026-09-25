@@ -13,7 +13,6 @@ import de.civitascore.modelforge.contract.SaveArtifactCommand;
 import de.civitascore.modelforge.contract.SchemaViewQuery;
 import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.modelforge.urn.UrnParser;
-import de.civitascore.portal.util.InvalidInputException;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -397,24 +396,6 @@ public class ModelRegistryGateway {
     return toPin(result.artifactId());
   }
 
-  /** Explicitly adds a member artifact to a DataSet's manifest ({@code dataset-ref} membership). */
-  public void linkToDataSet(String dataSetUrn, String memberUrn) {
-    try {
-      modelForge.linkToDataSet(new ArtifactId(dataSetUrn), new ArtifactId(memberUrn));
-    } catch (IllegalArgumentException e) {
-      throw rejectedMembership(e);
-    }
-  }
-
-  /** Explicitly removes an artifact from a DataSet's manifest. */
-  public void unlinkFromDataSet(String dataSetUrn, String memberUrn) {
-    try {
-      modelForge.unlinkFromDataSet(new ArtifactId(dataSetUrn), new ArtifactId(memberUrn));
-    } catch (IllegalArgumentException e) {
-      throw rejectedMembership(e);
-    }
-  }
-
   /**
    * Deletes an artifact under the DataSet-aware deletion policy, taking the artifacts it owns with
    * it when {@code cascade} is set. A reference the registry still holds refuses the delete; there
@@ -530,7 +511,6 @@ public class ModelRegistryGateway {
       case DATA_SOURCE -> ArtifactKind.DATA_SOURCE;
       case DATA_SINK -> ArtifactKind.DATA_SINK;
       case MAPPING -> ArtifactKind.MAPPING;
-      case DATA_SET -> ArtifactKind.DATA_SET;
     };
   }
 
@@ -602,13 +582,5 @@ public class ModelRegistryGateway {
       object.put("title", name);
     }
     return content;
-  }
-
-  /**
-   * The registry rejects a URN that names no artifact it can hold membership for. That is a caller
-   * mistake, so it is reported as invalid input rather than escaping as a registry-specific type.
-   */
-  private static InvalidInputException rejectedMembership(IllegalArgumentException cause) {
-    return new InvalidInputException("DataSet", "member", cause.getMessage());
   }
 }

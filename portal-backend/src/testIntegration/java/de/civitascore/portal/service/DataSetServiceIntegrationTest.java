@@ -252,13 +252,14 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       patchAssignments(dataSet.getId(), group.getId(), dataRole.getId());
 
-      assertThat(assignmentRepository.findAllByGroupId(group.getId()))
+      assertThat(
+              assignmentRepository.findAllByScopeTypeAndDatasetId(
+                  ScopeType.DATASET, dataSet.getId()))
           .singleElement()
           .satisfies(
               a -> {
+                assertThat(a.getGroup().getId()).isEqualTo(group.getId());
                 assertThat(a.getRole().getId()).isEqualTo(dataRole.getId());
-                assertThat(a.getScopeType()).isEqualTo(ScopeType.DATASET);
-                assertThat(a.getDataset().getId()).isEqualTo(dataSet.getId());
               });
     }
   }

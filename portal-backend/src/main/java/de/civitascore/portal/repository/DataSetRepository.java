@@ -1,6 +1,5 @@
 package de.civitascore.portal.repository;
 
-import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import java.util.Collection;
 import java.util.List;
@@ -28,17 +27,6 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
       })
   @Override
   @NonNull Optional<DataSet> findById(@NonNull UUID id);
-
-  /**
-   * Check if any dataset with the given statuses references the specified data source via its
-   * pipelines.
-   *
-   * @param dataSourceId the data source ID to check
-   * @param statuses the dataset statuses to include in the check
-   * @return true if at least one matching dataset exists
-   */
-  boolean existsByPipelinesDataSourcesIdAndDataSetStatusIn(
-      UUID dataSourceId, Collection<DataSetStatus> statuses);
 
   /** Variant for saga trigger publishing: also fetches {@code pipelines.dataSources}. */
   @EntityGraph(attributePaths = {"pipelines", "pipelines.dataSources", "namedApis"})
