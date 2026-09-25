@@ -14,7 +14,6 @@
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - config-adapter/**/*
-        - model-forge/model-forge-runtime/src/main/resources/mapping.schema.json # MappingSchemaContractTest reads it
         - .gitlab-ci.yml
         - .gitlab/ci/config-adapter.yml
 
