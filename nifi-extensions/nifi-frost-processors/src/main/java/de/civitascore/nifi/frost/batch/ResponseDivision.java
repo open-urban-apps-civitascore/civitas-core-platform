@@ -83,7 +83,7 @@ public final class ResponseDivision {
         return null;
       }
       if (!answer.successful()) {
-        return serverError(answer)
+        return temporary(answer)
             ? RecordOutcome.retry(recordIndex, request.entity(), answer.status(), reasonOf(answer))
             : RecordOutcome.failed(
                 recordIndex, request.entity(), answer.status(), reasonOf(answer));
@@ -105,14 +105,18 @@ public final class ResponseDivision {
     }
     // A miss on the record's own reference is the usual condition of an upsert and leaves a
     // successful status; only a lookup or a write that broke arrives here.
-    return serverError(answer)
+    return temporary(answer)
         ? RecordOutcome.retry(recordIndex, request.entity(), answer.status(), reasonOf(answer))
         : RecordOutcome.failed(recordIndex, request.entity(), answer.status(), reasonOf(answer));
   }
 
-  /** Whether the server failed rather than the request: the same request may succeed later. */
-  private static boolean serverError(SubResponse answer) {
-    return answer.status() >= 500;
+  /**
+   * Whether the same request may succeed later: the server failed, timed out, or asked for less
+   * load. The batch answer is read the same way.
+   */
+  private static boolean temporary(SubResponse answer) {
+    int status = answer.status();
+    return status >= 500 || status == 408 || status == 429;
   }
 
   /** The outcome when an entity of the record saw no write at all. */

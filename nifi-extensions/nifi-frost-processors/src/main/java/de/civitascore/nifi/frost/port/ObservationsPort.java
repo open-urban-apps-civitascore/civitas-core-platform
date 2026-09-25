@@ -57,7 +57,8 @@ public final class ObservationsPort implements PortPlanner {
     // the write with a 400 whose reason the batch drops, and a Thing whose Location the master
     // data has not written yet would look like a broken record instead of an early one.
     String gate = PARENT;
-    if (!record.has(FEATURE_OF_INTEREST)) {
+    // An explicit null is no feature: FROST derives one exactly as if the member were absent.
+    if (!record.path(FEATURE_OF_INTEREST).isObject()) {
       plan.parentLookup(
           StaEntities.LOCATION,
           POSITION,
@@ -114,6 +115,9 @@ public final class ObservationsPort implements PortPlanner {
   /** The Observation as delivered, linked to the Datastream the lookup resolved. */
   private ObjectNode observation(ObjectNode record, RecordPlan plan) {
     ObjectNode body = record.deepCopy();
+    if (!body.path(FEATURE_OF_INTEREST).isObject()) {
+      body.remove(FEATURE_OF_INTEREST);
+    }
     StaEntities.link(body, StaEntities.DATASTREAM, SubRequest.reference(plan.id(PARENT)));
     return body;
   }

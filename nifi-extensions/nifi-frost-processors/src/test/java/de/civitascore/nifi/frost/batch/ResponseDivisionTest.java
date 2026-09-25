@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class ResponseDivisionTest {
 
@@ -127,6 +129,24 @@ class ResponseDivisionTest {
     RecordOutcome outcome = outcomes.get(0);
     assertTrue(outcome.retryable());
     assertEquals(503, outcome.status());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {408, 429})
+  void divide_whenASubRequestTimesOutOrIsThrottled_retriesTheRecord(int status) {
+    BatchDocument document = document(SinkPort.THINGS, THING);
+
+    Map<Integer, RecordOutcome> outcomes =
+        ResponseDivision.divide(
+            document,
+            response(
+                answer("r0-thing", 200, "{\"value\":[]}"),
+                answer("r0-thing", status, "{\"message\":\"try again later\"}")));
+
+    // The batch answer retries these two already; one sub-request with them is no different.
+    RecordOutcome outcome = outcomes.get(0);
+    assertTrue(outcome.retryable());
+    assertEquals(status, outcome.status());
   }
 
   @Test
