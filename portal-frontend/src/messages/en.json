@@ -590,11 +590,6 @@
       "phone": "Telephone Number",
       "email": "E-Mail",
       "group": "Group",
-      "status": {
-        "title": "Status",
-        "active": "Active",
-        "inactive": "Inactive"
-      },
       "selectTitle": "Select title..."
     },
     "detailsTabs": {
@@ -682,8 +677,7 @@
     "detailsTabs": {
       "info": "Base Information",
       "roles": "Roles",
-      "users": "Users",
-      "subgroups": "Subgroups"
+      "users": "Users"
     },
     "details": {
       "baseInfo": "Base Information",

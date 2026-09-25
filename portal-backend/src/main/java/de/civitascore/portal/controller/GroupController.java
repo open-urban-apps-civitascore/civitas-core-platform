@@ -69,7 +69,7 @@ public class GroupController
   })
   /**
    * Retrieves a paginated list of groups with optional filtering by name, description, contact
-   * user, parent group, or free-text search.
+   * user, members, or free-text search.
    *
    * @param spec the group search/filter specification
    * @param pageable pagination and sorting parameters

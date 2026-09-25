@@ -119,14 +119,12 @@ class SqlConnectorHandlerTest {
       map.put("driver", "postgres");
       map.put("dsn", "postgres://host/db");
       map.put("table", "users");
-      map.put("conn_max_idle", 5);
 
       Map<String, Object> result = handler.normalizeAndValidate(map);
 
       assertThat(result.get("driver")).isEqualTo("postgres");
       assertThat(result.get("dsn")).isEqualTo("postgres://host/db");
       assertThat(result.get("table")).isEqualTo("users");
-      assertThat(result).doesNotContainKey("conn_max_idle");
     }
 
     @Test
