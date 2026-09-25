@@ -232,6 +232,17 @@ class NifiFlowBuilderTest {
   }
 
   @Test
+  void updateRecordCarriesOnlyTheMappedRecordPaths() throws Exception {
+    // A fragment re-exported with sample record paths would add those fields to every record.
+    JsonNode update =
+        component(build(mqttToPostgis(mapping())), "processors", "UpdateRecord").get("properties");
+    Set<String> names = new HashSet<>();
+    update.fieldNames().forEachRemaining(names::add);
+    assertEquals(
+        Set.of("Record Reader", "Record Writer", "Replacement Value Strategy", "/title"), names);
+  }
+
+  @Test
   void connectionsUseSourceOutputRelationships() throws Exception {
     JsonNode flow = build(mqttToPostgis(mapping()));
     boolean hasMessageRel = false;
