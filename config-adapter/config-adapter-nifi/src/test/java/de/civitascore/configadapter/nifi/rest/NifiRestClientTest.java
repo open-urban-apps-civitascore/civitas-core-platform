@@ -154,6 +154,54 @@ class NifiRestClientTest {
   }
 
   @Test
+  void deployFlowPinsTheOwnProcessorsToTheBundleNifiCarries() throws Exception {
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(json("{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [] } } }")));
+    // The NAR image is versioned on its own: NiFi carries another version than the fragment names.
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/processor-types?bundleGroupFilter=de.civitas-core"))
+            .willReturn(
+                json(
+                    "{ \"processorTypes\": [ { \"type\": \"de.civitascore.nifi.frost.PutFrostRecord\","
+                        + " \"bundle\": { \"group\": \"de.civitas-core\","
+                        + " \"artifact\": \"nifi-frost-nar\", \"version\": \"2.0.0\" } } ] }")));
+    server.stubFor(
+        post(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .willReturn(json("{ \"id\": \"pg-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(
+                json(
+                    "{ \"controllerServices\": [ { \"id\": \"cs-1\","
+                        + " \"component\": { \"name\": \"FrostWebClient\", \"state\": \"ENABLED\" },"
+                        + " \"revision\": { \"version\": 1 } } ] }")));
+    stubRunningProcessors();
+    server.stubFor(
+        put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{}")));
+    server.stubFor(put(urlEqualTo("/nifi-api/flow/process-groups/pg-1")).willReturn(json("{}")));
+
+    DeploymentPlan plan =
+        new DeploymentPlan(
+            "pipeline-frost",
+            "{ \"flowContents\": { \"name\": \"pipeline-frost\", \"processors\": [ {"
+                + " \"type\": \"de.civitascore.nifi.frost.PutFrostRecord\", \"bundle\": {"
+                + " \"group\": \"de.civitas-core\", \"artifact\": \"nifi-frost-nar\","
+                + " \"version\": \"1.0.0\" } } ] } }",
+            Map.of());
+
+    client.deployFlow(plan);
+
+    server.verify(
+        postRequestedFor(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .withRequestBody(containing("\"version\":\"2.0.0\"")));
+  }
+
+  @Test
   void provisionsRootPoliciesOnForbiddenThenRetries() throws Exception {
     // First root read is denied (fresh OIDC NiFi: the service account has global policies but not
     // the root canvas). The client must grant itself the four root policies, then re-read and
