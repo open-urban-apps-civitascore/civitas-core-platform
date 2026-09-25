@@ -157,7 +157,7 @@ Flyway migrations live in `src/main/resources/db/migration`. To add one:
 
 Two merge requests that both add a migration then conflict in `LATEST`, so the second one has to rebase and take the next version. A migration that is on `develop` never changes; fix it with a new one.
 
-`scripts/check-migrations.sh origin/develop` checks these rules locally (fetch first); CI runs it against the merge request target.
+`../.gitlab/ci/scripts/check-migrations.sh origin/develop` checks these rules locally (fetch first); CI runs it against the merge request target.
 
 ### Docker Infrastructure
 

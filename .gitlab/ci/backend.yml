@@ -79,7 +79,11 @@ lint-backend:
     - mvn spotless:check
 
 check-migrations-backend:
-  extends: .only-backend-changes
+  rules:
+    - !reference [.only-backend-changes, rules]
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - .gitlab/ci/scripts/check-migrations.sh
   image: alpine:latest
   stage: lint
   needs: []
@@ -89,9 +93,9 @@ check-migrations-backend:
     - |
       if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then
         git fetch --quiet --depth=1 origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
-        portal-backend/scripts/check-migrations.sh FETCH_HEAD
+        .gitlab/ci/scripts/check-migrations.sh FETCH_HEAD
       else
-        portal-backend/scripts/check-migrations.sh
+        .gitlab/ci/scripts/check-migrations.sh
       fi
 
 dependency-prune-backend:
