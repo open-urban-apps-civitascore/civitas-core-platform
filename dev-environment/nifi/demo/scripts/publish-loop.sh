@@ -7,6 +7,7 @@
 #   ./publish-loop.sh                # default: every 2s, 5 stations, indefinite
 #   INTERVAL=1 STATIONS=10 ./publish-loop.sh
 #   COUNT=20 ./publish-loop.sh       # publish 20 messages then stop
+#   MQTT_VERSION=mqttv5 ./publish-loop.sh   # publish as MQTT 5 (mqttv31/mqttv311/mqttv5)
 
 set -euo pipefail
 # Force POSIX numeric locale so awk uses `.` (not the German `,`) as decimal sep.
@@ -16,6 +17,7 @@ INTERVAL="${INTERVAL:-2}"          # seconds between publishes
 STATIONS="${STATIONS:-5}"          # rotate station-001 .. station-N
 COUNT="${COUNT:-0}"                # 0 = infinite
 BROKER="${BROKER:-civitas-nifi-demo-mosquitto}"
+MQTT_VERSION="${MQTT_VERSION:-}"   # mqttv31 | mqttv311 | mqttv5, empty = mosquitto_pub default (3.1.1)
 
 echo "Publishing every ${INTERVAL}s across ${STATIONS} stations" \
      "$([ "$COUNT" -gt 0 ] && echo "(${COUNT} messages total)" || echo "(Ctrl+C to stop)")" >&2
@@ -33,7 +35,11 @@ while true; do
   msg=$(printf '{"lat":%s,"lon":%s,"temperature":%s,"ts":"%s","station_id":"%s"}' \
         "$lat" "$lon" "$temp" "$ts" "$station")
 
-  docker exec "$BROKER" mosquitto_pub -h localhost -t "sensors/${station}/temp" -m "$msg"
+  if [[ -n "$MQTT_VERSION" ]]; then
+    docker exec "$BROKER" mosquitto_pub -h localhost -V "$MQTT_VERSION" -t "sensors/${station}/temp" -m "$msg"
+  else
+    docker exec "$BROKER" mosquitto_pub -h localhost -t "sensors/${station}/temp" -m "$msg"
+  fi
   echo "  → $station  $msg" >&2
 
   if [[ "$COUNT" -gt 0 && "$i" -ge "$COUNT" ]]; then break; fi

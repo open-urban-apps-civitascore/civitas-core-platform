@@ -39,9 +39,17 @@ public class DataSourceOutputDTO extends BaseOutputDTO {
   private DataStructureVersionSummaryDTO dataStructureVersion;
 
   @Schema(
-      description = "Whether this data source is currently referenced by a pipeline",
+      description =
+          "Whether any pipeline references this data source. While true, it cannot be deleted",
       accessMode = Schema.AccessMode.READ_ONLY)
   private boolean inUse;
+
+  @Schema(
+      description =
+          "Whether a Pipeline of a released Dataset references this data source. While true, the"
+              + " data source cannot be unreleased and its technical fields are locked",
+      accessMode = Schema.AccessMode.READ_ONLY)
+  private boolean inUseByReleased;
 
   @Schema(description = "Datapool scope configuration")
   private DatapoolScopeOutputDTO datapoolScope;
