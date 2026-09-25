@@ -16,6 +16,10 @@ FROM eclipse-temurin:25-jre-alpine@sha256:2ca9adf44f5c29d28ecd26cf92d75cc0c66b7f
 
 WORKDIR /app
 
+# libexpat: force the patched package (CVE-2026-93990) since the pinned base image
+# still bundles a vulnerable version; drop this once the base digest above ships the fix
+RUN apk add --no-cache --upgrade "libexpat=2.8.5-r0"
+
 # Create non-root user for security
 RUN addgroup -g 1001 -S appgroup && \
     adduser -u 1001 -S appuser -G appgroup
