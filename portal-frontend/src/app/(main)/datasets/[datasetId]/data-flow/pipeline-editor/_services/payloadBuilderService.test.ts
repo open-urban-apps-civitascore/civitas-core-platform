@@ -145,16 +145,19 @@ describe('buildDataSinkPayloads — PostGIS configuration', () => {
     expect(postgisPayload(p)?.configuration).toEqual({ tableName: 'my_table', element: NODE_URN })
   })
 
-  it('sends the mapping target as element when a mapping precedes the sink', () => {
+  it('sends the node data structure as element when a mapping precedes the sink', () => {
     const p = pipeline(
       [mappingNode('map-1', MAPPING_TARGET_URN), postgisNodeWithUrn(NODE_URN)],
       [{ source: 'map-1', target: 'postgis-1' }],
     )
-    expect(postgisPayload(p)?.configuration).toEqual({ tableName: 'my_table', element: MAPPING_TARGET_URN })
+    expect(postgisPayload(p)?.configuration).toEqual({ tableName: 'my_table', element: NODE_URN })
   })
 
-  it('rejects a node without a stored data structure URN and no mapping', () => {
-    const p = pipeline([postgisNode], [])
+  it('rejects a node without a stored data structure URN even when a mapping precedes the sink', () => {
+    const p = pipeline(
+      [mappingNode('map-1', MAPPING_TARGET_URN), postgisNode],
+      [{ source: 'map-1', target: 'postgis-1' }],
+    )
     expect(() => buildDataSinkPayloads(p)).toThrow(DataSinkDocumentValidationError)
   })
 })
