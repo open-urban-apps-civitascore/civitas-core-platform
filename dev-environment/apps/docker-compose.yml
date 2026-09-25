@@ -124,7 +124,6 @@ services:
       KEYCLOAK_TARGET_REALM: civitas-core
       # Disable enforced TOTP/OTP setup for local development
       KEYCLOAK_ENFORCE_OTP: "false"
-      APP_URL: http://localhost:8089
       SERVER_PORT: 8089
       SPRING_PROFILES_ACTIVE: local,postgres,init
     networks:
