@@ -56,7 +56,8 @@ public final class PlanContext {
   public void putSensitive(String componentFriendlyName, String key, String value) {
     sensitive
         .computeIfAbsent(componentFriendlyName, k -> new LinkedHashMap<>())
-        .put(key, NifiExpressionLanguage.requireLiteral(key, value));
+        .put(
+            key, NifiExpressionLanguage.requireLiteral(componentFriendlyName + " / " + key, value));
   }
 
   public Map<String, String> sourceProperties() {
