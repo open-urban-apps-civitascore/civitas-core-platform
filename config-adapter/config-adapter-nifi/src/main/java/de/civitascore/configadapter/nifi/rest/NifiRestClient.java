@@ -291,7 +291,8 @@ public class NifiRestClient implements AutoCloseable {
       stopAndDeleteProcessGroup(existing.get());
     }
 
-    String pgId = uploadSnapshot(rootId, plan.processGroupName(), plan.snapshotJson());
+    String pgId =
+        uploadSnapshot(rootId, plan.processGroupName(), withInstalledBundles(plan.snapshotJson()));
     // The snapshot is uploaded but not yet live. If any subsequent step fails, the half-deployed
     // group (whose controller services may already hold patched datasource secrets) must not be
     // left orphaned in NiFi — best-effort delete it before propagating the original failure.
@@ -308,6 +309,35 @@ public class NifiRestClient implements AutoCloseable {
     LOG.info(
         "Deployed NiFi flow {} as process group {}", Encode.forJava(plan.processGroupName()), pgId);
     return pgId;
+  }
+
+  /**
+   * The snapshot with the processors of the platform's own extensions pinned to the bundle version
+   * NiFi carries. A flow without them is sent as it is, and NiFi is not asked.
+   */
+  private String withInstalledBundles(String snapshotJson)
+      throws FatalAdapterException, RetryableAdapterException {
+    JsonNode snapshot;
+    try {
+      snapshot = mapper.readTree(snapshotJson);
+    } catch (JsonProcessingException e) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_FLOW_ERROR, e, "the flow snapshot is not a JSON document");
+    }
+    if (!ExtensionBundles.usesOwnBundles(snapshot)) {
+      return snapshotJson;
+    }
+    ExtensionBundles.pin(
+        snapshot,
+        getJson(
+            API + "/flow/processor-types?bundleGroupFilter=" + ExtensionBundles.GROUP,
+            "list processor types"));
+    try {
+      return mapper.writeValueAsString(snapshot);
+    } catch (JsonProcessingException e) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_FLOW_ERROR, e, "the pinned flow snapshot cannot be written");
+    }
   }
 
   /** Best-effort teardown of a partially-deployed group; never masks the original failure. */

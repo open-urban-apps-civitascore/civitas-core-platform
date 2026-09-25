@@ -1,32 +1,27 @@
 #!/usr/bin/env bash
-# Publish OGC SensorThings (STA) envelopes to MQTT for a FROST sink in passthrough mode.
+# Publish SensorThings records to MQTT for a FROST sink on the ThingTree port.
 #
-# A FROST sink fed by an MQTT source runs passthrough: no record mapping is involved and the
-# SOURCE must deliver the STA envelope itself. The sink splits it into two independent legs:
+# A FROST sink without a Mapping writes every message as one record in the structure of its port.
+# This script sends the ThingTree structure: a Thing with its Location, one Datastream with its
+# Sensor and ObservedProperty, and one measurement. The port finds the Thing by
+# properties.reference and the Datastream by its own properties.reference within that Thing,
+# creates what is missing, and appends the measurement — so nothing has to be provisioned first.
 #
-#   $.things        → looked up by  properties.reference        → PATCH if found, else POST
-#   $.observations  → the Datastream is looked up by
-#                     parameters.reference + parameters.name (scoped to the dataset's project),
-#                     its @iot.id is merged in, and the observation is POSTed to /Observations
-#
-# The Datastream is NOT created by the flow. An observation whose Datastream does not resolve is
-# routed to the error sink, so provision it first with ./provision-sta-datastream.sh.
+# The sink node must have the port ThingTree.
 #
 # Usage:
 #   ./publish-sta-loop.sh                       # every 2s, 3 stations, indefinite
-#   COUNT=6 ./publish-sta-loop.sh               # 6 envelopes then stop
+#   COUNT=6 ./publish-sta-loop.sh               # 6 records then stop
 #   INTERVAL=1 STATIONS=5 ./publish-sta-loop.sh
 #   TOPIC=sensors/sta DATASTREAM_NAME=Temperature ./publish-sta-loop.sh
 #
-# Every station-N publishes observations against Datastream
-#   properties.reference = "${REFERENCE_PREFIX}-N"   name = "$DATASTREAM_NAME"
-# so provisioning and publishing agree on the lookup keys without further configuration.
+# Every station-N is the Thing "${REFERENCE_PREFIX}-N" with the Datastream "$DATASTREAM_NAME".
 
 set -euo pipefail
 # Force POSIX numeric locale so awk uses `.` (not the German `,`) as decimal separator.
 export LC_ALL=C
 
-INTERVAL="${INTERVAL:-2}"                       # seconds between envelopes
+INTERVAL="${INTERVAL:-2}"                       # seconds between records
 STATIONS="${STATIONS:-3}"                       # rotate station-001 .. station-N
 COUNT="${COUNT:-0}"                             # 0 = infinite
 BROKER="${BROKER:-civitas-nifi-demo-mosquitto}" # container name; published via docker exec
@@ -34,9 +29,9 @@ TOPIC="${TOPIC:-sensors/sta}"                   # must match the DataSource's to
 REFERENCE_PREFIX="${REFERENCE_PREFIX:-sta-station}"
 DATASTREAM_NAME="${DATASTREAM_NAME:-Temperature}"
 
-echo "Publishing STA envelopes to '${TOPIC}' every ${INTERVAL}s across ${STATIONS} station(s)" \
+echo "Publishing ThingTree records to '${TOPIC}' every ${INTERVAL}s across ${STATIONS} station(s)" \
      "$([ "$COUNT" -gt 0 ] && echo "(${COUNT} total)" || echo "(Ctrl+C to stop)")" >&2
-echo "Datastream lookup keys: properties.reference=${REFERENCE_PREFIX}-<n>, name=${DATASTREAM_NAME}" >&2
+echo "Thing reference: ${REFERENCE_PREFIX}-<n>, Datastream reference: ${DATASTREAM_NAME}" >&2
 
 i=0
 while true; do
@@ -49,32 +44,46 @@ while true; do
   temp=$(awk -v i="$i" 'BEGIN { printf "%.2f", 15 + ((i * 17) % 20) }')
   ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-  # `properties.reference` is the Thing's identity for the upsert; `parameters.reference`/`.name`
-  # are the Datastream's lookup keys. Locations is a deep insert, so a first POST creates the
-  # Thing with its Location in one call.
+  # One record per message. properties.reference is the identity of the Thing and, within it, of
+  # the Datastream; a second message for the same station finds both and appends the measurement.
   envelope=$(cat <<JSON
 {
-  "things": [
+  "name": "STA Station ${ref}",
+  "description": "Synthetic SensorThings station for pipeline testing",
+  "properties": { "reference": "${ref}" },
+  "Locations": [
     {
-      "name": "STA Station ${ref}",
-      "description": "Synthetic SensorThings station for pipeline testing",
-      "properties": { "reference": "${ref}" },
-      "Locations": [
-        {
-          "name": "Location of ${ref}",
-          "description": "Synthetic location",
-          "encodingType": "application/geo+json",
-          "location": { "type": "Point", "coordinates": [${lon}, ${lat}] }
-        }
-      ]
+      "name": "Location of ${ref}",
+      "description": "Synthetic location",
+      "encodingType": "application/geo+json",
+      "location": { "type": "Point", "coordinates": [${lon}, ${lat}] }
     }
   ],
-  "observations": [
+  "Datastreams": [
     {
-      "phenomenonTime": "${ts}",
-      "resultTime": "${ts}",
-      "result": ${temp},
-      "parameters": { "reference": "${ref}", "name": "${DATASTREAM_NAME}" }
+      "name": "${DATASTREAM_NAME} of ${ref}",
+      "description": "Synthetic ${DATASTREAM_NAME} readings",
+      "observationType": "http://www.opengis.net/def/observationType/OGC-OM/2.0/OM_Measurement",
+      "unitOfMeasurement": {
+        "name": "degree Celsius",
+        "symbol": "degC",
+        "definition": "http://unitsofmeasure.org/ucum.html#para-30"
+      },
+      "properties": { "reference": "${DATASTREAM_NAME}" },
+      "Sensor": {
+        "name": "Synthetic sensor",
+        "description": "Sensor of the demo stations",
+        "encodingType": "text/plain",
+        "metadata": "synthetic"
+      },
+      "ObservedProperty": {
+        "name": "${DATASTREAM_NAME}",
+        "definition": "http://dd.eionet.europa.eu/vocabulary/aq/meteoparameter/54",
+        "description": "Air temperature"
+      },
+      "Observations": [
+        { "phenomenonTime": "${ts}", "resultTime": "${ts}", "result": ${temp} }
+      ]
     }
   ]
 }
