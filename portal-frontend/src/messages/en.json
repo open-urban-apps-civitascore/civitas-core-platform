@@ -114,7 +114,6 @@
     },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
-      "commaSeparated": "comma-separated",
       "requiredInAvailable": "This field is required in the available mode.",
       "descriptionHint": "max. 150 characters",
       "creationSubtitle": "Only a name is required in the first step. Additional basic information can be added later.",
@@ -1020,7 +1019,69 @@
       "type": "Type",
       "typePlaceholder": "Select connector type",
       "connection": "Connection",
-      "establishConnection": "Establish Connection"
+      "establishConnection": "Establish Connection",
+      "mqtt": {
+        "urls": {
+          "label": "Brokers",
+          "hint": "comma-separated"
+        },
+        "protocolVersion": {
+          "label": "Protocol version",
+          "placeholder": "Select a version"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Password"
+        },
+        "topics": {
+          "label": "Topic"
+        },
+        "clientId": {
+          "label": "Client ID",
+          "placeholder": "optional"
+        },
+        "qos": {
+          "label": "QoS"
+        },
+        "connectTimeout": {
+          "label": "Connect Timeout"
+        },
+        "keepalive": {
+          "label": "Keepalive"
+        },
+        "tls": {
+          "label": "TLS Enabled"
+        }
+      },
+      "sql": {
+        "driver": {
+          "label": "Driver"
+        },
+        "dsn": {
+          "label": "DSN",
+          "placeholder": "Driver-specific connection string"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Password"
+        },
+        "table": {
+          "label": "Table",
+          "placeholder": "table"
+        },
+        "columns": {
+          "label": "Columns",
+          "hint": "comma-separated",
+          "placeholder": "* or col1, col2"
+        },
+        "where": {
+          "label": "WHERE"
+        }
+      }
     },
     "dataModel": {
       "placeholder": {

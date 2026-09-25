@@ -113,7 +113,6 @@
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
-      "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
       "descriptionHint": "max. 150 Zeichen",
       "creationSubtitle": "Im ersten Schritt ist nur ein Name erforderlich. Weitere Basisinformationen können später ergänzt werden.",
@@ -1007,7 +1006,69 @@
       "type": "Typ",
       "typePlaceholder": "Konnektortyp auswählen",
       "connection": "Verbindung",
-      "establishConnection": "Verbindung herstellen"
+      "establishConnection": "Verbindung herstellen",
+      "mqtt": {
+        "urls": {
+          "label": "Broker",
+          "hint": "kommagetrennt"
+        },
+        "protocolVersion": {
+          "label": "Protokollversion",
+          "placeholder": "Version auswählen"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Passwort"
+        },
+        "topics": {
+          "label": "Topic"
+        },
+        "clientId": {
+          "label": "Client ID",
+          "placeholder": "optional"
+        },
+        "qos": {
+          "label": "QoS"
+        },
+        "connectTimeout": {
+          "label": "Verbindungs-Timeout"
+        },
+        "keepalive": {
+          "label": "Keepalive"
+        },
+        "tls": {
+          "label": "TLS aktiviert"
+        }
+      },
+      "sql": {
+        "driver": {
+          "label": "Treiber"
+        },
+        "dsn": {
+          "label": "DSN",
+          "placeholder": "treiber-spezifischer Connection String"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Passwort"
+        },
+        "table": {
+          "label": "Tabelle",
+          "placeholder": "Tabellenname"
+        },
+        "columns": {
+          "label": "Spalten",
+          "hint": "kommagetrennt",
+          "placeholder": "* oder col1, col2"
+        },
+        "where": {
+          "label": "WHERE"
+        }
+      }
     },
     "dataModel": {
       "placeholder": {

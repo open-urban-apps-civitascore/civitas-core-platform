@@ -40,6 +40,7 @@
         "topics": { "type": ["array", "null"], "items": { "type": "string" }, "description": "MQTT topic filter(s) to subscribe to. Wildcards (+, #) are supported." },
         "client_id":       { "type": ["string", "null"], "description": "Optional MQTT client ID. Auto-generated if omitted." },
         "qos":             { "enum": [0, 1, 2, null], "description": "MQTT Quality of Service level: 0, 1 or 2." },
+        "protocol_version": { "enum": ["3", "5", null], "description": "MQTT protocol version: '3' (auto-select 3.1 or 3.1.1) or '5' (5.0)." },
         "connect_timeout": { "type": ["string", "null"], "description": "Connection timeout, e.g. '5s'." },
         "keepalive":       { "type": ["string", "null"], "description": "Keep-alive interval, e.g. '30s'." },
         "tls": {
