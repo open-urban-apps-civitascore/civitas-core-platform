@@ -84,7 +84,7 @@ check-migrations-backend:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - .gitlab/ci/scripts/check-migrations.sh
-  image: alpine:latest
+  image: alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   stage: lint
   needs: []
   before_script:
