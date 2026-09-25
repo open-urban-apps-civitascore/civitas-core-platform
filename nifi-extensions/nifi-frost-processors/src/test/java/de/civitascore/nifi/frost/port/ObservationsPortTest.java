@@ -10,6 +10,7 @@
 package de.civitascore.nifi.frost.port;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -93,6 +94,23 @@ class ObservationsPortTest {
     assertEquals("$r0-ds/Thing/Locations?$select=id&$top=1", position.get("url").asText());
     assertEquals("$r0-ds", position.get("if").asText());
     assertEquals("$r0-ds-loc", requests.get(2).get("if").asText());
+  }
+
+  @Test
+  void plan_withANullFeatureOfInterest_waitsForThePositionOfTheThing() {
+    // A null is no feature: FROST derives one from the Location of the Thing, as for an absent one.
+    String withNull =
+        """
+        {
+          "result": 21.5,
+          "parameters": { "thingReference": "A7", "datastreamReference": "temp" },
+          "FeatureOfInterest": null
+        }
+        """;
+    JsonNode requests = BatchDocuments.of(SinkPort.OBSERVATIONS, withNull).get("requests");
+
+    assertEquals("r0-ds-loc", requests.get(1).get("id").asText());
+    assertFalse(requests.get(2).get("body").has("FeatureOfInterest"), requests.get(2).toString());
   }
 
   @Test
