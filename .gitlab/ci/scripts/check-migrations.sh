@@ -68,10 +68,11 @@ for version in $(cut -d' ' -f1 <<<"$branch" | uniq -d); do
 done
 
 highest=$(tail -n1 <<<"$branch" | cut -d' ' -f1)
+highest_file=$(tail -n1 <<<"$branch" | cut -d' ' -f3)
 if [[ ! -f $LATEST_FILE ]]; then
-  fail "$LATEST_FILE is missing; it must contain the highest migration version ($highest)"
-elif [[ $(tr -d '[:space:]' <"$LATEST_FILE") != "$highest" ]]; then
-  fail "$LATEST_FILE must contain the highest migration version $highest, found '$(tr -d '[:space:]' <"$LATEST_FILE")'"
+  fail "$LATEST_FILE is missing; it must contain the file name of the newest migration ($highest_file)"
+elif [[ $(tr -d '[:space:]' <"$LATEST_FILE") != "$highest_file" ]]; then
+  fail "$LATEST_FILE must contain the file name of the newest migration $highest_file, found '$(tr -d '[:space:]' <"$LATEST_FILE")'"
 fi
 
 if [[ -n $target ]]; then
