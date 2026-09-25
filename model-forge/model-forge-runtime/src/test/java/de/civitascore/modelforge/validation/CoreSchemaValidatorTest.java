@@ -75,6 +75,48 @@ class CoreSchemaValidatorTest {
             .isNotEmpty();
     }
 
+    @Test
+    @DisplayName("A Mapping with a toUuid field is accepted")
+    void mappingWithToUuidIsAccepted() {
+        assertThat(validate(ArtifactKind.MAPPING, """
+            {
+              "$schema": "https://civitasconnect.digital/core/mapping/v1",
+              "id": "urn:core:platform:civitas:mapping:common:StationToReading:abc1234567:1.0.0",
+              "fields": { "$.id": { "op": "toUuid", "input": { "op": "copy", "sourcePath": "$.stationId" } } }
+            }
+            """)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A Mapping with a toDateTime nested in another operation is accepted")
+    void mappingWithNestedToDateTimeIsAccepted() {
+        assertThat(validate(ArtifactKind.MAPPING, """
+            {
+              "$schema": "https://civitasconnect.digital/core/mapping/v1",
+              "id": "urn:core:platform:civitas:mapping:common:StationToReading:abc1234567:1.0.0",
+              "fields": {
+                "$.observedAt": {
+                  "op": "format",
+                  "pattern": "yyyy-MM-dd",
+                  "input": { "op": "toDateTime", "input": "$.timestamp", "pattern": "yyyy-MM-dd'T'HH:mm:ssXXX" }
+                }
+              }
+            }
+            """)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A Mapping with a toDateTime that has no pattern is rejected")
+    void mappingWithToDateTimeWithoutPatternIsRejected() {
+        assertThat(validate(ArtifactKind.MAPPING, """
+            {
+              "$schema": "https://civitasconnect.digital/core/mapping/v1",
+              "id": "urn:core:platform:civitas:mapping:common:StationToReading:abc1234567:1.0.0",
+              "fields": { "$.observedAt": { "op": "toDateTime", "input": "$.timestamp" } }
+            }
+            """)).isNotEmpty();
+    }
+
     // ── Pipeline ────────────────────────────────────────────────────────────────
 
     @Test
