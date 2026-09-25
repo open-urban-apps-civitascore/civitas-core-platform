@@ -54,7 +54,7 @@ tests {
     expect(res.body.configuration.table).to.equal("events");
     expect(res.body.configuration.columns).to.deep.equal(["*"]);
   });
-  test("Unsubmitted SQL fields default to null/zero, surfaced as expert-mode keys", function() {
+  test("Unsubmitted SQL where clause defaults to null", function() {
     expect(res.body.configuration).to.have.property('where', null);
   });
 }
