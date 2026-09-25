@@ -89,6 +89,12 @@ if [[ -n $target ]]; then
     fi
   done < <(join <(sort -k1,1 <<<"$target_list") <(sort -k1,1 <<<"$branch"))
 
+  for version in $(comm -23 <(cut -d' ' -f1 <<<"$target_list" | sort) <(cut -d' ' -f1 <<<"$branch" | sort)); do
+    if [[ $(printf '%s\n%s\n' "$version" "$highest" | sort -V | tail -n1) == "$highest" ]]; then
+      fail "$(awk -v v="$version" '$1 == v {print $3}' <<<"$target_list") is on the target but missing here; a migration that is merged must not be removed or renumbered"
+    fi
+  done
+
   previous=$target_highest
   for version in $(comm -13 <(cut -d' ' -f1 <<<"$target_list" | sort) <(cut -d' ' -f1 <<<"$branch" | sort) | sort -V); do
     if ! is_successor "$previous" "$version"; then
