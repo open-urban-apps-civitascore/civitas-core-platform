@@ -25,7 +25,6 @@ fail() {
 branch_migrations() {
   local path file
   for path in "$MIGRATIONS"/V*; do
-    [[ -e $path ]] || continue
     file=${path##*/}
     [[ $file =~ $NAME_PATTERN ]] || continue
     echo "${BASH_REMATCH[1]//_/.} $(git hash-object "$path") $file"
@@ -41,7 +40,6 @@ target_migrations() {
   done | sort -V
 }
 
-# A successor raises exactly one of major, minor and patch by one and resets the parts after it.
 is_successor() {
   local -a prev next
   IFS=. read -ra prev <<<"$1"
