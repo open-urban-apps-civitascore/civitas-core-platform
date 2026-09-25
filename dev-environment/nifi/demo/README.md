@@ -178,8 +178,8 @@ demo/
 │   ├── cleanup.sh                 # robust teardown (recovery fallback)
 │   ├── publish-loop.sh            # continuous synthetic publisher
 │   ├── build-snapshot.sh          # snapshot regenerator (maintenance)
-│   ├── provision-sta-datastream.sh  # FROST sink: the STA entities the sink never creates
-│   └── publish-sta-loop.sh        # FROST sink: SensorThings envelope publisher
+│   ├── provision-sta-datastream.sh  # FROST sink: pre-creates Datastreams (not needed for ThingTree)
+│   └── publish-sta-loop.sh        # FROST sink: ThingTree record publisher
 └── bruno/
     ├── collection.bru             # collection-level auth
     ├── environments/local.bru     # base URL, credentials, names
@@ -189,9 +189,9 @@ demo/
     └── 03_cleanup/                # tear down
 ```
 
-A FROST sink in passthrough mode resolves an existing Datastream and never creates one, so
-`provision-sta-datastream.sh` has to run before `publish-sta-loop.sh` — observations whose
-Datastream does not resolve are routed to the error sink.
+`publish-sta-loop.sh` sends records for a FROST sink on the ThingTree port. That port creates the
+Thing, its Location and its Datastream when they are missing, so no provisioning is needed first.
+A sink on the Observations port only appends measurements and needs the Datastreams to exist.
 
 ---
 
