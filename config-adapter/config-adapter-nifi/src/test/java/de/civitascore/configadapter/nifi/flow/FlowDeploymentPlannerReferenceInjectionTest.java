@@ -202,9 +202,6 @@ class FlowDeploymentPlannerReferenceInjectionTest {
     }
   }
 
-  /**
-   * The {@code $}→{@code $$} escape corrupted every lone dollar sign, since NiFi keeps it doubled.
-   */
   @Test
   void plan_literalDollarSigns_reachTheFlowUnchanged() throws Exception {
     byte[] key = stretchedKey();

@@ -123,7 +123,7 @@ class ArchitectureTest {
 
   /** A direct write to the node would skip the literal check in {@code setProp}. */
   @ArchTest
-  static final ArchRule onlyTheBuildContextWritesAProcessorNode =
+  static final ArchRule onlyTheBuildContextAccessesAProcessorNode =
       noClasses()
           .that()
           .doNotBelongToAnyOf(BuildContext.class, Processor.class)
