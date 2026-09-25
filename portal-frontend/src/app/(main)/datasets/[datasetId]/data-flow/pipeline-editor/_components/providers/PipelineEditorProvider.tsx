@@ -132,7 +132,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   const { canDeletePipeline: canDelete } = useDatasetPermissions(datasetQuery.data?.data)
 
-  const { getSinkLocks, getSinkLockReason, getSelectionLockReason } = useDataSinkLocks()
+  const { getSinkLocks, getSinkLockReason, getSelectionLockReason, isLoading: isLoadingSinkLocks } = useDataSinkLocks()
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
@@ -468,7 +468,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const isDeleting = deletePipelineMutation.isPending
 
   // ===== Loading State =====
-  const isLoadingPipelines = pipelinesQuery.isLoading
+  // Without the locks every node looks deletable, so the editor waits for them too.
+  const isLoadingEditor = pipelinesQuery.isLoading || isLoadingSinkLocks
 
   // ===== Cross-session state =====
   const hasAnyDirtySession = useMemo(() => sessionManager.sessions.some(s => s.isDirty), [sessionManager.sessions])
@@ -782,7 +783,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       // Pipeline operations
       deletePipeline,
       isDeleting,
-      isLoadingPipelines,
+      isLoadingEditor,
 
       // Cross-session operations
       saveAllPipelines,
@@ -827,7 +828,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       hideValidationPanel,
       deletePipeline,
       isDeleting,
-      isLoadingPipelines,
+      isLoadingEditor,
       saveAllPipelines,
       isSavingAll,
       hasAnyDirtySession,

@@ -107,8 +107,8 @@ export interface ActivePipelineContextValue {
   deletePipeline: () => void
   /** Whether a delete operation is currently in progress */
   isDeleting: boolean
-  /** Whether pipelines are being loaded from the backend */
-  isLoadingPipelines: boolean
+  /** Whether the pipelines and the data sink locks are being loaded from the backend */
+  isLoadingEditor: boolean
   /** Save all dirty pipelines across all tabs. Returns true if all saves succeeded. */
   saveAllPipelines: () => Promise<boolean>
   /** Whether a save-all operation is currently in progress */

@@ -7,6 +7,7 @@ import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
+  useGetDataSinks,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
@@ -230,6 +231,11 @@ beforeEach(() => {
     isLoading: false,
   } as unknown as ReturnType<typeof useGetPipelines>)
 
+  vi.mocked(useGetDataSinks).mockReturnValue({
+    data: undefined,
+    isLoading: false,
+  } as unknown as ReturnType<typeof useGetDataSinks>)
+
   vi.mocked(useGetDataset).mockReturnValue({
     data: { data: { provisioned: false } },
     isLoading: false,
@@ -330,7 +336,7 @@ describe('PipelineEditorProviderComponent', () => {
     })
   })
 
-  describe('isLoadingPipelines', () => {
+  describe('isLoadingEditor', () => {
     it('reflects the loading state of the pipelines query', () => {
       vi.mocked(useGetPipelines).mockReturnValue({
         data: undefined,
@@ -339,7 +345,24 @@ describe('PipelineEditorProviderComponent', () => {
 
       renderProvider()
 
-      expect(contextRef.current?.isLoadingPipelines).toBe(true)
+      expect(contextRef.current?.isLoadingEditor).toBe(true)
+    })
+
+    it('waits for the data sink locks', () => {
+      vi.mocked(useGetDataSinks).mockReturnValue({
+        data: undefined,
+        isLoading: true,
+      } as unknown as ReturnType<typeof useGetDataSinks>)
+
+      renderProvider()
+
+      expect(contextRef.current?.isLoadingEditor).toBe(true)
+    })
+
+    it('is false once both queries are done', () => {
+      renderProvider()
+
+      expect(contextRef.current?.isLoadingEditor).toBe(false)
     })
   })
 

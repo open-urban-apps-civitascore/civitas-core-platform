@@ -26,11 +26,13 @@ export interface DataSinkLocksLookup {
   getSinkLockReason: (node: PipelineNode) => SinkLockReason | null
   /** Lock reason of the first locked node among the selected ones. */
   getSelectionLockReason: (nodes: PipelineNode[]) => SinkLockReason | null
+  /** True while the sinks are still being loaded, so no lock is known yet. */
+  isLoading: boolean
 }
 
 export const useDataSinkLocks = (): DataSinkLocksLookup => {
   const { datasetId } = useParams<{ datasetId: string }>()
-  const { data } = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
+  const { data, isLoading } = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
 
   const locksById = useMemo(() => {
     const map = new Map<string, DataSinkLocks>()
@@ -66,5 +68,5 @@ export const useDataSinkLocks = (): DataSinkLocksLookup => {
     [getSinkLockReason],
   )
 
-  return { getSinkLocks, getSinkLockReason, getSelectionLockReason }
+  return { getSinkLocks, getSinkLockReason, getSelectionLockReason, isLoading }
 }
