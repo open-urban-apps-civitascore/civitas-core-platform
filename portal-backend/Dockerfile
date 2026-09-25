@@ -13,8 +13,11 @@ WORKDIR /app
 # Install dependencies
 # gcompat: snappy-java ships a glibc-linked native library; without the shim the Kafka
 # producer (compression=snappy) cannot load it on Alpine/musl and every publish fails.
+# libexpat: force the patched package (CVE-2026-93990) since the pinned base image
+# still bundles a vulnerable version; drop this once the base digest above ships the fix
 ENV TZ=Europe/Berlin
-RUN apk add --no-cache curl tzdata gcompat
+RUN apk add --no-cache --upgrade "libexpat=2.8.5-r0" && \
+    apk add --no-cache "curl=8.22.0-r0" "tzdata=2026d-r0" "gcompat=1.1.0-r4"
 
 # Copy pre-built JAR from CI artifacts
 COPY target/*.jar ./app.jar

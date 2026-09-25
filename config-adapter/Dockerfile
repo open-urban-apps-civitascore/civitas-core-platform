@@ -12,7 +12,10 @@ WORKDIR /civitas
 ENV TZ=Europe/Berlin
 # gcompat: snappy-java ships a glibc-linked native library; without the shim the Kafka
 # consumer cannot read snappy-compressed messages on this musl-based image
-RUN apk add --no-cache curl tzdata gcompat
+# libexpat: force the patched package (CVE-2026-93990) since the pinned base image
+# still bundles a vulnerable version; drop this once the base digest above ships the fix
+RUN apk add --no-cache --upgrade "libexpat=2.8.5-r0" && \
+    apk add --no-cache "curl=8.22.0-r0" "tzdata=2026d-r0" "gcompat=1.1.0-r4"
 
 COPY config-adapter-application/target/config-adapter-application-*.jar ./config-adapter.jar
 
