@@ -1114,6 +1114,43 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
+  void mqttProtocolVersionIsBoundToTheNifiSpecificationValue() throws Exception {
+    for (Map.Entry<String, String> version : Map.of("3", "0", "5", "5").entrySet()) {
+      Datasource source = mqttSource(null);
+      source.handleUnknownProperty("protocol_version", version.getKey());
+      try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+        String snapshot =
+            planner(resolver)
+                .plan(req("p-mqtt-v" + version.getKey(), graphWithMapping(), source, postgisSink()))
+                .snapshotJson();
+        JsonNode mqtt = processorOfType(snapshot, "ConsumeMQTT");
+        assertEquals(
+            version.getValue(),
+            mqtt.path("properties").path("MQTT Specification Version").asText());
+      }
+    }
+  }
+
+  @Test
+  void legacyMqttSourceWithoutProtocolVersionUsesV3Auto() throws Exception {
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(req("p-mqtt-legacy", graphWithMapping(), mqttSource(null), postgisSink()))
+              .snapshotJson();
+      JsonNode mqtt = processorOfType(snapshot, "ConsumeMQTT");
+      assertEquals("0", mqtt.path("properties").path("MQTT Specification Version").asText());
+    }
+  }
+
+  @Test
+  void unsupportedMqttProtocolVersionIsRejected() throws Exception {
+    Datasource source = mqttSource(null);
+    source.handleUnknownProperty("protocol_version", "4");
+    assertPlanRejected(source, "p-mqtt-version-invalid");
+  }
+
+  @Test
   void blankTopicElementIsRejected() throws Exception {
     // after trimming, a blank-only topic list is empty → treated as missing, not a blank filter
     Datasource source = mqttSource(null);

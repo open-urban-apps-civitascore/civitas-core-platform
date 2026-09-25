@@ -38,6 +38,8 @@ export const MqttDataSourceSchema = z
     client_id: z.union([z.string(), z.null()]).optional(),
     /** MQTT Quality of Service level: 0, 1 or 2. */
     qos: z.union([z.literal(0), z.literal(1), z.literal(2), z.null()]).optional(),
+    /** MQTT protocol version: '3' (auto-select 3.1 or 3.1.1) or '5' (5.0). */
+    protocol_version: z.union([z.literal('3'), z.literal('5'), z.null()]).optional(),
     /** Connection timeout, e.g. '5s'. */
     connect_timeout: z.union([z.string(), z.null()]).optional(),
     /** Keep-alive interval, e.g. '30s'. */
