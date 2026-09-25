@@ -1311,6 +1311,22 @@
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
       "anonymousName": "Anonyme Datenquelle"
     },
+    "sink": {
+      "locked": {
+        "provisioned": {
+          "title": "Bereitgestellt",
+          "description": "Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr bearbeitet oder entfernt werden."
+        },
+        "inUseByLayer": {
+          "title": "In Verwendung",
+          "tooltip": "Dieser Datenspeicher wird von API-Layern verwendet. Zum Bearbeiten oder Entfernen müssen zuerst die Layer-Zuordnungen aufgehoben werden."
+        }
+      },
+      "notRemovable": {
+        "provisioned": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr entfernt werden.",
+        "inUseByLayer": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wird von API-Layern verwendet. Heben Sie zuerst die Layer-Zuordnungen auf."
+      }
+    },
     "frostPanel": {
       "details": "Sensordaten-Speicher Details",
       "serverName": "Servername",
@@ -1435,7 +1451,9 @@
       "dataSinkInUseError": "{names} kann nicht gespeichert werden: Ein Datenspeicher wird noch von mindestens einem Layer verwendet.",
       "unconfirmedDataLossError": "{names} kann nicht gespeichert werden: Die Änderung verwirft gespeicherte Daten.",
       "notDraftError": "Der Datensatz muss im Entwurfsstatus sein, um Änderungen vorzunehmen.",
-      "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut."
+      "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut.",
+      "sinkStillInUse": "{names} wurde gespeichert, ein entfernter Datenspeicher wird aber noch verwendet und kann nicht gelöscht werden.",
+      "sinkDeleteFailed": "{names} wurde gespeichert, ein entfernter Datenspeicher konnte aber nicht gelöscht werden."
     },
     "tabs": {
       "closeTab": "Tab schließen",
