@@ -353,7 +353,7 @@ const documentOf = (fields: Record<string, ValueNode>) => ({
 
 describe('The operation the Mapping editor offers', () => {
   const expectedOperation: Record<ContractOperation, ValueNode> = {
-    copy: '$.name',
+    copy: '$.source',
     concat: { op: 'concat', separator: '-', inputs: ['$.id', '$.suffix'] },
     const: { op: 'const', value: 'fixed', valueType: 'String' },
     toString: { op: 'toString', input: '$.id' },
@@ -462,5 +462,33 @@ describe('nested operations', () => {
 
     const built = decompileConfig({ ...compiled }, fixtureSourceTree, shared.targetTree)
     expect(built.nodes.filter(node => node.type === 'transform')).toHaveLength(2)
+  })
+})
+
+describe('a copy operation written as an object with sourcePath', () => {
+  const copy = mappingFixtures.find(fixture => fixture.operation === 'copy')!
+  const objectForm: ValueNode = { op: 'copy', sourcePath: '$.source' }
+
+  const reopened = (value: ValueNode) =>
+    decompileConfig({ ...documentOf({ '$.target': value }), positions: {} }, fixtureSourceTree, copy.targetTree)
+
+  const savedAgain = (value: ValueNode) => {
+    const built = reopened(value)
+    return compileCanvas(built.nodes, built.edges).fields
+  }
+
+  it('builds an edge from the source field it names', () => {
+    const edge = reopened(objectForm).edges.find(e => e.target === TARGET_NODE_ID && e.targetHandle === '$.target')
+    expect(edge?.source).toBe(SOURCE_NODE_ID)
+    expect(edge?.sourceHandle).toBe('$.source')
+  })
+
+  it('means the same as the shorthand path once saved again', () => {
+    expect(savedAgain(objectForm)).toEqual(savedAgain('$.source'))
+    expect(savedAgain(objectForm)['$.target']).toBe('$.source')
+  })
+
+  it('keeps its written form once saved again', () => {
+    expect(savedAgain(objectForm)['$.target']).toEqual(objectForm)
   })
 })

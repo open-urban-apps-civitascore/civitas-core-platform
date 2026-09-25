@@ -38,7 +38,7 @@ export const sourceTree: SchemaTree = {
   fields: [
     field('$.id', 'id', 'int', false),
     field('$.suffix', 'suffix', 'str', false),
-    field('$.name', 'name', 'str', false),
+    field('$.source', 'source', 'str', false),
     field('$.longitude', 'longitude', 'number', false),
     field('$.latitude', 'latitude', 'number', false),
     field('$.day', 'day', 'str', false),
@@ -117,7 +117,7 @@ const opFixture = (
 })
 
 export const mappingFixtures: MappingFixture[] = [
-  copyFixture(field('$.title', 'title', 'str', false), '$.name'),
+  copyFixture(field('$.target', 'target', 'str', false), '$.source'),
   opFixture('concat', field('$.fullCode', 'fullCode', 'str', false), ['$.id', '$.suffix'], { separator: '-' }),
   opFixture('const', field('$.label', 'label', 'str', false), [], { value: 'fixed', type: 'String' }),
   opFixture('toString', field('$.text', 'text', 'str', false), ['$.id']),
