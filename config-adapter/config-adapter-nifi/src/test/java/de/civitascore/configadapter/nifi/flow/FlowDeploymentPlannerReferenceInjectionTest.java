@@ -23,6 +23,7 @@ import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSourceB
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.stretchedKey;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,6 +35,7 @@ import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
+import de.civitascore.configadapter.nifi.mapping.UnsafePropertyValueException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,7 +90,7 @@ class FlowDeploymentPlannerReferenceInjectionTest {
                 sql(
                     source ->
                         source.handleUnknownProperty(
-                            "dsn", "postgres://reader@srcdb:5432/in?application_name=" + ref))));
+                            "dsn", "postgres://reader@srcdb:5432/in?ApplicationName=" + ref))));
     FIELDS.put(
         "SQL user",
         (ref, key) -> postgisWithPk(sql(source -> source.handleUnknownProperty("user", ref))));
@@ -194,10 +196,8 @@ class FlowDeploymentPlannerReferenceInjectionTest {
                               input.sink(),
                               input.mappings())));
 
-      assertTrue(
-          ex.getErrorCode() == AdapterErrorCode.NIFI_TEMPLATE_ERROR
-              || ex.getErrorCode() == AdapterErrorCode.NIFI_MAPPING_ERROR,
-          ex.getErrorCode().name());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+      assertInstanceOf(UnsafePropertyValueException.class, ex.getCause());
       assertFalse(String.valueOf(ex.getMessage()).contains(reference), ex.getMessage());
     }
   }
