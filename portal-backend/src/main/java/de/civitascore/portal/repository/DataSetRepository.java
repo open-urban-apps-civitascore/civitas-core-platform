@@ -21,7 +21,6 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
   // pipeline.
   @EntityGraph(
       attributePaths = {
-        "owner",
         "pipelines",
         "pipelines.runtimeStatus",
         "pipelines.dataSources",
@@ -42,7 +41,7 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
       UUID dataSourceId, Collection<DataSetStatus> statuses);
 
   /** Variant for saga trigger publishing: also fetches {@code pipelines.dataSources}. */
-  @EntityGraph(attributePaths = {"owner", "pipelines", "pipelines.dataSources", "namedApis"})
+  @EntityGraph(attributePaths = {"pipelines", "pipelines.dataSources", "namedApis"})
   @Query("SELECT d FROM DataSet d WHERE d.id = :id")
   Optional<DataSet> findByIdWithPipelineDataSources(@Param("id") UUID id);
 

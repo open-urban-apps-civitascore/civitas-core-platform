@@ -27,7 +27,6 @@ import org.mapstruct.ReportingPolicy;
     },
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputDTO, DataSet> {
-  @Mapping(target = "owner", ignore = true)
   @Mapping(target = "pipelines", ignore = true)
   @Mapping(target = "projectId", ignore = true)
   @Mapping(target = "frostBaseUrl", ignore = true)
@@ -63,7 +62,6 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   DataSetSummaryDTO toSummary(DataSet entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
-  @Mapping(target = "owner", ignore = true)
   @Mapping(target = "pipelines", ignore = true)
   @Mapping(target = "assignments", ignore = true)
   @Mapping(target = "projectId", ignore = true)

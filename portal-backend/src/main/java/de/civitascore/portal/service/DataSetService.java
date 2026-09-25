@@ -290,7 +290,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       ModelRegistryGateway.ModelPin pin =
           modelRegistryGateway.createDataSetManifest(entity.getName());
       entity.setManifestLogicalUrn(pin.logicalUrn());
-      entity.setManifestUrn(pin.versionedUrn());
     }
     return super.postConvertToEntity(entity, input);
   }

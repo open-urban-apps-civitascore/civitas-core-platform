@@ -54,7 +54,6 @@ class PipelineRuntimeStatusServiceTest {
         message,
         stacktrace,
         Instant.now(),
-        null,
         UUID.randomUUID());
     ArgumentCaptor<PipelineRuntimeStatus> captor =
         ArgumentCaptor.forClass(PipelineRuntimeStatus.class);
@@ -130,7 +129,6 @@ class PipelineRuntimeStatusServiceTest {
           "again",
           null,
           Instant.now(),
-          null,
           eventId);
 
       verify(statusRepository, never()).save(any());
@@ -213,7 +211,6 @@ class PipelineRuntimeStatusServiceTest {
         "msg",
         null,
         Instant.now(),
-        null,
         UUID.randomUUID());
 
     verify(statusRepository, never()).save(any());
