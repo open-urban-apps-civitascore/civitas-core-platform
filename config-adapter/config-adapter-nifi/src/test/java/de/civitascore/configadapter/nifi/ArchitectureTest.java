@@ -120,4 +120,13 @@ class ArchitectureTest {
               String.class,
               String.class,
               String.class);
+
+  /** A direct write to the node would skip the literal check in {@code setProp}. */
+  @ArchTest
+  static final ArchRule onlyTheBuildContextWritesAProcessorNode =
+      noClasses()
+          .that()
+          .doNotBelongToAnyOf(BuildContext.class, Processor.class)
+          .should()
+          .callMethod(Processor.class, "node");
 }
