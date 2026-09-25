@@ -78,6 +78,22 @@ lint-backend:
     - cd portal-backend
     - mvn spotless:check
 
+check-migrations-backend:
+  extends: .only-backend-changes
+  image: alpine:latest
+  stage: lint
+  needs: []
+  before_script:
+    - apk add --no-cache bash coreutils git
+  script:
+    - |
+      if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then
+        git fetch --quiet --depth=1 origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+        portal-backend/scripts/check-migrations.sh FETCH_HEAD
+      else
+        portal-backend/scripts/check-migrations.sh
+      fi
+
 dependency-prune-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-25-alpine
