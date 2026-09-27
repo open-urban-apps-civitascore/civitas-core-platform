@@ -125,7 +125,7 @@ export const useUpdateReadyDatasetMeta = () => {
   return useMutation<ApiServiceResponse<Dataset>, unknown, DatasetUpdateApiData>({
     mutationFn: (data: DatasetUpdateApiData) =>
       apiRequest<Dataset>({
-        method: 'PUT',
+        method: 'PATCH',
         endpoint: `/datasets/${data.id}/ready/meta`,
         headers: { 'x-api-request': 'true' },
         data,
@@ -145,7 +145,7 @@ export const useUpdateReleasedDatasetMeta = () => {
   return useMutation<ApiServiceResponse<Dataset>, unknown, DatasetUpdateApiData>({
     mutationFn: (data: DatasetUpdateApiData) =>
       apiRequest<Dataset>({
-        method: 'PUT',
+        method: 'PATCH',
         endpoint: `/datasets/${data.id}/released/meta`,
         headers: { 'x-api-request': 'true' },
         data,

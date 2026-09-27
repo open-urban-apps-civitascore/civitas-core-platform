@@ -2,6 +2,7 @@ package de.civitascore.portal.mapper;
 
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
+import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import de.civitascore.portal.model.output.summary.DataStructureVersionUsageSummaryDTO;
@@ -34,6 +35,8 @@ public interface DataStructureVersionMapper
 
   @Override
   DataStructureVersionInputDTO toInput(DataStructureVersion entity);
+
+  DataStructureVersionMetaInputDTO toMetaInput(DataStructureVersion entity);
 
   @Mapping(source = "dataStructure.id", target = "dataStructureId")
   DataStructureVersionSummaryDTO toSummary(DataStructureVersion entity);

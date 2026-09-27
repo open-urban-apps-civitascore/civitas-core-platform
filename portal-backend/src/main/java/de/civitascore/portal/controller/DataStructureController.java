@@ -3,6 +3,7 @@ package de.civitascore.portal.controller;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
+import de.civitascore.portal.model.input.DataStructureMetaInputDTO;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataStructureAssembler;
 import de.civitascore.portal.repository.specification.DataStructureSpec;
@@ -29,7 +30,11 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Data Structures", description = "Data structure management endpoints")
 public class DataStructureController
     extends BaseDataEntityController<
-        DataStructureInputDTO, DataStructureOutputDTO, DataStructure, DataStructureSpec> {
+        DataStructureInputDTO,
+        DataStructureMetaInputDTO,
+        DataStructureOutputDTO,
+        DataStructure,
+        DataStructureSpec> {
 
   private final DataStructureService dataStructureService;
   private final DataStructureAssembler dataStructureAssembler;

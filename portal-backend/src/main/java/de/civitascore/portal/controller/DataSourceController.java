@@ -31,7 +31,7 @@ import tools.jackson.databind.JsonNode;
 @Tag(name = "DataSources", description = "Data source management endpoints")
 public class DataSourceController
     extends BaseDataEntityController<
-        DataSourceInputDTO, DataSourceOutputDTO, DataSource, DataSourceSpec> {
+        DataSourceInputDTO, DataSourceInputDTO, DataSourceOutputDTO, DataSource, DataSourceSpec> {
 
   private final DataSourceService dataSourceService;
   private final DataSourceAssembler dataSourceAssembler;

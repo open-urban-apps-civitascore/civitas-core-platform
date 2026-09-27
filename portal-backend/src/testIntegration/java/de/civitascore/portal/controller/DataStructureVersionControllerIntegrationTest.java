@@ -975,63 +975,41 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName(
-        "Should allow full update (version, styles, modelName) via released/meta when not in use")
-    void shouldAllowFullUpdateWhenNotInUse() {
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setModelName("UpdatedReleasedModel");
-      // PUT /released/meta is a full replace (SET_TO_NULL); a released version must always retain a
-      // non-empty model, so the model is sent here.
-      input.setModel(portalData.dataStructureVersionModel("ReleasedModel"));
+    @DisplayName("Should change only modelName via released/meta when not in use")
+    void shouldChangeOnlyModelNameWhenNotInUse() {
+      String path = getEndpoint() + "/" + releasedVersionId;
+      DataStructureVersionOutputDTO before =
+          restTemplate
+              .exchange(
+                  path,
+                  HttpMethod.GET,
+                  new HttpEntity<>(createAuthHeaders()),
+                  getOutputTypeReference())
+              .getBody();
+      assertThat(before).isNotNull();
 
-      Map<String, Object> newStyles = new HashMap<>();
-      newStyles.put("color", "red");
-      newStyles.put("size", 30);
-      input.setStyles(newStyles);
-
-      ResponseEntity<DataStructureVersionOutputDTO> response =
-          restTemplate.exchange(
-              getEndpoint() + "/" + releasedVersionId + "/released/meta",
-              HttpMethod.PUT,
-              new HttpEntity<>(input, createAuthHeaders()),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).as("Response body should not be null").isNotNull();
-
-      DataStructureVersionOutputDTO output = response.getBody();
-      assertThat(output.getId()).isEqualTo(releasedVersionId);
-      assertThat(output.getModelName())
-          .as("Model name should be updated")
-          .isEqualTo("UpdatedReleasedModel");
-      assertThat(output.getVersion())
-          .as("Replacing the model is an edit, so it advances the minor inside its own major")
-          .isEqualTo("1.1.0");
-      assertThat(output.getStyles().get("color")).as("Styles should be updated").isEqualTo("red");
-      assertThat(output.getDataStructureVersionStatus())
-          .as("Status should remain AVAILABLE")
-          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
-    }
-
-    @Test
-    @DisplayName("Should update the model via released/meta when not in use")
-    void shouldUpdateModelWhenNotInUse() {
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setModel(portalData.dataStructureVersionModel("UpdatedModel"));
+      Map<String, Object> patch = new HashMap<>();
+      patch.put("modelName", "UpdatedReleasedModel");
+      patch.put("model", portalData.dataStructureVersionModel("ReleasedModel"));
+      patch.put("styles", Map.of("color", "red"));
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + releasedVersionId + "/released/meta",
-              HttpMethod.PUT,
-              new HttpEntity<>(input, createAuthHeaders()),
+              path + "/released/meta",
+              HttpMethod.PATCH,
+              new HttpEntity<>(patch, createAuthHeaders()),
               getOutputTypeReference());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output).isNotNull();
-      assertThat(output.getModel())
-          .as("Model should be updated when not in use")
-          .containsEntry("title", "UpdatedModel");
+      assertThat(output.getModelName()).isEqualTo("UpdatedReleasedModel");
+      assertThat(output.getDescription()).isEqualTo(before.getDescription());
+      assertThat(output.getModel()).isEqualTo(before.getModel());
+      assertThat(output.getStyles()).isEqualTo(before.getStyles());
+      assertThat(output.getVersion()).isEqualTo(before.getVersion());
+      assertThat(output.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
     }
 
     @Test
@@ -1052,7 +1030,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpoint() + "/" + draftVersionId + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               new HttpEntity<>(input, createAuthHeaders()),
               String.class);
 
@@ -1069,7 +1047,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpoint() + "/" + UUID.randomUUID() + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               new HttpEntity<>(input, createAuthHeaders()),
               String.class);
 
@@ -1086,7 +1064,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpoint() + "/" + releasedVersionId + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               new HttpEntity<>(input),
               String.class);
 
@@ -1161,8 +1139,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should report inUseByReleased=false and accept a model change when a draft pins")
-    void shouldAcceptModelChangeWhenOnlyADraftPins() {
+    @DisplayName("Should report inUseByReleased=false when only a draft pins")
+    void shouldReportNotInUseByReleasedWhenOnlyADraftPins() {
       DataStructureVersion draftPinned = new DataStructureVersion();
       draftPinned.setDataStructure(
           dataStructureRepository.findById(inUseDataStructureId).orElseThrow());
@@ -1183,18 +1161,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(read.getBody()).isNotNull();
       assertThat(read.getBody().isInUse()).isTrue();
       assertThat(read.getBody().isInUseByReleased()).isFalse();
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setModel(portalData.dataStructureVersionModel("After"));
-      ResponseEntity<DataStructureVersionOutputDTO> updated =
-          restTemplate.exchange(
-              path + "/released/meta",
-              HttpMethod.PUT,
-              new HttpEntity<>(input, createAuthHeaders()),
-              getOutputTypeReference());
-
-      assertThat(updated.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(updated.getBody().getModel()).containsEntry("title", "After");
     }
 
     @Test
@@ -1268,7 +1234,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
                   + "/versions/"
                   + inUseVersionId
                   + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               new HttpEntity<>(input, createAuthHeaders()),
               getOutputTypeReference());
 

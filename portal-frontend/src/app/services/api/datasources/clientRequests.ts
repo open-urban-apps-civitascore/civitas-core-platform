@@ -42,7 +42,7 @@ export const useUpdateDatasource = () =>
 
 export const useUpdateDatasourceReleased = () =>
   useUpdateMutation<Datasource, DatasourcePutData>({
-    method: 'PUT',
+    method: 'PATCH',
     key,
     endpoint: ({ id }) => `/datasources/${id}/released/meta`,
     headers: { 'x-api-request': 'true' },

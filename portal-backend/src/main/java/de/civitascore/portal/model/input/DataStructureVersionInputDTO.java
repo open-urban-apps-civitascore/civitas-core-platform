@@ -17,13 +17,9 @@ import lombok.EqualsAndHashCode;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class DataStructureVersionInputDTO extends BaseInputDTO {
+public class DataStructureVersionInputDTO extends DataStructureVersionMetaInputDTO {
 
   @JsonIgnore private DataStructureVersionStatus dataStructureVersionStatus;
-
-  private String description;
-
-  private String modelName;
 
   @Schema(description = "Data model definition as a JSON Schema document")
   private Map<String, Object> model;

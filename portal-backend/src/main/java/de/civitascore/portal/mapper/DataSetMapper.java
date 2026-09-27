@@ -3,6 +3,7 @@ package de.civitascore.portal.mapper;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
@@ -57,6 +58,25 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @AfterMapping
   default void nullOutNamedApisAfterToInput(@MappingTarget DataSetInputDTO dto) {
     dto.setNamedApis(null);
+  }
+
+  @Mapping(target = "assignments", ignore = true)
+  @Mapping(source = "dataPool.id", target = "datapoolId")
+  DataSetMetaInputDTO toMetaInput(DataSet entity);
+
+  @Mapping(target = "namedApis", ignore = true)
+  @Mapping(target = "datapoolId", ignore = true)
+  @Mapping(target = "datapoolIdPresent", ignore = true)
+  DataSetInputDTO toUpdateInput(DataSetMetaInputDTO meta);
+
+  // The datapoolId setter marks the field present, so an unconditional copy would turn an omitted
+  // datapoolId into an explicit clear.
+  @AfterMapping
+  default void copyDatapoolIdIfPresent(
+      DataSetMetaInputDTO meta, @MappingTarget DataSetInputDTO input) {
+    if (meta.isDatapoolIdPresent()) {
+      input.setDatapoolId(meta.getDatapoolId());
+    }
   }
 
   DataSetSummaryDTO toSummary(DataSet entity);

@@ -52,7 +52,8 @@ import tools.jackson.databind.JsonNode;
  */
 @Service
 @RequiredArgsConstructor
-public class DataSourceService extends BaseDataEntityService<DataSource, DataSourceInputDTO> {
+public class DataSourceService
+    extends BaseDataEntityService<DataSource, DataSourceInputDTO, DataSourceInputDTO> {
 
   private final DataSourceRepository dataSourceRepository;
   private final DataSourceMapper dataSourceMapper;
@@ -449,6 +450,19 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
 
     return save(entity);
+  }
+
+  /**
+   * Leaves the technical fields {@code null}: {@link #updateReleasedMeta} rejects any configuration
+   * on a data source that a released dataset uses, so a patch base that carried the current one
+   * would fail every metadata update of such a data source.
+   */
+  @Override
+  public DataSourceInputDTO toMetaInput(DataSource entity) {
+    DataSourceInputDTO meta = new DataSourceInputDTO();
+    meta.setName(entity.getName());
+    meta.setDescription(entity.getDescription());
+    return meta;
   }
 
   /**

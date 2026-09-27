@@ -35,7 +35,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "DataPools", description = "Datapool management endpoints")
 public class DataPoolController
-    extends BaseDataEntityController<DataPoolInputDTO, DataPoolOutputDTO, DataPool, DataPoolSpec> {
+    extends BaseDataEntityController<
+        DataPoolInputDTO, DataPoolInputDTO, DataPoolOutputDTO, DataPool, DataPoolSpec> {
 
   private final DataPoolService dataPoolService;
   private final DataPoolAssembler dataPoolAssembler;

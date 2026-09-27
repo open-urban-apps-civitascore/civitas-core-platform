@@ -139,17 +139,7 @@ public abstract class BaseController<
       throws IOException {
     E current = getService().findByIdOrThrow(id);
     I currentDto = getAssembler().toInput(current);
-    I patchedDto = patchInput(currentDto, current, updates);
-
-    Set<ConstraintViolation<I>> violations = validator.validate(patchedDto);
-    if (!violations.isEmpty()) {
-      String message =
-          violations.stream()
-              .map(ConstraintViolation::getMessage)
-              .reduce((a, b) -> a + ";\n" + b)
-              .orElse("");
-      throw new InvalidInputException(patchedDto.getClass().getSimpleName(), id, message);
-    }
+    I patchedDto = validated(id, patchInput(currentDto, current, updates));
 
     patchedDto = preProcessInput(patchedDto);
     E updated = getService().update(id, patchedDto);
@@ -182,5 +172,32 @@ public abstract class BaseController<
 
   protected I patchInput(I currentDto, E current, JsonNode updates) throws IOException {
     return objectMapper.readerForUpdating(currentDto).readValue(updates);
+  }
+
+  /**
+   * Applies a JSON merge patch to the current state and validates the result. A field that the
+   * patch omits keeps its current value.
+   *
+   * @param id the UUID of the patched entity, used in the error
+   * @param current the current state, updated in place
+   * @param updates the JSON node containing the fields to update
+   * @return the patched and validated state
+   * @throws InvalidInputException if the patched state violates a Bean Validation constraint
+   */
+  protected <T> T mergePatch(UUID id, T current, JsonNode updates) {
+    return validated(id, objectMapper.readerForUpdating(current).readValue(updates));
+  }
+
+  private <T> T validated(UUID id, T dto) {
+    Set<ConstraintViolation<T>> violations = validator.validate(dto);
+    if (!violations.isEmpty()) {
+      String message =
+          violations.stream()
+              .map(ConstraintViolation::getMessage)
+              .reduce((a, b) -> a + ";\n" + b)
+              .orElse("");
+      throw new InvalidInputException(dto.getClass().getSimpleName(), id, message);
+    }
+    return dto;
   }
 }

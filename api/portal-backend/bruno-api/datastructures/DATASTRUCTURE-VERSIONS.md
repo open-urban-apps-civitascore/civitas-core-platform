@@ -218,13 +218,12 @@ POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unrelease
 
 **Request**
 ```
-PUT {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/released/meta
+PATCH {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/released/meta
 
 Content-Type: application/json
 
 {
-  "modelName": "UpdatedModelName",
-  "styles": {}
+  "modelName": "UpdatedModelName"
 }
 ```
 

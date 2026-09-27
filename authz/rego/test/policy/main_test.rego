@@ -577,7 +577,7 @@ test_scope_header_structure if {
 test_scope_header_and_tenant_wildcard if {
 	result := authz.decision with http.send as mock_send_tenant_and_perms
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/abc/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/abc/released/meta")
 	result.allow == true
 	result.headers["X-Allowed-Scope-Ids"] == "*"
 }
@@ -586,7 +586,7 @@ test_scope_header_and_tenant_wildcard if {
 test_scope_header_and_tenant_missing_one if {
 	result := authz.decision with http.send as mock_send_tenant_missing_one
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/abc/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/abc/released/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -595,7 +595,7 @@ test_scope_header_and_tenant_missing_one if {
 test_scope_header_and_specific_both if {
 	result := authz.decision with http.send as mock_send_specific_and_perms
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/dataset-abc/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/dataset-abc/released/meta")
 	result.allow == true
 	result.headers["X-Allowed-Scope-Ids"] == "dataset-abc"
 }
@@ -604,7 +604,7 @@ test_scope_header_and_specific_both if {
 test_scope_header_and_specific_partial if {
 	result := authz.decision with http.send as mock_send_specific_partial
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/dataset-abc/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/dataset-abc/released/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -619,7 +619,7 @@ test_scope_header_and_specific_partial if {
 test_and_cross_group_allowed if {
 	result := authz.decision with http.send as mock_send_and_cross_group
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/dataset-abc/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/dataset-abc/released/meta")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.headers["X-Allowed-Scope-Ids"] == "dataset-abc"
@@ -629,7 +629,7 @@ test_and_cross_group_allowed if {
 test_and_scope_intersection if {
 	result := authz.decision with http.send as mock_send_and_partial_overlap
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/ds-2/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/ds-2/released/meta")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.headers["X-Allowed-Scope-Ids"] == "ds-2"
@@ -639,7 +639,7 @@ test_and_scope_intersection if {
 test_and_scope_intersection_denied_missing_release if {
 	result := authz.decision with http.send as mock_send_and_partial_overlap
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/ds-1/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/ds-1/released/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -648,7 +648,7 @@ test_and_scope_intersection_denied_missing_release if {
 test_and_scope_intersection_denied_missing_update if {
 	result := authz.decision with http.send as mock_send_and_partial_overlap
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/ds-3/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/ds-3/released/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -657,7 +657,7 @@ test_and_scope_intersection_denied_missing_update if {
 test_and_disjoint_scopes_denied if {
 	result := authz.decision with http.send as mock_send_and_disjoint
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/ds-1/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/ds-1/released/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -707,11 +707,11 @@ test_unrelease_allowed if {
 	result.required_permissions == {"DATASET_RELEASE"}
 }
 
-# Test: PUT /datasets/{id}/released/meta requires AND-permission
+# Test: PATCH /datasets/{id}/released/meta requires AND-permission
 test_released_meta_and_perm if {
 	result := authz.decision with http.send as mock_send_specific_and_perms
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/dataset-abc/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/dataset-abc/released/meta")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {"DATASET_UPDATE", "DATASET_RELEASE"}
@@ -780,7 +780,7 @@ test_no_upward_inheritance if {
 test_and_mixed_scopes_allowed if {
 	result := authz.decision with http.send as mock_send_and_mixed_scopes
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/ds-1/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/ds-1/released/meta")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -790,7 +790,7 @@ test_and_mixed_scopes_allowed if {
 test_tenant_and_permission_both_tenant if {
 	result := authz.decision with http.send as mock_send_tenant_both_and_perms
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/abc/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/abc/released/meta")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -799,7 +799,7 @@ test_tenant_and_permission_both_tenant if {
 test_tenant_and_permission_one_missing if {
 	result := authz.decision with http.send as mock_send_tenant_missing_one
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/abc/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/abc/released/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }

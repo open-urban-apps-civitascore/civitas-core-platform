@@ -703,7 +703,7 @@ class DataStructureControllerIntegrationTest
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
               ENDPOINT + "/" + releasedDataStructureId + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               input,
               getOutputTypeReference());
@@ -725,6 +725,24 @@ class DataStructureControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should keep the description when the released meta patch omits it")
+    void shouldKeepDescriptionWhenReleasedMetaPatchOmitsIt() {
+      ResponseEntity<DataStructureOutputDTO> response =
+          exchange(
+              ENDPOINT + "/" + releasedDataStructureId + "/released/meta",
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("name", "Renamed Released Data Structure"),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getName()).isEqualTo("Renamed Released Data Structure");
+      assertThat(response.getBody().getDescription())
+          .isEqualTo("Data structure for meta update testing");
+    }
+
+    @Test
     @DisplayName("Should fail to update released meta for DRAFT data structure")
     void shouldFailToUpdateReleasedMetaForDraftDataStructure() {
       DataStructure draftDataStructure =
@@ -741,7 +759,7 @@ class DataStructureControllerIntegrationTest
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
               ENDPOINT + "/" + draftDataStructure.getId() + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               input,
               getOutputTypeReference());
@@ -761,7 +779,7 @@ class DataStructureControllerIntegrationTest
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
               ENDPOINT + "/" + UUID.randomUUID() + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               input,
               getOutputTypeReference());
@@ -776,7 +794,7 @@ class DataStructureControllerIntegrationTest
     void shouldFailToUpdateReleasedMetaWithoutAuth() {
       ResponseEntity<String> response =
           performRequestWithoutAuth(
-              "/" + releasedDataStructureId + "/released/meta", HttpMethod.PUT);
+              "/" + releasedDataStructureId + "/released/meta", HttpMethod.PATCH);
 
       assertThat(response.getStatusCode())
           .as("Should return UNAUTHORIZED status")
@@ -793,7 +811,7 @@ class DataStructureControllerIntegrationTest
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
               ENDPOINT + "/" + releasedDataStructureId + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               input,
               getOutputTypeReference());

@@ -807,7 +807,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> response =
           restTemplate.exchange(
               getEndpointPath() + "/" + secondId + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               DataSourceOutputDTO.class);
 
@@ -1059,7 +1059,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               metaUpdate,
               getOutputTypeReference());
@@ -1087,7 +1087,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               metaUpdate,
               getOutputTypeReference());
@@ -1120,7 +1120,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               metaUpdate,
               getOutputTypeReference());
@@ -1152,7 +1152,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               metaUpdate,
               getOutputTypeReference());
@@ -1172,7 +1172,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               String.class);
 
@@ -1191,7 +1191,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               metaUpdate,
               getOutputTypeReference());
@@ -1219,7 +1219,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               String.class);
 
@@ -1238,7 +1238,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               String.class);
 
@@ -1260,7 +1260,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               Map.of(
                   "name",
@@ -1294,7 +1294,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               fullUpdate,
               getOutputTypeReference());

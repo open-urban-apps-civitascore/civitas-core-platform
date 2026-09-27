@@ -1168,7 +1168,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/released/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               updateInput,
               getOutputTypeReference());
@@ -1193,6 +1193,32 @@ class DataSetControllerIntegrationTest
           .extracting(PipelineSummaryDTO::getId)
           .containsExactlyInAnyOrderElementsOf(originalPipelineIds);
       assertThat(output.getDataSetStatus()).as("Status should remain unchanged").isEqualTo(status);
+    }
+
+    @Test
+    @DisplayName("Should keep omitted fields when patching released dataset metadata")
+    void shouldKeepOmittedFieldsWhenPatchingReleasedMeta() {
+      // Without this test an omitted openDataAccess could fall back to its input default again and
+      // close an open dataset.
+      DataSet dataSet = createDataSetWithRelationships();
+      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      dataSet.setOpenDataAccess(true);
+      dataSet = dataSetRepository.save(dataSet);
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSet.getId() + "/released/meta",
+              org.springframework.http.HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("name", "Renamed Released Dataset"),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      DataSetOutputDTO output = response.getBody();
+      assertThat(output).isNotNull();
+      assertThat(output.getName()).isEqualTo("Renamed Released Dataset");
+      assertThat(output.getDescription()).isEqualTo("Test dataset with pipelines");
+      assertThat(output.getOpenDataAccess()).isTrue();
     }
 
     private UUID createTestGroup() {
@@ -1247,7 +1273,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/released/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               releasedUpdateInput,
               getOutputTypeReference());
@@ -1285,7 +1311,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/released/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               updateInput,
               getOutputTypeReference());
@@ -1324,7 +1350,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/ready/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               updateInput,
               getOutputTypeReference());
@@ -1364,7 +1390,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(
               getEndpointPath() + "/" + dataSetId + "/ready/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               updateInput);
 
@@ -1398,7 +1424,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/ready/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               updateInput,
               getOutputTypeReference());
@@ -1417,8 +1443,8 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject namedApis on /ready/meta endpoint")
-    void shouldRejectNamedApisViaReadyEndpoint() {
+    @DisplayName("Should ignore namedApis on /ready/meta endpoint")
+    void shouldIgnoreNamedApisViaReadyEndpoint() {
       DataSet dataSet = createDataSetWithRelationships();
       dataSet.setDataSetStatus(DataSetStatus.READY);
       dataSet = dataSetRepository.save(dataSet);
@@ -1432,17 +1458,15 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/ready/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               updateInput,
               getOutputTypeReference());
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-
-      DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElseThrow();
-      assertThat(unchangedDataSet.getName())
-          .as("The rejection must happen before anything is persisted")
-          .doesNotContain("Updated");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getName()).isEqualTo("Updated Ready Dataset");
+      assertThat(response.getBody().getNamedApis()).isEmpty();
     }
 
     @Test
@@ -1479,7 +1503,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/ready/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               readyUpdateInput,
               getOutputTypeReference());

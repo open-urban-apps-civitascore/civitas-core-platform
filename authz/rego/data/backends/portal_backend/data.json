@@ -86,10 +86,10 @@
       "POST": "DATASET_RELEASE"
     },
     "/v1/datasets/{id}/released/meta": {
-      "PUT": ["DATASET_UPDATE", "DATASET_RELEASE"]
+      "PATCH": ["DATASET_UPDATE", "DATASET_RELEASE"]
     },
     "/v1/datasets/{id}/ready/meta": {
-      "PUT": "DATASET_UPDATE"
+      "PATCH": "DATASET_UPDATE"
     },
     "/v1/datasets/{id}/assignments": {
       "GET": "DATASET_READ"
@@ -159,7 +159,7 @@
       "POST": "DATASOURCE_RELEASE"
     },
     "/v1/datasources/{id}/released/meta": {
-      "PUT": ["DATASOURCE_UPDATE", "DATASOURCE_RELEASE"]
+      "PATCH": ["DATASOURCE_UPDATE", "DATASOURCE_RELEASE"]
     },
     "/v1/datasources/{id}/assignments": {
       "GET": "DATASOURCE_READ"
@@ -182,7 +182,7 @@
       "POST": "DATASTRUCTURE_RELEASE"
     },
     "/v1/datastructures/{id}/released/meta": {
-      "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
+      "PATCH": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
     },
     "/v1/datastructures/{id}/assignments": {
       "GET": "DATASTRUCTURE_READ"
@@ -204,7 +204,7 @@
       "POST": "DATASTRUCTURE_RELEASE"
     },
     "/v1/datastructures/{id}/versions/{id}/released/meta": {
-      "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
+      "PATCH": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
     },
     "_comment_published_structures": "The data structures the platform's sinks publish. Readable by any authenticated user, across tenants and without a permission: they belong to the platform, they are the same for every tenant, and nobody changes them. A modeller needs them before they have a data structure to hold a permission on.",
     "/v1/published-structures": {

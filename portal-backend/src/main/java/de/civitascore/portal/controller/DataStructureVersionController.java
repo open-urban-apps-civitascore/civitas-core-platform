@@ -2,6 +2,7 @@ package de.civitascore.portal.controller;
 
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
+import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataStructureVersionAssembler;
 import de.civitascore.portal.repository.specification.DataStructureVersionSpec;
@@ -25,9 +26,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -181,25 +182,22 @@ public class DataStructureVersionController
   }
 
   /**
-   * Updates the metadata of a released data structure version.
+   * Applies a JSON merge patch to the metadata of a released data structure version.
    *
    * @param dataStructureId the UUID of the parent data structure
    * @param versionId the UUID of the released version
-   * @param input the validated version input DTO containing updated metadata
+   * @param updates the JSON node containing the metadata fields to update
    * @return the updated version output DTO with HTTP 200 status
    */
-  @PutMapping("/{versionId}/released/meta")
+  @PatchMapping("/{versionId}/released/meta")
   @Operation(
       operationId = "updateDataStructureVersionReleasedMeta",
       summary = "Update metadata of a released data structure version",
       description =
-          "Updates a released data structure version (AVAILABLE status). If the version is not in"
-              + " use by a DataSource or a DataSink, the model and styles can be replaced and the"
-              + " request must carry a model — it cannot be cleared. If the version is in use, only"
-              + " description and modelName can be changed. The version number is never a client"
-              + " input: replacing the model is an edit, so it stores a new registry version one"
-              + " minor above the current one, and the assigned number is returned. For DRAFT"
-              + " versions, use PUT"
+          "Applies a JSON merge patch to the description and modelName of a released data"
+              + " structure version (AVAILABLE status). An omitted field keeps its value. The model"
+              + " and styles of a released version do not change; a model in the request has no"
+              + " effect. For DRAFT versions, use PATCH"
               + " /datastructures/{dataStructureId}/versions/{versionId} instead.")
   @ApiResponse(responseCode = "200", description = "Released version metadata updated successfully")
   @ApiResponse(
@@ -217,10 +215,13 @@ public class DataStructureVersionController
   public ResponseEntity<DataStructureVersionOutputDTO> updateReleasedMeta(
       @PathVariable UUID dataStructureId,
       @PathVariable UUID versionId,
-      @Valid @RequestBody DataStructureVersionInputDTO input) {
-    DataStructureVersionInputDTO preProcessedInput = preProcessInput(input);
+      @RequestBody JsonNode updates) {
+    DataStructureVersionMetaInputDTO current =
+        dataStructureVersionService.toMetaInput(
+            dataStructureVersionService.findByIdOrThrow(versionId));
     DataStructureVersion updated =
-        dataStructureVersionService.updateReleasedMeta(versionId, preProcessedInput);
+        dataStructureVersionService.updateReleasedMeta(
+            versionId, mergePatch(versionId, current, updates));
     return ResponseEntity.ok(dataStructureVersionAssembler.toOutput(updated));
   }
 

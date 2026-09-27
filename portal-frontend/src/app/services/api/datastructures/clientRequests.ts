@@ -38,7 +38,7 @@ export const useUpdateDatastructure = () =>
 
 export const useUpdateDatastructureReleased = () =>
   useUpdateMutation<Datastructure, DatastructurePutData>({
-    method: 'PUT',
+    method: 'PATCH',
     key,
     endpoint: ({ id }) => `/datastructures/${id}/released/meta`,
     headers: { 'x-api-request': 'true' },

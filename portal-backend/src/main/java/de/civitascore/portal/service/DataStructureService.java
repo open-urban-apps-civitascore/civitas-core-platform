@@ -7,6 +7,7 @@ import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
+import de.civitascore.portal.model.input.DataStructureMetaInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for managing {@link DataStructure} entities through their lifecycle (DRAFT to AVAILABLE).
@@ -28,7 +30,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class DataStructureService
-    extends BaseDataEntityService<DataStructure, DataStructureInputDTO> {
+    extends BaseDataEntityService<DataStructure, DataStructureInputDTO, DataStructureMetaInputDTO> {
 
   private final DataStructureRepository dataStructureRepository;
   private final DataStructureMapper dataStructureMapper;
@@ -127,6 +129,22 @@ public class DataStructureService
           "Cannot update a released DataStructure. Use the released/meta endpoint instead.");
     }
     return super.update(id, input);
+  }
+
+  @Override
+  @Transactional
+  public DataStructure updateReleasedMeta(UUID id, DataStructureMetaInputDTO meta) {
+    DataStructure existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataStructureStatus() == DataStructureStatus.DRAFT) {
+      throw new InvalidInputException(
+          getEntityName(), id, "Cannot update released metadata on a DRAFT entity");
+    }
+    return super.update(id, dataStructureMapper.toUpdateInput(meta));
+  }
+
+  @Override
+  public DataStructureMetaInputDTO toMetaInput(DataStructure entity) {
+    return dataStructureMapper.toMetaInput(entity);
   }
 
   @Override

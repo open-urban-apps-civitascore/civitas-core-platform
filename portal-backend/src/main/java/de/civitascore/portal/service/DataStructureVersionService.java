@@ -6,6 +6,7 @@ import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
+import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -103,39 +104,6 @@ public class DataStructureVersionService
   }
 
   /**
-   * Validates and constrains update input based on the version's current state. If the version is
-   * released and a released entity references it, structural fields (model, styles) are locked and
-   * only description and modelName may change — the input's model/styles are nulled so no new
-   * registry version is stored and the existing pin is preserved. A released version that no
-   * released entity references may have its model replaced but never cleared — it must always
-   * retain a non-empty model.
-   *
-   * @param input the update input
-   * @param existingEntity the current version entity
-   * @return the preprocessed input, its structural fields neutralized while a released entity
-   *     references the version
-   * @throws InvalidInputException if an update to a released version would clear its model
-   */
-  @Override
-  protected DataStructureVersionInputDTO preProcessUpdateInput(
-      DataStructureVersionInputDTO input, DataStructureVersion existingEntity) {
-    boolean isReleased =
-        existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT;
-
-    if (isReleased && artifactUsageLookup.of(existingEntity).inUseByReleased()) {
-      input.setModel(null);
-      input.setStyles(null);
-    } else if (isReleased && (input.getModel() == null || input.getModel().isEmpty())) {
-      throw new InvalidInputException(
-          "model",
-          existingEntity.getId(),
-          "Cannot clear the model of a released DataStructureVersion");
-    }
-
-    return super.preProcessUpdateInput(input, existingEntity);
-  }
-
-  /**
    * Stores the input's model (styles merged in as {@code x-ui-styles} by the gateway) in Model
    * Forge (the version authority) and mirrors the assigned versioned URN and version string onto
    * the shell. Skipped when the input carries no model — a draft without a model stays unpinned, an
@@ -197,19 +165,16 @@ public class DataStructureVersionService
   }
 
   /**
-   * Updates a released data structure version. If the version is not in use by any DataSource, all
-   * fields (model, styles, modelName, description) can be updated — a new model stores a new
-   * registry version and re-mirrors the pin. If the version is in use, only description and
-   * modelName can be changed.
+   * Updates the metadata of a released data structure version. The model and its styles stay as
+   * they are, whether a released entity uses the version or not.
    *
    * @param id the version ID
-   * @param input the update input
+   * @param meta the metadata
    * @return the updated version
-   * @throws InvalidInputException if trying to update a DRAFT version
-   * @throws ResourceInUseException if trying to update restricted fields on an in-use version
+   * @throws InvalidInputException if the version is DRAFT
    */
   @Transactional
-  public DataStructureVersion updateReleasedMeta(UUID id, DataStructureVersionInputDTO input) {
+  public DataStructureVersion updateReleasedMeta(UUID id, DataStructureVersionMetaInputDTO meta) {
     DataStructureVersion existingEntity = findByIdOrThrow(id);
     if (existingEntity.getDataStructureVersionStatus() == DataStructureVersionStatus.DRAFT) {
       throw new InvalidInputException(
@@ -217,8 +182,19 @@ public class DataStructureVersionService
           id,
           "Cannot update released metadata for a DRAFT DataStructureVersion.");
     }
+    existingEntity.setDescription(meta.getDescription());
+    existingEntity.setModelName(meta.getModelName());
+    return save(existingEntity);
+  }
 
-    return super.update(id, input);
+  /**
+   * Returns the current metadata of the version, which a metadata patch starts from.
+   *
+   * @param entity the version
+   * @return the metadata
+   */
+  public DataStructureVersionMetaInputDTO toMetaInput(DataStructureVersion entity) {
+    return dataStructureVersionMapper.toMetaInput(entity);
   }
 
   /**

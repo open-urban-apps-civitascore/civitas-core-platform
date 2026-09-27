@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
  * during the post-conversion lifecycle hook.
  */
 public abstract class BaseDataEntityService<
-        E extends BaseDataEntity, I extends BaseDataEntityInputDTO>
+        E extends BaseDataEntity, I extends M, M extends BaseDataEntityInputDTO>
     extends BaseService<E, I> {
 
   /**
@@ -82,22 +82,29 @@ public abstract class BaseDataEntityService<
     return save(entity);
   }
 
-  @Transactional
-  public E updateReleasedMeta(UUID id, I input) {
-    E entity = findByIdOrThrow(id);
-    if (getEntityStatus(entity).isDraft()) {
-      throw new InvalidInputException(
-          getEntityName(), id, "Cannot update released metadata on a DRAFT entity");
-    }
-    validateUpdateReleasedMeta(entity, input);
-    return super.update(id, input);
-  }
+  /**
+   * Applies metadata to a released entity. A field that {@link #toMetaInput} leaves {@code null},
+   * such as {@code assignments}, keeps its value while it is still {@code null} here.
+   *
+   * @param id the entity ID
+   * @param meta the metadata, typically {@link #toMetaInput} with a patch applied
+   * @return the updated entity
+   * @throws InvalidInputException if the entity is in DRAFT status
+   */
+  public abstract E updateReleasedMeta(UUID id, M meta);
+
+  /**
+   * Returns the current metadata of the entity, which a metadata patch starts from.
+   *
+   * @param entity the entity
+   * @return the metadata, with {@code assignments} and any other field a patch may omit left {@code
+   *     null}
+   */
+  public abstract M toMetaInput(E entity);
 
   // --- Validation hooks (default no-op, subclasses override) ---
 
   protected void validateRelease(E entity) {}
 
   protected void validateUnrelease(E entity) {}
-
-  protected void validateUpdateReleasedMeta(E entity, I input) {}
 }
