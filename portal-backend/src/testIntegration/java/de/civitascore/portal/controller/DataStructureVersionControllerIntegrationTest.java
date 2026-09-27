@@ -1283,4 +1283,122 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .isFalse();
     }
   }
+
+  @Nested
+  @DisplayName("Parent ownership")
+  class ParentOwnershipTests {
+
+    private String pathUnderForeignDataStructure(String suffix) {
+      UUID foreignDataStructureId = portalData.dataStructure().getId();
+      return "/datastructures/" + foreignDataStructureId + "/versions/" + versionId1 + suffix;
+    }
+
+    private HttpStatus statusOf(String path, HttpMethod method, Object body) {
+      return HttpStatus.valueOf(
+          restTemplate
+              .exchange(path, method, new HttpEntity<>(body, createAuthHeaders()), String.class)
+              .getStatusCode()
+              .value());
+    }
+
+    private void markVersionReleased() {
+      DataStructureVersion version =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(version);
+    }
+
+    private DataStructureVersionOutputDTO getUnderOwnDataStructure() {
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      return response.getBody();
+    }
+
+    @Test
+    @DisplayName("GET answers 404 for a version of another data structure")
+    void getAnswers404ForForeignVersion() {
+      assertThat(statusOf(pathUnderForeignDataStructure(""), HttpMethod.GET, null))
+          .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("PUT answers 404 and leaves the version under its data structure")
+    void putAnswers404AndKeepsParentForForeignVersion() {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDescription("moved");
+
+      assertThat(statusOf(pathUnderForeignDataStructure(""), HttpMethod.PUT, input))
+          .isEqualTo(HttpStatus.NOT_FOUND);
+
+      DataStructureVersionOutputDTO output = getUnderOwnDataStructure();
+      assertThat(output.getDataStructure().getId()).isEqualTo(dataStructureId);
+      assertThat(output.getDescription()).isEqualTo("First version of the test data structure");
+    }
+
+    @Test
+    @DisplayName("PATCH answers 404 and leaves the version under its data structure")
+    void patchAnswers404AndKeepsParentForForeignVersion() {
+      assertThat(
+              statusOf(
+                  pathUnderForeignDataStructure(""),
+                  HttpMethod.PATCH,
+                  Map.of("description", "moved")))
+          .isEqualTo(HttpStatus.NOT_FOUND);
+
+      DataStructureVersionOutputDTO output = getUnderOwnDataStructure();
+      assertThat(output.getDataStructure().getId()).isEqualTo(dataStructureId);
+      assertThat(output.getDescription()).isEqualTo("First version of the test data structure");
+    }
+
+    @Test
+    @DisplayName("DELETE answers 404 and leaves the version in place")
+    void deleteAnswers404ForForeignVersion() {
+      assertThat(statusOf(pathUnderForeignDataStructure(""), HttpMethod.DELETE, null))
+          .isEqualTo(HttpStatus.NOT_FOUND);
+
+      getUnderOwnDataStructure();
+    }
+
+    @Test
+    @DisplayName("Release answers 404 and leaves the version in DRAFT")
+    void releaseAnswers404ForForeignVersion() {
+      assertThat(statusOf(pathUnderForeignDataStructure("/release"), HttpMethod.POST, null))
+          .isEqualTo(HttpStatus.NOT_FOUND);
+
+      assertThat(getUnderOwnDataStructure().getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Unrelease answers 404 and leaves the version released")
+    void unreleaseAnswers404ForForeignVersion() {
+      markVersionReleased();
+
+      assertThat(statusOf(pathUnderForeignDataStructure("/unrelease"), HttpMethod.POST, null))
+          .isEqualTo(HttpStatus.NOT_FOUND);
+
+      assertThat(getUnderOwnDataStructure().getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("Released meta PATCH answers 404 and leaves the metadata unchanged")
+    void releasedMetaAnswers404ForForeignVersion() {
+      markVersionReleased();
+
+      assertThat(
+              statusOf(
+                  pathUnderForeignDataStructure("/released/meta"),
+                  HttpMethod.PATCH,
+                  Map.of("modelName", "Changed")))
+          .isEqualTo(HttpStatus.NOT_FOUND);
+
+      assertThat(getUnderOwnDataStructure().getModelName()).isEqualTo("TestModel1");
+    }
+  }
 }
