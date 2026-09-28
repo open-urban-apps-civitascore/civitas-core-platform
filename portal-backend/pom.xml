@@ -44,7 +44,6 @@
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
         <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
-        <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
         <config-adapter.version>1.0.2-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
@@ -71,15 +70,6 @@
                 <groupId>at.yawk.lz4</groupId>
                 <artifactId>lz4-java</artifactId>
                 <version>${at.yawk.lz4.version}</version>
-            </dependency>
-            <!--
-                Drop once Apache Jena ships libthrift >= 0.24.0 on its 5.x line: jena-arq 5.6.0
-                pins 0.22.0, affected by GHSA-7pwc-h2j2-rjgj and GHSA-8wv5-x4w7-5gww.
-            -->
-            <dependency>
-                <groupId>org.apache.thrift</groupId>
-                <artifactId>libthrift</artifactId>
-                <version>0.24.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -156,15 +146,6 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
-
-        <!-- Serialization -->
-        <dependency>
-            <groupId>org.apache.jena</groupId>
-            <artifactId>apache-jena-libs</artifactId>
-            <version>${apache-jena.version}</version>
-            <type>pom</type>
-        </dependency>
-
 
         <!-- Actuator + OpenAPI -->
         <dependency>
@@ -347,7 +328,6 @@
                         <!-- Starters and BOM aggregators are runtime-wired; no bytecode references them. -->
                         <ignoredUnusedDeclaredDependency>org.springframework.boot:*</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.springdoc:springdoc-openapi-starter-webmvc-ui</ignoredUnusedDeclaredDependency>
-                        <ignoredUnusedDeclaredDependency>org.apache.jena:apache-jena-libs</ignoredUnusedDeclaredDependency>
                         <!-- Runtime requirement of commons-compress (Testcontainers file transfer) -->
                         <ignoredUnusedDeclaredDependency>commons-io:commons-io</ignoredUnusedDeclaredDependency>
                         <!-- JDBC driver and Flyway dialect: loaded by name at runtime -->
