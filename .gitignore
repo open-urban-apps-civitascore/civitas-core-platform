@@ -11,7 +11,7 @@ gl-dependency-scanning.json
 **/maven.graph.json
 .DS_Store
 
-/.idea/
+.idea/
 /test-results/
 **/.DS_Store
 errorlogs.txt

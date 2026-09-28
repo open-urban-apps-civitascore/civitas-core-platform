@@ -427,7 +427,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
             onSubmit={handleSubmit}
             className="h-full"
           >
-            <ContentCard className={cn('h-auto')} footerElement={<FooterElement />}>
+            <ContentCard className={cn('h-auto')} footerElement={<FooterElement areAllFieldsRequired />}>
               <BaseInfoForm
                 form={form}
                 isReadOnly={isReadOnly}

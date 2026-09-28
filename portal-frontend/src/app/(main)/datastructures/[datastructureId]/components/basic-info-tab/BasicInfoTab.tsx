@@ -23,7 +23,7 @@ export const BasicInfoTab = (props: BasicInfoTabProps) => {
   const tCommon = useTranslations('common')
 
   return (
-    <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement />}>
+    <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement areAllFieldsRequired />}>
       <div className="max-w-300 flex flex-col" data-testid="basicInfoTab">
         <DetailsFieldContainer className="pt-0 pb-4 ">
           <SubHeader title={t('edit.basicInfo.title')} subtitle={t('edit.basicInfo.subtitle')} />

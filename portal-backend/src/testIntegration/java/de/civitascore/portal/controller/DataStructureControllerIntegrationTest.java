@@ -153,6 +153,21 @@ class DataStructureControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should fail to create data structure with blank description")
+    void shouldFailToCreateDataStructureWithBlankDescription() {
+      DataStructureInputDTO input = new DataStructureInputDTO();
+      input.setName("Missing description");
+      input.setDescription("  ");
+      input.setCreatedFromDataSource(false);
+
+      ResponseEntity<DataStructureOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST status")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     @DisplayName("Should fail to create data structure without authentication")
     void shouldFailToCreateDataStructureWithoutAuth() {
       ResponseEntity<String> response = performRequestWithoutAuth("", HttpMethod.POST);
@@ -327,6 +342,7 @@ class DataStructureControllerIntegrationTest
     void shouldReturn404WhenUpdatingNonExistent() {
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Non-existent");
+      input.setDescription("a description");
       input.setDataStructureStatus(DataStructureStatus.DRAFT);
       input.setCreatedFromDataSource(false);
 
@@ -345,6 +361,23 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("");
       input.setDescription("Empty name");
+      input.setCreatedFromDataSource(false);
+
+      ResponseEntity<DataStructureOutputDTO> response = performUpdate(dataStructureId, input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST status")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should fail to update data structure with blank description")
+    void shouldFailToUpdateWithBlankDescription() {
+      UUID dataStructureId = createTestEntity();
+
+      DataStructureInputDTO input = new DataStructureInputDTO();
+      input.setName("Still has a name");
+      input.setDescription("  ");
       input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(dataStructureId, input);

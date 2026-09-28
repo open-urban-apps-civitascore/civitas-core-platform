@@ -285,6 +285,7 @@ public class PortalTestDataFactory {
     var builder =
         DataSet.builder()
             .name("dataset-" + nextSeq())
+            .description("test dataset")
             .dataSetStatus(DataSetStatus.DRAFT)
             .openDataAccess(false);
     customizer.accept(builder);
@@ -308,6 +309,7 @@ public class PortalTestDataFactory {
     var builder =
         DataSource.builder()
             .name("datasource-" + nextSeq())
+            .description("test data source")
             .dataSourceStatus(DataSourceStatus.DRAFT);
     customizer.accept(builder);
     return dataSourceRepository.save(builder.build());
@@ -326,6 +328,7 @@ public class PortalTestDataFactory {
     var builder =
         DataStructure.builder()
             .name("datastructure-" + nextSeq())
+            .description("test data structure")
             .dataStructureStatus(DataStructureStatus.DRAFT);
     customizer.accept(builder);
     return dataStructureRepository.save(builder.build());

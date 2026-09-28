@@ -1374,6 +1374,7 @@ class DataSetControllerIntegrationTest
 
       DataSetInputDTO updateInput = new DataSetInputDTO();
       updateInput.setName("Updated While Saga Runs");
+      updateInput.setDescription("a description");
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(
@@ -1548,8 +1549,8 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should set description to null with PATCH")
-    void shouldSetDescriptionToNullWithPatch() {
+    @DisplayName("Should reject PATCH that sets description to null")
+    void shouldRejectSettingDescriptionToNullWithPatch() {
       UUID dataSetId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
@@ -1557,10 +1558,9 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response = performPatch(dataSetId, patchMap);
 
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDescription())
-          .as("Description should be set to null")
-          .isNull();
+      assertThat(response.getStatusCode())
+          .as("Description is mandatory and cannot be cleared via PATCH")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
@@ -1771,14 +1771,25 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should handle null description")
-    void shouldHandleNullDescription() {
+    @DisplayName("Should reject null description as invalid")
+    void shouldRejectNullDescription() {
       DataSetInputDTO input = createValidInput();
       input.setDescription(null);
 
       ResponseEntity<DataSetOutputDTO> response = performCreate(input);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject blank description as invalid")
+    void shouldRejectBlankDescription() {
+      DataSetInputDTO input = createValidInput();
+      input.setDescription("   ");
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

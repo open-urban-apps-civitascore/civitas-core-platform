@@ -25,7 +25,7 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
   const tCommon = useTranslations('common')
 
   return (
-    <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement />}>
+    <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement areAllFieldsRequired />}>
       <Form {...form}>
         <form
           className="max-w-300 flex flex-col"

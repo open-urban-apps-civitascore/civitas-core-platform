@@ -434,9 +434,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     if (StringUtils.isBlank(dataSet.getName())) {
       throw new InvalidInputException("name", id, "DataSet name must not be blank");
     }
-    if (StringUtils.isBlank(dataSet.getDescription())) {
-      throw new InvalidInputException("description", id, "DataSet description must not be blank");
-    }
     if (dataSet.getPipelines() == null || dataSet.getPipelines().isEmpty()) {
       throw new InvalidInputException(
           "pipelines", id, "DataSet must contain at least one Pipeline before staging");
