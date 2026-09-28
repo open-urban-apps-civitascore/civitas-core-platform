@@ -146,6 +146,19 @@ mvn spotless:apply          # Format code
 mvn spotless:check          # Check formatting
 ```
 
+### Database Migrations
+
+Flyway migrations live in `src/main/resources/db/migration`. To add one:
+
+1. Rebase onto the latest `develop`.
+2. Take the version that directly follows the highest one: after `1.2.19` only `1.2.20`, `1.3.0` or `2.0.0`.
+3. Name the file `V<major>_<minor>_<patch>__<description>.sql`, for example `V1_2_20__drop_unused_columns.sql`.
+4. Write the new file name into `LATEST` in the same folder.
+
+Two merge requests that both add a migration then write different file names into `LATEST` and conflict there, so the second one has to rebase and take the next version. A migration that is on `develop` never changes; fix it with a new one.
+
+`node ../.gitlab/ci/scripts/check-migrations.mjs origin/develop` checks these rules locally (fetch first); CI runs it against the merge request target.
+
 ### Docker Infrastructure
 
 ```bash

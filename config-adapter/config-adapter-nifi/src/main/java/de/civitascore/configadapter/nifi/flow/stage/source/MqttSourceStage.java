@@ -70,6 +70,9 @@ public final class MqttSourceStage implements SourceStage {
    */
   private static final Map<String, String> SCHEME_ALIASES = Map.of("mqtt", "tcp", "mqtts", "ssl");
 
+  /** MQTT major versions mapped to NiFi/Paho/HiveMQ protocol-level values. */
+  private static final Map<String, String> MQTT_PROTOCOL_VERSIONS = Map.of("3", "0", "5", "5");
+
   private static final Pattern BROKER_SCHEME =
       Pattern.compile("^([a-z][a-z0-9+.-]*)://", Pattern.CASE_INSENSITIVE);
 
@@ -142,6 +145,7 @@ public final class MqttSourceStage implements SourceStage {
     putIfPresent(out::putSourceProperty, "Username", decrypted.get("user"));
     putIfPresent(out::putSourceProperty, "Client ID", decrypted.get("client_id"));
     putIfPresent(out::putSourceProperty, "Quality of Service", decrypted.get("qos"));
+    bindProtocolVersion(out, decrypted.get("protocol_version"));
     bindSeconds(out, "Connection Timeout", decrypted.get("connect_timeout"));
     bindSeconds(out, "Keep Alive", decrypted.get("keepalive"));
     // A password, if present, must be encrypted: a plaintext secret must never be written into
@@ -318,5 +322,17 @@ public final class MqttSourceStage implements SourceStage {
           "MQTT '" + nifiKey + "' is not a valid seconds duration: " + text);
     }
     out.putSourceProperty(nifiKey, matcher.group(1));
+  }
+
+  private void bindProtocolVersion(PlanContext out, Object value) throws FatalAdapterException {
+    // Missing values belong to pre-version-field datasources and retain the old fragment behaviour:
+    // Paho's v3 AUTO mode tries MQTT 3.1.1 first, then falls back to MQTT 3.1.0.
+    String configured = value == null ? "3" : String.valueOf(value).trim();
+    String nifiValue = MQTT_PROTOCOL_VERSIONS.get(configured);
+    if (nifiValue == null) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, "MQTT protocol version must be 3 or 5");
+    }
+    out.putSourceProperty("MQTT Specification Version", nifiValue);
   }
 }

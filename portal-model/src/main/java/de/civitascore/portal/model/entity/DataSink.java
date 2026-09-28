@@ -65,6 +65,13 @@ public class DataSink extends DataSetOwnedEntity {
   @Column(name = "configuration_urn")
   private String configurationUrn;
 
+  /**
+   * Set by a completed provisioning saga and never reset: the resource survives an unrelease, and
+   * the row goes when the sink or its dataset is deleted.
+   */
+  @Column(name = "provisioned", nullable = false)
+  private boolean provisioned = false;
+
   /** A Layer's {@code datasink_id} is non-null, so layers cannot outlive their sink. */
   @OneToMany(
       mappedBy = "dataSink",

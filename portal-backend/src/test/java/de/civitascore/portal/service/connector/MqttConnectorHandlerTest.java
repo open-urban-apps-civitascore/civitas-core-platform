@@ -71,14 +71,16 @@ class MqttConnectorHandlerTest {
       config.put("urls", List.of("tcp://broker:1883"));
       config.put("topics", List.of("sensor/#"));
       config.put("qos", 1);
+      config.put("protocol_version", "3");
 
       assertThat(handler.validate(config, Default.class, OnRelease.class)).isEmpty();
     }
 
     @Test
-    @DisplayName("Should pass type-only validation even without required fields")
+    @DisplayName("Should pass type-only validation even without release-only required fields")
     void shouldPassTypeOnlyWithoutRequiredFields() {
       Map<String, Object> config = new HashMap<>();
+      config.put("protocol_version", "3");
 
       assertThat(handler.validate(config, Default.class)).isEmpty();
     }
@@ -89,6 +91,7 @@ class MqttConnectorHandlerTest {
       Map<String, Object> config = new HashMap<>();
       config.put("topics", List.of("sensor/#"));
       config.put("qos", 1);
+      config.put("protocol_version", "3");
 
       List<String> errors = handler.validate(config, Default.class, OnRelease.class);
       assertThat(errors).hasSize(1);
@@ -102,10 +105,42 @@ class MqttConnectorHandlerTest {
       config.put("urls", List.of("tcp://broker:1883"));
       config.put("topics", List.of("sensor/#"));
       config.put("qos", 5);
+      config.put("protocol_version", "3");
 
       List<String> errors = handler.validate(config, Default.class);
       assertThat(errors).hasSize(1);
       assertThat(errors.get(0)).contains("qos");
+    }
+
+    @Test
+    @DisplayName("Should reject unsupported MQTT protocol versions")
+    void shouldRejectUnsupportedProtocolVersion() {
+      Map<String, Object> config = new HashMap<>();
+      config.put("protocol_version", "4");
+
+      List<String> errors = handler.validate(config, Default.class);
+
+      assertThat(errors).containsExactly("'protocol_version' must be 3 or 5");
+    }
+
+    @Test
+    @DisplayName("Should reject an explicit null protocol_version even on a draft")
+    void shouldRejectExplicitNullProtocolVersionOnDraft() {
+      Map<String, Object> config = new HashMap<>();
+      config.put("protocol_version", null);
+
+      List<String> errors = handler.validate(config, Default.class);
+
+      assertThat(errors).containsExactly("'protocol_version' is required");
+    }
+
+    @Test
+    @DisplayName("Should default protocol_version to 3 when the key is simply absent")
+    void shouldDefaultProtocolVersionWhenAbsent() {
+      Map<String, Object> config = new HashMap<>();
+      config.put("urls", List.of("tcp://broker:1883"));
+
+      assertThat(handler.validate(config, Default.class)).isEmpty();
     }
 
     @Test
@@ -161,6 +196,7 @@ class MqttConnectorHandlerTest {
       config.put("urls", List.of("tcp://broker:1883"));
       config.put("topics", topics);
       config.put("qos", 1);
+      config.put("protocol_version", "3");
       return config;
     }
   }
@@ -176,6 +212,7 @@ class MqttConnectorHandlerTest {
       map.put("urls", List.of("tcp://admin:pass@broker:1883"));
       map.put("topics", List.of("foo/#"));
       map.put("qos", 1);
+      map.put("protocol_version", "3");
       map.put("user", "mqttuser");
       map.put("password", "mqttpass");
 
@@ -194,12 +231,21 @@ class MqttConnectorHandlerTest {
       map.put("urls", List.of("tcp://broker:1883"));
       map.put("topics", List.of("foo/#"));
       map.put("qos", 1);
+      map.put("protocol_version", "3");
 
       Map<String, Object> result = handler.normalizeAndValidate(map);
 
       assertThat(result.get("urls")).isEqualTo(List.of("tcp://broker:1883"));
       assertThat(result.get("user")).isNull();
       assertThat(result.get("password")).isNull();
+    }
+
+    @Test
+    @DisplayName("Should default legacy MQTT configurations to protocol version 3")
+    void shouldDefaultLegacyProtocolVersion() {
+      Map<String, Object> result = handler.normalizeAndValidate(Map.of());
+
+      assertThat(result.get("protocol_version")).isEqualTo("3");
     }
   }
 
@@ -233,6 +279,56 @@ class MqttConnectorHandlerTest {
 
       assertThat(result.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
       assertThat(result.get("client_id")).isEqualTo("my-client");
+    }
+  }
+
+  @Nested
+  @DisplayName("prepareForOutput")
+  class PrepareForOutputTests {
+
+    @Test
+    @DisplayName("Should leave protocol_version absent when the key is missing")
+    void shouldLeaveMissingProtocolVersionAbsent() {
+      Map<String, Object> config = new HashMap<>();
+      config.put("urls", List.of("tcp://broker:1883"));
+
+      Map<String, Object> result = handler.prepareForOutput(config);
+
+      assertThat(result.get("protocol_version")).isNull();
+    }
+
+    @Test
+    @DisplayName("Should preserve an explicit null protocol_version")
+    void shouldPreserveNullProtocolVersion() {
+      Map<String, Object> config = new HashMap<>();
+      config.put("protocol_version", null);
+
+      Map<String, Object> result = handler.prepareForOutput(config);
+
+      assertThat(result.get("protocol_version")).isNull();
+    }
+
+    @Test
+    @DisplayName("Should preserve an explicit protocol_version")
+    void shouldPreserveExplicitProtocolVersion() {
+      Map<String, Object> config = new HashMap<>();
+      config.put("protocol_version", "5");
+
+      Map<String, Object> result = handler.prepareForOutput(config);
+
+      assertThat(result.get("protocol_version")).isEqualTo("5");
+    }
+
+    @Test
+    @DisplayName("Should still mask sensitive fields")
+    void shouldStillMaskSensitiveFields() {
+      String encrypted = textEncryptor.encrypt("secret");
+      Map<String, Object> config = new HashMap<>();
+      config.put("password", encrypted);
+
+      Map<String, Object> result = handler.prepareForOutput(config);
+
+      assertThat(result.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
     }
   }
 

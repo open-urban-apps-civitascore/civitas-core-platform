@@ -63,7 +63,7 @@ interface PipelineEditorLayoutInnerProps {
  */
 const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ className = '', sessionManager }) => {
   const t = useTranslations('pipelineEditor')
-  const { isLoadingPipelines, saveAllPipelines, isSavingAll, hasAnyDirtySession } = useActivePipeline()
+  const { isLoadingEditor, saveAllPipelines, isSavingAll, hasAnyDirtySession } = useActivePipeline()
   const { isReadOnly } = useReadOnly()
   const router = useRouter()
   const params = useParams<{ datasetId: string }>()
@@ -155,7 +155,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
           </div>
 
           {/* Main Content Area */}
-          {isLoadingPipelines ? (
+          {isLoadingEditor ? (
             <div className="flex flex-1 items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               <span className="ml-2 text-sm text-muted-foreground">{t('toolbar.loading')}</span>

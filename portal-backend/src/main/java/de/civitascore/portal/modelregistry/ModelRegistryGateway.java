@@ -198,7 +198,7 @@ public class ModelRegistryGateway {
   /**
    * Whether anything outside the model still references it — a DataSource or DataSink carrying one
    * of its Elements, a Mapping naming one as an endpoint, another model associating with one, or
-   * membership of a second DataSet. Gates the delete and the unrelease of a DataStructure alike.
+   * membership of a second DataSet.
    *
    * @param modelUrn versioned or logical CORE URN of the model; null/blank yields {@code false}
    * @return true while at least one reference stands in the way of deleting the model
@@ -230,6 +230,46 @@ public class ModelRegistryGateway {
    */
   public String logicalUrn(String urn) {
     return UrnParser.logicalUrn(urn);
+  }
+
+  /**
+   * The CORE artifact-type segment of a URN, such as {@code "pipeline"} or {@code "element"}.
+   *
+   * @return the segment, or null when {@code urn} is not a CORE URN
+   */
+  public String artifactType(String urn) {
+    return UrnParser.artifactTypeFromUrn(urn);
+  }
+
+  /**
+   * The logical URNs a Data structure row may store as the model of an Element or Data structure:
+   * the artifact itself, each Data structure grouping that contains it, and the root Element of
+   * each such grouping.
+   *
+   * @param urn logical or versioned CORE URN of an Element or Data structure
+   */
+  public Set<String> hostModelUrnsOf(String urn) {
+    String logical = logicalUrn(urn);
+    Set<String> hosts = new LinkedHashSet<>(hostModelUrnsOfGrouping(logical));
+    if ("element".equals(artifactType(logical))) {
+      hosts.add(logical);
+      modelForge.dependents(new DependencyQuery(new ArtifactId(urn))).nodes().stream()
+          .map(node -> node.artifactId().value())
+          .filter(u -> "datastructure".equals(UrnParser.artifactTypeFromUrn(u)))
+          .forEach(grouping -> hosts.addAll(hostModelUrnsOfGrouping(logicalUrn(grouping))));
+    }
+    return hosts;
+  }
+
+  /**
+   * An imported model's grouping takes its name and disambiguator from its root Element, which is
+   * what a Data structure row stores for a model that is not a UML Data structure.
+   */
+  private static Set<String> hostModelUrnsOfGrouping(String logicalUrn) {
+    if (!logicalUrn.contains(":datastructure:")) {
+      return Set.of();
+    }
+    return Set.of(logicalUrn, logicalUrn.replace(":datastructure:", ":element:"));
   }
 
   /**

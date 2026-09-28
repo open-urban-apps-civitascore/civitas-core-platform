@@ -114,7 +114,6 @@
     },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
-      "commaSeparated": "comma-separated",
       "requiredInAvailable": "This field is required in the available mode.",
       "descriptionHint": "max. 150 characters",
       "creationSubtitle": "Only a name is required in the first step. Additional basic information can be added later.",
@@ -310,9 +309,24 @@
             "addButton": "Add pipeline",
             "unknownError": "Unknown error.",
             "pipelineError": "Pipeline error",
+            "activeLabel": "Active",
             "errorLabel": "Error",
             "errorDetails": "Error details for {name}",
-            "errorToast": "Pipeline \"{name}\": {message}"
+            "errorToast": "Pipeline \"{name}\": {message}",
+            "menuLabel": "Actions for {name}",
+            "actions": {
+              "open": "Open",
+              "delete": "Delete"
+            },
+            "deleteConfirm": {
+              "title": "Delete Pipeline",
+              "description": "Do you really want to delete the pipeline \"{name}\"? This action cannot be undone.",
+              "confirm": "Delete"
+            },
+            "messages": {
+              "deleteSuccess": "Pipeline has been successfully deleted.",
+              "deleteError": "An error occurred while deleting the pipeline. Please try again."
+            }
           },
           "apis": {
             "title": "APIs",
@@ -328,6 +342,7 @@
               "CUSTOM": "Custom API"
             },
             "card": {
+              "menuLabel": "Actions for {name}",
               "actions": {
                 "edit": "Edit",
                 "view": "Open",
@@ -1020,7 +1035,69 @@
       "type": "Type",
       "typePlaceholder": "Select connector type",
       "connection": "Connection",
-      "establishConnection": "Establish Connection"
+      "establishConnection": "Establish Connection",
+      "mqtt": {
+        "urls": {
+          "label": "Brokers",
+          "hint": "comma-separated"
+        },
+        "protocolVersion": {
+          "label": "Protocol version",
+          "placeholder": "Select a version"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Password"
+        },
+        "topics": {
+          "label": "Topic"
+        },
+        "clientId": {
+          "label": "Client ID",
+          "placeholder": "optional"
+        },
+        "qos": {
+          "label": "QoS"
+        },
+        "connectTimeout": {
+          "label": "Connect Timeout"
+        },
+        "keepalive": {
+          "label": "Keepalive"
+        },
+        "tls": {
+          "label": "TLS Enabled"
+        }
+      },
+      "sql": {
+        "driver": {
+          "label": "Driver"
+        },
+        "dsn": {
+          "label": "DSN",
+          "placeholder": "Driver-specific connection string"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Password"
+        },
+        "table": {
+          "label": "Table",
+          "placeholder": "table"
+        },
+        "columns": {
+          "label": "Columns",
+          "hint": "comma-separated",
+          "placeholder": "* or col1, col2"
+        },
+        "where": {
+          "label": "WHERE"
+        }
+      }
     },
     "dataModel": {
       "placeholder": {
@@ -1247,6 +1324,22 @@
       "noPermission": "No permission to read datasources",
       "anonymousName": "Anonymous Data Source"
     },
+    "sink": {
+      "locked": {
+        "provisioned": {
+          "title": "Provisioned",
+          "description": "This Data storage has been provisioned and can no longer be edited or removed."
+        },
+        "inUseByLayer": {
+          "title": "In use",
+          "tooltip": "This Data storage is used by API layers. To edit or remove it, the layer assignments must be removed first."
+        }
+      },
+      "notRemovable": {
+        "provisioned": "Data storage can not be removed. This Data storage has been provisioned and can no longer be removed.",
+        "inUseByLayer": "Data storage can not be removed. This Data storage is used by API layers. Remove the layer assignments first."
+      }
+    },
     "frostPanel": {
       "details": "Sensor Data Storage Details",
       "serverName": "Server Name",
@@ -1372,7 +1465,9 @@
       "unconfirmedDataLossError": "Cannot save {names}: the change would discard stored data.",
       "missingDataStructureUrn": "Cannot save {names}: the geo persistence node is not valid. Assign its data structure again, or delete it and add it again.",
       "notDraftError": "The Dataset must be in draft status to make changes.",
-      "sagaInFlightError": "The Dataset is currently being processed. Please try again later."
+      "sagaInFlightError": "The Dataset is currently being processed. Please try again later.",
+      "sinkStillInUse": "{names} was saved, but a removed Data storage is still in use and cannot be deleted.",
+      "sinkDeleteFailed": "{names} was saved, but a removed Data storage could not be deleted."
     },
     "tabs": {
       "closeTab": "Close tab",
@@ -1485,22 +1580,43 @@
     }
   },
   "umlModeler": {
+    "modelNamePlaceholder": "Model name",
     "closeTabModal": {
       "title": "Discard model?",
       "description": "This action deletes the model. It can not be undone."
     },
     "import": {
       "title": "Import",
+      "file": "Import diagram",
       "fromPlatform": "from the platform",
-      "fromFile": "from file"
+      "fromFile": "from file",
+      "success": "Diagram imported successfully",
+      "fileError": "Failed to import file.",
+      "overwriteModal": {
+        "title": "Replace existing structure definition?",
+        "description": "Importing will replace all existing classes, attributes, and relationships in the structure definition. This action cannot be undone.",
+        "confirm": "Replace structure"
+      },
+      "errors": {
+        "FILE_TOO_LARGE": "The file is too large (maximum 5 MB allowed).",
+        "INVALID_JSON": "The file does not contain valid JSON.",
+        "INVALID_DATASTRUCTURE_DOCUMENT": "The file does not contain a valid data structure.",
+        "MISSING_UI_STYLES": "The file does not contain layout data to display the structure.",
+        "INVALID_DIAGRAM_SCHEMA": "The diagram data in the file is invalid."
+      }
     },
     "save": {
       "success": "Model saved successfully",
       "error": "Failed to save model. Please try again."
     },
     "export": {
+      "title": "Export",
+      "file": "Export diagram",
       "success": "Diagram exported successfully",
-      "error": "Failed to export diagram. Please try again."
+      "error": "Failed to export diagram. Please try again.",
+      "errors": {
+        "INVALID_URN": "The data structure name does not yield a valid CORE URN. It must contain at least one letter or digit."
+      }
     },
     "rootValidation": {
       "noRoot": "No root class can be determined in the diagram — every class is embedded in another one (cyclic structure).",

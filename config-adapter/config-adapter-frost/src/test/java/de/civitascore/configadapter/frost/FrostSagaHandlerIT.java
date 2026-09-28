@@ -164,6 +164,68 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
   }
 
   /**
+   * Reproduces GitLab #2260: a dataset released, unreleased (its FROST project survives, per
+   * design), renamed while unreleased, then re-released must reuse the SAME project — not orphan it
+   * behind a duplicate. The dataset-id lookup must match on the datasetId suffix of the name even
+   * though the display-name portion is now stale, and the reuse PATCH must bring FROST's stored
+   * name back in sync with the new display name.
+   */
+  @Test
+  void createProjectReusesExistingProjectAfterDatasetRename() {
+    String datasetId = "ds-" + UUID.randomUUID();
+    SagaCommandMessage firstRelease =
+        createProjectCommand(datasetId, "Original Name", "before rename");
+
+    SagaCommandResult firstResult = handler.handle(firstRelease);
+    assertEquals(
+        "STEP_COMPLETED",
+        firstResult.type(),
+        () -> "First CREATE_PROJECT failed: " + firstResult.error());
+    String firstProjectId = (String) firstResult.resultData().get("projectId");
+
+    // Re-release after a rename: same datasetId, new datasetName, no projectId hint — the exact
+    // scenario from the bug report (unrelease preserves projectId, but release() never passed it
+    // through before this fix, so the lookup had to fall back to matching the full, now-stale
+    // name).
+    SagaCommandResult secondResult =
+        handler.handle(createProjectCommand(datasetId, "Renamed Dataset", "after rename"));
+    assertEquals(
+        "STEP_COMPLETED",
+        secondResult.type(),
+        () -> "Re-release CREATE_PROJECT failed: " + secondResult.error());
+    assertEquals(
+        firstProjectId,
+        secondResult.resultData().get("projectId"),
+        "Re-release after a rename must reuse the same FROST project, not create a duplicate");
+
+    Request getProjectRequest = jsonRequest("Projects(" + firstProjectId + ")").get().build();
+    try (Response getProject = httpClient.newCall(getProjectRequest).execute()) {
+      JsonNode project = objectMapper.readTree(getProject.body().string());
+      assertEquals(
+          "Renamed Dataset (" + datasetId + ")",
+          project.get("name").asText(),
+          "The reuse PATCH must sync FROST's stored name to the dataset's current display name");
+    } catch (Exception e) {
+      throw new AssertionError("Failed to read back the reused project", e);
+    }
+  }
+
+  private SagaCommandMessage createProjectCommand(
+      String datasetId, String datasetName, String description) {
+    return new SagaCommandMessage(
+        "EXECUTE_STEP",
+        UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(),
+        "create-frost-project",
+        "frost",
+        "CREATE_PROJECT",
+        Map.of(
+            "datasetName", datasetName,
+            "datasetId", datasetId,
+            "description", description));
+  }
+
+  /**
    * FROST does not cascade project deletion, so the handler must delete the project's Things first
    * (that cascade covers Datastreams and Observations) — without touching other projects' data.
    */

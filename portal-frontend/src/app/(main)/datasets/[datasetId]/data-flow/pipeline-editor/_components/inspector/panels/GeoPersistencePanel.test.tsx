@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { buildDataStructureUrn } from '@/utils/urn'
 
 import { ActivePipelineContext } from '../../../_hooks/use-active-pipeline'
+import type { DataSinkLocks } from '../../../_hooks/use-datasink-locks'
 import type { ActivePipelineContextValue } from '../../../_types/context'
 import type { GeoPersistenceNodeData } from '../../../_types/nodes'
 import type { PipelineNode } from '../../../_types/pipeline'
@@ -56,8 +57,13 @@ const renderPanel = (
   pipelineUsingTableName: (nodeId: string, tableName: string) => string | null,
   overrides: Partial<GeoPersistenceNodeData> = {},
   onUpdate: (data: Partial<GeoPersistenceNodeData>) => void = vi.fn(),
+  locks: DataSinkLocks = { provisioned: false, inUseByLayer: false },
 ) => {
-  const contextValue = { selectedNode, pipelineUsingTableName } as unknown as ActivePipelineContextValue
+  const contextValue = {
+    selectedNode,
+    pipelineUsingTableName,
+    getSinkLocks: () => locks,
+  } as unknown as ActivePipelineContextValue
 
   render(
     <QueryClientProvider client={new QueryClient()}>
@@ -119,6 +125,26 @@ describe('GeoPersistencePanel', () => {
     renderPanel(() => null)
 
     expect(screen.getByLabelText('geoPersistencePanel.tableName')).toHaveAttribute('maxlength', '63')
+  })
+
+  it('offers the data structure import for an unlocked sink', () => {
+    renderPanel(() => null)
+
+    expect(screen.getByRole('button', { name: 'geoPersistencePanel.importDataStructure' })).toBeEnabled()
+  })
+
+  it('hides the data structure import for a provisioned sink', () => {
+    renderPanel(() => null, {}, vi.fn(), { provisioned: true, inUseByLayer: false })
+
+    expect(screen.queryByRole('button', { name: 'geoPersistencePanel.importDataStructure' })).not.toBeInTheDocument()
+    expect(screen.queryByText('geoPersistencePanel.dataStructureVersion')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('geoPersistencePanel.tableName')).toBeInTheDocument()
+  })
+
+  it('disables editing the data structure of a layer-referenced sink', () => {
+    renderPanel(() => null, {}, vi.fn(), { provisioned: false, inUseByLayer: true })
+
+    expect(screen.getByRole('button', { name: 'geoPersistencePanel.importDataStructure' })).toBeDisabled()
   })
 })
 

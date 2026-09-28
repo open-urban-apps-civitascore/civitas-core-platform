@@ -5,7 +5,7 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.DataSourceRepository;
+import de.civitascore.portal.service.ArtifactUsageLookup;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -26,7 +26,7 @@ public class DataStructureVersionAssembler
     implements BaseAssembler<DataStructureVersion, DataStructureVersionOutputDTO, UUID> {
 
   private final DataStructureVersionMapper dataStructureVersionMapper;
-  private final DataSourceRepository dataSourceRepository;
+  private final ArtifactUsageLookup artifactUsageLookup;
   private final ModelRegistryGateway modelRegistryGateway;
 
   /** {@inheritDoc} Delegates to the {@link DataStructureVersionMapper} for basic field mapping. */
@@ -36,15 +36,15 @@ public class DataStructureVersionAssembler
   }
 
   /**
-   * {@inheritDoc} Sets the {@code inUse} flag from whether anything still references this version,
-   * and serves {@code model}/{@code styles} from the registry pin.
+   * {@inheritDoc} Sets the {@code inUse} and {@code inUseByReleased} flags, and serves {@code
+   * model}/{@code styles} from the registry pin.
    */
   @Override
   public DataStructureVersionOutputDTO enrichDto(
       DataStructureVersionOutputDTO dto, DataStructureVersion entity) {
-    dto.setInUse(
-        dataSourceRepository.existsByDataStructureVersionId(entity.getId())
-            || modelRegistryGateway.isReferenced(entity.getModelUrn()));
+    ArtifactUsageLookup.ArtifactUsage usage = artifactUsageLookup.of(entity);
+    dto.setInUse(usage.inUse());
+    dto.setInUseByReleased(usage.inUseByReleased());
     dto.setModelUrn(entity.getModelUrn());
     if (entity.getModelUrn() != null) {
       // Styles (the UML diagram) ride on the bundled view's x-ui-styles keyword.
