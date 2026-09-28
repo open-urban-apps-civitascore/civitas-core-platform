@@ -55,7 +55,7 @@ export const isSagaInFlightError = (error: unknown) => {
 
 export const isResourceInUseError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
-  return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && problem.detail.includes('is referenced by')
+  return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && !problem.detail.includes('confirmDataLoss')
 }
 
 export const isUnconfirmedDataLossError = (error: unknown) => {

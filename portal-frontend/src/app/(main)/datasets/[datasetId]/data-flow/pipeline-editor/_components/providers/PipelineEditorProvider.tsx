@@ -21,7 +21,7 @@ import {
   useDeleteDataSink,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
-import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
+import { useCreateMapping, useDeleteMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
@@ -53,6 +53,7 @@ import {
   createMappingSnapshot,
   type DataSinkSnapshot,
   getRemovedDataSinkIds,
+  getRemovedMappingUrns,
   hasDataSinkChanged,
   hasMappingChanged,
   isDestructiveDataSinkChange,
@@ -127,6 +128,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const updateDataSinkMutation = useUpdateDataSink()
   const createMappingMutation = useCreateMapping(datasetId)
   const updateMappingMutation = useUpdateMapping(datasetId)
+  const deleteMappingMutation = useDeleteMapping(datasetId)
 
   const { isReadOnly } = useReadOnly()
 
@@ -546,6 +548,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     const sagaInFlightNames: string[] = []
     const sinkStillInUseNames: string[] = []
     const sinkDeleteFailedNames: string[] = []
+    const mappingInUseNames: string[] = []
+    const mappingCleanupFailedNames: string[] = []
     try {
       if (hasDestructiveChange) {
         const isConfirmed = await confirmDataLoss()
@@ -640,6 +644,19 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           if (hasSinkStillInUse) sinkStillInUseNames.push(session.name)
           if (hasSinkDeleteFailed) sinkDeleteFailedNames.push(session.name)
 
+          // Step 3.6: Delete removed mappings. Has to be executed after the pipeline save,
+          // otherwise the backend refuses with 409.
+          for (const logicalUrn of getRemovedMappingUrns(currentPipeline, mappingSnapshot)) {
+            try {
+              await deleteMappingMutation.mutateAsync(logicalUrn)
+            } catch (error) {
+              // The save itself already succeeded, so a failed cleanup is reported on its own below.
+              console.error('Failed to delete removed mapping of pipeline:', session.name, logicalUrn, error)
+              const names = isResourceInUseError(error) ? mappingInUseNames : mappingCleanupFailedNames
+              if (!names.includes(session.name)) names.push(session.name)
+            }
+          }
+
           // Step 4: Update session state and snapshot
           sessionManager.updateSessionPipeline(session.id, { ...currentPipeline, isDirty: false })
           sessionManager.markSessionClean(session.id)
@@ -700,6 +717,13 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       if (sinkDeleteFailedNames.length > 0) {
         toast.warning(t('header.sinkDeleteFailed', { names: sinkDeleteFailedNames.join(', ') }))
       }
+      // The pipeline itself was saved in both cases, so neither fails the save.
+      if (mappingInUseNames.length > 0) {
+        toast.error(t('header.mappingStillInUse', { name: mappingInUseNames.join(', ') }))
+      }
+      if (mappingCleanupFailedNames.length > 0) {
+        toast.error(t('header.mappingCleanupFailed', { name: mappingCleanupFailedNames.join(', ') }))
+      }
       if (
         notDraftNames.length > 0 ||
         sagaInFlightNames.length > 0 ||
@@ -726,6 +750,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     updateDataSinkMutation,
     createMappingMutation,
     updateMappingMutation,
+    deleteMappingMutation,
     datasetId,
     datasetQuery.data,
     confirmDataLoss,

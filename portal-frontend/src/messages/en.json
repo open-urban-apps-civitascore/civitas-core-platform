@@ -1461,7 +1461,9 @@
       "notDraftError": "The dataset must be in draft status to make changes.",
       "sagaInFlightError": "The dataset is currently being processed. Please try again later.",
       "sinkStillInUse": "{names} was saved, but a removed data storage is still in use and cannot be deleted.",
-      "sinkDeleteFailed": "{names} was saved, but a removed data storage could not be deleted."
+      "sinkDeleteFailed": "{names} was saved, but a removed data storage could not be deleted.",
+      "mappingStillInUse": "A mapping removed from pipeline {name} cannot be deleted because another pipeline still uses it.",
+      "mappingCleanupFailed": "A mapping removed from pipeline {name} could not be deleted."
     },
     "tabs": {
       "closeTab": "Close tab",

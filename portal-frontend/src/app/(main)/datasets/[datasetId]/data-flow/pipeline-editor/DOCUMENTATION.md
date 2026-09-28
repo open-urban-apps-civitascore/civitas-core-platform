@@ -636,9 +636,10 @@ The FROST section is a fixed template that generates thing/observation upsert lo
 3. **Save the mappings** – create or version the mapping artifacts. An unchanged mapping is skipped, because the mapping API creates a new version per request.
 4. **Save the pipeline** – `POST` for a new pipeline, `PUT` for an existing one, with the ids and URNs from the steps above.
 5. **Delete the removed sinks** – the pipeline is already stored, so a failed delete gives a warning toast but keeps the save successful.
-6. **Clean the session** – mark it clean, write the new data sink and mapping snapshots, show the success toast.
+6. **Delete the removed mappings** – `getRemovedMappingUrns()` collects the logical URNs of mapping nodes that were removed since the last save. A node that was never saved has no URN and is skipped. A failed delete gives an error toast (`mappingStillInUse` or `mappingCleanupFailed`) but keeps the save successful.
+7. **Clean the session** – mark it clean, write the new data sink and mapping snapshots, show the success toast.
 
-**Order rule:** the delete must stay behind the pipeline save. When it came first, the backend refused it with `409 RESOURCE_IN_USE`, because the stored pipeline still pointed at the sink through `sinkRef`. The pipeline could then no longer be saved at all.
+**Order rule:** both deletes must stay behind the pipeline save. When they come first, the backend refuses them with `409 RESOURCE_IN_USE`, because the stored pipeline still points at the sink through `sinkRef` and at the mapping through `mappingRef`. For a sink, the pipeline could then no longer be saved at all.
 
 If a step throws, the partial progress is written back to the session — still dirty — so a retry updates the artifacts that were already created instead of creating duplicates. The error is classified and reported in a toast.
 
