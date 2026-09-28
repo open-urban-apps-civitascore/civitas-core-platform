@@ -105,7 +105,11 @@ const defaultValues: DatasourceFormDraft = {
   },
 }
 
-const renderConnectorTab = (values?: Partial<DatasourceFormDraft>, isReadOnly = false) => {
+const renderConnectorTab = (
+  values?: Partial<DatasourceFormDraft>,
+  isReadOnly = false,
+  isDatasourceReleased = false,
+) => {
   const merged = { ...defaultValues, ...values }
   const Wrapper = () => {
     const form = useForm<DatasourceFormDraft>({
@@ -115,7 +119,12 @@ const renderConnectorTab = (values?: Partial<DatasourceFormDraft>, isReadOnly = 
 
     return (
       <Form {...form}>
-        <ConnectorTab form={form} connectorType={merged.connectorType} isReadOnly={isReadOnly} />
+        <ConnectorTab
+          form={form}
+          connectorType={merged.connectorType}
+          isReadOnly={isReadOnly}
+          isDatasourceReleased={isDatasourceReleased}
+        />
       </Form>
     )
   }
@@ -290,6 +299,25 @@ describe('ConnectorTab (integration)', () => {
       renderConnectorTab(undefined, false)
       expect(screen.getByTestId('connectorTypeSelectTrigger')).not.toBeDisabled()
       expect(screen.getByLabelText(/URLs/)).not.toBeDisabled()
+    })
+  })
+
+  describe('Released data source', () => {
+    it('disables the connector type and all configuration fields in edit mode', () => {
+      renderConnectorTab(undefined, false, true)
+      expect(screen.getByTestId('connectorTypeSelectTrigger')).toBeDisabled()
+      expect(screen.getByLabelText(/URLs/)).toBeDisabled()
+      expect(screen.getByRole('checkbox')).toBeDisabled()
+    })
+
+    it('shows the released info in edit mode', () => {
+      renderConnectorTab(undefined, false, true)
+      expect(screen.getByText('releasedInfo')).toBeInTheDocument()
+    })
+
+    it('shows no released info for a draft data source', () => {
+      renderConnectorTab(undefined, false, false)
+      expect(screen.queryByText('releasedInfo')).not.toBeInTheDocument()
     })
   })
 })

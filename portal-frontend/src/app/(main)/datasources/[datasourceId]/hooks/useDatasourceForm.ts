@@ -26,6 +26,7 @@ import {
   DatasourceFormDraft,
   DatasourceFormDraftSchema,
   DatasourcePatchData,
+  DatasourcePutData,
   DatasourceStatusType,
   DatasourceTab,
 } from '@/types/datasources'
@@ -189,13 +190,18 @@ export const useDatasourceForm = (
     }
   }
 
+  const toReleasedPayload = (values: DatasourcePatchData): DatasourcePutData => {
+    const { id, description, datapoolScope, assignments } = values
+    return { id, name: nameWatch, description, datapoolScope, assignments }
+  }
+
   const handleUpdateValues = async (values: DatasourcePatchData) => {
     const hasInvalidAssignments = assignedGroups.some(group => group.assignedRoles.length === 0)
 
     try {
       const response =
         datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
-          ? await updateReleasedDatasource.mutateAsync({ ...values, name: nameWatch })
+          ? await updateReleasedDatasource.mutateAsync(toReleasedPayload(values))
           : await updateDatasource.mutateAsync(values)
 
       toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.datasource') }))

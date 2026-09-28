@@ -6,6 +6,7 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { FormSelect } from '@/components/form/fields/FormSelect'
 import { FooterElement } from '@/components/form/FooterElement'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
+import { InfoBox } from '@/components/text-box/TextBox'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { CONNECTOR_FIELD_REVALIDATION_RULES, ConnectorType } from '@/types/connectors'
@@ -18,9 +19,11 @@ interface ConnectorTabProps {
   form: UseFormReturn<DatasourceFormDraft>
   connectorType?: ConnectorType
   isReadOnly?: boolean
+  isDatasourceReleased?: boolean
 }
 export const ConnectorTab = (props: ConnectorTabProps) => {
-  const { form, connectorType, isReadOnly = false } = props
+  const { form, connectorType, isReadOnly = false, isDatasourceReleased = false } = props
+  const isDisabled = isReadOnly || isDatasourceReleased
   const t = useTranslations('datasources.connectorTab')
   const connectorTypeOptions: SelectOption[] = Object.keys(CONNECTOR_INPUTS).map(type => ({
     value: type as ConnectorType,
@@ -60,6 +63,11 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
 
   return (
     <div>
+      {isDatasourceReleased && !isReadOnly && (
+        <div className="mb-6">
+          <InfoBox text={t('releasedInfo')} />
+        </div>
+      )}
       <ContentCard className={cn('h-full overflow-auto mb-6')} footerElement={<FooterElement />}>
         <SubHeader title={t('title1')} className="pb-4  border-b-1" />
 
@@ -72,7 +80,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
           placeholder={t('typePlaceholder')}
           formItemProps={{ className: 'py-6' }}
           required
-          disabled={isReadOnly}
+          disabled={isDisabled}
         />
       </ContentCard>
 
@@ -93,7 +101,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
               shouldShowErrors
               required={property.required}
               className="py-3"
-              disabled={isReadOnly}
+              disabled={isDisabled}
             />
           ))}
         </ContentCard>

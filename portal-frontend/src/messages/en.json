@@ -1043,6 +1043,7 @@
       "typePlaceholder": "Select connector type",
       "connection": "Connection",
       "establishConnection": "Establish Connection",
+      "releasedInfo": "The connector can only be changed after the Data source has been unreleased.",
       "mqtt": {
         "urls": {
           "label": "Brokers",
@@ -1116,7 +1117,8 @@
       "importModal": {
         "title": "Import Data Model",
         "to": "into {name}"
-      }
+      },
+      "releasedInfo": "The Data structure can only be changed after the Data source has been unreleased."
     },
     "accessManagementTab": {
       "infoBoxes": {

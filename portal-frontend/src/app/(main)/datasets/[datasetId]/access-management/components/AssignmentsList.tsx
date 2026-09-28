@@ -67,10 +67,8 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
       if (isDraft) {
         await patchDataset({ id: dataset.id, assignments })
       } else if (isReady) {
-        // Ready datasets go through the ready/meta PATCH endpoint
         await updateReadyMeta(realeasedPayload)
       } else {
-        // Released datasets go through the released/meta PATCH endpoint
         await updateReleasedMeta(realeasedPayload)
       }
       toast.success(t('messages.updateSuccess'))

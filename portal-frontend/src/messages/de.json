@@ -1030,6 +1030,7 @@
       "typePlaceholder": "Konnektortyp auswählen",
       "connection": "Verbindung",
       "establishConnection": "Verbindung herstellen",
+      "releasedInfo": "Der Konnektor kann erst geändert werden, nachdem die Freigabe der Datenquelle aufgehoben wurde.",
       "mqtt": {
         "urls": {
           "label": "Broker",
@@ -1103,7 +1104,8 @@
       "importModal": {
         "title": "Datenmodell importieren",
         "to": "in {name}"
-      }
+      },
+      "releasedInfo": "Die Datenstruktur kann erst geändert werden, nachdem die Freigabe der Datenquelle aufgehoben wurde."
     },
     "accessManagementTab": {
       "infoBoxes": {

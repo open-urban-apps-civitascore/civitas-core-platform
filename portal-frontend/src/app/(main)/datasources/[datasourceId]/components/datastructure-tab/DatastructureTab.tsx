@@ -8,6 +8,7 @@ import {
 } from '@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion'
 import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
+import { InfoBox } from '@/components/text-box/TextBox'
 import { UmlModeler } from '@/components/uml-modeler/UmlModeler'
 import { DatastructureVersion } from '@/types/datastructures'
 import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'
@@ -19,12 +20,21 @@ interface DatastructureTabProps {
   selectedVersionId: string | null
   isReadOnly: boolean
   isDatasourceInUseByReleased: boolean
+  isDatasourceReleased: boolean
   onSelectDatastructureVersion: (selection: RowSelectionState) => void
 }
 export const DatastructureTab = (props: DatastructureTabProps) => {
-  const { datasourceTitle, selectedVersionId, isReadOnly, isDatasourceInUseByReleased, onSelectDatastructureVersion } =
-    props
+  const {
+    datasourceTitle,
+    selectedVersionId,
+    isReadOnly,
+    isDatasourceInUseByReleased,
+    isDatasourceReleased,
+    onSelectDatastructureVersion,
+  } = props
   const t = useTranslations('datasources.dataModel.placeholder')
+  const tDataModel = useTranslations('datasources.dataModel')
+  const canImport = !isDatasourceInUseByReleased && !isDatasourceReleased && !isReadOnly
   const [isImportDatastructureModalOpen, setIsImportDatastructureModalOpen] = useState(false)
 
   // Parse the composite "datastructureId/versionId" prop
@@ -91,16 +101,16 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
   )
 
   return (
-    <>
+    <div className="flex h-full flex-col gap-4">
+      {isDatasourceReleased && !isReadOnly && <InfoBox text={tDataModel('releasedInfo')} />}
       <UmlModeler
+        className="min-h-0"
         isReadOnly={true}
         modelSessionManager={modelSessionManager}
         isMultiSessionMode={false}
         canExportModel={false}
         placeHolder={UmlCanvasPlaceholder}
-        onImportFromDatastructure={
-          !isDatasourceInUseByReleased && !isReadOnly ? handleImportFromDatastructure : undefined
-        }
+        onImportFromDatastructure={canImport ? handleImportFromDatastructure : undefined}
       />
       <DataModelImportModal
         datasourceTitle={datasourceTitle}
@@ -109,6 +119,6 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
         onSelectVersion={handleSelectVersion}
         onOpenChange={() => setIsImportDatastructureModalOpen(false)}
       />
-    </>
+    </div>
   )
 }

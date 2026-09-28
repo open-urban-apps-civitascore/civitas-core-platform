@@ -46,6 +46,7 @@ const defaultProps = {
   selectedVersionId: null,
   isReadOnly: false,
   isDatasourceInUseByReleased: false,
+  isDatasourceReleased: false,
   onSelectDatastructureVersion: vi.fn(),
 }
 
@@ -87,5 +88,18 @@ describe('DatastructureTab', () => {
     fireEvent.click(screen.getByText('import.fromPlatform'))
 
     expect(screen.getByTestId('dataModelImportModal')).toBeInTheDocument()
+  })
+
+  it('offers no import and shows the released info for a released data source', () => {
+    renderComponent({ ...defaultProps, isDatasourceReleased: true })
+
+    expect(screen.queryByLabelText('Open menu')).not.toBeInTheDocument()
+    expect(screen.getByText('releasedInfo')).toBeInTheDocument()
+  })
+
+  it('shows no released info for a draft data source', () => {
+    renderComponent()
+
+    expect(screen.queryByText('releasedInfo')).not.toBeInTheDocument()
   })
 })
