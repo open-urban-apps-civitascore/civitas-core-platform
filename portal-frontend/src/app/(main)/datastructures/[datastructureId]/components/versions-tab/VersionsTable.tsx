@@ -68,10 +68,9 @@ export const VersionsTable = (props: VersionsTableProps) => {
         },
       },
     }),
-    columnHelper.display({
-      id: 'source',
+    columnHelper.accessor('source', {
       header: t('tableHeaders.source'),
-      cell: () => tVersion('source.OWN'),
+      cell: info => (info.getValue() ? tVersion(`source.${info.getValue()}`) : '-'),
       meta: {
         style: {
           width: '5%',

@@ -108,6 +108,7 @@ describe('DatastructuresList deletion', () => {
     name: 'Struct',
     description: '',
     status: 'DRAFT',
+    source: null,
     versionNumber: null,
     versions: [],
     inUse: false,

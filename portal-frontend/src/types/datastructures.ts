@@ -27,6 +27,13 @@ export type DatastructureTab = 'basicInfo' | 'versions' | 'accessManagement'
 
 export type DatastructureVersionTab = 'structure' | 'versionInfo'
 
+export const DATASTRUCTURE_VERSION_SOURCE = {
+  OWN: 'OWN',
+} as const
+
+export type DatastructureVersionSource =
+  (typeof DATASTRUCTURE_VERSION_SOURCE)[keyof typeof DATASTRUCTURE_VERSION_SOURCE]
+
 export const UMLModelStylesPayloadSchema = z.object({
   viewport: z.object({ x: z.number(), y: z.number(), zoom: z.number() }).optional(),
   nodePositions: z.record(z.string(), z.object({ x: z.number(), y: z.number() })),
@@ -112,6 +119,7 @@ export type DatastructureVersionsListData = {
   name: string
   description: string
   status: DatastructureStatusType
+  source: DatastructureVersionSource
   versionNumber: string | null
   inUseByReleased?: boolean
 }
@@ -207,6 +215,7 @@ export type DatastructuresListData = {
   name: string
   description: string
   status: DatastructureStatusType
+  source: DatastructureVersionSource | null
   versionNumber: string | null
   versions: DatastructuresListData[]
   inUse?: boolean

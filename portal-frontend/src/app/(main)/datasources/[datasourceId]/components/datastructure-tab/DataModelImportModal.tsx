@@ -163,10 +163,9 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
         },
       },
     }),
-    columnHelper.display({
-      id: 'source',
+    columnHelper.accessor('source', {
       header: tDatastructures('tableHeaders.source'),
-      cell: ({ row }) => (row.depth > 0 || row.original.versionNumber ? tVersion('source.OWN') : '-'),
+      cell: info => (info.getValue() ? tVersion(`source.${info.getValue()}`) : '-'),
       meta: {
         style: {
           width: '10%',

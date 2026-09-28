@@ -83,10 +83,9 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
         },
       },
     }),
-    columnHelper.display({
-      id: 'source',
+    columnHelper.accessor('source', {
       header: t('tableHeaders.source'),
-      cell: ({ row }) => (row.depth > 0 || row.original.versionNumber ? tVersion('source.OWN') : '-'),
+      cell: info => (info.getValue() ? tVersion(`source.${info.getValue()}`) : '-'),
       meta: {
         style: {
           width: '10%',

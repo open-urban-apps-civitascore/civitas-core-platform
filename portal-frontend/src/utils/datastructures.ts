@@ -7,6 +7,7 @@ import { SelectOption } from '@/types/common'
 import {
   Datastructure,
   DATASTRUCTURE_STATUS_TYPES,
+  DATASTRUCTURE_VERSION_SOURCE,
   DatastructureFormDraft,
   DatastructuresListData,
   DatastructureVersion,
@@ -41,6 +42,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       description: datastructure.description || '-',
       status: datastructure.dataStructureStatus,
       versionNumber: highestVersion?.version ?? null,
+      source: highestVersion ? DATASTRUCTURE_VERSION_SOURCE.OWN : null,
       inUse: datastructure.inUse,
       inUseByReleased: datastructure.inUseByReleased,
       // add versions field to versions for showing subrows in table
@@ -50,6 +52,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
         name: version.version ? `Version ${version.version}` : '-',
         description: version.description || '-',
         status: version.dataStructureVersionStatus,
+        source: DATASTRUCTURE_VERSION_SOURCE.OWN,
         inUseByReleased: version.inUseByReleased,
         versions: [],
       })),
@@ -66,6 +69,7 @@ export const mapDatastructureVersionsApiToListData = (
     name: version.version ? `Version ${version.version}` : '-',
     description: version.description || '-',
     status: version.dataStructureVersionStatus,
+    source: DATASTRUCTURE_VERSION_SOURCE.OWN,
     inUseByReleased: version.inUseByReleased,
   }))
 

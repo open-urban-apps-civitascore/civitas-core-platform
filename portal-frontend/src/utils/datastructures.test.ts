@@ -8,7 +8,7 @@ import type {
   DatastructureVersionFormData,
   DatastructureVersionSummary,
 } from '@/types/datastructures'
-import { DATASTRUCTURE_STATUS_TYPES } from '@/types/datastructures'
+import { DATASTRUCTURE_STATUS_TYPES, DATASTRUCTURE_VERSION_SOURCE } from '@/types/datastructures'
 
 import {
   buildSessionFromVersion,
@@ -103,6 +103,7 @@ describe('mapDatastructuresApiToListData', () => {
       name: datastructure.name,
       description: datastructure.description,
       status: datastructure.dataStructureStatus,
+      source: DATASTRUCTURE_VERSION_SOURCE.OWN,
       versionNumber: '1.0',
       inUse: datastructure.inUse,
     })
@@ -117,6 +118,7 @@ describe('mapDatastructuresApiToListData', () => {
       id: datastructure.id,
       name: datastructure.name,
       description: datastructure.description as string,
+      source: DATASTRUCTURE_VERSION_SOURCE.OWN,
       status: datastructure.dataStructureStatus,
       versionNumber: expectedVersions[0].version,
       versions: [
@@ -124,6 +126,7 @@ describe('mapDatastructuresApiToListData', () => {
           id: expectedVersions[0].id,
           name: `Version ${expectedVersions[0].version}`,
           description: expectedVersions[0].description as string,
+          source: DATASTRUCTURE_VERSION_SOURCE.OWN,
           status: expectedVersions[0].dataStructureVersionStatus,
           versionNumber: expectedVersions[0].version,
           versions: [],
@@ -190,6 +193,7 @@ describe('mapDatastructuresApiToListData', () => {
 
     expect(result).toHaveLength(1)
     expect(result[0].versionNumber).toBeNull()
+    expect(result[0].source).toBeNull()
     expect(result[0].versions).toEqual([])
   })
 })
@@ -233,6 +237,7 @@ describe('mapDatastructureVersionsApiToListData', () => {
         name: `Version ${versions[0].version}`,
         description: versions[0].description,
         status: versions[0].dataStructureVersionStatus,
+        source: DATASTRUCTURE_VERSION_SOURCE.OWN,
       },
     ])
   })
