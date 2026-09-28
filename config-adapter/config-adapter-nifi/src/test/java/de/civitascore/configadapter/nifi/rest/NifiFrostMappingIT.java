@@ -67,27 +67,29 @@ import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
 /**
- * DATA-CORRECTNESS integration test for the mapped FROST path (record mapping → per-entity body
- * templates → find-or-create) against a <b>real FROST-Server</b>. Two pipelines are planned through
- * the real {@link FlowDeploymentPlanner} (so the {@code FrostMappingCompiler} output is what
- * deploys) and exercised end to end:
+ * DATA-CORRECTNESS integration test for the mapped FROST path (record mapping → the body of the
+ * ThingTree port → PutFrostRecord) against a <b>real FROST-Server</b>. Two pipelines are planned
+ * through the real {@link FlowDeploymentPlanner} (so the {@code FrostMappingCompiler} output is
+ * what deploys) and exercised end to end:
  *
  * <ul>
- *   <li><b>MQTT (non-STA payload)</b>: the STA bodies are rendered from mapped record fields —
- *       Thing find-or-create stays idempotent across re-deliveries, the observation lands typed on
- *       the pre-provisioned Datastream (with an explicitly deep-inserted FeatureOfInterest and the
- *       optional {@code resultQuality}/{@code validTime} fields), a data value containing
- *       NiFi-EL/backreference syntax ({@code ${NIFI_SECURITY_USER_OIDC_CLIENT_SECRET}}, {@code $1})
- *       and a const value containing bare {@code $} arrive <i>literally</i> in FROST — the
- *       injection-hardening proof for the template path.
+ *   <li><b>MQTT (non-STA payload)</b>: the STA bodies are rendered from mapped record fields — the
+ *       Thing upsert stays idempotent across re-deliveries, the observation lands typed on the
+ *       pre-provisioned Datastream of that Thing (with an explicitly deep-inserted
+ *       FeatureOfInterest and the optional {@code resultQuality}/{@code validTime} fields), a data
+ *       value containing NiFi-EL/backreference syntax ({@code
+ *       ${NIFI_SECURITY_USER_OIDC_CLIENT_SECRET}}, {@code $1}) and a const value containing bare
+ *       {@code $} arrive <i>literally</i> in FROST — the injection-hardening proof for the template
+ *       path.
  *   <li><b>SQL (table rows)</b>: a multi-record batch is split into individual STA elements ({@code
  *       $[*]}), deduplicating the Thing across rows and re-reads.
  * </ul>
  *
  * <p>Failure paths must never drop silently: a missing source field renders a JSON {@code null}
- * result (valid body), an unmatched Datastream routes to the error sink without creating anything,
- * and a FROST-rejected observation (bad {@code phenomenonTime}) never becomes an observation while
- * the flow keeps running. Skipped when Docker is unavailable.
+ * result (valid body), a record whose Datastream does not exist writes nothing and waits in {@code
+ * retry}, and a FROST-rejected observation (bad {@code phenomenonTime}) never becomes an
+ * observation while the flow keeps running. The port writes a record as one unit: when one of its
+ * entities is refused, none of them is written. Skipped when Docker is unavailable.
  */
 class NifiFrostMappingIT extends AbstractNifiIT {
 
@@ -119,6 +121,10 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String DS_NULL = "DS-NULL-1";
   private static final String REF_NEVER = "REF-NEVER-1";
   private static final String DS_NEVER = "DS-NEVER-1";
+  // A station that always lands: its observation shows that the flow went on after a record it
+  // refused or put back, so an absence is not mistaken for a flow that stopped.
+  private static final String REF_ALIVE = "REF-ALIVE-1";
+  private static final String DS_ALIVE = "DS-ALIVE-1";
   private static final String REF_BADTS = "REF-BADTS-1";
   private static final String DS_BADTS = "DS-BADTS-1";
   private static final String REF_DATEONLY = "REF-DATEONLY-1";
@@ -146,6 +152,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static long dsFoiId;
   private static long dsFanoutId;
   private static long dsPartialId;
+  private static long dsAliveId;
 
   private final HttpClient http = HttpClient.newHttpClient();
 
@@ -227,14 +234,17 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         });
 
     projectId = createProject();
-    dsMapId = createDatastream(DS_MAP, REF_MAP, "HOLDER-MAP");
-    dsNullId = createDatastream(DS_NULL, REF_NULL, "HOLDER-NULL");
-    dsBadTsId = createDatastream(DS_BADTS, REF_BADTS, "HOLDER-BADTS");
-    dsDateOnlyId = createDatastream(DS_DATEONLY, REF_DATEONLY, "HOLDER-DATEONLY");
-    dsSqlId = createDatastream(DS_SQL, REF_SQL, "HOLDER-SQL");
-    dsFoiId = createDatastream(DS_FOI, REF_FOI, "HOLDER-FOI");
-    dsFanoutId = createDatastream(DS_FANOUT, REF_FANOUT, "HOLDER-FANOUT");
-    dsPartialId = createDatastream(DS_PARTIAL, REF_PARTIAL, "HOLDER-PARTIAL");
+    // Each Datastream belongs to the Thing the record names: the ThingTree port looks it up below
+    // that Thing, not across the project.
+    dsMapId = createDatastream(DS_MAP, REF_MAP);
+    dsNullId = createDatastream(DS_NULL, REF_NULL);
+    dsBadTsId = createDatastream(DS_BADTS, REF_BADTS);
+    dsDateOnlyId = createDatastream(DS_DATEONLY, REF_DATEONLY);
+    dsSqlId = createDatastream(DS_SQL, REF_SQL);
+    dsFoiId = createDatastream(DS_FOI, REF_FOI);
+    dsFanoutId = createDatastream(DS_FANOUT, REF_FANOUT);
+    dsPartialId = createDatastream(DS_PARTIAL, REF_PARTIAL);
+    dsAliveId = createDatastream(DS_ALIVE, REF_ALIVE);
 
     deployMqttPipeline();
     deploySqlPipeline();
@@ -372,13 +382,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         countDatastreamsByFilter(REF_FANOUT, DS_FANOUT),
         "the Datastream tier must not multiply with the array");
 
-    // The Thing tier is CREATED here (nothing carries REF_FANOUT up front), and the siblings all
-    // pass the lookup before the first create is visible in FROST — so find-or-create is not
-    // idempotent across them and the tier currently multiplies. That race belongs to the entity
-    // stage, not to the array fan-out: a SQL batch delivering several rows for one Thing hits it
-    // the same way, and resolving it needs an identity the sink can collide on (a derived
-    // @iot.id) rather than a lookup. Asserted as "at least one" so this test keeps covering the
-    // fan-out; the exact count returns once entity identity is deterministic.
+    // The Thing tier must not multiply either: the Thing exists up front, since the Datastream
+    // belongs to it, so every sibling finds it and none creates another.
     assertTrue(
         countThings(REF_FANOUT) >= 1, "the mapped Thing tier must be created for the array source");
   }
@@ -551,23 +556,17 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   }
 
   @Test
-  void unmatchedDatastreamIsRoutedToErrorSinkNotCreated() throws Exception {
-    // DS_NEVER is never provisioned: the observation leg must route to the error sink — the
-    // pipeline keeps running (the Thing leg still creates its Thing) and no Datastream appears.
-    String payload =
-        payload("Never Station", REF_NEVER, DS_NEVER, "9.9", "\"2026-01-04T00:00:00Z\"");
-
+  void aRecordWithoutItsDatastreamWritesNothing() throws Exception {
+    // DS_NEVER is never provisioned and the mapping only looks the Datastream up. The record waits
+    // in retry for a Datastream that may still come, and since the port writes a record as one
+    // unit, not even its Thing appears. The station after it proves the flow went on meanwhile.
     try (MqttPublisher publisher = publisher("civitas-it-never")) {
-      await()
-          .atMost(Duration.ofSeconds(120))
-          .pollInterval(Duration.ofSeconds(3))
-          .ignoreExceptions()
-          .until(
-              () -> {
-                publisher.publish(TOPIC, payload);
-                return countThings(REF_NEVER) >= 1;
-              });
+      publisher.publishOnce(
+          TOPIC, payload("Never Station", REF_NEVER, DS_NEVER, "9.9", "\"2026-01-04T00:00:00Z\""));
     }
+    awaitTheAliveStation("civitas-it-never-alive", 9.1);
+
+    assertEquals(0, countThings(REF_NEVER), "the Thing of a waiting record must not be written");
     assertEquals(
         0,
         countDatastreamsByFilter(REF_NEVER, DS_NEVER),
@@ -576,58 +575,78 @@ class NifiFrostMappingIT extends AbstractNifiIT {
 
   @Test
   void invalidPhenomenonTimeNeverBecomesAnObservation() throws Exception {
-    // 'not-a-date' renders a valid envelope (it is a string), FROST rejects the POST with 400 →
-    // obsPost routes to the error sink. The Thing leg proves the message was fully processed.
-    String payload = payload("BadTs Station", REF_BADTS, DS_BADTS, "12.3", "\"not-a-date\"");
-
-    try (MqttPublisher publisher = publisher("civitas-it-badts")) {
-      await()
-          .atMost(Duration.ofSeconds(120))
-          .pollInterval(Duration.ofSeconds(3))
-          .ignoreExceptions()
-          .until(
-              () -> {
-                publisher.publish(TOPIC, payload);
-                return countThings(REF_BADTS) >= 1;
-              });
-      // Deliberate dwell: gives the observation leg ample time to (wrongly) post before asserting
-      // it
-      // never did — an absence has no condition that can complete early.
-      Thread.sleep(Duration.ofSeconds(10).toMillis());
-    }
-    assertEquals(
-        0,
-        observations(dsBadTsId).size(),
-        "a FROST-rejected observation must go to the error sink, not into the Datastream");
+    // 'not-a-date' renders a valid body (it is a string); FROST refuses the observation with 400,
+    // and the record goes to the error sink. A valid record for the same Thing follows: once its
+    // observation is there, the refused one had its turn, and it must not be there.
+    assertOnlyTheValidObservationLands(REF_BADTS, DS_BADTS, dsBadTsId, "\"not-a-date\"", 45.6);
   }
 
   @Test
   void dateOnlyPhenomenonTimeIsRejectedByFrost() throws Exception {
     // A Date-typed (format:date) modeller attribute yields '2026-07-29' — no time, no zone. The
     // adapter passes STA time targets through as plain strings (StaJsonType.STRING), so whether
-    // such
-    // a value is usable is FROST's call alone: it rejects it, exactly as it rejects 'not-a-date'.
-    // Consequence for the modeller: a Date attribute must never be mapped onto an STA time target.
-    String payload =
-        payload("DateOnly Station", REF_DATEONLY, DS_DATEONLY, "12.3", "\"2026-07-29\"");
+    // such a value is usable is FROST's call alone: it rejects it, exactly as it rejects
+    // 'not-a-date'. Consequence for the modeller: a Date attribute must never be mapped onto an STA
+    // time target.
+    assertOnlyTheValidObservationLands(
+        REF_DATEONLY, DS_DATEONLY, dsDateOnlyId, "\"2026-07-29\"", 46.7);
+  }
 
-    try (MqttPublisher publisher = publisher("civitas-it-dateonly")) {
+  /**
+   * Sends one record FROST refuses, then valid ones for the same Thing until one lands, and asserts
+   * that only the valid observation is on the Datastream.
+   */
+  private void assertOnlyTheValidObservationLands(
+      String reference, String dsName, long datastreamId, String refusedTime, double validResult)
+      throws Exception {
+    try (MqttPublisher publisher = publisher("civitas-it-refused-" + reference)) {
+      publisher.publishOnce(
+          TOPIC, payload("Refused Station", reference, dsName, "12.3", refusedTime));
+    }
+    String valid =
+        payload(
+            "Refused Station",
+            reference,
+            dsName,
+            String.valueOf(validResult),
+            "\"2026-01-05T00:00:00Z\"");
+    try (MqttPublisher publisher = publisher("civitas-it-valid-" + reference)) {
       await()
           .atMost(Duration.ofSeconds(120))
           .pollInterval(Duration.ofSeconds(3))
           .ignoreExceptions()
           .until(
               () -> {
-                publisher.publish(TOPIC, payload);
-                return countThings(REF_DATEONLY) >= 1;
+                publisher.publish(TOPIC, valid);
+                return resultValues(datastreamId).contains(validResult);
               });
-      // the Thing leg proves the message was processed; give the observation leg time to post
-      Thread.sleep(Duration.ofSeconds(10).toMillis());
     }
-    assertEquals(
-        0,
-        observations(dsDateOnlyId).size(),
-        "a date-only phenomenonTime must not silently become an observation");
+    for (double result : resultValues(datastreamId)) {
+      assertEquals(
+          validResult, result, 1e-9, "a FROST-refused observation must not reach the Datastream");
+    }
+  }
+
+  /** Delivers records of the control station until one of its observations is in FROST. */
+  private void awaitTheAliveStation(String clientId, double result) throws Exception {
+    String alive =
+        payload(
+            "Alive Station",
+            REF_ALIVE,
+            DS_ALIVE,
+            String.valueOf(result),
+            "\"2026-01-06T00:00:00Z\"");
+    try (MqttPublisher publisher = publisher(clientId)) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(TOPIC, alive);
+                return resultValues(dsAliveId).contains(result);
+              });
+    }
   }
 
   // ─── SQL → mapping → FROST ──────────────────────────────────────────────────
@@ -973,15 +992,18 @@ class NifiFrostMappingIT extends AbstractNifiIT {
    * resolve by {@code properties/reference} + {@code name}, project-linked so the {@code
    * Thing/Projects/id} filter matches.
    */
-  private static long createDatastream(String dsName, String dsReference, String holderReference)
-      throws Exception {
+  /**
+   * Creates a Thing with the given reference and a Datastream with the same reference below it —
+   * the shape the mappings of this IT write, since they map one {@code ref} onto both.
+   */
+  private static long createDatastream(String dsName, String reference) throws Exception {
     HttpClient staticHttp = HttpClient.newHttpClient();
     String thingBody =
-        "{\"name\":\"Holder "
+        "{\"name\":\"Station of "
             + dsName
             + "\",\"description\":\"mapping IT holder\","
             + "\"properties\":{\"reference\":\""
-            + holderReference
+            + reference
             + "\"},"
             + "\"Locations\":[{\"name\":\"loc\",\"description\":\"loc\","
             + "\"encodingType\":\"application/geo+json\","
@@ -1004,7 +1026,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
             + "\"observationType\":\"http://www.opengis.net/def/observationType/OGC-OM/2.0/OM_Measurement\","
             + "\"unitOfMeasurement\":{\"name\":\"Celsius\",\"symbol\":\"degC\",\"definition\":\"ucum:Cel\"},"
             + "\"properties\":{\"reference\":\""
-            + dsReference
+            + reference
             + "\"},"
             + "\"Sensor\":{\"name\":\"Sensor-IT\",\"description\":\"s\","
             + "\"encodingType\":\"application/pdf\",\"metadata\":\"http://example.org/s\"},"
