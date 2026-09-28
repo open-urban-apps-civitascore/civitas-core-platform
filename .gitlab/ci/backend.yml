@@ -382,6 +382,10 @@ api-test-backend:
     - docker compose -p api-test $COMPOSE_FILES run --rm apisix-seed
     # Provision the NiFi parameter context the MQTT-TLS flows resolve their truststore password from
     - docker compose -p api-test $COMPOSE_FILES run --rm nifi-parameter-contexts
+    # Export the OpenAPI description from the running backend (springdoc, unauthenticated under
+    # the `local` profile) and publish it as a job artifact. On develop, update-openapi-spec
+    # takes this file and opens a merge request when it differs from the committed copy.
+    - docker compose -p api-test $COMPOSE_FILES exec -T portal-backend curl -sf http://localhost:8089/v1/api-docs.yaml > openapi.generated.yaml
     # Run Bruno API tests from a container on the same Compose network
     - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
     - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/
@@ -414,6 +418,7 @@ api-test-backend:
   artifacts:
     when: always
     paths:
+      - openapi.generated.yaml
       - bruno-results.txt
       - portal-backend-logs.txt
       - config-adapter-logs.txt
