@@ -1,9 +1,55 @@
 # Keeps api/portal-backend/openapi.yaml in sync with the description the running backend serves.
-#
-# api-test-backend exports the spec from the Compose stack (artifact openapi.generated.yaml).
-# This job compares that export with the committed file. Direct pushes to develop are not
-# allowed, so it works the way Renovate does: on a difference it pushes the new file to a bot
-# branch and opens a merge request against develop, or refreshes the one already open.
+
+# Starts the portal-backend with only the services it needs to boot (postgres-portal, Kafka,
+# Keycloak) and exports the springdoc description as the artifact openapi.generated.yaml.
+# This job is separate from api-test-backend, so the export does not wait for the Bruno run,
+# a failed Bruno test does not stop the export, and a failed export does not stop the tests.
+export-openapi-spec:
+  rules:
+    - !reference [.only-backend-changes, rules]
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - .gitlab/ci/openapi.yml
+  image: docker:27
+  stage: test
+  needs:
+    - job: build-backend
+      artifacts: true
+      optional: true
+  services:
+    - name: docker:27-dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ''
+  script:
+    - export COMPOSE_FILES="-f dev-environment/ci/docker-compose.api-test.yml"
+    - |
+      if ls portal-backend/target/*.jar >/dev/null 2>&1; then
+        echo "Portal-backend JAR found — building from source"
+        export COMPOSE_FILES="$COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-portal.yml"
+      else
+        echo "Portal-backend JAR not available — using registry image"
+        echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+      fi
+    # Naming the service starts it with its depends_on chain only, not the full api-test stack
+    - |
+      docker compose -p openapi-export $COMPOSE_FILES up -d --build --wait --wait-timeout 600 portal-backend || {
+        docker compose -p openapi-export $COMPOSE_FILES ps -a
+        docker compose -p openapi-export $COMPOSE_FILES logs --tail=100 --no-color portal-backend
+        exit 1
+      }
+    # The `local` profile of the stack permits /api-docs.yaml without a token
+    - docker compose -p openapi-export $COMPOSE_FILES exec -T portal-backend curl -sf http://localhost:8089/v1/api-docs.yaml > openapi.generated.yaml
+  artifacts:
+    when: on_success
+    paths:
+      - openapi.generated.yaml
+    expire_in: 30 days
+
+# Compares the export with the committed file. Direct pushes to develop are not allowed, so it
+# works the way Renovate does: on a difference it pushes the new file to a bot branch and opens
+# a merge request against develop, or refreshes the one already open.
 #
 # Requires OPENAPI_BOT_TOKEN (falls back to RENOVATE_TOKEN): a Project Access Token with the
 # api and write_repository scopes and the Developer role, stored as a masked CI/CD variable.
@@ -11,7 +57,7 @@ update-openapi-spec:
   image: alpine:3
   stage: report
   needs:
-    - job: api-test-backend
+    - job: export-openapi-spec
       artifacts: true
   rules:
     - if: $CI_COMMIT_BRANCH == "develop"
@@ -24,7 +70,7 @@ update-openapi-spec:
   script:
     - |
       if [ ! -s openapi.generated.yaml ]; then
-        echo "openapi.generated.yaml is missing or empty — api-test-backend did not export the spec."
+        echo "openapi.generated.yaml is missing or empty — export-openapi-spec did not export the spec."
         exit 1
       fi
       if [ -f "$SPEC_PATH" ] && cmp -s "$SPEC_PATH" openapi.generated.yaml; then
