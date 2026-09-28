@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Service for managing {@link DataStructureVersion} entities through their lifecycle (DRAFT to
  * AVAILABLE). The version's JSON Schema (and its UI styles) lives in the Model Forge registry — the
  * service stores it through the {@link ModelRegistryGateway} and mirrors the assigned pin onto the
- * shell — and constrains versions that are in use by a data source or a data sink.
+ * shell — and constrains a version that something still references.
  */
 @Slf4j
 @Service
@@ -40,6 +40,8 @@ public class DataStructureVersionService
   private final DataStructureVersionMapper dataStructureVersionMapper;
 
   private final ModelRegistryGateway modelRegistryGateway;
+
+  private final ArtifactUsageLookup artifactUsageLookup;
 
   @Override
   protected DataStructureVersionRepository getRepository() {
@@ -78,10 +80,10 @@ public class DataStructureVersionService
                   "dataStructureId", entity.getId(), "dataStructureId cannot be null or blank");
             });
 
-    // Validate the model and store it in Model Forge (the version authority), mirroring the
-    // assigned version + URN onto the shell. Done here rather than in preSave because model,
-    // styles and the version bump live on the input DTO, which preSave does not receive.
-    validateModelSchema(entity, input);
+    // Store the model in Model Forge (the version authority), mirroring the assigned version + URN
+    // onto the shell. Done here rather than in preSave because model, styles and the version bump
+    // live on the input DTO, which preSave does not receive. The registry refuses a model that is
+    // not a conforming JSON Schema, reported as a 400 by ModelRegistryExceptionHandler.
     storeModelInRegistry(entity, input);
 
     return super.postConvertToEntity(entity, input);
@@ -102,14 +104,16 @@ public class DataStructureVersionService
 
   /**
    * Validates and constrains update input based on the version's current state. If the version is
-   * in use by a data source or a data sink, structural fields (model, styles) are locked and only
-   * description and modelName may change — the input's model/styles are nulled so no new registry
-   * version is stored and the existing pin is preserved. A released version that is not in use may
-   * have its model replaced but never cleared — it must always retain a non-empty model.
+   * released and a released entity references it, structural fields (model, styles) are locked and
+   * only description and modelName may change — the input's model/styles are nulled so no new
+   * registry version is stored and the existing pin is preserved. A released version that no
+   * released entity references may have its model replaced but never cleared — it must always
+   * retain a non-empty model.
    *
    * @param input the update input
    * @param existingEntity the current version entity
-   * @return the preprocessed input with restricted fields neutralized if in use
+   * @return the preprocessed input, its structural fields neutralized while a released entity
+   *     references the version
    * @throws InvalidInputException if an update to a released version would clear its model
    */
   @Override
@@ -118,15 +122,10 @@ public class DataStructureVersionService
     boolean isReleased =
         existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT;
 
-    if (isReleased && isInUse(existingEntity.getId())) {
-      // Version is in use: block all structural changes, allow only description and modelName.
-      // An absent model means "content unchanged" — no registry write happens, the version keeps
-      // its stored pin (modelUrn/version stay untouched; they are not mapped from the input).
+    if (isReleased && artifactUsageLookup.of(existingEntity).inUseByReleased()) {
       input.setModel(null);
       input.setStyles(null);
     } else if (isReleased && (input.getModel() == null || input.getModel().isEmpty())) {
-      // Released but not in use: the model may be replaced, but never cleared — a released
-      // version must always retain a non-empty model, so the full update must carry one.
       throw new InvalidInputException(
           "model",
           existingEntity.getId(),
@@ -134,27 +133,6 @@ public class DataStructureVersionService
     }
 
     return super.preProcessUpdateInput(input, existingEntity);
-  }
-
-  /**
-   * Validates the input's model as a JSON Schema via embedded Model Forge before saving.
-   * portal-backend has no schema validation of its own; a malformed model is rejected here on
-   * create and update. An absent/empty model is not validated (the release check enforces
-   * presence).
-   *
-   * @param entity the data structure version entity (for error context)
-   * @param input the input DTO carrying the model
-   * @throws InvalidInputException if the model is present but not a valid JSON Schema
-   */
-  private void validateModelSchema(
-      DataStructureVersion entity, DataStructureVersionInputDTO input) {
-    List<String> errors = modelRegistryGateway.validateSchema(input.getModel());
-    if (!errors.isEmpty()) {
-      throw new InvalidInputException(
-          "model",
-          entity.getId(),
-          "Model is not a valid JSON Schema: " + String.join("; ", errors));
-    }
   }
 
   /**
@@ -280,6 +258,7 @@ public class DataStructureVersionService
    * @return the unreleased version
    * @throws InvalidInputException if version is already DRAFT or if unreleasing would leave a
    *     released DataStructure without released versions
+   * @throws ResourceInUseException if a released entity references the version
    */
   @Transactional
   public DataStructureVersion unrelease(UUID id) {
@@ -291,7 +270,7 @@ public class DataStructureVersionService
           "dataStructureVersionStatus", id, "DataStructureVersion is already in DRAFT status");
     }
 
-    validateNotInUse(id);
+    artifactUsageLookup.of(version).requireNoReleasedReferrer(getEntityName(), id);
     validateExistenceOfOtherReleasedVersion(
         version,
         "Cannot unrelease this DataStructureVersion because it is the only released version of a released DataStructure. Please unrelease the DataStructure first.");
@@ -306,7 +285,7 @@ public class DataStructureVersionService
    *
    * @param id the version ID to delete
    * @return the version entity to be deleted
-   * @throws ResourceInUseException if the version is referenced by a data source or a data sink
+   * @throws ResourceInUseException if the version is still referenced
    * @throws InvalidInputException if the version is the only released version of a released data
    *     structure
    */
@@ -322,30 +301,27 @@ public class DataStructureVersionService
   }
 
   private void validateNotInUse(UUID versionId) {
-    if (isInUse(versionId)) {
+    if (dataSourceRepository.existsByDataStructureVersionId(versionId)) {
       throw new ResourceInUseException(
           "DataStructureVersion",
           versionId,
-          "Cannot modify DataStructureVersion because it is referenced by one or more DataSources or DataSinks.");
+          "Cannot modify DataStructureVersion because a DataSource is pinned to it.");
+    }
+    List<String> blockers = modelRegistryGateway.referencesTo(modelUrnOf(versionId));
+    if (!blockers.isEmpty()) {
+      throw new ResourceInUseException(
+          "DataStructureVersion",
+          versionId,
+          "Cannot modify DataStructureVersion because it is still referenced.",
+          blockers);
     }
   }
 
-  /**
-   * A version is in use when a data source (host FK) or a data sink references it. Sink references
-   * live in the registry: a sink's configuration carries the version's model URN in its {@code
-   * element} field, which Model Forge tracks as a dependency edge — so the sink dimension is
-   * answered by asking the registry who depends on the version's model.
-   */
-  private boolean isInUse(UUID versionId) {
-    if (dataSourceRepository.existsByDataStructureVersionId(versionId)) {
-      return true;
-    }
-    String modelUrn =
-        dataStructureVersionRepository
-            .findById(versionId)
-            .map(DataStructureVersion::getModelUrn)
-            .orElse(null);
-    return modelRegistryGateway.isReferencedBySink(modelUrn);
+  private String modelUrnOf(UUID versionId) {
+    return dataStructureVersionRepository
+        .findById(versionId)
+        .map(DataStructureVersion::getModelUrn)
+        .orElse(null);
   }
 
   private void validateExistenceOfOtherReleasedVersion(

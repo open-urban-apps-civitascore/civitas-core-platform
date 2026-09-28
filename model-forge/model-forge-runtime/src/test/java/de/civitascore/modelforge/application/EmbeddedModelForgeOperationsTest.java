@@ -4,12 +4,15 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.StringNode;
 import de.civitascore.modelforge.contract.ArtifactId;
+import de.civitascore.modelforge.contract.DependencyClosureView;
+import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
+import de.civitascore.modelforge.contract.ValidationFailedException;
 import de.civitascore.modelforge.contract.VersionBump;
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
 import de.civitascore.modelforge.core.port.ArtifactSearchResult;
@@ -17,6 +20,7 @@ import de.civitascore.modelforge.graph.DependencyGraphService;
 import de.civitascore.modelforge.graph.SchemaRefExtractor;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.modelforge.validation.ModelValidator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,13 +31,17 @@ import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -58,11 +66,12 @@ class EmbeddedModelForgeOperationsTest {
         var refExtractor = mock(SchemaRefExtractor.class);
         when(refExtractor.extractRefs(any())).thenReturn(Set.of());
         when(refExtractor.extractCoreRefTypes(any())).thenReturn(Set.of());
-        elementCommandService = new ElementCommandService(registry, graph, refExtractor);
+        var modelValidator = mock(ModelValidator.class);
+        when(modelValidator.validateSchema(any())).thenReturn(List.of());
+        elementCommandService = new ElementCommandService(registry, graph, refExtractor, modelValidator);
         var elementQueryService = new ElementQueryService(registry);
         schemaImportService = mock(SchemaImportService.class);
         viewService = mock(ViewService.class);
-        var modelValidator = mock(ModelValidator.class);
         var smartDataModelsService = mock(SmartDataModelsService.class);
         var xRepositoryService = mock(XRepositoryService.class);
 
@@ -278,14 +287,14 @@ class EmbeddedModelForgeOperationsTest {
         String sharedLogical = UrnParser.logicalUrn(shared);
 
         when(registry.nonDataSetBlockingDependents(container.value())).thenReturn(List.of());
-        when(registry.fetchArtifactRefUrns(container.value())).thenReturn(List.of(orphan, shared));
+        when(registry.ownedMemberUrns(container.value())).thenReturn(List.of(orphanLogical, sharedLogical));
         // Once the container is gone, A is orphaned but B is still grouped by another DataStructure.
         when(registry.nonDataSetBlockingDependents(orphanLogical)).thenReturn(List.of());
         when(registry.nonDataSetBlockingDependents(sharedLogical))
             .thenReturn(List.of("urn:core:platform:civitas:datastructure:common:d2:zzzzzzzzzz"));
         when(registry.fetch(orphanLogical)).thenReturn(Optional.of(mapper.createObjectNode()));
         when(registry.fetch(sharedLogical)).thenReturn(Optional.of(mapper.createObjectNode()));
-        when(registry.fetchArtifactRefUrns(orphanLogical)).thenReturn(List.of());
+        when(registry.ownedMemberUrns(orphanLogical)).thenReturn(List.of());
 
         operations.deleteArtifact(container, true);
 
@@ -293,6 +302,125 @@ class EmbeddedModelForgeOperationsTest {
         verify(registry).deleteArtifact(orphanLogical);
         verify(registry, org.mockito.Mockito.never()).deleteArtifact(shared);
         verify(registry, org.mockito.Mockito.never()).deleteArtifact(sharedLogical);
+    }
+
+    /** A Data Set the caller holds, the Mapping it names, and the Data Set that holds that Mapping. */
+    private static final ArtifactId MINE =
+        new ArtifactId("urn:core:platform:civitas:dataset:common:Mine:mmmmmmmmmm");
+    private static final ArtifactId MAPPING =
+        new ArtifactId("urn:core:platform:civitas:mapping:common:m1:aaaaaaaaaa");
+    private static final String THEIRS = "urn:core:platform:civitas:dataset:common:Theirs:tttttttttt";
+
+    private void manifestExists() {
+        when(registry.fetch(MINE.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+    }
+
+    @Test
+    void linkingAMappingADifferentDataSetHoldsIsRefused() {
+        manifestExists();
+        when(registry.fetch(MAPPING.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+        when(registry.dataSetMemberships(MAPPING.value())).thenReturn(List.of(THEIRS));
+
+        assertThatThrownBy(() -> operations.linkToDataSet(MINE, MAPPING))
+            .isInstanceOf(ValidationFailedException.class)
+            .as("the Data Set holding it stays unnamed")
+            .hasMessageNotContaining(THEIRS);
+        verify(registry, org.mockito.Mockito.never()).storeDataSet(anyString(), any(), any());
+    }
+
+    @Test
+    void aMappingThatDoesNotExistIsRefusedInTheSameWords() {
+        manifestExists();
+        when(registry.fetch(MAPPING.value())).thenReturn(Optional.empty());
+
+        String absent = catchThrowable(() -> operations.linkToDataSet(MINE, MAPPING)).getMessage();
+
+        when(registry.fetch(MAPPING.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+        when(registry.dataSetMemberships(MAPPING.value())).thenReturn(List.of(THEIRS));
+        String taken = catchThrowable(() -> operations.linkToDataSet(MINE, MAPPING)).getMessage();
+
+        // Telling the two apart would say which Mapping URNs are taken.
+        assertThat(absent).isEqualTo(taken);
+    }
+
+    @Test
+    void linkingAMappingOnlyItsOwnDataSetHoldsIsAllowed() {
+        manifestExists();
+        when(registry.fetch(MAPPING.value())).thenReturn(Optional.of(mapper.createObjectNode()));
+        when(registry.dataSetMemberships(MAPPING.value())).thenReturn(List.of(MINE.value()));
+
+        operations.linkToDataSet(MINE, MAPPING);
+
+        verify(registry).storeDataSet(eq(MINE.value()), any(), eq(VersionBump.MINOR));
+    }
+
+    @Test
+    void linkingADataSinkADifferentDataSetHoldsIsAllowed() {
+        var sink = new ArtifactId("urn:core:platform:civitas:datasink:common:s1:bbbbbbbbbb");
+        manifestExists();
+
+        operations.linkToDataSet(MINE, sink);
+
+        // The one-Data-Set rule is the Mapping's alone: every other kind has a record and rights of
+        // its own, so sharing one discloses nothing.
+        verify(registry).storeDataSet(eq(MINE.value()), any(), eq(VersionBump.MINOR));
+    }
+
+    @Test
+    void deletionBlockersNamesTheReferrersThatWouldRefuseTheDelete() {
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56");
+        String mapping = "urn:core:platform:civitas:mapping:common:sensor-to-obs:4rrb1hifsm";
+        when(registry.nonDataSetBlockingDependents(artifactId.value(), null)).thenReturn(List.of(mapping));
+
+        assertThat(operations.deletionBlockers(artifactId)).containsExactly(mapping);
+    }
+
+    @Test
+    void deletionBlockersIgnoresAReferenceHeldFromInsideTheDeletedSet() {
+        var grouping = new ArtifactId("urn:core:platform:civitas:datastructure:common:Sensor:m8i4hc3h56");
+        String member = "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56";
+        when(registry.ownedMemberUrns(grouping.value(), null)).thenReturn(List.of(member));
+        // The grouping is the only thing referencing its own member, and the same delete removes it.
+        when(registry.nonDataSetBlockingDependents(member, null)).thenReturn(List.of(grouping.value()));
+
+        assertThat(operations.deletionBlockers(grouping)).isEmpty();
+    }
+
+    @Test
+    void deletionBlockersNamesAReferrerOfAnOwnedMember() {
+        var grouping = new ArtifactId("urn:core:platform:civitas:datastructure:common:Sensor:m8i4hc3h56");
+        String member = "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56";
+        String mapping = "urn:core:platform:civitas:mapping:common:sensor-to-obs:4rrb1hifsm";
+        when(registry.ownedMemberUrns(grouping.value(), null)).thenReturn(List.of(member));
+        when(registry.nonDataSetBlockingDependents(member, null))
+            .thenReturn(List.of(grouping.value(), mapping));
+
+        assertThat(operations.deletionBlockers(grouping)).containsExactly(mapping);
+    }
+
+    @Test
+    void deletionBlockersNamesTheDataSetsOnlyOnceAMemberIsSharedByTwo() {
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56");
+        String one = "urn:core:platform:civitas:dataset:common:ds1:1111111111";
+        String two = "urn:core:platform:civitas:dataset:common:ds2:2222222222";
+        when(registry.nonDataSetBlockingDependents(artifactId.value(), null)).thenReturn(List.of());
+
+        // A member of a single Data Set is deleted and unlinked from it, so that membership is no
+        // obstacle and must not be reported as one.
+        when(registry.dataSetMemberships(artifactId.value())).thenReturn(List.of(one));
+        assertThat(operations.deletionBlockers(artifactId)).isEmpty();
+
+        when(registry.dataSetMemberships(artifactId.value())).thenReturn(List.of(one, two));
+        assertThat(operations.deletionBlockers(artifactId)).containsExactly(one, two);
+    }
+
+    @Test
+    void deletionBlockersIsEmptyWhenNothingStandsInTheWay() {
+        var artifactId = new ArtifactId("urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56");
+        when(registry.nonDataSetBlockingDependents(artifactId.value(), null)).thenReturn(List.of());
+        when(registry.dataSetMemberships(artifactId.value())).thenReturn(List.of());
+
+        assertThat(operations.deletionBlockers(artifactId)).isEmpty();
     }
 
     @Test
@@ -504,5 +632,129 @@ class EmbeddedModelForgeOperationsTest {
         assertThatThrownBy(() -> operations.bumpVersion(command))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("pins a version");
+    }
+
+    // ── closure / existing ────────────────────────────────────────────────────
+
+    private static final String CLOSURE_ROOT =
+        "urn:core:platform:civitas:pipeline:common:Ingest:aaaaaaaaaa:1.0.0";
+    private static final String CLOSURE_MEMBER =
+        "urn:core:platform:civitas:datastructure:common:Sensor:bbbbbbbbbb:1.0.0";
+    private static final String CLOSURE_GHOST =
+        "urn:core:platform:civitas:element:common:Ghost:cccccccccc:1.0.0";
+
+    @Test
+    void closureRejectsAQueryWithoutADepthBound() {
+        assertThatThrownBy(() -> operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("maxDepth");
+        verifyNoInteractions(graph);
+    }
+
+    @Test
+    void closureCarriesWhetherTheBoundCutTheWalkShort() {
+        when(graph.getTransitiveDependenciesBounded(CLOSURE_ROOT, 4))
+            .thenReturn(new DependencyGraphService.BoundedWalk(Set.of(CLOSURE_MEMBER), true));
+        when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_MEMBER));
+
+        assertThat(operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT), 4)).truncated())
+            .isTrue();
+    }
+
+    @Test
+    void closureWalksToTheRequestedDepth() {
+        when(graph.getTransitiveDependenciesBounded(CLOSURE_ROOT, 4))
+            .thenReturn(new DependencyGraphService.BoundedWalk(Set.of(CLOSURE_MEMBER), false));
+        when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_MEMBER));
+
+        operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT), 4));
+
+        verify(graph).getTransitiveDependenciesBounded(CLOSURE_ROOT, 4);
+        verify(graph, never()).getDependencies(any());
+    }
+
+    @Test
+    void closureReportsTheUnheldMembersFromOneProbe() {
+        when(graph.getTransitiveDependenciesBounded(CLOSURE_ROOT, 10))
+            .thenReturn(new DependencyGraphService.BoundedWalk(new LinkedHashSet<>(List.of(CLOSURE_MEMBER, CLOSURE_GHOST)), false));
+        when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_MEMBER));
+
+        var view = operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT), 10));
+
+        assertThat(view.closure()).extracting(ArtifactId::value)
+            .containsExactly(CLOSURE_MEMBER, CLOSURE_GHOST);
+        assertThat(view.unresolved()).extracting(ArtifactId::value).containsExactly(CLOSURE_GHOST);
+        assertThat(view.complete()).isFalse();
+        verify(registry, times(1)).heldUrns(any());
+    }
+
+    @Test
+    void closureExcludesEveryVersionOfTheRootEvenWhenACycleReachesIt() {
+        String otherRootVersion =
+            "urn:core:platform:civitas:pipeline:common:Ingest:aaaaaaaaaa:2.0.0";
+        when(graph.getTransitiveDependenciesBounded(CLOSURE_ROOT, 10))
+            .thenReturn(new DependencyGraphService.BoundedWalk(new LinkedHashSet<>(List.of(CLOSURE_MEMBER, CLOSURE_ROOT, otherRootVersion)), false));
+        when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_MEMBER));
+
+        var view = operations.closure(new DependencyQuery(new ArtifactId(CLOSURE_ROOT), 10));
+
+        assertThat(view.closure()).extracting(ArtifactId::value).containsExactly(CLOSURE_MEMBER);
+        assertThat(view.complete()).isTrue();
+    }
+
+    @Test
+    void existingReturnsOnlyTheHeldSubsetInInputOrder() {
+        when(registry.heldUrns(any())).thenReturn(Set.of(CLOSURE_GHOST, CLOSURE_MEMBER));
+
+        var held = operations.existing(
+            List.of(new ArtifactId(CLOSURE_MEMBER), new ArtifactId(CLOSURE_ROOT), new ArtifactId(CLOSURE_GHOST)));
+
+        assertThat(held).extracting(ArtifactId::value).containsExactly(CLOSURE_MEMBER, CLOSURE_GHOST);
+        verify(registry, times(1)).heldUrns(any());
+    }
+
+    @Test
+    void existingWithNothingAskedTouchesNoRegistry() {
+        assertThat(operations.existing(List.of())).isEmpty();
+        assertThat(operations.existing(null)).isEmpty();
+        verify(registry, never()).heldUrns(any());
+    }
+
+    // ── The version a write publishes to the graph ────────────────────────────
+
+    private static final String REVISED_LOGICAL = "urn:core:platform:civitas:datastructure:common:Holder:m8i4hc3h56";
+    private static final String REVISED_PIN     = REVISED_LOGICAL + ":1.1.0";
+    private static final String REVISED_CURRENT = REVISED_LOGICAL + ":2.0.0";
+    private static final String REVISED_MEMBER  = "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0";
+
+    @Test
+    void writeOntoAnOlderVersionLinePublishesThatVersion() {
+        // A revision of a line that is not the newest keeps its own major and stays behind the
+        // current version. The node has to be the version that was written.
+        var realGraph = new DependencyGraphService(registry);
+        var ops = operationsWith(realGraph);
+        when(registry.storeDataStructure(eq(REVISED_LOGICAL), any(), any())).thenReturn(REVISED_PIN);
+        when(registry.resolveReference(REVISED_LOGICAL)).thenReturn(Optional.of(REVISED_CURRENT));
+        when(registry.fetchArtifactRefUrns(REVISED_PIN)).thenReturn(List.of(REVISED_MEMBER));
+        when(registry.fetchArtifactRefUrns(REVISED_CURRENT)).thenReturn(List.of());
+
+        ops.saveArtifact(new SaveArtifactCommand(
+            new ArtifactId(REVISED_LOGICAL), ArtifactKind.DATA_STRUCTURE, mapper.createObjectNode(),
+            VersionBump.MINOR));
+
+        assertThat(realGraph.getDependencies(REVISED_PIN)).containsExactly(REVISED_MEMBER);
+        assertThat(realGraph.getDependencies(REVISED_CURRENT))
+            .as("the current version was not written and must keep its own edges")
+            .isEmpty();
+    }
+
+    /** The same operations, wired to a graph the test can read back. */
+    private EmbeddedModelForgeOperations operationsWith(DependencyGraphService realGraph) {
+        return new EmbeddedModelForgeOperations(
+            schemaImportService, new ElementQueryService(registry), elementCommandService, viewService,
+            mock(ModelValidator.class), mock(de.civitascore.modelforge.validation.CoreSchemaValidator.class),
+            new ReferenceExistenceValidator(registry, mock(SchemaRefExtractor.class)),
+            realGraph, registry, mock(SmartDataModelsService.class), mock(XRepositoryService.class),
+            new de.civitascore.modelforge.urn.UrnService("platform", "civitas", "common", "1.0.0"));
     }
 }

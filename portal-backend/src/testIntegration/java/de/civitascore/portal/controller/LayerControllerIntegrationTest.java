@@ -333,7 +333,7 @@ class LayerControllerIntegrationTest
   class MutationGuardTests {
 
     private static final String NOT_EDITABLE_URN = "urn:civitas:error:DATASET_NOT_EDITABLE";
-    private static final String IN_USE_URN = "urn:civitas:error:RESOURCE_IN_USE";
+    private static final String SAGA_IN_FLIGHT_URN = "urn:civitas:error:SAGA_IN_FLIGHT";
 
     private void setParentStatus(DataSetStatus status) {
       ensurePrerequisites();
@@ -407,7 +407,7 @@ class LayerControllerIntegrationTest
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
 
-      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertSagaRejected(response);
       assertThat(layerRepository.existsByDataSetId(testDataSetId)).isFalse();
     }
 
@@ -425,7 +425,7 @@ class LayerControllerIntegrationTest
               createAuthHeaders(),
               createUpdateInput());
 
-      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertSagaRejected(response);
       assertThat(layerRepository.findById(layerId).orElseThrow().getLayerName())
           .isEqualTo(originalName);
     }
@@ -440,10 +440,16 @@ class LayerControllerIntegrationTest
           exchangeForProblem(
               getEndpointPath() + "/" + layerId, HttpMethod.DELETE, createAuthHeaders(), null);
 
-      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertSagaRejected(response);
       assertThat(layerRepository.findById(layerId))
           .as("Entity survives the rejected delete")
           .isPresent();
+    }
+
+    private void assertSagaRejected(ResponseEntity<ProblemDetail> response) {
+      assertRejected(response, HttpStatus.CONFLICT, SAGA_IN_FLIGHT_URN);
+      assertThat(response.getBody().getProperties())
+          .containsEntry("pendingSagaType", PendingSagaType.UNRELEASE.name());
     }
 
     @Test

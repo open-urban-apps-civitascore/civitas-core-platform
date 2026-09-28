@@ -16,8 +16,8 @@ import java.util.regex.Pattern;
  * <ul>
  *   <li>{@code apis} — collides with the {@code GET /v1/datasets/{id}/apis} discovery endpoint
  *       (implemented per #1596)
- *   <li>{@code usable-datasources} — collides with the {@code GET
- *       /v1/datasets/{id}/usable-datasources} picker endpoint
+ *   <li>{@code usable-datasources} — stays reserved although the endpoint of that name is gone: a
+ *       tenant that claimed the slug would turn any reinstatement into a breaking change
  *   <li>{@code api}, {@code v1}, {@code admin} — conservative reserves for future platform
  *       endpoints; refine with the team before lifting
  * </ul>

@@ -364,7 +364,7 @@ class StyleControllerIntegrationTest
   class MutationGuardTests {
 
     private static final String NOT_EDITABLE_URN = "urn:civitas:error:DATASET_NOT_EDITABLE";
-    private static final String IN_USE_URN = "urn:civitas:error:RESOURCE_IN_USE";
+    private static final String SAGA_IN_FLIGHT_URN = "urn:civitas:error:SAGA_IN_FLIGHT";
 
     private void setParentStatus(DataSetStatus status) {
       ensureTestDataSet();
@@ -437,7 +437,7 @@ class StyleControllerIntegrationTest
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
 
-      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertSagaRejected(response);
       assertThat(styleRepository.count()).as("No style was created").isZero();
     }
 
@@ -455,7 +455,7 @@ class StyleControllerIntegrationTest
               createAuthHeaders(),
               createUpdateInput());
 
-      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertSagaRejected(response);
       assertThat(styleRepository.findById(styleId).orElseThrow().getName()).isEqualTo(originalName);
     }
 
@@ -469,10 +469,16 @@ class StyleControllerIntegrationTest
           exchangeForProblem(
               getEndpointPath() + "/" + styleId, HttpMethod.DELETE, createAuthHeaders(), null);
 
-      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertSagaRejected(response);
       assertThat(styleRepository.findById(styleId))
           .as("Entity survives the rejected delete")
           .isPresent();
+    }
+
+    private void assertSagaRejected(ResponseEntity<ProblemDetail> response) {
+      assertRejected(response, HttpStatus.CONFLICT, SAGA_IN_FLIGHT_URN);
+      assertThat(response.getBody().getProperties())
+          .containsEntry("pendingSagaType", PendingSagaType.UNRELEASE.name());
     }
 
     @Test

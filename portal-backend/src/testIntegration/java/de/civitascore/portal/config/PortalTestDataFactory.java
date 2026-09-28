@@ -8,44 +8,32 @@ import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
-import de.civitascore.portal.model.entity.Activity;
-import de.civitascore.portal.model.entity.Agent;
 import de.civitascore.portal.model.entity.Assignment;
-import de.civitascore.portal.model.entity.Catalog;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.DataSetSeries;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
-import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
-import de.civitascore.portal.model.entity.Resource;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.modelregistry.VersionBump;
-import de.civitascore.portal.repository.ActivityRepository;
-import de.civitascore.portal.repository.AgentRepository;
 import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.repository.DataSetSeriesRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
-import de.civitascore.portal.repository.ResourceRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.repository.UserRepository;
@@ -86,13 +74,7 @@ public class PortalTestDataFactory {
   @Autowired private LayerRepository layerRepository;
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private StyleRepository styleRepository;
-  @Autowired private CatalogRepository catalogRepository;
   @Autowired private DataPoolRepository dataPoolRepository;
-  @Autowired private DistributionRepository distributionRepository;
-  @Autowired private ResourceRepository resourceRepository;
-  @Autowired private AgentRepository agentRepository;
-  @Autowired private ActivityRepository activityRepository;
-  @Autowired private DataSetSeriesRepository dataSetSeriesRepository;
   @Autowired private ModelRegistryGateway modelRegistryGateway;
 
   private static long nextSeq() {
@@ -285,12 +267,6 @@ public class PortalTestDataFactory {
     return assignmentRepository.save(a);
   }
 
-  public Assignment assignment(Group group, Role role, Catalog scope) {
-    Assignment a = Assignment.builder().group(group).role(role).build();
-    a.setScope(scope);
-    return assignmentRepository.save(a);
-  }
-
   public Assignment assignment(Group group, Role role, DataPool scope) {
     Assignment a = Assignment.builder().group(group).role(role).build();
     a.setScope(scope);
@@ -309,6 +285,7 @@ public class PortalTestDataFactory {
     var builder =
         DataSet.builder()
             .name("dataset-" + nextSeq())
+            .description("test dataset")
             .dataSetStatus(DataSetStatus.DRAFT)
             .openDataAccess(false);
     customizer.accept(builder);
@@ -332,6 +309,7 @@ public class PortalTestDataFactory {
     var builder =
         DataSource.builder()
             .name("datasource-" + nextSeq())
+            .description("test data source")
             .dataSourceStatus(DataSourceStatus.DRAFT);
     customizer.accept(builder);
     return dataSourceRepository.save(builder.build());
@@ -350,6 +328,7 @@ public class PortalTestDataFactory {
     var builder =
         DataStructure.builder()
             .name("datastructure-" + nextSeq())
+            .description("test data structure")
             .dataStructureStatus(DataStructureStatus.DRAFT);
     customizer.accept(builder);
     return dataStructureRepository.save(builder.build());
@@ -472,112 +451,26 @@ public class PortalTestDataFactory {
   }
 
   // ---------------------------------------------------------------------------
-  // Catalog
-  // ---------------------------------------------------------------------------
-
-  public Catalog catalog() {
-    return catalog(b -> {});
-  }
-
-  public Catalog catalog(Consumer<Catalog.CatalogBuilder<?, ?>> customizer) {
-    var builder = Catalog.builder().name("catalog-" + nextSeq());
-    customizer.accept(builder);
-    return catalogRepository.save(builder.build());
-  }
-
-  // ---------------------------------------------------------------------------
-  // Distribution
-  // ---------------------------------------------------------------------------
-
-  public Distribution distribution() {
-    return distribution(b -> {});
-  }
-
-  public Distribution distribution(Consumer<Distribution.DistributionBuilder<?, ?>> customizer) {
-    var builder = Distribution.builder();
-    customizer.accept(builder);
-    return distributionRepository.save(builder.build());
-  }
-
-  // ---------------------------------------------------------------------------
-  // Resource
-  // ---------------------------------------------------------------------------
-
-  public Resource resource() {
-    return resourceRepository.save(Resource.builder().build());
-  }
-
-  // ---------------------------------------------------------------------------
-  // Agent
-  // ---------------------------------------------------------------------------
-
-  public Agent agent() {
-    return agent(b -> {});
-  }
-
-  public Agent agent(Consumer<Agent.AgentBuilder<?, ?>> customizer) {
-    var builder = Agent.builder().name("agent-" + nextSeq());
-    customizer.accept(builder);
-    return agentRepository.save(builder.build());
-  }
-
-  // ---------------------------------------------------------------------------
-  // Activity
-  // ---------------------------------------------------------------------------
-
-  public Activity activity() {
-    return activity(b -> {});
-  }
-
-  public Activity activity(Consumer<Activity.ActivityBuilder<?, ?>> customizer) {
-    var builder = Activity.builder().name("activity-" + nextSeq());
-    customizer.accept(builder);
-    return activityRepository.save(builder.build());
-  }
-
-  // ---------------------------------------------------------------------------
-  // DataSetSeries
-  // ---------------------------------------------------------------------------
-
-  public DataSetSeries dataSetSeries() {
-    return dataSetSeries(b -> {});
-  }
-
-  public DataSetSeries dataSetSeries(
-      Consumer<DataSetSeries.DataSetSeriesBuilder<?, ?>> customizer) {
-    var builder = DataSetSeries.builder().name("series-" + nextSeq());
-    customizer.accept(builder);
-    return dataSetSeriesRepository.save(builder.build());
-  }
-
-  // ---------------------------------------------------------------------------
   // cleanAll — deletes all entities in FK-safe order
   // ---------------------------------------------------------------------------
 
   /**
    * Deletes all test entities in the correct order (respecting FK and join-table constraints).
    *
-   * <p>ManyToMany join tables are owned by: Catalog (catalog_datasets, catalog_children), DataSet
-   * (dataset_dataspaces, dataset_agents), Pipeline (pipeline_data_sources), Activity
-   * (activity_agents), Group (group_members), Role (role_permissions). The owning side must be
-   * deleted before the inverse side.
+   * <p>ManyToMany join tables are owned by: Pipeline (pipeline_data_sources), Group
+   * (group_members), Role (role_permissions). The owning side must be deleted before the inverse
+   * side.
    */
   public void cleanAll() {
     assignmentRepository.deleteAll();
-    distributionRepository.deleteAll();
     layerRepository.deleteAll();
     styleRepository.deleteAll();
     dataSinkRepository.deleteAll();
     pipelineRepository.deleteAll();
-    catalogRepository.deleteAll();
     dataSetRepository.deleteAll();
     dataSourceRepository.deleteAll();
     dataStructureVersionRepository.deleteAll();
     dataStructureRepository.deleteAll();
-    activityRepository.deleteAll();
-    agentRepository.deleteAll();
-    resourceRepository.deleteAll();
-    dataSetSeriesRepository.deleteAll();
     dataPoolRepository.deleteAll();
     groupRepository.deleteAll();
     roleRepository.deleteAll();

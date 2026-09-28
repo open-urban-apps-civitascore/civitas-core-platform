@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 // ── $defs ──────────────────────────────────────────────────────────────────
 
-/** Writes to an OGC SensorThings API / FROST-Server. A passthrough sink may carry no configuration; otherwise it references the mapping's Thing-shaped target structure by URN. */
+/** Writes to an OGC SensorThings API / FROST-Server. The port declares what the sink writes; the element references the mapping’s target structure by URN. */
 export const FrostDataSinkSchema = z
   .object({
     $schema: z.enum([
@@ -19,6 +19,8 @@ export const FrostDataSinkSchema = z
     description: z.string().optional(),
     /** OGC SensorThings / FROST-Server target. */
     connectionType: z.literal('frost'),
+    /** The write logic of the sink: the data model it expects, the write operation it applies and the references it resolves. There is no default — a sink without a port is not configured, and the Dataset does not publish. */
+    port: z.enum(['Things', 'Observations', 'ThingTree']).optional(),
     /**
      * Versioned CORE URN of the DataStructure describing the Thing-shaped target structure.
      * @coreRef { type: "urn:core:type:DataStructure" }
@@ -53,9 +55,6 @@ export const PostgisDataSinkSchema = z
     tableName: z.string(),
     /**
      * Versioned CORE URN of the DataStructure describing the row format written to the table.
-     * Absent on a passthrough sink with no upstream mapping (mirrors FrostDataSinkSchema.element).
-     * MANUAL PATCH: the backend CORE JSON Schema (model-forge-runtime) still marks this required —
-     * this override is lost on the next `npm run generate:core-types` until that source is fixed.
      * @coreRef { type: "urn:core:type:DataStructure" }
      */
     element: z
@@ -63,8 +62,7 @@ export const PostgisDataSinkSchema = z
       .regex(
         /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$/,
         'Must be a versioned CORE DataStructure URN',
-      )
-      .optional(),
+      ),
   })
   .strict()
 

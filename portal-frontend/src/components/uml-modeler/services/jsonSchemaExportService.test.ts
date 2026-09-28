@@ -141,6 +141,7 @@ describe('exportToJsonSchema', () => {
     Date: { type: 'string', format: 'date' },
     DateTime: { type: 'string', format: 'date-time' },
     Uuid: { type: 'string', format: 'uuid' },
+    Json: { type: 'object' },
   }
   const primitiveCases = UML_PRIMITIVE_TYPES.map(type => ({ type, expected: primitiveExpectations[type] }))
 

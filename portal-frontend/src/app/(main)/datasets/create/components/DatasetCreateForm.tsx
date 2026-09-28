@@ -11,6 +11,7 @@ import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormSelect } from '@/components/form/fields/FormSelect'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
+import { FooterElement } from '@/components/form/FooterElement'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -115,7 +116,7 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
     <PageContainer testId="createDatasetPage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <PageHeader title={t('create.title')} subtitle={t('create.subtitle')} customElement={customElementCreateMode} />
       <PageBackground className="overflow-y-auto" hasBackground>
-        <ContentCard className={cn('overflow-auto')}>
+        <ContentCard className={cn('overflow-auto')} footerElement={<FooterElement areAllFieldsRequired />}>
           <Form {...form}>
             <form
               id="dataset-create-form"
@@ -174,6 +175,7 @@ export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
                       maxLength={150}
                       hasCharacterCount
                       className="min-h-[100px] resize-none"
+                      required
                     />
                   </DetailsFieldContainer>
                 </>

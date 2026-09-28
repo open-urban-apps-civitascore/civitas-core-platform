@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -58,6 +59,14 @@ public class DataStructureVersion extends BaseEntity {
 
   @Column(name = "model_name")
   private String modelName;
+
+  /**
+   * The published structures this version was built from, each pinned at the version it was loaded
+   * at. Derived from the diagram on every save, like the model document: the diagram is where the
+   * import happens, and this is what makes the provenance readable without it.
+   */
+  @Column(name = "imported_structure_urns", columnDefinition = "text[]")
+  private List<String> importedStructureUrns;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "data_structure_id", nullable = false)

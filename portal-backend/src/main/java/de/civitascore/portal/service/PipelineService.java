@@ -1,7 +1,6 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.PipelineMapper;
-import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
@@ -14,8 +13,8 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.AllowedScopes;
-import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
+import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -102,9 +101,8 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
    * @return the entity with resolved dataset and data source relationships
    * @throws ResourceNotFoundException if the dataset is not found
    * @throws org.springframework.security.access.AccessDeniedException if no scope header is present
-   * @throws DataSourceScopeViolationException if a referenced data source is not usable by this
-   *     dataset's pipelines — it does not exist, is not AVAILABLE, or is not released for the
-   *     dataset's datapool. The three cases are deliberately indistinguishable.
+   * @throws DataSourceScopeViolationException if a referenced data source does not exist or is not
+   *     released for the Dataset's Data pool. The cases are deliberately indistinguishable.
    */
   @Override
   protected Pipeline postConvertToEntity(Pipeline entity, PipelineInputDTO input) {
@@ -293,13 +291,12 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
   }
 
   /**
-   * Whether a referenced DataSource may feed this dataset's pipelines: it must exist, be AVAILABLE,
-   * and be released for the dataset's datapool. A nonexistent id ({@code null} here) is treated the
-   * same as an unusable one so the three cases stay indistinguishable to the caller.
+   * Whether a referenced Data source may feed this Dataset's Pipelines. It must exist and be
+   * released for the Dataset's Data pool. A nonexistent id ({@code null} here) is treated like an
+   * unusable one so the cases stay indistinguishable to the caller.
    */
   private boolean isUsable(DataSource dataSource, DataSet dataSet) {
     return dataSource != null
-        && dataSource.getDataSourceStatus() == DataSourceStatus.AVAILABLE
         && datapoolScopeValidator.isPermitted(dataSource, dataSet.getDataPool());
   }
 
@@ -356,16 +353,19 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
 
   /**
    * After the pipeline row is deleted, delete the backing definition artifact from Model Forge in
-   * the same transaction. No-op when no definition was ever stored. (Datasets cascade-delete their
-   * pipelines via JPA without this hook; the orphaned registry artifacts are harmless append-only
-   * history — see concept 6.7.)
+   * the same transaction, taking with it the mappings no other pipeline uses. No-op when no
+   * definition was ever stored.
+   *
+   * <p>A mapping left behind would still name the two data structures it joined and refuse their
+   * deletion, and no route reaches a mapping once its pipeline is gone. The data source and data
+   * sink the pipeline wired belong to the data set and stay.
    *
    * @param entity the deleted pipeline
    */
   @Override
   protected void postDelete(Pipeline entity) {
     if (entity != null && entity.getModelLogicalUrn() != null) {
-      modelRegistryGateway.deletePayload(entity.getModelLogicalUrn());
+      modelRegistryGateway.deleteArtifact(entity.getModelLogicalUrn(), true);
     }
   }
 }

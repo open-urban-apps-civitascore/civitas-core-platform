@@ -19,10 +19,9 @@ import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.ConfigEvent;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.Operation;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import okhttp3.OkHttpClient;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +55,7 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   private static final String UPSTREAMS_SEGMENT = "upstreams";
   private static final String ROUTES_SEGMENT = "routes";
 
-  private Client client;
+  private OkHttpClient client;
   private ApisixAdminOperations operations;
 
   @Override
@@ -85,23 +84,23 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   }
 
   /**
-   * Creates the default JAX-RS Client. Can be overridden for testing.
+   * Creates the default OkHttp client. Can be overridden for testing.
    *
-   * @return configured Client instance
+   * @return configured OkHttpClient instance
    */
-  protected Client createClient() {
-    return ClientBuilder.newBuilder()
+  protected OkHttpClient createClient() {
+    return new OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build();
   }
 
   /**
-   * Sets the Client for testing purposes.
+   * Sets the client for testing purposes.
    *
-   * @param client the Client to use
+   * @param client the OkHttpClient to use
    */
-  void setClient(Client client) {
+  void setClient(OkHttpClient client) {
     this.client = client;
   }
 
@@ -191,7 +190,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   @Override
   public void close() {
     if (client != null) {
-      client.close();
+      client.dispatcher().executorService().shutdown();
+      client.connectionPool().evictAll();
     }
     LOG.info("APISIX adapter closed");
   }

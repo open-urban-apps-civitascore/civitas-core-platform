@@ -11,6 +11,7 @@ import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
+import { InUseIndicator } from '@/components/in-use-indicator/InUseIndicator'
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
@@ -97,6 +98,16 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       cell: info => info.getValue() || '-',
       meta: {
         truncate: true,
+        style: {
+          minWidth: '100px',
+        },
+      },
+    }),
+    columnHelper.accessor('inUseByReleased', {
+      header: tCommon('inUse.columnHeader'),
+      cell: info => <InUseIndicator isInUseByReleased={!!info.getValue()} />,
+      enableSorting: false,
+      meta: {
         style: {
           minWidth: '100px',
         },

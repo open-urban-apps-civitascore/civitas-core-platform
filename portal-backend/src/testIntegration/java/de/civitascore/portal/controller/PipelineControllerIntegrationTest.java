@@ -1031,30 +1031,21 @@ class PipelineControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("DataSource Status Validation Tests")
+  @DisplayName("DataSource lifecycle reference tests")
   class DataSourceStatusValidationTests {
 
     @Test
-    @DisplayName("Should reject creating a pipeline with a DRAFT datasource")
-    void shouldRejectDraftDataSource() {
+    @DisplayName("Should create a Pipeline with a DRAFT DataSource")
+    void shouldAcceptDraftDataSource() {
       DataSource draftDataSource = createTestDataSource();
-      // draftDataSource is DRAFT by default (DataSourceStatus.DRAFT)
 
       PipelineInputDTO input = createValidInput();
       input.setDataSourceIds(Set.of(draftDataSource.getId()));
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              String.class);
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
-      // 422 with a status-agnostic message: a DRAFT source answers exactly like a nonexistent or
-      // out-of-pool one, so referencing cannot be used to probe the DataSource table.
-      assertThat(response.getStatusCode().value()).isEqualTo(422);
-      assertThat(response.getBody()).contains("cannot be used by this Dataset's pipelines");
-      assertThat(response.getBody()).doesNotContain("AVAILABLE status");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody().getDataSourceIds()).containsExactly(draftDataSource.getId());
     }
 
     @Test
@@ -1073,30 +1064,22 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject when one of multiple datasources is DRAFT")
-    void shouldRejectWhenOneDataSourceIsDraft() {
+    @DisplayName("Should accept DRAFT and AVAILABLE DataSources together")
+    void shouldAcceptDraftAndAvailableDataSources() {
       DataSource availableDataSource = createTestDataSource();
       availableDataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
       dataSourceRepository.save(availableDataSource);
 
       DataSource draftDataSource = createTestDataSource();
-      // draftDataSource is DRAFT by default
 
       PipelineInputDTO input = createValidInput();
       input.setDataSourceIds(Set.of(availableDataSource.getId(), draftDataSource.getId()));
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              String.class);
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
-      // 422 with a status-agnostic message: a DRAFT source answers exactly like a nonexistent or
-      // out-of-pool one, so referencing cannot be used to probe the DataSource table.
-      assertThat(response.getStatusCode().value()).isEqualTo(422);
-      assertThat(response.getBody()).contains("cannot be used by this Dataset's pipelines");
-      assertThat(response.getBody()).doesNotContain("AVAILABLE status");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody().getDataSourceIds())
+          .containsExactlyInAnyOrder(availableDataSource.getId(), draftDataSource.getId());
     }
 
     @Test
@@ -1125,27 +1108,18 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("PUT rejects linking a DRAFT (non-AVAILABLE) datasource")
-    void shouldRejectUpdateAddingDraftDataSource() {
-      // A freshly created, never-linked datasource is DRAFT by default and may not be attached.
+    @DisplayName("PUT links a DRAFT DataSource")
+    void shouldUpdateWithDraftDataSource() {
       UUID pipelineId = createTestEntity();
       DataSource draftDataSource = createTestDataSource();
 
       PipelineInputDTO updateInput = createUpdateInput();
       updateInput.setDataSourceIds(Set.of(draftDataSource.getId()));
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath() + "/" + pipelineId,
-              HttpMethod.PUT,
-              new HttpEntity<>(updateInput, createAuthHeaders()),
-              String.class);
+      ResponseEntity<PipelineOutputDTO> response = performUpdate(pipelineId, updateInput);
 
-      // 422 with a status-agnostic message: a DRAFT source answers exactly like a nonexistent or
-      // out-of-pool one, so referencing cannot be used to probe the DataSource table.
-      assertThat(response.getStatusCode().value()).isEqualTo(422);
-      assertThat(response.getBody()).contains("cannot be used by this Dataset's pipelines");
-      assertThat(response.getBody()).doesNotContain("AVAILABLE status");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDataSourceIds()).containsExactly(draftDataSource.getId());
     }
 
     @Test
@@ -1484,7 +1458,7 @@ class PipelineControllerIntegrationTest
   class MutationGuardTests {
 
     private static final String NOT_EDITABLE_URN = "urn:civitas:error:DATASET_NOT_EDITABLE";
-    private static final String IN_USE_URN = "urn:civitas:error:RESOURCE_IN_USE";
+    private static final String SAGA_IN_FLIGHT_URN = "urn:civitas:error:SAGA_IN_FLIGHT";
 
     private void setParentStatus(DataSetStatus status) {
       ensureTestDataSet();
@@ -1578,7 +1552,7 @@ class PipelineControllerIntegrationTest
           exchangeForProblem(
               getEndpointPath(), HttpMethod.POST, createAuthHeaders(), createValidInput());
 
-      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertSagaRejected(response);
       assertThat(pipelineRepository.count()).as("No pipeline was created").isZero();
     }
 
@@ -1596,7 +1570,7 @@ class PipelineControllerIntegrationTest
               createAuthHeaders(),
               createUpdateInput());
 
-      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertSagaRejected(response);
       assertThat(pipelineRepository.findById(pipelineId).orElseThrow().getName())
           .isEqualTo(originalName);
     }
@@ -1611,10 +1585,16 @@ class PipelineControllerIntegrationTest
           exchangeForProblem(
               getEndpointPath() + "/" + pipelineId, HttpMethod.DELETE, createAuthHeaders(), null);
 
-      assertRejected(response, HttpStatus.CONFLICT, IN_USE_URN);
+      assertSagaRejected(response);
       assertThat(pipelineRepository.findById(pipelineId))
           .as("Entity survives the rejected delete")
           .isPresent();
+    }
+
+    private void assertSagaRejected(ResponseEntity<ProblemDetail> response) {
+      assertRejected(response, HttpStatus.CONFLICT, SAGA_IN_FLIGHT_URN);
+      assertThat(response.getBody().getProperties())
+          .containsEntry("pendingSagaType", PendingSagaType.UNRELEASE.name());
     }
 
     @Test

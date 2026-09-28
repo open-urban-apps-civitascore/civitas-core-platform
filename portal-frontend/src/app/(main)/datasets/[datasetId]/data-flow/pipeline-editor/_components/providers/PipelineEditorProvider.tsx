@@ -21,7 +21,7 @@ import {
   useDeleteDataSink,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
-import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
+import { useCreateMapping, useDeleteMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
@@ -29,11 +29,21 @@ import {
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
+import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
-import { isDatapoolScopeViolationError, isTableNameConflictError } from '@/utils/errors'
+import {
+  isDatapoolScopeViolationError,
+  isNotDraftError,
+  isResourceInUseError,
+  isSagaInFlightError,
+  isTableNameConflictError,
+  isUnconfirmedDataLossError,
+} from '@/utils/errors'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
+import { useDataSinkLocks } from '../../_hooks/use-datasink-locks'
+import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import { tableNameOwnerOutsideNode, tableNameOwnersOutsideSession } from '../../_services/dataSinkNameService'
 import {
   buildDataSinkPayloads,
@@ -43,10 +53,12 @@ import {
   createMappingSnapshot,
   type DataSinkSnapshot,
   getRemovedDataSinkIds,
+  getRemovedMappingUrns,
   hasDataSinkChanged,
   hasMappingChanged,
   isDestructiveDataSinkChange,
   type MappingSnapshot,
+  MissingDataStructureUrnError,
   updateNodeData,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
@@ -117,6 +129,13 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const updateDataSinkMutation = useUpdateDataSink()
   const createMappingMutation = useCreateMapping(datasetId)
   const updateMappingMutation = useUpdateMapping(datasetId)
+  const deleteMappingMutation = useDeleteMapping(datasetId)
+
+  const { isReadOnly } = useReadOnly()
+
+  const { canDeletePipeline: canDelete } = useDatasetPermissions(datasetQuery.data?.data)
+
+  const { getSinkLocks, getSinkLockReason, getSelectionLockReason, isLoading: isLoadingSinkLocks } = useDataSinkLocks()
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
@@ -424,27 +443,36 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       sessionManager.closeSession(activeSession.id)
     }
 
-    if (pipelineId) {
-      // Existing pipeline → DELETE from backend, then remove session
-      deletePipelineMutation.mutate(pipelineId, {
-        onSuccess: () => {
-          removeSession()
-          console.log('Pipeline deleted successfully')
-        },
-        onError: error => {
-          console.error('Failed to delete pipeline:', error)
-        },
-      })
-    } else {
-      // Never-saved pipeline → just remove the session
+    // A never-saved pipeline exists only in the session, so discarding it needs no permission.
+    if (!pipelineId) {
       removeSession()
+      return
     }
-  }, [activeSession, sessionManager, deletePipelineMutation])
+
+    if (!canDelete) return
+
+    deletePipelineMutation.mutate(pipelineId, {
+      onSuccess: () => {
+        removeSession()
+      },
+      onError: error => {
+        if (isNotDraftError(error)) {
+          toast.error(t('header.notDraftError'))
+        } else if (isSagaInFlightError(error)) {
+          toast.error(t('header.sagaInFlightError'))
+        } else {
+          console.error('Failed to delete pipeline:', error)
+          toast.error(t('toolbar.deleteFailed'))
+        }
+      },
+    })
+  }, [activeSession, sessionManager, deletePipelineMutation, canDelete, t])
 
   const isDeleting = deletePipelineMutation.isPending
 
   // ===== Loading State =====
-  const isLoadingPipelines = pipelinesQuery.isLoading
+  // Without the locks every node looks deletable, so the editor waits for them too.
+  const isLoadingEditor = pipelinesQuery.isLoading || isLoadingSinkLocks
 
   // ===== Cross-session state =====
   const hasAnyDirtySession = useMemo(() => sessionManager.sessions.some(s => s.isDirty), [sessionManager.sessions])
@@ -452,7 +480,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const [isSavingAll, setIsSavingAll] = useState(false)
 
   const saveAllPipelines = useCallback(async (): Promise<boolean> => {
-    if (isSavingAll) return false
+    if (isSavingAll || isReadOnly) return false
 
     const dirtySessions = sessionManager.sessions.filter(s => s.isDirty)
     if (dirtySessions.length === 0) return true
@@ -515,6 +543,15 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     const saveFailedNames: string[] = []
     const scopeViolationNames: string[] = []
     const tableNameConflictNames: string[] = []
+    const sinkInUsePipelineNames: string[] = []
+    const dataLossPipelineNames: string[] = []
+    const missingDataStructureUrnNames: string[] = []
+    const notDraftNames: string[] = []
+    const sagaInFlightNames: string[] = []
+    const sinkStillInUseNames: string[] = []
+    const sinkDeleteFailedNames: string[] = []
+    const mappingInUseNames: string[] = []
+    const mappingCleanupFailedNames: string[] = []
     try {
       if (hasDestructiveChange) {
         const isConfirmed = await confirmDataLoss()
@@ -529,11 +566,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         try {
           const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
 
-          // Step 1: Delete data sinks for removed persistence nodes
+          // Step 1: Collect removed sinks. A saved pipeline still references them, so they get deleted in step 3.5.
           const removedDataSinkIds = getRemovedDataSinkIds(currentPipeline, snapshot)
-          for (const dataSinkId of removedDataSinkIds) {
-            await deleteDataSinkMutation.mutateAsync({ datasetId, dataSinkId: dataSinkId })
-          }
 
           // Step 2: Save data sinks (create new / update changed). Stash the sink's CORE
           // configurationUrn back onto the node so it is emitted as the CORE model's `sinkRef`.
@@ -597,6 +631,34 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             currentPipeline = { ...currentPipeline, id: response.data.id }
           }
 
+          // Step 3.5: Delete the sinks from step 1. The saved pipeline no longer references them.
+          let hasSinkStillInUse = false
+          let hasSinkDeleteFailed = false
+          for (const dataSinkId of removedDataSinkIds) {
+            try {
+              await deleteDataSinkMutation.mutateAsync({ datasetId, dataSinkId })
+            } catch (error) {
+              console.error('Failed to delete data sink:', dataSinkId, error)
+              if (isResourceInUseError(error)) hasSinkStillInUse = true
+              else hasSinkDeleteFailed = true
+            }
+          }
+          if (hasSinkStillInUse) sinkStillInUseNames.push(session.name)
+          if (hasSinkDeleteFailed) sinkDeleteFailedNames.push(session.name)
+
+          // Step 3.6: Delete removed mappings. Has to be executed after the pipeline save,
+          // otherwise the backend refuses with 409.
+          for (const logicalUrn of getRemovedMappingUrns(currentPipeline, mappingSnapshot)) {
+            try {
+              await deleteMappingMutation.mutateAsync(logicalUrn)
+            } catch (error) {
+              // The save itself already succeeded, so a failed cleanup is reported on its own below.
+              console.error('Failed to delete removed mapping of pipeline:', session.name, logicalUrn, error)
+              const names = isResourceInUseError(error) ? mappingInUseNames : mappingCleanupFailedNames
+              if (!names.includes(session.name)) names.push(session.name)
+            }
+          }
+
           // Step 4: Update session state and snapshot
           sessionManager.updateSessionPipeline(session.id, { ...currentPipeline, isDirty: false })
           sessionManager.markSessionClean(session.id)
@@ -611,26 +673,74 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           // and leaking a duplicate.
           sessionManager.updateSessionPipeline(session.id, currentPipeline)
 
-          if (isDatapoolScopeViolationError(error)) {
+          if (isNotDraftError(error)) {
+            notDraftNames.push(session.name)
+          } else if (isSagaInFlightError(error)) {
+            sagaInFlightNames.push(session.name)
+          } else if (isDatapoolScopeViolationError(error)) {
             scopeViolationNames.push(session.name)
           } else if (isTableNameConflictError(error)) {
             tableNameConflictNames.push(session.name)
+          } else if (isResourceInUseError(error)) {
+            sinkInUsePipelineNames.push(session.name)
+          } else if (isUnconfirmedDataLossError(error)) {
+            dataLossPipelineNames.push(session.name)
+          } else if (error instanceof MissingDataStructureUrnError) {
+            missingDataStructureUrnNames.push(session.name)
           } else {
             saveFailedNames.push(session.name)
           }
         }
       }
 
+      if (notDraftNames.length > 0) {
+        toast.error(t('header.notDraftError'))
+      }
+      if (sagaInFlightNames.length > 0) {
+        toast.error(t('header.sagaInFlightError'))
+      }
       if (scopeViolationNames.length > 0) {
         toast.error(t('header.datasourceScopeViolation', { name: scopeViolationNames.join(', ') }))
       }
       if (tableNameConflictNames.length > 0) {
         toast.error(t('header.tableNameConflict', { names: tableNameConflictNames.join(', ') }))
       }
+      if (sinkInUsePipelineNames.length > 0) {
+        toast.error(t('header.dataSinkInUseError', { names: sinkInUsePipelineNames.join(', ') }))
+      }
+      if (dataLossPipelineNames.length > 0) {
+        toast.error(t('header.unconfirmedDataLossError', { names: dataLossPipelineNames.join(', ') }))
+      }
+      if (missingDataStructureUrnNames.length > 0) {
+        toast.error(t('header.missingDataStructureUrn', { names: missingDataStructureUrnNames.join(', ') }))
+      }
       if (saveFailedNames.length > 0) {
         toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
       }
-      if (scopeViolationNames.length > 0 || tableNameConflictNames.length > 0 || saveFailedNames.length > 0) {
+      // A failed sink delete does not fail the save: the pipeline is already stored.
+      if (sinkStillInUseNames.length > 0) {
+        toast.warning(t('header.sinkStillInUse', { names: sinkStillInUseNames.join(', ') }))
+      }
+      if (sinkDeleteFailedNames.length > 0) {
+        toast.warning(t('header.sinkDeleteFailed', { names: sinkDeleteFailedNames.join(', ') }))
+      }
+      // The pipeline itself was saved in both cases, so neither fails the save.
+      if (mappingInUseNames.length > 0) {
+        toast.error(t('header.mappingStillInUse', { name: mappingInUseNames.join(', ') }))
+      }
+      if (mappingCleanupFailedNames.length > 0) {
+        toast.error(t('header.mappingCleanupFailed', { name: mappingCleanupFailedNames.join(', ') }))
+      }
+      if (
+        notDraftNames.length > 0 ||
+        sagaInFlightNames.length > 0 ||
+        scopeViolationNames.length > 0 ||
+        tableNameConflictNames.length > 0 ||
+        sinkInUsePipelineNames.length > 0 ||
+        dataLossPipelineNames.length > 0 ||
+        missingDataStructureUrnNames.length > 0 ||
+        saveFailedNames.length > 0
+      ) {
         return false
       }
 
@@ -648,11 +758,13 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     updateDataSinkMutation,
     createMappingMutation,
     updateMappingMutation,
+    deleteMappingMutation,
     datasetId,
     datasetQuery.data,
     confirmDataLoss,
     validationContextFor,
     t,
+    isReadOnly,
   ])
 
   useRegisterUnsavedChanges(hasAnyDirtySession, saveAllPipelines)
@@ -704,12 +816,17 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       // Pipeline operations
       deletePipeline,
       isDeleting,
-      isLoadingPipelines,
+      isLoadingEditor,
 
       // Cross-session operations
       saveAllPipelines,
       isSavingAll,
       hasAnyDirtySession,
+
+      // Data sink locks
+      getSinkLocks,
+      getSinkLockReason,
+      getSelectionLockReason,
 
       // Session info
       activeSessionId: activeSession?.id || null,
@@ -744,10 +861,13 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       hideValidationPanel,
       deletePipeline,
       isDeleting,
-      isLoadingPipelines,
+      isLoadingEditor,
       saveAllPipelines,
       isSavingAll,
       hasAnyDirtySession,
+      getSinkLocks,
+      getSinkLockReason,
+      getSelectionLockReason,
     ],
   )
 

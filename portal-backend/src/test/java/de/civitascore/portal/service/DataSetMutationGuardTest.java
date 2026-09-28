@@ -1,5 +1,6 @@
 package de.civitascore.portal.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -11,8 +12,8 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.DataSetNotEditableException;
-import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.SagaInFlightException;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -70,11 +71,18 @@ class DataSetMutationGuardTest {
 
     @ParameterizedTest(name = "{0}")
     @EnumSource(PendingSagaType.class)
-    @DisplayName("Should throw ResourceInUseException when a saga is in flight")
+    @DisplayName("Should throw SagaInFlightException when a saga is in flight")
     void shouldThrowWhenSagaPending(PendingSagaType pendingSagaType) {
-      assertThatThrownBy(() -> guard.requireMutable(dataSet(DataSetStatus.DRAFT, pendingSagaType)))
-          .isInstanceOf(ResourceInUseException.class)
-          .hasMessageContaining(pendingSagaType.name());
+      DataSet dataSet = dataSet(DataSetStatus.DRAFT, pendingSagaType);
+
+      assertThatThrownBy(() -> guard.requireMutable(dataSet))
+          .isInstanceOfSatisfying(
+              SagaInFlightException.class,
+              exception -> {
+                assertThat(exception.getDataSetId()).isEqualTo(dataSet.getId());
+                assertThat(exception.getPendingSagaType()).isEqualTo(pendingSagaType);
+                assertThat(exception).hasMessageContaining(pendingSagaType.name());
+              });
     }
 
     @Test
@@ -117,12 +125,12 @@ class DataSetMutationGuardTest {
     }
 
     @Test
-    @DisplayName("Should throw ResourceInUseException when a saga is in flight on the parent")
+    @DisplayName("Should throw SagaInFlightException when a saga is in flight on the parent")
     void shouldThrowWhenParentHasSagaPending() {
       DataSet parent = dataSet(DataSetStatus.DRAFT, PendingSagaType.UPDATE);
 
       assertThatThrownBy(() -> guard.requireMutable(subEntityOf(parent), "update Layer"))
-          .isInstanceOf(ResourceInUseException.class);
+          .isInstanceOf(SagaInFlightException.class);
     }
 
     @Test

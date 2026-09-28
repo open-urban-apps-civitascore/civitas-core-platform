@@ -1,0 +1,35 @@
+meta {
+  name: Get All Datasets Including Pending Deletes
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/datasets
+  body: none
+  auth: inherit
+}
+
+
+params:query {
+  includePendingDelete: true
+  page: 0
+  size: 20
+  sort: createdAt,DESC
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns paginated list", function() {
+    expect(res.body.content).to.be.an('array');
+  });
+}
+
+docs {
+  **Expected Response:** 200 OK, paginated list of data set objects.
+
+  **Behavior:** The `includePendingDelete=true` query parameter includes datasets whose
+  `pendingSagaType` is `DELETE`.
+}

@@ -560,6 +560,14 @@ public class OpenApiConfig {
                       "RESOURCE_IN_USE",
                       "Cannot delete: resource is referenced by other entities",
                       path),
+                  "saga_in_flight",
+                  problemExample(
+                      409,
+                      "SAGA_IN_FLIGHT",
+                      "Cannot write while a saga is in-flight: CREATE",
+                      path,
+                      "pendingSagaType",
+                      "CREATE"),
                   "foreign_key_violation",
                   problemExample(
                       409, "FOREIGN_KEY_VIOLATION", "Referenced entity does not exist", path)));
@@ -600,6 +608,18 @@ public class OpenApiConfig {
     map.put("status", status);
     map.put("detail", detail);
     map.put("instance", instance);
+    return map;
+  }
+
+  private Map<String, Object> problemExample(
+      int status,
+      String errorCode,
+      String detail,
+      String instance,
+      String propertyName,
+      Object propertyValue) {
+    Map<String, Object> map = problemExample(status, errorCode, detail, instance);
+    map.put(propertyName, propertyValue);
     return map;
   }
 

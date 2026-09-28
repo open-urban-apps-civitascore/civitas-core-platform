@@ -3,17 +3,21 @@ package de.civitascore.portal.model.output.assembler;
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.datasink.DataSinkConfigurationOutput;
+import de.civitascore.portal.model.datasink.FrostSinkPort;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.repository.LayerRepository;
+import de.civitascore.portal.service.GoverningVersionLookup;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,12 +36,14 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutputDTO, UUID> {
 
   private final DataSinkMapper dataSinkMapper;
   private final ModelRegistryGateway modelRegistryGateway;
-  private final DataStructureVersionRepository dataStructureVersionRepository;
+  private final GoverningVersionLookup governingVersions;
   private final DataStructureVersionMapper dataStructureVersionMapper;
+  private final LayerRepository layerRepository;
 
   /** {@inheritDoc} Delegates to the {@link DataSinkMapper} for basic field mapping. */
   @Override
@@ -47,11 +53,12 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
 
   /**
    * {@inheritDoc} Resolves the type-specific {@code configuration} object from the registry-stored
-   * configuration document and the derived {@code inUse} flag.
+   * configuration document and the two derived usage flags.
    */
   @Override
   public DataSinkOutputDTO enrichDto(DataSinkOutputDTO dto, DataSink entity) {
-    dto.setInUse(entity.getPipeline() != null);
+    dto.setInUseByPipeline(entity.getPipeline() != null);
+    dto.setInUseByLayer(layerRepository.existsByDataSinkId(entity.getId()));
 
     if (entity.getDataSinkType() == null) {
       return dto;
@@ -114,10 +121,25 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     };
   }
 
+  /**
+   * The stored configuration is a free document, so the port arrives as text. A value outside the
+   * closed set is left unset rather than passed on: the editor would offer it for selection, and
+   * the deploy engine rejects it anyway.
+   */
   private FrostConfigurationOutput buildFrostConfiguration(Map<String, Object> raw) {
     FrostConfigurationOutput output = new FrostConfigurationOutput();
-    if (raw != null && raw.get("element") instanceof String element) {
+    if (raw == null) {
+      return output;
+    }
+    if (raw.get("element") instanceof String element) {
       output.setElement(element);
+    }
+    if (raw.get("port") instanceof String port) {
+      try {
+        output.setPort(FrostSinkPort.of(port));
+      } catch (IllegalArgumentException e) {
+        log.warn("DataSink carries an unknown FROST port {}", Encode.forJava(port));
+      }
     }
     return output;
   }
@@ -134,8 +156,8 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     output.setTableName((String) raw.get("tableName"));
     if (raw.get("element") instanceof String element) {
       output.setElement(element);
-      dataStructureVersionRepository
-          .findFirstByModelUrn(element)
+      governingVersions
+          .governing(element)
           .map(dataStructureVersionMapper::toSummary)
           .ifPresent(output::setDataStructureVersion);
     }

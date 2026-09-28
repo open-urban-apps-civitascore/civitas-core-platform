@@ -806,10 +806,9 @@ describe('validateMappingDataShape', () => {
 })
 
 describe('validateEdgeCompatibility', () => {
-  it('rejects a records source feeding an unmapped FROST sink, anchored at the sink', () => {
+  it('accepts a records source feeding an unmapped FROST sink (its records carry the port structure)', () => {
     const pipeline = graph([sourceAt('src-1', 'SQL'), frostAt('frost-1')], [{ source: 'src-1', target: 'frost-1' }])
-    const errors = errorsFor(pipeline, 'sqlSourceToFrost').filter(error => error.elementId === 'frost-1')
-    expect(errors).toHaveLength(1)
+    expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
   })
 
   it('accepts a records source feeding a FROST sink through a wired mapping', () => {
@@ -820,22 +819,11 @@ describe('validateEdgeCompatibility', () => {
         { source: 'map-1', target: 'frost-1' },
       ],
     )
-    expect(errorsFor(pipeline, 'sqlSourceToFrost')).toEqual([])
     expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
   })
 
-  it('judges mapped-upstream by wiring, not by a mapping existing elsewhere on the canvas', () => {
-    const pipeline = graph(
-      [sourceAt('src-1', 'SQL'), mappingAt('map-1'), frostAt('frost-1')],
-      [{ source: 'src-1', target: 'frost-1' }],
-    )
-    const errors = errorsFor(pipeline, 'sqlSourceToFrost').filter(error => error.elementId === 'frost-1')
-    expect(errors).toHaveLength(1)
-  })
-
-  it('accepts an envelope source feeding an unmapped FROST sink (passthrough)', () => {
+  it('accepts an MQTT source feeding an unmapped FROST sink (the engine inserts the convert)', () => {
     const pipeline = graph([sourceAt('src-1', 'MQTT'), frostAt('frost-1')], [{ source: 'src-1', target: 'frost-1' }])
-    expect(errorsFor(pipeline, 'sqlSourceToFrost')).toEqual([])
     expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
   })
 
@@ -846,7 +834,6 @@ describe('validateEdgeCompatibility', () => {
 
   it('skips the check when the source form cannot be determined (unknown connector)', () => {
     const pipeline = graph([sourceAt('src-1'), frostAt('frost-1')], [{ source: 'src-1', target: 'frost-1' }])
-    expect(errorsFor(pipeline, 'sqlSourceToFrost')).toEqual([])
     expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
   })
 })

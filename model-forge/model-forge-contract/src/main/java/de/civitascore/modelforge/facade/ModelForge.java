@@ -8,6 +8,7 @@ import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
 import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
+import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ImportResult;
@@ -19,11 +20,14 @@ import de.civitascore.modelforge.contract.SchemaViewQuery;
 import de.civitascore.modelforge.contract.ValidateInstanceCommand;
 import de.civitascore.modelforge.contract.ValidateSchemaCommand;
 import de.civitascore.modelforge.contract.ValidationFailedException;
+import de.civitascore.modelforge.contract.NonConformingArtifact;
 import de.civitascore.modelforge.contract.ValidationResult;
 import de.civitascore.modelforge.contract.XRepositoryHit;
 import de.civitascore.modelforge.contract.XRepositorySearchQuery;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Public Java entry point for embedded Model Forge usage.
@@ -102,6 +106,20 @@ public interface ModelForge {
      */
     Optional<ArtifactView> getInlinedView(SchemaViewQuery query);
 
+    /**
+     * Of the given ids, the subset the registry holds — one call in place of a {@link #getArtifact}
+     * per id, and without reading any content.
+     *
+     * <p>A <em>versioned</em> id is held only when that concrete version exists; a logical or
+     * {@code :latest} id is held when the artifact exists at any version. Returned ids are the
+     * caller's own, verbatim, so the missing subset is a plain set difference. An empty input yields
+     * an empty result.
+     *
+     * <p>Takes a collection rather than a Command record, as {@link #orphans(ArtifactKind)} takes a
+     * bare kind: the question carries no parameters beyond the ids themselves.
+     */
+    Set<ArtifactId> existing(Collection<ArtifactId> artifactIds);
+
     // ── Validate ─────────────────────────────────────────────────────────────
 
     ValidationResult validateSchema(ValidateSchemaCommand command);
@@ -120,6 +138,22 @@ public interface ModelForge {
 
     /** Mappings that use this artifact as their target, as {@code mapped-from} edges. */
     DependencyGraphView mappedFrom(DependencyQuery query);
+
+    /**
+     * The transitive dependency closure of one artifact together with the part of it that does not
+     * resolve — "is everything this model participates in actually there", answered in one call
+     * rather than an existence probe per member.
+     *
+     * <p>The query's {@link DependencyQuery#maxDepth()} is <b>required</b>: the bound belongs to the
+     * caller, which knows how much traversal it is willing to spend. A depth of zero or less yields
+     * an empty closure.
+     *
+     * <p>See {@link DependencyClosureView} for the members' URN form and the root's exclusion.
+     * Traversal terminates on a cyclic graph.
+     *
+     * @throws IllegalArgumentException when the query carries no {@code maxDepth}
+     */
+    DependencyClosureView closure(DependencyQuery query);
 
     // ── Search ───────────────────────────────────────────────────────────────
 
@@ -199,19 +233,32 @@ public interface ModelForge {
      *
      * <p>Non-DataSet references block unconditionally (referential integrity). DataSet membership is
      * count-based: 0 → delete; 1 → delete and auto-unlink from that DataSet's manifest; ≥2 → blocked
-     * (remove from the other DataSets first). Deleting a DataSet deletes only its manifest — its
-     * members are kept.
+     * (remove from the other DataSets first).
      *
-     * <p>When {@code cascade} is {@code true}, the target's members are deleted too, but each only if
-     * it becomes fully orphaned once this container is gone (no non-DataSet referrer, in no other
-     * DataSet); shared members are kept. When {@code force} is {@code true}, the blocks are overridden
-     * and the target is deleted regardless of referrers (and auto-unlinked from every DataSet) —
-     * dangerous (may dangle non-DataSet references); for administrative repair only.
+     * <p>With {@code cascade}, the artifacts the target <em>owns</em> go too — a grouping's
+     * Elements, a pipeline's Mapping, a DataSet's pipelines and mappings — each only while nothing
+     * else holds it, under the same two rules. Ownership is read off the reference, so what a
+     * DataSet merely groups (its data structures, sources and sinks) stays. {@code force} overrides
+     * both blocks and unlinks from every DataSet; it may dangle references, so administrative
+     * repair only.
      *
      * @throws de.civitascore.modelforge.contract.ArtifactInUseException when a non-DataSet artifact
      *     still references the target, or it is a member of ≥2 DataSets, and {@code force} is false.
      */
     void deleteArtifact(ArtifactId artifactId, boolean cascade, boolean force);
+
+    /**
+     * What stands in the way of deleting the artifact, without attempting the delete. Asked of the
+     * whole set a cascade removes, so a grouping does not report the Elements it owns. Empty when
+     * nothing stands in the way.
+     *
+     * <p>Memberships count for the named artifact only, from the second onwards.
+     *
+     * <p>A versioned URN asks about that version alone; a logical URN about the artifact as a whole,
+     * which is the question a delete asks. Answered from the stored references, not the in-memory
+     * graph.
+     */
+    List<String> deletionBlockers(ArtifactId artifactId);
 
     // ── DataSet membership ─────────────────────────────────────────────────────
 
@@ -221,6 +268,15 @@ public interface ModelForge {
      * they can be reviewed, assigned, or cleaned up.
      */
     List<ArtifactSummary> orphans(ArtifactKind kind);
+
+    /**
+     * Stored Elements whose schema does not conform to JSON Schema 2020-12 — the ones written before
+     * the write paths enforced conformance, which a re-save would now refuse.
+     *
+     * <p>Reads of these artifacts keep working; this is the inventory to review before treating the
+     * registry as uniformly conforming. An empty list means every stored Element conforms.
+     */
+    List<NonConformingArtifact> nonConformingElements();
 
     /**
      * Explicitly adds a reusable artifact to a DataSet's manifest (a {@code dataset-ref} member),

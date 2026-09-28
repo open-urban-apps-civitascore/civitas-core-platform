@@ -21,11 +21,10 @@ import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
-import de.civitascore.portal.repository.specification.DataSourceDatapoolUsability;
-import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
+import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -40,9 +39,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,6 +66,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final ModelRegistryGateway modelRegistryGateway;
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
+  private final ArtifactUsageLookup artifactUsageLookup;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -139,16 +136,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     return super.update(id, input);
   }
 
-  /**
-   * Links the data structure version to the data source after DTO-to-entity conversion. Validates
-   * that the referenced version is in AVAILABLE status and its parent data structure is also
-   * AVAILABLE.
-   *
-   * @param entity the data source entity
-   * @param input the data source input DTO
-   * @return the entity with the data structure version relationship set
-   * @throws InvalidInputException if the data structure version is not linkable
-   */
+  /** Links the authorized data structure version after DTO-to-entity conversion. */
   @Override
   protected DataSource postConvertToEntity(DataSource entity, DataSourceInputDTO input) {
     if (input.getDataStructureVersionId() != null) {
@@ -396,33 +384,32 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
           getEntityName(), entity.getId(), "Data structure version must be set before releasing");
     }
 
+    validateDataStructureVersionAvailable(entity.getDataStructureVersion());
     validateConfiguration(entity);
   }
 
   @Override
   protected void validateUnrelease(DataSource entity) {
-    validateNotInUse(entity.getId());
+    artifactUsageLookup.of(entity).requireNoReleasedReferrer(getEntityName(), entity.getId());
   }
 
   private void validateNotInUse(UUID id) {
     if (pipelineRepository.existsByDataSourcesId(id)) {
       throw new ResourceInUseException(
-          getEntityName(),
-          id,
-          "Cannot unrelease DataSource because it is referenced by a Pipeline.");
+          getEntityName(), id, "Cannot delete DataSource because it is referenced by a Pipeline.");
     }
   }
 
   /**
    * Updates metadata of an AVAILABLE data source. Allows name, description, and assignment changes.
    * Technical fields (connector type, configuration, data structure version) can only be changed
-   * when the data source is not referenced by any READY or AVAILABLE dataset.
+   * while no Pipeline of an AVAILABLE dataset references the data source.
    *
    * @param id the data source ID
    * @param input the partial update input
    * @return the updated data source
-   * @throws InvalidInputException if the data source is not AVAILABLE or violates in-use
-   *     constraints
+   * @throws InvalidInputException if the data source is not AVAILABLE, or a technical field is
+   *     changed while a released dataset uses it
    */
   @Override
   @Transactional
@@ -434,10 +421,10 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
           getEntityName(), id, "Only data sources in AVAILABLE status can have metadata updated");
     }
 
-    boolean inUse = pipelineRepository.existsByDataSourcesId(id);
+    boolean inUseByReleased = artifactUsageLookup.of(entity).inUseByReleased();
 
-    if (inUse) {
-      validateInUseConstraints(input, entity);
+    if (inUseByReleased) {
+      validateTechnicalFieldsUnchanged(input, entity);
     }
 
     if (input.getName() != null) {
@@ -456,12 +443,10 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
     if (input.getDatapoolScope() != null) {
       applyDatapoolScope(entity, input.getDatapoolScope());
-      if (inUse) {
-        revalidateLinkedDatasetsAgainstNewScope(entity);
-      }
+      revalidateLinkedDatasetsAgainstNewScope(entity);
     }
 
-    if (!inUse) {
+    if (!inUseByReleased) {
       applyTechnicalFields(input, entity);
     }
 
@@ -489,18 +474,18 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
                 datapoolScopeValidator.validate(sources, pipeline.getDataSet().getDataPool()));
   }
 
-  private void validateInUseConstraints(DataSourceInputDTO input, DataSource entity) {
+  private void validateTechnicalFieldsUnchanged(DataSourceInputDTO input, DataSource entity) {
     if (input.getConnectorType() != null && input.getConnectorType() != entity.getConnectorType()) {
       throw new InvalidInputException(
           getEntityName(),
           entity.getId(),
-          "Cannot change connector type of a data source that is in use");
+          "Cannot change connector type of a data source that a released dataset uses");
     }
     if (input.getConfiguration() != null) {
       throw new InvalidInputException(
           getEntityName(),
           entity.getId(),
-          "Cannot change configuration of a data source that is in use");
+          "Cannot change configuration of a data source that a released dataset uses");
     }
     UUID existingDsvId =
         entity.getDataStructureVersion() != null ? entity.getDataStructureVersion().getId() : null;
@@ -509,7 +494,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       throw new InvalidInputException(
           getEntityName(),
           entity.getId(),
-          "Cannot change data structure version of a data source that is in use");
+          "Cannot change data structure version of a data source that a released dataset uses");
     }
   }
 
@@ -518,7 +503,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       entity.setConnectorType(input.getConnectorType());
     }
     if (input.getDataStructureVersionId() != null) {
-      entity.setDataStructureVersion(resolveAuthorizedVersion(input.getDataStructureVersionId()));
+      DataStructureVersion version = resolveAuthorizedVersion(input.getDataStructureVersionId());
+      validateDataStructureVersionAvailable(version);
+      entity.setDataStructureVersion(version);
     }
     if (input.getConfiguration() != null) {
       ConnectorType type = entity.getConnectorType();
@@ -555,6 +542,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       throw new InvalidInputException(
           getEntityName(), id, "Cannot delete a released data source. Unrelease it first.");
     }
+    // A draft may be referenced too, and postDelete drops the Model Forge artifact before the
+    // foreign key aborts the commit, which would leave the surviving row pinned to a dead URN.
+    validateNotInUse(id);
 
     return entity;
   }
@@ -638,26 +628,6 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   }
 
   /**
-   * Returns the AVAILABLE data sources a dataset in the given datapool may build a pipeline from,
-   * ordered by name.
-   *
-   * <p>Restricted to AVAILABLE because {@code PipelineService} rejects anything else on save, so
-   * offering a DRAFT source would only produce a failure one step later.
-   *
-   * @param dataPool the datapool of the dataset, or {@code null} for a pool-less dataset
-   * @return the usable data sources, ordered by name
-   */
-  @Transactional(readOnly = true)
-  public List<DataSource> findUsableIn(DataPool dataPool) {
-    Specification<DataSource> usable =
-        DataSourceDatapoolUsability.usableInPool(dataPool == null ? null : dataPool.getId())
-            .and(
-                (root, query, cb) ->
-                    cb.equal(root.get("dataSourceStatus"), DataSourceStatus.AVAILABLE));
-    return findAll(usable, Pageable.unpaged(Sort.by(Sort.Direction.ASC, "name"))).getContent();
-  }
-
-  /**
    * Returns the data structure version linked to the given data source, or {@code null} if none is
    * linked.
    *
@@ -693,22 +663,21 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     } catch (AccessDeniedException e) {
       throw new ResourceNotFoundException(getEntityName(), versionId);
     }
-    validateDataStructureVersionLinkable(dsv);
     return dsv;
   }
 
-  private void validateDataStructureVersionLinkable(DataStructureVersion dsv) {
+  private void validateDataStructureVersionAvailable(DataStructureVersion dsv) {
     if (dsv.getDataStructureVersionStatus() != DataStructureVersionStatus.AVAILABLE) {
       throw new InvalidInputException(
           getEntityName(),
           dsv.getId(),
-          "DataStructureVersion must be in AVAILABLE status to be linked to a DataSource");
+          "DataStructureVersion must be in AVAILABLE status for an AVAILABLE DataSource");
     }
     if (dsv.getDataStructure().getDataStructureStatus() != DataStructureStatus.AVAILABLE) {
       throw new InvalidInputException(
           getEntityName(),
           dsv.getId(),
-          "The parent DataStructure must be in AVAILABLE status to be linked to a DataSource");
+          "The parent DataStructure must be in AVAILABLE status for an AVAILABLE DataSource");
     }
   }
 

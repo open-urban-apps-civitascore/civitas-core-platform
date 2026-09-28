@@ -11,7 +11,7 @@ import { useCallback, useMemo } from 'react'
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
 import { DATASOURCE_FILTER_PARAMS, QUERY_PARAMS } from '@/const/searchParams'
 import type { Datasource } from '@/types/datasources'
-import { DATAPOOL_SCOPE_TYPES, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
+import { DATAPOOL_SCOPE_TYPES } from '@/types/datasources'
 
 // ============================================================================
 // Types
@@ -59,7 +59,6 @@ export const useDataSourceEntities = (opts?: {
 
   const params = useMemo(() => {
     const p = new URLSearchParams()
-    p.set(DATASOURCE_FILTER_PARAMS.dataSourceStatus, DATASOURCE_STATUS_TYPES.AVAILABLE)
     p.set(QUERY_PARAMS.pageSize, String(DATASOURCE_PAGE_SIZE))
     if (datapoolId) {
       p.set(DATASOURCE_FILTER_PARAMS.datapoolId, datapoolId)

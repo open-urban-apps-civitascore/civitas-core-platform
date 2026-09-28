@@ -84,6 +84,14 @@ export class DataSinkDocumentValidationError extends Error {
   }
 }
 
+/** Thrown for a geo persistence node whose version was selected before `dataStructureUrn` existed. */
+export class MissingDataStructureUrnError extends Error {
+  constructor(public readonly nodeId: string) {
+    super('Geo persistence node has no data structure URN')
+    this.name = 'MissingDataStructureUrnError'
+  }
+}
+
 /**
  * Builds the clean, URN-native CORE Pipeline document (the payload `model`). References are read from
  * node data (resolved from the pickers / stashed after datasink & mapping saves) and omitted when a
@@ -223,17 +231,31 @@ export const buildMappingArtifacts = (pipeline: Pipeline): MappingArtifactReques
 }
 
 /**
- * Snapshot type for mapping change detection: maps nodeId → JSON-stringified artifact body.
+ * Snapshot entry for a single mapping node: tracks both the logical URN and the artifact body.
  */
-export type MappingSnapshot = Record<string, string>
+export interface MappingSnapshotEntry {
+  /** The mapping's logical CORE URN at snapshot time, or null for nodes never saved */
+  logicalUrn: string | null
+  /** JSON-stringified artifact body */
+  body: string
+}
 
 /**
- * Creates a snapshot of the current mapping artifact bodies for later change detection.
+ * Snapshot type for mapping change detection: maps nodeId → snapshot entry.
+ */
+export type MappingSnapshot = Record<string, MappingSnapshotEntry>
+
+/**
+ * Creates a snapshot of the current mapping artifacts for later change detection.
+ * The snapshot stores the logical URN and a JSON string of the artifact body.
  */
 export const createMappingSnapshot = (pipeline: Pipeline): MappingSnapshot => {
   const snapshot: MappingSnapshot = {}
-  for (const { nodeId, body } of buildMappingArtifacts(pipeline)) {
-    snapshot[nodeId] = JSON.stringify(body)
+  for (const { nodeId, logicalUrn, body } of buildMappingArtifacts(pipeline)) {
+    snapshot[nodeId] = {
+      logicalUrn: logicalUrn ?? null,
+      body: JSON.stringify(body),
+    }
   }
   return snapshot
 }
@@ -245,7 +267,18 @@ export const createMappingSnapshot = (pipeline: Pipeline): MappingSnapshot => {
 export const hasMappingChanged = (nodeId: string, body: MappingArtifactBody, snapshot: MappingSnapshot): boolean => {
   const entry = snapshot[nodeId]
   if (!entry) return true // new node, not in snapshot
-  return JSON.stringify(body) !== entry
+  return JSON.stringify(body) !== entry.body
+}
+
+/**
+ * Finds logical mapping URNs that were in the snapshot but whose node no longer exists in the
+ * current pipeline. A node that was never saved carries no URN and has no artifact to delete.
+ */
+export const getRemovedMappingUrns = (pipeline: Pipeline, snapshot: MappingSnapshot): string[] => {
+  const currentNodeIds = new Set(pipeline.nodes.map(n => n.id))
+  return Object.entries(snapshot)
+    .filter(([nodeId, entry]) => !currentNodeIds.has(nodeId) && entry.logicalUrn != null)
+    .map(([, entry]) => entry.logicalUrn as string)
 }
 
 // ============================================================================
@@ -270,25 +303,28 @@ export interface DataSinkNodePayload {
  */
 export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[] => {
   return pipeline.nodes.flatMap<DataSinkNodePayload>(node => {
-    // The deploy engine derives a sink's target structure from the mapping's Thing-shaped target,
-    // referenced by versioned CORE URN (the backend's *Configuration.element, a Model-Forge soft
-    // reference — not a raw version id). A passthrough pipeline (no mapping) has no element.
-    const elementUrn = mappingTargetElementBefore(pipeline, node.id)
-
+    // `element` is the versioned CORE URN of the sink's target structure (a Model-Forge soft reference,
+    // not a raw version id). POSTGIS uses its own data structure, FROST the mapping's target.
     let payload: DataSinkPayload | null = null
     if (isGeoPersistenceNodeData(node.data) && node.data.dataStructureVersionId != null) {
+      const { tableName, dataStructureUrn } = node.data
+      if (!dataStructureUrn) throw new MissingDataStructureUrnError(node.id)
       payload = {
         id: node.data.entityId ?? null,
         dataSinkType: DATASINK_TYPES.POSTGIS,
-        configuration: elementUrn
-          ? { tableName: node.data.tableName, element: elementUrn }
-          : { tableName: node.data.tableName },
+        configuration: { tableName, element: dataStructureUrn },
       }
     } else if (isFrostNodeData(node.data)) {
+      const elementUrn = mappingTargetElementBefore(pipeline, node.id)
       payload = {
         id: node.data.entityId ?? null,
         dataSinkType: DATASINK_TYPES.FROST,
-        configuration: elementUrn ? { element: elementUrn } : {},
+        // The port is what the sink writes. A save without it would overwrite a stored port, and
+        // the Dataset would not publish.
+        configuration: {
+          ...(node.data.port ? { port: node.data.port } : {}),
+          ...(elementUrn ? { element: elementUrn } : {}),
+        },
       }
     }
 

@@ -10,6 +10,7 @@ import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
 import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
+import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.Diagnostic;
@@ -18,6 +19,7 @@ import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.ImportSmartDataModelCommand;
 import de.civitascore.modelforge.contract.ImportXRepositoryCommand;
+import de.civitascore.modelforge.contract.NonConformingArtifact;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
 import de.civitascore.modelforge.contract.SchemaViewQuery;
 import de.civitascore.modelforge.contract.ValidateInstanceCommand;
@@ -34,11 +36,17 @@ import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.modelforge.urn.UrnService;
 import de.civitascore.modelforge.validation.CoreSchemaValidator;
 import de.civitascore.modelforge.validation.ModelValidator;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Deque;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class EmbeddedModelForgeOperations implements ModelForge {
 
@@ -215,6 +223,50 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     }
 
     @Override
+    public Set<ArtifactId> existing(Collection<ArtifactId> artifactIds) {
+        if (artifactIds == null || artifactIds.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> held = registry.heldUrns(artifactIds.stream()
+            .filter(Objects::nonNull)
+            .map(ArtifactId::value)
+            .toList());
+        return artifactIds.stream()
+            .filter(id -> id != null && held.contains(id.value()))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    /** Publishes a write's edges under its pin; only a registry double returns none. */
+    private void registerWritten(String pin, String requestUrn) {
+        dependencyGraph.registerFromRegistry(pin != null && !pin.isBlank() ? pin : requestUrn);
+    }
+
+    @Override
+    public DependencyClosureView closure(DependencyQuery query) {
+        if (query.maxDepth() == null) {
+            throw new IllegalArgumentException("A closure query must state its maxDepth");
+        }
+        ArtifactId root = query.artifactId();
+        String rootLogical = UrnParser.logicalUrn(root.value());
+        // The walk surfaces the root itself when a cycle leads back to it, and a cycle may reach a
+        // different version of it. The closure is what the root participates in, so drop the whole
+        // root artifact by logical identity.
+        var walk = dependencyGraph.getTransitiveDependenciesBounded(root.value(), query.maxDepth());
+        List<String> members = walk.visited()
+            .stream()
+            .filter(urn -> !rootLogical.equals(UrnParser.logicalUrn(urn)))
+            .toList();
+        // The graph hands back a pinned target without looking it up, so a pin whose version was
+        // never stored reaches here unverified. One probe answers for the whole closure.
+        Set<String> held = registry.heldUrns(members);
+        return new DependencyClosureView(
+            root,
+            members.stream().map(ArtifactId::new).toList(),
+            members.stream().filter(urn -> !held.contains(urn)).map(ArtifactId::new).toList(),
+            walk.truncated());
+    }
+
+    @Override
     public DependencyGraphView mapsTo(DependencyQuery query) {
         return mappingEdges(query.artifactId(), "source", "target", "maps-to");
     }
@@ -361,13 +413,14 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             // The non-Element kinds store straight through the registry, which extracts and
             // persists their per-type reference edges (Mapping source/target, Pipeline nodes,
             // DataStructure/DataSet *Refs). registerFromRegistry() then mirrors those durable
-            // edges into the in-memory graph so dependencies()/dependents() see them.
-            case DATA_STRUCTURE -> { String p = registry.storeDataStructure(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case MAPPING -> { String p = registry.storeMapping(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case PIPELINE -> { String p = registry.storePipeline(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case DATA_SOURCE -> { String p = registry.storeDataSource(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case DATA_SINK -> { String p = registry.storeDataSink(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case DATA_SET -> { String p = registry.storeDataSet(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
+            // edges into the in-memory graph so dependencies()/dependents() see them. It is given
+            // the pin the write returned, never the request URN.
+            case DATA_STRUCTURE -> { String p = registry.storeDataStructure(urn, content, bump); registerWritten(p, urn); yield p; }
+            case MAPPING -> { String p = registry.storeMapping(urn, content, bump); registerWritten(p, urn); yield p; }
+            case PIPELINE -> { String p = registry.storePipeline(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DATA_SOURCE -> { String p = registry.storeDataSource(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DATA_SINK -> { String p = registry.storeDataSink(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DATA_SET -> { String p = registry.storeDataSet(urn, content, bump); registerWritten(p, urn); yield p; }
         };
         // Defensive fallback (a registry double may return nothing): the honest unversioned
         // logical URN — deliberately NOT a resolveReference read-back.
@@ -461,6 +514,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
                 }
             }
             if (!present) {
+                requireOwnMapping(dataSetUrn, entry.getValue(), memberLogical);
                 refs.add(memberLogical);
                 changed = true;
             }
@@ -468,6 +522,25 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         if (changed) {
             saveArtifact(new SaveArtifactCommand(
                 new ArtifactId(UrnParser.logicalUrn(dataSetUrn)), ArtifactKind.DATA_SET, doc, VersionBump.MINOR));
+        }
+    }
+
+    /**
+     * A Mapping belongs to one Data Set — membership is the only condition that lets a caller read
+     * one, so a second link would grant that read. A Mapping that does not exist is refused in the
+     * same words, or the difference would tell a caller which URNs are taken.
+     */
+    private void requireOwnMapping(String dataSetUrn, ArtifactKind kind, String memberLogical) {
+        if (kind != ArtifactKind.MAPPING) {
+            return;
+        }
+        String own = UrnParser.logicalUrn(dataSetUrn);
+        boolean ours = registry.fetch(memberLogical).isPresent()
+            && registry.dataSetMemberships(memberLogical).stream()
+                .allMatch(holder -> own.equals(UrnParser.logicalUrn(holder)));
+        if (!ours) {
+            throw new ValidationFailedException(
+                "Mapping " + memberLogical + " is not a Mapping of this Data Set", List.of());
         }
     }
 
@@ -522,7 +595,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         }
         String logical = UrnParser.logicalUrn(urn);
         String assigned = registry.bumpVersion(logical, command.bump());
-        dependencyGraph.registerFromRegistry(logical);
+        registerWritten(assigned, logical);
         var pin = new ArtifactId(assigned != null && !assigned.isBlank() ? assigned : logical);
         return new ArtifactWriteResult(pin, dependenciesOf(pin));
     }
@@ -533,11 +606,69 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     }
 
     @Override
+    public List<String> deletionBlockers(ArtifactId artifactId) {
+        String root = artifactId.value();
+        // Every artifact this one would take with it, each kept as the owner pinned it so a member's
+        // version is known. A caller naming one version asks about that version alone.
+        Set<String> removedTogether = deleteClosure(root);
+        Set<String> logicalOfSet =
+            removedTogether.stream().map(UrnParser::logicalUrn).collect(Collectors.toSet());
+        // A reference held from inside the set is removed by the same delete, so only a referrer
+        // outside it stands in the way — a grouping does not block the Elements it owns.
+        List<String> blockers = removedTogether.stream()
+            .flatMap(member -> registry
+                .nonDataSetBlockingDependents(member, UrnParser.versionFromUrn(member)).stream())
+            .filter(blocker -> !logicalOfSet.contains(UrnParser.logicalUrn(blocker)))
+            .distinct()
+            .toList();
+        if (!blockers.isEmpty()) {
+            return blockers;
+        }
+        List<String> memberships = registry.dataSetMemberships(root);
+        return memberships.size() >= 2 ? memberships : List.of();
+    }
+
+    /**
+     * The artifact and, transitively, the artifacts it owns — what one cascading delete removes.
+     * Each entry keeps the version the owner pinned, so a blocker query can ask about that version.
+     */
+    private Set<String> deleteClosure(String rootUrn) {
+        Set<String> closure = new LinkedHashSet<>();
+        Deque<String> pending = new ArrayDeque<>();
+        pending.add(rootUrn);
+        while (!pending.isEmpty()) {
+            String current = pending.poll();
+            if (closure.add(current)) {
+                pending.addAll(
+                    registry.ownedMemberUrns(current, UrnParser.versionFromUrn(current)));
+            }
+        }
+        return closure;
+    }
+
+    @Override
     public List<ArtifactSummary> orphans(ArtifactKind kind) {
         // Artifacts of this kind with no dataset-ref in-edge — search by type, then keep only those
         // the registry reports as members of zero DataSets.
         return search(new ArtifactSearchQuery(null, typeSegmentFor(kind), null, Integer.MAX_VALUE, 0)).stream()
             .filter(summary -> registry.dataSetMemberships(summary.artifactId().value()).isEmpty())
+            .toList();
+    }
+
+    @Override
+    public List<NonConformingArtifact> nonConformingElements() {
+        // Only the stored JSON Schema representation can be meta-validated; an XSD Element has no
+        // JSON Schema to check, and fetch() returns nothing for it, so it drops out here.
+        return search(new ArtifactSearchQuery(null, typeSegmentFor(ArtifactKind.ELEMENT), null, Integer.MAX_VALUE, 0))
+            .stream()
+            .flatMap(summary -> elementQueryService.rawJsonSchema(summary.artifactId().value())
+                .map(schema -> modelValidator.validateSchema(schema).stream()
+                    .filter(d -> d.severity() == DiagnosticSeverity.ERROR)
+                    .toList())
+                .filter(diagnostics -> !diagnostics.isEmpty())
+                .map(diagnostics -> new NonConformingArtifact(
+                    summary.artifactId(), summary.title(), diagnostics))
+                .stream())
             .toList();
     }
 

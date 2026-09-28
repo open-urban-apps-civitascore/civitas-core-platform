@@ -18,8 +18,8 @@ public class DataSourceInputDTO extends BaseDataEntityInputDTO {
   @Schema(description = "Data source name (required)")
   @NotBlank(message = "Name is required") private String name;
 
-  @Schema(description = "Data source description")
-  private String description;
+  @Schema(description = "Data source description (required)")
+  @NotBlank(message = "Description is required") private String description;
 
   @Schema(description = "Type of connector (e.g. MQTT, SQL)")
   private ConnectorType connectorType;

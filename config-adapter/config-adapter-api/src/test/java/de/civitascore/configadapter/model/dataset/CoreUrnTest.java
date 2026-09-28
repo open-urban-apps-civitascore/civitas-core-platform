@@ -80,6 +80,14 @@ class CoreUrnTest {
   }
 
   @Test
+  @DisplayName("keeps the disambiguator short enough for a 23-character MQTT client id")
+  void disambiguatorFitsMqttClientId() {
+    // MQTT client ids are "civitascore" plus this disambiguator, and brokers need accept only 23
+    // characters [MQTT-3.1.3-5].
+    assertTrue(CoreUrn.DISAMBIGUATOR_LENGTH <= 23 - "civitascore".length());
+  }
+
+  @Test
   @DisplayName("matchesId accepts a URN whose disambiguator was derived from the id")
   void matchesId_accepts() {
     UUID id = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");

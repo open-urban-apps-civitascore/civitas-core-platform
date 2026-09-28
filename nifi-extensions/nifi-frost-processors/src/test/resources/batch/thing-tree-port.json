@@ -1,0 +1,186 @@
+{
+  "requests" : [ {
+    "id" : "r0-thing",
+    "atomicityGroup" : "r0",
+    "method" : "get",
+    "url" : "Projects(5)/Things?$select=id&$top=1&$filter=properties/reference eq 'A7'"
+  }, {
+    "id" : "r0-thing-update",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-thing",
+    "method" : "patch",
+    "url" : "$r0-thing",
+    "body" : {
+      "name" : "Station A7",
+      "description" : "Weather station",
+      "properties" : {
+        "reference" : "A7",
+        "referenceName" : "stationsnummer"
+      }
+    }
+  }, {
+    "id" : "r0-thing",
+    "atomicityGroup" : "r0",
+    "if" : "not $r0-thing",
+    "method" : "post",
+    "url" : "Projects(5)/Things",
+    "body" : {
+      "name" : "Station A7",
+      "description" : "Weather station",
+      "properties" : {
+        "reference" : "A7",
+        "referenceName" : "stationsnummer"
+      }
+    }
+  }, {
+    "id" : "r0-loc",
+    "atomicityGroup" : "r0",
+    "method" : "get",
+    "url" : "$r0-thing/Locations?$select=id&$top=1&$filter=properties/reference eq 'A7'"
+  }, {
+    "id" : "r0-loc-update",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-loc",
+    "method" : "patch",
+    "url" : "$r0-loc",
+    "body" : {
+      "name" : "A7 site",
+      "encodingType" : "application/geo+json",
+      "location" : {
+        "type" : "Point",
+        "coordinates" : [ 9.18, 48.78 ]
+      },
+      "properties" : {
+        "reference" : "A7",
+        "thingReference" : "A7"
+      }
+    }
+  }, {
+    "id" : "r0-loc",
+    "atomicityGroup" : "r0",
+    "if" : "not $r0-loc",
+    "method" : "post",
+    "url" : "Locations",
+    "body" : {
+      "name" : "A7 site",
+      "encodingType" : "application/geo+json",
+      "location" : {
+        "type" : "Point",
+        "coordinates" : [ 9.18, 48.78 ]
+      },
+      "properties" : {
+        "reference" : "A7",
+        "thingReference" : "A7"
+      },
+      "Things" : [ {
+        "@iot.id" : "$r0-thing"
+      } ]
+    }
+  }, {
+    "id" : "r0-ds",
+    "atomicityGroup" : "r0",
+    "method" : "get",
+    "url" : "Datastreams?$select=id&$top=1&$filter=properties/reference eq 'temp' and properties/thingReference eq 'A7' and Thing/Projects/id eq 5"
+  }, {
+    "id" : "r0-ds-update",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-ds",
+    "method" : "patch",
+    "url" : "$r0-ds",
+    "body" : {
+      "name" : "Air temperature",
+      "description" : "Air temperature at A7",
+      "observationType" : "http://www.opengis.net/def/observationType/OGC-OM/2.0/OM_Measurement",
+      "unitOfMeasurement" : {
+        "name" : "degree Celsius",
+        "symbol" : "degC",
+        "definition" : "http://unitsofmeasure.org/ucum.html#para-30"
+      },
+      "properties" : {
+        "reference" : "temp",
+        "thingReference" : "A7"
+      }
+    }
+  }, {
+    "id" : "r0-ds-sensor",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-ds",
+    "method" : "get",
+    "url" : "$r0-ds/Sensor?$select=id"
+  }, {
+    "id" : "r0-ds-sensor-update",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-ds-sensor",
+    "method" : "patch",
+    "url" : "$r0-ds-sensor",
+    "body" : {
+      "name" : "DS18B20",
+      "description" : "Air temperature sensor",
+      "encodingType" : "application/pdf",
+      "metadata" : "http://example.org/ds18b20.pdf"
+    }
+  }, {
+    "id" : "r0-ds-op",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-ds",
+    "method" : "get",
+    "url" : "$r0-ds/ObservedProperty?$select=id"
+  }, {
+    "id" : "r0-ds-op-update",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-ds-op",
+    "method" : "patch",
+    "url" : "$r0-ds-op",
+    "body" : {
+      "name" : "Temperature",
+      "definition" : "http://dd.eionet.europa.eu/vocabulary/aq/meteoparameter/54",
+      "description" : "Air temperature"
+    }
+  }, {
+    "id" : "r0-ds",
+    "atomicityGroup" : "r0",
+    "if" : "not $r0-ds",
+    "method" : "post",
+    "url" : "Datastreams",
+    "body" : {
+      "name" : "Air temperature",
+      "description" : "Air temperature at A7",
+      "observationType" : "http://www.opengis.net/def/observationType/OGC-OM/2.0/OM_Measurement",
+      "unitOfMeasurement" : {
+        "name" : "degree Celsius",
+        "symbol" : "degC",
+        "definition" : "http://unitsofmeasure.org/ucum.html#para-30"
+      },
+      "properties" : {
+        "reference" : "temp",
+        "thingReference" : "A7"
+      },
+      "Thing" : {
+        "@iot.id" : "$r0-thing"
+      },
+      "Sensor" : {
+        "name" : "DS18B20",
+        "description" : "Air temperature sensor",
+        "encodingType" : "application/pdf",
+        "metadata" : "http://example.org/ds18b20.pdf"
+      },
+      "ObservedProperty" : {
+        "name" : "Temperature",
+        "definition" : "http://dd.eionet.europa.eu/vocabulary/aq/meteoparameter/54",
+        "description" : "Air temperature"
+      }
+    }
+  }, {
+    "id" : "r0-obs",
+    "atomicityGroup" : "r0",
+    "method" : "post",
+    "url" : "Observations",
+    "body" : {
+      "phenomenonTime" : "2026-09-18T07:00:00Z",
+      "result" : 21.5,
+      "Datastream" : {
+        "@iot.id" : "$r0-ds"
+      }
+    }
+  } ]
+}

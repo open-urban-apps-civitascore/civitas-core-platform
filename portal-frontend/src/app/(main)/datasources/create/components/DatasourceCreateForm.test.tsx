@@ -88,11 +88,22 @@ describe('DatasourceCreateForm', () => {
   test('calls createDatasource mutation on form submission and shows success toast', async () => {
     setup()
     fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Datasource' } })
+    fireEvent.change(screen.getByTestId('descriptionTextArea'), { target: { value: 'A description' } })
     fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalledWith({ name: 'Test Datasource', description: '' })
+      expect(mockMutateAsync).toHaveBeenCalledWith({ name: 'Test Datasource', description: 'A description' })
       expect(toast.success).toHaveBeenCalled()
+    })
+  })
+
+  test('does not submit when description is left blank', async () => {
+    setup()
+    fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Datasource' } })
+    fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
+
+    await waitFor(() => {
+      expect(mockMutateAsync).not.toHaveBeenCalled()
     })
   })
 
@@ -112,6 +123,7 @@ describe('DatasourceCreateForm', () => {
 
     setup()
     fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Datasource' } })
+    fireEvent.change(screen.getByTestId('descriptionTextArea'), { target: { value: 'A description' } })
     fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
 
     await waitFor(() => {

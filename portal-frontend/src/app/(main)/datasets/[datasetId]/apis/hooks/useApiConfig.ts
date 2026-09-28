@@ -16,7 +16,7 @@ import { Dataset } from '@/types/datasets'
 import { LayerApiPayload, LayerFormData } from '@/types/layers'
 import { API_TYPE_QUERY, NamedApi, NamedApiPayload, OwsApiFormData, StaApiFormData } from '@/types/namedApis'
 import { StyleFormData } from '@/types/styles'
-import { isLayerNameError, LayerSaveError } from '@/utils/errors'
+import { isLayerNameError, isNotDraftError, isSagaInFlightError, LayerSaveError } from '@/utils/errors'
 import { hasDirtyField } from '@/utils/form'
 import { buildOwsPayload, buildStaPayloadData, mapFormLayerToPayload, mapFormStyleToPayload } from '@/utils/namedApis'
 
@@ -208,8 +208,14 @@ export const useApiConfig = <TFormData extends FormData>({
           }
           isSaved = true
         } catch (error) {
-          if (error instanceof LayerSaveError && isLayerNameError(error.originalError)) {
+          const cause = error instanceof LayerSaveError ? error.originalError : error
+
+          if (error instanceof LayerSaveError && isLayerNameError(cause)) {
             handleLayerNameError(error)
+          } else if (isNotDraftError(cause)) {
+            toast.error(t('messages.notDraftError'))
+          } else if (isSagaInFlightError(cause)) {
+            toast.error(t('messages.sagaInFlightError'))
           } else {
             toast.error(t('messages.saveError'))
           }

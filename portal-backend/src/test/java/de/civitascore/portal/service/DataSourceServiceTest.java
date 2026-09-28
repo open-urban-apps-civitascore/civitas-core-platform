@@ -31,10 +31,10 @@ import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
-import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
+import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -76,6 +76,7 @@ class DataSourceServiceTest {
   @Mock private DataPoolRepository dataPoolRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
+  @Mock private ArtifactUsageLookup artifactUsageLookup;
 
   @Spy private DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
@@ -85,6 +86,17 @@ class DataSourceServiceTest {
       "urn:core:platform:civitas:data-source:common:test";
   private static final String STORED_VERSIONED_URN = STORED_LOGICAL_URN + ":1.0.0";
 
+  private static final ArtifactUsageLookup.ArtifactUsage NOT_IN_USE =
+      new ArtifactUsageLookup.ArtifactUsage(false, List.of());
+  private static final ArtifactUsageLookup.ArtifactUsage IN_USE_BY_DRAFTS =
+      new ArtifactUsageLookup.ArtifactUsage(true, List.of());
+  private static final ArtifactUsageLookup.ArtifactUsage IN_USE_BY_RELEASED =
+      new ArtifactUsageLookup.ArtifactUsage(
+          true,
+          List.of(
+              new ArtifactUsageLookup.ReleasedReferrer(
+                  ArtifactUsageLookup.ReferrerKind.PIPELINE, UUID.randomUUID().toString())));
+
   @BeforeEach
   void stubPayloadStore() {
     // Storing a configuration returns the registry-assigned pin. Lenient so tests that never
@@ -93,6 +105,7 @@ class DataSourceServiceTest {
         .when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any()))
         .thenReturn(
             new ModelRegistryGateway.ModelPin(STORED_LOGICAL_URN, STORED_VERSIONED_URN, "1.0.0"));
+    lenient().when(artifactUsageLookup.of(any(DataSource.class))).thenReturn(NOT_IN_USE);
   }
 
   /**
@@ -151,6 +164,41 @@ class DataSourceServiceTest {
   class ReleaseTests {
 
     @Test
+    @DisplayName("Should reject release when the DataStructureVersion is DRAFT")
+    void shouldRejectReleaseWithDraftDataStructureVersion() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = createMqttDataSource(id);
+      entity
+          .getDataStructureVersion()
+          .setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+
+      assertThatThrownBy(() -> dataSourceService.release(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DataStructureVersion")
+          .hasMessageContaining("AVAILABLE");
+    }
+
+    @Test
+    @DisplayName("Should reject release when the parent DataStructure is DRAFT")
+    void shouldRejectReleaseWithDraftParentDataStructure() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = createMqttDataSource(id);
+      entity
+          .getDataStructureVersion()
+          .getDataStructure()
+          .setDataStructureStatus(DataStructureStatus.DRAFT);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+
+      assertThatThrownBy(() -> dataSourceService.release(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("parent DataStructure")
+          .hasMessageContaining("AVAILABLE");
+    }
+
+    @Test
     @DisplayName("Should release valid MQTT data source")
     void shouldReleaseValidMqttDataSource() {
       UUID id = UUID.randomUUID();
@@ -203,6 +251,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
+      entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(null);
 
@@ -219,6 +268,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
+      entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.MQTT);
       entity.setDataStructureVersion(null);
@@ -236,6 +286,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
+      entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.MQTT);
       stubStoredConfiguration(entity, Map.of("topics", List.of("sensor/data"), "qos", 1));
@@ -256,6 +307,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
+      entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.MQTT);
       stubStoredConfiguration(
@@ -279,6 +331,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
+      entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.SQL);
       stubStoredConfiguration(
@@ -301,6 +354,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
+      entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.MQTT);
       // no configuration ever stored: the registry pin is null
@@ -338,7 +392,7 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-      when(pipelineRepository.existsByDataSourcesId(any())).thenReturn(false);
+      when(artifactUsageLookup.of(entity)).thenReturn(IN_USE_BY_DRAFTS);
 
       DataSource result = dataSourceService.unrelease(id);
 
@@ -347,18 +401,19 @@ class DataSourceServiceTest {
 
     @Test
     @DisplayName(
-        "Should block unrelease when DataSource is referenced by a READY or AVAILABLE DataSet")
-    void shouldBlockUnreleaseWhenInUse() {
+        "Should block unrelease when a Pipeline of an AVAILABLE DataSet references the DataSource")
+    void shouldBlockUnreleaseWhenInUseByReleased() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
       entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(pipelineRepository.existsByDataSourcesId(any())).thenReturn(true);
+      when(artifactUsageLookup.of(entity)).thenReturn(IN_USE_BY_RELEASED);
 
       assertThatThrownBy(() -> dataSourceService.unrelease(id))
-          .isInstanceOf(ResourceInUseException.class);
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("a Pipeline of a released Dataset");
     }
 
     @Test
@@ -381,12 +436,8 @@ class DataSourceServiceTest {
   @DisplayName("Update Released Metadata")
   class UpdateReleasedMetaTests {
 
-    private void stubNotInUse(UUID id) {
-      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(false);
-    }
-
-    private void stubInUse(UUID id) {
-      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(true);
+    private void stubInUseByReleased() {
+      when(artifactUsageLookup.of(any(DataSource.class))).thenReturn(IN_USE_BY_RELEASED);
     }
 
     @Test
@@ -404,7 +455,6 @@ class DataSourceServiceTest {
       input.setDescription("new-desc");
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubNotInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
@@ -431,7 +481,6 @@ class DataSourceServiceTest {
       input.setDatapoolScope(scope);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubNotInUse(id);
       doThrow(new AccessDeniedException("denied"))
           .when(scopeAccessAuthorizer)
           .authorizeReferences(eq(ScopeType.DATAPOOL), any());
@@ -457,7 +506,6 @@ class DataSourceServiceTest {
       input.setDataStructureVersionId(dsvId);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubNotInUse(id);
       when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
       doThrow(new AccessDeniedException("denied"))
           .when(scopeAccessAuthorizer)
@@ -467,6 +515,30 @@ class DataSourceServiceTest {
       // the caller cannot distinguish an existing-but-forbidden version from a non-existent one.
       assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("Should reject changing an AVAILABLE DataSource to a DRAFT version")
+    void shouldRejectDraftVersionOnUpdateReleasedMeta() {
+      UUID id = UUID.randomUUID();
+      UUID dsvId = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      DataStructureVersion dsv = createDataStructureVersion();
+      dsv.setId(dsvId);
+      dsv.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setDataStructureVersionId(dsvId);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DataStructureVersion")
+          .hasMessageContaining("AVAILABLE");
     }
 
     @Test
@@ -501,7 +573,6 @@ class DataSourceServiceTest {
       input.setName("updated-name");
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubNotInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
@@ -531,7 +602,6 @@ class DataSourceServiceTest {
       input.setConfiguration(newConfig);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubNotInUse(id);
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.MQTT)).thenReturn(mqttHandler);
       when(mqttHandler.normalizeAndValidate(any())).thenReturn(newConfig);
       when(mqttHandler.encryptSensitiveFields(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -546,6 +616,38 @@ class DataSourceServiceTest {
       Map<String, Object> expectedPayload = new java.util.HashMap<>(newConfig);
       expectedPayload.put("connectionType", "mqtt");
       verify(modelRegistryGateway).storePayload(any(), any(), any(), eq(expectedPayload), isNull());
+      assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);
+    }
+
+    @Test
+    @DisplayName("Should update configuration when only draft datasets use the data source")
+    void shouldUpdateConfigurationWhenInUseByDraftsOnly() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("mqtt-source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setConnectorType(ConnectorType.MQTT);
+      stubStoredConfiguration(
+          entity, Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("old/topic")));
+
+      Map<String, Object> newConfig =
+          new java.util.HashMap<>(
+              Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("new/topic")));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setConfiguration(newConfig);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(artifactUsageLookup.of(entity)).thenReturn(IN_USE_BY_DRAFTS);
+      when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.MQTT)).thenReturn(mqttHandler);
+      when(mqttHandler.normalizeAndValidate(any())).thenReturn(newConfig);
+      when(mqttHandler.encryptSensitiveFields(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(mqttHandler.getSensitiveFields()).thenReturn(Set.of());
+      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
+
       assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);
     }
 
@@ -585,7 +687,6 @@ class DataSourceServiceTest {
                   "password", ConnectorHandler.MASKED_VALUE)));
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubNotInUse(id);
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.SQL)).thenReturn(sqlHandler);
       when(sqlHandler.normalizeAndValidate(any())).thenReturn(normalized);
       when(sqlHandler.encryptSensitiveFields(any())).thenReturn(encrypted);
@@ -622,7 +723,6 @@ class DataSourceServiceTest {
       input.setName("new-name");
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubNotInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
@@ -648,7 +748,7 @@ class DataSourceServiceTest {
       input.setDescription("new-desc");
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUse(id);
+      stubInUseByReleased();
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
@@ -672,12 +772,12 @@ class DataSourceServiceTest {
       input.setConfiguration(Map.of("urls", List.of("tcp://new-broker:1883")));
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUse(id);
+      stubInUseByReleased();
 
       assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("configuration")
-          .hasMessageContaining("in use");
+          .hasMessageContaining("released dataset");
     }
 
     @Test
@@ -695,12 +795,12 @@ class DataSourceServiceTest {
       input.setConnectorType(ConnectorType.SQL);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUse(id);
+      stubInUseByReleased();
 
       assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("connector type")
-          .hasMessageContaining("in use");
+          .hasMessageContaining("released dataset");
     }
 
     @Test
@@ -722,12 +822,12 @@ class DataSourceServiceTest {
       input.setDataStructureVersionId(UUID.randomUUID());
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUse(id);
+      stubInUseByReleased();
 
       assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("data structure version")
-          .hasMessageContaining("in use");
+          .hasMessageContaining("released dataset");
     }
 
     @Test
@@ -745,7 +845,7 @@ class DataSourceServiceTest {
       input.setConnectorType(ConnectorType.MQTT);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUse(id);
+      stubInUseByReleased();
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
@@ -767,7 +867,7 @@ class DataSourceServiceTest {
       input.setAssignments(Set.of());
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUse(id);
+      stubInUseByReleased();
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
@@ -807,7 +907,7 @@ class DataSourceServiceTest {
       input.setDatapoolScope(scope);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUse(id);
+      stubInUseByReleased();
       when(dataPoolRepository.findAllById(List.of(poolB.getId()))).thenReturn(List.of(poolB));
       when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
 
@@ -846,7 +946,7 @@ class DataSourceServiceTest {
       input.setDatapoolScope(scope);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUse(id);
+      stubInUseByReleased();
       when(dataPoolRepository.findAllById(List.of(poolA.getId()))).thenReturn(List.of(poolA));
       when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -882,7 +982,7 @@ class DataSourceServiceTest {
       input.setDatapoolScope(scope);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUse(id);
+      stubInUseByReleased();
       when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
 
       assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
@@ -891,6 +991,49 @@ class DataSourceServiceTest {
               ex ->
                   assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
                       .containsExactly(id));
+    }
+
+    @Test
+    @DisplayName(
+        "Should reject narrowing the scope to exclude a pool it feeds when only drafts use it")
+    void shouldRejectNarrowingScopeExcludingLinkedPoolWhenInUseByDraftsOnly() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setDatapoolScopeType(DatapoolScopeType.ALL);
+
+      DataPool poolA = new DataPool();
+      poolA.setId(UUID.randomUUID());
+      DataSet draftDataSet = new DataSet();
+      draftDataSet.setId(UUID.randomUUID());
+      draftDataSet.setDataPool(poolA);
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSet(draftDataSet);
+      pipeline.setDataSources(new HashSet<>(Set.of(entity)));
+
+      DataPool poolB = new DataPool();
+      poolB.setId(UUID.randomUUID());
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(poolB.getId()));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setDatapoolScope(scope);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(artifactUsageLookup.of(entity)).thenReturn(IN_USE_BY_DRAFTS);
+      when(dataPoolRepository.findAllById(List.of(poolB.getId()))).thenReturn(List.of(poolB));
+      when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(id));
+      verify(dataSourceRepository, never()).save(any());
     }
   }
 
@@ -915,6 +1058,39 @@ class DataSourceServiceTest {
     }
 
     @Test
+    @DisplayName("Should refuse to delete a DRAFT data source that a Pipeline references")
+    void shouldRefuseDeletingDraftDataSourceReferencedByPipeline() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = createMqttDataSource(id);
+
+      when(dataSourceRepository.existsById(id)).thenReturn(true);
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(true);
+
+      assertThatThrownBy(() -> dataSourceService.deleteById(id))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("referenced by a Pipeline");
+      verify(dataSourceRepository, never()).deleteById(id);
+      verify(modelRegistryGateway, never()).deletePayload(any());
+    }
+
+    @Test
+    @DisplayName("Should delete a DRAFT data source that no Pipeline references")
+    void shouldDeleteDraftDataSourceNotReferencedByPipeline() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = createMqttDataSource(id);
+
+      when(dataSourceRepository.existsById(id)).thenReturn(true);
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(false);
+
+      dataSourceService.deleteById(id);
+
+      verify(dataSourceRepository).deleteById(id);
+      verify(modelRegistryGateway).deletePayload(entity.getConfigurationLogicalUrn());
+    }
+
+    @Test
     @DisplayName("Should fail to delete non-existent data source")
     void shouldFailToDeleteNonExistentDataSource() {
       UUID id = UUID.randomUUID();
@@ -930,8 +1106,8 @@ class DataSourceServiceTest {
   class DataStructureVersionLinkingTests {
 
     @Test
-    @DisplayName("Should reject linking a DRAFT DataStructureVersion")
-    void shouldRejectLinkingDraftDataStructureVersion() {
+    @DisplayName("Should link a DRAFT DataStructureVersion to a DRAFT DataSource")
+    void shouldLinkDraftDataStructureVersion() {
       UUID dsvId = UUID.randomUUID();
       DataStructureVersion dsv = createDataStructureVersion();
       dsv.setId(dsvId);
@@ -950,15 +1126,16 @@ class DataSourceServiceTest {
 
       when(dataSourceMapper.toEntity(any())).thenReturn(entity);
       when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
+      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      assertThatThrownBy(() -> dataSourceService.create(input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("AVAILABLE status");
+      DataSource result = dataSourceService.create(input);
+
+      assertThat(result.getDataStructureVersion()).isSameAs(dsv);
     }
 
     @Test
-    @DisplayName("Should reject linking when parent DataStructure is DRAFT")
-    void shouldRejectLinkingWhenParentDataStructureIsDraft() {
+    @DisplayName("Should link a version whose parent DataStructure is DRAFT")
+    void shouldLinkVersionWithDraftParentDataStructure() {
       UUID dsvId = UUID.randomUUID();
       DataStructureVersion dsv = createDataStructureVersion();
       dsv.setId(dsvId);
@@ -977,10 +1154,11 @@ class DataSourceServiceTest {
 
       when(dataSourceMapper.toEntity(any())).thenReturn(entity);
       when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
+      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      assertThatThrownBy(() -> dataSourceService.create(input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("parent DataStructure");
+      DataSource result = dataSourceService.create(input);
+
+      assertThat(result.getDataStructureVersion()).isSameAs(dsv);
     }
 
     @Test
@@ -1060,7 +1238,7 @@ class DataSourceServiceTest {
       input.setDataStructureVersionId(UUID.randomUUID());
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(true);
+      when(artifactUsageLookup.of(entity)).thenReturn(IN_USE_BY_RELEASED);
 
       assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
@@ -1143,7 +1321,7 @@ class DataSourceServiceTest {
       input.setConnectorType(ConnectorType.SQL);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(true);
+      when(artifactUsageLookup.of(entity)).thenReturn(IN_USE_BY_RELEASED);
 
       assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
@@ -1537,7 +1715,6 @@ class DataSourceServiceTest {
       input.setDatapoolScope(scope);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(false);
       when(dataPoolRepository.findAllById(List.of(poolId))).thenReturn(List.of(pool));
       when(dataSourceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -1552,6 +1729,7 @@ class DataSourceServiceTest {
     DataSource entity = new DataSource();
     entity.setId(id);
     entity.setName("mqtt-source");
+    entity.setDescription("An MQTT data source");
     entity.setDataSourceStatus(DataSourceStatus.DRAFT);
     entity.setConnectorType(ConnectorType.MQTT);
     stubStoredConfiguration(
@@ -1565,6 +1743,7 @@ class DataSourceServiceTest {
     DataSource entity = new DataSource();
     entity.setId(id);
     entity.setName("sql-source");
+    entity.setDescription("A SQL data source");
     entity.setDataSourceStatus(DataSourceStatus.DRAFT);
     entity.setConnectorType(ConnectorType.SQL);
     stubStoredConfiguration(
@@ -1583,8 +1762,10 @@ class DataSourceServiceTest {
   private DataStructureVersion createDataStructureVersion() {
     DataStructureVersion dsv = new DataStructureVersion();
     dsv.setId(UUID.randomUUID());
+    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     DataStructure parent = new DataStructure();
     parent.setId(UUID.randomUUID());
+    parent.setDataStructureStatus(DataStructureStatus.AVAILABLE);
     dsv.setDataStructure(parent);
     return dsv;
   }

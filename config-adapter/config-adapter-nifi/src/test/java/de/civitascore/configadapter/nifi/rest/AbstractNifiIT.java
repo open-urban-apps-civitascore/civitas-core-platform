@@ -16,19 +16,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.nifi.auth.OidcClientCredentialsTokenProvider;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import okhttp3.OkHttpClient;
 import org.awaitility.Awaitility;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.FixedHostPortGenericContainer;
@@ -39,7 +42,7 @@ import org.testcontainers.utility.MountableFile;
 
 /**
  * Shared Testcontainers scaffolding for the real-NiFi integration tests: brings up an Apache NiFi
- * 2.9.0 container secured with OpenID Connect, a trust-all JAX-RS {@link Client} and a {@link
+ * 2.9.0 container secured with OpenID Connect, a trust-all {@link OkHttpClient} and a {@link
  * NifiRestClient} that authenticates via the OIDC client-credentials grant. A single Keycloak
  * container (started once per JVM) issues the tokens; NiFi validates them against that same
  * provider. Subclasses provide their own {@code @BeforeAll}/{@code @AfterAll} — they start any
@@ -219,7 +222,7 @@ abstract class AbstractNifiIT {
   }
 
   protected static FixedHostPortGenericContainer<?> nifi;
-  protected static Client httpClient;
+  protected static OkHttpClient httpClient;
   protected static NifiRestClient client;
 
   /**
@@ -304,8 +307,8 @@ abstract class AbstractNifiIT {
     nifi.start();
 
     httpClient =
-        ClientBuilder.newBuilder()
-            .sslContext(trustAll())
+        new OkHttpClient.Builder()
+            .sslSocketFactory(trustAll().getSocketFactory(), TRUST_ALL_MANAGER)
             .hostnameVerifier((host, session) -> true)
             .build();
     // The config-adapter runs on the host, so it fetches tokens from Keycloak's published port on
@@ -342,10 +345,51 @@ abstract class AbstractNifiIT {
             });
   }
 
+  /**
+   * The built {@code PutFrostRecord} NAR: the path given by {@code -Dfrost.nar} (the CI job passes
+   * the artifact of the extensions build), otherwise the newest one in the sibling build tree.
+   *
+   * <p>The NAR is built by its own Maven reactor, against the NiFi extension API rather than the
+   * Java of this repository, so it is not on the test classpath and cannot be resolved as a
+   * dependency here. A FROST IT skips when it is absent instead of timing out: NiFi leaves a flow
+   * with an unknown processor invalid without failing the deployment, which reads like a defect of
+   * the adapter.
+   */
+  protected static Optional<Path> frostNar() {
+    String configured = System.getProperty("frost.nar", System.getenv("FROST_NAR"));
+    if (configured != null && !configured.isBlank()) {
+      Path path = Path.of(configured);
+      return Files.isRegularFile(path) ? Optional.of(path) : Optional.empty();
+    }
+    Path target = Path.of("..", "..", "nifi-extensions", "nifi-frost-nar", "target");
+    if (!Files.isDirectory(target)) {
+      return Optional.empty();
+    }
+    try (Stream<Path> files = Files.list(target)) {
+      return files
+          .filter(path -> path.getFileName().toString().endsWith(".nar"))
+          .max(Comparator.comparingLong(path -> path.toFile().lastModified()));
+    } catch (IOException e) {
+      return Optional.empty();
+    }
+  }
+
+  /**
+   * Copies the NAR into {@code lib}, which NiFi loads before it answers a request. The {@code
+   * extensions} directory of the image is not read at all: its start script points the auto-loader
+   * at {@code nar_extensions}, and the auto-loader works after startup, so a test that deploys at
+   * once could still miss the processor.
+   */
+  protected static void installFrostNar(GenericContainer<?> container, Path nar) {
+    container.withCopyFileToContainer(
+        MountableFile.forHostPath(nar), "/opt/nifi/nifi-current/lib/nifi-frost-nar.nar");
+  }
+
   /** Closes the HTTP client and stops NiFi. Subclasses stop their own containers separately. */
   protected static void stopNifi() {
     if (httpClient != null) {
-      httpClient.close();
+      httpClient.dispatcher().executorService().shutdown();
+      httpClient.connectionPool().evictAll();
     }
     if (nifi != null) {
       nifi.stop();
@@ -356,26 +400,24 @@ abstract class AbstractNifiIT {
     return mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
   }
 
+  private static final X509TrustManager TRUST_ALL_MANAGER =
+      new X509TrustManager() {
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+          return new X509Certificate[0];
+        }
+      };
+
   protected static SSLContext trustAll() {
     try {
       SSLContext ctx = SSLContext.getInstance("TLS");
-      ctx.init(
-          null,
-          new TrustManager[] {
-            new X509TrustManager() {
-              @Override
-              public void checkClientTrusted(X509Certificate[] chain, String authType) {}
-
-              @Override
-              public void checkServerTrusted(X509Certificate[] chain, String authType) {}
-
-              @Override
-              public X509Certificate[] getAcceptedIssuers() {
-                return new X509Certificate[0];
-              }
-            }
-          },
-          new SecureRandom());
+      ctx.init(null, new TrustManager[] {TRUST_ALL_MANAGER}, new SecureRandom());
       return ctx;
     } catch (Exception e) {
       throw new IllegalStateException("cannot build trust-all SSL context", e);

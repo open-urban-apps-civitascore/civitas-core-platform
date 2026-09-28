@@ -15,15 +15,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.core.Form;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.InstantSource;
+import okhttp3.FormBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +51,7 @@ public class OidcClientCredentialsTokenProvider implements NifiTokenProvider {
   private final String clientId;
   private final String clientSecret;
   private final String scope;
-  private final Client client;
+  private final OkHttpClient client;
   private final InstantSource clock;
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -67,10 +66,10 @@ public class OidcClientCredentialsTokenProvider implements NifiTokenProvider {
    * @param clientId the OIDC client id of the config-adapter's service account
    * @param clientSecret the client secret
    * @param scope an optional space-delimited scope to request, or {@code null}/blank for none
-   * @param client the JAX-RS client to use
+   * @param client the OkHttp client to use
    */
   public OidcClientCredentialsTokenProvider(
-      String tokenUri, String clientId, String clientSecret, String scope, Client client) {
+      String tokenUri, String clientId, String clientSecret, String scope, OkHttpClient client) {
     this(tokenUri, clientId, clientSecret, scope, client, InstantSource.system());
   }
 
@@ -80,7 +79,7 @@ public class OidcClientCredentialsTokenProvider implements NifiTokenProvider {
       String clientId,
       String clientSecret,
       String scope,
-      Client client,
+      OkHttpClient client,
       InstantSource clock) {
     this.tokenUri = tokenUri;
     this.clientId = clientId;
@@ -105,32 +104,32 @@ public class OidcClientCredentialsTokenProvider implements NifiTokenProvider {
   }
 
   private String fetchAndCache() throws FatalAdapterException, RetryableAdapterException {
-    Form form =
-        new Form()
-            .param("grant_type", "client_credentials")
-            .param("client_id", clientId)
-            .param("client_secret", clientSecret);
+    FormBody.Builder form =
+        new FormBody.Builder()
+            .add("grant_type", "client_credentials")
+            .add("client_id", clientId)
+            .add("client_secret", clientSecret);
     if (scope != null && !scope.isBlank()) {
-      form.param("scope", scope);
+      form.add("scope", scope);
     }
-    try (Response response =
-        client.target(tokenUri).request(MediaType.APPLICATION_JSON).post(Entity.form(form))) {
+    Request request = new Request.Builder().url(tokenUri).post(form.build()).build();
+    try (Response response = client.newCall(request).execute()) {
       TokenResponse parsed = parseTokenResponse(response);
       // Measure the lifetime from when the response was received, not when the request was sent.
       this.cachedToken = parsed.accessToken();
       this.expiresAt = clock.instant().plusSeconds(cacheableSeconds(parsed.expiresInSeconds()));
       LOG.debug("Obtained NiFi OIDC token from {}", Encode.forJava(tokenUri));
       return parsed.accessToken();
-    } catch (ProcessingException e) {
+    } catch (IOException e) {
       throw new RetryableAdapterException(
           AdapterErrorCode.NETWORK_ERROR, e, "nifi-oidc", "token request: " + e.getMessage());
     }
   }
 
   private TokenResponse parseTokenResponse(Response response)
-      throws FatalAdapterException, RetryableAdapterException {
-    int status = response.getStatus();
-    String body = response.hasEntity() ? response.readEntity(String.class) : "";
+      throws FatalAdapterException, RetryableAdapterException, IOException {
+    int status = response.code();
+    String body = response.body().string();
     if (status < 200 || status >= 300) {
       // 5xx, 408 (request timeout) and 429 (rate limited) are transient; any other status — notably
       // 400 invalid_scope and 401 invalid_client — is a misconfiguration that retrying cannot fix.

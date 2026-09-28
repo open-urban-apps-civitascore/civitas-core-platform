@@ -1,0 +1,64 @@
+{
+  "name": "FrostWebClient",
+  "comments": "",
+  "type": "org.apache.nifi.web.client.provider.service.StandardWebClientServiceProvider",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-web-client-provider-service-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "Connect Timeout": "5 secs",
+    "Read Timeout": "15 secs",
+    "Write Timeout": "15 secs",
+    "Redirect Handling Strategy": "FOLLOWED",
+    "SSL Context Service": null,
+    "Proxy Configuration Service": null
+  },
+  "propertyDescriptors": {
+    "Connect Timeout": {
+      "name": "Connect Timeout",
+      "displayName": "Connect Timeout",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Read Timeout": {
+      "name": "Read Timeout",
+      "displayName": "Read Timeout",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Write Timeout": {
+      "name": "Write Timeout",
+      "displayName": "Write Timeout",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Redirect Handling Strategy": {
+      "name": "Redirect Handling Strategy",
+      "displayName": "Redirect Handling Strategy",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "SSL Context Service": {
+      "name": "SSL Context Service",
+      "displayName": "SSL Context Service",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Proxy Configuration Service": {
+      "name": "Proxy Configuration Service",
+      "displayName": "Proxy Configuration Service",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "componentType": "CONTROLLER_SERVICE",
+  "bulletinLevel": "WARN"
+}

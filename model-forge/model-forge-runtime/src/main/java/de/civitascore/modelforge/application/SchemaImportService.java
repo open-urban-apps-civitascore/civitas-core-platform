@@ -187,6 +187,15 @@ public class SchemaImportService {
             return importError("invalid-version",
                 "Version '" + version + "' is not a valid version (expected e.g. 1.0, 6.0, or 1.0.0).");
         }
+        // A caller-supplied identity is stored verbatim as the logical URN, and logicalUrn() passes
+        // a non-URN through unchanged — so an unchecked value here is persisted as an identity that
+        // nothing navigating by URN can resolve. The JSON paths gate a caller `$id` the same way.
+        if (artifactId != null && !artifactId.isBlank() && !UrnParser.isUrn(artifactId)) {
+            return importError("invalid-artifact-id",
+                "Artifact id '" + artifactId + "' is not a CORE URN (expected "
+                    + "urn:core:<scope>:<owner>:<type>:<domain>:<name>:<disambiguator>"
+                    + " with an optional :<version>).");
+        }
         String safeName = sanitizeId(name, UUID.randomUUID().toString());
         // XSD shares the Element identity — the format is a stored representation, not in the URN.
         // A name-derived identity is minted (UUID invariant); an explicit artifactId (e.g. the
@@ -614,8 +623,8 @@ public class SchemaImportService {
             return new Edges(pin, edges);
         }
 
-        static PendingGraphNode fromRegistry(String logicalUrn) {
-            return new FromRegistry(logicalUrn);
+        static PendingGraphNode fromRegistry(String urn) {
+            return new FromRegistry(urn);
         }
 
         record Edges(String pin, Set<String> edges) implements PendingGraphNode {
@@ -625,10 +634,10 @@ public class SchemaImportService {
             }
         }
 
-        record FromRegistry(String logicalUrn) implements PendingGraphNode {
+        record FromRegistry(String urn) implements PendingGraphNode {
             @Override
             public void publish(DependencyGraphService graph) {
-                graph.registerFromRegistry(logicalUrn);
+                graph.registerFromRegistry(urn);
             }
         }
     }
@@ -699,7 +708,9 @@ public class SchemaImportService {
         // relations and no graph edges until the next full rebuild() — unlike the createArtifact
         // write path, which pairs every store with registerFromRegistry(). Queued rather than
         // applied, so it lands only if the surrounding import commits.
-        pendingNodes.add(PendingGraphNode.fromRegistry(dataStructureLogicalUrn));
+        // Queued under the pin, never the logical URN.
+        pendingNodes.add(PendingGraphNode.fromRegistry(
+            pin != null && !pin.isBlank() ? pin : dataStructureLogicalUrn));
         return pin;
     }
 

@@ -32,10 +32,16 @@ tests {
       expect(res.body.configuration).to.be.an('object');
     }
   });
+
+  test("Reports whether it is provisioned", function() {
+    if (res.getStatus() === 200) {
+      expect(res.body.provisioned).to.be.a('boolean');
+    }
+  });
 }
 
 docs {
   **Precondition:** `dataSetId` and `dataSinkId` are set.
 
-  **Expected Response:** 200 OK, body contains the DataSink with matching `id`, including the `inUse` flag and (for POSTGIS) the inline DataStructureVersion summary.
+  **Expected Response:** 200 OK, body contains the DataSink with matching `id`, including the `inUseByPipeline` and `inUseByLayer` flags, the `provisioned` flag and (for POSTGIS) the inline DataStructureVersion summary.
 }

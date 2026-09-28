@@ -2,11 +2,13 @@ package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSink;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data JPA repository for {@link DataSink} entities. */
@@ -29,8 +31,15 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
 
   boolean existsByDataSetIdAndDataSinkType(UUID dataSetId, DataSinkType dataSinkType);
 
-  // Sink -> DataStructureVersion references are no longer a relational column: a sink carries the
-  // version's model URN in its registry-stored configuration ("element" field). The in-use guard
-  // therefore asks Model Forge for dependents of the model URN
-  // (ModelRegistryGateway#isReferencedBySink) instead of querying this table.
+  /** Whether each sink's Dataset is released, keyed by the sink's logical URN. */
+  @Query(
+      "SELECT new de.civitascore.portal.repository.ReferrerReleaseState(s.configurationLogicalUrn,"
+          + " CASE WHEN s.dataSet.dataSetStatus ="
+          + " de.civitascore.portal.model.embedded.DataSetStatus.AVAILABLE"
+          + " OR s.dataSet.pendingSagaType ="
+          + " de.civitascore.portal.model.embedded.PendingSagaType.UNRELEASE"
+          + " THEN true ELSE false END)"
+          + " FROM DataSink s WHERE s.configurationLogicalUrn IN :urns")
+  List<ReferrerReleaseState> findReleaseStatesByConfigurationLogicalUrnIn(
+      @Param("urns") Collection<String> urns);
 }

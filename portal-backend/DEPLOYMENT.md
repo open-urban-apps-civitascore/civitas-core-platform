@@ -20,6 +20,7 @@
    - [OpenAPI / Swagger UI](#26-openapi--swagger-ui)
    - [Security Permit Paths](#27-security-permit-paths)
    - [Group-Member Backfill (one-shot)](#28-group-member-backfill-one-shot)
+   - [Dataset Staging & Release](#29-dataset-staging--release)
 3. [Seed Data Profile (init)](#3-seed-data-profile-init)
 4. [Local Development Only](#4-local-development-only)
    - [Local Defaults](#41-local-defaults)
@@ -279,6 +280,18 @@ One-time migration switch that reconciles the members of already-synced groups (
 | `KEYCLOAK_GROUP_MEMBER_BACKFILL` | `false` | When `true`, reconcile already-synced groups' members into Keycloak on startup |
 
 Enable for a single rollout deploy, then check the completion log — `Group-member backfill completed: N succeeded, M failed, K skipped (of T candidates)` — and re-run while the flag is on if `M > 0` (failures are also logged individually at `ERROR`). Once it reports `0 failed`, set the flag back to `false`. The reconcile is idempotent; there is no run-once marker, so the flag must be turned off after rollout.
+
+---
+
+### 2.9 Dataset Staging & Release
+
+Before a dataset is staged or released, the backend walks out from each of its pipelines over the references the model registry recorded and refuses the transition while an artifact the flow reaches cannot carry a release. The walk follows a bounded number of hops.
+
+| Property / Env Var | Default | Description |
+|---|---|---|
+| `DATASET_CLOSUREVALIDATION_MAXDEPTH` | `10` | Reference hops the walk follows out from a pipeline. A flow reaching further is **refused**, not passed unchecked — everything past the bound goes unexamined |
+
+Raise it only when real models legitimately nest deeper: observed flows reach two to three hops, so the default leaves roughly threefold headroom. Lowering it below what a deployment's models need makes those datasets unreleasable, with a 422 naming the offending pipelines and the log recording that the bound cut the walk short. The walk visits each artifact once and terminates on reference cycles, but resolves every unpinned reference against the registry, so raising the bound does add reads.
 
 ---
 

@@ -6,8 +6,10 @@ import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.SagaInFlightException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -86,9 +88,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public ProblemDetail handleDataSetNotEditable(
       DataSetNotEditableException ex, HttpServletRequest request) {
     log.warn("DataSet not editable: {}", Encode.forJava(ex.getMessage()));
-    // TR-03187 W-18/W-19: the detail is a fixed constant with no runtime data interpolated. The
-    // sibling 409 from the same guard does name the pending saga type, which OPA has already
-    // authorised the caller to read on this dataset.
+    // TR-03187 W-18/W-19: the detail is a fixed constant with no runtime data interpolated.
     return createProblemDetail(
         HttpStatus.BAD_REQUEST, "DATASET_NOT_EDITABLE", ex.getMessage(), request);
   }
@@ -121,8 +121,26 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(ResourceInUseException.class)
   @ResponseStatus(HttpStatus.CONFLICT)
   public ProblemDetail handleResourceInUse(ResourceInUseException ex, HttpServletRequest request) {
-    log.warn("Resource in use: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 W-18/W-19: what holds the resource is logged, not returned — the URNs carry the
+    // names of artifacts the caller need not be scoped for.
+    log.warn(
+        "Resource in use: {} blockedBy={}",
+        Encode.forJava(ex.getMessage()),
+        Encode.forJava(ex.getBlockedBy().toString()));
     return createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(SagaInFlightException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ProblemDetail handleSagaInFlight(SagaInFlightException ex, HttpServletRequest request) {
+    log.warn(
+        "Saga in flight on dataset {}: {}", ex.getDataSetId(), Encode.forJava(ex.getMessage()));
+    // TR-03187 W-18/W-19: the saga type is already part of the detail message, so promoting it to
+    // its own property discloses nothing further.
+    ProblemDetail problemDetail =
+        createProblemDetail(HttpStatus.CONFLICT, "SAGA_IN_FLIGHT", ex.getMessage(), request);
+    problemDetail.setProperty("pendingSagaType", ex.getPendingSagaType());
+    return problemDetail;
   }
 
   /**
@@ -144,6 +162,28 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             ex.getMessage(),
             request);
     pd.setProperty("offendingDataSourceIds", ex.getOffendingDataSourceIds());
+    return pd;
+  }
+
+  /**
+   * Maps a failed participating-artifact validation onto 422 with every finding attached, so one
+   * release attempt tells the caller everything that needs repairing.
+   *
+   * @param ex the validation exception carrying the findings
+   * @param request the current HTTP request
+   * @return a Problem Detail with HTTP 422 status and an {@code offendingPipelineIds} property
+   */
+  @ExceptionHandler(PipelineClosureValidationException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+  public ProblemDetail handlePipelineClosureValidation(
+      PipelineClosureValidationException ex, HttpServletRequest request) {
+    log.warn(
+        "Pipeline closure validation failed for {} pipeline(s)",
+        ex.getOffendingPipelineIds().size());
+    ProblemDetail pd =
+        createProblemDetail(
+            HttpStatus.UNPROCESSABLE_ENTITY, "PIPELINE_CLOSURE_INVALID", ex.getMessage(), request);
+    pd.setProperty("offendingPipelineIds", ex.getOffendingPipelineIds());
     return pd;
   }
 

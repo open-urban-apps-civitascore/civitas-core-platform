@@ -288,14 +288,23 @@ public final class StaTargetCatalog {
   }
 
   /**
+   * The name of the entity's bag of free attributes. SensorThings gives every entity a {@code
+   * properties} object — except the Observation, which has {@code parameters} and rejects {@code
+   * properties}.
+   */
+  public static String bagOf(StaEntity entity) {
+    return entity == StaEntity.OBSERVATION ? "parameters" : "properties";
+  }
+
+  /**
    * The record path of an entity's schema-derived match-key attribute, nested under the entity's
-   * {@code properties} bag ({@code $.properties.<key>} for the Thing, {@code
-   * $.Datastreams[].properties.<key>} for the datastream) — SensorThings has no top-level match-key
-   * field; an identifier lives in the entity's {@code properties} object, which is also where the
-   * created body carries it and where the {@code $filter} looks it up ({@code properties/<key>}).
+   * bag ({@code $.properties.<key>} for the Thing, {@code $.Datastreams[].properties.<key>} for the
+   * datastream, {@code $.Datastreams[].Observations[].parameters.<key>} for the measurement) —
+   * SensorThings has no top-level match-key field; an identifier lives in the entity's bag, which
+   * is also where the created body carries it and where the {@code $filter} looks it up.
    */
   public static String keyPath(StaEntity entity, String keyName) {
-    return entity.pathOf("properties." + keyName);
+    return entity.pathOf(bagOf(entity) + "." + keyName);
   }
 
   /**

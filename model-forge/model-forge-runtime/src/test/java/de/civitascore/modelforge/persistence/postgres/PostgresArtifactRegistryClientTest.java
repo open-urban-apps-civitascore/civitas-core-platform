@@ -63,10 +63,12 @@ class PostgresArtifactRegistryClientTest {
     @Test
     void readDuringStorageOutage_surfacesAsRegistryUnavailableException() {
         var client = clientWithFailingDb();
-        // listAllUrns() and searchArtifacts() both run through the read() wrapper, which must
-        // translate the DataAccessException to a 502 RegistryUnavailableException rather than letting it leak
-        // or collapsing it into an empty/"not found" result.
-        assertThatThrownBy(client::listAllUrns).isInstanceOf(RegistryUnavailableException.class);
+        // referenceEdgesByVersion() and searchArtifacts() both run through the read() wrapper, which
+        // must translate the DataAccessException to a 502 RegistryUnavailableException rather than
+        // letting it leak or collapsing it into an empty/"not found" result. An empty result here
+        // would build a graph with no edges, and a dependency check over one objects to nothing.
+        assertThatThrownBy(client::referenceEdgesByVersion)
+            .isInstanceOf(RegistryUnavailableException.class);
     }
 
     @Test

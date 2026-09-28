@@ -9,6 +9,7 @@ import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.specification.DataSourceDatapoolUsability;
+import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import java.util.HashSet;
 import java.util.List;
@@ -24,8 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 /**
  * Pins one rule — may this data source be used in that datapool — across the two places that decide
  * it independently: the entity validator that rejects a pipeline reference, and the SQL predicate
- * behind both the {@code datapoolId} query filter and {@code GET
- * /datasets/{id}/usable-datasources}. Nothing but this test keeps them from drifting, and a
+ * behind the {@code datapoolId} query filter. Nothing but this test keeps them from drifting, and a
  * divergence would let the picker offer a source that saving then rejects.
  */
 @DisplayName("DataSource Datapool Usability Contract Integration Tests")
@@ -80,11 +80,11 @@ class DataSourceDatapoolUsabilityContractIntegrationTest extends BaseKeycloakInt
         .as("entity validator (pipeline reference)")
         .isEqualTo(expectedUsable);
     assertThat(queryFilterSaysUsable(dataSource.getId(), candidateId))
-        .as("SQL predicate (picker filter and usable-datasources endpoint)")
+        .as("SQL predicate (picker filter)")
         .isEqualTo(expectedUsable);
   }
 
-  /** The SQL predicate shared by the {@code datapoolId} filter and the endpoint. */
+  /** The SQL predicate behind the {@code datapoolId} filter. */
   private boolean queryFilterSaysUsable(UUID dataSourceId, UUID poolId) {
     return dataSourceRepository.findAll(DataSourceDatapoolUsability.usableInPool(poolId)).stream()
         .anyMatch(found -> found.getId().equals(dataSourceId));

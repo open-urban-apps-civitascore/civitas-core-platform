@@ -209,6 +209,33 @@ test_users_me_denied_without_auth if {
 	result.reason == "authentication_required"
 }
 
+# Test: the list of published structures is readable by any authenticated user
+test_published_structures_allowed_for_authenticated if {
+	result := authz.decision with http.send as mock_send_authenticated_no_groups
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/published-structures")
+	result.allow == true
+	result.reason == "authenticated_endpoint"
+}
+
+# Test: one published structure is readable too — this is the {id} substitution, and a typo in
+# the pattern entry would otherwise leave the document endpoint an unknown_endpoint while the
+# list works.
+test_published_structure_document_allowed_for_authenticated if {
+	result := authz.decision with http.send as mock_send_authenticated_no_groups
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/published-structures/ThingTree")
+	result.allow == true
+	result.reason == "authenticated_endpoint"
+}
+
+# Test: published structures denied for unauthenticated request (no X-Userinfo header)
+test_published_structures_denied_without_auth if {
+	result := authz.decision with input as portal_request_no_auth("GET", "/v1/published-structures")
+	result.allow == false
+	result.reason == "authentication_required"
+}
+
 # =============================================================================
 # ERROR CASE TESTS
 # =============================================================================
@@ -953,60 +980,4 @@ test_resource_pool_inheritance_emits_pool_header if {
 	result.reason == "permission_granted"
 	result.headers["X-Allowed-Pool-Ids"] == "pool-1"
 	result.headers["X-Allowed-Scope-Ids"] == ""
-}
-
-# The data source picker in the pipeline editor reads /usable-datasources, authorized on the
-# DATASET (DATASET_UPDATE) rather than on the data sources. A steward scoped to one datapool must
-# reach it through that pool grant — this is what lets them see what their pipelines may use
-# without holding DATASOURCE_READ.
-mock_pool_steward_can_update(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_UPDATE"], "DATAPOOL", "pool-1")} if {
-	contains(req.url, "user-context")
-}
-
-mock_pool_steward_can_update(req) := {"status_code": 200, "body": {"poolId": "pool-1"}} if {
-	contains(req.url, "dataset-pool")
-}
-
-test_usable_datasources_granted_via_pool_update_grant if {
-	result := authz.decision with http.send as mock_pool_steward_can_update
-		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v1/datasets/ds-99/usable-datasources")
-	result.allow == true
-	result.reason == "permission_granted"
-	result.headers["X-Allowed-Pool-Ids"] == "pool-1"
-	result.headers["X-Allowed-Scope-Ids"] == ""
-}
-
-# DATASET_READ is not enough: the route is an editing affordance, so a read-only pool grant must
-# not reach it.
-mock_pool_reader_only(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_READ"], "DATAPOOL", "pool-1")} if {
-	contains(req.url, "user-context")
-}
-
-mock_pool_reader_only(req) := {"status_code": 200, "body": {"poolId": "pool-1"}} if {
-	contains(req.url, "dataset-pool")
-}
-
-test_usable_datasources_denied_for_read_only_pool_grant if {
-	result := authz.decision with http.send as mock_pool_reader_only
-		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v1/datasets/ds-99/usable-datasources")
-	result.allow == false
-}
-
-# A pool grant on a DIFFERENT pool than the dataset's must not reach it either — the dataset→pool
-# lookup, not the mere existence of a pool grant, is what binds the decision to this dataset.
-mock_pool_steward_other_pool(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_UPDATE"], "DATAPOOL", "pool-other")} if {
-	contains(req.url, "user-context")
-}
-
-mock_pool_steward_other_pool(req) := {"status_code": 200, "body": {"poolId": "pool-1"}} if {
-	contains(req.url, "dataset-pool")
-}
-
-test_usable_datasources_denied_for_grant_on_another_pool if {
-	result := authz.decision with http.send as mock_pool_steward_other_pool
-		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v1/datasets/ds-99/usable-datasources")
-	result.allow == false
 }

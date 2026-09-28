@@ -34,6 +34,7 @@ import { GeoPersistencePanel } from '../_components/inspector/panels/GeoPersiste
 import { MappingPanel } from '../_components/inspector/panels/MappingPanel'
 import { emptyMappingConfig } from '../_components/mapping-editor/_types'
 import { DataSourceSublabel } from '../_components/nodes/DataSourceSublabel'
+import { FrostSublabel } from '../_components/nodes/FrostSublabel'
 import { MappingSublabel } from '../_components/nodes/MappingSublabel'
 import { NODE_CATEGORIES, type NodeCategory } from '../_constants/nodeCategories'
 import {
@@ -212,7 +213,9 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     handles: { left: true, right: true },
     createDefaultData: (): FrostNodeData => ({
       label: 'Sensor Data Storage',
-      configured: true,
+      // A new sink carries no port, so it is not configured. The platform must not decide what a
+      // Pipeline writes, and an unconfigured node is what stops the Dataset from publishing.
+      configured: false,
       entityType: ENTITY_TYPES.Frost,
       serverName: 'Sensor Data Storage',
       serverUrl: '',
@@ -220,8 +223,8 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     }),
     isData: (data): data is FrostNodeData =>
       'entityType' in data && (data as FrostNodeData).entityType === ENTITY_TYPES.Frost,
+    SublabelComponent: FrostSublabel,
     InspectorPanel: FrostPanel,
-    isPanelReadonly: true,
   },
 
   // ---- Storage: GeoPersistence ----

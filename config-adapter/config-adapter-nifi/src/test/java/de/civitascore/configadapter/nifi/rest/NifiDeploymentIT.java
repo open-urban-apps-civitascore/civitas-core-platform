@@ -26,6 +26,7 @@ import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +51,9 @@ class NifiDeploymentIT extends AbstractNifiIT {
   @BeforeAll
   static void startStack() {
     assumeTrue(dockerAvailable(), "Docker not available — skipping NiFi IT");
-    startNifi(HOST_PORT);
+    // The FROST flow writes through PutFrostRecord; the PostGIS flow does not need the NAR.
+    startNifi(
+        HOST_PORT, null, container -> frostNar().ifPresent(nar -> installFrostNar(container, nar)));
   }
 
   @AfterAll
@@ -141,6 +144,7 @@ class NifiDeploymentIT extends AbstractNifiIT {
 
   @Test
   void deploysFrostFlowFullLifecycleOntoRealNifi() throws Exception {
+    assumeTrue(frostNar().isPresent(), "FROST NAR not built — skipping the FROST deployment");
     Datasource source = new Datasource();
     source.setId("ds-frost");
     source.setType("MQTT");
@@ -172,7 +176,11 @@ class NifiDeploymentIT extends AbstractNifiIT {
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "frost-it", graph, source, new FrostSinkSpec("1", null), Map.of()));
+                "frost-it",
+                graph,
+                source,
+                new FrostSinkSpec("1", SinkPort.THING_TREE, null),
+                Map.of()));
 
     // A FROST/HTTP sink has no DBCP/JDBC-driver dependency, so the FULL deploy lifecycle
     // (upload → enable controller services → start) must succeed on real NiFi — this is exactly

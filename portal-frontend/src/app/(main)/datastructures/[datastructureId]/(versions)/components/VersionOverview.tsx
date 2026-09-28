@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
+import { InfoModal } from '@/components/modals/info-modal/InfoModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import PageEditControls from '@/components/page-edit-controls/PageEditControls'
@@ -35,12 +36,12 @@ import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
 
 const tabs: Tab<DatastructureVersionTab>[] = [
   {
-    value: 'versionInfo',
-    label: 'datastructureVersions.tabs.versionInfo',
-  },
-  {
     value: 'structure',
     label: 'datastructureVersions.tabs.structure',
+  },
+  {
+    value: 'versionInfo',
+    label: 'datastructureVersions.tabs.versionInfo',
   },
 ]
 
@@ -83,9 +84,10 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const canEdit = isVersionAvailable ? canUpdate && canRelease : canUpdate
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+  const [isDraftBlockedModalOpen, setIsDraftBlockedModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit' || !canEdit)
 
-  const isInUse = version?.inUse || false
+  const isInUseByReleased = version?.inUseByReleased ?? false
 
   const otherVersions = !version
     ? datastructure.dataStructureVersions
@@ -138,7 +140,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues])
 
-  const canSetDraft = !isInUse && !isLastAvailableVersionInAvailableDatastructure
+  const canSetDraft = !isLastAvailableVersionInAvailableDatastructure
 
   const canStage = useMemo(() => DatastructureVersionFormAvailableSchema.safeParse(formValues).success, [formValues])
 
@@ -210,11 +212,15 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     [pathname, params, router],
   )
 
-  const statusHint = useMemo(() => {
-    if (isInUse) return t('messages.isInUseStatusHint')
-    if (isLastAvailableVersionInAvailableDatastructure) return t('messages.isLastAvailableVersion')
-    return undefined
-  }, [isInUse, isLastAvailableVersionInAvailableDatastructure, t])
+  const statusHint = isLastAvailableVersionInAvailableDatastructure ? t('messages.isLastAvailableVersion') : undefined
+
+  const handleStatusSelect = (newStatus: DatastructureStatusType) => {
+    if (newStatus === DATASTRUCTURE_STATUS_TYPES.DRAFT && isInUseByReleased) {
+      setIsDraftBlockedModalOpen(true)
+      return
+    }
+    handleStatusChange(newStatus)
+  }
 
   // isValid must be read on every render, otherwise RHF's validation does not run
   const { isValid } = form.formState
@@ -222,25 +228,36 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const renderTabContent = () => {
     switch (subTabValue) {
+      case 'versionInfo':
+        return (
+          <VersionInfoTab
+            form={form}
+            isReadOnly={isReadOnly}
+            isAvailable={isVersionAvailable}
+            importedStructureUrns={version?.importedStructureUrns ?? []}
+          />
+        )
       case 'structure':
+      default:
         return (
           <StructureDefinitionTab
             isReadOnly={isReadOnly}
             modelSessionManager={modelSessionManager}
             isAvailable={isVersionAvailable}
+            dataStructureName={datastructure.name}
+            versionName={version?.version}
+            datastructureId={datastructure.id}
           />
         )
-      case 'versionInfo':
-      default:
-        return <VersionInfoTab form={form} isReadOnly={isReadOnly} isAvailable={isVersionAvailable} />
     }
   }
 
   const PageEditButtons = (
     <PageEditControls<DatastructureStatusType>
+      isInUseByReleased={isInUseByReleased}
       statusProps={{
         status: statusWatch,
-        onStatusChange: handleStatusChange,
+        onStatusChange: handleStatusSelect,
         statusOptions: Object.values(DATASTRUCTURE_STATUS_TYPES),
         canStage,
         canRelease,
@@ -285,6 +302,14 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         onDiscard={handleExit}
         onConfirm={handleExitWarningSave}
         isLoading={isLoading}
+      />
+
+      <InfoModal
+        open={isDraftBlockedModalOpen}
+        title={tCommon('draftBlockedModal.title')}
+        description={tCommon('draftBlockedModal.description')}
+        onOpenChange={setIsDraftBlockedModalOpen}
+        onClose={() => setIsDraftBlockedModalOpen(false)}
       />
     </PageContainer>
   )

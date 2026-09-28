@@ -19,6 +19,7 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Dataset } from '@/types/datasets'
+import { isSagaInFlightError } from '@/utils/errors'
 
 import { DatasetsTable } from './DatasetsTable'
 
@@ -68,10 +69,10 @@ const DatasetsList = (props: DatasetsListProps) => {
         toast.success(t('messages.deleteSuccess'))
         router.refresh()
       },
-      onError: () => {
+      onError: error => {
         setDatasetToDelete(null)
         setIsWarningOpen(false)
-        toast.error(t('messages.deleteError'))
+        toast.error(isSagaInFlightError(error) ? t('messages.sagaInFlightError') : t('messages.deleteError'))
       },
     })
   }

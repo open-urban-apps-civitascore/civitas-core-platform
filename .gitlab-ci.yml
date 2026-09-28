@@ -5,16 +5,13 @@
 # Local testing:
 # gitlab-ci-local <jobName>
 
-# Use private runner (hosted by Frachtwerk @tobias.dillig@frachtwerk.de)
-default:
-  tags: ['external']
-
 # Change to retrigger all pipeline for a new commit
 
 include:
   - .gitlab/ci/frontend.yml
   - .gitlab/ci/backend.yml
   - .gitlab/ci/config-adapter.yml
+  - .gitlab/ci/nifi-extensions.yml
   - .gitlab/ci/portal-model.yml
   - .gitlab/ci/renovate.yml
   - .gitlab/ci/authz.yml
@@ -35,6 +32,7 @@ include:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -81,8 +79,9 @@ workflow:
   rules:
     # Run on the nightly scheduled pipeline (schedule must set IS_NIGHTLY=true)
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
-    # Always run on main and develop branch
+    # Always run on main, staging and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     # Run on merge request branches
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
