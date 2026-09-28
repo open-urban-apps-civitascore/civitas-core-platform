@@ -277,7 +277,6 @@ class DataSourceControllerIntegrationTest
       config.put("urls", List.of("tcp://broker:1883"));
       config.put("topics", List.of("sensor/data"));
       config.put("qos", 1);
-      config.put("client_id", "");
       config.put("connect_timeout", "   ");
       config.put("keepalive", "");
       config.put("user", " ");
@@ -287,7 +286,6 @@ class DataSourceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       Map<String, Object> resultConfig = response.getBody().getConfiguration();
-      assertThat(resultConfig.get("client_id")).isNull();
       assertThat(resultConfig.get("connect_timeout")).isNull();
       assertThat(resultConfig.get("keepalive")).isNull();
       assertThat(resultConfig.get("user")).isNull();
@@ -301,19 +299,23 @@ class DataSourceControllerIntegrationTest
       input.setConnectorType(ConnectorType.MQTT);
       input.setConfiguration(
           Map.of(
-              "urls", List.of("tcp://broker:1883"),
-              "topics", List.of("sensor/data"),
-              "qos", 1,
-              "client_id", "my-client",
-              "connect_timeout", "5s",
-              "keepalive", "30s",
-              "user", "mqttuser"));
+              "urls",
+              List.of("tcp://broker:1883"),
+              "topics",
+              List.of("sensor/data"),
+              "qos",
+              1,
+              "connect_timeout",
+              "5s",
+              "keepalive",
+              "30s",
+              "user",
+              "mqttuser"));
 
       ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       Map<String, Object> resultConfig = response.getBody().getConfiguration();
-      assertThat(resultConfig.get("client_id")).isEqualTo("my-client");
       assertThat(resultConfig.get("connect_timeout")).isEqualTo("5s");
       assertThat(resultConfig.get("keepalive")).isEqualTo("30s");
       assertThat(resultConfig.get("user")).isEqualTo("mqttuser");

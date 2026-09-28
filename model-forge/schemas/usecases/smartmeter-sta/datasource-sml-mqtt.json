@@ -6,6 +6,5 @@
   "element":        "urn:core:platform:civitas:element:smartmeter:SMLReading:1.0.0",
   "urls":           ["mqtt://mosquitto:1883"],
   "topics":         ["smartmeter/sml/+"],
-  "client_id":      "minifi-sml",
   "qos":            1
 }

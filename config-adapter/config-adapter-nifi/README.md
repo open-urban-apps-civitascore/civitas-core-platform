@@ -21,7 +21,8 @@ Any other operation, and any unknown per-pipeline `action`, fails naming the off
 - **Association** — a source or sink node with no configured entity id, an entity id absent from the trigger's catalog, or a pipeline carrying no association ids at all (reported as its own condition).
 - **Combination** — an unsupported source or sink type; a source payload form the sink can neither consume nor have converted; a cron on a push-based source; a cron expression that is not exactly six whitespace-separated fields; a SQL source writing to PostGIS with no resolvable primary key.
 - **Source configuration** — a plaintext password (secrets MUST arrive encrypted); an MQTT broker scheme that is unsupported or disagrees with the datasource's TLS switch; a path on a `tcp`/`ssl` broker URL; brokers spread over more than one transport; more than one MQTT topic filter; a timeout that is not a plain seconds duration; a SQL source the pre-deploy JDBC probe cannot reach with the resolved credentials.
-- **SQL hardening** — a `dsn` query parameter outside the permitted allowlist; a bind placeholder in `where`; query-shaping fields with no NiFi equivalent; a driver other than PostgreSQL; a NiFi Expression Language reference in `table`, `columns` or `where`.
+- **SQL hardening** — a `dsn` query parameter outside the permitted allowlist; a bind placeholder in `where`; query-shaping fields with no NiFi equivalent; a driver other than PostgreSQL.
+- **Property values** — a NiFi Expression Language reference (`${`) or parameter reference (`#{`) in any tenant value or secret that reaches a NiFi property: source and sink fields, mapping values, credentials. The error names the property, never the value.
 - **Sink prerequisites** — a FROST sink without the saga's numeric project id or without `nifi.frost.url`; a mapped FROST sink whose datasink carries no target data structure; a PostGIS sink without a table name or without `nifi.postgis.url`.
 - **Mapping** — any grammar violation; a mapping node without a configuration; a chain whose neighbours disagree on the structure handed between them; an unresolvable fan-out; a violated FROST target rule.
 
@@ -33,6 +34,8 @@ Any other operation, and any unknown per-pipeline `action`, fails naming the off
 |---|---|---|---|---|
 | MQTT (push) | `mqtt` | `STA_ENVELOPE` | Rejected — the source self-triggers on broker messages | Broker URLs, exactly one topic filter |
 | SQL (pull) | `sql`, `postgresql`, `postgres`, `jdbc` | `RECORDS` | Accepted | Table, DSN |
+
+Every MQTT flow connects with its own client id, so flows that share a datasource do not evict each other's broker session. The id is `civitascore` plus a base36 hash of pipeline id and source node id: alphanumeric and within the 23 characters every MQTT broker must accept, and the same on every deploy of that node.
 
 A TLS MQTT broker is supported: the flow mints an SSL context service over the truststore that `nifi.mqtt.truststore.*` names — the JVM's own trust store by default, which carries the public root CAs, so a publicly trusted broker certificate needs no configuration. A store with a real password is opened through a deployment-owned Parameter Context the flow declares but never carries a value for; a well-known one (the JDK's `changeit`) through a literal pushed onto the controller service after upload. A SQL source re-reads the whole table on every run and tracks no high-water column, on an explicit cron or the source fragment's built-in schedule.
 

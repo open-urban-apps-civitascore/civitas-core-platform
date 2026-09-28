@@ -224,7 +224,6 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
             "user": null,
             "topics": ["sensor/data"],
             "password": null,
-            "client_id": null,
             "keepalive": null,
             "connect_timeout": null
           }
@@ -316,7 +315,6 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
             "user": null,
             "topics": ["sensor/data", "sensor/heartbeat"],
             "password": null,
-            "client_id": null,
             "keepalive": null,
             "connect_timeout": null
           }

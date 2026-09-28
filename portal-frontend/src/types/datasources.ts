@@ -26,14 +26,22 @@ export type FormFieldType = 'input' | 'textArea' | 'select' | 'checkbox'
 
 export type FormInputType = 'text' | 'password'
 
+// Keys are relative to the `datasources.connectorTab` namespace, e.g. `mqtt.urls.label`.
+export type ConnectorFieldLabel = { labelKey: string; hintKey?: string }
+
 export type ConnectorField = {
   key: string
   type: FormFieldType
   inputType?: FormInputType
-  label: { label: string; labelHint: string | null }
+  label: ConnectorFieldLabel
   options?: string[]
   defaultValue?: unknown
   required?: boolean
+  // Set `placeholderKey` to use a translation string for the placeholder
+  // or `placeholder` to set a literal string (for non-translateable technical
+  // terms such as URIs, durations, SQL statements).
+  // `placeholderKey` is a translation key relative to `datasources.connectorTab`.
+  placeholderKey?: string
   placeholder?: string
   rows?: number
   expert?: boolean

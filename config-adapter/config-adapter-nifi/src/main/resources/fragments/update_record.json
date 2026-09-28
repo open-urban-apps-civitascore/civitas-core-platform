@@ -12,22 +12,11 @@
     "version": "2.9.0"
   },
   "properties": {
-    "/measurement_time": "toDate( /ts , \"yyyy-MM-dd'T'HH:mm:ss'Z'\")",
     "Record Writer": "${CS:JsonRecordSetWriter}",
     "Record Reader": "${CS:JsonTreeReader}",
-    "/station_id": "/station_id",
-    "/geom": "concat('POINT(', /lon, ' ', /lat, ')')",
-    "Replacement Value Strategy": "record-path-value",
-    "/temperature": "/temperature"
+    "Replacement Value Strategy": "record-path-value"
   },
   "propertyDescriptors": {
-    "/measurement_time": {
-      "name": "/measurement_time",
-      "displayName": "/measurement_time",
-      "identifiesControllerService": false,
-      "sensitive": false,
-      "dynamic": true
-    },
     "Record Writer": {
       "name": "Record Writer",
       "displayName": "Record Writer",
@@ -42,33 +31,12 @@
       "sensitive": false,
       "dynamic": false
     },
-    "/station_id": {
-      "name": "/station_id",
-      "displayName": "/station_id",
-      "identifiesControllerService": false,
-      "sensitive": false,
-      "dynamic": true
-    },
-    "/geom": {
-      "name": "/geom",
-      "displayName": "/geom",
-      "identifiesControllerService": false,
-      "sensitive": false,
-      "dynamic": true
-    },
     "Replacement Value Strategy": {
       "name": "Replacement Value Strategy",
       "displayName": "Replacement Value Strategy",
       "identifiesControllerService": false,
       "sensitive": false,
       "dynamic": false
-    },
-    "/temperature": {
-      "name": "/temperature",
-      "displayName": "/temperature",
-      "identifiesControllerService": false,
-      "sensitive": false,
-      "dynamic": true
     }
   },
   "style": {},

@@ -49,7 +49,6 @@ path_pattern := restmapper.match_pattern(input.request.path, endpoints)
 #
 # For resource endpoints (/v1/resource/{id}), the {id} IS the scopeId.
 # TENANT scope cascades to all resource endpoints (Q-005 resolved).
-# Dataspaces and catalogs are null-permission endpoints (excluded from V2 scope model, see #989).
 
 # Map resource name to expected scope type
 resource_scope_type := {

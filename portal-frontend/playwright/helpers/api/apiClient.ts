@@ -315,7 +315,6 @@ export class ApiClient {
     return this.post<{ id: string; name: string }>('/datastructures', {
       description: '',
       createdFromDataSource: false,
-      dataStructureVersionIds: [],
       assignments: [],
       ...data,
     })

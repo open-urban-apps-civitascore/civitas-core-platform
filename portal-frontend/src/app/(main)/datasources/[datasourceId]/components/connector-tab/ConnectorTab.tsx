@@ -9,7 +9,7 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { CONNECTOR_FIELD_REVALIDATION_RULES, ConnectorType } from '@/types/connectors'
-import { DatasourceFormDraft } from '@/types/datasources'
+import { ConnectorFieldLabel, DatasourceFormDraft } from '@/types/datasources'
 
 import { CONNECTOR_INPUTS } from './connectorSources'
 import { DynamicFormField } from './DynamicFormField'
@@ -22,7 +22,6 @@ interface ConnectorTabProps {
 export const ConnectorTab = (props: ConnectorTabProps) => {
   const { form, connectorType, isReadOnly = false } = props
   const t = useTranslations('datasources.connectorTab')
-  const tCommon = useTranslations('common')
   const connectorTypeOptions: SelectOption[] = Object.keys(CONNECTOR_INPUTS).map(type => ({
     value: type as ConnectorType,
     label: type,
@@ -54,9 +53,9 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedFieldValue])
 
-  const getLabel = (label: { label: string; labelHint: string | null }) => {
-    const labelHint = label.labelHint ? `(${tCommon(`info.${label.labelHint}`)})` : ''
-    return `${label.label} ${labelHint}`
+  const getLabel = (label: ConnectorFieldLabel) => {
+    const hint = label.hintKey ? `(${t(label.hintKey)})` : ''
+    return `${t(label.labelKey)} ${hint}`.trim()
   }
 
   return (
@@ -87,7 +86,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
               form={form}
               label={getLabel(property.label)}
               name={`configuration.${property.key}` as Path<DatasourceFormDraft>}
-              placeholder={property.placeholder ?? ''}
+              placeholder={property.placeholderKey ? t(property.placeholderKey) : (property.placeholder ?? '')}
               type={property.type}
               inputType={property.inputType}
               options={property.options?.map(option => ({ value: option, label: option }))}
