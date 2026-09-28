@@ -14,11 +14,7 @@ const baseDraft = {
 
 describe.each([
   ['DatastructureCreateFormSchema', DatastructureCreateFormSchema, { name: 'A data structure' }],
-  [
-    'DatastructureCreateDataSchema',
-    DatastructureCreateDataSchema,
-    { name: 'A data structure', createdFromDataSource: false },
-  ],
+  ['DatastructureCreateDataSchema', DatastructureCreateDataSchema, { name: 'A data structure' }],
   ['DatastructureFormDraftSchema', DatastructureFormDraftSchema, baseDraft],
   ['DatastructureFormAvailableSchema', DatastructureFormAvailableSchema, baseDraft],
 ])('%s description validation', (_name, schema, base) => {

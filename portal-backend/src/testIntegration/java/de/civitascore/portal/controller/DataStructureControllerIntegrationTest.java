@@ -151,7 +151,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Missing description");
       input.setDescription("  ");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performCreate(input);
 
@@ -363,7 +362,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Still has a name");
       input.setDescription("  ");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(dataStructureId, input);
 
