@@ -400,6 +400,28 @@ describe('The operation the Mapping editor offers', () => {
     expect([...Object.keys(mappingRegistry.byType), 'copy'].sort()).toEqual(defined)
   })
 
+  it('offers no free-text field beyond a date pattern, a literal value and a separator', () => {
+    const configFields = Object.fromEntries(
+      mappingRegistry.list.map(def => [
+        def.type,
+        Object.fromEntries(def.config.map(field => [field.key, field.control])),
+      ]),
+    )
+
+    expect(configFields).toEqual({
+      const: { type: 'select', value: 'text' },
+      concat: { separator: 'text' },
+      geoPoint: {},
+      toString: {},
+      toInt: {},
+      toFloat: {},
+      toUuid: {},
+      toDate: { pattern: 'text' },
+      toDateTime: { pattern: 'text' },
+      format: { pattern: 'text' },
+    })
+  })
+
   it.each(['toDate', 'toDateTime', 'format'] as const)('reports an emptied %s pattern as a config error', op => {
     const def = transformDef(op)
     const patternNodes: Node[] = [
