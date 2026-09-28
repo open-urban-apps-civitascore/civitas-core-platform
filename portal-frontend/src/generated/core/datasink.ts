@@ -55,9 +55,6 @@ export const PostgisDataSinkSchema = z
     tableName: z.string(),
     /**
      * Versioned CORE URN of the DataStructure describing the row format written to the table.
-     * Absent on a passthrough sink with no upstream mapping (mirrors FrostDataSinkSchema.element).
-     * MANUAL PATCH: the backend CORE JSON Schema (model-forge-runtime) still marks this required —
-     * this override is lost on the next `npm run generate:core-types` until that source is fixed.
      * @coreRef { type: "urn:core:type:DataStructure" }
      */
     element: z
@@ -65,8 +62,7 @@ export const PostgisDataSinkSchema = z
       .regex(
         /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$/,
         'Must be a versioned CORE DataStructure URN',
-      )
-      .optional(),
+      ),
   })
   .strict()
 

@@ -84,6 +84,14 @@ export class DataSinkDocumentValidationError extends Error {
   }
 }
 
+/** Thrown for a geo persistence node whose version was selected before `dataStructureUrn` existed. */
+export class MissingDataStructureUrnError extends Error {
+  constructor(public readonly nodeId: string) {
+    super('Geo persistence node has no data structure URN')
+    this.name = 'MissingDataStructureUrnError'
+  }
+}
+
 /**
  * Builds the clean, URN-native CORE Pipeline document (the payload `model`). References are read from
  * node data (resolved from the pickers / stashed after datasink & mapping saves) and omitted when a
@@ -295,21 +303,19 @@ export interface DataSinkNodePayload {
  */
 export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[] => {
   return pipeline.nodes.flatMap<DataSinkNodePayload>(node => {
-    // The deploy engine derives a sink's target structure from the mapping's Thing-shaped target,
-    // referenced by versioned CORE URN (the backend's *Configuration.element, a Model-Forge soft
-    // reference — not a raw version id). A passthrough pipeline (no mapping) has no element.
-    const elementUrn = mappingTargetElementBefore(pipeline, node.id)
-
+    // `element` is the versioned CORE URN of the sink's target structure (a Model-Forge soft reference,
+    // not a raw version id). POSTGIS uses its own data structure, FROST the mapping's target.
     let payload: DataSinkPayload | null = null
     if (isGeoPersistenceNodeData(node.data) && node.data.dataStructureVersionId != null) {
+      const { tableName, dataStructureUrn } = node.data
+      if (!dataStructureUrn) throw new MissingDataStructureUrnError(node.id)
       payload = {
         id: node.data.entityId ?? null,
         dataSinkType: DATASINK_TYPES.POSTGIS,
-        configuration: elementUrn
-          ? { tableName: node.data.tableName, element: elementUrn }
-          : { tableName: node.data.tableName },
+        configuration: { tableName, element: dataStructureUrn },
       }
     } else if (isFrostNodeData(node.data)) {
+      const elementUrn = mappingTargetElementBefore(pipeline, node.id)
       payload = {
         id: node.data.entityId ?? null,
         dataSinkType: DATASINK_TYPES.FROST,

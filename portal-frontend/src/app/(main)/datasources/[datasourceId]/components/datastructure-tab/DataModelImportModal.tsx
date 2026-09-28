@@ -28,10 +28,16 @@ import { DATASTRUCTURE_STATUS_TYPES, DatastructuresListData } from '@/types/data
 import { mapDatastructuresApiToListData } from '@/utils/datastructures'
 import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
 
+export interface SelectedDatastructureVersion {
+  datastructureId: string
+  name: string
+  version: string
+}
+
 interface DataModelImportModalProps extends DialogProps {
   selectedVersion: string | null
   datasourceTitle: string
-  onSelectVersion: (selection: RowSelectionState) => void
+  onSelectVersion: (selection: RowSelectionState, selectedVersion?: SelectedDatastructureVersion) => void
   isUpdating?: boolean
   // If true, the import button is enabled when a saved datastructure gets unselected
   canRemoveSelection?: boolean
@@ -74,6 +80,20 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
   }))
 
   const datastructures = mapDatastructuresApiToListData(selectableDatastructures)
+
+  const findSelectedVersion = (rowId: string | undefined): SelectedDatastructureVersion | undefined => {
+    for (const datastructure of datastructures) {
+      const version = datastructure.versions.find(item => `${datastructure.id}/${item.id}` === rowId)
+      if (version?.versionNumber) {
+        return { datastructureId: datastructure.id, name: datastructure.name, version: version.versionNumber }
+      }
+    }
+    return undefined
+  }
+
+  const handleConfirm = () => {
+    onSelectVersion(selection, findSelectedVersion(Object.keys(selection)[0]))
+  }
 
   const rowCount = datastructuresData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize)
@@ -263,7 +283,7 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
         </div>
         <ActionButtons
           confirmButtonType="button"
-          onConfirmClick={() => onSelectVersion(selection)}
+          onConfirmClick={handleConfirm}
           onCancelClick={() => onOpenChange(false)}
           isConfirmButtonDisabled={isImportButtonDisabled}
           hasCard={false}
