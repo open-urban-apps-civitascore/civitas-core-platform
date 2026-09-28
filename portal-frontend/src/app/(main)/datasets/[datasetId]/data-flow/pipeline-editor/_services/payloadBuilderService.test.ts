@@ -7,12 +7,13 @@ import {
   buildDataSinkPayloads,
   buildMappingArtifacts,
   buildPipelinePayload,
+  createDataSinkSnapshot,
   createMappingSnapshot,
-  DataSinkDocumentValidationError,
   type DataSinkSnapshot,
   hasMappingChanged,
   isDestructiveDataSinkChange,
   MappingDocumentValidationError,
+  MissingDataStructureUrnError,
   PipelineModelValidationError,
 } from './payloadBuilderService'
 
@@ -130,6 +131,7 @@ describe('buildDataSinkPayloads — PostGIS configuration', () => {
   }
 
   const NODE_URN = 'urn:core:platform:civitas:datastructure:common:Roads:aa11bb22cc:1.0.0'
+  const OTHER_NODE_URN = 'urn:core:platform:civitas:datastructure:common:Roads:aa11bb22cc:2.0.0'
   const MAPPING_TARGET_URN = 'urn:core:platform:civitas:datastructure:common:Target:dd33ee44ff:1.0.0'
 
   const postgisNodeWithUrn = (dataStructureUrn: string): TestNode => ({
@@ -158,7 +160,13 @@ describe('buildDataSinkPayloads — PostGIS configuration', () => {
       [mappingNode('map-1', MAPPING_TARGET_URN), postgisNode],
       [{ source: 'map-1', target: 'postgis-1' }],
     )
-    expect(() => buildDataSinkPayloads(p)).toThrow(DataSinkDocumentValidationError)
+    expect(() => buildDataSinkPayloads(p)).toThrow(MissingDataStructureUrnError)
+  })
+
+  it('flags a version change on a saved sink without mapping as destructive', () => {
+    const snapshot = createDataSinkSnapshot(pipeline([postgisNodeWithUrn(NODE_URN)], []))
+    const [{ payload }] = buildDataSinkPayloads(pipeline([postgisNodeWithUrn(OTHER_NODE_URN)], []))
+    expect(isDestructiveDataSinkChange('postgis-1', payload, snapshot)).toBe(true)
   })
 })
 

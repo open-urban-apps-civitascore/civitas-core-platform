@@ -27,6 +27,7 @@ import {
   hasDataSinkChanged,
   hasMappingChanged,
   isDestructiveDataSinkChange,
+  MissingDataStructureUrnError,
   updateNodeData,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
@@ -108,7 +109,9 @@ vi.mock('../../_services/validationService', () => ({
   getNodeValidationSeverity: vi.fn().mockReturnValue('none'),
 }))
 
-vi.mock('../../_services/payloadBuilderService', () => ({
+vi.mock('../../_services/payloadBuilderService', async importOriginal => ({
+  MissingDataStructureUrnError: (await importOriginal<typeof import('../../_services/payloadBuilderService')>())
+    .MissingDataStructureUrnError,
   buildPipelinePayload: vi.fn().mockReturnValue({
     name: 'Test',
     description: '',
@@ -1706,6 +1709,23 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.unconfirmedDataLossError')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
+    })
+
+    it('asks to re-add the geo persistence node when it has no data structure URN', async () => {
+      vi.mocked(buildDataSinkPayloads).mockImplementation(() => {
+        throw new MissingDataStructureUrnError('persist-1')
+      })
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.missingDataStructureUrn')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
     })
 

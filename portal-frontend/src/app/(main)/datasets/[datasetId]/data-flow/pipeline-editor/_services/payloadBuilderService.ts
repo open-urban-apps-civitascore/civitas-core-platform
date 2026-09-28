@@ -84,6 +84,14 @@ export class DataSinkDocumentValidationError extends Error {
   }
 }
 
+/** Thrown for a geo persistence node whose version was selected before `dataStructureUrn` existed. */
+export class MissingDataStructureUrnError extends Error {
+  constructor(public readonly nodeId: string) {
+    super('Geo persistence node has no data structure URN')
+    this.name = 'MissingDataStructureUrnError'
+  }
+}
+
 /**
  * Builds the clean, URN-native CORE Pipeline document (the payload `model`). References are read from
  * node data (resolved from the pickers / stashed after datasink & mapping saves) and omitted when a
@@ -275,10 +283,11 @@ export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[]
     let payload: DataSinkPayload | null = null
     if (isGeoPersistenceNodeData(node.data) && node.data.dataStructureVersionId != null) {
       const { tableName, dataStructureUrn } = node.data
+      if (!dataStructureUrn) throw new MissingDataStructureUrnError(node.id)
       payload = {
         id: node.data.entityId ?? null,
         dataSinkType: DATASINK_TYPES.POSTGIS,
-        configuration: dataStructureUrn ? { tableName, element: dataStructureUrn } : { tableName },
+        configuration: { tableName, element: dataStructureUrn },
       }
     } else if (isFrostNodeData(node.data)) {
       const elementUrn = mappingTargetElementBefore(pipeline, node.id)

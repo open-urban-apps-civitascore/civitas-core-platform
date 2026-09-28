@@ -1370,6 +1370,7 @@
       "tableNameConflict": "Cannot save {names}: a geo persistence table name is already used by another data storage of this Dataset.",
       "dataSinkInUseError": "Cannot save {names}: a data storage is still used by at least one layer.",
       "unconfirmedDataLossError": "Cannot save {names}: the change would discard stored data.",
+      "missingDataStructureUrn": "Cannot save {names}: the geo persistence node is not valid. Assign its data structure again, or delete it and add it again.",
       "notDraftError": "The Dataset must be in draft status to make changes.",
       "sagaInFlightError": "The Dataset is currently being processed. Please try again later."
     },

@@ -1357,6 +1357,7 @@
       "tableNameConflict": "{names} kann nicht gespeichert werden: Ein Geo-Persistenz-Tabellenname wird bereits von einem anderen Datenspeicher dieses Datensatzes verwendet.",
       "dataSinkInUseError": "{names} kann nicht gespeichert werden: Ein Datenspeicher wird noch von mindestens einem Layer verwendet.",
       "unconfirmedDataLossError": "{names} kann nicht gespeichert werden: Die Änderung verwirft gespeicherte Daten.",
+      "missingDataStructureUrn": "{names} kann nicht gespeichert werden: Der Geo-Persistenz-Knoten ist nicht valide. Weise ihm seine Datenstruktur neu zu oder lösche ihn und lege ihn neu an.",
       "notDraftError": "Der Datensatz muss im Entwurfsstatus sein, um Änderungen vorzunehmen.",
       "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut."
     },

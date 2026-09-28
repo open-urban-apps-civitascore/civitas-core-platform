@@ -56,6 +56,7 @@ import {
   hasMappingChanged,
   isDestructiveDataSinkChange,
   type MappingSnapshot,
+  MissingDataStructureUrnError,
   updateNodeData,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
@@ -538,6 +539,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     const tableNameConflictNames: string[] = []
     const sinkInUsePipelineNames: string[] = []
     const dataLossPipelineNames: string[] = []
+    const missingDataStructureUrnNames: string[] = []
     const notDraftNames: string[] = []
     const sagaInFlightNames: string[] = []
     try {
@@ -648,6 +650,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             sinkInUsePipelineNames.push(session.name)
           } else if (isUnconfirmedDataLossError(error)) {
             dataLossPipelineNames.push(session.name)
+          } else if (error instanceof MissingDataStructureUrnError) {
+            missingDataStructureUrnNames.push(session.name)
           } else {
             saveFailedNames.push(session.name)
           }
@@ -672,6 +676,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       if (dataLossPipelineNames.length > 0) {
         toast.error(t('header.unconfirmedDataLossError', { names: dataLossPipelineNames.join(', ') }))
       }
+      if (missingDataStructureUrnNames.length > 0) {
+        toast.error(t('header.missingDataStructureUrn', { names: missingDataStructureUrnNames.join(', ') }))
+      }
       if (saveFailedNames.length > 0) {
         toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
       }
@@ -682,6 +689,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         tableNameConflictNames.length > 0 ||
         sinkInUsePipelineNames.length > 0 ||
         dataLossPipelineNames.length > 0 ||
+        missingDataStructureUrnNames.length > 0 ||
         saveFailedNames.length > 0
       ) {
         return false
