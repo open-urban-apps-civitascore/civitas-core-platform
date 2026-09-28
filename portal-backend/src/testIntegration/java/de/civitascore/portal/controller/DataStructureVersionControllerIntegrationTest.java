@@ -6,6 +6,7 @@ import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
@@ -185,6 +186,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(output.getDataStructureVersionStatus())
           .as("Status should be set to DRAFT by preProcessCreateInput hook")
           .isEqualTo(DataStructureVersionStatus.DRAFT);
+      assertThat(output.getDataStructureVersionSource())
+          .as("Source is set by the backend, the input does not carry it")
+          .isEqualTo(DataStructureVersionSource.OWN);
       assertThat(output.getModel())
           .as("Model (JSON Schema) should be persisted and returned")
           .containsEntry("title", "Model3");
@@ -319,6 +323,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(output.getDescription()).isEqualTo("First version of the test data structure");
       assertThat(output.getDataStructureVersionStatus())
           .isEqualTo(DataStructureVersionStatus.DRAFT);
+      assertThat(output.getDataStructureVersionSource()).isEqualTo(DataStructureVersionSource.OWN);
       assertThat(output.getModelName()).isEqualTo("TestModel1");
       assertThat(output.getStyles().get("color")).isEqualTo("blue");
       assertThat(output.getModel())

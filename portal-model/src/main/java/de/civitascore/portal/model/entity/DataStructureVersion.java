@@ -1,5 +1,6 @@
 package de.civitascore.portal.model.entity;
 
+import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.base.BaseEntity;
 import jakarta.persistence.Column;
@@ -12,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -24,6 +26,7 @@ import lombok.experimental.SuperBuilder;
  * #modelUrn}.
  *
  * @see DataStructureVersionStatus
+ * @see DataStructureVersionSource
  */
 @Entity
 @Table(name = "data_structure_versions")
@@ -39,6 +42,11 @@ public class DataStructureVersion extends BaseEntity {
   @Enumerated(EnumType.STRING)
   @Column(name = "data_structure_version_status", nullable = false)
   @NotNull private DataStructureVersionStatus dataStructureVersionStatus;
+
+  @Builder.Default
+  @Enumerated(EnumType.STRING)
+  @Column(name = "data_structure_version_source", nullable = false)
+  private DataStructureVersionSource dataStructureVersionSource = DataStructureVersionSource.OWN;
 
   // Assigned by Model Forge when the model is stored; null while a draft has no model yet.
   @Column(name = "version")

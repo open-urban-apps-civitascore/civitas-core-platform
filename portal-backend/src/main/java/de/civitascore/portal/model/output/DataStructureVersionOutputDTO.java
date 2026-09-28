@@ -1,5 +1,6 @@
 package de.civitascore.portal.model.output;
 
+import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.output.summary.DataStructureSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,6 +24,9 @@ public class DataStructureVersionOutputDTO extends BaseOutputDTO {
   private DataStructureSummaryDTO dataStructure;
 
   private DataStructureVersionStatus dataStructureVersionStatus;
+
+  @Schema(description = "How this version was created (e.g. MANUAL, AUTO)")
+  private DataStructureVersionSource dataStructureVersionSource;
 
   private String modelName;
 
