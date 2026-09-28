@@ -86,8 +86,8 @@ import org.testcontainers.utility.MountableFile;
  * </ul>
  *
  * <p>Failure paths must never drop silently: a missing source field renders a JSON {@code null}
- * result (valid body), a record whose Datastream does not exist writes nothing and waits in {@code
- * retry}, and a FROST-rejected observation (bad {@code phenomenonTime}) never becomes an
+ * result (valid body), a record whose Datastream does not exist writes nothing and reaches the
+ * error sink, and a FROST-rejected observation (bad {@code phenomenonTime}) never becomes an
  * observation while the flow keeps running. The port writes a record as one unit: when one of its
  * entities is refused, none of them is written. Skipped when Docker is unavailable.
  */
@@ -122,7 +122,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String REF_NEVER = "REF-NEVER-1";
   private static final String DS_NEVER = "DS-NEVER-1";
   // A station that always lands: its observation shows that the flow went on after a record it
-  // refused or put back, so an absence is not mistaken for a flow that stopped.
+  // refused, so an absence is not mistaken for a flow that stopped.
   private static final String REF_ALIVE = "REF-ALIVE-1";
   private static final String DS_ALIVE = "DS-ALIVE-1";
   private static final String REF_BADTS = "REF-BADTS-1";
@@ -557,9 +557,9 @@ class NifiFrostMappingIT extends AbstractNifiIT {
 
   @Test
   void aRecordWithoutItsDatastreamWritesNothing() throws Exception {
-    // DS_NEVER is never provisioned and the mapping only looks the Datastream up. The record waits
-    // in retry for a Datastream that may still come, and since the port writes a record as one
-    // unit, not even its Thing appears. The station after it proves the flow went on meanwhile.
+    // DS_NEVER is never provisioned and the mapping only looks the Datastream up, so the port has
+    // no fields to create it with, and FROST refuses the create. The port writes a record as one
+    // unit, so not even its Thing appears. The station after it proves the flow went on meanwhile.
     try (MqttPublisher publisher = publisher("civitas-it-never")) {
       publisher.publishOnce(
           TOPIC, payload("Never Station", REF_NEVER, DS_NEVER, "9.9", "\"2026-01-04T00:00:00Z\""));
@@ -1025,7 +1025,12 @@ class NifiFrostMappingIT extends AbstractNifiIT {
             + "\",\"description\":\"mapping IT\","
             + "\"observationType\":\"http://www.opengis.net/def/observationType/OGC-OM/2.0/OM_Measurement\","
             + "\"unitOfMeasurement\":{\"name\":\"Celsius\",\"symbol\":\"degC\",\"definition\":\"ucum:Cel\"},"
+            // The port knows a Datastream by its own reference and by the one of its Thing, the
+            // pair
+            // it writes on every Datastream it creates.
             + "\"properties\":{\"reference\":\""
+            + reference
+            + "\",\"thingReference\":\""
             + reference
             + "\"},"
             + "\"Sensor\":{\"name\":\"Sensor-IT\",\"description\":\"s\","
