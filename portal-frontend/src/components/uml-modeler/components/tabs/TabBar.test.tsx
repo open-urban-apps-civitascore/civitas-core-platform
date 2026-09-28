@@ -9,6 +9,16 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
+// The menu needs the diagram, React Flow and the query client; its own test covers it. Here it only
+// has to hand the file dialog on.
+vi.mock('./ImportMenu', () => ({
+  ImportMenu: ({ onImportFile }: { onImportFile?: () => void }) => (
+    <button type="button" onClick={onImportFile}>
+      import.title
+    </button>
+  ),
+}))
+
 const createMockSession = (overrides?: Partial<DiagramSession>): DiagramSession => ({
   id: 'session-1',
   name: 'Untitled Diagram',

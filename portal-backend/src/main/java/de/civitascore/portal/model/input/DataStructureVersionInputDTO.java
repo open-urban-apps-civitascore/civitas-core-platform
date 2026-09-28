@@ -5,6 +5,7 @@ import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.Data;
@@ -33,6 +34,12 @@ public class DataStructureVersionInputDTO extends BaseInputDTO {
   private Map<String, Object> model;
 
   private Map<String, Object> styles;
+
+  /**
+   * The published structures the diagram was built from, each pinned at the version it was loaded
+   * at. The editor derives them from the diagram, like the model document.
+   */
+  private List<String> importedStructureUrns;
 
   @JsonIgnore
   // The dataStructureId is required for the service layer to associate the version with the correct

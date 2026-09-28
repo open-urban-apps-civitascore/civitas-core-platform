@@ -48,6 +48,9 @@ export const DatastructureVersionApiResponseSchema = z.object({
   modelUrn: z.string().nullable().optional(),
   model: z.record(z.string(), z.unknown()).nullable(),
   styles: z.custom<UMLDiagram>().nullable(),
+  // Versioned CORE URNs of the published structures this version was built from. The import pins
+  // the version, so a later version of a structure leaves this one untouched.
+  importedStructureUrns: z.array(z.string()).nullable().optional(),
   inUse: z.boolean().optional(),
   inUseByReleased: z.boolean().optional(),
   dataStructure: ItemSchema,
@@ -98,6 +101,7 @@ export const DatastructureVersionCreateSchema = z.object({
   modelName: z.string().trim().nullable().optional(),
   model: z.record(z.string(), z.unknown()).nullable().optional(),
   styles: z.custom<UMLDiagram>().nullable().optional(),
+  importedStructureUrns: z.array(z.string()).nullable().optional(),
 })
 
 export type DatastructureVersion = z.infer<typeof DatastructureVersionApiResponseSchema>

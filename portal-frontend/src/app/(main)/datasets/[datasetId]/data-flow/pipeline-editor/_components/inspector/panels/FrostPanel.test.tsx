@@ -8,6 +8,43 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
+const portStructure = vi.fn()
+vi.mock('@/app/services/api/published-structures/clientRequests', () => ({
+  useGetPublishedStructure: (options: { structureKey?: string }) => portStructure(options),
+}))
+
+beforeEach(() => {
+  portStructure.mockReturnValue({ data: undefined })
+})
+
+/** The structure a port publishes, in the shape the generator writes. */
+const observationsModel = {
+  title: 'Observations',
+  type: 'object',
+  properties: { observation: { $ref: '#/$defs/Observation' } },
+  $defs: {
+    Observation: {
+      type: 'object',
+      title: 'Observation',
+      properties: {
+        result: {},
+        resultTime: { type: 'string', format: 'date-time' },
+        parameters: { $ref: '#/$defs/ObservationParameters' },
+      },
+      required: ['result', 'parameters'],
+    },
+    ObservationParameters: {
+      type: 'object',
+      title: 'ObservationParameters',
+      properties: {
+        reference: { type: 'string', 'x-core-primaryKey': true },
+        thingReference: { type: 'string' },
+      },
+      required: ['thingReference'],
+    },
+  },
+}
+
 // The select is a Radix listbox, and jsdom implements neither pointer capture nor scrollIntoView.
 // Without these the list never opens and every interaction test fails for the environment rather
 // than for the component. Kept local: this is the first Radix select under test here.
@@ -71,10 +108,27 @@ describe('FrostPanel', () => {
     expect(onUpdate).toHaveBeenCalledWith({ port: 'Observations', configured: true })
   })
 
-  it('shows the description and the references of the selected port', () => {
+  it('shows the structure the selected port publishes', () => {
+    portStructure.mockReturnValue({ data: { data: observationsModel } })
     renderPanel({ port: 'Observations', configured: true })
 
     expect(screen.getByText('frostPanel.ports.Observations.description')).toBeInTheDocument()
+    expect(screen.getByText('result')).toBeInTheDocument()
+    expect(screen.getByText('thingReference')).toBeInTheDocument()
+    // The data type of a field.
+    expect(screen.getByText('datetime')).toBeInTheDocument()
+    // The field the port finds the entity by is marked as such. Under the test's identity
+    // translator the marker renders as the same word as the field's own name, so it appears twice.
+    expect(screen.getAllByText('reference')).toHaveLength(2)
+    // Three mandatory fields: result, parameters and thingReference.
+    expect(screen.getAllByText('*')).toHaveLength(3)
+  })
+
+  it('names the references while the structure is not there', () => {
+    // A failed or pending request must not leave the panel empty: what the port resolves is known
+    // here, and a modeller who reads it can start.
+    renderPanel({ port: 'Observations', configured: true })
+
     expect(screen.getByText('frostPanel.expects')).toBeInTheDocument()
     expect(screen.getByText('frostPanel.ports.Observations.expects')).toBeInTheDocument()
   })

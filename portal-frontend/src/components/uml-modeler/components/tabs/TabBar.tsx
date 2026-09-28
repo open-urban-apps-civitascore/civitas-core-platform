@@ -1,6 +1,6 @@
 'use client'
 
-import { Download, Plus, Upload, X } from 'lucide-react'
+import { Download, Plus, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useState } from 'react'
 
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { useReadOnly } from '../../hooks/use-read-only'
 import { DEFAULT_DIAGRAM_NAME } from '../../services/diagramService'
 import type { DiagramSession } from '../../types/session'
+import { ImportMenu } from './ImportMenu'
 
 interface TabProps {
   session: DiagramSession
@@ -184,19 +185,8 @@ export const TabBar: React.FC<TabBarProps> = props => {
 
       {/* Actions (Import & Export) */}
       <div className="flex items-center gap-1 px-2">
-        {onImportClick && !isModelerReadOnly && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onImportClick}
-            className="h-8 px-2 text-xs font-normal text-gray-700 hover:text-gray-900"
-            title={t('import.file')}
-          >
-            <Upload className="h-3.5 w-3.5 mr-1 text-gray-600" />
-            <span>{t('import.title')}</span>
-          </Button>
-        )}
+        {/* A file and the standard structures share one menu: both bring a structure in. */}
+        {!isModelerReadOnly && <ImportMenu onImportFile={onImportClick} />}
         {onExportClick && (
           <Button
             type="button"

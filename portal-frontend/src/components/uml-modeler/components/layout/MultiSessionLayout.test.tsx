@@ -38,6 +38,16 @@ vi.mock('../tabs/Toolbar', () => ({
   Toolbar: () => <div data-testid="toolbar" />,
 }))
 
+// The menu needs the diagram, React Flow and the query client; its own test covers it. Here it only
+// has to hand the file dialog on.
+vi.mock('../tabs/ImportMenu', () => ({
+  ImportMenu: ({ onImportFile }: { onImportFile?: () => void }) => (
+    <button type="button" onClick={onImportFile}>
+      import.title
+    </button>
+  ),
+}))
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: false },
@@ -144,8 +154,8 @@ describe('MultiSessionLayout Import & Export', () => {
   })
 
   it('shows error toast when importing a file that fails validation', async () => {
-    vi.spyOn(diagramFileService, 'readDiagramFile').mockRejectedValueOnce(
-      new DiagramImportError('MISSING_UI_STYLES', 'No styles'),
+    vi.spyOn(diagramFileService, 'readImportFile').mockRejectedValueOnce(
+      new DiagramImportError('INVALID_JSON', 'Not JSON'),
     )
 
     renderLayout()
@@ -156,13 +166,13 @@ describe('MultiSessionLayout Import & Export', () => {
     fireEvent.change(fileInput, { target: { files: [file] } })
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('import.errors.MISSING_UI_STYLES')
+      expect(toast.error).toHaveBeenCalledWith('import.errors.INVALID_JSON')
     })
   })
 
   it('imports directly without modal when the canvas has no existing nodes', async () => {
     const imported = createMockDiagram([createSampleNode('node-1', 'ImportedClass')], 'ImportedModel')
-    vi.spyOn(diagramFileService, 'readDiagramFile').mockResolvedValueOnce(imported)
+    vi.spyOn(diagramFileService, 'readImportFile').mockResolvedValueOnce({ diagram: imported, document: {} })
 
     const { mockSessionManager } = renderLayout(createMockDiagram([], 'Untitled Diagram'))
 
@@ -188,7 +198,7 @@ describe('MultiSessionLayout Import & Export', () => {
 
   it('preserves existing custom session name on import without marking modelName dirty', async () => {
     const imported = createMockDiagram([createSampleNode('node-1', 'ImportedClass')], 'ImportedModel')
-    vi.spyOn(diagramFileService, 'readDiagramFile').mockResolvedValueOnce(imported)
+    vi.spyOn(diagramFileService, 'readImportFile').mockResolvedValueOnce({ diagram: imported, document: {} })
 
     const { mockSessionManager } = renderLayout(createMockDiagram([], 'MyCustomStructure'))
 
@@ -214,7 +224,7 @@ describe('MultiSessionLayout Import & Export', () => {
   it('opens overwrite confirmation modal when canvas has existing nodes', async () => {
     const existingNode = createSampleNode('node-existing', 'ExistingClass')
     const imported = createMockDiagram([createSampleNode('node-imported', 'ImportedClass')], 'ImportedModel')
-    vi.spyOn(diagramFileService, 'readDiagramFile').mockResolvedValueOnce(imported)
+    vi.spyOn(diagramFileService, 'readImportFile').mockResolvedValueOnce({ diagram: imported, document: {} })
 
     const { mockSessionManager } = renderLayout(createMockDiagram([existingNode], 'Untitled Diagram'))
 
@@ -237,7 +247,7 @@ describe('MultiSessionLayout Import & Export', () => {
   it('replaces diagram and sets session dirty when confirming overwrite modal', async () => {
     const existingNode = createSampleNode('node-existing', 'ExistingClass')
     const imported = createMockDiagram([createSampleNode('node-imported', 'ImportedClass')], 'ImportedModel')
-    vi.spyOn(diagramFileService, 'readDiagramFile').mockResolvedValueOnce(imported)
+    vi.spyOn(diagramFileService, 'readImportFile').mockResolvedValueOnce({ diagram: imported, document: {} })
 
     const { mockSessionManager } = renderLayout(createMockDiagram([existingNode], 'Untitled Diagram'))
 
@@ -263,6 +273,36 @@ describe('MultiSessionLayout Import & Export', () => {
     )
     expect(toast.success).toHaveBeenCalledWith('import.success')
     expect(screen.queryByText('import.overwriteModal.title')).not.toBeInTheDocument()
+  })
+
+  it('adds the classes of the file beside the existing ones when choosing add', async () => {
+    const existingNode = createSampleNode('node-existing', 'ExistingClass')
+    const pins = [
+      { urn: 'urn:core:platform:civitas:datastructure:frost:ThingTree:0123456789:1.0.0', name: 'ThingTree' },
+    ]
+    const document = {
+      $ref: '#/$defs/Station',
+      $defs: { Station: { type: 'object', title: 'Station', properties: { name: { type: 'string' } } } },
+    }
+    const imported = { ...createMockDiagram([], 'Stations'), importedStructures: pins }
+    vi.spyOn(diagramFileService, 'readImportFile').mockResolvedValueOnce({ diagram: imported, document })
+
+    const { mockSessionManager } = renderLayout(createMockDiagram([existingNode], 'Untitled Diagram'))
+
+    fireEvent.change(screen.getByTestId('diagram-file-input'), {
+      target: { files: [new File(['{}'], 'stations.json', { type: 'application/json' })] },
+    })
+    await waitFor(() => {
+      expect(screen.getByText('import.overwriteModal.title')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('addButton'))
+
+    const [, updated] = mockSessionManager.setSession.mock.calls[0]
+    expect(updated.diagram.nodes.map((node: UMLNode) => node.data.element.name)).toEqual(['ExistingClass', 'Station'])
+    expect(updated.diagram.importedStructures).toEqual(pins)
+    expect(updated.dirtyFields.has('model')).toBe(true)
+    expect(toast.success).toHaveBeenCalledWith('import.added')
   })
 
   it('hides the export button when datastructureId is missing or canExportDiagram is false', () => {

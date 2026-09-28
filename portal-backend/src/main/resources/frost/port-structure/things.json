@@ -1,0 +1,46 @@
+{
+  "$id": "urn:core:platform:civitas:datastructure:frost:Things:4eg5hgeyxv",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Things",
+  "type": "object",
+  "properties": {
+    "thing": {
+      "$ref": "#/$defs/Thing"
+    }
+  },
+  "$defs": {
+    "Thing": {
+      "type": "object",
+      "title": "Thing",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "properties": {
+          "$ref": "#/$defs/ThingProperties"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "properties"
+      ]
+    },
+    "ThingProperties": {
+      "type": "object",
+      "title": "ThingProperties",
+      "properties": {
+        "reference": {
+          "type": "string",
+          "x-core-primaryKey": true
+        }
+      },
+      "required": [
+        "reference"
+      ]
+    }
+  }
+}

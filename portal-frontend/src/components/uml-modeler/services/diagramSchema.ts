@@ -1,6 +1,15 @@
 import { z } from 'zod'
 
-export const UMLPrimitiveTypeSchema = z.enum(['String', 'Integer', 'Boolean', 'Number', 'Date', 'DateTime', 'Uuid'])
+export const UMLPrimitiveTypeSchema = z.enum([
+  'String',
+  'Integer',
+  'Boolean',
+  'Number',
+  'Date',
+  'DateTime',
+  'Uuid',
+  'Json',
+])
 
 export const UMLGeometryTypeSchema = z.enum([
   'Point',
@@ -179,6 +188,9 @@ export const RawUMLDiagramSchema = z.object({
   viewport: ViewportSchema.optional(),
   lastModified: z.union([z.string(), z.date()]).optional(),
   isDirty: z.boolean().optional(),
+  // The published structures the diagram was built from. Without them a file import would drop
+  // the pins, and the next save would record no provenance.
+  importedStructures: z.array(z.object({ urn: z.string(), name: z.string() })).optional(),
 })
 
 export const UMLDiagramSchema = RawUMLDiagramSchema.superRefine((diagram, ctx) => {

@@ -229,7 +229,14 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const renderTabContent = () => {
     switch (subTabValue) {
       case 'versionInfo':
-        return <VersionInfoTab form={form} isReadOnly={isReadOnly} isAvailable={isVersionAvailable} />
+        return (
+          <VersionInfoTab
+            form={form}
+            isReadOnly={isReadOnly}
+            isAvailable={isVersionAvailable}
+            importedStructureUrns={version?.importedStructureUrns ?? []}
+          />
+        )
       case 'structure':
       default:
         return (
