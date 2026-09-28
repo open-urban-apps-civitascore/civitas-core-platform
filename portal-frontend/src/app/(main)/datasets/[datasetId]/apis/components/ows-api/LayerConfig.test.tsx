@@ -6,7 +6,7 @@ import { FormProvider, useForm } from 'react-hook-form'
 import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { STATUS_TYPES } from '@/types/common'
 import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
-import { DatastructureVersion } from '@/types/datastructures'
+import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
 import { LayerFormData } from '@/types/layers'
 import { API_TYPE_QUERY, OwsApiFormData, OwsApiFormSchema } from '@/types/namedApis'
 import { Style } from '@/types/styles'
@@ -37,6 +37,7 @@ const mockDataSink: DataSink = {
       version: '1.0.0',
       description: null,
       dataStructureVersionStatus: STATUS_TYPES.AVAILABLE,
+      dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
       dataStructureId: '00000000-0000-0000-0000-000000000011',
       createdAt: '2026-01-01T00:00:00',
       modifiedAt: '2026-01-01T00:00:00',
@@ -51,6 +52,7 @@ const mockDatastructureVersion: DatastructureVersion = {
   version: '1.0.0',
   description: null,
   dataStructureVersionStatus: STATUS_TYPES.AVAILABLE,
+  dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
   modelName: null,
   model: null,
   styles: null,

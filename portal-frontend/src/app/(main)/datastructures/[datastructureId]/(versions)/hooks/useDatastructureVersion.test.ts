@@ -101,6 +101,7 @@ const version = (over: Partial<DatastructureVersion> = {}): DatastructureVersion
     id: 'v1',
     version: '1.0.0',
     description: 'desc',
+    dataStructureVersionSource: 'OWN',
     dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
     modelName: 'Struct',
     styles: invalidDiagram(),

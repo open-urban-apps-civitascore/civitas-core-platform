@@ -31,13 +31,15 @@ export const DATASTRUCTURE_VERSION_SOURCE = {
   OWN: 'OWN',
 } as const
 
-export type DatastructureVersionSource =
-  (typeof DATASTRUCTURE_VERSION_SOURCE)[keyof typeof DATASTRUCTURE_VERSION_SOURCE]
-
 export const UMLModelStylesPayloadSchema = z.object({
   viewport: z.object({ x: z.number(), y: z.number(), zoom: z.number() }).optional(),
   nodePositions: z.record(z.string(), z.object({ x: z.number(), y: z.number() })),
 })
+
+export const DatastructureVersionSourceEnum = enumFromConst(DATASTRUCTURE_VERSION_SOURCE)
+
+export type DatastructureVersionSource =
+  (typeof DATASTRUCTURE_VERSION_SOURCE)[keyof typeof DATASTRUCTURE_VERSION_SOURCE]
 
 // DATASTRUCTURE VERSIONS
 
@@ -48,6 +50,7 @@ export const DatastructureVersionApiResponseSchema = z.object({
   version: z.string().nullable(),
   description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
+  dataStructureVersionSource: DatastructureVersionSourceEnum,
   modelName: z.string().nullable(),
   // Versioned CORE URN of this version's model (DataStructure) artifact in Model Forge.
   modelUrn: z.string().nullable().optional(),
@@ -68,6 +71,7 @@ export const DatastructureVersionSummaryApiResponseSchema = z.object({
   version: z.string().nullable(),
   description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
+  dataStructureVersionSource: DatastructureVersionSourceEnum,
   createdAt: z.string(),
   modifiedAt: z.string(),
   dataStructureId: z.string(),
@@ -83,6 +87,7 @@ export const DatastructureVersionFormDraftSchema = z.object({
   id: z.string(),
   version: versionSchema,
   description: z.string().trim(),
+  dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum,
   modelName: z.string().trim().nullable(),
   nodes: z.array(z.custom<UMLNode>()),

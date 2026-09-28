@@ -7,7 +7,6 @@ import { SelectOption } from '@/types/common'
 import {
   Datastructure,
   DATASTRUCTURE_STATUS_TYPES,
-  DATASTRUCTURE_VERSION_SOURCE,
   DatastructureFormDraft,
   DatastructuresListData,
   DatastructureVersion,
@@ -42,7 +41,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       description: datastructure.description || '-',
       status: datastructure.dataStructureStatus,
       versionNumber: highestVersion?.version ?? null,
-      source: highestVersion ? DATASTRUCTURE_VERSION_SOURCE.OWN : null,
+      source: highestVersion?.dataStructureVersionSource || null,
       inUse: datastructure.inUse,
       inUseByReleased: datastructure.inUseByReleased,
       // add versions field to versions for showing subrows in table
@@ -52,7 +51,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
         name: version.version ? `Version ${version.version}` : '-',
         description: version.description || '-',
         status: version.dataStructureVersionStatus,
-        source: DATASTRUCTURE_VERSION_SOURCE.OWN,
+        source: version.dataStructureVersionSource,
         inUseByReleased: version.inUseByReleased,
         versions: [],
       })),
@@ -69,7 +68,7 @@ export const mapDatastructureVersionsApiToListData = (
     name: version.version ? `Version ${version.version}` : '-',
     description: version.description || '-',
     status: version.dataStructureVersionStatus,
-    source: DATASTRUCTURE_VERSION_SOURCE.OWN,
+    source: version.dataStructureVersionSource,
     inUseByReleased: version.inUseByReleased,
   }))
 
@@ -78,6 +77,7 @@ export const mapDatastructureVersionApiToFormData = (version: DatastructureVersi
   version: version.version ?? '',
   description: version.description || '',
   dataStructureVersionStatus: version.dataStructureVersionStatus,
+  dataStructureVersionSource: version.dataStructureVersionSource,
   modelName: version.modelName,
   nodes: version.styles?.nodes || [],
   edges: version.styles?.edges || [],

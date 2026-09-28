@@ -78,6 +78,7 @@ const mockVersion: DatastructureVersion = {
   version: '1.0.0',
   description: 'Version 1.0',
   dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
+  dataStructureVersionSource: 'OWN',
   inUse: false,
   modelName: null,
   createdAt: '2024-01-01',
