@@ -36,6 +36,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import okhttp3.Request;
@@ -119,17 +120,22 @@ class NifiDataFlowIT extends AbstractNifiIT {
             .waitingFor(Wait.forHttp("/__admin/health").forStatusCode(200).forStatusCode(404));
     sink.start();
 
+    // The FROST sink writes through PutFrostRecord, so NiFi needs the NAR.
+    Optional<Path> nar = frostNar();
+    assumeTrue(nar.isPresent(), "FROST NAR not built — skipping NiFi data-flow IT");
     startNifi(
         HOST_PORT,
         network,
-        container ->
-            container
-                .withCopyFileToContainer(
-                    MountableFile.forHostPath(mqttTruststore), "/opt/certs/mqtt-truststore.p12")
-                // Mirror the apache-nifi-helm node-truststore contract used in deployment.
-                .withEnv("TRUSTSTORE_PATH", "/opt/certs/mqtt-truststore.p12")
-                .withEnv("TRUSTSTORE_TYPE", "PKCS12")
-                .withEnv("TRUSTSTORE_PASSWORD", MQTT_TRUSTSTORE_PASSWORD));
+        container -> {
+          container
+              .withCopyFileToContainer(
+                  MountableFile.forHostPath(mqttTruststore), "/opt/certs/mqtt-truststore.p12")
+              // Mirror the apache-nifi-helm node-truststore contract used in deployment.
+              .withEnv("TRUSTSTORE_PATH", "/opt/certs/mqtt-truststore.p12")
+              .withEnv("TRUSTSTORE_TYPE", "PKCS12")
+              .withEnv("TRUSTSTORE_PASSWORD", MQTT_TRUSTSTORE_PASSWORD);
+          installFrostNar(container, nar.get());
+        });
   }
 
   @AfterAll
