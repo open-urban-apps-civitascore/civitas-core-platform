@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi.flow.stage.sink;
 
 import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.removeAutoTerminated;
+import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.setExpression;
 import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.setProp;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
@@ -382,7 +383,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       throws FatalAdapterException {
     Processor errorSink = ctx.loadProcessor(Fragment.LOG_MESSAGE, null);
     // A record rejected by the processor carries the entity, the status and the reason FROST gave.
-    setProp(
+    setExpression(
         errorSink,
         "log-message",
         "Pipeline record dropped: entity=${frost.error.entity} status=${frost.error.status}"
@@ -450,7 +451,9 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       setProp(capture, key, "$." + key);
     }
     Processor render = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "staPortBody");
-    setProp(render, "Replacement Value", plan.body());
+    // Platform EL: the body holds only placeholders over the flat keys the compiler named. The
+    // tenant's values stay in the attributes, and NiFi does not evaluate an attribute again.
+    setExpression(render, "Replacement Value", plan.body());
 
     ctx.addProcessor(capture);
     ctx.addProcessor(render);
