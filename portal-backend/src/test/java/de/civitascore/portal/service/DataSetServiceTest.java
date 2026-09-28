@@ -2470,20 +2470,17 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("a dataset whose flows carry a defect is not staged")
-    void blockedStagingLeavesTheDatasetInDraft() {
+    @DisplayName("staging leaves the participating artifacts to the release gate")
+    void stagingDoesNotValidateParticipatingArtifacts() {
       UUID id = UUID.randomUUID();
       DataSet ds = stageable(id);
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
-      doThrow(new PipelineClosureValidationException(List.of(UUID.randomUUID())))
-          .when(pipelineClosureValidator)
-          .validate(any());
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      assertThatThrownBy(() -> createService().stage(id))
-          .isInstanceOf(PipelineClosureValidationException.class);
+      DataSet result = createService().stage(id);
 
-      assertThat(ds.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
-      verify(dataSetRepository, never()).save(any());
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+      verify(pipelineClosureValidator, never()).validate(any());
     }
 
     @Test

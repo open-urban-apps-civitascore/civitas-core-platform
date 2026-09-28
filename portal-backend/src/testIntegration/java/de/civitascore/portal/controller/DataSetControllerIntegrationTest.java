@@ -1908,18 +1908,21 @@ class DataSetControllerIntegrationTest
           .as("Should return NOT_FOUND status")
           .isEqualTo(HttpStatus.NOT_FOUND);
     }
+  }
+
+  @Nested
+  @DisplayName("Participating Artifact Tests")
+  class ParticipatingArtifactTests {
 
     /**
      * A dataset whose pipeline reaches a governed data structure two hops out, the shape a real
      * flow has: the source node names a DataSource, whose element names the structure. The walk,
      * the pin resolution and the scope check all run against the real registry.
      */
-    private DataSet dataSetReachingStructure(DataStructureVersionStatus versionStatus) {
-      return dataSetReachingStructure(versionStatus, DataSourceStatus.AVAILABLE);
-    }
-
     private DataSet dataSetReachingStructure(
-        DataStructureVersionStatus versionStatus, DataSourceStatus sourceStatus) {
+        DataSetStatus dataSetStatus,
+        DataStructureVersionStatus versionStatus,
+        DataSourceStatus sourceStatus) {
       DataStructure structure =
           portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
       DataStructureVersion version =
@@ -1942,8 +1945,7 @@ class DataSetControllerIntegrationTest
 
       DataSet dataSet =
           portalData.dataSet(
-              b ->
-                  b.description("reaches a governed structure").dataSetStatus(DataSetStatus.DRAFT));
+              b -> b.description("reaches a governed structure").dataSetStatus(dataSetStatus));
       Pipeline pipeline = portalData.pipeline(dataSet);
       pipeline.getDataSources().add(dataSource);
       pipeline = pipelineRepository.save(pipeline);
@@ -1967,11 +1969,7 @@ class DataSetControllerIntegrationTest
       return dataSet;
     }
 
-    @Test
-    @DisplayName("Should stage when the reached data structure is released")
-    void shouldStageWhenReachedStructureIsReleased() {
-      DataSet dataSet = dataSetReachingStructure(DataStructureVersionStatus.AVAILABLE);
-
+    private void assertStaged(DataSet dataSet) {
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSet.getId() + "/stage",
@@ -1980,21 +1978,15 @@ class DataSetControllerIntegrationTest
               null,
               getOutputTypeReference());
 
-      assertThat(response.getStatusCode())
-          .as("a flow reaching only released artifacts carries a release")
-          .isEqualTo(HttpStatus.OK);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     }
 
-    @Test
-    @DisplayName("Should refuse staging when the reached data structure is still a draft")
-    void shouldRefuseStagingWhenReachedStructureIsDraft() {
-      DataSet dataSet = dataSetReachingStructure(DataStructureVersionStatus.DRAFT);
-
+    private void assertReleaseRefused(DataSet dataSet) {
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(
-              getEndpointPath() + "/" + dataSet.getId() + "/stage",
+              getEndpointPath() + "/" + dataSet.getId() + "/release",
               HttpMethod.POST,
               createAuthHeaders(),
               null);
@@ -2007,52 +1999,43 @@ class DataSetControllerIntegrationTest
       assertThat(response.getBody().getProperties().toString())
           .as("an artifact the caller may not read must not be disclosed by the reply")
           .doesNotContain("urn:core:");
-      assertThat(dataSetRepository.findById(dataSet.getId()).orElseThrow().getDataSetStatus())
-          .as("a refused stage leaves the dataset where it was")
-          .isEqualTo(DataSetStatus.DRAFT);
+      DataSet stored = dataSetRepository.findById(dataSet.getId()).orElseThrow();
+      assertThat(stored.getDataSetStatus())
+          .as("a refused release leaves the dataset where it was")
+          .isEqualTo(DataSetStatus.READY);
+      assertThat(stored.getPendingSagaType()).as("a refused release provisions nothing").isNull();
     }
 
     @Test
-    @DisplayName("Should refuse staging when a referenced data source is still a draft")
-    void shouldRefuseStagingWhenReferencedDataSourceIsDraft() {
-      DataSet dataSet =
-          dataSetReachingStructure(DataStructureVersionStatus.AVAILABLE, DataSourceStatus.DRAFT);
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              getEndpointPath() + "/" + dataSet.getId() + "/stage",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getProperties())
-          .as("the reply names the pipeline the caller has to repair")
-          .containsKey("offendingPipelineIds");
-      assertThat(dataSetRepository.findById(dataSet.getId()).orElseThrow().getDataSetStatus())
-          .as("a refused stage leaves the dataset where it was")
-          .isEqualTo(DataSetStatus.DRAFT);
-    }
-
-    @Test
-    @DisplayName("Should stage a draft-authored pipeline once its data source is released")
-    void shouldStageWhenReferencedDataSourceIsReleased() {
-      DataSet dataSet =
+    @DisplayName("Should stage while the reached data structure is still a draft")
+    void shouldStageWhenReachedStructureIsDraft() {
+      assertStaged(
           dataSetReachingStructure(
-              DataStructureVersionStatus.AVAILABLE, DataSourceStatus.AVAILABLE);
+              DataSetStatus.DRAFT, DataStructureVersionStatus.DRAFT, DataSourceStatus.AVAILABLE));
+    }
 
-      ResponseEntity<DataSetOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + dataSet.getId() + "/stage",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
+    @Test
+    @DisplayName("Should stage while a referenced data source is still a draft")
+    void shouldStageWhenReferencedDataSourceIsDraft() {
+      assertStaged(
+          dataSetReachingStructure(
+              DataSetStatus.DRAFT, DataStructureVersionStatus.AVAILABLE, DataSourceStatus.DRAFT));
+    }
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+    @Test
+    @DisplayName("Should refuse release when the reached data structure is still a draft")
+    void shouldRefuseReleaseWhenReachedStructureIsDraft() {
+      assertReleaseRefused(
+          dataSetReachingStructure(
+              DataSetStatus.READY, DataStructureVersionStatus.DRAFT, DataSourceStatus.AVAILABLE));
+    }
+
+    @Test
+    @DisplayName("Should refuse release when a referenced data source is still a draft")
+    void shouldRefuseReleaseWhenReferencedDataSourceIsDraft() {
+      assertReleaseRefused(
+          dataSetReachingStructure(
+              DataSetStatus.READY, DataStructureVersionStatus.AVAILABLE, DataSourceStatus.DRAFT));
     }
   }
 
