@@ -251,14 +251,9 @@ class NifiDataFlowIT extends AbstractNifiIT {
     Map<String, String> sourceProperties = new LinkedHashMap<>();
     sourceProperties.put("Broker URI", brokerUri);
     sourceProperties.put("Topic Filter", topic);
-    Map<String, Map<String, String>> controllerServiceProperties = Map.of();
     if (tls) {
       sourceProperties.put(
           "SSL Context Service", "${CS:" + MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE + "}");
-      controllerServiceProperties =
-          Map.of(
-              MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE,
-              MqttTruststoreConfig.nodeTruststore().sslContextProperties());
     }
     String snapshot =
         NifiTestFixtures.flowBuilder()
@@ -274,7 +269,7 @@ class NifiDataFlowIT extends AbstractNifiIT {
                         FrostSinkStage.FROST_PROJECT_ID,
                         PROJECT_ID),
                     List.of(),
-                    controllerServiceProperties,
+                    Map.of(),
                     null,
                     null));
     if (tls) {

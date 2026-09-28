@@ -1053,10 +1053,6 @@
         "topics": {
           "label": "Topic"
         },
-        "clientId": {
-          "label": "Client ID",
-          "placeholder": "optional"
-        },
         "qos": {
           "label": "QoS"
         },

@@ -101,6 +101,22 @@ class CoreSchemaValidatorTest {
             """)).isNotEmpty();
     }
 
+    // ── DataSource ──────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("A conforming MQTT DataSource is accepted")
+    void conformingMqttDataSourceIsAccepted() {
+        assertThat(validate(ArtifactKind.DATA_SOURCE, """
+            {
+              "$schema": "https://civitasconnect.digital/core/datasource/v1",
+              "id": "urn:core:platform:civitas:datasource:common:Broker:abc1234567:1.0.0",
+              "connectionType": "mqtt",
+              "urls": ["mqtt://mosquitto:1883"],
+              "topics": ["sensors/+/temp"]
+            }
+            """)).isEmpty();
+    }
+
     // ── DataSet ─────────────────────────────────────────────────────────────────
 
     @Test

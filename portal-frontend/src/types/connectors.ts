@@ -40,7 +40,6 @@ export const stringifyStringArray = (v: unknown): string | undefined => {
 export const MqttApiResponseSchema = z.object({
   urls: z.array(z.string()).nullable().optional(),
   topics: z.array(z.string()).max(1).nullable().optional(),
-  client_id: z.string().nullable().optional(),
   qos: QosSchema.nullable().optional(),
   protocol_version: MqttProtocolVersionSchema,
   connect_timeout: z.string().nullable().optional(),
@@ -56,7 +55,6 @@ const singleTopic = z.string().regex(/^[^,;\s]*$/, 'datasources.errors.topicInva
 const MqttBaseSchema = z.object({
   urls: z.string().trim(),
   topics: singleTopic,
-  client_id: z.string().trim(),
   qos: QosSchema,
   protocol_version: MqttProtocolVersionSchema,
   connect_timeout: z.string().trim(),
