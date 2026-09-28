@@ -302,14 +302,14 @@ All activity-style nodes extend from `BasePipelineNode`. It provides:
 
 Each node type has a corresponding inspector panel:
 
-| Node Type   | Panel Component   | Features                   |
-| ----------- | ----------------- | -------------------------- |
-| Start/End   | `ControlPanel`    | Static description         |
-| DataSource  | `DataSourcePanel` | Entity dropdown + metadata |
-| ApiRequest  | `ApiPanel`        | Entity dropdown + metadata |
-| ApiResponse | `ApiPanel`        | Entity dropdown + metadata |
-| Cron        | `CronPanel`       | Expression input           |
-| Frost       | `FrostPanel`      | Entity dropdown + metadata        |
+| Node Type   | Panel Component   | Features                                 |
+| ----------- | ----------------- | ---------------------------------------- |
+| Start/End   | `ControlPanel`    | Static description                       |
+| DataSource  | `DataSourcePanel` | Entity dropdown + metadata               |
+| ApiRequest  | `ApiPanel`        | Entity dropdown + metadata               |
+| ApiResponse | `ApiPanel`        | Entity dropdown + metadata               |
+| Cron        | `CronPanel`       | Expression input                         |
+| Frost       | `FrostPanel`      | Entity dropdown + metadata               |
 | Mapping     | `MappingPanel`    | Source/target selectors + mapping editor |
 
 ### EntitySelector
@@ -545,15 +545,28 @@ for (const node of newNodes) {
 
 ### API Endpoint
 
-Pipelines are saved via `POST /pipeline` on the real backend. The request is routed through the Next.js API proxy using the `x-api-request: true` header (same pattern as other backend APIs like users).
+Pipelines belong to a dataset: `POST /datasets/{datasetId}/pipelines` creates one, `PUT /datasets/{datasetId}/pipelines/{pipelineId}` replaces one. Both requests are routed through the Next.js API proxy with the `x-api-request: true` header (same pattern as other backend APIs like users).
 
 ```typescript
 // src/app/services/api/pipelines/clientRequests.ts
-export const useCreatePipeline = () => {
-  return useCreateMutation<unknown, PipelinePayload>({
-    key: 'pipeline',
-    errorMessage: 'An error occurred while saving the pipeline.',
-    headers: { 'x-api-request': 'true' },
+export const useCreatePipeline = (datasetId: string) => {
+  const queryClient = useQueryClient()
+
+  return useMutation<ApiServiceResponse<PipelineOutputDTO>, unknown, PipelinePayload>({
+    mutationFn: (data: PipelinePayload) =>
+      apiRequest<PipelineOutputDTO>({
+        method: 'POST',
+        endpoint: `/datasets/${datasetId}/pipelines`,
+        headers: { [API_REQUEST_HEADER]: 'true' },
+        data,
+        errorMessage: 'An error occurred while creating the pipeline.',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PIPELINES_QUERY_KEY, datasetId] })
+    },
+    onError: error => {
+      console.error('Failed to create pipeline:', error)
+    },
   })
 }
 ```
@@ -616,18 +629,39 @@ The FROST section is a fixed template that generates thing/observation upsert lo
 
 ### Save Flow
 
-1. User clicks "Save" in toolbar (enabled only after validation passes)
-2. `savePipeline()` in `PipelineEditorProvider` calls `buildPipelinePayload()`
-3. `useCreatePipeline().mutate()` sends `POST /api/pipeline` with `x-api-request: true`
-4. Proxy routes to real backend at `API_URL/pipeline`
-5. On success: session is marked as clean (no more unsaved changes)
-6. On error: error is logged to console
+`saveAllPipelines()` in `PipelineEditorProvider` saves every dirty session, one after the other. Per session:
+
+1. **Collect the removed sinks** – `getRemovedDataSinkIds()` compares the pipeline with the snapshot of the last save and collects the removed sink entity ids.
+2. **Save the data sinks** – create a sink for a node that has no `entityId`, update a changed one. The returned `configurationUrn` is stashed on the node and becomes the model's `sinkRef`.
+3. **Save the mappings** – create or version the mapping artifacts. An unchanged mapping is skipped, because the mapping API creates a new version per request.
+4. **Save the pipeline** – `POST` for a new pipeline, `PUT` for an existing one, with the ids and URNs from the steps above.
+5. **Delete the removed sinks** – the pipeline is already stored, so a failed delete gives a warning toast but keeps the save successful.
+6. **Clean the session** – mark it clean, write the new data sink and mapping snapshots, show the success toast.
+
+**Order rule:** the delete must stay behind the pipeline save. When it came first, the backend refused it with `409 RESOURCE_IN_USE`, because the stored pipeline still pointed at the sink through `sinkRef`. The pipeline could then no longer be saved at all.
+
+If a step throws, the partial progress is written back to the session — still dirty — so a retry updates the artifacts that were already created instead of creating duplicates. The error is classified and reported in a toast.
+
+### Locked Data Sinks
+
+`GET /datasets/{datasetId}/datasinks` reports two flags per sink, `provisioned` and `inUseByLayer`. `useDataSinkLocks()` reads the flags once and tells the canvas and the inspector which lock a node has. It finds the sink through the node's `entityId`, so a node without one is new and never locked.
+
+| Flag           | Delete | Data structure       | Table name |
+| -------------- | ------ | -------------------- | ---------- |
+| `provisioned`  | locked | edit button hidden   | locked     |
+| `inUseByLayer` | locked | edit button disabled | editable   |
+
+`provisioned` wins when both apply.
+
+`PipelineCanvas` sets `deletable: false` on a locked node. `onBeforeDelete` shows an error toast with the reason.
+
+The `PipelineInspector` shows a notice with the lock reason. In read-only mode, only the `inUseByLayer` hint is shown.
 
 ### Save Button States
 
-- `isSaving` is exposed via `useActivePipeline()` context
-- Save button shows a loading spinner and "Saving..." text while request is in flight
-- Both Validate and Save buttons are disabled during save
+- `isSavingAll` is exposed via `useActivePipeline()` context
+- The Save button is disabled while no session is dirty, while a save runs, and in read-only mode
+- It shows a loading spinner and "Saving..." text while the save runs
 
 ---
 

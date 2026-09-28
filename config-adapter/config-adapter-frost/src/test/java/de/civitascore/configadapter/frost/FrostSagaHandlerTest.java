@@ -167,15 +167,20 @@ class FrostSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("reuses an existing project found by name and skips the POST (find-or-create)")
-    void shouldReuseExistingProjectAndSkipPost() {
+    @DisplayName(
+        "reuses an existing project found by dataset id, syncs its name, and skips the POST"
+            + " (find-or-create)")
+    void shouldReuseExistingProjectAndSkipPost() throws InterruptedException {
       try (FrostSagaHandler handler = createHandler()) {
         // Up-front lookup finds the dataset's own project → reuse it, never POST.
         server.enqueue(projectLookupFound(42));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(
-                "EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Existing Dataset"));
+                "EXECUTE_STEP",
+                "CREATE_PROJECT",
+                Map.of("datasetName", "Existing Dataset", "datasetId", "ds-1"));
 
         SagaCommandResult result = handler.handle(command);
 
@@ -184,7 +189,38 @@ class FrostSagaHandlerTest {
         assertEquals("42", result.compensationData().get("projectId"));
         // Reuse must flag created=false so its compensation skips the destructive delete.
         assertEquals(false, result.compensationData().get("created"));
-        assertEquals(1, server.getRequestCount());
+        assertEquals(2, server.getRequestCount());
+        server.takeRequest(); // the up-front dataset-id lookup GET
+        // The reuse PATCH syncs the name to the dataset's CURRENT display name — self-healing a
+        // display name left stale by a rename that happened while the dataset was unreleased.
+        Map<String, Object> patchBody = requestBodyAsMap(server.takeRequest());
+        assertEquals("Existing Dataset (ds-1)", patchBody.get("name"));
+        // The reuse PATCH must keep the project private, not just sync its name.
+        assertEquals(false, patchBody.get("public"));
+      }
+    }
+
+    @Test
+    @DisplayName("finds an existing project by the datasetId suffix even when the name changed")
+    void shouldReuseExistingProjectWhenDisplayNameChanged() throws InterruptedException {
+      try (FrostSagaHandler handler = createHandler()) {
+        server.enqueue(projectLookupFound(42));
+        server.enqueue(new MockResponse.Builder().code(200).build());
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "CREATE_PROJECT",
+                Map.of("datasetName", "Renamed Dataset", "datasetId", "ds-1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("42", result.resultData().get("projectId"));
+        // The lookup key is the immutable datasetId suffix, not the full (now stale) name — it
+        // must survive the dataset having been renamed since the project was created.
+        assertEquals(
+            "endswith(name,'(ds-1)')", server.takeRequest().getUrl().queryParameter("$filter"));
       }
     }
 
@@ -201,6 +237,7 @@ class FrostSagaHandlerTest {
                 .body("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}")
                 .build());
         server.enqueue(projectLookupFound(42));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(
@@ -228,6 +265,7 @@ class FrostSagaHandlerTest {
                     "{\"code\":409,\"type\":\"error\",\"message\":\"Data violates constraints.\"}")
                 .build());
         server.enqueue(projectLookupFound(42));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(

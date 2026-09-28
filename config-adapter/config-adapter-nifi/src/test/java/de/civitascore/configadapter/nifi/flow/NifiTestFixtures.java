@@ -345,11 +345,10 @@ public final class NifiTestFixtures {
     Datasource source = new Datasource();
     source.setId("a1");
     source.setType("MQTT");
-    // the portal connector shape: urls/topics are lists, user/client_id/qos scalars
+    // the portal connector shape: urls/topics are lists, user/qos scalars
     source.handleUnknownProperty("urls", List.of("tcp://mosquitto:1883"));
     source.handleUnknownProperty("topics", List.of("sensors/+/temp"));
     source.handleUnknownProperty("user", "mqttuser");
-    source.handleUnknownProperty("client_id", "civitas-it");
     source.handleUnknownProperty("qos", 1);
     source.handleUnknownProperty("password", encryptedPassword);
     return source;

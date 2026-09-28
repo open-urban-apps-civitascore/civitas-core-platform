@@ -52,6 +52,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   private static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
   private static final String KEY_PROJECT_ID = "projectId";
+  private static final String KEY_DATASET_ID = "datasetId";
   private static final String KEY_CREATED = "created";
   private static final String KEY_NAME = "name";
   private static final String KEY_DESCRIPTION = "description";
@@ -99,7 +100,17 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
    * dataset to its OWN project (correct retry idempotency, never a foreign binding).
    */
   private static String frostProjectName(String datasetName, String datasetId) {
-    return datasetName + " (" + datasetId + ")";
+    return datasetName + " " + frostProjectNameSuffix(datasetId);
+  }
+
+  /**
+   * The immutable {@code "(datasetId)"} suffix of a FROST project name, shared by {@link
+   * #frostProjectName} and the datasetId lookup filter in {@link #reuseProjectByDatasetId} so the
+   * two can never drift apart — a mismatch would make the lookup miss the dataset's own project and
+   * let CREATE_PROJECT create a duplicate.
+   */
+  private static String frostProjectNameSuffix(String datasetId) {
+    return "(" + datasetId + ")";
   }
 
   /** FROST entity path of a project, e.g. {@code Projects(42)}. */
@@ -119,17 +130,18 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
   private SagaCommandResult handleCreateProject(SagaCommandMessage command) {
     String datasetName = requireString(command, "datasetName");
-    String datasetId = requireString(command, "datasetId");
+    String datasetId = requireString(command, KEY_DATASET_ID);
     String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
 
     String projectName = frostProjectName(datasetName, datasetId);
 
-    // Find-or-create: the project name carries the globally-unique datasetId, so a pre-existing
-    // project can only be this dataset's own — a prior CREATE_PROJECT that already ran (re-release,
-    // retried saga). Reusing it keeps the FROST data (Things → Datastreams → Observations) intact
-    // instead of orphaning it behind a second project. Idempotency no longer hinges on the
-    // version-specific 500 "Failed to store data." string; that path stays only as a race guard.
-    SagaCommandResult existing = findExistingProjectByName(command, projectName);
+    // Find-or-create: the lookup matches on the immutable datasetId suffix of the name, so a match
+    // can only be this dataset's own project — a prior CREATE_PROJECT that already ran (re-release,
+    // retried saga) — even when the display-name portion is now stale because the dataset was
+    // renamed while unreleased. Reusing it keeps the FROST data (Things → Datastreams →
+    // Observations) intact instead of orphaning it behind a second project.
+    SagaCommandResult existing =
+        reuseProjectByDatasetId(command, datasetId, projectName, description);
     if (existing != null) {
       return existing;
     }
@@ -184,7 +196,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   /**
    * Handles an HTTP 409 or 500 from the CREATE_PROJECT POST. This is a race guard: the up-front
    * find-or-create lookup already ran, but a concurrent CREATE may have inserted the project in
-   * between — so re-run the name lookup and reuse the winner.
+   * between — so re-run the dataset-id lookup and reuse the winner.
    *
    * <p>FROST-Server core &gt;= 2.7.0 answers a UNIQUE constraint violation (duplicate project name)
    * with 409 Conflict; earlier cores answer 500 with a {@code "Failed to store data."} body, which
@@ -199,21 +211,24 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
         status == HttpURLConnection.HTTP_CONFLICT
             || responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA);
     if (isDuplicate) {
+      String datasetId = requireString(command, KEY_DATASET_ID);
       log.info(
-          "FROST returned {} for CREATE_PROJECT — re-checking for existing project with name"
+          "FROST returned {} for CREATE_PROJECT — re-checking for an existing project for dataset"
               + " '{}', saga={}",
           status,
-          Encode.forJava(projectName),
+          Encode.forJava(datasetId),
           Encode.forJava(command.sagaId()));
-      SagaCommandResult recovered = findExistingProjectByName(command, projectName);
+      String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
+      SagaCommandResult recovered =
+          reuseProjectByDatasetId(command, datasetId, projectName, description);
       if (recovered != null) {
         return recovered;
       }
       throw new SagaApiException(
           "CREATE_PROJECT failed: HTTP "
               + status
-              + " — no existing project found with name '"
-              + projectName
+              + " — no existing project found for dataset '"
+              + datasetId
               + "'",
           status);
     }
@@ -229,22 +244,26 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Looks up a project by its globally-unique {@code "{datasetName} ({datasetId})"} name. Returns a
-   * successful {@link SagaCommandResult} bound to the existing project, or {@code null} if none
-   * exists. The datasetId in the name guarantees any match is this dataset's own project, never a
-   * foreign same-display-named one.
+   * Looks up a project by the immutable datasetId suffix of its name — {@code
+   * endswith(name,'({datasetId})')} — rather than the full name, so a match survives the dataset's
+   * display name changing since the project was created. On a match it also PATCHes the project's
+   * name/description to the freshly computed values, self-healing a display name left stale by a
+   * rename that happened while the dataset was unreleased. Returns a successful {@link
+   * SagaCommandResult} bound to the existing project, or {@code null} if none exists.
    */
-  private SagaCommandResult findExistingProjectByName(SagaCommandMessage command, String name) {
-    String escapedName = name.replace("'", "''");
+  private SagaCommandResult reuseProjectByDatasetId(
+      SagaCommandMessage command, String datasetId, String projectName, String description) {
+    String escapedDatasetId = datasetId.replace("'", "''");
     HttpUrl url =
         url("Projects")
             .newBuilder()
-            .addQueryParameter("$filter", "name eq '" + escapedName + "'")
+            .addQueryParameter(
+                "$filter", "endswith(name,'" + frostProjectNameSuffix(escapedDatasetId) + "')")
             .build();
     Request request = authStrategy.apply(OkHttpJson.jsonRequest(url).get()).build();
     try (Response response = execute(request)) {
 
-      checkResponse(response, "GET_PROJECTS_BY_NAME");
+      checkResponse(response, "GET_PROJECTS_BY_DATASET_ID");
 
       Map<String, Object> result = OkHttpJson.readJsonMap(response);
       @SuppressWarnings("unchecked")
@@ -255,23 +274,44 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       }
 
       String projectId = String.valueOf(projects.get(0).get("@iot.id"));
-      String baseUrl = projectBaseUrl(projectId);
-
-      Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
-      // created=false: this project pre-existed and holds data the unrelease flow intentionally
-      // preserves — a CREATE_PROJECT compensation must NOT delete it, or a later step's failure
-      // would destroy exactly the storage re-release is meant to reuse.
-      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId, KEY_CREATED, false);
-
-      log.info(
-          "FROST CREATE_PROJECT reused the existing project matched by unique name: projectId={},"
-              + " saga={}",
-          Encode.forJava(projectId),
-          Encode.forJava(command.sagaId()));
-
-      return SagaCommandResult.success(
-          command.sagaId(), command.stepId(), resultData, compensationData);
+      return patchAndBuildReuseResult(command, projectId, projectName, description);
     }
+  }
+
+  /**
+   * PATCHes a known-existing project's name/description to the freshly computed values —
+   * self-healing a display name left stale by a rename that happened while the dataset was
+   * unreleased — then returns success reusing it. Compensation is {@code created=false}: a
+   * CREATE_PROJECT compensation must not delete data a re-release is meant to reuse.
+   */
+  private SagaCommandResult patchAndBuildReuseResult(
+      SagaCommandMessage command, String projectId, String projectName, String description) {
+    Map<String, Object> body =
+        Map.of(KEY_NAME, projectName, KEY_DESCRIPTION, description, KEY_PUBLIC, false);
+
+    Request request =
+        authStrategy
+            .apply(
+                OkHttpJson.jsonRequest(url(projectPath(projectId)))
+                    .patch(OkHttpJson.jsonBodyUnchecked(body)))
+            .build();
+    try (Response response = execute(request)) {
+
+      checkResponse(response, "CREATE_PROJECT (reuse)");
+    }
+
+    String baseUrl = projectBaseUrl(projectId);
+    Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
+    Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId, KEY_CREATED, false);
+
+    log.info(
+        "FROST CREATE_PROJECT reused the existing project, syncing its name: projectId={},"
+            + " saga={}",
+        Encode.forJava(projectId),
+        Encode.forJava(command.sagaId()));
+
+    return SagaCommandResult.success(
+        command.sagaId(), command.stepId(), resultData, compensationData);
   }
 
   private SagaCommandResult handleUpdateProject(SagaCommandMessage command) {
@@ -283,13 +323,13 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
         || projectId.isBlank()) {
       log.info(
           "UPDATE_PROJECT: dataset {} has no FROST project yet — provisioning it. saga={}",
-          Encode.forJava((String) command.payload().get("datasetId")),
+          Encode.forJava((String) command.payload().get(KEY_DATASET_ID)),
           Encode.forJava(command.sagaId()));
       return handleCreateProject(command);
     }
 
     String datasetName = requireString(command, "datasetName");
-    String datasetId = requireString(command, "datasetId");
+    String datasetId = requireString(command, KEY_DATASET_ID);
     String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
 
     // Read current state before updating (needed for compensation)
@@ -328,6 +368,9 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
       String baseUrl = projectBaseUrl(projectId);
       Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
+      // created=false: this project pre-existed and holds data the unrelease flow intentionally
+      // preserves — a CREATE_PROJECT compensation must NOT delete it, or a later step's failure
+      // would destroy exactly the storage re-release is meant to reuse.
       Map<String, Object> compensationData =
           new HashMap<>(
               Map.of(KEY_PROJECT_ID, projectId, "previousDescription", previousDescription));

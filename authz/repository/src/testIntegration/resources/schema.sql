@@ -76,7 +76,6 @@ CREATE TABLE IF NOT EXISTS assignments
     data_source_id       UUID,
     dataset_id           UUID,
     datapool_id          UUID,
-    catalog_id           UUID,
     CONSTRAINT pk_assignments PRIMARY KEY (id)
 );
 

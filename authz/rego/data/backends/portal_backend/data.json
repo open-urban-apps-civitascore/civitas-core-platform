@@ -227,7 +227,6 @@
     },
     "/v1/datapools/{id}/assignments": {
       "GET": "DATAPOOL_READ"
-    },
-    "_removed_for_v2": "catalogs and dataspaces removed — not implemented in v2.0 (see #989). OPA denies as unknown_endpoint."
+    }
   }
 }
