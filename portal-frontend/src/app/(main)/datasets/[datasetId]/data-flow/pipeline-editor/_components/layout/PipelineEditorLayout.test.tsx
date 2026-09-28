@@ -21,10 +21,8 @@ import {
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
 import {
-  FROST_SINK_URN,
   frostNode,
   geoPersistenceNode,
-  POSTGIS_SINK_URN,
   savablePipeline,
   savedAs,
   TARGET_STRUCTURE_URN,
@@ -130,16 +128,17 @@ beforeEach(() => {
 })
 
 const sinks = [
-  ['PostGIS', geoPersistenceNode(), POSTGIS_SINK_URN],
-  ['FROST', frostNode(), FROST_SINK_URN],
+  ['PostGIS', geoPersistenceNode()],
+  ['FROST', frostNode()],
 ] as const
 
 const loadPipeline = (sink: ReturnType<typeof frostNode>) => {
   const saved = savablePipeline(sink)
   // Pre-selected: the inspector shows the selected node, and React Flow needs pointer events to select.
   const loaded = { ...saved, nodes: saved.nodes.map(node => ({ ...node, selected: node.id === 'cron-1' })) }
+  const response = savedAs(loaded)
   vi.mocked(useGetPipelines).mockReturnValue({
-    data: { data: [savedAs(loaded)] },
+    data: { data: [response] },
     isLoading: false,
   } as unknown as ReturnType<typeof useGetPipelines>)
 
@@ -148,6 +147,7 @@ const loadPipeline = (sink: ReturnType<typeof frostNode>) => {
       <PipelineEditorWrapper />
     </NextIntlClientProvider>,
   )
+  return response
 }
 
 const editCronAndSave = async () => {
@@ -167,17 +167,18 @@ const savedPipeline = async () => {
 
 describe('saving from the Pipeline editor', () => {
   it.each(sinks)(
-    'sends the %s pipeline with the cron expression edited in the inspector',
-    async (_label, sink, sinkUrn) => {
-      loadPipeline(sink)
+    'sends the CORE model of the reloaded %s pipeline unchanged except the edited cron expression',
+    async (_label, sink) => {
+      const model = loadPipeline(sink).model as PipelinePayload['model']
 
       await editCronAndSave()
 
-      const { pipelineId, data, nodeById } = await savedPipeline()
+      const { pipelineId, data } = await savedPipeline()
       expect(pipelineId).toBe('backend-pipeline-1')
-      expect(data.model.nodes.map(node => node.kind)).toEqual(['start', 'cron', 'source', 'mapping', 'sink', 'end'])
-      expect(nodeById('cron-1')).toMatchObject({ cronExpression: '0 30 * * * ?' })
-      expect(nodeById(sink.id)).toMatchObject({ sinkRef: sinkUrn })
+      expect(data.model).toEqual({
+        ...model,
+        nodes: model.nodes.map(node => (node.id === 'cron-1' ? { ...node, cronExpression: '0 30 * * * ?' } : node)),
+      })
     },
   )
 
