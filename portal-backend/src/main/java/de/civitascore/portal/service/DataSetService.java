@@ -532,8 +532,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
     revalidatePipelineDataSourcesAgainstPool(dataSet);
     verifyPublishedSurfacesAreServable(dataSet);
-    // Not checked at staging: a READY dataset may still reference DRAFT artifacts, and this is the
-    // transition that provisions infrastructure against them.
     pipelineClosureValidator.validate(dataSet.getPipelines());
 
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);

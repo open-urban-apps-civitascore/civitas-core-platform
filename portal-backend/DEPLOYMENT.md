@@ -285,7 +285,7 @@ Enable for a single rollout deploy, then check the completion log — `Group-mem
 
 ### 2.9 Dataset Staging & Release
 
-Before a dataset is staged or released, the backend walks out from each of its pipelines over the references the model registry recorded and refuses the transition while an artifact the flow reaches cannot carry a release. The walk follows a bounded number of hops.
+Before a dataset is released, the backend walks out from each of its pipelines over the references the model registry recorded and refuses the transition while an artifact the flow reaches cannot carry a release. The walk follows a bounded number of hops.
 
 | Property / Env Var | Default | Description |
 |---|---|---|
