@@ -204,6 +204,12 @@ public class DataSetController
     return ScopeType.DATASET;
   }
 
+  /** {@inheritDoc} */
+  @Override
+  protected List<String> getFieldsFixedAfterRelease() {
+    return List.of("namedApis");
+  }
+
   @PostMapping("/{id}/stage")
   @Operation(
       operationId = "stageDataSet",
@@ -300,12 +306,14 @@ public class DataSetController
           "Applies a JSON merge patch to the metadata of a dataset in READY status, requiring only"
               + " DATASET_UPDATE — unlike PATCH /datasets/{id}/released/meta, which also requires"
               + " DATASET_RELEASE. An omitted field keeps its value. Rejects DRAFT and AVAILABLE"
-              + " datasets. namedApis are not metadata and have no effect here — unrelease the"
-              + " dataset and edit it in DRAFT.")
+              + " datasets. namedApis cannot change here and answer 400 — unrelease the dataset and"
+              + " edit it in DRAFT.")
   @ApiResponse(responseCode = "200", description = "Dataset metadata updated successfully")
   @ApiResponse(
       responseCode = "400",
-      description = "Dataset is not READY, or the patched metadata is invalid",
+      description =
+          "Dataset is not READY, the request contains namedApis, or the patched metadata is"
+              + " invalid",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "409",

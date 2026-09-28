@@ -30,6 +30,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -1070,68 +1072,6 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should update configuration of AVAILABLE data source via released/meta")
-    void shouldUpdateConfiguration() {
-      UUID id = createReleasableTestEntity();
-      performRelease(id);
-
-      Map<String, Object> newConfig =
-          Map.of(
-              "urls", List.of("tcp://new-broker:1883"),
-              "topics", List.of("new/topic"),
-              "qos", 2);
-      Map<String, Object> metaUpdate =
-          Map.of(
-              "name", "updated-name", "description", "a description", "configuration", newConfig);
-
-      ResponseEntity<DataSourceOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PATCH,
-              createAuthHeaders(),
-              metaUpdate,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config.get("urls")).isEqualTo(List.of("tcp://new-broker:1883"));
-      assertThat(config.get("topics")).isEqualTo(List.of("new/topic"));
-      assertThat(config.get("qos")).isEqualTo(2);
-    }
-
-    @Test
-    @DisplayName("Should preserve masked password when updating configuration via released/meta")
-    void shouldPreserveMaskedPassword() {
-      UUID id = createReleasableSqlTestEntity();
-      performRelease(id);
-
-      Map<String, Object> newConfig =
-          new HashMap<>(
-              Map.of(
-                  "driver", "postgres",
-                  "dsn", "postgres://new-host:5432/db",
-                  "table", "measurements",
-                  "columns", List.of("id", "value", "timestamp"),
-                  "user", "admin",
-                  "password", ConnectorHandler.MASKED_VALUE));
-      Map<String, Object> metaUpdate =
-          Map.of("name", "updated-sql", "description", "a description", "configuration", newConfig);
-
-      ResponseEntity<DataSourceOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PATCH,
-              createAuthHeaders(),
-              metaUpdate,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config.get("dsn")).isEqualTo("postgres://new-host:5432/db");
-      assertThat(config.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
-    }
-
-    @Test
     @DisplayName("Should not change configuration when not provided in released/meta update")
     void shouldNotChangeConfigurationWhenNotProvided() {
       UUID id = createReleasableTestEntity();
@@ -1202,107 +1142,71 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject configuration change when in use")
-    void shouldRejectConfigurationChangeWhenInUse() {
-      DataSource dataSource = createAvailableDataSource();
-      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
-
-      Map<String, Object> newConfig =
-          Map.of(
-              "urls", List.of("tcp://new-broker:1883"),
-              "topics", List.of("new/topic"),
-              "qos", 2);
-      Map<String, Object> metaUpdate =
-          Map.of(
-              "name", "updated-name", "description", "a description", "configuration", newConfig);
-
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
-              HttpMethod.PATCH,
-              new HttpEntity<>(metaUpdate, createAuthHeaders()),
-              String.class);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("Should reject connector type change when an AVAILABLE DataSet uses it")
-    void shouldRejectConnectorTypeChangeWhenInUse() {
-      DataSource dataSource = createAvailableDataSource();
-      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
-
-      Map<String, Object> metaUpdate =
-          Map.of("name", "updated-name", "description", "a description", "connectorType", "SQL");
-
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
-              HttpMethod.PATCH,
-              new HttpEntity<>(metaUpdate, createAuthHeaders()),
-              String.class);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("Should accept a configuration change when only a DRAFT DataSet uses it")
-    void shouldAcceptConfigurationChangeWhenInUseByDraftDataSetOnly() {
-      DataSource dataSource = createAvailableDataSource();
-      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.DRAFT);
-
-      Map<String, Object> newConfig =
-          Map.of(
-              "urls", List.of("tcp://new-broker:1883"),
-              "topics", List.of("new/topic"),
-              "qos", 2);
-
-      ResponseEntity<DataSourceOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
-              HttpMethod.PATCH,
-              createAuthHeaders(),
-              Map.of(
-                  "name",
-                  dataSource.getName(),
-                  "description",
-                  "a description",
-                  "configuration",
-                  newConfig),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody().getConfiguration().get("urls"))
-          .isEqualTo(List.of("tcp://new-broker:1883"));
-    }
-
-    @Test
-    @DisplayName("Should allow full update when not in use")
-    void shouldAllowFullUpdateWhenNotInUse() {
+    @DisplayName(
+        "Should reject clearing the description of AVAILABLE data source with an explicit null")
+    void shouldRejectClearingDescriptionWithNull() {
       UUID id = createReleasableTestEntity();
       performRelease(id);
 
-      Map<String, Object> newConfig =
-          Map.of(
-              "urls", List.of("tcp://new-broker:1883"),
-              "topics", List.of("new/topic"),
-              "qos", 2);
-      Map<String, Object> fullUpdate =
-          Map.of(
-              "name", "updated-name", "description", "a description", "configuration", newConfig);
+      Map<String, Object> metaUpdate = new HashMap<>();
+      metaUpdate.put("description", null);
 
-      ResponseEntity<DataSourceOutputDTO> response =
-          exchange(
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + id + "/released/meta",
+              HttpMethod.PATCH,
+              new HttpEntity<>(metaUpdate, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"connectorType", "configuration", "dataStructureVersionId"})
+    @DisplayName("Should reject a field fixed after release when no dataset uses the data source")
+    void shouldRejectFieldFixedAfterReleaseWhenNotInUse(String field) {
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
+
+      assertRejectedAndUnchanged(id, field);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"connectorType", "configuration", "dataStructureVersionId"})
+    @DisplayName("Should reject a field fixed after release when an AVAILABLE dataset uses it")
+    void shouldRejectFieldFixedAfterReleaseWhenInUse(String field) {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
+
+      assertRejectedAndUnchanged(dataSource.getId(), field);
+    }
+
+    private void assertRejectedAndUnchanged(UUID id, String field) {
+      DataSourceOutputDTO before = performGetById(id).getBody();
+      Map<String, Object> newValues =
+          Map.of(
+              "connectorType",
+              "SQL",
+              "configuration",
+              Map.of("urls", List.of("tcp://new-broker:1883"), "topics", List.of("new/topic")),
+              "dataStructureVersionId",
+              createAvailableDataStructureVersionId());
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
               getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PATCH,
               createAuthHeaders(),
-              fullUpdate,
-              getOutputTypeReference());
+              Map.of("name", "updated-name", field, newValues.get(field)));
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody().getName()).isEqualTo("updated-name");
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config.get("urls")).isEqualTo(List.of("tcp://new-broker:1883"));
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getDetail()).contains(field);
+      DataSourceOutputDTO after = performGetById(id).getBody();
+      assertThat(after.getName()).isEqualTo(before.getName());
+      assertThat(after.getConnectorType()).isEqualTo(before.getConnectorType());
+      assertThat(after.getConfiguration()).isEqualTo(before.getConfiguration());
+      assertThat(after.getDataStructureVersion().getId())
+          .isEqualTo(before.getDataStructureVersion().getId());
     }
   }
 

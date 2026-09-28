@@ -22,6 +22,7 @@ import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import de.civitascore.portal.model.input.validation.NamedApiAllowedSlugValidator;
@@ -46,6 +47,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -1160,7 +1162,7 @@ class DataSetControllerIntegrationTest
       List<UUID> originalPipelineIds =
           dataSet.getPipelines().stream().map(Pipeline::getId).toList();
 
-      DataSetInputDTO updateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO updateInput = new DataSetMetaInputDTO();
       updateInput.setName("Updated Released Dataset");
       updateInput.setDescription("Updated description for released dataset");
       updateInput.setOpenDataAccess(false);
@@ -1264,7 +1266,7 @@ class DataSetControllerIntegrationTest
       replacementAssignment.setGroupId(groupId2);
       replacementAssignment.setRoleId(roleId);
 
-      DataSetInputDTO releasedUpdateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO releasedUpdateInput = new DataSetMetaInputDTO();
       releasedUpdateInput.setName("Updated Released Dataset With New Assignment");
       releasedUpdateInput.setDescription("Updated description for released dataset");
       releasedUpdateInput.setOpenDataAccess(false);
@@ -1303,7 +1305,7 @@ class DataSetControllerIntegrationTest
     void shouldFailToUpdateDraftDataSetViaReleasedEndpoint() {
       UUID dataSetId = createTestEntity();
 
-      DataSetInputDTO updateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO updateInput = new DataSetMetaInputDTO();
       updateInput.setName("Updated Name");
       updateInput.setDescription("Updated description");
       updateInput.setOpenDataAccess(false);
@@ -1342,7 +1344,7 @@ class DataSetControllerIntegrationTest
       List<UUID> originalPipelineIds =
           dataSet.getPipelines().stream().map(Pipeline::getId).toList();
 
-      DataSetInputDTO updateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO updateInput = new DataSetMetaInputDTO();
       updateInput.setName("Updated Ready Dataset");
       updateInput.setDescription("Updated description for ready dataset");
       updateInput.setOpenDataAccess(false);
@@ -1383,7 +1385,7 @@ class DataSetControllerIntegrationTest
       UUID dataSetId = dataSet.getId();
       String originalName = dataSet.getName();
 
-      DataSetInputDTO updateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO updateInput = new DataSetMetaInputDTO();
       updateInput.setName("Updated While Saga Runs");
       updateInput.setDescription("a description");
 
@@ -1416,7 +1418,7 @@ class DataSetControllerIntegrationTest
       UUID dataSetId = dataSet.getId();
       String originalName = dataSet.getName();
 
-      DataSetInputDTO updateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO updateInput = new DataSetMetaInputDTO();
       updateInput.setName("Updated Name");
       updateInput.setDescription("Updated description");
       updateInput.setOpenDataAccess(false);
@@ -1442,31 +1444,38 @@ class DataSetControllerIntegrationTest
           .isEqualTo(status);
     }
 
-    @Test
-    @DisplayName("Should ignore namedApis on /ready/meta endpoint")
-    void shouldIgnoreNamedApisViaReadyEndpoint() {
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName(
+        "Should reject namedApis on the metadata endpoints and leave the dataset unchanged")
+    void shouldRejectNamedApisViaMetaEndpoints(String endpoint, DataSetStatus status) {
       DataSet dataSet = createDataSetWithRelationships();
-      dataSet.setDataSetStatus(DataSetStatus.READY);
+      dataSet.setDataSetStatus(status);
       dataSet = dataSetRepository.save(dataSet);
       UUID dataSetId = dataSet.getId();
+      String originalName = dataSet.getName();
 
-      DataSetInputDTO updateInput = new DataSetInputDTO();
-      updateInput.setName("Updated Ready Dataset");
-      updateInput.setDescription("Updated description");
-      updateInput.setNamedApis(List.of(namedApi("Traffic", "traffic", ApiStandard.STA, null)));
+      Map<String, Object> patch =
+          Map.of(
+              "name",
+              "Updated Dataset",
+              "namedApis",
+              List.of(namedApi("Traffic", "traffic", ApiStandard.STA, null)));
 
-      ResponseEntity<DataSetOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + dataSetId + "/ready/meta",
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSetId + "/" + endpoint,
               org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
-              updateInput,
-              getOutputTypeReference());
+              patch);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getName()).isEqualTo("Updated Ready Dataset");
-      assertThat(response.getBody().getNamedApis()).isEmpty();
+      assertThat(response.getBody().getDetail()).contains("namedApis");
+      DataSetOutputDTO unchanged = performGetById(dataSetId).getBody();
+      assertThat(unchanged).isNotNull();
+      assertThat(unchanged.getName()).isEqualTo(originalName);
+      assertThat(unchanged.getNamedApis()).isEmpty();
     }
 
     @Test
@@ -1495,7 +1504,7 @@ class DataSetControllerIntegrationTest
       replacementAssignment.setGroupId(groupId2);
       replacementAssignment.setRoleId(roleId);
 
-      DataSetInputDTO readyUpdateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO readyUpdateInput = new DataSetMetaInputDTO();
       readyUpdateInput.setName("Updated Ready Dataset With New Assignment");
       readyUpdateInput.setDescription("Updated description for ready dataset");
       readyUpdateInput.setAssignments(Set.of(replacementAssignment));

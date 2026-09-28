@@ -13,6 +13,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.net.URI;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -175,6 +176,16 @@ public abstract class BaseController<
   }
 
   /**
+   * Returns the top-level fields that cannot change after release. {@link #mergePatch} rejects a
+   * patch that contains one of them.
+   *
+   * @return the field names, empty by default
+   */
+  protected List<String> getFieldsFixedAfterRelease() {
+    return List.of();
+  }
+
+  /**
    * Applies a JSON merge patch to the current state and validates the result. A field that the
    * patch omits keeps its current value.
    *
@@ -182,10 +193,24 @@ public abstract class BaseController<
    * @param current the current state, updated in place
    * @param updates the JSON node containing the fields to update
    * @return the patched and validated state
-   * @throws InvalidInputException if the patched state violates a Bean Validation constraint
+   * @throws InvalidInputException if the patch contains a field of {@link
+   *     #getFieldsFixedAfterRelease()}, even with a {@code null} value, or the patched state
+   *     violates a Bean Validation constraint
    */
   protected <T> T mergePatch(UUID id, T current, JsonNode updates) {
+    rejectFieldsFixedAfterRelease(id, current, updates);
     return validated(id, objectMapper.readerForUpdating(current).readValue(updates));
+  }
+
+  private void rejectFieldsFixedAfterRelease(UUID id, Object current, JsonNode updates) {
+    List<String> presentFields =
+        getFieldsFixedAfterRelease().stream().filter(updates::has).toList();
+    if (!presentFields.isEmpty()) {
+      throw new InvalidInputException(
+          current.getClass().getSimpleName(),
+          id,
+          "Cannot change after release: " + String.join(", ", presentFields));
+    }
   }
 
   private <T> T validated(UUID id, T dto) {

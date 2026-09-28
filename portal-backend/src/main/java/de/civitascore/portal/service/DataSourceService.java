@@ -14,6 +14,7 @@ import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
+import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.PayloadKind;
@@ -53,7 +54,7 @@ import tools.jackson.databind.JsonNode;
 @Service
 @RequiredArgsConstructor
 public class DataSourceService
-    extends BaseDataEntityService<DataSource, DataSourceInputDTO, DataSourceInputDTO> {
+    extends BaseDataEntityService<DataSource, DataSourceInputDTO, DataSourceMetaInputDTO> {
 
   private final DataSourceRepository dataSourceRepository;
   private final DataSourceMapper dataSourceMapper;
@@ -109,11 +110,11 @@ public class DataSourceService
 
   /**
    * Restricts the generic CRUD update to DRAFT data sources. A released (AVAILABLE) data source may
-   * only be changed through {@link #updateReleasedMeta(UUID, DataSourceInputDTO)}, which is the
-   * single point that enforces the in-use constraints and re-asserts the DataSource→DataPool scope
-   * rule for the datasets the source already feeds. Without this restriction the generic route
-   * would reach {@link #postConvertToEntity} — which applies a new datapool scope unconditionally —
-   * and silently bypass both guards.
+   * only be changed through {@link #updateReleasedMeta(UUID, DataSourceMetaInputDTO)}, which is the
+   * single point that re-asserts the DataSource→DataPool scope rule for the datasets the source
+   * already feeds. Without this restriction the generic route would reach {@link
+   * #postConvertToEntity} — which applies a new datapool scope unconditionally — and silently
+   * bypass that guard.
    *
    * @param id the data source ID
    * @param input the update input
@@ -400,19 +401,17 @@ public class DataSourceService
   }
 
   /**
-   * Updates metadata of an AVAILABLE data source. Allows name, description, and assignment changes.
-   * Technical fields (connector type, configuration, data structure version) can only be changed
-   * while no Pipeline of an AVAILABLE dataset references the data source.
+   * Updates the metadata of an AVAILABLE data source: name, description, assignments and datapool
+   * scope.
    *
    * @param id the data source ID
-   * @param input the partial update input
+   * @param input the metadata
    * @return the updated data source
-   * @throws InvalidInputException if the data source is not AVAILABLE, or a technical field is
-   *     changed while a released dataset uses it
+   * @throws InvalidInputException if the data source is not AVAILABLE
    */
   @Override
   @Transactional
-  public DataSource updateReleasedMeta(UUID id, DataSourceInputDTO input) {
+  public DataSource updateReleasedMeta(UUID id, DataSourceMetaInputDTO input) {
     DataSource entity = findByIdOrThrow(id);
 
     if (entity.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
@@ -420,18 +419,10 @@ public class DataSourceService
           getEntityName(), id, "Only data sources in AVAILABLE status can have metadata updated");
     }
 
-    boolean inUseByReleased = artifactUsageLookup.of(entity).inUseByReleased();
-
-    if (inUseByReleased) {
-      validateTechnicalFieldsUnchanged(input, entity);
-    }
-
     if (input.getName() != null) {
       entity.setName(input.getName());
     }
-    if (input.getDescription() != null) {
-      entity.setDescription(input.getDescription());
-    }
+    entity.setDescription(input.getDescription());
     if (input.getAssignments() != null) {
       Set<Assignment> assignments =
           input.getAssignments().stream()
@@ -445,24 +436,12 @@ public class DataSourceService
       revalidateLinkedDatasetsAgainstNewScope(entity);
     }
 
-    if (!inUseByReleased) {
-      applyTechnicalFields(input, entity);
-    }
-
     return save(entity);
   }
 
-  /**
-   * Leaves the technical fields {@code null}: {@link #updateReleasedMeta} rejects any configuration
-   * on a data source that a released dataset uses, so a patch base that carried the current one
-   * would fail every metadata update of such a data source.
-   */
   @Override
-  public DataSourceInputDTO toMetaInput(DataSource entity) {
-    DataSourceInputDTO meta = new DataSourceInputDTO();
-    meta.setName(entity.getName());
-    meta.setDescription(entity.getDescription());
-    return meta;
+  public DataSourceMetaInputDTO toMetaInput(DataSource entity) {
+    return dataSourceMapper.toMetaInput(entity);
   }
 
   /**
@@ -484,58 +463,6 @@ public class DataSourceService
         .forEach(
             pipeline ->
                 datapoolScopeValidator.validate(sources, pipeline.getDataSet().getDataPool()));
-  }
-
-  private void validateTechnicalFieldsUnchanged(DataSourceInputDTO input, DataSource entity) {
-    if (input.getConnectorType() != null && input.getConnectorType() != entity.getConnectorType()) {
-      throw new InvalidInputException(
-          getEntityName(),
-          entity.getId(),
-          "Cannot change connector type of a data source that a released dataset uses");
-    }
-    if (input.getConfiguration() != null) {
-      throw new InvalidInputException(
-          getEntityName(),
-          entity.getId(),
-          "Cannot change configuration of a data source that a released dataset uses");
-    }
-    UUID existingDsvId =
-        entity.getDataStructureVersion() != null ? entity.getDataStructureVersion().getId() : null;
-    if (input.getDataStructureVersionId() != null
-        && !input.getDataStructureVersionId().equals(existingDsvId)) {
-      throw new InvalidInputException(
-          getEntityName(),
-          entity.getId(),
-          "Cannot change data structure version of a data source that a released dataset uses");
-    }
-  }
-
-  private void applyTechnicalFields(DataSourceInputDTO input, DataSource entity) {
-    if (input.getConnectorType() != null) {
-      entity.setConnectorType(input.getConnectorType());
-    }
-    if (input.getDataStructureVersionId() != null) {
-      DataStructureVersion version = resolveAuthorizedVersion(input.getDataStructureVersionId());
-      validateDataStructureVersionAvailable(version);
-      entity.setDataStructureVersion(version);
-    }
-    if (input.getConfiguration() != null) {
-      ConnectorType type = entity.getConnectorType();
-      if (type == null) {
-        throw new InvalidInputException(
-            getEntityName(), entity.getId(), "Cannot set configuration without a connector type");
-      }
-      ConnectorHandler handler = connectorHandlerRegistry.getHandlerOrThrow(type);
-
-      Map<String, Object> existingConfig = fetchConfiguration(entity);
-
-      Map<String, Object> normalized = handler.normalizeAndValidate(input.getConfiguration());
-      Map<String, Object> encrypted = handler.encryptSensitiveFields(normalized);
-      if (existingConfig != null) {
-        restoreMaskedValues(encrypted, existingConfig, handler, normalized);
-      }
-      storeConfigurationInRegistry(entity, encrypted, entity.getConnectorType());
-    }
   }
 
   /**

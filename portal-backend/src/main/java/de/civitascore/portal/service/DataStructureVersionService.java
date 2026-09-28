@@ -165,8 +165,7 @@ public class DataStructureVersionService
   }
 
   /**
-   * Updates the metadata of a released data structure version. The model and its styles stay as
-   * they are, whether a released entity uses the version or not.
+   * Updates the metadata of a released data structure version.
    *
    * @param id the version ID
    * @param meta the metadata

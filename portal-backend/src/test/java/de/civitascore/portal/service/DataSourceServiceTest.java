@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -25,6 +24,7 @@ import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
+import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
@@ -434,12 +434,8 @@ class DataSourceServiceTest {
   @DisplayName("Update Released Metadata")
   class UpdateReleasedMetaTests {
 
-    private void stubInUseByReleased() {
-      when(artifactUsageLookup.of(any(DataSource.class))).thenReturn(IN_USE_BY_RELEASED);
-    }
-
     @Test
-    @DisplayName("Should update name and description when not in use")
+    @DisplayName("Should update name and description")
     void shouldUpdateMetaOfAvailableDataSource() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
@@ -448,7 +444,7 @@ class DataSourceServiceTest {
       entity.setDescription("old-desc");
       entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
 
-      DataSourceInputDTO input = new DataSourceInputDTO();
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
       input.setName("new-name");
       input.setDescription("new-desc");
 
@@ -475,7 +471,7 @@ class DataSourceServiceTest {
       scope.setType(DatapoolScopeType.SPECIFIC);
       scope.setDatapoolIds(List.of(poolId));
 
-      DataSourceInputDTO input = new DataSourceInputDTO();
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
       input.setDatapoolScope(scope);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
@@ -488,58 +484,6 @@ class DataSourceServiceTest {
     }
 
     @Test
-    @DisplayName("Should deny updateReleasedMeta binding a DataStructure the caller cannot access")
-    void shouldDenyUnauthorizedDataStructureOnUpdateReleasedMeta() {
-      UUID id = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-
-      DataStructureVersion dsv = createDataStructureVersion();
-      dsv.setId(dsvId);
-      dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setDataStructureVersionId(dsvId);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
-      doThrow(new AccessDeniedException("denied"))
-          .when(scopeAccessAuthorizer)
-          .authorizeReferences(eq(ScopeType.DATASTRUCTURE), any());
-
-      // An unauthorized version must surface as the same not-found failure as a missing one, so
-      // the caller cannot distinguish an existing-but-forbidden version from a non-existent one.
-      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
-          .isInstanceOf(ResourceNotFoundException.class);
-    }
-
-    @Test
-    @DisplayName("Should reject changing an AVAILABLE DataSource to a DRAFT version")
-    void shouldRejectDraftVersionOnUpdateReleasedMeta() {
-      UUID id = UUID.randomUUID();
-      UUID dsvId = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      DataStructureVersion dsv = createDataStructureVersion();
-      dsv.setId(dsvId);
-      dsv.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setDataStructureVersionId(dsvId);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
-
-      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("DataStructureVersion")
-          .hasMessageContaining("AVAILABLE");
-    }
-
-    @Test
     @DisplayName("Should fail to update metadata of DRAFT data source")
     void shouldFailToUpdateMetaOfDraftDataSource() {
       UUID id = UUID.randomUUID();
@@ -547,7 +491,7 @@ class DataSourceServiceTest {
       entity.setId(id);
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
 
-      DataSourceInputDTO input = new DataSourceInputDTO();
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
       input.setName("new-name");
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
@@ -558,8 +502,8 @@ class DataSourceServiceTest {
     }
 
     @Test
-    @DisplayName("Should only update provided fields when not in use")
-    void shouldOnlyUpdateProvidedFields() {
+    @DisplayName("Should clear the description when the metadata has none")
+    void shouldClearDescriptionWhenMetadataHasNone() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -567,7 +511,7 @@ class DataSourceServiceTest {
       entity.setDescription("original-desc");
       entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
 
-      DataSourceInputDTO input = new DataSourceInputDTO();
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
       input.setName("updated-name");
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
@@ -576,133 +520,7 @@ class DataSourceServiceTest {
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getName()).isEqualTo("updated-name");
-      assertThat(result.getDescription()).isEqualTo("original-desc");
-    }
-
-    @Test
-    @DisplayName("Should update configuration when not in use")
-    void shouldUpdateConfigurationOfAvailableDataSource() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setName("mqtt-source");
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      entity.setConnectorType(ConnectorType.MQTT);
-      stubStoredConfiguration(
-          entity, Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("old/topic")));
-
-      Map<String, Object> newConfig =
-          new java.util.HashMap<>(
-              Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("new/topic")));
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("mqtt-source");
-      input.setConfiguration(newConfig);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.MQTT)).thenReturn(mqttHandler);
-      when(mqttHandler.normalizeAndValidate(any())).thenReturn(newConfig);
-      when(mqttHandler.encryptSensitiveFields(any())).thenAnswer(inv -> inv.getArgument(0));
-      when(mqttHandler.getSensitiveFields()).thenReturn(Set.of());
-      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-      DataSource result = dataSourceService.updateReleasedMeta(id, input);
-
-      // The new configuration — enriched with connectionType (from the connector type); Model Forge
-      // stamps $schema + id on write — went to the registry; the assigned pin was mirrored on the
-      // shell.
-      Map<String, Object> expectedPayload = new java.util.HashMap<>(newConfig);
-      expectedPayload.put("connectionType", "mqtt");
-      verify(modelRegistryGateway).storePayload(any(), any(), any(), eq(expectedPayload), isNull());
-      assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);
-    }
-
-    @Test
-    @DisplayName("Should update configuration when only draft datasets use the data source")
-    void shouldUpdateConfigurationWhenInUseByDraftsOnly() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setName("mqtt-source");
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      entity.setConnectorType(ConnectorType.MQTT);
-      stubStoredConfiguration(
-          entity, Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("old/topic")));
-
-      Map<String, Object> newConfig =
-          new java.util.HashMap<>(
-              Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("new/topic")));
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setConfiguration(newConfig);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(artifactUsageLookup.of(entity)).thenReturn(IN_USE_BY_DRAFTS);
-      when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.MQTT)).thenReturn(mqttHandler);
-      when(mqttHandler.normalizeAndValidate(any())).thenReturn(newConfig);
-      when(mqttHandler.encryptSensitiveFields(any())).thenAnswer(inv -> inv.getArgument(0));
-      when(mqttHandler.getSensitiveFields()).thenReturn(Set.of());
-      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-      DataSource result = dataSourceService.updateReleasedMeta(id, input);
-
-      assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);
-    }
-
-    @Test
-    @DisplayName("Should restore masked sensitive fields when updating configuration")
-    void shouldRestoreMaskedFieldsWhenUpdatingConfiguration() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setName("sql-source");
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      entity.setConnectorType(ConnectorType.SQL);
-      stubStoredConfiguration(
-          entity,
-          Map.of("driver", "postgres", "dsn", "postgres://host/db", "password", "enc_secret"));
-
-      Map<String, Object> normalized =
-          new java.util.HashMap<>(
-              Map.of(
-                  "driver", "postgres",
-                  "dsn", "postgres://new-host/db",
-                  "password", ConnectorHandler.MASKED_VALUE));
-      Map<String, Object> encrypted =
-          new java.util.HashMap<>(
-              Map.of(
-                  "driver", "postgres",
-                  "dsn", "postgres://new-host/db",
-                  "password", "enc_garbage"));
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("sql-source");
-      input.setConfiguration(
-          new java.util.HashMap<>(
-              Map.of(
-                  "driver", "postgres",
-                  "dsn", "postgres://new-host/db",
-                  "password", ConnectorHandler.MASKED_VALUE)));
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.SQL)).thenReturn(sqlHandler);
-      when(sqlHandler.normalizeAndValidate(any())).thenReturn(normalized);
-      when(sqlHandler.encryptSensitiveFields(any())).thenReturn(encrypted);
-      when(sqlHandler.getSensitiveFields()).thenReturn(Set.of("password"));
-      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-      DataSource result = dataSourceService.updateReleasedMeta(id, input);
-
-      // The masked password was restored from the registry-stored document before the new
-      // configuration was stored; the pin was re-mirrored.
-      assertThat(encrypted).containsEntry("password", "enc_secret");
-      assertThat(encrypted).containsEntry("dsn", "postgres://new-host/db");
-      // Stored payload = the restored/encrypted config enriched with connectionType (from the
-      // connector type); Model Forge stamps $schema + id on write.
-      Map<String, Object> expectedPayload = new java.util.HashMap<>(encrypted);
-      expectedPayload.put("connectionType", "sql");
-      verify(modelRegistryGateway).storePayload(any(), any(), any(), eq(expectedPayload), isNull());
-      assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);
+      assertThat(result.getDescription()).isNull();
     }
 
     @Test
@@ -717,7 +535,7 @@ class DataSourceServiceTest {
       stubStoredConfiguration(entity, Map.of("urls", List.of("tcp://broker:1883")));
       String originalPin = entity.getConfigurationUrn();
 
-      DataSourceInputDTO input = new DataSourceInputDTO();
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
       input.setName("new-name");
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
@@ -732,140 +550,19 @@ class DataSourceServiceTest {
     }
 
     @Test
-    @DisplayName("Should update name and description when in use")
-    void shouldUpdateNameAndDescriptionWhenInUse() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setName("old-name");
-      entity.setDescription("old-desc");
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("new-name");
-      input.setDescription("new-desc");
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUseByReleased();
-      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-      DataSource result = dataSourceService.updateReleasedMeta(id, input);
-
-      assertThat(result.getName()).isEqualTo("new-name");
-      assertThat(result.getDescription()).isEqualTo("new-desc");
-    }
-
-    @Test
-    @DisplayName("Should reject configuration change when in use")
-    void shouldRejectConfigurationChangeWhenInUse() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setName("mqtt-source");
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      entity.setConnectorType(ConnectorType.MQTT);
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("mqtt-source");
-      input.setConfiguration(Map.of("urls", List.of("tcp://new-broker:1883")));
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUseByReleased();
-
-      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("configuration")
-          .hasMessageContaining("released dataset");
-    }
-
-    @Test
-    @DisplayName("Should reject connector type change when in use")
-    void shouldRejectConnectorTypeChangeWhenInUse() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setName("mqtt-source");
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      entity.setConnectorType(ConnectorType.MQTT);
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("mqtt-source");
-      input.setConnectorType(ConnectorType.SQL);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUseByReleased();
-
-      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("connector type")
-          .hasMessageContaining("released dataset");
-    }
-
-    @Test
-    @DisplayName("Should reject data structure version change when in use")
-    void shouldRejectDsvChangeWhenInUse() {
-      UUID id = UUID.randomUUID();
-      UUID existingDsvId = UUID.randomUUID();
-      DataStructureVersion dsv = new DataStructureVersion();
-      dsv.setId(existingDsvId);
-
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setName("source");
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      entity.setDataStructureVersion(dsv);
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("source");
-      input.setDataStructureVersionId(UUID.randomUUID());
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUseByReleased();
-
-      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("data structure version")
-          .hasMessageContaining("released dataset");
-    }
-
-    @Test
-    @DisplayName("Should allow same connector type when in use")
-    void shouldAllowSameConnectorTypeWhenInUse() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setName("mqtt-source");
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      entity.setConnectorType(ConnectorType.MQTT);
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("new-name");
-      input.setConnectorType(ConnectorType.MQTT);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUseByReleased();
-      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-      DataSource result = dataSourceService.updateReleasedMeta(id, input);
-
-      assertThat(result.getName()).isEqualTo("new-name");
-    }
-
-    @Test
-    @DisplayName("Should allow assignments update when in use")
-    void shouldAllowAssignmentsUpdateWhenInUse() {
+    @DisplayName("Should update assignments")
+    void shouldUpdateAssignments() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
       entity.setName("source");
       entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
 
-      DataSourceInputDTO input = new DataSourceInputDTO();
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
       input.setName("source");
       input.setAssignments(Set.of());
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUseByReleased();
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
@@ -901,11 +598,10 @@ class DataSourceServiceTest {
       scope.setType(DatapoolScopeType.SPECIFIC);
       scope.setDatapoolIds(List.of(poolB.getId()));
 
-      DataSourceInputDTO input = new DataSourceInputDTO();
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
       input.setDatapoolScope(scope);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUseByReleased();
       when(dataPoolRepository.findAllById(List.of(poolB.getId()))).thenReturn(List.of(poolB));
       when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
 
@@ -940,11 +636,10 @@ class DataSourceServiceTest {
       scope.setType(DatapoolScopeType.SPECIFIC);
       scope.setDatapoolIds(List.of(poolA.getId()));
 
-      DataSourceInputDTO input = new DataSourceInputDTO();
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
       input.setDatapoolScope(scope);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUseByReleased();
       when(dataPoolRepository.findAllById(List.of(poolA.getId()))).thenReturn(List.of(poolA));
       when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -976,11 +671,10 @@ class DataSourceServiceTest {
       DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
       scope.setType(DatapoolScopeType.NONE);
 
-      DataSourceInputDTO input = new DataSourceInputDTO();
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
       input.setDatapoolScope(scope);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      stubInUseByReleased();
       when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
 
       assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
@@ -989,49 +683,6 @@ class DataSourceServiceTest {
               ex ->
                   assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
                       .containsExactly(id));
-    }
-
-    @Test
-    @DisplayName(
-        "Should reject narrowing the scope to exclude a pool it feeds when only drafts use it")
-    void shouldRejectNarrowingScopeExcludingLinkedPoolWhenInUseByDraftsOnly() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setName("source");
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      entity.setDatapoolScopeType(DatapoolScopeType.ALL);
-
-      DataPool poolA = new DataPool();
-      poolA.setId(UUID.randomUUID());
-      DataSet draftDataSet = new DataSet();
-      draftDataSet.setId(UUID.randomUUID());
-      draftDataSet.setDataPool(poolA);
-      Pipeline pipeline = new Pipeline();
-      pipeline.setDataSet(draftDataSet);
-      pipeline.setDataSources(new HashSet<>(Set.of(entity)));
-
-      DataPool poolB = new DataPool();
-      poolB.setId(UUID.randomUUID());
-      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
-      scope.setType(DatapoolScopeType.SPECIFIC);
-      scope.setDatapoolIds(List.of(poolB.getId()));
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setDatapoolScope(scope);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(artifactUsageLookup.of(entity)).thenReturn(IN_USE_BY_DRAFTS);
-      when(dataPoolRepository.findAllById(List.of(poolB.getId()))).thenReturn(List.of(poolB));
-      when(pipelineRepository.findByDataSourcesId(id)).thenReturn(List.of(pipeline));
-
-      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
-          .isInstanceOf(DataSourceScopeViolationException.class)
-          .satisfies(
-              ex ->
-                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
-                      .containsExactly(id));
-      verify(dataSourceRepository, never()).save(any());
     }
   }
 
@@ -1219,31 +870,6 @@ class DataSourceServiceTest {
     }
 
     @Test
-    @DisplayName("Should reject changing DSV on an in-use AVAILABLE data source")
-    void shouldRejectChangingDsvWhenAvailableAndInUse() {
-      UUID id = UUID.randomUUID();
-      DataStructureVersion existingDsv = createDataStructureVersion();
-
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      entity.setConnectorType(ConnectorType.MQTT);
-      entity.setDataStructureVersion(existingDsv);
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("updated");
-      input.setConnectorType(ConnectorType.MQTT);
-      input.setDataStructureVersionId(UUID.randomUUID());
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(artifactUsageLookup.of(entity)).thenReturn(IN_USE_BY_RELEASED);
-
-      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("data structure version");
-    }
-
-    @Test
     @DisplayName("Should reject changing DSV on an AVAILABLE data source via the generic route")
     void shouldRejectChangingDsvWhenAvailableViaGenericUpdate() {
       UUID id = UUID.randomUUID();
@@ -1271,27 +897,6 @@ class DataSourceServiceTest {
   @Nested
   @DisplayName("Update DataSource")
   class UpdateTests {
-
-    @Test
-    @DisplayName("Should prevent changing connector type of an in-use AVAILABLE data source")
-    void shouldPreventChangingConnectorTypeWhenAvailableAndInUse() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-      entity.setConnectorType(ConnectorType.MQTT);
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("updated");
-      input.setConnectorType(ConnectorType.SQL);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(artifactUsageLookup.of(entity)).thenReturn(IN_USE_BY_RELEASED);
-
-      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("connector type");
-    }
 
     @Test
     @DisplayName("Should reject the generic update route for an AVAILABLE data source")
@@ -1675,7 +1280,7 @@ class DataSourceServiceTest {
       scope.setType(DatapoolScopeType.SPECIFIC);
       scope.setDatapoolIds(List.of(poolId));
 
-      DataSourceInputDTO input = new DataSourceInputDTO();
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
       input.setName("source");
       input.setDatapoolScope(scope);
 

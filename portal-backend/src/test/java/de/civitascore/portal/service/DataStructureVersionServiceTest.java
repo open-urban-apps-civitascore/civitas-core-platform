@@ -238,7 +238,7 @@ class DataStructureVersionServiceTest {
     @DisplayName("Should change description and modelName and keep the model pin")
     void updateReleasedMeta_whenNotInUse_keepsModelPin() {
       // A released version that no released entity uses is the case that could replace its model;
-      // without this test a meta path routed back through the full update would do so again.
+      // without this test a meta path routed through the full update would replace it.
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
