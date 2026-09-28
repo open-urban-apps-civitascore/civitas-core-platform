@@ -30,6 +30,7 @@ export const VersionsTable = (props: VersionsTableProps) => {
     onSortingChange,
   } = props
   const t = useTranslations('datastructures')
+  const tVersion = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
   const columnHelper = createColumnHelper<DatastructureVersionsListData>()
 
@@ -64,6 +65,17 @@ export const VersionsTable = (props: VersionsTableProps) => {
         style: {
           width: '25%',
           minWidth: '200px',
+        },
+      },
+    }),
+    columnHelper.display({
+      id: 'source',
+      header: t('tableHeaders.source'),
+      cell: () => tVersion('source.OWN'),
+      meta: {
+        style: {
+          width: '5%',
+          minWidth: '100px',
         },
       },
     }),

@@ -1152,6 +1152,7 @@
     "tableHeaders": {
       "name": "Name",
       "description": "Beschreibung",
+      "source": "Quelle",
       "versionNumber": "Version",
       "status": "Status"
     },
@@ -1214,7 +1215,11 @@
       "versionNumber": "Versionsnummer",
       "versionNumberPlaceholder": "Wird beim Speichern des Modells zugewiesen",
       "description": "Versionsbeschreibung",
+      "source": "Quelle",
       "builtFrom": "Aufgebaut aus"
+    },
+    "source": {
+      "OWN": "Eigene"
     },
     "messages": {
       "createSuccess": "Die Version der Datenstruktur wurde erfolgreich angelegt.",

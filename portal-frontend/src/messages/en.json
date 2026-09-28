@@ -1165,6 +1165,7 @@
     "tableHeaders": {
       "name": "Name",
       "description": "Description",
+      "source": "Source",
       "versionNumber": "Version",
       "status": "Status"
     },
@@ -1227,7 +1228,11 @@
       "versionNumber": "Version Number",
       "versionNumberPlaceholder": "Assigned when the model is saved",
       "description": "Version Description",
+      "source": "Source",
       "builtFrom": "Built from"
+    },
+    "source": {
+      "OWN": "Own"
     },
     "messages": {
       "createSuccess": "The version of the Data structure has been successfully created.",

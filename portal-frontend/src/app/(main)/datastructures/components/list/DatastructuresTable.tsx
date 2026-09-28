@@ -43,6 +43,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
   } = props
   const { hasScopedPermission } = usePermissions()
   const t = useTranslations('datastructures')
+  const tVersion = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
   const columnHelper = createColumnHelper<DatastructuresListData>()
 
@@ -79,6 +80,17 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
         truncate: true,
         style: {
           minWidth: '200px',
+        },
+      },
+    }),
+    columnHelper.display({
+      id: 'source',
+      header: t('tableHeaders.source'),
+      cell: ({ row }) => (row.depth > 0 || row.original.versionNumber ? tVersion('source.OWN') : '-'),
+      meta: {
+        style: {
+          width: '10%',
+          minWidth: '100px',
         },
       },
     }),

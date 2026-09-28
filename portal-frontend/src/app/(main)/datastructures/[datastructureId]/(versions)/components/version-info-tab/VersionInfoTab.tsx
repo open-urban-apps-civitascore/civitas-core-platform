@@ -10,6 +10,9 @@ import { TextField } from '@/components/form/fields/TextField'
 import { FooterElement } from '@/components/form/FooterElement'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Form } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { DatastructureVersionFormData } from '@/types/datastructures'
 
@@ -55,6 +58,7 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
   const { form, isReadOnly = false, isAvailable, importedStructureUrns = [] } = props
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
+  const isMobile = useIsMobile()
 
   return (
     <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement areAllFieldsRequired />}>
@@ -100,6 +104,22 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
               required
               className="min-h-[100px] resize-none"
             />
+          </DetailsFieldContainer>
+
+          <DetailsFieldContainer className="max-w-300">
+            <div className={isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]'}>
+              <Label htmlFor="dataStructureVersionSource">
+                {t('versionInfo.source')}
+                <span className="text-red-500 ml-1">*</span>
+              </Label>
+              <Input
+                id="dataStructureVersionSource"
+                data-testid="dataStructureVersionSourceTextField"
+                className="disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
+                value={t('source.OWN')}
+                disabled
+              />
+            </div>
           </DetailsFieldContainer>
         </form>
       </Form>
