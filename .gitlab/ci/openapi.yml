@@ -1,0 +1,76 @@
+# Keeps api/portal-backend/openapi.yaml in sync with the description the running backend serves.
+#
+# api-test-backend exports the spec from the Compose stack (artifact openapi.generated.yaml).
+# This job compares that export with the committed file. Direct pushes to develop are not
+# allowed, so it works the way Renovate does: on a difference it pushes the new file to a bot
+# branch and opens a merge request against develop, or refreshes the one already open.
+#
+# Requires OPENAPI_BOT_TOKEN (falls back to RENOVATE_TOKEN): a Project Access Token with the
+# api and write_repository scopes and the Developer role, stored as a masked CI/CD variable.
+update-openapi-spec:
+  image: alpine:3
+  stage: report
+  needs:
+    - job: api-test-backend
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop"
+  variables:
+    GIT_DEPTH: 1
+    SPEC_PATH: api/portal-backend/openapi.yaml
+    BOT_BRANCH: ci/openapi-spec-update
+  before_script:
+    - apk add --no-cache git curl jq >/dev/null
+  script:
+    - |
+      if [ ! -s openapi.generated.yaml ]; then
+        echo "openapi.generated.yaml is missing or empty — api-test-backend did not export the spec."
+        exit 1
+      fi
+      if [ -f "$SPEC_PATH" ] && cmp -s "$SPEC_PATH" openapi.generated.yaml; then
+        echo "$SPEC_PATH matches the running backend — nothing to do."
+        exit 0
+      fi
+      TOKEN="${OPENAPI_BOT_TOKEN:-$RENOVATE_TOKEN}"
+      if [ -z "$TOKEN" ]; then
+        echo "OPENAPI_BOT_TOKEN (or RENOVATE_TOKEN) is not set — cannot push the bot branch or open a merge request."
+        exit 1
+      fi
+      REPO_URL="https://oauth2:${TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      MR_API="$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests"
+
+      # Skip the push when the bot branch already carries exactly this spec, so a develop pipeline
+      # that changes nothing about the API does not add a commit to the open merge request.
+      if git fetch --depth 1 "$REPO_URL" "refs/heads/$BOT_BRANCH" 2>/dev/null \
+         && git show "FETCH_HEAD:$SPEC_PATH" 2>/dev/null | cmp -s - openapi.generated.yaml; then
+        echo "Bot branch $BOT_BRANCH already carries this spec."
+      else
+        cp openapi.generated.yaml "$SPEC_PATH"
+        git config user.name "CIVITAS CI"
+        git config user.email "noreply@${CI_SERVER_HOST}"
+        git checkout -q -B "$BOT_BRANCH"
+        git add "$SPEC_PATH"
+        git commit -q -m "chore(api): sync openapi.yaml with the backend on develop
+
+      Exported by pipeline $CI_PIPELINE_ID from $CI_COMMIT_SHORT_SHA."
+        git push -q --force "$REPO_URL" "HEAD:refs/heads/$BOT_BRANCH"
+        echo "Pushed $BOT_BRANCH."
+      fi
+
+      # Open a merge request unless one for the bot branch is already open (it picks up the push).
+      OPEN_COUNT=$(curl -sSf --header "PRIVATE-TOKEN: $TOKEN" \
+        "$MR_API?state=opened&source_branch=$BOT_BRANCH&target_branch=develop" | jq length)
+      if [ "${OPEN_COUNT:-0}" -gt 0 ]; then
+        echo "Merge request for $BOT_BRANCH is already open — branch updated."
+        exit 0
+      fi
+      DESCRIPTION="Automated update of \`$SPEC_PATH\`.
+
+      The file is the OpenAPI description exported from the backend built in pipeline $CI_PIPELINE_URL (develop @ $CI_COMMIT_SHORT_SHA) and differs from the committed copy. Do not edit it by hand — merge to bring the repository in line with the running code, or fix the backend and let the next develop pipeline refresh this merge request."
+      curl -sSf --header "PRIVATE-TOKEN: $TOKEN" -X POST "$MR_API" \
+        --data-urlencode "source_branch=$BOT_BRANCH" \
+        --data-urlencode "target_branch=develop" \
+        --data-urlencode "title=chore(api): sync openapi.yaml with the backend" \
+        --data-urlencode "description=$DESCRIPTION" \
+        --data "remove_source_branch=true" \
+        | jq -r '"Opened merge request " + .web_url'

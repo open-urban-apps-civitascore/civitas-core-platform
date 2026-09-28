@@ -4,6 +4,7 @@ Bruno collections for the Portal Backend service.
 
 ```
 api/portal-backend/
+  openapi.yaml        OpenAPI description, generated — see below, do not edit by hand
   bruno-api/          API reference + manual testing, one request per endpoint
   bruno-tests/        Scenario-based test flows
 ```
@@ -26,8 +27,7 @@ how to run the suite locally.
 
 ## API documentation
 
-The backend serves its own OpenAPI description from springdoc; there is no committed
-spec file. With the backend running:
+The backend serves its own OpenAPI description from springdoc. With the backend running:
 
 | | |
 |---|---|
@@ -36,3 +36,10 @@ spec file. With the backend running:
 
 The document is assembled in `portal-backend/.../configuration/OpenApiConfig.java` and the
 springdoc annotations on the controllers.
+
+`openapi.yaml` in this directory is a committed copy of that description, kept in sync by CI:
+`api-test-backend` exports it from the backend built in the pipeline (job artifact
+`openapi.generated.yaml`), and on `develop` the `update-openapi-spec` job opens a merge request
+from the branch `ci/openapi-spec-update` whenever the export differs from the committed file
+(`.gitlab/ci/openapi.yml`). To change the spec, change the backend — the next `develop`
+pipeline refreshes the merge request.
