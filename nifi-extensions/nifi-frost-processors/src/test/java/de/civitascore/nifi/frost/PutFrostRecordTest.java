@@ -199,7 +199,32 @@ class PutFrostRecordTest {
 
       runner.assertTransferCount(PutFrostRecord.SUCCESS, 0);
       runner.assertTransferCount(PutFrostRecord.FAILURE, 1);
+      MockFlowFile failed = runner.getFlowFilesForRelationship(PutFrostRecord.FAILURE).get(0);
+      failed.assertAttributeEquals(PutFrostRecord.ERROR_ENTITY, "Batch");
+      failed.assertAttributeEquals(PutFrostRecord.ERROR_STATUS, "200");
     }
+  }
+
+  @Test
+  void onTrigger_whenTheRequestDoesNotComplete_retriesTheRecordWithTheReason()
+      throws InitializationException {
+    // No answer at all: the error sink must still learn why, once the retries are spent.
+    String baseUrl;
+    try (FrostEndpoint endpoint = FrostEndpoint.answering(document -> "{}", 200)) {
+      baseUrl = endpoint.baseUrl();
+    }
+    TestRunner runner = runner(baseUrl);
+    runner.enqueue(THING_A.getBytes(StandardCharsets.UTF_8));
+
+    runner.run();
+
+    runner.assertTransferCount(PutFrostRecord.RETRY, 1);
+    MockFlowFile retried = runner.getFlowFilesForRelationship(PutFrostRecord.RETRY).get(0);
+    retried.assertAttributeEquals(PutFrostRecord.ERROR_ENTITY, "Batch");
+    retried.assertAttributeEquals(PutFrostRecord.ERROR_STATUS, "0");
+    assertTrue(
+        retried.getAttribute(PutFrostRecord.ERROR_MESSAGE).startsWith("the FROST batch request"),
+        retried.getAttribute(PutFrostRecord.ERROR_MESSAGE));
   }
 
   @Test

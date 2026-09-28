@@ -275,7 +275,11 @@ public class PutFrostRecord extends AbstractProcessor {
       exchange = client.send(mapper.writeValueAsBytes(planned.document().toJson(mapper)));
     } catch (IOException e) {
       getLogger().warn("The FROST batch request to {} did not complete", client.batchUri(), e);
-      transferAll(session, planned.pending().values(), RETRY, true);
+      // Status 0: no answer came. The attributes say so once the retries are spent.
+      String reason = "the FROST batch request did not complete: " + e.getMessage();
+      for (FlowFile flowFile : List.copyOf(planned.pending().values())) {
+        session.transfer(session.penalize(fail(session, flowFile, "Batch", 0, reason)), RETRY);
+      }
       return;
     }
     if (!exchange.successful()) {
@@ -290,7 +294,10 @@ public class PutFrostRecord extends AbstractProcessor {
       // A successful status that is not a batch response means the endpoint is not a batch
       // endpoint. Reporting the records as written here would lose every one of them.
       getLogger().error("The answer of {} is not a batch response", client.batchUri(), e);
-      transferAll(session, planned.pending().values(), FAILURE, false);
+      String reason = "the answer is not a batch response: " + e.getMessage();
+      for (FlowFile flowFile : List.copyOf(planned.pending().values())) {
+        session.transfer(fail(session, flowFile, "Batch", exchange.status(), reason), FAILURE);
+      }
       return;
     }
     route(session, planned.pending(), outcomes);
@@ -374,16 +381,6 @@ public class PutFrostRecord extends AbstractProcessor {
     String reason = exchange.body() == null ? "" : exchange.body().toString();
     for (FlowFile flowFile : List.copyOf(flowFiles)) {
       session.transfer(fail(session, flowFile, "Batch", exchange.status(), reason), FAILURE);
-    }
-  }
-
-  private void transferAll(
-      ProcessSession session,
-      Collection<FlowFile> flowFiles,
-      Relationship relationship,
-      boolean penalize) {
-    for (FlowFile flowFile : List.copyOf(flowFiles)) {
-      session.transfer(penalize ? session.penalize(flowFile) : flowFile, relationship);
     }
   }
 

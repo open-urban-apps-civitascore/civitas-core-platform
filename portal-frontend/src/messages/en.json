@@ -1447,6 +1447,7 @@
         "frostMappingNoMatchKeyInStructure": "{label}: the target structure declares no match key for {entity} — mark an attribute with the UML '{id}' flag or add a \"reference\" attribute",
         "frostMappingCreateSetIncomplete": "{label} maps {entity} partially; creating it also requires: {fields} (or map none of the create fields for lookup-only)",
         "frostMappingLocationNeedsCreatableThing": "{label} maps a Location — that requires a fully mapped Thing (name, description), since Locations are created via its deep insert",
+        "frostMappingObservationPortNeedsReferences": "{label} maps into the Observations port but does not assign: {fields} — the port finds the Datastream of the measurement by those references",
         "frostMappingObservationNeedsResult": "{label} maps an Observation without $.Datastreams[].Observations[].result",
         "frostMappingFeatureOfInterestNeedsObservation": "{label} maps a FeatureOfInterest without an Observation — the feature is deep-inserted into the observation body",
         "frostMappingUnsafeMatchKeyName": "{label}: the match-key name \"{keyName}\" is not a valid identifier (letters, digits, underscore; must not start with a digit) — rename the attribute",

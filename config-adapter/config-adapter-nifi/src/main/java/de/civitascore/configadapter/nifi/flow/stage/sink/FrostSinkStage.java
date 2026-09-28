@@ -176,8 +176,8 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
           "FROST sink requires the saga's 'projectId' (result of the FROST create-project step)");
     }
     try {
-      return new FrostSinkSpec(
-          ctx.frostProjectId(), resolvePort(datasink), resolveStaProperties(datasink));
+      SinkPort port = resolvePort(datasink);
+      return new FrostSinkSpec(ctx.frostProjectId(), port, resolveStaProperties(datasink, port));
     } catch (UnresolvableDataStructureException e) {
       // The one sink-spec defect the modeller can fix themselves (designate a root element in the
       // data structure) — its dedicated code carries that remedy as the safe external message,
@@ -234,16 +234,24 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
    * empty attributes.
    */
   @SuppressWarnings("unchecked")
-  private static StaProperties resolveStaProperties(Map<String, Object> datasink) {
+  private static StaProperties resolveStaProperties(Map<String, Object> datasink, SinkPort port) {
     if (!(datasink.get("dataStructure") instanceof Map<?, ?> ds)) {
       return null;
     }
     Map<String, Object> schema = (Map<String, Object>) ds;
+    if (port == SinkPort.OBSERVATIONS) {
+      // The record of this port is the measurement itself, so its bag sits at the root — and a
+      // measurement keeps its references in 'parameters', the one entity SensorThings gives no
+      // 'properties'.
+      return StaProperties.ofObservation(entityBag(schema, List.of(), "parameters"));
+    }
     ResolvedDefinition thing = DataStructureSchema.resolveDefinitionAt(schema, List.of());
     String datastreamsProperty = entityPropertyName(thing.properties(), "Datastreams");
     List<StaBagAttribute> datastreamBag =
-        datastreamsProperty != null ? entityBag(schema, List.of(datastreamsProperty)) : List.of();
-    return new StaProperties(entityBag(schema, List.of()), datastreamBag);
+        datastreamsProperty != null
+            ? entityBag(schema, List.of(datastreamsProperty), "properties")
+            : List.of();
+    return new StaProperties(entityBag(schema, List.of(), "properties"), datastreamBag, List.of());
   }
 
   /** Finds an entity collection exported from a labelled or an unlabelled UML relationship. */
@@ -267,13 +275,14 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
   }
 
   @SuppressWarnings("unchecked")
-  private static List<StaBagAttribute> entityBag(Map<String, Object> schema, List<String> path) {
+  private static List<StaBagAttribute> entityBag(
+      Map<String, Object> schema, List<String> path, String bagName) {
     // SensorThings keeps identifiers (and any free attributes) in the entity's 'properties' bag
     // rather than top-level, so the bag is read from the 'properties' class, not the entity class
     // itself. A structurally broken entity class throws here (resolveDefinitionAt is unguarded) and
     // surfaces as a payload error rather than degrading to "no attributes".
     Object bagSpec =
-        DataStructureSchema.resolveDefinitionAt(schema, path).properties().get("properties");
+        DataStructureSchema.resolveDefinitionAt(schema, path).properties().get(bagName);
     if (!(bagSpec instanceof Map<?, ?> spec) || isEmptyBagSpec((Map<String, Object>) spec)) {
       // No 'properties' bag, or one modelled with no attributes: legitimate (passthrough /
       // lookup-only). A bag that DOES declare content (a $ref or nested properties) is resolved
@@ -282,7 +291,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       return List.of();
     }
     List<String> propertiesPath = new ArrayList<>(path);
-    propertiesPath.add("properties");
+    propertiesPath.add(bagName);
 
     // Resolves the bag class fully (follows a local $ref / allOf) — the modelled bag may be a named
     // class shared across entities.
