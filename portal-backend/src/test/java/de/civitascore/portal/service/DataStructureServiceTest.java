@@ -14,7 +14,6 @@ import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.List;
 import java.util.Optional;
@@ -40,7 +39,6 @@ class DataStructureServiceTest {
   @Mock private DataStructureRepository dataStructureRepository;
   @Mock private DataStructureMapper dataStructureMapper;
   @Mock private AssignmentRepository assignmentRepository;
-  @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private DataSourceRepository dataSourceRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private ArtifactUsageLookup artifactUsageLookup;

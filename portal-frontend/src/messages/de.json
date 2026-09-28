@@ -113,7 +113,6 @@
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
-      "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
       "descriptionHint": "max. 150 Zeichen",
       "creationSubtitle": "Im ersten Schritt ist nur ein Name erforderlich. Weitere Basisinformationen können später ergänzt werden.",
@@ -203,7 +202,6 @@
     "home": "Home",
     "menu-item": "Menüpunkt",
     "sub-item": "Unterpunkt",
-    "data-catalog": "Datenkatalog",
     "all-datasets": "Alle Datensätze",
     "documentation": "Dokumentation",
     "logout": "Abmelden",
@@ -1023,7 +1021,65 @@
       "type": "Typ",
       "typePlaceholder": "Konnektortyp auswählen",
       "connection": "Verbindung",
-      "establishConnection": "Verbindung herstellen"
+      "establishConnection": "Verbindung herstellen",
+      "mqtt": {
+        "urls": {
+          "label": "Broker",
+          "hint": "kommagetrennt"
+        },
+        "protocolVersion": {
+          "label": "Protokollversion",
+          "placeholder": "Version auswählen"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Passwort"
+        },
+        "topics": {
+          "label": "Topic"
+        },
+        "qos": {
+          "label": "QoS"
+        },
+        "connectTimeout": {
+          "label": "Verbindungs-Timeout"
+        },
+        "keepalive": {
+          "label": "Keepalive"
+        },
+        "tls": {
+          "label": "TLS aktiviert"
+        }
+      },
+      "sql": {
+        "driver": {
+          "label": "Treiber"
+        },
+        "dsn": {
+          "label": "DSN",
+          "placeholder": "treiber-spezifischer Connection String"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Passwort"
+        },
+        "table": {
+          "label": "Tabelle",
+          "placeholder": "Tabellenname"
+        },
+        "columns": {
+          "label": "Spalten",
+          "hint": "kommagetrennt",
+          "placeholder": "* oder col1, col2"
+        },
+        "where": {
+          "label": "WHERE"
+        }
+      }
     },
     "dataModel": {
       "placeholder": {
@@ -1250,6 +1306,22 @@
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
       "anonymousName": "Anonyme Datenquelle"
     },
+    "sink": {
+      "locked": {
+        "provisioned": {
+          "title": "Bereitgestellt",
+          "description": "Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr bearbeitet oder entfernt werden."
+        },
+        "inUseByLayer": {
+          "title": "In Verwendung",
+          "tooltip": "Dieser Datenspeicher wird von API-Layern verwendet. Zum Bearbeiten oder Entfernen müssen zuerst die Layer-Zuordnungen aufgehoben werden."
+        }
+      },
+      "notRemovable": {
+        "provisioned": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr entfernt werden.",
+        "inUseByLayer": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wird von API-Layern verwendet. Heben Sie zuerst die Layer-Zuordnungen auf."
+      }
+    },
     "frostPanel": {
       "details": "Sensordaten-Speicher Details",
       "serverName": "Servername",
@@ -1399,7 +1471,9 @@
       "dataSinkInUseError": "{names} kann nicht gespeichert werden: Ein Datenspeicher wird noch von mindestens einem Layer verwendet.",
       "unconfirmedDataLossError": "{names} kann nicht gespeichert werden: Die Änderung verwirft gespeicherte Daten.",
       "notDraftError": "Der Datensatz muss im Entwurfsstatus sein, um Änderungen vorzunehmen.",
-      "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut."
+      "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut.",
+      "sinkStillInUse": "{names} wurde gespeichert, ein entfernter Datenspeicher wird aber noch verwendet und kann nicht gelöscht werden.",
+      "sinkDeleteFailed": "{names} wurde gespeichert, ein entfernter Datenspeicher konnte aber nicht gelöscht werden."
     },
     "tabs": {
       "closeTab": "Tab schließen",

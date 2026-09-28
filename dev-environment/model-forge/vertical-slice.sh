@@ -71,7 +71,7 @@ if [ -z "$TOKEN" ]; then echo "    token fetch failed (Keycloak up? creds correc
 echo "==> 3/4  Creating a DataStructure + schema version via portal-backend ..."
 DS_ID=$(curl -fsS -X POST "$BACKEND_URL/v1/datastructures" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"Vertical Slice DataStructure","description":"vertical-slice smoke test: portal-backend -> Model Forge","createdFromDataSource":false,"dataStructureVersionIds":[],"assignments":[]}' | json id)
+  -d '{"name":"Vertical Slice DataStructure","description":"vertical-slice smoke test: portal-backend -> Model Forge","createdFromDataSource":false,"assignments":[]}' | json id)
 echo "    DataStructure id = $DS_ID"
 
 curl -fsS -X POST "$BACKEND_URL/v1/datastructures/$DS_ID/versions" \

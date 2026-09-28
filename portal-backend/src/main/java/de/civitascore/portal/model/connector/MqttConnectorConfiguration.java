@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -35,14 +36,19 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
           "'topics' must contain exactly one topic filter; use wildcards (+, #) for multiple topics")
   private List<String> topics;
 
-  @JsonProperty("client_id")
-  @Schema(description = "MQTT client identifier.", example = "civitas-client-1")
-  private String clientId;
-
   @Schema(
       description = "QoS level: 0 = at most once, 1 = at least once, 2 = exactly once.",
       example = "1")
   @NotNull(groups = OnRelease.class, message = "'qos' is required") @Min(value = 0, message = "'qos' must be 0, 1, or 2") @Max(value = 2, message = "'qos' must be 0, 1, or 2") private Integer qos;
+
+  @JsonProperty("protocol_version")
+  @Schema(
+      description = "MQTT major protocol version.",
+      allowableValues = {"3", "5"},
+      defaultValue = "3",
+      example = "3",
+      requiredMode = Schema.RequiredMode.REQUIRED)
+  @NotNull(message = "'protocol_version' is required") @Pattern(regexp = "3|5", message = "'protocol_version' must be 3 or 5") private String protocolVersion = "3";
 
   @JsonProperty("connect_timeout")
   @Schema(description = "Connection timeout duration.", example = "5s")
@@ -62,10 +68,6 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
 
   @Schema(description = "Broker username.", example = "mqttuser")
   private String user;
-
-  public void setClientId(String clientId) {
-    this.clientId = normalizeBlank(clientId);
-  }
 
   public void setConnectTimeout(String connectTimeout) {
     this.connectTimeout = normalizeBlank(connectTimeout);

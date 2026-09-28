@@ -27,7 +27,6 @@ tests {
     expect(res.body.configuration.tls).to.deep.equal({ enabled: false });
     expect(res.body.configuration).to.have.property('user', null);
     expect(res.body.configuration).to.have.property('password', null);
-    expect(res.body.configuration).to.have.property('client_id', null);
     expect(res.body.configuration).to.have.property('keepalive', null);
     expect(res.body.configuration).to.have.property('connect_timeout', null);
   });
