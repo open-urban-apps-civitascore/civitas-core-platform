@@ -26,6 +26,6 @@ public class DataSinkInputDTO extends DataSetOwnedInputDTO {
       description =
           "Acknowledges that this update rebuilds the sink's table and discards all stored data."
               + " Required (true) when tableName or the referenced element changes on a"
-              + " provisioned dataset; ignored otherwise.")
+              + " provisioned sink; ignored otherwise.")
   private boolean confirmDataLoss;
 }

@@ -44,7 +44,7 @@ volumes:
 
 services:
   geoserverdb:
-    image: imresamu/postgis:17-3.5
+    image: imresamu/postgis:17-3.5@sha256:35fe7dceda62bfe7d2965b0ba78d915ff9f901b5e0466d633ecc58421b5b5210
     container_name: civitas-geoserver-db
     hostname: civitas-geoserver-db
     shm_size: 2g
@@ -87,7 +87,7 @@ services:
   # Named civitas-geoserver so APISIX can reach it via Docker network
   # at civitas-geoserver:8080 (see setup-apisix-route.sh).
   gateway:
-    image: geoservercloud/geoserver-cloud-gateway:3.0.1.1
+    image: geoservercloud/geoserver-cloud-gateway:3.0.1.1@sha256:de0b20bd2a4393bac7b9923e63f6e03611648bd749834434f170e9bfc9c0e47d
     user: "1000:1000"
     container_name: civitas-geoserver
     hostname: civitas-geoserver
@@ -104,7 +104,7 @@ services:
 
   # Base template for all GeoServer microservices (replicas: 0 = not started directly)
   geoserver_template:
-    image: geoservercloud/geoserver-cloud-webui:3.0.1.1
+    image: geoservercloud/geoserver-cloud-webui:3.0.1.1@sha256:4f91e3048ac894a476a1e84c2a018d2fb8e9d933fb88d1a6556386bdc2bf1bde
     user: "1000:1000"
     environment:
       <<: *common_env
@@ -117,7 +117,7 @@ services:
       - geoserver-internal
 
   wfs:
-    image: geoservercloud/geoserver-cloud-wfs:3.0.1.1
+    image: geoservercloud/geoserver-cloud-wfs:3.0.1.1@sha256:299f0d6232d1aa7a94afce0394fa8d5465e03b3f890b445c7876a62d55259ddc
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
@@ -125,7 +125,7 @@ services:
       replicas: 1
 
   wms:
-    image: geoservercloud/geoserver-cloud-wms:3.0.1.1
+    image: geoservercloud/geoserver-cloud-wms:3.0.1.1@sha256:5164f687ce4d853690802e304022ce540e4f0144a08e88d63112fa2da84fa1f7
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
@@ -133,7 +133,7 @@ services:
       replicas: 1
 
   wcs:
-    image: geoservercloud/geoserver-cloud-wcs:3.0.1.1
+    image: geoservercloud/geoserver-cloud-wcs:3.0.1.1@sha256:4f077124f59154ba60b110466776cd4bd2aafabf7738a26e958b8c92d4af376d
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
@@ -141,7 +141,7 @@ services:
       replicas: 1
 
   wps:
-    image: geoservercloud/geoserver-cloud-wps:3.0.1.1
+    image: geoservercloud/geoserver-cloud-wps:3.0.1.1@sha256:0b41bd2c9a76cc0bc9e7f21294472026597c41dd1a0b1bac1aa758b9c6ed53fb
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
@@ -149,7 +149,7 @@ services:
       replicas: 1
 
   restconfig:
-    image: geoservercloud/geoserver-cloud-rest:3.0.1.1
+    image: geoservercloud/geoserver-cloud-rest:3.0.1.1@sha256:318254b52f967de74ffbef8efcf1f7d8cf81035e6b8145ea5d42d6e8a65fd301
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
@@ -157,7 +157,7 @@ services:
       replicas: 1
 
   webui:
-    image: geoservercloud/geoserver-cloud-webui:3.0.1.1
+    image: geoservercloud/geoserver-cloud-webui:3.0.1.1@sha256:4f91e3048ac894a476a1e84c2a018d2fb8e9d933fb88d1a6556386bdc2bf1bde
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies
@@ -171,7 +171,7 @@ services:
       replicas: 1
 
   gwc:
-    image: geoservercloud/geoserver-cloud-gwc:3.0.1.1
+    image: geoservercloud/geoserver-cloud-gwc:3.0.1.1@sha256:b04ed89b5d2b0ce41cc50dabe0250dcdf1368b6c65f9ad81bc239695700fe794
     extends:
       service: geoserver_template
     depends_on: *gs-dependencies

@@ -143,7 +143,27 @@ class DataSinkControllerIntegrationTest
       assertThat(body.getDataSinkType()).isEqualTo(DataSinkType.FROST);
       assertThat(body.getDataSetId()).isEqualTo(testDataSetId);
       assertThat(body.getPipelineId()).isNull();
-      assertThat(body.isInUse()).isFalse();
+      assertThat(body.isInUseByPipeline()).isFalse();
+      assertThat(body.isInUseByLayer()).isFalse();
+      assertThat(body.isProvisioned()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should report a provisioned DataSink as provisioned")
+    void shouldReportProvisionedFlag() {
+      ensureTestData();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      DataSink sink = new DataSink();
+      sink.setDataSet(dataSet);
+      sink.setDataSinkType(DataSinkType.FROST);
+      sink.setProvisioned(true);
+      UUID id = dataSinkRepository.save(sink).getId();
+
+      ResponseEntity<DataSinkOutputDTO> response = performGetById(id);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().isProvisioned()).isTrue();
     }
 
     @Test
@@ -207,8 +227,8 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should report inUse=true when the DataSink is linked to a pipeline")
-    void shouldReportInUseWhenLinkedToPipeline() {
+    @DisplayName("Should report inUseByPipeline=true when the DataSink is linked to a pipeline")
+    void shouldReportInUseByPipelineWhenLinkedToPipeline() {
       ensureTestData();
       DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
       Pipeline pipeline = pipelineRepository.findById(testPipelineId).orElseThrow();
@@ -222,7 +242,8 @@ class DataSinkControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().isInUse()).isTrue();
+      assertThat(response.getBody().isInUseByPipeline()).isTrue();
+      assertThat(response.getBody().isInUseByLayer()).isFalse();
       assertThat(response.getBody().getPipelineId()).isEqualTo(testPipelineId);
     }
   }
@@ -245,7 +266,8 @@ class DataSinkControllerIntegrationTest
       assertThat(body.getDataSinkType()).isEqualTo(DataSinkType.FROST);
       assertThat(body.getDataSetId()).isEqualTo(testDataSetId);
       assertThat(body.getPipelineId()).isNull();
-      assertThat(body.isInUse()).isFalse();
+      assertThat(body.isInUseByPipeline()).isFalse();
+      assertThat(body.isInUseByLayer()).isFalse();
       assertThat(dataSinkRepository.findById(body.getId()))
           .isPresent()
           .get()
@@ -577,6 +599,44 @@ class DataSinkControllerIntegrationTest
           .isInstanceOfSatisfying(
               PostgisConfigurationOutput.class,
               c -> assertThat(c.getTableName()).isEqualTo("renamed_table"));
+    }
+
+    /**
+     * A flag a client could reset would skip the data-loss confirmation for a table that exists.
+     */
+    @Test
+    @DisplayName("PATCH cannot reset the provisioned flag of a DataSink")
+    void patchKeepsProvisionedFlag() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      dsv = portalData.attachModel(dsv, portalData.dataStructureVersionModel("PatchStatus"));
+
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      DataSink sink = new DataSink();
+      sink.setDataSet(dataSet);
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      sink.setProvisioned(true);
+      sink = dataSinkRepository.save(sink);
+      UUID id =
+          portalData
+              .attachSinkConfiguration(
+                  sink, Map.of("tableName", "original_table", "element", dsv.getModelUrn()))
+              .getId();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("provisioned", false);
+      patchMap.put(
+          "configuration", Map.of("tableName", "original_table", "element", dsv.getModelUrn()));
+
+      ResponseEntity<DataSinkOutputDTO> response = performPatch(id, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().isProvisioned()).isTrue();
+      assertThat(dataSinkRepository.findById(id).orElseThrow().isProvisioned()).isTrue();
     }
 
     @Test

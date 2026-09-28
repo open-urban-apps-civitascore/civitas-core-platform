@@ -74,6 +74,9 @@ public class DataSetSagaPublisher {
    * provisioned protected and the FROST project is always private. Open data access is decided by
    * OPA at request time from the persisted {@code openDataAccess} flag (read via the AuthZ
    * Repository), not by saga-time route/FROST configuration.
+   *
+   * <p>The FROST adapter finds a prior release's project itself, by looking up the datasetId suffix
+   * of its name — a create trigger carries no {@code projectId} hint.
    */
   public void publishCreateRequested(DataSet dataset) {
     verifyLayerStyleReferences(dataset);

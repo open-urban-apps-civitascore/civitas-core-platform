@@ -10,10 +10,8 @@ import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -34,10 +32,10 @@ public class DataStructureService
 
   private final DataStructureRepository dataStructureRepository;
   private final DataStructureMapper dataStructureMapper;
-  private final DataStructureVersionRepository dataStructureVersionRepository;
   private final AssignmentFactory assignmentFactory;
   private final DataSourceRepository dataSourceRepository;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final ArtifactUsageLookup artifactUsageLookup;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -77,36 +75,6 @@ public class DataStructureService
   @Override
   protected ReleasableStatus getAvailableStatus() {
     return DataStructureStatus.AVAILABLE;
-  }
-
-  /**
-   * Resolves data structure version references after DTO-to-entity conversion. Validates that all
-   * provided version IDs exist and sets the bidirectional relationship.
-   *
-   * @param entity the data structure entity
-   * @param input the input DTO containing version IDs
-   * @return the entity with resolved version relationships and assignments
-   * @throws InvalidInputException if any version ID is not found
-   */
-  @Override
-  protected DataStructure postConvertToEntity(DataStructure entity, DataStructureInputDTO input) {
-    if (input.getDataStructureVersionIds() != null) {
-      if (input.getDataStructureVersionIds().isEmpty()) {
-        entity.setDataStructureVersions(new HashSet<>());
-      } else {
-        List<DataStructureVersion> versions =
-            dataStructureVersionRepository.findAllById(input.getDataStructureVersionIds());
-        if (versions.size() != input.getDataStructureVersionIds().size()) {
-          throw new InvalidInputException(
-              "DataStructure",
-              "dataStructureVersionIds",
-              "One or more DataStructureVersion IDs not found");
-        }
-        entity.setDataStructureVersions(new HashSet<>(versions));
-      }
-    }
-
-    return super.postConvertToEntity(entity, input); // base handles assignments
   }
 
   /**
@@ -180,7 +148,7 @@ public class DataStructureService
 
   @Override
   protected void validateUnrelease(DataStructure entity) {
-    validateNoVersionInUse(entity);
+    artifactUsageLookup.of(entity).requireNoReleasedReferrer(getEntityName(), entity.getId());
   }
 
   /**

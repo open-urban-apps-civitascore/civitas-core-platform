@@ -236,6 +236,11 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
+    /** Publishes a write's edges under its pin; only a registry double returns none. */
+    private void registerWritten(String pin, String requestUrn) {
+        dependencyGraph.registerFromRegistry(pin != null && !pin.isBlank() ? pin : requestUrn);
+    }
+
     @Override
     public DependencyClosureView closure(DependencyQuery query) {
         if (query.maxDepth() == null) {
@@ -408,13 +413,14 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             // The non-Element kinds store straight through the registry, which extracts and
             // persists their per-type reference edges (Mapping source/target, Pipeline nodes,
             // DataStructure/DataSet *Refs). registerFromRegistry() then mirrors those durable
-            // edges into the in-memory graph so dependencies()/dependents() see them.
-            case DATA_STRUCTURE -> { String p = registry.storeDataStructure(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case MAPPING -> { String p = registry.storeMapping(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case PIPELINE -> { String p = registry.storePipeline(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case DATA_SOURCE -> { String p = registry.storeDataSource(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case DATA_SINK -> { String p = registry.storeDataSink(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
-            case DATA_SET -> { String p = registry.storeDataSet(urn, content, bump); dependencyGraph.registerFromRegistry(urn); yield p; }
+            // edges into the in-memory graph so dependencies()/dependents() see them. It is given
+            // the pin the write returned, never the request URN.
+            case DATA_STRUCTURE -> { String p = registry.storeDataStructure(urn, content, bump); registerWritten(p, urn); yield p; }
+            case MAPPING -> { String p = registry.storeMapping(urn, content, bump); registerWritten(p, urn); yield p; }
+            case PIPELINE -> { String p = registry.storePipeline(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DATA_SOURCE -> { String p = registry.storeDataSource(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DATA_SINK -> { String p = registry.storeDataSink(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DATA_SET -> { String p = registry.storeDataSet(urn, content, bump); registerWritten(p, urn); yield p; }
         };
         // Defensive fallback (a registry double may return nothing): the honest unversioned
         // logical URN — deliberately NOT a resolveReference read-back.
@@ -589,7 +595,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         }
         String logical = UrnParser.logicalUrn(urn);
         String assigned = registry.bumpVersion(logical, command.bump());
-        dependencyGraph.registerFromRegistry(logical);
+        registerWritten(assigned, logical);
         var pin = new ArtifactId(assigned != null && !assigned.isBlank() ? assigned : logical);
         return new ArtifactWriteResult(pin, dependenciesOf(pin));
     }

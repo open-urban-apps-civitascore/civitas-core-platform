@@ -1,6 +1,8 @@
+import { versionToSchemaTree } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_components/mapping-editor/schema/versionTree'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
 import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { DirtyField } from '@/components/uml-modeler/types/session'
+import { SelectOption } from '@/types/common'
 import {
   Datastructure,
   DATASTRUCTURE_STATUS_TYPES,
@@ -20,7 +22,6 @@ export const mapDatastructureApiToFormData = (datastructure: Datastructure): Dat
   name: datastructure.name ?? '',
   description: datastructure.description ?? '',
   dataStructureStatus: datastructure.dataStructureStatus ?? DATASTRUCTURE_STATUS_TYPES.DRAFT,
-  dataStructureVersionIds: datastructure.dataStructureVersions.map(version => version.id),
 })
 
 export const mapDatastructuresApiToListData = (datastructures: Datastructure[]): DatastructuresListData[] => {
@@ -125,4 +126,11 @@ export const buildSessionFromVersion = (
     lastModified: diagram?.lastModified || fallbackSession.lastModified,
     created: created || diagram?.lastModified || fallbackSession.created,
   }
+}
+
+export const getDatastructureFieldOptions = (
+  version: Pick<DatastructureVersion, 'model' | 'styles' | 'modelName'> | undefined,
+): SelectOption[] => {
+  const { tree } = versionToSchemaTree(version, version?.modelName ?? '')
+  return tree.fields.map(field => ({ value: field.name, label: field.name }))
 }

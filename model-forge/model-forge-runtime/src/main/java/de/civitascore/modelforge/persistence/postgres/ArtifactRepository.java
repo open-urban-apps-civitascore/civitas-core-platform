@@ -35,13 +35,6 @@ class ArtifactRepository {
             .list();
     }
 
-    /** Every artifact's logical URN, of every type, ordered by name. */
-    List<String> listAllLogicalUrns() {
-        return jdbc.sql("select logical_urn from model_forge.artifact order by name")
-            .query(String.class)
-            .list();
-    }
-
     /**
      * The stored versions of the given artifacts, each row carrying its artifact's current-version
      * pointer — everything needed to decide, without a second query, which of a set of reference

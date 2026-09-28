@@ -44,12 +44,8 @@
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
         <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
-        <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
-        <!-- Pinned to this merge request's config-adapter snapshot: the branch changes
-             config-adapter, so portal-backend has to resolve the adapter artifacts built for it
-             rather than another branch's. CI overrides it with -Dconfig-adapter.version. -->
-        <config-adapter.version>1.0.2-MR-788-SNAPSHOT</config-adapter.version>
+        <config-adapter.version>1.0.2-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
         <at.yawk.lz4.version>1.11.2</at.yawk.lz4.version>
         <!-- develop's snapshot, so a flagless build (generate-graph-backend, a fresh clone)
@@ -57,6 +53,9 @@
              -Dmodel-forge.version so the backend builds against its own branch's Model Forge. -->
         <model-forge.version>0.1.0-SNAPSHOT</model-forge.version>
         <archunit.version>1.4.2</archunit.version>
+        <!-- Drop once the Spring Boot parent manages Tomcat >= 11.0.25: Boot 4.1.1 pins 11.0.24,
+             affected by GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6 and GHSA-h3x4-894j-xpx5. -->
+        <tomcat.version>11.0.26</tomcat.version>
     </properties>
 
     <dependencyManagement>
@@ -147,15 +146,6 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
-
-        <!-- Serialization -->
-        <dependency>
-            <groupId>org.apache.jena</groupId>
-            <artifactId>apache-jena-libs</artifactId>
-            <version>${apache-jena.version}</version>
-            <type>pom</type>
-        </dependency>
-
 
         <!-- Actuator + OpenAPI -->
         <dependency>
@@ -338,7 +328,6 @@
                         <!-- Starters and BOM aggregators are runtime-wired; no bytecode references them. -->
                         <ignoredUnusedDeclaredDependency>org.springframework.boot:*</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.springdoc:springdoc-openapi-starter-webmvc-ui</ignoredUnusedDeclaredDependency>
-                        <ignoredUnusedDeclaredDependency>org.apache.jena:apache-jena-libs</ignoredUnusedDeclaredDependency>
                         <!-- Runtime requirement of commons-compress (Testcontainers file transfer) -->
                         <ignoredUnusedDeclaredDependency>commons-io:commons-io</ignoredUnusedDeclaredDependency>
                         <!-- JDBC driver and Flyway dialect: loaded by name at runtime -->

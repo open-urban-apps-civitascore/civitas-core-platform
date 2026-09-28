@@ -14,13 +14,13 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.model.dataset.NamedApiHelper;
-import jakarta.ws.rs.client.Client;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import okhttp3.OkHttpClient;
 import org.owasp.encoder.Encode;
 
 /**
@@ -110,7 +110,7 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
         Encode.forJava(settings.frostAuth().headerName()));
   }
 
-  void setTestClient(Client client) {
+  void setTestClient(OkHttpClient client) {
     super.setClient(client);
   }
 

@@ -23,7 +23,7 @@ const makeStyle = (overrides: Partial<StyleFormData> = {}): StyleFormData => ({
   ...overrides,
 })
 
-const Wrapper = ({ styles }: { styles: StyleFormData[] }) => {
+const Wrapper = ({ styles, isReadOnly = false }: { styles: StyleFormData[]; isReadOnly?: boolean }) => {
   const form = useForm<OwsApiFormData>({
     resolver: zodResolver(OwsApiFormSchema({ existingSlugs: [] })),
     mode: 'onChange',
@@ -40,7 +40,7 @@ const Wrapper = ({ styles }: { styles: StyleFormData[] }) => {
         form={form}
         existingStyles={styles}
         selectedStyleIndex={0}
-        isReadOnly={false}
+        isReadOnly={isReadOnly}
         onSelectStyle={vi.fn()}
         onAddStyle={vi.fn()}
       />
@@ -48,10 +48,10 @@ const Wrapper = ({ styles }: { styles: StyleFormData[] }) => {
   )
 }
 
-const renderWithIntl = (styles: StyleFormData[]) =>
+const renderWithIntl = (styles: StyleFormData[], isReadOnly = false) =>
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <Wrapper styles={styles} />
+      <Wrapper styles={styles} isReadOnly={isReadOnly} />
     </NextIntlClientProvider>,
   )
 
@@ -108,5 +108,21 @@ describe('StylesConfig — SLD content validation feedback', () => {
     await waitFor(() => {
       expect(screen.queryByText(DOCTYPE_ERROR_TEXT)).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('StylesConfig — read-only mode', () => {
+  it('disables the SLD content textarea when isReadOnly is true', () => {
+    renderWithIntl([makeStyle()], true)
+
+    const textarea = screen.getByTestId('styles.0.sldContentTextArea')
+    expect(textarea).toBeDisabled()
+  })
+
+  it('enables the SLD content textarea when isReadOnly is false', () => {
+    renderWithIntl([makeStyle()], false)
+
+    const textarea = screen.getByTestId('styles.0.sldContentTextArea')
+    expect(textarea).not.toBeDisabled()
   })
 })

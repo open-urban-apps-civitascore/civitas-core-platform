@@ -1,6 +1,6 @@
 {
   "welcome": {
-    "title": "Willkommen in CIVITAS/CORE V2 Beta",
+    "title": "Willkommen in CIVITAS/CORE V2",
     "subtitle": "Neu hier?",
     "docsButton": "Dokumentation",
     "recommendedWorkflow": {
@@ -113,7 +113,6 @@
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
-      "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
       "descriptionHint": "max. 150 Zeichen",
       "creationSubtitle": "Im ersten Schritt ist nur ein Name erforderlich. Weitere Basisinformationen können später ergänzt werden.",
@@ -203,7 +202,6 @@
     "home": "Home",
     "menu-item": "Menüpunkt",
     "sub-item": "Unterpunkt",
-    "data-catalog": "Datenkatalog",
     "all-datasets": "Alle Datensätze",
     "documentation": "Dokumentation",
     "logout": "Abmelden",
@@ -309,9 +307,24 @@
             "addButton": "Pipeline hinzufügen",
             "unknownError": "Unbekannter Fehler.",
             "pipelineError": "Pipelinefehler",
+            "activeLabel": "Aktiv",
             "errorLabel": "Fehler",
             "errorDetails": "Fehlerdetails für {name}",
-            "errorToast": "Pipeline „{name}“: {message}"
+            "errorToast": "Pipeline „{name}“: {message}",
+            "menuLabel": "Aktionen für {name}",
+            "actions": {
+              "open": "Öffnen",
+              "delete": "Löschen"
+            },
+            "deleteConfirm": {
+              "title": "Pipeline löschen",
+              "description": "Möchtest du die Pipeline „{name}“ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+              "confirm": "Löschen"
+            },
+            "messages": {
+              "deleteSuccess": "Pipeline wurde erfolgreich gelöscht.",
+              "deleteError": "Beim Löschen der Pipeline ist ein Fehler aufgetreten. Bitte versuche es erneut."
+            }
           },
           "apis": {
             "title": "APIs",
@@ -327,6 +340,7 @@
               "CUSTOM": "Custom API"
             },
             "card": {
+              "menuLabel": "Aktionen für {name}",
               "actions": {
                 "edit": "Bearbeiten",
                 "view": "Öffnen",
@@ -479,7 +493,10 @@
               "updateStyleSuccess": "Stil wurde erfolgreich aktualisiert.",
               "saveStyleError": "Beim Speichern des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
               "deleteStyleSuccess": "Stil wurde erfolgreich gelöscht.",
-              "deleteStyleError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              "deleteStyleError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "styleInUseError": "Dieser Stil wird noch von mindestens einem Layer verwendet. Entferne ihn dort zuerst.",
+              "notDraftError": "Der Datensatz muss im Entwurfsstatus sein, um Änderungen vorzunehmen.",
+              "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut."
             },
             "errors": {
               "name": {
@@ -526,6 +543,7 @@
       "releaseSuccess": "Der Datensatz wurde erfolgreich freigegeben.",
       "unreleaseSuccess": "Die Freigabe des Datensatzes wurde erfolgreich aufgehoben.",
       "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+      "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut.",
       "datasourceScopeViolation": "Der ausgewählte Datenpool ist nicht mit den verwendeten Datenquellen kompatibel. Eine oder mehrere Datenquellen sind für diesen Datenpool nicht freigegeben."
     },
     "warningModal": {
@@ -964,6 +982,7 @@
       "topicSingle": "Es ist nur ein Topic erlaubt.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
+      "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
     "connection": {
@@ -1002,7 +1021,65 @@
       "type": "Typ",
       "typePlaceholder": "Konnektortyp auswählen",
       "connection": "Verbindung",
-      "establishConnection": "Verbindung herstellen"
+      "establishConnection": "Verbindung herstellen",
+      "mqtt": {
+        "urls": {
+          "label": "Broker",
+          "hint": "kommagetrennt"
+        },
+        "protocolVersion": {
+          "label": "Protokollversion",
+          "placeholder": "Version auswählen"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Passwort"
+        },
+        "topics": {
+          "label": "Topic"
+        },
+        "qos": {
+          "label": "QoS"
+        },
+        "connectTimeout": {
+          "label": "Verbindungs-Timeout"
+        },
+        "keepalive": {
+          "label": "Keepalive"
+        },
+        "tls": {
+          "label": "TLS aktiviert"
+        }
+      },
+      "sql": {
+        "driver": {
+          "label": "Treiber"
+        },
+        "dsn": {
+          "label": "DSN",
+          "placeholder": "treiber-spezifischer Connection String"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Passwort"
+        },
+        "table": {
+          "label": "Tabelle",
+          "placeholder": "Tabellenname"
+        },
+        "columns": {
+          "label": "Spalten",
+          "hint": "kommagetrennt",
+          "placeholder": "* oder col1, col2"
+        },
+        "where": {
+          "label": "WHERE"
+        }
+      }
     },
     "dataModel": {
       "placeholder": {
@@ -1101,6 +1178,7 @@
     },
     "errors": {
       "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten.",
+      "inUseError": "Diese Datenstruktur wird noch von einer Datenquelle oder einem Datenspeicher verwendet.",
       "creationError": "Beim Anlegen der Datenstruktur ist ein Fehler aufgetreten.",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
@@ -1143,7 +1221,8 @@
     },
     "errors": {
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
-      "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}"
+      "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}",
+      "inUseError": "Diese Version wird noch von einer Datenquelle oder einem Datenspeicher verwendet."
     }
   },
   "pipelineEditor": {
@@ -1226,6 +1305,22 @@
       "showDataStructure": "Datenstruktur anzeigen",
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
       "anonymousName": "Anonyme Datenquelle"
+    },
+    "sink": {
+      "locked": {
+        "provisioned": {
+          "title": "Bereitgestellt",
+          "description": "Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr bearbeitet oder entfernt werden."
+        },
+        "inUseByLayer": {
+          "title": "In Verwendung",
+          "tooltip": "Dieser Datenspeicher wird von API-Layern verwendet. Zum Bearbeiten oder Entfernen müssen zuerst die Layer-Zuordnungen aufgehoben werden."
+        }
+      },
+      "notRemovable": {
+        "provisioned": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr entfernt werden.",
+        "inUseByLayer": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wird von API-Layern verwendet. Heben Sie zuerst die Layer-Zuordnungen auf."
+      }
     },
     "frostPanel": {
       "details": "Sensordaten-Speicher Details",
@@ -1327,7 +1422,11 @@
       "pipelineSettings": "Pipeline-Einstellungen",
       "deletePipeline": "Pipeline löschen",
       "deleteConfirmTitle": "Pipeline löschen?",
-      "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+      "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "deleteFailed": "Beim Löschen der Pipeline ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+      "discardPipeline": "Pipeline verwerfen",
+      "discardConfirmTitle": "Pipeline wirklich verwerfen?",
+      "discardConfirmDescription": "Sind Sie sicher, dass Sie die Pipeline verwerfen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
     },
     "dataLoss": {
       "title": "Gespeicherte Daten verwerfen und neu erzeugen?",
@@ -1342,8 +1441,14 @@
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
       "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
-      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt.",
+      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datenpool nicht erlaubt.",
       "tableNameConflict": "{names} kann nicht gespeichert werden: Ein Geo-Persistenz-Tabellenname wird bereits von einem anderen Datenspeicher dieses Datensatzes verwendet.",
+      "dataSinkInUseError": "{names} kann nicht gespeichert werden: Ein Datenspeicher wird noch von mindestens einem Layer verwendet.",
+      "unconfirmedDataLossError": "{names} kann nicht gespeichert werden: Die Änderung verwirft gespeicherte Daten.",
+      "notDraftError": "Der Datensatz muss im Entwurfsstatus sein, um Änderungen vorzunehmen.",
+      "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut.",
+      "sinkStillInUse": "{names} wurde gespeichert, ein entfernter Datenspeicher wird aber noch verwendet und kann nicht gelöscht werden.",
+      "sinkDeleteFailed": "{names} wurde gespeichert, ein entfernter Datenspeicher konnte aber nicht gelöscht werden.",
       "mappingStillInUse": "Ein aus Pipeline {name} entferntes Mapping kann nicht gelöscht werden, weil es noch von einer anderen Pipeline verwendet wird.",
       "mappingCleanupFailed": "Ein aus Pipeline {name} entferntes Mapping konnte nicht gelöscht werden."
     },
@@ -1458,22 +1563,43 @@
     }
   },
   "umlModeler": {
+    "modelNamePlaceholder": "Modellname",
     "closeTabModal": {
       "title": "Modell wirklich verwerfen?",
       "description": "Diese Aktion löscht das Modell. Sie kann nicht rückgängig gemacht werden."
     },
     "import": {
       "title": "Importieren",
+      "file": "Diagramm importieren",
       "fromPlatform": "aus der Plattform",
-      "fromFile": "aus Datei"
+      "fromFile": "aus Datei",
+      "success": "Diagramm erfolgreich importiert",
+      "fileError": "Fehler beim Importieren der Datei.",
+      "overwriteModal": {
+        "title": "Bestehende Strukturdefinition ersetzen?",
+        "description": "Beim Import werden alle bestehenden Klassen, Attribute und Beziehungen in der Strukturdefinition ersetzt. Diese Aktion kann nicht rückgängig gemacht werden.",
+        "confirm": "Struktur ersetzen"
+      },
+      "errors": {
+        "FILE_TOO_LARGE": "Die Datei ist zu groß (maximal 5 MB erlaubt).",
+        "INVALID_JSON": "Die Datei enthält kein gültiges JSON.",
+        "INVALID_DATASTRUCTURE_DOCUMENT": "Die Datei enthält keine gültige Datenstruktur.",
+        "MISSING_UI_STYLES": "Die Datei enthält keine Layoutdaten für die Darstellung der Struktur.",
+        "INVALID_DIAGRAM_SCHEMA": "Die Diagrammdaten in der Datei sind ungültig."
+      }
     },
     "save": {
       "success": "Modell erfolgreich gespeichert",
       "error": "Modell konnte nicht gespeichert werden. Bitte versuchen Sie es erneut."
     },
     "export": {
+      "title": "Exportieren",
+      "file": "Diagramm exportieren",
       "success": "Diagramm erfolgreich exportiert",
-      "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut."
+      "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut.",
+      "errors": {
+        "INVALID_URN": "Aus dem Namen der Datenstruktur lässt sich keine gültige CORE-URN bilden. Der Name muss mindestens einen Buchstaben oder eine Ziffer enthalten."
+      }
     },
     "rootValidation": {
       "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",

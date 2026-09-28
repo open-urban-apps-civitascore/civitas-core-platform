@@ -732,11 +732,12 @@ class DataSinkServiceTest {
 
     private DataSink existingPostgisSink(boolean provisioned) {
       DataSet ds = dataSet(UUID.randomUUID());
-      ds.setProvisioned(provisioned);
+      ds.setProvisioned(true);
       DataSink sink = new DataSink();
       sink.setId(UUID.randomUUID());
       sink.setDataSet(ds);
       sink.setDataSinkType(DataSinkType.POSTGIS);
+      sink.setProvisioned(provisioned);
       sink.setConfigurationUrn(STORED_VERSIONED_URN);
       lenient()
           .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
@@ -758,11 +759,12 @@ class DataSinkServiceTest {
 
     private DataSink existingFrostSink(boolean provisioned, String element) {
       DataSet ds = dataSet(UUID.randomUUID());
-      ds.setProvisioned(provisioned);
+      ds.setProvisioned(true);
       DataSink sink = new DataSink();
       sink.setId(UUID.randomUUID());
       sink.setDataSet(ds);
       sink.setDataSinkType(DataSinkType.FROST);
+      sink.setProvisioned(provisioned);
       sink.setConfigurationUrn(STORED_VERSIONED_URN);
       lenient()
           .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
@@ -773,7 +775,7 @@ class DataSinkServiceTest {
     }
 
     @Test
-    @DisplayName("rejects a FROST element change on a provisioned dataset")
+    @DisplayName("rejects a FROST element change on a provisioned sink")
     void rejectsFrostVersionChangeWithoutConfirmation() {
       DataSink sink = existingFrostSink(true, "v1");
       when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
@@ -789,7 +791,7 @@ class DataSinkServiceTest {
     }
 
     @Test
-    @DisplayName("rejects a destructive change on a provisioned dataset without confirmDataLoss")
+    @DisplayName("rejects a destructive change on a provisioned sink without confirmDataLoss")
     void rejectsDestructiveChangeWithoutConfirmation() {
       DataSink sink = existingPostgisSink(true);
       when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
@@ -818,8 +820,12 @@ class DataSinkServiceTest {
           .isNotInstanceOf(ResourceInUseException.class);
     }
 
+    /**
+     * The dataset-level flag is set, so a guard that still read it would ask for a sink added in
+     * DRAFT after the release, which has no table yet.
+     */
     @Test
-    @DisplayName("does not raise the data-loss guard on a never-provisioned dataset")
+    @DisplayName("does not raise the data-loss guard on a never-provisioned sink")
     void allowsDestructiveChangeWhenNotProvisioned() {
       DataSink sink = existingPostgisSink(false);
       when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));

@@ -30,6 +30,7 @@ import {
 } from '@/types/datastructures'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { containsNonStatusField, mapDatastructureApiToFormData } from '@/utils/datastructures'
+import { isResourceInUseError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { tabs } from '../components/DatastructureOverview'
@@ -141,7 +142,7 @@ export const useDatastructure = ({
       toast.success(tCommon('success.statusChangeSuccess'))
       return response.data
     } catch (error) {
-      toast.error(tCommon('errors.statusChangeError'))
+      toast.error(isResourceInUseError(error) ? t('errors.inUseError') : tCommon('errors.statusChangeError'))
       throw error
     }
   }
@@ -171,7 +172,11 @@ export const useDatastructure = ({
       }
       return response.data
     } catch (error) {
-      toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructure') }))
+      toast.error(
+        isResourceInUseError(error)
+          ? t('errors.inUseError')
+          : tCommon('errors.updateError', { item: tCommon('items.datastructure') }),
+      )
       throw error
     }
   }

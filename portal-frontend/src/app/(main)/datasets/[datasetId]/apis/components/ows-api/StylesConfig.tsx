@@ -185,6 +185,7 @@ export const StylesConfig = (props: StylesConfigProps) => {
                     className="min-h-[120px] max-h-[300px] overflow-y-auto font-mono text-sm"
                     required
                     formItemProps={wideField}
+                    disabled={isReadOnly}
                   />
                 </DetailsFieldContainer>
 

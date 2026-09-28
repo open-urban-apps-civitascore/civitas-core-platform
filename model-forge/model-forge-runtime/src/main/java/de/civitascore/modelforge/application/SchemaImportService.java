@@ -623,8 +623,8 @@ public class SchemaImportService {
             return new Edges(pin, edges);
         }
 
-        static PendingGraphNode fromRegistry(String logicalUrn) {
-            return new FromRegistry(logicalUrn);
+        static PendingGraphNode fromRegistry(String urn) {
+            return new FromRegistry(urn);
         }
 
         record Edges(String pin, Set<String> edges) implements PendingGraphNode {
@@ -634,10 +634,10 @@ public class SchemaImportService {
             }
         }
 
-        record FromRegistry(String logicalUrn) implements PendingGraphNode {
+        record FromRegistry(String urn) implements PendingGraphNode {
             @Override
             public void publish(DependencyGraphService graph) {
-                graph.registerFromRegistry(logicalUrn);
+                graph.registerFromRegistry(urn);
             }
         }
     }
@@ -708,7 +708,9 @@ public class SchemaImportService {
         // relations and no graph edges until the next full rebuild() — unlike the createArtifact
         // write path, which pairs every store with registerFromRegistry(). Queued rather than
         // applied, so it lands only if the surrounding import commits.
-        pendingNodes.add(PendingGraphNode.fromRegistry(dataStructureLogicalUrn));
+        // Queued under the pin, never the logical URN.
+        pendingNodes.add(PendingGraphNode.fromRegistry(
+            pin != null && !pin.isBlank() ? pin : dataStructureLogicalUrn));
         return pin;
     }
 

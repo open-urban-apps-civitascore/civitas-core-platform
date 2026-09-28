@@ -11,8 +11,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -29,7 +27,7 @@ import lombok.experimental.SuperBuilder;
 
 /**
  * Represents a dataset with its lifecycle status, infrastructure references, and relationships to
- * {@link Pipeline Pipelines} and {@link Distribution Distributions}.
+ * {@link Pipeline Pipelines}.
  *
  * @see DataSetStatus
  */
@@ -38,8 +36,7 @@ import lombok.experimental.SuperBuilder;
     name = "datasets",
     indexes = {
       @Index(name = "idx_dataset_owner", columnList = "owner_user_id"),
-      @Index(name = "idx_dataset_external_id", columnList = "external_id"),
-      @Index(name = "idx_dataset_series", columnList = "dataset_series_id")
+      @Index(name = "idx_dataset_external_id", columnList = "external_id")
     })
 @Getter
 @Setter
@@ -86,39 +83,6 @@ public class DataSet extends BaseDataEntity {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "datapool_id")
   private DataPool dataPool;
-
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "dataset_series_id")
-  private DataSetSeries dataSetSeries;
-
-  @ManyToMany(fetch = FetchType.LAZY)
-  @JoinTable(
-      name = "dataset_agents",
-      joinColumns = @JoinColumn(name = "dataset_id"),
-      inverseJoinColumns = @JoinColumn(name = "agent_id"),
-      indexes = {
-        @Index(name = "idx_dataset_agents_dataset", columnList = "dataset_id"),
-        @Index(name = "idx_dataset_agents_agent", columnList = "agent_id")
-      })
-  @Builder.Default
-  private Set<Agent> agents = new HashSet<>();
-
-  /**
-   * Distribution rows linked to this dataset. Currently has no production writer — the entity is
-   * reserved for the deferred DCAT distribution work. Existing rows are preserved by cascade
-   * delete; the dormancy is documented on {@link Distribution} itself.
-   */
-  @OneToMany(
-      mappedBy = "dataSet",
-      fetch = FetchType.LAZY,
-      cascade = CascadeType.ALL,
-      orphanRemoval = true)
-  @Builder.Default
-  private Set<Distribution> distributions = new HashSet<>();
-
-  @ManyToMany(mappedBy = "dataSets", fetch = FetchType.LAZY)
-  @Builder.Default
-  private Set<Catalog> catalogs = new HashSet<>();
 
   @Column(name = "external_id")
   private String externalId;
@@ -185,8 +149,8 @@ public class DataSet extends BaseDataEntity {
    * completion regardless of which sinks the dataset has, and left untouched by unrelease — the
    * sinks survive it. (There is no reset path: the row is removed on DELETE-saga completion.)
    * Distinguishes "never released, nothing provisioned yet" from "infrastructure exists, holds
-   * data" so a destructive sink edit only warns once data is actually at risk, and so a delete
-   * knows a teardown saga is required.
+   * data" so a delete knows a teardown saga is required. It cannot be derived from the sink flags:
+   * the teardown also drops resources of sinks deleted since the release, which have no row left.
    */
   @Column(name = "provisioned", nullable = false)
   private boolean provisioned = false;
@@ -204,19 +168,6 @@ public class DataSet extends BaseDataEntity {
   @Override
   protected void linkAssignment(Assignment assignment) {
     assignment.setScope(this);
-  }
-
-  /**
-   * Replaces the current distributions with the provided collection, clearing then re-adding to
-   * satisfy Hibernate orphan-removal semantics.
-   *
-   * @param newDistributions the new distributions, or {@code null} to clear
-   */
-  public void setDistributions(Collection<Distribution> newDistributions) {
-    this.distributions.clear();
-    if (newDistributions != null) {
-      this.distributions.addAll(newDistributions);
-    }
   }
 
   /**

@@ -97,9 +97,6 @@
     "/v1/datasets/{id}/apis": {
       "GET": "DATASET_READ"
     },
-    "/v1/datasets/{id}/usable-datasources": {
-      "GET": "DATASET_UPDATE"
-    },
     "/v1/datasets/{id}/datasinks": {
       "GET": "DATASET_READ",
       "POST": "DATASET_UPDATE"
@@ -222,7 +219,6 @@
     },
     "/v1/datapools/{id}/assignments": {
       "GET": "DATAPOOL_READ"
-    },
-    "_removed_for_v2": "catalogs and dataspaces removed — not implemented in v2.0 (see #989). OPA denies as unknown_endpoint."
+    }
   }
 }

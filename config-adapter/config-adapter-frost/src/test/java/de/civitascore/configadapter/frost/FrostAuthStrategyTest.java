@@ -17,7 +17,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.configuration.AdapterConfig;
-import jakarta.ws.rs.client.Invocation;
+import okhttp3.Request;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -31,11 +31,11 @@ class FrostAuthStrategyTest {
     @Test
     @DisplayName("sets Authorization header with Base64-encoded credentials")
     void shouldSetBasicAuthHeader() {
-      Invocation.Builder builder = mock(Invocation.Builder.class);
+      Request.Builder builder = mock(Request.Builder.class);
       when(builder.header("Authorization", "Basic dXNlcjpwYXNz")).thenReturn(builder);
 
       FrostAuthStrategy strategy = FrostAuthStrategy.basicAuth("user", "pass");
-      Invocation.Builder result = strategy.apply(builder);
+      Request.Builder result = strategy.apply(builder);
 
       verify(builder).header("Authorization", "Basic dXNlcjpwYXNz");
       assertSame(builder, result);
@@ -44,7 +44,7 @@ class FrostAuthStrategyTest {
     @Test
     @DisplayName("treats null password as empty string")
     void shouldTreatNullPasswordAsEmpty() {
-      Invocation.Builder builder = mock(Invocation.Builder.class);
+      Request.Builder builder = mock(Request.Builder.class);
       when(builder.header("Authorization", "Basic dXNlcjo=")).thenReturn(builder);
 
       FrostAuthStrategy strategy = FrostAuthStrategy.basicAuth("user", null);
@@ -56,8 +56,8 @@ class FrostAuthStrategyTest {
     @Test
     @DisplayName("pre-computes credentials so encoding happens once, not per request")
     void shouldReuseEncodedCredentials() {
-      Invocation.Builder builder1 = mock(Invocation.Builder.class);
-      Invocation.Builder builder2 = mock(Invocation.Builder.class);
+      Request.Builder builder1 = mock(Request.Builder.class);
+      Request.Builder builder2 = mock(Request.Builder.class);
       String expectedHeader = "Basic dXNlcjpwYXNz";
       when(builder1.header("Authorization", expectedHeader)).thenReturn(builder1);
       when(builder2.header("Authorization", expectedHeader)).thenReturn(builder2);
@@ -84,11 +84,11 @@ class FrostAuthStrategyTest {
     @Test
     @DisplayName("sets the configured header with API key value")
     void shouldSetApiKeyHeader() {
-      Invocation.Builder builder = mock(Invocation.Builder.class);
+      Request.Builder builder = mock(Request.Builder.class);
       when(builder.header("X-API-Key", "my-key")).thenReturn(builder);
 
       FrostAuthStrategy strategy = FrostAuthStrategy.apiKey("X-API-Key", "my-key");
-      Invocation.Builder result = strategy.apply(builder);
+      Request.Builder result = strategy.apply(builder);
 
       verify(builder).header("X-API-Key", "my-key");
       assertSame(builder, result);
@@ -114,7 +114,7 @@ class FrostAuthStrategyTest {
     @Test
     @DisplayName("selects Basic Auth when username is configured")
     void shouldSelectBasicAuthWhenUsernamePresent() {
-      Invocation.Builder builder = mock(Invocation.Builder.class);
+      Request.Builder builder = mock(Request.Builder.class);
       when(builder.header("Authorization", "Basic dXNlcjpwYXNz")).thenReturn(builder);
 
       FrostAuthStrategy strategy =
@@ -128,7 +128,7 @@ class FrostAuthStrategyTest {
     @Test
     @DisplayName("falls back to API key when username is null")
     void shouldFallBackToApiKeyWhenUsernameNull() {
-      Invocation.Builder builder = mock(Invocation.Builder.class);
+      Request.Builder builder = mock(Request.Builder.class);
       when(builder.header("X-API-Key", "my-key")).thenReturn(builder);
 
       FrostAuthStrategy strategy =
@@ -142,7 +142,7 @@ class FrostAuthStrategyTest {
     @Test
     @DisplayName("falls back to API key when username is blank")
     void shouldFallBackToApiKeyWhenUsernameBlank() {
-      Invocation.Builder builder = mock(Invocation.Builder.class);
+      Request.Builder builder = mock(Request.Builder.class);
       when(builder.header("X-API-Key", "my-key")).thenReturn(builder);
 
       FrostAuthStrategy strategy =
@@ -192,7 +192,7 @@ class FrostAuthStrategyTest {
       when(config.getProperty("frost.api.key")).thenReturn(null);
       when(config.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
 
-      Invocation.Builder builder = mock(Invocation.Builder.class);
+      Request.Builder builder = mock(Request.Builder.class);
       when(builder.header("Authorization", "Basic dXNlcjpwYXNz")).thenReturn(builder);
 
       FrostAuthStrategy strategy = FrostAuthStrategy.fromConfig(config, "frost");
@@ -210,7 +210,7 @@ class FrostAuthStrategyTest {
       when(config.getProperty("frost.api.key")).thenReturn("my-key");
       when(config.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
 
-      Invocation.Builder builder = mock(Invocation.Builder.class);
+      Request.Builder builder = mock(Request.Builder.class);
       when(builder.header("X-API-Key", "my-key")).thenReturn(builder);
 
       FrostAuthStrategy strategy = FrostAuthStrategy.fromConfig(config, "frost");
@@ -228,7 +228,7 @@ class FrostAuthStrategyTest {
       when(config.getProperty("frost.api.key")).thenReturn("my-key");
       when(config.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("Authorization");
 
-      Invocation.Builder builder = mock(Invocation.Builder.class);
+      Request.Builder builder = mock(Request.Builder.class);
       when(builder.header("Authorization", "my-key")).thenReturn(builder);
 
       FrostAuthStrategy strategy = FrostAuthStrategy.fromConfig(config, "frost");

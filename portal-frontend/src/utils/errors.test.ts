@@ -1,94 +1,71 @@
-import { AxiosError, AxiosHeaders, InternalAxiosRequestConfig } from 'axios'
 import { describe, expect, it } from 'vitest'
+
+import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 
 import {
   isDatapoolScopeViolationError,
   isNameConflictError,
+  isNotDraftError,
   isPermissionsError,
   isResourceInUseError,
+  isSagaInFlightError,
   isTableNameConflictError,
+  isUnconfirmedDataLossError,
 } from './errors'
-
-const getError = (status: number, detail?: string, type?: string) => {
-  return new AxiosError(
-    'request failed',
-    undefined,
-    {
-      headers: new AxiosHeaders(),
-      method: 'GET',
-      url: '/test',
-    } as InternalAxiosRequestConfig,
-    undefined,
-    {
-      status,
-      statusText: '',
-      headers: new AxiosHeaders(),
-      config: {
-        headers: new AxiosHeaders(),
-        method: 'GET',
-        url: '/test',
-      } as InternalAxiosRequestConfig,
-      data: {
-        detail,
-        type,
-      },
-    },
-  )
-}
 
 describe('isNameConflictError', () => {
   it('returns true for a 409 conflict error with name conflict message', () => {
-    const error1 = getError(409, 'Group with name "Local Data Consumers" already exists')
+    const error1 = mockApiError(409, 'Group with name "Local Data Consumers" already exists')
     expect(isNameConflictError(error1)).toBe(true)
-    const error2 = getError(409, 'Role with name "Admin" already exists')
+    const error2 = mockApiError(409, 'Role with name "Admin" already exists')
     expect(isNameConflictError(error2)).toBe(true)
   })
 
   it('returns false for non-409 status codes', () => {
-    const error = getError(400, 'Role with name "Admin" already exists')
+    const error = mockApiError(400, 'Role with name "Admin" already exists')
 
     expect(isNameConflictError(error)).toBe(false)
   })
 
   it('returns false when response is missing', () => {
-    const error = getError(409)
+    const error = mockApiError(409)
 
     expect(isNameConflictError(error)).toBe(false)
   })
 
   it('returns false when detail is missing "with name"', () => {
-    const error = getError(409, 'Group "Local Data Consumers" already exists')
+    const error = mockApiError(409, 'Group "Local Data Consumers" already exists')
 
     expect(isNameConflictError(error)).toBe(false)
   })
 
   it('returns false when detail is missing "already exists"', () => {
-    const error = getError(409, 'Group with name "Local Data Consumers" is in use')
+    const error = mockApiError(409, 'Group with name "Local Data Consumers" is in use')
 
     expect(isNameConflictError(error)).toBe(false)
   })
 
   it('returns false when both required strings are missing', () => {
-    const error = getError(409, 'Role validation failed')
+    const error = mockApiError(409, 'Role validation failed')
     expect(isNameConflictError(error)).toBe(false)
   })
 })
 
 describe('isPermissionsError', () => {
   it('returns true for a 403 forbidden error', () => {
-    const error = getError(403, 'User does not have permission')
+    const error = mockApiError(403, 'User does not have permission')
     expect(isPermissionsError(error)).toBe(true)
   })
 
   it('returns false for non-403 status codes', () => {
-    const error = getError(401, 'Unauthorized')
+    const error = mockApiError(401, 'Unauthorized')
     expect(isPermissionsError(error)).toBe(false)
   })
 })
 
 describe('isDatapoolScopeViolationError', () => {
   it('returns true for a 422 error carrying the DATASOURCE_SCOPE_VIOLATION type', () => {
-    const error = getError(
+    const error = mockApiError(
       422,
       'DataSource "My DS" is not permitted for this datapool',
       'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION',
@@ -97,17 +74,17 @@ describe('isDatapoolScopeViolationError', () => {
   })
 
   it('returns false for a 422 error with a different error type', () => {
-    const error = getError(422, 'Some other validation failed', 'urn:civitas:error:SOME_OTHER_ERROR')
+    const error = mockApiError(422, 'Some other validation failed', 'urn:civitas:error:SOME_OTHER_ERROR')
     expect(isDatapoolScopeViolationError(error)).toBe(false)
   })
 
   it('returns false for a 422 error without a type field', () => {
-    const error = getError(422, 'Some other validation failed')
+    const error = mockApiError(422, 'Some other validation failed')
     expect(isDatapoolScopeViolationError(error)).toBe(false)
   })
 
   it('returns false for non-422 status codes', () => {
-    const error = getError(400, 'Bad request')
+    const error = mockApiError(400, 'Bad request')
     expect(isDatapoolScopeViolationError(error)).toBe(false)
   })
 
@@ -116,27 +93,143 @@ describe('isDatapoolScopeViolationError', () => {
   })
 })
 
-describe('isResourceInUseError', () => {
-  it('returns true for a 409 error carrying the RESOURCE_IN_USE type', () => {
-    const error = getError(
+const TABLE_NAME_CONFLICT_ON_CREATE =
+  "Another POSTGIS DataSink of this dataset already uses tableName 'shared_table'; they would share one physical table"
+
+const TABLE_NAME_CONFLICT_ON_UPDATE =
+  "This DataSink's tableName 'T_ONE' is already used by another POSTGIS DataSink of this dataset; rename it to change this sink"
+
+describe('isTableNameConflictError', () => {
+  it('returns true when a new data storage uses a table name that is already taken', () => {
+    const error = mockApiError(409, TABLE_NAME_CONFLICT_ON_CREATE, 'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION')
+    expect(isTableNameConflictError(error)).toBe(true)
+  })
+
+  it('returns true when a saved data storage is renamed to a table name that is already taken', () => {
+    const error = mockApiError(409, TABLE_NAME_CONFLICT_ON_UPDATE, 'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION')
+    expect(isTableNameConflictError(error)).toBe(true)
+  })
+
+  it('returns false when two pipelines have the same name', () => {
+    const error = mockApiError(
       409,
-      'Cannot delete urn:core:mapping:x — still referenced by: urn:core:pipeline:y',
-      'urn:civitas:error:RESOURCE_IN_USE',
+      "Pipeline with name 'Test' and datasetId 'ds-1' already exists",
+      'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION',
     )
+    expect(isTableNameConflictError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error without a type field', () => {
+    const error = mockApiError(409, TABLE_NAME_CONFLICT_ON_CREATE)
+    expect(isTableNameConflictError(error)).toBe(false)
+  })
+
+  it('returns false for non-409 status codes', () => {
+    const error = mockApiError(400, TABLE_NAME_CONFLICT_ON_CREATE, 'urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION')
+    expect(isTableNameConflictError(error)).toBe(false)
+  })
+
+  it('returns false for non-axios errors', () => {
+    expect(isTableNameConflictError(new Error('plain error'))).toBe(false)
+  })
+})
+
+describe('isNotDraftError', () => {
+  it('returns true for a 400 error carrying the DATASET_NOT_EDITABLE type', () => {
+    const error = mockApiError(
+      400,
+      'DataSet must be in DRAFT to modify sub-entities',
+      'urn:civitas:error:DATASET_NOT_EDITABLE',
+    )
+    expect(isNotDraftError(error)).toBe(true)
+  })
+
+  it('returns false for a 400 error with a different type', () => {
+    const error = mockApiError(400, 'Bad request', 'urn:civitas:error:INVALID_INPUT')
+    expect(isNotDraftError(error)).toBe(false)
+  })
+
+  it('returns false for a 400 error without a type field', () => {
+    const error = mockApiError(400, 'Bad request')
+    expect(isNotDraftError(error)).toBe(false)
+  })
+
+  it('returns false for non-400 status codes', () => {
+    const error = mockApiError(409, 'Conflict', 'urn:civitas:error:DATASET_NOT_EDITABLE')
+    expect(isNotDraftError(error)).toBe(false)
+  })
+
+  it('returns false for non-axios errors', () => {
+    expect(isNotDraftError(new Error('plain error'))).toBe(false)
+  })
+})
+
+const SAGA_IN_FLIGHT = 'urn:civitas:error:SAGA_IN_FLIGHT'
+
+describe('isSagaInFlightError', () => {
+  it.each([
+    'Cannot write while a saga is in-flight: UNRELEASE',
+    'Cannot write while a saga is in-flight: DELETE',
+    'Cannot release while a saga is in-flight: CREATE',
+    'Cannot unrelease while a saga is in-flight: UPDATE',
+  ])('returns true for a saga rejection: %s', detail => {
+    expect(isSagaInFlightError(mockApiError(409, detail, SAGA_IN_FLIGHT))).toBe(true)
+  })
+
+  it('returns false for a 409 error with a different type', () => {
+    const error = mockApiError(409, 'Name conflict', 'urn:civitas:error:SOME_OTHER_ERROR')
+    expect(isSagaInFlightError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error without a type field', () => {
+    const error = mockApiError(409, 'Conflict')
+    expect(isSagaInFlightError(error)).toBe(false)
+  })
+
+  it('returns false for non-409 status codes', () => {
+    const error = mockApiError(400, 'Cannot write while a saga is in-flight: UNRELEASE', SAGA_IN_FLIGHT)
+    expect(isSagaInFlightError(error)).toBe(false)
+  })
+
+  it('returns false for non-axios errors', () => {
+    expect(isSagaInFlightError(new Error('plain error'))).toBe(false)
+  })
+})
+
+const RESOURCE_IN_USE = 'urn:civitas:error:RESOURCE_IN_USE'
+
+describe('isResourceInUseError', () => {
+  it('returns true when a style is still referenced by layers', () => {
+    const error = mockApiError(409, 'Style is referenced by one or more Layers', RESOURCE_IN_USE)
     expect(isResourceInUseError(error)).toBe(true)
   })
 
-  it('returns false for a 409 error of another type', () => {
-    const error = getError(409, 'Something else conflicts', 'urn:civitas:error:SAGA_IN_FLIGHT')
+  it('returns true when a data sink is still referenced by layers', () => {
+    const error = mockApiError(409, 'DataSink is referenced by one or more Layers', RESOURCE_IN_USE)
+    expect(isResourceInUseError(error)).toBe(true)
+  })
+
+  it('returns false for a missing data-loss confirmation, which shares the type', () => {
+    const error = mockApiError(
+      409,
+      "This change rebuilds the sink's table and discards all stored data; set confirmDataLoss=true to proceed",
+      RESOURCE_IN_USE,
+    )
+    expect(isResourceInUseError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error with a different type', () => {
+    const error = mockApiError(409, 'Style is referenced by one or more Layers', SAGA_IN_FLIGHT)
     expect(isResourceInUseError(error)).toBe(false)
   })
 
   it('returns false for a 409 error without a type field', () => {
-    expect(isResourceInUseError(getError(409, 'Conflict'))).toBe(false)
+    const error = mockApiError(409, 'Style is referenced by one or more Layers')
+    expect(isResourceInUseError(error)).toBe(false)
   })
 
   it('returns false for non-409 status codes', () => {
-    const error = getError(403, 'Forbidden', 'urn:civitas:error:RESOURCE_IN_USE')
+    const error = mockApiError(400, 'Style is referenced by one or more Layers', RESOURCE_IN_USE)
     expect(isResourceInUseError(error)).toBe(false)
   })
 
@@ -145,23 +238,41 @@ describe('isResourceInUseError', () => {
   })
 })
 
-describe('isTableNameConflictError', () => {
-  it('returns true for a 409 error naming the tableName field', () => {
-    const error = getError(409, "DataSink with configuration.tableName 'roads' and dataSetId 'ds-1' already exists")
-    expect(isTableNameConflictError(error)).toBe(true)
+const UNCONFIRMED_DATA_LOSS =
+  "This change rebuilds the sink's table and discards all stored data; set confirmDataLoss=true to proceed"
+
+describe('isUnconfirmedDataLossError', () => {
+  it('returns true when a destructive sink change was not confirmed', () => {
+    const error = mockApiError(409, UNCONFIRMED_DATA_LOSS, RESOURCE_IN_USE)
+    expect(isUnconfirmedDataLossError(error)).toBe(true)
   })
 
-  it('returns false for a 409 error about another field', () => {
-    const error = getError(409, 'Group with name "Local Data Consumers" already exists')
-    expect(isTableNameConflictError(error)).toBe(false)
+  it('returns false when a style is still referenced, which shares the type', () => {
+    const error = mockApiError(409, 'Style is referenced by one or more Layers', RESOURCE_IN_USE)
+    expect(isUnconfirmedDataLossError(error)).toBe(false)
+  })
+
+  it('returns false when a data sink is still referenced, which shares the type', () => {
+    const error = mockApiError(409, 'DataSink is referenced by one or more Layers', RESOURCE_IN_USE)
+    expect(isUnconfirmedDataLossError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error with a different type', () => {
+    const error = mockApiError(409, UNCONFIRMED_DATA_LOSS, SAGA_IN_FLIGHT)
+    expect(isUnconfirmedDataLossError(error)).toBe(false)
+  })
+
+  it('returns false for a 409 error without a type field', () => {
+    const error = mockApiError(409, UNCONFIRMED_DATA_LOSS)
+    expect(isUnconfirmedDataLossError(error)).toBe(false)
   })
 
   it('returns false for non-409 status codes', () => {
-    const error = getError(400, "DataSink with configuration.tableName 'roads' already exists")
-    expect(isTableNameConflictError(error)).toBe(false)
+    const error = mockApiError(400, UNCONFIRMED_DATA_LOSS, RESOURCE_IN_USE)
+    expect(isUnconfirmedDataLossError(error)).toBe(false)
   })
 
   it('returns false for non-axios errors', () => {
-    expect(isTableNameConflictError(new Error('plain error'))).toBe(false)
+    expect(isUnconfirmedDataLossError(new Error('plain error'))).toBe(false)
   })
 })

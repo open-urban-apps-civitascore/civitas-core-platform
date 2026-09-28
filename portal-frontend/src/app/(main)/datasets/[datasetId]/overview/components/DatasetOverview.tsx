@@ -43,7 +43,7 @@ import {
   DatasetUpdateApiData,
   DatasetUpdateApiSchema,
 } from '@/types/datasets'
-import { isDatapoolScopeViolationError } from '@/utils/errors'
+import { isDatapoolScopeViolationError, isSagaInFlightError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { mapDatasetToFormData } from '../../../utils/mappers'
@@ -74,7 +74,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const isServerReadyState = serverStatus === DATASET_STATUS_TYPES.READY
   const hasStatusChanged = dataSetStatus !== serverStatus
 
-  const { canEditMetadata, canRelease, canViewApis, canEditApis, canCreatePipeline } = useDatasetPermissions(dataset)
+  const { canEditMetadata, canRelease, canViewApis, canEditApis, canCreatePipeline, canDeletePipeline } =
+    useDatasetPermissions(dataset)
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
@@ -227,6 +228,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     } catch (error) {
       if (isDatapoolScopeViolationError(error)) {
         toast.error(t('messages.datasourceScopeViolation'))
+      } else if (isSagaInFlightError(error)) {
+        toast.error(t('messages.sagaInFlightError'))
       } else {
         toast.error(t('messages.transitionError'))
       }
@@ -318,6 +321,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
             datasetId={dataset.id}
             pipelines={pipelineList}
             canCreatePipeline={canCreatePipeline && isSelectedDraftState}
+            canDeletePipeline={canDeletePipeline && isSelectedDraftState}
           />
           <div className="border-t" />
           <ApiList
@@ -332,7 +336,6 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     },
     {
       title: t('overview.completion.accessManagement.title'),
-      isCompleted: groupCount > 0 && roleCount > 0,
       buttons: [
         {
           text: isReadOnly

@@ -19,10 +19,18 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.adapter.AbstractSagaCommandHandler.SagaApiException;
 import de.civitascore.configadapter.configuration.AdapterConfig;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.core.Response;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import okhttp3.ConnectionPool;
+import okhttp3.Dispatcher;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Protocol;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -183,10 +191,10 @@ class AbstractSagaCommandHandlerTest {
   class ErrorClassification {
 
     @Test
-    @DisplayName("classifies ProcessingException as network error")
-    void classifiesProcessingExceptionAsNetworkError() {
+    @DisplayName("classifies IOException as network error")
+    void classifiesIOExceptionAsNetworkError() {
       try (TestHandler handler = createInitializedHandler()) {
-        handler.throwOnHandle = new ProcessingException("Connection refused");
+        handler.throwOnHandle = new UncheckedIOException(new IOException("Connection refused"));
         SagaCommandMessage command = createCommand("EXECUTE_STEP", "CREATE");
 
         SagaCommandResult result = handler.handle(command);
@@ -219,10 +227,7 @@ class AbstractSagaCommandHandlerTest {
     @DisplayName("succeeds for 2xx status codes")
     void succeedsFor2xx() {
       try (TestHandler handler = createInitializedHandler()) {
-        Response response = mock(Response.class);
-        when(response.getStatus()).thenReturn(200);
-
-        handler.checkResponse(response, "test-op");
+        handler.checkResponse(response(200, "ignored"), "test-op");
       }
     }
 
@@ -230,9 +235,7 @@ class AbstractSagaCommandHandlerTest {
     @DisplayName("throws SagaApiException for 4xx status codes")
     void throwsFor4xx() {
       try (TestHandler handler = createInitializedHandler()) {
-        Response response = mock(Response.class);
-        when(response.getStatus()).thenReturn(400);
-        when(response.readEntity(String.class)).thenReturn("Bad Request");
+        Response response = response(400, "Bad Request");
 
         SagaApiException ex =
             assertThrows(SagaApiException.class, () -> handler.checkResponse(response, "test-op"));
@@ -244,43 +247,61 @@ class AbstractSagaCommandHandlerTest {
     @DisplayName("throws SagaApiException for 5xx status codes")
     void throwsFor5xx() {
       try (TestHandler handler = createInitializedHandler()) {
-        Response response = mock(Response.class);
-        when(response.getStatus()).thenReturn(500);
-        when(response.readEntity(String.class)).thenReturn("Server Error");
+        Response response = response(500, "Server Error");
 
         SagaApiException ex =
             assertThrows(SagaApiException.class, () -> handler.checkResponse(response, "test-op"));
         assertEquals(500, ex.statusCode());
       }
     }
+
+    private Response response(int code, String body) {
+      return new Response.Builder()
+          .request(new Request.Builder().url("http://localhost/").build())
+          .protocol(Protocol.HTTP_1_1)
+          .code(code)
+          .message("")
+          .body(ResponseBody.create(body, MediaType.get("text/plain")))
+          .build();
+    }
   }
 
   @Nested
-  @DisplayName("JAX-RS client lifecycle")
+  @DisplayName("HTTP client lifecycle")
   class ClientLifecycle {
 
     @Test
     @DisplayName("setClient() replaces the client")
     void setClientReplacesClient() {
       try (TestHandler handler = createInitializedHandler()) {
-        Client mockClient = mock(Client.class);
+        // A real instance, not a mock: the try-with-resources close() below calls
+        // dispatcher().executorService() and connectionPool(), always non-null on a real client
+        // but null on a bare mock.
+        OkHttpClient client = new OkHttpClient();
 
-        handler.setClient(mockClient);
+        handler.setClient(client);
 
-        assertEquals(mockClient, handler.client());
+        assertEquals(client, handler.client());
       }
     }
 
     @Test
-    @DisplayName("close() closes the client")
-    void closeClosesClient() {
+    @DisplayName("close() shuts down the client's dispatcher and evicts its connection pool")
+    void closeShutsDownClient() {
       try (TestHandler handler = createInitializedHandler()) {
-        Client mockClient = mock(Client.class);
+        OkHttpClient mockClient = mock(OkHttpClient.class);
+        Dispatcher dispatcher = mock(Dispatcher.class);
+        ExecutorService executorService = mock(ExecutorService.class);
+        ConnectionPool connectionPool = mock(ConnectionPool.class);
+        when(mockClient.dispatcher()).thenReturn(dispatcher);
+        when(dispatcher.executorService()).thenReturn(executorService);
+        when(mockClient.connectionPool()).thenReturn(connectionPool);
         handler.setClient(mockClient);
 
         handler.close();
 
-        verify(mockClient).close();
+        verify(executorService).shutdown();
+        verify(connectionPool).evictAll();
       }
     }
   }
@@ -308,8 +329,10 @@ class AbstractSagaCommandHandlerTest {
     }
 
     @Override
-    protected Client createClient() {
-      return mock(Client.class);
+    protected OkHttpClient createClient() {
+      // A real instance, not a mock: close() calls dispatcher().executorService() and
+      // connectionPool(), which are always non-null on a real client but null on a bare mock.
+      return new OkHttpClient();
     }
 
     @Override

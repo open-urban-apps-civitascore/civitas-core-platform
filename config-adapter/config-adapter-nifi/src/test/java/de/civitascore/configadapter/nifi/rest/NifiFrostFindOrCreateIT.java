@@ -21,7 +21,6 @@ import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
-import jakarta.ws.rs.core.Response;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -33,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.awaitility.core.ConditionTimeoutException;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
@@ -359,13 +360,14 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
   /** Dumps the NiFi bulletin board (errors/warnings from the deployed flow) for diagnostics. */
   private String bulletins() throws Exception {
     String token = client.authenticate();
-    try (Response response =
-        httpClient
-            .target("https://" + dockerHost + ":" + HOST_PORT + "/nifi-api/flow/bulletin-board")
-            .request()
+    Request request =
+        new Request.Builder()
+            .url("https://" + dockerHost + ":" + HOST_PORT + "/nifi-api/flow/bulletin-board")
             .header("Authorization", "Bearer " + token)
-            .get()) {
-      return response.readEntity(String.class);
+            .get()
+            .build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      return response.body().string();
     }
   }
 

@@ -12,6 +12,8 @@ const QosSchema = z.preprocess(
   z.union([z.literal(0), z.literal(1), z.literal(2)]),
 )
 
+const MqttProtocolVersionSchema = z.enum(['3', '5'])
+
 export const parseStringArray = (v: unknown): string[] | undefined => {
   if (v === undefined) return undefined
   if (typeof v === 'string') {
@@ -38,8 +40,8 @@ export const stringifyStringArray = (v: unknown): string | undefined => {
 export const MqttApiResponseSchema = z.object({
   urls: z.array(z.string()).nullable().optional(),
   topics: z.array(z.string()).max(1).nullable().optional(),
-  client_id: z.string().nullable().optional(),
   qos: QosSchema.nullable().optional(),
+  protocol_version: MqttProtocolVersionSchema,
   connect_timeout: z.string().nullable().optional(),
   keepalive: z.string().nullable().optional(),
   tls: z.object({ enabled: z.boolean() }).nullable().optional(),
@@ -53,8 +55,8 @@ const singleTopic = z.string().regex(/^[^,;\s]*$/, 'datasources.errors.topicInva
 const MqttBaseSchema = z.object({
   urls: z.string().trim(),
   topics: singleTopic,
-  client_id: z.string().trim(),
   qos: QosSchema,
+  protocol_version: MqttProtocolVersionSchema,
   connect_timeout: z.string().trim(),
   keepalive: z.string().trim(),
   tls: z.boolean(),
@@ -139,7 +141,7 @@ export const MqttLooseSchema = MqttBaseSchema.partial()
   .superRefine(validateMqttSchemes)
 
 export const MqttStrictSchema = MqttBaseSchema.partial()
-  .required({ qos: true })
+  .required({ qos: true, protocol_version: true })
   .extend({
     urls: brokerUrlArray(z.array(z.string()).min(1, 'common.errors.required')),
     topics: singleTopic
@@ -148,15 +150,21 @@ export const MqttStrictSchema = MqttBaseSchema.partial()
   })
   .superRefine(validateMqttSchemes)
 
-export const MqttApiToFormSchema = MqttApiResponseSchema.transform(({ urls, topics, tls, qos, ...rest }) => ({
-  ...Object.fromEntries(
-    Object.entries(rest).map(([k, v]) => [k, typeof v === 'string' && v.trim() === '' ? undefined : (v ?? undefined)]),
-  ),
-  urls: urls?.join(', '),
-  topics: topics?.join(', '),
-  qos: qos == null ? undefined : String(qos),
-  tls: tls?.enabled ?? false,
-}))
+export const MqttApiToFormSchema = MqttApiResponseSchema.transform(
+  ({ urls, topics, tls, qos, protocol_version, ...rest }) => ({
+    ...Object.fromEntries(
+      Object.entries(rest).map(([k, v]) => [
+        k,
+        typeof v === 'string' && v.trim() === '' ? undefined : (v ?? undefined),
+      ]),
+    ),
+    urls: urls?.join(', '),
+    topics: topics?.join(', '),
+    qos: qos == null ? undefined : String(qos),
+    protocol_version,
+    tls: tls?.enabled ?? false,
+  }),
+)
 
 export const SqlApiResponseSchema = z.object({
   driver: z

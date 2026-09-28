@@ -10,35 +10,24 @@
 package de.civitascore.configadapter.apisix;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.model.dataset.NamedApiHelper;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import de.civitascore.configadapter.util.PayloadConverter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -46,24 +35,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import mockwebserver3.RecordedRequest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 
 class ApisixSagaHandlerTest {
 
-  private Invocation.Builder mockBuilder;
+  private MockWebServer server;
 
-  /**
-   * The path-bearing {@link WebTarget} from {@link #wireMockClient}. Exposed so per-named-API tests
-   * can capture every {@code .path(...)} argument and assert one APISIX route is provisioned per
-   * slug (issue #1368, per-NamedApi route model).
-   */
-  private WebTarget mockTarget;
+  @BeforeEach
+  void startServer() throws IOException {
+    server = new MockWebServer();
+    server.start();
+  }
+
+  @AfterEach
+  void stopServer() throws IOException {
+    server.close();
+  }
 
   @Test
   @DisplayName("adapter() returns 'apisix'")
@@ -221,9 +218,8 @@ class ApisixSagaHandlerTest {
     @DisplayName("creates upstream and one slug route, returns slug-keyed routeIds and serviceId")
     void shouldCreateRouteSuccessfully() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+        server.enqueue(created()); // upstream
+        server.enqueue(created()); // route
 
         SagaCommandResult result =
             handler.handle(createRouteCommand(Map.of("openDataAccess", true)));
@@ -244,9 +240,8 @@ class ApisixSagaHandlerTest {
     @DisplayName("sets plugin_config_id when openDataAccess is false")
     void shouldSetPluginConfigIdForNonOpenData() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+        server.enqueue(created()); // upstream
+        server.enqueue(created()); // route
 
         SagaCommandResult result =
             handler.handle(createRouteCommand(Map.of("openDataAccess", false)));
@@ -254,11 +249,9 @@ class ApisixSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         // Verify the security-relevant effect, not just the step status: the route body must carry
         // plugin_config_id so the gateway enforces auth on the protected dataset.
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-            ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(2)).put(entityCaptor.capture()); // upstream + route
-        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
+        assertEquals(2, server.getRequestCount());
+        takeRequest(); // upstream
+        Map<String, Object> routeBody = requestBodyAsMap(takeRequest());
         assertEquals("auth-plugin-1", routeBody.get("plugin_config_id"));
       }
     }
@@ -268,9 +261,8 @@ class ApisixSagaHandlerTest {
         "always protects the route (plugin_config_id, no methods gate) even when openDataAccess=true")
     void shouldAlwaysProtectRouteEvenWhenOpenDataAccessTrue() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+        server.enqueue(created()); // upstream
+        server.enqueue(created()); // route
 
         // openDataAccess=true must NOT bypass auth anymore: open-data access is decided by OPA per
         // request (ABAC), so the route is provisioned protected exactly like any other — it keeps
@@ -279,11 +271,8 @@ class ApisixSagaHandlerTest {
             handler.handle(createRouteCommand(Map.of("openDataAccess", true)));
 
         assertEquals("STEP_COMPLETED", result.type());
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-            ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(2)).put(entityCaptor.capture()); // upstream + route
-        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
+        takeRequest(); // upstream
+        Map<String, Object> routeBody = requestBodyAsMap(takeRequest());
         assertEquals("auth-plugin-1", routeBody.get("plugin_config_id"));
         assertNull(routeBody.get("methods"), "no read-only method gate — OPA gates per request");
       }
@@ -293,17 +282,13 @@ class ApisixSagaHandlerTest {
     @DisplayName("includes service_id in route body when configured")
     void shouldIncludeServiceIdInRouteBody() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+        server.enqueue(created()); // upstream
+        server.enqueue(created()); // route
 
         handler.handle(createRouteCommand(Map.of("openDataAccess", true)));
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-            ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(2)).put(entityCaptor.capture());
-        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
+        takeRequest(); // upstream
+        Map<String, Object> routeBody = requestBodyAsMap(takeRequest());
         assertEquals("svc-frost-server", routeBody.get("service_id"));
       }
     }
@@ -312,12 +297,7 @@ class ApisixSagaHandlerTest {
     @DisplayName("returns failure on HTTP error")
     void shouldReturnFailureOnHttpError() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(400);
-        when(mockResponse.readEntity(String.class)).thenReturn("Bad Request");
-        when(mockResponse.readEntity(Map.class)).thenReturn(Map.of());
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
-        when(mockBuilder.delete()).thenReturn(mockResponse);
+        server.enqueue(new MockResponse.Builder().code(400).body("Bad Request").build());
 
         SagaCommandResult result = handler.handle(createRouteCommand(Map.of()));
 
@@ -328,14 +308,10 @@ class ApisixSagaHandlerTest {
 
     @Test
     @DisplayName("returns failure on network error")
-    void shouldReturnFailureOnNetworkError() {
+    void shouldReturnFailureOnNetworkError() throws IOException {
       try (ApisixSagaHandler handler = createHandler()) {
-        when(mockBuilder.put(any(Entity.class)))
-            .thenThrow(new ProcessingException("Connection refused"));
-        Response notFound = mock(Response.class);
-        when(notFound.getStatus()).thenReturn(404);
-        when(notFound.readEntity(Map.class)).thenReturn(Map.of());
-        when(mockBuilder.delete()).thenReturn(notFound);
+        // Torn down before any request is made: the connection attempt itself fails.
+        server.close();
 
         SagaCommandResult result = handler.handle(createRouteCommand(Map.of()));
 
@@ -355,7 +331,7 @@ class ApisixSagaHandlerTest {
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
         // Upstream targets resolve before any write, so a bad URL touches no gateway state.
-        verify(mockBuilder, never()).put(any(Entity.class));
+        assertEquals(0, server.getRequestCount());
       }
     }
 
@@ -377,7 +353,7 @@ class ApisixSagaHandlerTest {
 
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
-        verify(mockBuilder, never()).put(any(Entity.class));
+        assertEquals(0, server.getRequestCount());
       }
     }
 
@@ -391,7 +367,7 @@ class ApisixSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals(Map.of(), result.resultData().get("routeIds"));
-        verify(mockBuilder, never()).put(any(Entity.class));
+        assertEquals(0, server.getRequestCount());
       }
     }
 
@@ -399,9 +375,8 @@ class ApisixSagaHandlerTest {
     @DisplayName("handles upstream URL without port")
     void shouldHandleUpstreamUrlWithoutPort() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+        server.enqueue(created()); // upstream
+        server.enqueue(created()); // route
 
         SagaCommandResult result =
             handler.handle(
@@ -416,9 +391,8 @@ class ApisixSagaHandlerTest {
     @DisplayName("handles upstream URL without path")
     void shouldHandleUpstreamUrlWithoutPath() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+        server.enqueue(created()); // upstream
+        server.enqueue(created()); // route
 
         SagaCommandResult result =
             handler.handle(createRouteCommand(Map.of("upstreamUrl", "http://frost:8080")));
@@ -447,11 +421,6 @@ class ApisixSagaHandlerTest {
     @DisplayName("fails (STEP_FAILED) for a non-routable standard (CUSTOM/unknown)")
     void shouldFailForNonRoutableStandard() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
-        when(mockBuilder.delete()).thenReturn(ok);
-
         SagaCommandResult result =
             handler.handle(
                 createPerApiCommand(true, List.of(Map.of("slug", "custom", "standard", "CUSTOM"))));
@@ -463,8 +432,7 @@ class ApisixSagaHandlerTest {
 
         // Standards are validated BEFORE provisioning, so neither a route nor an upstream is ever
         // created — no gateway state, no cleanup needed.
-        verify(mockBuilder, never()).put(any(Entity.class));
-        verify(mockBuilder, never()).delete();
+        assertEquals(0, server.getRequestCount());
       }
     }
 
@@ -472,9 +440,9 @@ class ApisixSagaHandlerTest {
     @DisplayName("creates one shared upstream and one route per slug, returns slug-keyed routeIds")
     void shouldCreateOneRoutePerSlug() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+        server.enqueue(created()); // shared upstream
+        server.enqueue(created()); // traffic route
+        server.enqueue(created()); // weather route
 
         SagaCommandResult result =
             handler.handle(
@@ -486,11 +454,9 @@ class ApisixSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         // One shared dataset upstream + one route per slug.
-        verify(mockBuilder, times(3)).put(any(Entity.class));
+        assertEquals(3, server.getRequestCount());
 
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
-        List<String> paths = pathCaptor.getAllValues();
+        List<String> paths = recordedPaths();
         assertTrue(
             paths.contains("/apisix/admin/upstreams/ds-001"), "one shared upstream per dataset");
         assertTrue(
@@ -516,23 +482,19 @@ class ApisixSagaHandlerTest {
         "binds each slug route to /v1/datasets/{id}/{slug} and the shared dataset upstream")
     void shouldBindSlugRouteToDatasetSlugPath() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+        server.enqueue(created()); // shared upstream
+        server.enqueue(created()); // traffic route
 
         handler.handle(
             createPerApiCommand(true, List.of(Map.of("slug", "traffic", "standard", "STA"))));
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-            ArgumentCaptor.forClass(Entity.class);
         // PUT order: shared upstream first, then the slug route.
-        verify(mockBuilder, times(2)).put(entityCaptor.capture());
-        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
+        takeRequest(); // upstream
+        Map<String, Object> routeBody = requestBodyAsMap(takeRequest());
 
-        assertArrayEquals(
-            new String[] {"/v1/datasets/ds-001/traffic", "/v1/datasets/ds-001/traffic/*"},
-            (String[]) routeBody.get("uris"));
+        assertEquals(
+            List.of("/v1/datasets/ds-001/traffic", "/v1/datasets/ds-001/traffic/*"),
+            routeBody.get("uris"));
         assertEquals("ds-001", routeBody.get("upstream_id"));
       }
     }
@@ -542,9 +504,8 @@ class ApisixSagaHandlerTest {
         "compensation data carries the slug-keyed routeIds and shared upstream for rollback")
     void shouldReturnSlugKeyedCompensationData() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+        server.enqueue(created()); // shared upstream
+        server.enqueue(created()); // traffic route
 
         SagaCommandResult result =
             handler.handle(
@@ -562,9 +523,8 @@ class ApisixSagaHandlerTest {
     @DisplayName("ignores a namedApi entry without a usable slug (only valid slugs get a route)")
     void shouldIgnoreNamedApiEntriesWithoutSlug() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+        server.enqueue(created()); // shared upstream
+        server.enqueue(created()); // traffic route
 
         SagaCommandResult result =
             handler.handle(
@@ -576,7 +536,7 @@ class ApisixSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         // One shared upstream + exactly one route (the valid slug only).
-        verify(mockBuilder, times(2)).put(any(Entity.class));
+        assertEquals(2, server.getRequestCount());
         @SuppressWarnings("unchecked")
         Map<String, String> routeIds = (Map<String, String>) result.resultData().get("routeIds");
         assertEquals(Map.of("traffic", NamedApiHelper.derive("ds-001", "traffic")), routeIds);
@@ -587,17 +547,13 @@ class ApisixSagaHandlerTest {
     @DisplayName("cleans up already-created routes + the upstream when a later route PUT fails")
     void shouldCleanUpPartialStateOnCreateFailure() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(201);
-        Response err = mock(Response.class);
-        when(err.getStatus()).thenReturn(500);
-        when(err.readEntity(String.class)).thenReturn("boom");
         // PUT order: shared upstream, then one route per slug. Upstream + first slug succeed,
         // the second slug route fails — leaving the upstream and the first route to clean up.
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok, ok, err);
-        Response delOk = mock(Response.class);
-        when(delOk.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(delOk);
+        server.enqueue(created()); // upstream
+        server.enqueue(created()); // traffic route
+        server.enqueue(new MockResponse.Builder().code(500).body("boom").build()); // weather route
+        server.enqueue(new MockResponse.Builder().code(200).build()); // cleanup: delete traffic
+        server.enqueue(new MockResponse.Builder().code(200).build()); // cleanup: delete upstream
 
         SagaCommandResult result =
             handler.handle(
@@ -609,16 +565,23 @@ class ApisixSagaHandlerTest {
 
         assertEquals("STEP_FAILED", result.type());
         // Best-effort rollback: the created route (traffic) and the shared upstream are deleted.
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
-        List<String> paths = pathCaptor.getAllValues();
+        // 3 PUTs (upstream, traffic route, failed weather route) + 2 cleanup DELETEs.
+        assertEquals(5, server.getRequestCount());
+        List<RecordedRequest> requests = new ArrayList<>();
+        for (int i = 0; i < server.getRequestCount(); i++) {
+          requests.add(takeRequest());
+        }
+        List<RecordedRequest> deletes =
+            requests.stream().filter(r -> "DELETE".equals(r.getMethod())).toList();
+        assertEquals(2, deletes.size(), "exactly the traffic route and the shared upstream");
+        List<String> deletedPaths = deletes.stream().map(r -> r.getUrl().encodedPath()).toList();
         assertTrue(
-            paths.contains("/apisix/admin/routes/" + NamedApiHelper.derive("ds-001", "traffic")),
+            deletedPaths.contains(
+                "/apisix/admin/routes/" + NamedApiHelper.derive("ds-001", "traffic")),
             "created route should be cleaned up");
         assertTrue(
-            paths.contains("/apisix/admin/upstreams/ds-001"),
+            deletedPaths.contains("/apisix/admin/upstreams/ds-001"),
             "shared upstream should be cleaned up");
-        verify(mockBuilder, atLeastOnce()).delete();
       }
     }
 
@@ -627,9 +590,8 @@ class ApisixSagaHandlerTest {
         "OWS named API routes to the per-dataset map-server upstream and the workspace /ows path")
     void shouldRouteOwsToMapUpstream() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+        server.enqueue(created()); // map upstream
+        server.enqueue(created()); // route
 
         SagaCommandResult result =
             handler.handle(
@@ -637,9 +599,7 @@ class ApisixSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         // OWS-only dataset: one map-server upstream + one route, and NO FROST upstream.
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
-        List<String> paths = pathCaptor.getAllValues();
+        List<String> paths = recordedPaths();
         assertTrue(
             paths.contains("/apisix/admin/upstreams/ds-001-ows"),
             "per-dataset map-server upstream");
@@ -648,13 +608,22 @@ class ApisixSagaHandlerTest {
             "no FROST upstream for an OWS-only dataset");
         assertTrue(
             paths.contains("/apisix/admin/routes/" + NamedApiHelper.derive("ds-001", "map")));
+      }
+    }
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-            ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(2)).put(entityCaptor.capture()); // map upstream + route
-        Map<String, Object> upstreamBody = entityCaptor.getAllValues().get(0).getEntity();
-        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
+    @Test
+    @DisplayName(
+        "OWS named API route body binds the map upstream, rewrites to /ows and strips headers")
+    void shouldRouteOwsToMapUpstreamBody() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        server.enqueue(created()); // map upstream
+        server.enqueue(created()); // route
+
+        handler.handle(
+            createPerApiCommand(false, List.of(Map.of("slug", "map", "standard", "OWS"))));
+
+        Map<String, Object> upstreamBody = requestBodyAsMap(takeRequest());
+        Map<String, Object> routeBody = requestBodyAsMap(takeRequest());
 
         // Upstream points at the configured GeoServer host:port.
         assertEquals(Map.of("civitas-geoserver:8080", 1), upstreamBody.get("nodes"));
@@ -662,15 +631,14 @@ class ApisixSagaHandlerTest {
         // Route binds to the map upstream and rewrites to /geoserver/{workspace}/ows. The dataset
         // id "ds-001" normalizes to the workspace "ds_001".
         assertEquals("ds-001-ows", routeBody.get("upstream_id"));
-        assertArrayEquals(
-            new String[] {"^/v1/datasets/ds-001/map/?$", "/geoserver/ds_001/ows"},
-            (String[]) proxyRewriteOf(routeBody).get("regex_uri"));
+        assertEquals(
+            List.of("^/v1/datasets/ds-001/map/?$", "/geoserver/ds_001/ows"),
+            proxyRewriteOf(routeBody).get("regex_uri"));
         // An OWS endpoint takes its parameters in the query string, so the route matches the bare
         // address and the trailing-slash form only — a sub-path would reach the unthrottled
         // service.
-        assertArrayEquals(
-            new String[] {"/v1/datasets/ds-001/map", "/v1/datasets/ds-001/map/"},
-            (String[]) routeBody.get("uris"));
+        assertEquals(
+            List.of("/v1/datasets/ds-001/map", "/v1/datasets/ds-001/map/"), routeBody.get("uris"));
         // Protected → gateway gate present.
         assertEquals("auth-plugin-1", routeBody.get("plugin_config_id"));
         // The route self-describes its standard but carries NO FROST upstream credential.
@@ -702,10 +670,11 @@ class ApisixSagaHandlerTest {
         Map<String, Object> responseRewrite =
             (Map<String, Object>) pluginsOf(routeBody).get("response-rewrite");
         assertNotNull(responseRewrite, "OWS route rewrites GeoServer's self-referential URLs");
-        Object[] filters = (Object[]) responseRewrite.get("filters");
-        assertEquals(1, filters.length);
         @SuppressWarnings("unchecked")
-        Map<String, Object> filter = (Map<String, Object>) filters[0];
+        List<Object> filters = (List<Object>) responseRewrite.get("filters");
+        assertEquals(1, filters.size());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> filter = (Map<String, Object>) filters.get(0);
         assertEquals("global", filter.get("scope"));
         assertEquals(
             "https?://[^/]+/geoserver/ds_001/(wfs|wms|wcs|wps|wmts|ows|gwc)", filter.get("regex"));
@@ -717,9 +686,8 @@ class ApisixSagaHandlerTest {
     @DisplayName("provisions an OWS-only dataset that carries no FROST upstream URL at all")
     void shouldCreateOwsOnlyRouteWithoutUpstreamUrl() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+        server.enqueue(created()); // map upstream
+        server.enqueue(created()); // route
 
         // A dataset with no FROST data sink gets no FROST project, so the saga carries no
         // upstreamUrl. Its OWS surface must still be published.
@@ -743,9 +711,7 @@ class ApisixSagaHandlerTest {
             Map.of("map", NamedApiHelper.derive("ds-001", "map")),
             result.resultData().get("routeIds"));
 
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
-        List<String> paths = pathCaptor.getAllValues();
+        List<String> paths = recordedPaths();
         assertTrue(paths.contains("/apisix/admin/upstreams/ds-001-ows"), "map-server upstream");
         assertFalse(paths.contains("/apisix/admin/upstreams/ds-001"), "no FROST upstream");
       }
@@ -756,9 +722,10 @@ class ApisixSagaHandlerTest {
         "a dataset with both STA and OWS named APIs provisions a FROST and a map-server upstream")
     void shouldProvisionBothUpstreamsForMixedStandards() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+        server.enqueue(created()); // FROST upstream
+        server.enqueue(created()); // map upstream
+        server.enqueue(created()); // data route
+        server.enqueue(created()); // map route
 
         SagaCommandResult result =
             handler.handle(
@@ -770,29 +737,43 @@ class ApisixSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         // FROST upstream + map upstream + one route per slug.
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
-        List<String> paths = pathCaptor.getAllValues();
+        List<String> paths = recordedPaths();
         assertTrue(paths.contains("/apisix/admin/upstreams/ds-001"), "FROST upstream for STA slug");
         assertTrue(
             paths.contains("/apisix/admin/upstreams/ds-001-ows"), "map upstream for OWS slug");
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "a dataset with both STA and OWS named APIs binds each route to the right upstream/uris")
+    void shouldProvisionBothUpstreamsForMixedStandardsBodies() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        server.enqueue(created()); // FROST upstream
+        server.enqueue(created()); // map upstream
+        server.enqueue(created()); // data route
+        server.enqueue(created()); // map route
+
+        handler.handle(
+            createPerApiCommand(
+                false,
+                List.of(
+                    Map.of("slug", "data", "standard", "STA"),
+                    Map.of("slug", "map", "standard", "OWS"))));
 
         // PUT order: FROST upstream, map upstream, then routes in slug order (data, map).
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-            ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(4)).put(entityCaptor.capture());
-        Map<String, Object> staRoute = entityCaptor.getAllValues().get(2).getEntity();
-        Map<String, Object> owsRoute = entityCaptor.getAllValues().get(3).getEntity();
+        takeRequest(); // FROST upstream
+        takeRequest(); // map upstream
+        Map<String, Object> staRoute = requestBodyAsMap(takeRequest());
+        Map<String, Object> owsRoute = requestBodyAsMap(takeRequest());
 
         // The two standards match differently: STA addresses entities by sub-path, while an OWS
         // endpoint takes its parameters in the query string and matches its address exactly.
-        assertArrayEquals(
-            new String[] {"/v1/datasets/ds-001/data", "/v1/datasets/ds-001/data/*"},
-            (String[]) staRoute.get("uris"));
-        assertArrayEquals(
-            new String[] {"/v1/datasets/ds-001/map", "/v1/datasets/ds-001/map/"},
-            (String[]) owsRoute.get("uris"));
+        assertEquals(
+            List.of("/v1/datasets/ds-001/data", "/v1/datasets/ds-001/data/*"),
+            staRoute.get("uris"));
+        assertEquals(
+            List.of("/v1/datasets/ds-001/map", "/v1/datasets/ds-001/map/"), owsRoute.get("uris"));
         assertEquals("ds-001", staRoute.get("upstream_id"));
         assertEquals("ds-001-ows", owsRoute.get("upstream_id"));
         // The STA route injects the FROST credential; the OWS route never does.
@@ -826,23 +807,10 @@ class ApisixSagaHandlerTest {
     @DisplayName("updates every route in the slug-keyed routeIds map")
     void shouldUpdateEachRouteInMap() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response getResp = mock(Response.class);
-        when(getResp.getStatus()).thenReturn(200);
-        // Mutable route value — the handler mutates it in place (GET → mutate → PUT).
-        when(getResp.readEntity(Map.class))
-            .thenAnswer(
-                inv -> {
-                  Map<String, Object> value = new HashMap<>();
-                  value.put("uri", "/v1/datasets/ds-001/traffic");
-                  value.put("plugin_config_id", "auth-plugin-1");
-                  Map<String, Object> envelope = new HashMap<>();
-                  envelope.put("value", value);
-                  return envelope;
-                });
-        when(mockBuilder.get()).thenReturn(getResp);
-        Response putResp = mock(Response.class);
-        when(putResp.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResp);
+        server.enqueue(routeGet("/v1/datasets/ds-001/traffic", "auth-plugin-1"));
+        server.enqueue(routeGet("/v1/datasets/ds-001/weather", "auth-plugin-1"));
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("traffic", "rid-traffic", "weather", "rid-weather"));
@@ -855,11 +823,8 @@ class ApisixSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(2)).get();
-        verify(mockBuilder, times(2)).put(any(Entity.class));
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
-        List<String> paths = pathCaptor.getAllValues();
+        assertEquals(4, server.getRequestCount());
+        List<String> paths = recordedPaths();
         assertTrue(paths.contains("/apisix/admin/routes/rid-traffic"));
         assertTrue(paths.contains("/apisix/admin/routes/rid-weather"));
 
@@ -881,24 +846,10 @@ class ApisixSagaHandlerTest {
     @DisplayName("fails (STEP_FAILED) without mutating any route when a slug route is absent")
     void shouldFailWhenSlugRouteAbsentOnForwardUpdate() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response notFound = mock(Response.class);
-        when(notFound.getStatus()).thenReturn(404);
-        when(notFound.readEntity(Map.class)).thenReturn(Map.of());
-        Response present = mock(Response.class);
-        when(present.getStatus()).thenReturn(200);
-        when(present.readEntity(Map.class))
-            .thenAnswer(
-                inv -> {
-                  Map<String, Object> value = new HashMap<>();
-                  value.put("uri", "/v1/datasets/ds-001/weather");
-                  value.put("plugin_config_id", "auth-plugin-1");
-                  Map<String, Object> envelope = new HashMap<>();
-                  envelope.put("value", value);
-                  return envelope;
-                });
         // Phase 1 loads both routes (deterministic order): the first slug (traffic) is gone (404),
         // the second (weather) is present.
-        when(mockBuilder.get()).thenReturn(notFound, present);
+        server.enqueue(new MockResponse.Builder().code(404).body("Key not found").build());
+        server.enqueue(routeGet("/v1/datasets/ds-001/weather", "auth-plugin-1"));
 
         Map<String, String> routeIds = new LinkedHashMap<>();
         routeIds.put("traffic", "rid-traffic");
@@ -924,8 +875,7 @@ class ApisixSagaHandlerTest {
         // data — SagaStepDelegate only records it for completed steps — so there must be nothing to
         // roll back.) Both routes are GET-validated in phase 1; neither is PUT.
         assertEquals("STEP_FAILED", result.type());
-        verify(mockBuilder, times(2)).get();
-        verify(mockBuilder, never()).put(any(Entity.class));
+        assertEquals(2, server.getRequestCount());
         assertTrue(result.error().contains("traffic"));
       }
     }
@@ -935,25 +885,9 @@ class ApisixSagaHandlerTest {
         "compensation re-run tolerates an absent slug route (no fail) and updates the rest")
     void shouldTolerateAbsentSlugRouteOnUpdateCompensation() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response notFound = mock(Response.class);
-        when(notFound.getStatus()).thenReturn(404);
-        when(notFound.readEntity(Map.class)).thenReturn(Map.of());
-        Response present = mock(Response.class);
-        when(present.getStatus()).thenReturn(200);
-        when(present.readEntity(Map.class))
-            .thenAnswer(
-                inv -> {
-                  Map<String, Object> value = new HashMap<>();
-                  value.put("uri", "/v1/datasets/ds-001/weather");
-                  value.put("plugin_config_id", "auth-plugin-1");
-                  Map<String, Object> envelope = new HashMap<>();
-                  envelope.put("value", value);
-                  return envelope;
-                });
-        when(mockBuilder.get()).thenReturn(notFound, present);
-        Response putResp = mock(Response.class);
-        when(putResp.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResp);
+        server.enqueue(new MockResponse.Builder().code(404).body("Key not found").build());
+        server.enqueue(routeGet("/v1/datasets/ds-001/weather", "auth-plugin-1"));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         Map<String, String> routeIds = new LinkedHashMap<>();
         routeIds.put("traffic", "rid-traffic");
@@ -976,8 +910,7 @@ class ApisixSagaHandlerTest {
                     payload));
 
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(2)).get();
-        verify(mockBuilder, times(1)).put(any(Entity.class));
+        assertEquals(3, server.getRequestCount());
         // Routes are always protected — no previousOpenDataAccess capture.
         assertNull(result.compensationData().get("previousOpenDataAccess"));
       }
@@ -1006,8 +939,7 @@ class ApisixSagaHandlerTest {
 
         assertEquals("STEP_FAILED", result.type());
         // Fails before any route I/O.
-        verify(mockBuilder, never()).get();
-        verify(mockBuilder, never()).put(any(Entity.class));
+        assertEquals(0, server.getRequestCount());
       }
     }
 
@@ -1015,34 +947,22 @@ class ApisixSagaHandlerTest {
     @DisplayName("toggling an OWS route applies the gateway gate but injects no FROST credential")
     void shouldNotInjectFrostCredentialWhenTogglingOwsRoute() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response getResp = mock(Response.class);
-        when(getResp.getStatus()).thenReturn(200);
         // The route read back from APISIX carries the OWS standard marker the handler wrote at
         // CREATE, so the toggle knows it is a map-service route.
-        when(getResp.readEntity(Map.class))
-            .thenAnswer(
-                inv -> {
-                  Map<String, Object> value = new HashMap<>();
-                  value.put("uri", "/v1/datasets/ds-001/map");
-                  value.put("upstream_id", "ds-001-ows");
-                  Map<String, Object> labels = new HashMap<>();
-                  labels.put("civitas-named-api-standard", "OWS");
-                  value.put("labels", labels);
-                  Map<String, Object> proxyRewrite = new HashMap<>();
-                  proxyRewrite.put(
-                      "regex_uri",
-                      new String[] {"^/v1/datasets/ds-001/map(/.*)?$", "/geoserver/ds_001/ows$1"});
-                  Map<String, Object> plugins = new HashMap<>();
-                  plugins.put("proxy-rewrite", proxyRewrite);
-                  value.put("plugins", plugins);
-                  Map<String, Object> envelope = new HashMap<>();
-                  envelope.put("value", value);
-                  return envelope;
-                });
-        when(mockBuilder.get()).thenReturn(getResp);
-        Response putResp = mock(Response.class);
-        when(putResp.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResp);
+        Map<String, Object> value = new HashMap<>();
+        value.put("uri", "/v1/datasets/ds-001/map");
+        value.put("upstream_id", "ds-001-ows");
+        Map<String, Object> labels = new HashMap<>();
+        labels.put("civitas-named-api-standard", "OWS");
+        value.put("labels", labels);
+        Map<String, Object> proxyRewrite = new HashMap<>();
+        proxyRewrite.put(
+            "regex_uri", List.of("^/v1/datasets/ds-001/map(/.*)?$", "/geoserver/ds_001/ows$1"));
+        Map<String, Object> plugins = new HashMap<>();
+        plugins.put("proxy-rewrite", proxyRewrite);
+        value.put("plugins", plugins);
+        server.enqueue(jsonResponse(200, Map.of("value", value)));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("map", "rid-map"));
@@ -1060,20 +980,17 @@ class ApisixSagaHandlerTest {
                     payload));
 
         assertEquals("STEP_COMPLETED", result.type());
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-            ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder).put(entityCaptor.capture());
-        Map<String, Object> routeBody = entityCaptor.getValue().getEntity();
+        takeRequest(); // GET
+        Map<String, Object> routeBody = requestBodyAsMap(takeRequest());
 
         // Protected → the gateway gate applies to OWS too...
         assertEquals("auth-plugin-1", routeBody.get("plugin_config_id"));
         // ...but the map-service route never gets a FROST credential or its tracking label.
         assertNull(authSetHeadersOf(routeBody), "OWS toggle must not inject a FROST credential");
         @SuppressWarnings("unchecked")
-        Map<String, Object> labels = (Map<String, Object>) routeBody.get("labels");
-        assertFalse(labels.containsKey("civitas-frost-upstream-auth-header"));
-        assertEquals("OWS", labels.get("civitas-named-api-standard"));
+        Map<String, Object> resultLabels = (Map<String, Object>) routeBody.get("labels");
+        assertFalse(resultLabels.containsKey("civitas-frost-upstream-auth-header"));
+        assertEquals("OWS", resultLabels.get("civitas-named-api-standard"));
         // Re-applying the state also (re-)installs the capabilities URL rewrite, so a route created
         // before this feature is healed on the next UPDATE/RESTORE.
         @SuppressWarnings("unchecked")
@@ -1081,9 +998,10 @@ class ApisixSagaHandlerTest {
             (Map<String, Object>) pluginsOf(routeBody).get("response-rewrite");
         assertNotNull(
             responseRewrite, "toggling an OWS route (re-)installs the capabilities rewrite");
-        Object[] filters = (Object[]) responseRewrite.get("filters");
         @SuppressWarnings("unchecked")
-        Map<String, Object> filter = (Map<String, Object>) filters[0];
+        List<Object> filters = (List<Object>) responseRewrite.get("filters");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> filter = (Map<String, Object>) filters.get(0);
         assertEquals(
             "https?://[^/]+/geoserver/ds_001/(wfs|wms|wcs|wps|wmts|ows|gwc)", filter.get("regex"));
         assertEquals("https://api.example.test/v1/datasets/ds-001/map", filter.get("replace"));
@@ -1099,9 +1017,10 @@ class ApisixSagaHandlerTest {
     @DisplayName("deletes every route in the map and the shared dataset upstream")
     void shouldDeleteEachRouteAndUpstream() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(ok);
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("traffic", "rid-traffic", "weather", "rid-weather"));
@@ -1115,10 +1034,8 @@ class ApisixSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         // Two slug routes + both per-dataset upstreams (FROST + map server). The DELETE payload
         // carries no standard, so both upstreams are torn down (404-tolerant for the absent one).
-        verify(mockBuilder, times(4)).delete();
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
-        List<String> paths = pathCaptor.getAllValues();
+        assertEquals(4, server.getRequestCount());
+        List<String> paths = recordedPaths();
         assertTrue(paths.contains("/apisix/admin/routes/rid-traffic"));
         assertTrue(paths.contains("/apisix/admin/routes/rid-weather"));
         assertTrue(paths.contains("/apisix/admin/upstreams/ds-001"));
@@ -1130,13 +1047,11 @@ class ApisixSagaHandlerTest {
     @DisplayName("tolerates an already-gone slug route (404) and still deletes the rest + upstream")
     void shouldTolerate404OnIndividualSlugRoute() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        Response notFound = mock(Response.class);
-        when(notFound.getStatus()).thenReturn(404);
-        when(notFound.readEntity(String.class)).thenReturn("Key not found");
         // First delete is an already-gone route (404), the remaining route + upstreams are present.
-        when(mockBuilder.delete()).thenReturn(notFound, ok, ok, ok);
+        server.enqueue(new MockResponse.Builder().code(404).body("Key not found").build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("traffic", "rid-traffic", "weather", "rid-weather"));
@@ -1155,7 +1070,7 @@ class ApisixSagaHandlerTest {
         // Idempotent: a 404 on one slug route must not abort the per-slug teardown.
         assertEquals("STEP_COMPLETED", result.type());
         // Two slug routes + both per-dataset upstreams (FROST + map server).
-        verify(mockBuilder, times(4)).delete();
+        assertEquals(4, server.getRequestCount());
       }
     }
 
@@ -1165,10 +1080,9 @@ class ApisixSagaHandlerTest {
             + " STEP_FAILED); state drift is surfaced via WARN log, not a failure")
     void shouldCompleteWhenNoTargetRoutesExist() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response notFound = mock(Response.class);
-        when(notFound.getStatus()).thenReturn(404);
-        when(notFound.readEntity(String.class)).thenReturn("Key not found");
-        when(mockBuilder.delete()).thenReturn(notFound);
+        for (int i = 0; i < 4; i++) {
+          server.enqueue(new MockResponse.Builder().code(404).body("Key not found").build());
+        }
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("traffic", "rid-traffic", "weather", "rid-weather"));
@@ -1193,7 +1107,7 @@ class ApisixSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         // Two slug routes + both per-dataset upstreams (FROST + map server) — all 404, all
         // tolerated.
-        verify(mockBuilder, times(4)).delete();
+        assertEquals(4, server.getRequestCount());
       }
     }
 
@@ -1203,17 +1117,12 @@ class ApisixSagaHandlerTest {
             + " completes")
     void shouldRetryUpstreamDeleteOnStaleRouteReference() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        Response staleReference = mock(Response.class);
-        when(staleReference.getStatus()).thenReturn(400);
-        when(staleReference.readEntity(String.class))
-            .thenReturn(
-                "{\"error_msg\":\"can not delete this upstream, route [rid-things] is still using"
-                    + " it now\"}");
         // Route delete succeeds; the immediately following upstream delete still sees the route in
         // APISIX's worker-local route cache, then succeeds once the cache has caught up.
-        when(mockBuilder.delete()).thenReturn(ok, staleReference, ok, ok);
+        server.enqueue(new MockResponse.Builder().code(200).build()); // route delete
+        server.enqueue(staleRouteReferenceResponse()); // ds-001 upstream attempt 1
+        server.enqueue(new MockResponse.Builder().code(200).build()); // ds-001 upstream attempt 2
+        server.enqueue(new MockResponse.Builder().code(200).build()); // ds-001-ows upstream
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("things", "rid-things"));
@@ -1232,7 +1141,7 @@ class ApisixSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         // 1 route + 2 upstream attempts for ds-001 (one rejected, one accepted) + 1 for ds-001-ows.
-        verify(mockBuilder, times(4)).delete();
+        assertEquals(4, server.getRequestCount());
       }
     }
 
@@ -1240,15 +1149,10 @@ class ApisixSagaHandlerTest {
     @DisplayName("fails the step when the stale route reference does not clear within the retries")
     void shouldFailWhenStaleRouteReferencePersists() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        Response staleReference = mock(Response.class);
-        when(staleReference.getStatus()).thenReturn(400);
-        when(staleReference.readEntity(String.class))
-            .thenReturn(
-                "{\"error_msg\":\"can not delete this upstream, route [rid-things] is still using"
-                    + " it now\"}");
-        when(mockBuilder.delete()).thenReturn(ok, staleReference, staleReference, staleReference);
+        server.enqueue(new MockResponse.Builder().code(200).build()); // route delete
+        server.enqueue(staleRouteReferenceResponse());
+        server.enqueue(staleRouteReferenceResponse());
+        server.enqueue(staleRouteReferenceResponse());
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("things", "rid-things"));
@@ -1268,7 +1172,7 @@ class ApisixSagaHandlerTest {
         // A reference that outlives the retry budget is surfaced, not waited out.
         assertEquals("STEP_FAILED", result.type());
         // 1 route + exactly 3 upstream attempts: pins the budget, which STEP_FAILED alone does not.
-        verify(mockBuilder, times(4)).delete();
+        assertEquals(4, server.getRequestCount());
       }
     }
 
@@ -1276,13 +1180,12 @@ class ApisixSagaHandlerTest {
     @DisplayName("does not retry an upstream delete rejected for an unrelated reason")
     void shouldNotRetryUnrelatedUpstreamDeleteFailure() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        Response badRequest = mock(Response.class);
-        when(badRequest.getStatus()).thenReturn(400);
-        when(badRequest.readEntity(String.class))
-            .thenReturn("{\"error_msg\":\"invalid configuration\"}");
-        when(mockBuilder.delete()).thenReturn(ok, badRequest, ok, ok);
+        server.enqueue(new MockResponse.Builder().code(200).build()); // route delete
+        server.enqueue(
+            new MockResponse.Builder()
+                .code(400)
+                .body("{\"error_msg\":\"invalid configuration\"}")
+                .build());
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("things", "rid-things"));
@@ -1302,7 +1205,7 @@ class ApisixSagaHandlerTest {
         assertEquals("STEP_FAILED", result.type());
         // 1 route + a single (non-retried) upstream attempt — the step aborts on the first
         // unrelated rejection.
-        verify(mockBuilder, times(2)).delete();
+        assertEquals(2, server.getRequestCount());
       }
     }
 
@@ -1310,9 +1213,9 @@ class ApisixSagaHandlerTest {
     @DisplayName("drops a routeIds entry with a null value and still deletes the valid route(s)")
     void shouldDropNullValuedRouteIdEntry() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(ok);
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         Map<String, String> routeIds = new HashMap<>();
         routeIds.put("traffic", "rid-traffic");
@@ -1335,12 +1238,11 @@ class ApisixSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         // Only the valid 'traffic' route + both per-dataset upstreams are deleted; the null-valued
         // 'weather' entry is dropped rather than NPE-ing or aborting the step.
-        verify(mockBuilder, times(3)).delete();
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
-        assertTrue(pathCaptor.getAllValues().contains("/apisix/admin/routes/rid-traffic"));
-        assertTrue(pathCaptor.getAllValues().contains("/apisix/admin/upstreams/ds-001"));
-        assertTrue(pathCaptor.getAllValues().contains("/apisix/admin/upstreams/ds-001-ows"));
+        assertEquals(3, server.getRequestCount());
+        List<String> paths = recordedPaths();
+        assertTrue(paths.contains("/apisix/admin/routes/rid-traffic"));
+        assertTrue(paths.contains("/apisix/admin/upstreams/ds-001"));
+        assertTrue(paths.contains("/apisix/admin/upstreams/ds-001-ows"));
       }
     }
   }
@@ -1349,36 +1251,21 @@ class ApisixSagaHandlerTest {
   @DisplayName("RESTORE_ROUTE per named API (slug-keyed route model, issue #1368)")
   class RestoreRoutePerNamedApi {
 
-    private Response privateRouteGet() {
-      Response getResp = mock(Response.class);
-      when(getResp.getStatus()).thenReturn(200);
-      // Fresh map per GET so per-slug in-place mutations don't bleed across iterations.
-      when(getResp.readEntity(Map.class))
-          .thenAnswer(
-              inv -> {
-                Map<String, Object> value = new HashMap<>();
-                value.put("uri", "/v1/datasets/ds-001/x");
-                value.put("plugin_config_id", "auth-plugin-1");
-                Map<String, Object> envelope = new HashMap<>();
-                envelope.put("value", value);
-                return envelope;
-              });
-      return getResp;
+    private MockResponse privateRouteGet() {
+      Map<String, Object> value = new HashMap<>();
+      value.put("uri", "/v1/datasets/ds-001/x");
+      value.put("plugin_config_id", "auth-plugin-1");
+      return jsonResponse(200, Map.of("value", value));
     }
 
     @Test
     @DisplayName("skips a slug route that is already gone (404) and restores the rest")
     void shouldSkipGoneSlugAndRestoreOthers() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response notFound = mock(Response.class);
-        when(notFound.getStatus()).thenReturn(404);
-        when(notFound.readEntity(Map.class)).thenReturn(Map.of());
-        Response present = privateRouteGet();
         // One slug route is already gone (404 on GET), the other is present and restorable.
-        when(mockBuilder.get()).thenReturn(notFound, present);
-        Response putResp = mock(Response.class);
-        when(putResp.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResp);
+        server.enqueue(new MockResponse.Builder().code(404).build());
+        server.enqueue(privateRouteGet());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("traffic", "rid-traffic", "weather", "rid-weather"));
@@ -1396,9 +1283,8 @@ class ApisixSagaHandlerTest {
                     payload));
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
-        verify(mockBuilder, times(2)).get();
-        // The gone route is skipped — only the present route is PUT back.
-        verify(mockBuilder, times(1)).put(any(Entity.class));
+        // The gone route is skipped — only the present route is PUT back (2 GETs + 1 PUT).
+        assertEquals(3, server.getRequestCount());
       }
     }
 
@@ -1406,11 +1292,8 @@ class ApisixSagaHandlerTest {
     @DisplayName("restores a slug route as protected (routes are always protected)")
     void shouldRestoreSlugAsProtected() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response getResp = privateRouteGet();
-        when(mockBuilder.get()).thenReturn(getResp);
-        Response putResp = mock(Response.class);
-        when(putResp.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResp);
+        server.enqueue(privateRouteGet());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("traffic", "rid-traffic"));
@@ -1428,11 +1311,10 @@ class ApisixSagaHandlerTest {
                     payload));
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> captor = ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder).put(captor.capture());
+        takeRequest(); // GET
+        Map<String, Object> body = requestBodyAsMap(takeRequest());
         // Default false → protected → plugin_config_id retained.
-        assertTrue(captor.getValue().getEntity().containsKey("plugin_config_id"));
+        assertTrue(body.containsKey("plugin_config_id"));
       }
     }
 
@@ -1440,42 +1322,29 @@ class ApisixSagaHandlerTest {
     @DisplayName("restoring an OWS route applies the gateway gate but injects no FROST credential")
     void shouldNotInjectFrostCredentialWhenRestoringOwsRoute() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response getResp = mock(Response.class);
-        when(getResp.getStatus()).thenReturn(200);
         // The route read back from APISIX carries the OWS standard marker the handler wrote at
         // CREATE, so the compensation knows it is a map-service route (the standard is not in the
         // RESTORE payload).
-        when(getResp.readEntity(Map.class))
-            .thenAnswer(
-                inv -> {
-                  Map<String, Object> value = new HashMap<>();
-                  value.put("uri", "/v1/datasets/ds-001/map");
-                  value.put("upstream_id", "ds-001-ows");
-                  Map<String, Object> labels = new HashMap<>();
-                  labels.put("civitas-named-api-standard", "OWS");
-                  value.put("labels", labels);
-                  Map<String, Object> proxyRewrite = new HashMap<>();
-                  proxyRewrite.put(
-                      "regex_uri",
-                      new String[] {"^/v1/datasets/ds-001/map(/.*)?$", "/geoserver/ds_001/ows$1"});
-                  Map<String, Object> plugins = new HashMap<>();
-                  plugins.put("proxy-rewrite", proxyRewrite);
-                  value.put("plugins", plugins);
-                  Map<String, Object> envelope = new HashMap<>();
-                  envelope.put("value", value);
-                  return envelope;
-                });
-        when(mockBuilder.get()).thenReturn(getResp);
-        Response putResp = mock(Response.class);
-        when(putResp.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResp);
+        Map<String, Object> value = new HashMap<>();
+        value.put("uri", "/v1/datasets/ds-001/map");
+        value.put("upstream_id", "ds-001-ows");
+        Map<String, Object> labels = new HashMap<>();
+        labels.put("civitas-named-api-standard", "OWS");
+        value.put("labels", labels);
+        Map<String, Object> proxyRewrite = new HashMap<>();
+        proxyRewrite.put(
+            "regex_uri", List.of("^/v1/datasets/ds-001/map(/.*)?$", "/geoserver/ds_001/ows$1"));
+        Map<String, Object> plugins = new HashMap<>();
+        plugins.put("proxy-rewrite", proxyRewrite);
+        value.put("plugins", plugins);
+        server.enqueue(jsonResponse(200, Map.of("value", value)));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("map", "rid-map"));
         payload.put("serviceId", "ds-001");
         // Compensation must re-apply the gateway gate without ever injecting a FROST credential
-        // onto a
-        // GeoServer route.
+        // onto a GeoServer route.
 
         SagaCommandResult result =
             handler.handle(
@@ -1489,20 +1358,17 @@ class ApisixSagaHandlerTest {
                     payload));
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-            ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder).put(entityCaptor.capture());
-        Map<String, Object> routeBody = entityCaptor.getValue().getEntity();
+        takeRequest(); // GET
+        Map<String, Object> routeBody = requestBodyAsMap(takeRequest());
 
         // Protected → the gateway gate applies to OWS too...
         assertEquals("auth-plugin-1", routeBody.get("plugin_config_id"));
         // ...but the map-service route never gets a FROST credential or its tracking label.
         assertNull(authSetHeadersOf(routeBody), "OWS restore must not inject a FROST credential");
         @SuppressWarnings("unchecked")
-        Map<String, Object> labels = (Map<String, Object>) routeBody.get("labels");
-        assertFalse(labels.containsKey("civitas-frost-upstream-auth-header"));
-        assertEquals("OWS", labels.get("civitas-named-api-standard"));
+        Map<String, Object> resultLabels = (Map<String, Object>) routeBody.get("labels");
+        assertFalse(resultLabels.containsKey("civitas-frost-upstream-auth-header"));
+        assertEquals("OWS", resultLabels.get("civitas-named-api-standard"));
       }
     }
   }
@@ -1512,12 +1378,6 @@ class ApisixSagaHandlerTest {
   class MethodGateAndDriftHandling {
 
     private static final List<String> OPEN_DATA_METHODS = List.of("GET", "HEAD", "OPTIONS");
-
-    private void stubPutCreated() {
-      Response mockResponse = mock(Response.class);
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
-    }
 
     private SagaCommandMessage createRouteCommand(boolean openDataAccess) {
       return createCommand(
@@ -1534,23 +1394,18 @@ class ApisixSagaHandlerTest {
               List.of(Map.of("slug", "data", "standard", "STA"))));
     }
 
-    private Map<String, Object> captureRouteBody(int expectedPuts) {
-      @SuppressWarnings("unchecked")
-      ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-          ArgumentCaptor.forClass(Entity.class);
-      verify(mockBuilder, times(expectedPuts)).put(entityCaptor.capture());
-      return entityCaptor.getValue().getEntity();
-    }
-
     @Test
     @DisplayName("protected routes carry no methods filter (OPA gates per request)")
     void shouldNotRestrictMethodsOnProtectedRoute() {
       try (ApisixSagaHandler handler = createHandler()) {
-        stubPutCreated();
+        server.enqueue(created()); // upstream
+        server.enqueue(created()); // route
 
         handler.handle(createRouteCommand(false));
 
-        assertFalse(captureRouteBody(2).containsKey("methods"));
+        takeRequest(); // upstream
+        Map<String, Object> body = requestBodyAsMap(takeRequest());
+        assertFalse(body.containsKey("methods"));
       }
     }
 
@@ -1558,20 +1413,11 @@ class ApisixSagaHandlerTest {
     @DisplayName("UPDATE toggle open→protected removes the method gate (OPA takes over)")
     void shouldRemoveMethodGateWhenTogglingToProtected() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response getResp = mock(Response.class);
-        when(getResp.getStatus()).thenReturn(200);
-        when(getResp.readEntity(Map.class))
-            .thenAnswer(
-                inv -> {
-                  Map<String, Object> value = new HashMap<>();
-                  value.put("uri", "/v1/datasets/ds-001/data");
-                  value.put("methods", new ArrayList<>(OPEN_DATA_METHODS));
-                  Map<String, Object> envelope = new HashMap<>();
-                  envelope.put("value", value);
-                  return envelope;
-                });
-        when(mockBuilder.get()).thenReturn(getResp);
-        stubPutCreated();
+        Map<String, Object> value = new HashMap<>();
+        value.put("uri", "/v1/datasets/ds-001/data");
+        value.put("methods", new ArrayList<>(OPEN_DATA_METHODS));
+        server.enqueue(jsonResponse(200, Map.of("value", value)));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         handler.handle(
             createCommand(
@@ -1585,7 +1431,8 @@ class ApisixSagaHandlerTest {
                     "openDataAccess",
                     false)));
 
-        Map<String, Object> body = captureRouteBody(1);
+        takeRequest(); // GET
+        Map<String, Object> body = requestBodyAsMap(takeRequest());
         assertFalse(
             body.containsKey("methods"),
             "protected routes must not keep a stale read-only gate — OPA decides per request");
@@ -1619,8 +1466,7 @@ class ApisixSagaHandlerTest {
         // with live named APIs is drift, not a no-op — the dataset could silently stay public.
         assertEquals("STEP_FAILED", result.type());
         assertTrue(result.error().contains("data"), "error should name the drifted slug");
-        verify(mockBuilder, never()).get();
-        verify(mockBuilder, never()).put(any(Entity.class));
+        assertEquals(0, server.getRequestCount());
       }
     }
 
@@ -1646,8 +1492,7 @@ class ApisixSagaHandlerTest {
 
         // A dataset without named APIs has no data-plane routes — nothing to update, by design.
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, never()).get();
-        verify(mockBuilder, never()).put(any(Entity.class));
+        assertEquals(0, server.getRequestCount());
       }
     }
 
@@ -1656,9 +1501,10 @@ class ApisixSagaHandlerTest {
         "DELETE derives the deterministic routeId for slugs missing from the map (finding 5)")
     void shouldDeleteDerivedRouteIdForSlugWithoutPersistedId() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(ok);
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("traffic", "rid-traffic"));
@@ -1684,10 +1530,8 @@ class ApisixSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         // Persisted route + derived route + both per-dataset upstreams (FROST + map server).
-        verify(mockBuilder, times(4)).delete();
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
-        List<String> paths = pathCaptor.getAllValues();
+        assertEquals(4, server.getRequestCount());
+        List<String> paths = recordedPaths();
         assertTrue(paths.contains("/apisix/admin/routes/rid-traffic"));
         assertTrue(
             paths.contains("/apisix/admin/routes/" + NamedApiHelper.derive("ds-001", "weather")),
@@ -1717,23 +1561,19 @@ class ApisixSagaHandlerTest {
               List.of(Map.of("slug", "data", "standard", "STA"))));
     }
 
-    private void stubPutCreated() {
-      Response mockResponse = mock(Response.class);
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
-    }
-
     @Test
     @DisplayName(
         "pins api host, uses /v1/datasets/{id}/{slug} layout, rewrites to FROST upstream and returns"
             + " publicUrl")
     void shouldBuildRouteBodyForApiHost() {
       try (ApisixSagaHandler handler = createHandler()) {
-        stubPutCreated();
+        server.enqueue(created()); // upstream
+        server.enqueue(created()); // route
 
         SagaCommandResult result = handler.handle(createRouteCommand());
 
-        Map<String, Object> routeBody = captureRouteBody();
+        takeRequest(); // upstream
+        Map<String, Object> routeBody = requestBodyAsMap(takeRequest());
         @SuppressWarnings("unchecked")
         Map<String, Object> proxyRewrite =
             (Map<String, Object>)
@@ -1742,43 +1582,32 @@ class ApisixSagaHandlerTest {
         assertAll(
             () ->
                 assertEquals(
-                    "[api.example.test]",
-                    Arrays.toString((String[]) routeBody.get("hosts")),
+                    List.of("api.example.test"),
+                    routeBody.get("hosts"),
                     "route body must carry hosts to pin saga route to configured API host"),
             () ->
                 assertEquals(
-                    "[/v1/datasets/ds-001/data, /v1/datasets/ds-001/data/*]",
-                    Arrays.toString((String[]) routeBody.get("uris"))),
+                    List.of("/v1/datasets/ds-001/data", "/v1/datasets/ds-001/data/*"),
+                    routeBody.get("uris")),
             () ->
                 assertEquals(
-                    "[^/v1/datasets/ds-001/data/?$, /FROST-Server/v1.1/Projects(1),"
-                        + " ^/v1/datasets/ds-001/data(/.+)$, /FROST-Server/v1.1/Projects(1)$1]",
-                    Arrays.toString((String[]) proxyRewrite.get("regex_uri"))),
+                    List.of(
+                        "^/v1/datasets/ds-001/data/?$",
+                        "/FROST-Server/v1.1/Projects(1)",
+                        "^/v1/datasets/ds-001/data(/.+)$",
+                        "/FROST-Server/v1.1/Projects(1)$1"),
+                    proxyRewrite.get("regex_uri")),
             () ->
                 assertEquals(
                     "https://api.example.test/v1/datasets/ds-001",
                     result.resultData().get("publicUrl")));
       }
     }
-
-    private Map<String, Object> captureRouteBody() {
-      @SuppressWarnings("unchecked")
-      ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-          ArgumentCaptor.forClass(Entity.class);
-      verify(mockBuilder, times(2)).put(entityCaptor.capture());
-      return entityCaptor.getValue().getEntity();
-    }
   }
 
   @Nested
   @DisplayName("CREATE_ROUTE injects FROST upstream Basic Auth header")
   class CreateRouteFrostUpstreamAuth {
-
-    private void stubPutCreated() {
-      Response mockResponse = mock(Response.class);
-      when(mockResponse.getStatus()).thenReturn(201);
-      when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
-    }
 
     private SagaCommandMessage createRouteCommand(boolean openDataAccess) {
       return createCommand(
@@ -1796,11 +1625,8 @@ class ApisixSagaHandlerTest {
     }
 
     private Map<String, Object> captureProxyRewrite() {
-      @SuppressWarnings("unchecked")
-      ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-          ArgumentCaptor.forClass(Entity.class);
-      verify(mockBuilder, times(2)).put(entityCaptor.capture());
-      Map<String, Object> routeBody = entityCaptor.getValue().getEntity();
+      takeRequest(); // upstream
+      Map<String, Object> routeBody = requestBodyAsMap(takeRequest());
       @SuppressWarnings("unchecked")
       Map<String, Object> plugins = (Map<String, Object>) routeBody.get("plugins");
       @SuppressWarnings("unchecked")
@@ -1812,7 +1638,8 @@ class ApisixSagaHandlerTest {
     @DisplayName("injects Basic Auth header into proxy-rewrite when openDataAccess=false")
     void shouldInjectAuthHeaderForPrivateProject() {
       try (ApisixSagaHandler handler = createHandler()) {
-        stubPutCreated();
+        server.enqueue(created()); // upstream
+        server.enqueue(created()); // route
 
         handler.handle(createRouteCommand(false));
 
@@ -1834,7 +1661,8 @@ class ApisixSagaHandlerTest {
     void shouldMergeProxyRewriteHeadersRemoveIntoRoute() {
       try (ApisixSagaHandler handler =
           createHandlerWithHeadersRemove("X-Allowed-Scope-Ids,X-Some-Other")) {
-        stubPutCreated();
+        server.enqueue(created()); // upstream
+        server.enqueue(created()); // route
 
         handler.handle(createRouteCommand(false));
 
@@ -1844,7 +1672,7 @@ class ApisixSagaHandlerTest {
         Object remove = headers.get("remove");
         assertEquals(
             List.of("X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids", "X-Some-Other"),
-            remove instanceof String[] arr ? Arrays.asList(arr) : remove,
+            remove,
             "route-level proxy-rewrite must strip the configured headers (Finding P1 — plugin"
                 + " config's proxy-rewrite is overridden by route precedence)");
       }
@@ -1855,7 +1683,8 @@ class ApisixSagaHandlerTest {
     void shouldInjectApiKeyHeaderWhenConfigured() {
       try (ApisixSagaHandler handler =
           createHandlerWithApiKeyAuth("apisix-test-key", "X-API-Key")) {
-        stubPutCreated();
+        server.enqueue(created()); // upstream
+        server.enqueue(created()); // route
 
         handler.handle(createRouteCommand(false));
 
@@ -1874,38 +1703,12 @@ class ApisixSagaHandlerTest {
   @DisplayName("UPDATE_ROUTE")
   class UpdateRoute {
 
-    private void stubGetReturning(Map<String, Object> route) {
-      Map<String, Object> wrapper = new HashMap<>();
-      wrapper.put("value", route);
-      Response getResponse = mock(Response.class);
-      when(getResponse.getStatus()).thenReturn(200);
-      when(getResponse.readEntity(Map.class)).thenReturn(wrapper);
-      when(mockBuilder.get()).thenReturn(getResponse);
-    }
-
-    private void stubPutOk() {
-      Response putResponse = mock(Response.class);
-      when(putResponse.getStatus()).thenReturn(200);
-      when(mockBuilder.put(any(Entity.class))).thenReturn(putResponse);
-    }
-
-    private Map<String, Object> capturePutBody() {
-      @SuppressWarnings("unchecked")
-      ArgumentCaptor<Entity<Map<String, Object>>> captor = ArgumentCaptor.forClass(Entity.class);
-      verify(mockBuilder).put(captor.capture());
-      return captor.getValue().getEntity();
-    }
-
     @Test
     @DisplayName("fails clearly when the route GET returns an unexpected body shape")
     void shouldFailClearlyOnMalformedRouteBody() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Map<String, Object> wrapper = new HashMap<>();
-        wrapper.put("value", "not-an-object"); // value should be a route object, not a string
-        Response getResponse = mock(Response.class);
-        when(getResponse.getStatus()).thenReturn(200);
-        when(getResponse.readEntity(Map.class)).thenReturn(wrapper);
-        when(mockBuilder.get()).thenReturn(getResponse);
+        // value should be a route object, not a string
+        server.enqueue(jsonResponse(200, Map.of("value", "not-an-object")));
 
         SagaCommandResult result =
             handler.handle(
@@ -1931,8 +1734,8 @@ class ApisixSagaHandlerTest {
     @DisplayName("strips read-only fields (create_time, update_time) from the PUT body")
     void shouldStripReadOnlyFields() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        stubGetReturning(existingRoute(true));
-        stubPutOk();
+        server.enqueue(jsonResponse(200, Map.of("value", existingRoute(true))));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         handler.handle(
             createCommand(
@@ -1946,7 +1749,8 @@ class ApisixSagaHandlerTest {
                     "openDataAccess",
                     true)));
 
-        Map<String, Object> body = capturePutBody();
+        takeRequest(); // GET
+        Map<String, Object> body = requestBodyAsMap(takeRequest());
         assertFalse(body.containsKey("create_time"));
         assertFalse(body.containsKey("update_time"));
       }
@@ -1958,8 +1762,8 @@ class ApisixSagaHandlerTest {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
         // A route provisioned before the rewrite was split into pairs forwards "<path>/" as
         // "<upstream>/", which reaches a different service than "<path>" does.
-        stubGetReturning(existingRoute(false));
-        stubPutOk();
+        server.enqueue(jsonResponse(200, Map.of("value", existingRoute(false))));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         handler.handle(
             createCommand(
@@ -1973,10 +1777,11 @@ class ApisixSagaHandlerTest {
                     "openDataAccess",
                     false)));
 
+        takeRequest(); // GET
+        Map<String, Object> body = requestBodyAsMap(takeRequest());
         @SuppressWarnings("unchecked")
         Map<String, Object> proxyRewrite =
-            (Map<String, Object>)
-                ((Map<String, Object>) capturePutBody().get("plugins")).get("proxy-rewrite");
+            (Map<String, Object>) ((Map<String, Object>) body.get("plugins")).get("proxy-rewrite");
         assertEquals(
             List.of(
                 "^/v1/datasets/ds-001/?$",
@@ -1987,7 +1792,7 @@ class ApisixSagaHandlerTest {
         // An STA endpoint addresses entities by sub-path, so the wildcard stays.
         assertEquals(
             List.of("/v1/datasets/ds-001", "/v1/datasets/ds-001/*"),
-            RouteAuthConfigurer.readStringList(capturePutBody().get("uris")));
+            RouteAuthConfigurer.readStringList(body.get("uris")));
       }
     }
 
@@ -2011,8 +1816,8 @@ class ApisixSagaHandlerTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> labels = (Map<String, Object>) existing.get("labels");
         labels.put("civitas-frost-upstream-auth-header", "X-Old-Key");
-        stubGetReturning(existing);
-        stubPutOk();
+        server.enqueue(jsonResponse(200, Map.of("value", existing)));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         handler.handle(
             createCommand(
@@ -2026,7 +1831,8 @@ class ApisixSagaHandlerTest {
                     "openDataAccess",
                     false)));
 
-        Map<String, Object> body = capturePutBody();
+        takeRequest(); // GET
+        Map<String, Object> body = requestBodyAsMap(takeRequest());
         @SuppressWarnings("unchecked")
         Map<String, Object> resultPlugins = (Map<String, Object>) body.get("plugins");
         @SuppressWarnings("unchecked")
@@ -2068,8 +1874,8 @@ class ApisixSagaHandlerTest {
         userHeaders.put("add", userAdd);
         userHeaders.put("remove", new ArrayList<>(List.of("X-User-Strip")));
         proxyRewrite.put("headers", userHeaders);
-        stubGetReturning(existing);
-        stubPutOk();
+        server.enqueue(jsonResponse(200, Map.of("value", existing)));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         handler.handle(
             createCommand(
@@ -2083,7 +1889,8 @@ class ApisixSagaHandlerTest {
                     "openDataAccess",
                     false)));
 
-        Map<String, Object> body = capturePutBody();
+        takeRequest(); // GET
+        Map<String, Object> body = requestBodyAsMap(takeRequest());
         @SuppressWarnings("unchecked")
         Map<String, Object> resultPlugins = (Map<String, Object>) body.get("plugins");
         @SuppressWarnings("unchecked")
@@ -2107,9 +1914,8 @@ class ApisixSagaHandlerTest {
             resultAdd.get("X-Forwarded-For"),
             "foreign headers.add entries are not touched by the adapter");
 
-        Object resultRemove = resultHeaders.get("remove");
-        List<?> removeList =
-            resultRemove instanceof String[] arr ? Arrays.asList(arr) : (List<?>) resultRemove;
+        @SuppressWarnings("unchecked")
+        List<Object> removeList = (List<Object>) resultHeaders.get("remove");
         assertTrue(
             removeList.contains("X-User-Strip"),
             "user-defined headers.remove entries must survive the merge");
@@ -2120,8 +1926,8 @@ class ApisixSagaHandlerTest {
     @DisplayName("preserves existing route fields like uris, hosts, upstream_id")
     void shouldPreserveExistingRouteFields() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        stubGetReturning(existingRoute(true));
-        stubPutOk();
+        server.enqueue(jsonResponse(200, Map.of("value", existingRoute(true))));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         handler.handle(
             createCommand(
@@ -2135,7 +1941,8 @@ class ApisixSagaHandlerTest {
                     "openDataAccess",
                     true)));
 
-        Map<String, Object> body = capturePutBody();
+        takeRequest(); // GET
+        Map<String, Object> body = requestBodyAsMap(takeRequest());
         assertEquals("ds-001", body.get("upstream_id"));
         assertEquals(1, body.get("status"));
         assertNotNull(body.get("uris"));
@@ -2152,9 +1959,9 @@ class ApisixSagaHandlerTest {
     @DisplayName("deletes route and upstream on forward delete")
     void shouldDeleteRouteSuccessfully() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(mockResponse);
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(
@@ -2173,9 +1980,9 @@ class ApisixSagaHandlerTest {
     @DisplayName("returns COMPENSATION_COMPLETED on compensate delete")
     void shouldReturnCompensationSuccessOnCompensateDelete() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(mockResponse);
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandMessage command =
             createCommand(
@@ -2193,10 +2000,7 @@ class ApisixSagaHandlerTest {
     @DisplayName("returns COMPENSATION_FAILED on compensate error")
     void shouldReturnCompensationFailureOnError() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(500);
-        when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.delete()).thenReturn(mockResponse);
+        server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
         SagaCommandMessage command =
             createCommand(
@@ -2218,10 +2022,9 @@ class ApisixSagaHandlerTest {
         // A re-run delete (or a route the create step never finished provisioning) returns 404.
         // Deleting an already-absent resource has reached the desired end state, so the saga
         // compensation must succeed rather than fail and stall the rollback.
-        Response notFound = mock(Response.class);
-        when(notFound.getStatus()).thenReturn(404);
-        when(notFound.readEntity(String.class)).thenReturn("Key not found");
-        when(mockBuilder.delete()).thenReturn(notFound);
+        server.enqueue(new MockResponse.Builder().code(404).body("Key not found").build());
+        server.enqueue(new MockResponse.Builder().code(404).body("Key not found").build());
+        server.enqueue(new MockResponse.Builder().code(404).body("Key not found").build());
 
         SagaCommandResult result =
             handler.handle(
@@ -2239,34 +2042,12 @@ class ApisixSagaHandlerTest {
   @DisplayName("RESTORE_ROUTE")
   class RestoreRoute {
 
-    private void stubGetReturning(Map<String, Object> route) {
-      Map<String, Object> wrapper = new HashMap<>();
-      wrapper.put("value", route);
-      Response getResponse = mock(Response.class);
-      when(getResponse.getStatus()).thenReturn(200);
-      when(getResponse.readEntity(Map.class)).thenReturn(wrapper);
-      when(mockBuilder.get()).thenReturn(getResponse);
-    }
-
-    private void stubPutOk() {
-      Response putResponse = mock(Response.class);
-      when(putResponse.getStatus()).thenReturn(200);
-      when(mockBuilder.put(any(Entity.class))).thenReturn(putResponse);
-    }
-
-    private Map<String, Object> capturePutBody() {
-      @SuppressWarnings("unchecked")
-      ArgumentCaptor<Entity<Map<String, Object>>> captor = ArgumentCaptor.forClass(Entity.class);
-      verify(mockBuilder).put(captor.capture());
-      return captor.getValue().getEntity();
-    }
-
     @Test
     @DisplayName("returns COMPENSATION_COMPLETED and restores previous private state")
     void shouldRestorePreviousPrivateState() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        stubGetReturning(existingRoute(false));
-        stubPutOk();
+        server.enqueue(jsonResponse(200, Map.of("value", existingRoute(false))));
+        server.enqueue(new MockResponse.Builder().code(200).build());
 
         SagaCommandResult result =
             handler.handle(
@@ -2278,7 +2059,8 @@ class ApisixSagaHandlerTest {
         assertEquals("COMPENSATION_COMPLETED", result.type());
         assertEquals("saga-001", result.sagaId());
 
-        Map<String, Object> body = capturePutBody();
+        takeRequest(); // GET
+        Map<String, Object> body = requestBodyAsMap(takeRequest());
         assertEquals("auth-plugin-1", body.get("plugin_config_id"));
       }
     }
@@ -2287,11 +2069,8 @@ class ApisixSagaHandlerTest {
     @DisplayName("returns COMPENSATION_FAILED on HTTP error")
     void shouldReturnCompensationFailureOnError() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        stubGetReturning(existingRoute(false));
-        Response putResponse = mock(Response.class);
-        when(putResponse.getStatus()).thenReturn(500);
-        when(putResponse.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResponse);
+        server.enqueue(jsonResponse(200, Map.of("value", existingRoute(false))));
+        server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
         SagaCommandResult result =
             handler.handle(
@@ -2307,9 +2086,9 @@ class ApisixSagaHandlerTest {
 
     @Test
     @DisplayName("returns COMPENSATION_FAILED on network error")
-    void shouldReturnCompensationFailureOnNetworkError() {
+    void shouldReturnCompensationFailureOnNetworkError() throws IOException {
       try (ApisixSagaHandler handler = createHandler()) {
-        when(mockBuilder.get()).thenThrow(new ProcessingException("Connection refused"));
+        server.close();
 
         SagaCommandResult result =
             handler.handle(
@@ -2327,10 +2106,7 @@ class ApisixSagaHandlerTest {
     @DisplayName("skips restore when the route is already gone (404) — idempotent compensation")
     void shouldSkipRestoreWhenRouteAlreadyGone() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response notFound = mock(Response.class);
-        when(notFound.getStatus()).thenReturn(404);
-        when(notFound.readEntity(Map.class)).thenReturn(Map.of());
-        when(mockBuilder.get()).thenReturn(notFound);
+        server.enqueue(new MockResponse.Builder().code(404).build());
 
         SagaCommandResult result =
             handler.handle(
@@ -2340,7 +2116,7 @@ class ApisixSagaHandlerTest {
                     Map.of("routeIds", Map.of("data", "ds-001"), "serviceId", "ds-001")));
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
-        verify(mockBuilder, never()).put(any(Entity.class));
+        assertEquals(1, server.getRequestCount());
       }
     }
   }
@@ -2427,8 +2203,8 @@ class ApisixSagaHandlerTest {
   }
 
   /**
-   * Builds a mutable, JSON-shaped APISIX route response approximating what {@code readEntity(Map)}
-   * would deliver — used by UPDATE_ROUTE/RESTORE_ROUTE tests to drive the GET→mutate→PUT flow.
+   * Builds a mutable, JSON-shaped APISIX route response approximating what {@code readRoute} would
+   * deliver — used by UPDATE_ROUTE/RESTORE_ROUTE tests to drive the GET→mutate→PUT flow.
    */
   private static Map<String, Object> existingRoute(boolean withAuth) {
     Map<String, Object> route = new HashMap<>();
@@ -2477,7 +2253,7 @@ class ApisixSagaHandlerTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("test-admin-key");
     when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
-        .thenReturn("http://apisix:9180");
+        .thenReturn(server.url("/").toString());
     when(mockConfig.getProperty("apisix.plugin.config.id")).thenReturn("auth-plugin-default");
     when(mockConfig.getProperty("apisix.service.id")).thenReturn("svc-frost-server");
     when(mockConfig.getProperty("apisix.api.host")).thenReturn("api.example.test");
@@ -2491,7 +2267,6 @@ class ApisixSagaHandlerTest {
     when(mockConfig.getProperty("apisix.proxy.rewrite.headers.remove"))
         .thenReturn(csvHeadersToRemove);
     handler.initialize(mockConfig);
-    wireMockClient(handler);
     return handler;
   }
 
@@ -2500,7 +2275,7 @@ class ApisixSagaHandlerTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("test-admin-key");
     when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
-        .thenReturn("http://apisix:9180");
+        .thenReturn(server.url("/").toString());
     when(mockConfig.getProperty("apisix.plugin.config.id")).thenReturn("auth-plugin-default");
     when(mockConfig.getProperty("apisix.service.id")).thenReturn("svc-frost-server");
     when(mockConfig.getProperty("apisix.api.host")).thenReturn("api.example.test");
@@ -2512,7 +2287,6 @@ class ApisixSagaHandlerTest {
         .thenReturn("http://civitas-geoserver:8080/geoserver");
     handler.initialize(mockConfig);
 
-    wireMockClient(handler);
     return handler;
   }
 
@@ -2521,7 +2295,7 @@ class ApisixSagaHandlerTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("test-admin-key");
     when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
-        .thenReturn("http://apisix:9180");
+        .thenReturn(server.url("/").toString());
     when(mockConfig.getProperty("apisix.plugin.config.id")).thenReturn(pluginConfig);
     when(mockConfig.getProperty("apisix.service.id")).thenReturn(serviceId);
     when(mockConfig.getProperty("apisix.api.host")).thenReturn("api.example.test");
@@ -2534,7 +2308,6 @@ class ApisixSagaHandlerTest {
         .thenReturn("http://civitas-geoserver:8080/geoserver");
     handler.initialize(mockConfig);
 
-    wireMockClient(handler);
     return handler;
   }
 
@@ -2543,7 +2316,7 @@ class ApisixSagaHandlerTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("test-admin-key");
     when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
-        .thenReturn("http://apisix:9180");
+        .thenReturn(server.url("/").toString());
     when(mockConfig.getProperty("apisix.plugin.config.id")).thenReturn("auth-plugin-default");
     when(mockConfig.getProperty("apisix.service.id")).thenReturn("svc-frost-server");
     when(mockConfig.getProperty("apisix.api.host")).thenReturn("api.example.test");
@@ -2555,7 +2328,6 @@ class ApisixSagaHandlerTest {
     when(mockConfig.getProperty("apisix.geoserver.url", "http://localhost:8080/geoserver"))
         .thenReturn(geoserverUrl);
     handler.initialize(mockConfig);
-    wireMockClient(handler);
     return handler;
   }
 
@@ -2580,19 +2352,69 @@ class ApisixSagaHandlerTest {
     return headers == null ? null : (Map<String, Object>) headers.get("set");
   }
 
-  private void wireMockClient(ApisixSagaHandler handler) {
-    Client mockClient = mock(Client.class);
-    mockTarget = mock(WebTarget.class);
-    WebTarget mockPathTarget = mock(WebTarget.class);
-    mockBuilder = mock(Invocation.Builder.class);
+  /** A bare 201, used for PUT (upstream/route create) responses. */
+  private static MockResponse created() {
+    return new MockResponse.Builder().code(201).build();
+  }
 
-    when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-    when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-    when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-    when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-    when(mockBuilder.method(any(String.class), any(Entity.class))).thenReturn(mock(Response.class));
+  /** The APISIX Admin API's "upstream still referenced by a route" rejection (400). */
+  private static MockResponse staleRouteReferenceResponse() {
+    return new MockResponse.Builder()
+        .code(400)
+        .body(
+            "{\"error_msg\":\"can not delete this upstream, route [rid-things] is still using"
+                + " it now\"}")
+        .build();
+  }
 
-    handler.setTestClient(mockClient);
+  /** A 200 GET response wrapping the given route value in the etcd {@code value} envelope. */
+  private static MockResponse routeGet(String uri, String pluginConfigId) {
+    Map<String, Object> value = new HashMap<>();
+    value.put("uri", uri);
+    value.put("plugin_config_id", pluginConfigId);
+    return jsonResponse(200, Map.of("value", value));
+  }
+
+  private static MockResponse jsonResponse(int code, Map<String, Object> body) {
+    try {
+      return new MockResponse.Builder()
+          .code(code)
+          .body(PayloadConverter.objectMapper().writeValueAsString(body))
+          .build();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static Map<String, Object> requestBodyAsMap(RecordedRequest request) {
+    try {
+      return PayloadConverter.readMap(request.getBody().toByteArray());
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  /**
+   * Drains every recorded request's encoded path, in call order. Call ONLY ONCE per test — {@code
+   * takeRequest()} drains the queue, so a second call would see nothing.
+   */
+  private List<String> recordedPaths() {
+    List<String> paths = new ArrayList<>();
+    int count = server.getRequestCount();
+    for (int i = 0; i < count; i++) {
+      paths.add(takeRequest().getUrl().encodedPath());
+    }
+    return paths;
+  }
+
+  /** {@link MockWebServer#takeRequest()}, wrapping its checked {@link InterruptedException}. */
+  private RecordedRequest takeRequest() {
+    try {
+      return server.takeRequest();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    }
   }
 
   private SagaCommandMessage createCommand(
