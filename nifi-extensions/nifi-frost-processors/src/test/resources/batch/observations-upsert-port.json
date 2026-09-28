@@ -1,0 +1,53 @@
+{
+  "requests" : [ {
+    "id" : "r0-ds",
+    "atomicityGroup" : "r0",
+    "method" : "get",
+    "url" : "Datastreams?$select=id&$top=1&$filter=properties/reference eq 'temp' and properties/thingReference eq 'A7' and Thing/Projects/id eq 5"
+  }, {
+    "id" : "r0-ds-loc",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-ds",
+    "method" : "get",
+    "url" : "$r0-ds/Thing/Locations?$select=id&$top=1"
+  }, {
+    "id" : "r0-obs",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-ds-loc",
+    "method" : "get",
+    "url" : "Observations?$select=id&$top=1&$filter=parameters/reference eq 'm-1' and Datastream/properties/reference eq 'temp' and Datastream/properties/thingReference eq 'A7' and Datastream/Thing/Projects/id eq 5"
+  }, {
+    "id" : "r0-obs-update",
+    "atomicityGroup" : "r0",
+    "if" : "$r0-obs",
+    "method" : "patch",
+    "url" : "$r0-obs",
+    "body" : {
+      "phenomenonTime" : "2026-09-18T07:00:00Z",
+      "result" : 21.5,
+      "parameters" : {
+        "reference" : "m-1",
+        "thingReference" : "A7",
+        "datastreamReference" : "temp"
+      }
+    }
+  }, {
+    "id" : "r0-obs",
+    "atomicityGroup" : "r0",
+    "if" : "not $r0-obs",
+    "method" : "post",
+    "url" : "Observations",
+    "body" : {
+      "phenomenonTime" : "2026-09-18T07:00:00Z",
+      "result" : 21.5,
+      "parameters" : {
+        "reference" : "m-1",
+        "thingReference" : "A7",
+        "datastreamReference" : "temp"
+      },
+      "Datastream" : {
+        "@iot.id" : "$r0-ds"
+      }
+    }
+  } ]
+}
