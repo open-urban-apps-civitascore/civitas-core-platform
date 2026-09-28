@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ActivePipelineContext } from '../../../_hooks/use-active-pipeline'
@@ -10,14 +10,54 @@ import { GeoPersistencePanel } from './GeoPersistencePanel'
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ datasetId: 'dataset-1' }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/',
 }))
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
+const permissions = vi.hoisted(() => ({ canReadDatastructures: false }))
+
 vi.mock('@/hooks/use-permissions', () => ({
-  usePermissions: () => ({ hasPermission: () => false, hasScopedPermission: () => false }),
+  usePermissions: () => ({
+    hasPermission: () => permissions.canReadDatastructures,
+    hasScopedPermission: () => false,
+  }),
+}))
+
+vi.mock('@/hooks/use-query-params', () => ({
+  useQueryParams: () => ({ getApiRequestParams: () => new URLSearchParams() }),
+}))
+
+vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
+  useGetDatastructures: () => ({
+    data: {
+      data: [
+        {
+          id: 'structure-1',
+          name: 'Roads',
+          description: '',
+          dataStructureStatus: 'AVAILABLE',
+          dataStructureVersions: [
+            {
+              id: 'version-1',
+              version: '1.0',
+              description: '',
+              dataStructureVersionStatus: 'AVAILABLE',
+              dataStructureVersionSource: null,
+            },
+          ],
+          createdAt: '2024-01-01',
+          modifiedAt: '2024-01-01',
+        },
+      ],
+      totalElements: 1,
+    },
+    isFetching: false,
+  }),
 }))
 
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
@@ -100,5 +140,41 @@ describe('GeoPersistencePanel', () => {
     renderPanel(() => null)
 
     expect(screen.getByLabelText('geoPersistencePanel.tableName')).toHaveAttribute('maxlength', '63')
+  })
+
+  describe('choosing a data structure version', () => {
+    beforeEach(() => {
+      permissions.canReadDatastructures = true
+    })
+
+    afterEach(() => {
+      permissions.canReadDatastructures = false
+    })
+
+    const chooseVersion = async () => {
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'geoPersistencePanel.importDataStructure' }))
+      await user.click(within(screen.getByTestId('expanderCell')).getByRole('button'))
+      await user.click(screen.getByRole('checkbox', { name: 'Select datastructure Version 1.0' }))
+      await user.click(screen.getByTestId('confirmButton'))
+    }
+
+    it('configures the node once a data structure version is chosen for a valid table name', async () => {
+      const onUpdate = vi.fn()
+      renderPanel(() => null, { configured: false }, onUpdate)
+
+      await chooseVersion()
+
+      expect(onUpdate).toHaveBeenCalledWith({ dataStructureVersionId: 'structure-1/version-1', configured: true })
+    })
+
+    it('leaves the node unconfigured when a version is chosen for an invalid table name', async () => {
+      const onUpdate = vi.fn()
+      renderPanel(() => null, { configured: false, tableName: 'roads-2024' }, onUpdate)
+
+      await chooseVersion()
+
+      expect(onUpdate).toHaveBeenCalledWith({ dataStructureVersionId: 'structure-1/version-1', configured: false })
+    })
   })
 })

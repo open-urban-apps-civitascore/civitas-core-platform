@@ -27,6 +27,7 @@ import {
   POSTGIS_SINK_URN,
   savablePipeline,
   savedAs,
+  TARGET_STRUCTURE_URN,
 } from '@/test-support/pipelineFixtures'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 
@@ -66,14 +67,18 @@ vi.mock('@/app/services/api/mappings/clientRequests', () => ({
   useUpdateMapping: vi.fn(),
 }))
 
+const CREATED_SINK_URN = 'urn:core:platform:civitas:datasink:common:Created:zyxw987654:1.0.0'
+
 const mutation = (mutateAsync = vi.fn().mockResolvedValue({ data: {} })) =>
   ({ mutate: vi.fn(), mutateAsync, isPending: false }) as never
 
 let updatePipeline: ReturnType<typeof vi.fn>
+let createDataSink: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   vi.clearAllMocks()
   updatePipeline = vi.fn().mockResolvedValue({ data: {} })
+  createDataSink = vi.fn().mockResolvedValue({ data: { id: 'created-sink-guid', configurationUrn: CREATED_SINK_URN } })
 
   vi.mocked(useGetCurrentUser).mockReturnValue({
     data: {
@@ -117,7 +122,7 @@ beforeEach(() => {
   vi.mocked(useUpdatePipeline).mockReturnValue(mutation(updatePipeline))
   vi.mocked(useCreatePipeline).mockReturnValue(mutation())
   vi.mocked(useDeletePipeline).mockReturnValue(mutation())
-  vi.mocked(useCreateDataSink).mockReturnValue(mutation())
+  vi.mocked(useCreateDataSink).mockReturnValue(mutation(createDataSink))
   vi.mocked(useUpdateDataSink).mockReturnValue(mutation())
   vi.mocked(useDeleteDataSink).mockReturnValue(mutation())
   vi.mocked(useCreateMapping).mockReturnValue(mutation())
@@ -129,38 +134,75 @@ const sinks = [
   ['FROST', frostNode(), FROST_SINK_URN],
 ] as const
 
+const loadPipeline = (sink: ReturnType<typeof frostNode>) => {
+  const saved = savablePipeline(sink)
+  // Pre-selected: the inspector shows the selected node, and React Flow needs pointer events to select.
+  const loaded = { ...saved, nodes: saved.nodes.map(node => ({ ...node, selected: node.id === 'cron-1' })) }
+  vi.mocked(useGetPipelines).mockReturnValue({
+    data: { data: [savedAs(loaded)] },
+    isLoading: false,
+  } as unknown as ReturnType<typeof useGetPipelines>)
+
+  render(
+    <NextIntlClientProvider locale="de" messages={messages}>
+      <PipelineEditorWrapper />
+    </NextIntlClientProvider>,
+  )
+}
+
+const editCronAndSave = async () => {
+  const user = userEvent.setup()
+  const cron = await screen.findByDisplayValue('0 0 * * * ?')
+  await user.clear(cron)
+  await user.type(cron, '0 30 * * * ?')
+  await user.click(screen.getByRole('button', { name: 'Alle speichern' }))
+}
+
+const savedPipeline = async () => {
+  await waitFor(() => expect(updatePipeline).toHaveBeenCalledTimes(1))
+  const { pipelineId, data } = updatePipeline.mock.calls[0][0] as { pipelineId: string; data: PipelinePayload }
+  const nodeById = (id: string): CorePipelineNode | undefined => data.model.nodes.find(node => node.id === id)
+  return { pipelineId, data, nodeById }
+}
+
 describe('saving from the Pipeline editor', () => {
   it.each(sinks)(
     'sends the %s pipeline with the cron expression edited in the inspector',
     async (_label, sink, sinkUrn) => {
-      const saved = savablePipeline(sink)
-      // Pre-selected: the inspector shows the selected node, and React Flow needs pointer events to select.
-      const loaded = { ...saved, nodes: saved.nodes.map(node => ({ ...node, selected: node.id === 'cron-1' })) }
-      vi.mocked(useGetPipelines).mockReturnValue({
-        data: { data: [savedAs(loaded)] },
-        isLoading: false,
-      } as unknown as ReturnType<typeof useGetPipelines>)
+      loadPipeline(sink)
 
-      const user = userEvent.setup()
-      render(
-        <NextIntlClientProvider locale="de" messages={messages}>
-          <PipelineEditorWrapper />
-        </NextIntlClientProvider>,
-      )
+      await editCronAndSave()
 
-      const cron = await screen.findByDisplayValue('0 0 * * * ?')
-      await user.clear(cron)
-      await user.type(cron, '0 30 * * * ?')
-      await user.click(screen.getByRole('button', { name: 'Alle speichern' }))
-
-      await waitFor(() => expect(updatePipeline).toHaveBeenCalledTimes(1))
-      const { pipelineId, data } = updatePipeline.mock.calls[0][0] as { pipelineId: string; data: PipelinePayload }
-      const nodeById = (id: string): CorePipelineNode | undefined => data.model.nodes.find(node => node.id === id)
-
+      const { pipelineId, data, nodeById } = await savedPipeline()
       expect(pipelineId).toBe('backend-pipeline-1')
       expect(data.model.nodes.map(node => node.kind)).toEqual(['start', 'cron', 'source', 'mapping', 'sink', 'end'])
       expect(nodeById('cron-1')).toMatchObject({ cronExpression: '0 30 * * * ?' })
       expect(nodeById(sink.id)).toMatchObject({ sinkRef: sinkUrn })
     },
   )
+
+  const newSinks = [
+    [
+      'FROST',
+      frostNode({ data: { entityId: undefined, configurationUrn: undefined } }),
+      { id: null, dataSinkType: 'FROST', configuration: { element: TARGET_STRUCTURE_URN } },
+    ],
+    [
+      'PostGIS',
+      geoPersistenceNode({ data: { entityId: undefined, configurationUrn: undefined } }),
+      { id: null, dataSinkType: 'POSTGIS', configuration: { tableName: 'my_table', element: TARGET_STRUCTURE_URN } },
+    ],
+  ] as const
+
+  it.each(newSinks)('creates the new %s sink and references it by the returned URN', async (_label, sink, payload) => {
+    loadPipeline(sink)
+
+    await editCronAndSave()
+
+    const { data, nodeById } = await savedPipeline()
+    expect(createDataSink).toHaveBeenCalledTimes(1)
+    expect(createDataSink).toHaveBeenCalledWith({ datasetId: 'dataset-1', data: payload })
+    expect(nodeById(sink.id)).toMatchObject({ sinkRef: CREATED_SINK_URN })
+    expect(data.dataSinkIds).toEqual(['created-sink-guid'])
+  })
 })
