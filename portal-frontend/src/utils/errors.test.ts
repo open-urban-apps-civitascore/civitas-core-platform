@@ -209,6 +209,24 @@ describe('isResourceInUseError', () => {
     expect(isResourceInUseError(error)).toBe(true)
   })
 
+  it('returns true when a mapping is still referenced by a pipeline', () => {
+    const error = mockApiError(
+      409,
+      'Cannot delete urn:core:mapping:x — still referenced by: urn:core:pipeline:y',
+      RESOURCE_IN_USE,
+    )
+    expect(isResourceInUseError(error)).toBe(true)
+  })
+
+  it('returns true when a data source is pinned to a data structure version', () => {
+    const error = mockApiError(
+      409,
+      'Cannot modify DataStructureVersion because a DataSource is pinned to it.',
+      RESOURCE_IN_USE,
+    )
+    expect(isResourceInUseError(error)).toBe(true)
+  })
+
   it('returns false for a missing data-loss confirmation, which shares the type', () => {
     const error = mockApiError(
       409,
