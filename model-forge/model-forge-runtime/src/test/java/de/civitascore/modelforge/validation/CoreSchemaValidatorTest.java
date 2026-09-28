@@ -190,6 +190,51 @@ class CoreSchemaValidatorTest {
         assertThat(diagnostics).as("the declared mapping contract requires a field map").isNotEmpty();
     }
 
+    // ── DataSink ────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("A FROST DataSink carrying a port is accepted")
+    void frostDataSinkWithAPortIsAccepted() {
+        // The port is the write logic of the sink. The branch closes over its properties, so a
+        // sink could not carry one before the field was published here.
+        assertThat(validate(ArtifactKind.DATA_SINK, """
+            {
+              "$schema": "https://civitasconnect.digital/core/datasink/v1",
+              "id": "urn:core:platform:civitas:datasink:common:Sensors:abc1234567:1.0.0",
+              "connectionType": "frost",
+              "port": "ThingTree"
+            }
+            """)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A FROST DataSink with a port outside the closed set is rejected")
+    void frostDataSinkWithAnUnknownPortIsRejected() {
+        // The value reaches a NiFi processor property. Only the published set may be stored.
+        assertThat(validate(ArtifactKind.DATA_SINK, """
+            {
+              "$schema": "https://civitasconnect.digital/core/datasink/v1",
+              "id": "urn:core:platform:civitas:datasink:common:Sensors:abc1234567:1.0.0",
+              "connectionType": "frost",
+              "port": "Everything"
+            }
+            """)).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("A FROST DataSink without a port is accepted")
+    void frostDataSinkWithoutAPortIsAccepted() {
+        // The schema says what may be stored; the deploy engine says what may publish. A sink that
+        // predates the port must still load, or the migration could not read it.
+        assertThat(validate(ArtifactKind.DATA_SINK, """
+            {
+              "$schema": "https://civitasconnect.digital/core/datasink/v1",
+              "id": "urn:core:platform:civitas:datasink:common:Sensors:abc1234567:1.0.0",
+              "connectionType": "frost"
+            }
+            """)).isEmpty();
+    }
+
     private List<Diagnostic> validate(ArtifactKind kind, String document) {
         return validator.validate(kind, json(document));
     }

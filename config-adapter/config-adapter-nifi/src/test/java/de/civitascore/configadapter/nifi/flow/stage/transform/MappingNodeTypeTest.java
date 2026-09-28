@@ -24,6 +24,7 @@ import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -76,7 +77,10 @@ class MappingNodeTypeTest {
             FatalAdapterException.class,
             () ->
                 mappingNodeType.compile(
-                    List.of(mapping), envelopeSink, new FrostSinkSpec("1", null), mappings));
+                    List.of(mapping),
+                    envelopeSink,
+                    new FrostSinkSpec("1", SinkPort.THING_TREE, null),
+                    mappings));
     assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 
@@ -95,7 +99,8 @@ class MappingNodeTypeTest {
         mappingNodeType.compile(
             List.of(first, last),
             envelopeSink,
-            new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())),
+            new FrostSinkSpec(
+                "1", SinkPort.THING_TREE, StaProperties.ofKeys(List.of("reference"), List.of())),
             mappings);
 
     assertEquals(2, compilation.units().size());
@@ -114,7 +119,10 @@ class MappingNodeTypeTest {
                 mappingNodeType.compile(
                     List.of(mapping),
                     envelopeSink,
-                    new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())),
+                    new FrostSinkSpec(
+                        "1",
+                        SinkPort.THING_TREE,
+                        StaProperties.ofKeys(List.of("reference"), List.of())),
                     Map.of()));
     assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
@@ -132,7 +140,10 @@ class MappingNodeTypeTest {
                 mappingNodeType.compile(
                     List.of(mapping),
                     envelopeSink,
-                    new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())),
+                    new FrostSinkSpec(
+                        "1",
+                        SinkPort.THING_TREE,
+                        StaProperties.ofKeys(List.of("reference"), List.of())),
                     Map.of()));
     assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
@@ -154,7 +165,8 @@ class MappingNodeTypeTest {
         mappingNodeType.compile(
             List.of(first, last),
             envelopeSink,
-            new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())),
+            new FrostSinkSpec(
+                "1", SinkPort.THING_TREE, StaProperties.ofKeys(List.of("reference"), List.of())),
             mappings);
 
     assertEquals(2, compilation.units().size());
@@ -217,7 +229,10 @@ class MappingNodeTypeTest {
             mappingNodeType.compile(
                 List.of(nodes),
                 envelopeSink,
-                new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())),
+                new FrostSinkSpec(
+                    "1",
+                    SinkPort.THING_TREE,
+                    StaProperties.ofKeys(List.of("reference"), List.of())),
                 mappings));
   }
 
@@ -324,7 +339,8 @@ class MappingNodeTypeTest {
         mappingNodeType.compile(
             List.of(first, last),
             envelopeSink,
-            new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())),
+            new FrostSinkSpec(
+                "1", SinkPort.THING_TREE, StaProperties.ofKeys(List.of("reference"), List.of())),
             mappings);
 
     assertEquals(2, compilation.units().size());
@@ -344,7 +360,8 @@ class MappingNodeTypeTest {
         mappingNodeType.compile(
             List.of(first, last),
             envelopeSink,
-            new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())),
+            new FrostSinkSpec(
+                "1", SinkPort.THING_TREE, StaProperties.ofKeys(List.of("reference"), List.of())),
             mappings);
 
     assertEquals(2, compilation.units().size());

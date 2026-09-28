@@ -1,4 +1,5 @@
 import { type MappingConfig } from '../_components/mapping-editor/_types'
+import type { FrostSinkPort } from '../_constants/frostPorts'
 import type { StaTargetVocabulary } from '../_constants/staTargetCatalog'
 import { PIPELINE_NODE_TYPES } from './pipeline'
 
@@ -107,6 +108,11 @@ export interface FrostNodeData extends BasePipelineNodeData {
    * saved and emitted as the CORE pipeline node's `sinkRef`. Round-trips via `styles`.
    */
   configurationUrn?: string
+  /**
+   * The write logic the modeller selected. Absent means the node is not configured: the platform
+   * must not decide what a Pipeline writes.
+   */
+  port?: FrostSinkPort
   /** Fixed FROST server display name */
   serverName: string
   /** Fixed FROST server URL */

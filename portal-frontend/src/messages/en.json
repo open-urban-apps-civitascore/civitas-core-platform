@@ -1352,7 +1352,33 @@
       "serverName": "Server Name",
       "serverUrl": "Server URL",
       "internalServer": "Internal Server",
-      "version": "Version"
+      "version": "Version",
+      "port": "Port",
+      "portPlaceholder": "Select what this sink writes",
+      "portHelp": "The port decides what the sink writes. There is no default: without one the Dataset does not publish.",
+      "expects": "Expects:",
+      "logic": {
+        "ownKey": "Upsert with its own key",
+        "parentReference": "Append with a parent reference",
+        "composite": "Composite"
+      },
+      "ports": {
+        "Things": {
+          "description": "Upserts a Thing by its reference, inside the Dataset’s project.",
+          "cost": "1 entity for each record",
+          "expects": "properties.reference"
+        },
+        "Observations": {
+          "description": "Appends a measurement to a Datastream that must exist. A measurement carrying a reference of its own is updated instead of added.",
+          "cost": "1 entity for each record",
+          "expects": "parameters.thingReference, parameters.datastreamReference, result"
+        },
+        "ThingTree": {
+          "description": "Upserts a Thing with its Location, Datastream, Sensor and ObservedProperty, and appends one measurement.",
+          "cost": "6 entities for each record",
+          "expects": "properties.reference, Datastreams[].properties.reference"
+        }
+      }
     },
     "geoPersistencePanel": {
       "title": "Geospatial Data Storage",
@@ -1410,7 +1436,6 @@
         "cronMqttIncompatible": "A CRON trigger cannot be used with an MQTT Data source. Use a SQL (pull) source instead.",
         "cronSourceConnectorUnknown": "Could not verify the source connector; a CRON trigger only works with a SQL (pull) source, not MQTT.",
         "sqlSourceNoScheduleDefaultPoll": "This SQL source has no CRON node and will poll on the default schedule (every 5 minutes). Add a CRON node to set an explicit schedule.",
-        "sqlSourceToFrost": "A SQL source can only write to a FROST sink through a field mapping — add a mapping node or use a SensorThings (MQTT) source.",
         "frostMappingUnknownStaTarget": "{label} maps {path} — not a valid SensorThings target path; allowed are the catalog paths of the Thing-shaped target model (e.g. $.name, $.Datastreams[].name, $.Datastreams[].Observations[].result) plus its match keys",
         "frostMappingMissingMatchKeys": "{label} must map the {entity} match keys: {fields} — they identify the entity during find-or-create",
         "frostMappingNoMatchKeyInStructure": "{label}: the target structure declares no match key for {entity} — mark an attribute with the UML '{id}' flag or add a \"reference\" attribute",

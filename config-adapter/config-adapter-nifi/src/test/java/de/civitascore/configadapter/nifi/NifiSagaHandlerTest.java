@@ -327,7 +327,7 @@ class NifiSagaHandlerTest {
               "adapter": "nifi", "operation": "%s",
               %s
               "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
-              "datasinks": [ { "id": "sk-f", "type": "FROST", "configuration": {} } ],
+              "datasinks": [ { "id": "sk-f", "type": "FROST", "configuration": { "port": "ThingTree" } } ],
               "dataPipelines": [ { "id": "p-1", "version": "1", "action": "%s",
                 "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-f"],
                 "data": { "nodes": [
@@ -351,7 +351,7 @@ class NifiSagaHandlerTest {
     ArgumentCaptor<DeploymentPlan> plan = ArgumentCaptor.forClass(DeploymentPlan.class);
     verify(restClient).deployFlow(plan.capture());
     // the saga's projectId scopes the flow to the dataset's FROST project
-    assertTrue(plan.getValue().snapshotJson().contains("/Projects(5)/Things"));
+    assertTrue(plan.getValue().snapshotJson().contains("\"FROST Project Id\":\"5\""));
   }
 
   @Test
@@ -364,7 +364,7 @@ class NifiSagaHandlerTest {
     assertEquals("STEP_COMPLETED", result.type());
     ArgumentCaptor<DeploymentPlan> plan = ArgumentCaptor.forClass(DeploymentPlan.class);
     verify(restClient).deployFlow(plan.capture());
-    assertTrue(plan.getValue().snapshotJson().contains("/Projects(9)/Things"));
+    assertTrue(plan.getValue().snapshotJson().contains("\"FROST Project Id\":\"9\""));
   }
 
   @Test

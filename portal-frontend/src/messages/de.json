@@ -1339,7 +1339,33 @@
       "serverName": "Servername",
       "serverUrl": "Server-URL",
       "internalServer": "Interner Server",
-      "version": "Version"
+      "version": "Version",
+      "port": "Port",
+      "portPlaceholder": "Wählen Sie, was diese Senke schreibt",
+      "portHelp": "Der Port entscheidet, was die Senke schreibt. Es gibt keine Vorgabe: ohne ihn veröffentlicht das Dataset nicht.",
+      "expects": "Erwartet:",
+      "logic": {
+        "ownKey": "Upsert mit eigenem Schlüssel",
+        "parentReference": "Anhängen mit Elternreferenz",
+        "composite": "Zusammengesetzt"
+      },
+      "ports": {
+        "Things": {
+          "description": "Legt ein Thing über seine Referenz an oder aktualisiert es, im Projekt des Datasets.",
+          "cost": "1 Entität je Datensatz",
+          "expects": "properties.reference"
+        },
+        "Observations": {
+          "description": "Hängt eine Messung an einen Datastream an, der bestehen muss. Eine Messung mit eigener Referenz wird aktualisiert statt hinzugefügt.",
+          "cost": "1 Entität je Datensatz",
+          "expects": "parameters.thingReference, parameters.datastreamReference, result"
+        },
+        "ThingTree": {
+          "description": "Legt ein Thing mit Location, Datastream, Sensor und ObservedProperty an oder aktualisiert es und hängt eine Messung an.",
+          "cost": "6 Entitäten je Datensatz",
+          "expects": "properties.reference, Datastreams[].properties.reference"
+        }
+      }
     },
     "geoPersistencePanel": {
       "title": "Geodaten-Speicher",
@@ -1397,7 +1423,6 @@
         "cronMqttIncompatible": "Ein CRON-Trigger kann nicht mit einer MQTT-Datenquelle verwendet werden. Bitte eine SQL-Quelle (Pull) verwenden.",
         "cronSourceConnectorUnknown": "Der Quell-Konnektor konnte nicht ermittelt werden; ein CRON-Trigger funktioniert nur mit einer SQL-Quelle (Pull), nicht mit MQTT.",
         "sqlSourceNoScheduleDefaultPoll": "Diese SQL-Quelle hat keinen CRON-Knoten und pollt im Standardintervall (alle 5 Minuten). Für einen expliziten Zeitplan bitte einen CRON-Knoten hinzufügen.",
-        "sqlSourceToFrost": "Eine SQL-Quelle kann nur über ein Feld-Mapping in einen FROST-Speicher schreiben — bitte einen Mapping-Knoten hinzufügen oder eine SensorThings-Quelle (MQTT) verwenden.",
         "frostMappingUnknownStaTarget": "{label} bildet {path} ab — kein gültiger SensorThings-Zielpfad; erlaubt sind die Katalogpfade des Thing-förmigen Zielmodells (z. B. $.name, $.Datastreams[].name, $.Datastreams[].Observations[].result) sowie dessen Match-Schlüssel",
         "frostMappingMissingMatchKeys": "{label} muss die Match-Schlüssel ({entity}) abbilden: {fields} — sie identifizieren die Entität beim Find-or-Create",
         "frostMappingNoMatchKeyInStructure": "{label}: die Zielstruktur deklariert keinen Match-Schlüssel für {entity} — markiere ein Attribut mit dem UML-'{id}'-Flag oder lege ein Attribut \"reference\" an",

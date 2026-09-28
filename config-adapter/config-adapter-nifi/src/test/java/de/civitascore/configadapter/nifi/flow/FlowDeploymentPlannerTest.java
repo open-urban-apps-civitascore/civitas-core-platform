@@ -40,6 +40,7 @@ import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
@@ -401,7 +402,8 @@ class FlowDeploymentPlannerTest {
                               "p-frost-map",
                               graphWithMapping(),
                               mqttSource(null),
-                              new FrostSinkSpec("1", NifiTestFixtures.STA_KEYS))));
+                              new FrostSinkSpec(
+                                  "1", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS))));
       assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
       assertTrue(ex.getMessage().contains("unsupported FROST mapping target path"));
     }
@@ -422,7 +424,8 @@ class FlowDeploymentPlannerTest {
                               "p-frost-incomplete",
                               NifiTestFixtures.graphWithIncompleteFrostMapping(),
                               mqttSource(null),
-                              new FrostSinkSpec("1", NifiTestFixtures.STA_KEYS))));
+                              new FrostSinkSpec(
+                                  "1", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS))));
       assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
       assertTrue(
           ex.getMessage().contains("must map the thing match key(s): $.properties.reference"));
@@ -430,27 +433,46 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
-  void sqlToFrostWithoutMappingIsRejected() throws Exception {
-    // Without a mapping the find-or-create consumes the source's envelope as-is; a SQL source emits
-    // plain records, so the combination is rejected — with the hint that a mapping unlocks it
+  void sqlToFrostWithoutMappingIsPlanned() throws Exception {
+    // Without a mapping the records must already have the structure of the port. A SQL source
+    // emits records, so no ConvertRecord is added, and the split hands one record to the writer.
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
-      FatalAdapterException ex =
-          assertThrows(
-              FatalAdapterException.class,
-              () ->
-                  planner(resolver)
-                      .plan(
-                          req(
-                              "p-sql-frost-nomap",
-                              graphWithoutMapping(),
-                              sqlSource(null),
-                              new FrostSinkSpec("1", null))));
-      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
-      assertTrue(
-          ex.getMessage()
-              .contains(
-                  "FROST sink without a record mapping requires a source that emits the"
-                      + " SensorThings envelope (MQTT)"));
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  req(
+                      "p-sql-frost-nomap",
+                      graphWithoutMapping(),
+                      sqlSource(null),
+                      new FrostSinkSpec("1", SinkPort.THING_TREE, null)))
+              .snapshotJson();
+      assertFalse(snapshot.contains("ConvertRecord"), "SQL already emits records");
+      processorOfType(snapshot, "PutFrostRecord");
+    }
+  }
+
+  @Test
+  void mqttToFrostWithoutMappingConvertsToRecords() throws Exception {
+    // MQTT delivers raw JSON: without a mapping the flow still converts it to records, so that the
+    // split hands PutFrostRecord one JSON object per record and never the whole message.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  req(
+                      "p-mqtt-frost-nomap",
+                      graphWithoutMapping(),
+                      mqttSource(null),
+                      new FrostSinkSpec("1", SinkPort.THING_TREE, null)))
+              .snapshotJson();
+      processorOfType(snapshot, "ConvertRecord");
+      assertEquals(
+          "$[*]",
+          processorOfType(snapshot, "SplitJson")
+              .path("properties")
+              .path("JsonPath Expression")
+              .asText(),
+          "the record-writer array is split into records");
     }
   }
 
@@ -466,7 +488,7 @@ class FlowDeploymentPlannerTest {
                       "p-mqtt-frost-map",
                       NifiTestFixtures.graphWithFrostMapping(),
                       mqttSource(null),
-                      new FrostSinkSpec("7", NifiTestFixtures.STA_KEYS)))
+                      new FrostSinkSpec("7", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS)))
               .snapshotJson();
       processorOfType(snapshot, "ConvertRecord");
       assertEquals(
@@ -495,7 +517,7 @@ class FlowDeploymentPlannerTest {
                       "p-sql-frost-map",
                       NifiTestFixtures.graphWithFrostMapping(),
                       sqlSource(null),
-                      new FrostSinkSpec("7", NifiTestFixtures.STA_KEYS)))
+                      new FrostSinkSpec("7", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS)))
               .snapshotJson();
       processorOfType(snapshot, "QueryDatabaseTableRecord");
       assertFalse(snapshot.contains("ConvertRecord"), "SQL records need no convert step");
@@ -518,18 +540,16 @@ class FlowDeploymentPlannerTest {
                       "p-frost-scoped",
                       graphWithoutMapping(),
                       mqttSource(null),
-                      new FrostSinkSpec("7", null)));
+                      new FrostSinkSpec("7", SinkPort.THING_TREE, null)));
       String snapshot = plan.snapshotJson();
+      // The project scopes the writes through the processor property now, not through forty URLs.
       assertTrue(
-          snapshot.contains("/Projects(7)/Things"),
-          "Thing leg must be scoped to the saga's project");
-      assertTrue(
-          snapshot.contains("Thing/Projects/id%20eq%207"),
-          "Datastream lookup must be filtered by the saga's project");
+          snapshot.contains("\"FROST Project Id\":\"7\""),
+          "the flow must carry the saga's project");
       assertFalse(snapshot.contains("secret"), "FROST secret must not enter the snapshot");
       assertEquals(
           "secret",
-          plan.sensitivePropsByComponent().get("FrostPublish").get("Request Password"),
+          plan.sensitivePropsByComponent().get("FrostPublish").get("Basic Auth Password"),
           "the Basic Auth password must be patched onto FROST processors after upload");
     }
   }
@@ -745,7 +765,7 @@ class FlowDeploymentPlannerTest {
                         "p-nofrost",
                         graphWithoutMapping(),
                         mqttSource(null),
-                        new FrostSinkSpec("1", null))));
+                        new FrostSinkSpec("1", SinkPort.THING_TREE, null))));
     assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 

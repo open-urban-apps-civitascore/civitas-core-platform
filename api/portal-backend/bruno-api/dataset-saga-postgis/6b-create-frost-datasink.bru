@@ -17,7 +17,7 @@ params:path {
 body:json {
   {
     "dataSinkType": "FROST",
-    "configuration": {}
+    "configuration": { "port": "ThingTree" }
   }
 }
 
@@ -44,7 +44,7 @@ docs {
 
   The dataset publishes an STA named API, and release rejects an STA API that has no FROST sink
   behind it — the route would resolve to a FROST project that is never provisioned. FROST sinks
-  carry no configuration of their own; the project is provisioned when the dataset is released.
+  carry their port, the write logic the deploy engine builds the flow for; the project is provisioned when the dataset is released.
 
   **Expected Response:** 201 Created, body contains `id` and `dataSinkType: "FROST"`.
 

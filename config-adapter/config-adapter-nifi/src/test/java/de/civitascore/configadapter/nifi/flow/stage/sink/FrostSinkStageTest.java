@@ -21,6 +21,7 @@ import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.FreeAttribute;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.KeyAttribute;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaJsonType;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +55,8 @@ class FrostSinkStageTest {
   private static Map<String, Object> datasinkWith(String thingProps, String datastreamProps) {
     return json(
         """
-        { "dataStructure": {
+        { "configuration": { "port": "ThingTree" },
+          "dataStructure": {
             "title": "SensorThingsDataModel",
             "properties": { "thing": { "$ref": "#/$defs/Thing" } },
             "$defs": {
@@ -131,7 +133,8 @@ class FrostSinkStageTest {
     Map<String, Object> datasink =
         json(
             """
-            { "dataStructure": {
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
                 "properties": { "thing": { "$ref": "#/$defs/Thing" } },
                 "$defs": { "Thing": { "properties": {
                     "properties": { "$ref": "#/$defs/Missing" } } } } } }
@@ -147,7 +150,8 @@ class FrostSinkStageTest {
     Map<String, Object> datasink =
         json(
             """
-            { "dataStructure": {
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
                 "properties": { "thing": { "$ref": "#/$defs/Thing" } },
                 "$defs": {
                   "Properties": { "properties": {
@@ -170,7 +174,8 @@ class FrostSinkStageTest {
     Map<String, Object> datasink =
         json(
             """
-            { "dataStructure": {
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
                 "$id": "urn:core:platform:civitas:datastructure:common:ALittleThing:91zjftfn1i:1.0.0",
                 "type": "object",
                 "$defs": {
@@ -208,7 +213,8 @@ class FrostSinkStageTest {
     Map<String, Object> datasink =
         json(
             """
-            { "dataStructure": {
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
                 "properties": { "thing": { "$ref": "#/$defs/Thing" } },
                 "$defs": {
                   "Thing": {
@@ -247,7 +253,8 @@ class FrostSinkStageTest {
     Map<String, Object> datasink =
         json(
             """
-            { "dataStructure": {
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
                 "properties": { "thing": { "$ref": "#/$defs/Thing" } },
                 "$defs": {
                   "Geo": { "type": "object", "properties": { "lat": { "type": "number" } } },
@@ -285,7 +292,8 @@ class FrostSinkStageTest {
     Map<String, Object> datasink =
         json(
             """
-            { "dataStructure": {
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
                 "properties": { "thing": { "$ref": "#/$defs/Thing" } },
                 "$defs": {
                   "Thing": {
@@ -325,7 +333,8 @@ class FrostSinkStageTest {
     Map<String, Object> datasink =
         json(
             """
-            { "dataStructure": {
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
                 "properties": { "thing": { "$ref": "#/$defs/Thing" } },
                 "$defs": { "Thing": { "properties": {
                     "properties": { "type": "object", "properties": {
@@ -339,9 +348,44 @@ class FrostSinkStageTest {
   }
 
   @Test
-  void missingDataStructureYieldsNullKeysForPassthrough() throws Exception {
-    FrostSinkSpec spec = stage.parseSpec(Map.of("configuration", Map.of()), ctx);
+  void missingDataStructureYieldsNullKeys() throws Exception {
+    // A sink may carry no target structure: the source then delivers the port's shape itself.
+    FrostSinkSpec spec = stage.parseSpec(Map.of("configuration", Map.of("port", "ThingTree")), ctx);
     assertNull(spec.staProperties());
+  }
+
+  @Test
+  void parseSpec_withoutAPort_isRejectedAndNamesTheChoice() {
+    // There is no default and no fallback to the old derivation from the Mapping: deriving a port
+    // would put the decision back where this field took it from.
+    FatalAdapterException rejected =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> stage.parseSpec(Map.of("configuration", Map.of()), ctx));
+
+    assertEquals(AdapterErrorCode.INVALID_PAYLOAD, rejected.getErrorCode());
+    assertTrue(rejected.getMessage().contains("FROST sink node"), rejected.getMessage());
+    assertTrue(rejected.getMessage().contains("ThingTree"), rejected.getMessage());
+  }
+
+  @Test
+  void parseSpec_withAnUnknownPort_isRejected() {
+    // The value reaches a processor property, so only the closed set may pass.
+    FatalAdapterException rejected =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> stage.parseSpec(Map.of("configuration", Map.of("port", "Everything")), ctx));
+
+    assertEquals(AdapterErrorCode.INVALID_PAYLOAD, rejected.getErrorCode());
+    assertTrue(rejected.getMessage().contains("unknown port"), rejected.getMessage());
+  }
+
+  @Test
+  void parseSpec_withAPort_carriesItIntoTheSpec() throws Exception {
+    FrostSinkSpec spec =
+        stage.parseSpec(Map.of("configuration", Map.of("port", "Observations")), ctx);
+
+    assertEquals(SinkPort.OBSERVATIONS, spec.port());
   }
 
   @Test
@@ -351,7 +395,8 @@ class FrostSinkStageTest {
     Map<String, Object> datasink =
         json(
             """
-            { "dataStructure": {
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
                 "properties": { "thing": { "$ref": "#/$defs/Thing" } },
                 "$defs": { "Thing": { "properties": {
                     "properties": { "type": "object", "properties": {
@@ -375,7 +420,8 @@ class FrostSinkStageTest {
     Map<String, Object> datasink =
         json(
             """
-            { "dataStructure": {
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
                 "title": "OrderStructure",
                 "$defs": {
                   "Customer": { "properties": { "id": { "type": "string" } } },

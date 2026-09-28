@@ -371,6 +371,65 @@ class DataSinkServiceTest {
     }
 
     @Test
+    @DisplayName("Should accept a FROST config carrying a port")
+    void shouldAcceptFrostConfigWithPort() {
+      UUID dataSetId = UUID.randomUUID();
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSinkType(DataSinkType.FROST);
+      // The port is what a modeller selects on the sink node, and the only way it reaches the
+      // configuration is this endpoint.
+      input.setConfiguration(Map.of("port", "Things"));
+
+      DataSink entity = new DataSink();
+      when(dataSinkMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      when(dataSinkRepository.save(any())).thenReturn(entity);
+
+      assertThat(dataSinkService.create(input)).isSameAs(entity);
+    }
+
+    @Test
+    @DisplayName("Should accept a FROST config carrying a port and an element")
+    void shouldAcceptFrostConfigWithPortAndElement() {
+      UUID dataSetId = UUID.randomUUID();
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSinkType(DataSinkType.FROST);
+      input.setConfiguration(Map.of("port", "ThingTree", "element", ELEMENT_URN));
+
+      DataSink entity = new DataSink();
+      when(dataSinkMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      when(dataSinkRepository.save(any())).thenReturn(entity);
+
+      assertThat(dataSinkService.create(input)).isSameAs(entity);
+    }
+
+    @Test
+    @DisplayName("Should throw InvalidInputException for a port outside the closed set")
+    void shouldThrowWhenFrostPortUnknown() {
+      UUID dataSetId = UUID.randomUUID();
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSinkType(DataSinkType.FROST);
+      input.setConfiguration(Map.of("port", "Everything"));
+
+      DataSink entity = new DataSink();
+      when(dataSinkMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+
+      // An unknown port must not pass through: the deploy engine writes it into a processor
+      // property, where it would fail far from where it was entered.
+      assertThatThrownBy(() -> dataSinkService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Everything");
+    }
+
+    @Test
     @DisplayName("Should accept a FROST config referencing an existing element")
     void shouldAcceptFrostConfigWithExistingElement() {
       UUID dataSetId = UUID.randomUUID();

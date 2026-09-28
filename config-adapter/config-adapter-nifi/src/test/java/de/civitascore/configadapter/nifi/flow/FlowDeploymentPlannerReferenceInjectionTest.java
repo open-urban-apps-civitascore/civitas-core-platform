@@ -35,6 +35,7 @@ import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import de.civitascore.configadapter.nifi.mapping.UnsafePropertyValueException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -159,7 +160,7 @@ class FlowDeploymentPlannerReferenceInjectionTest {
             new Case(
                 graphWithFrostMapping(),
                 mqttSource(null),
-                new FrostSinkSpec("7", NifiTestFixtures.STA_KEYS),
+                new FrostSinkSpec("7", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS),
                 mappingsWith(
                     MAP_FROST,
                     "{\"$.name\":\"$.station\",\"$.description\":{\"op\":\"const\",\"value\":\""

@@ -313,7 +313,12 @@ export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[]
       payload = {
         id: node.data.entityId ?? null,
         dataSinkType: DATASINK_TYPES.FROST,
-        configuration: elementUrn ? { element: elementUrn } : {},
+        // The port is what the sink writes. A save without it would overwrite a stored port, and
+        // the Dataset would not publish.
+        configuration: {
+          ...(node.data.port ? { port: node.data.port } : {}),
+          ...(elementUrn ? { element: elementUrn } : {}),
+        },
       }
     }
 
