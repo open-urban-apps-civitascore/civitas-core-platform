@@ -989,6 +989,7 @@
       "creationError": "An error occurred while creating the Data source.",
       "updateError": "An error occurred while updating the Data source.",
       "inUseError": "This Data source is still used by a pipeline.",
+      "datastructureNotAvailableError": "The Data source could not be set to \"Available\". Set the Data structure and its version to \"Available\" first.",
       "groupsWithoutRoles": "Groups with no assigned Roles have not been saved."
     },
     "connection": {

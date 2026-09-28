@@ -4,6 +4,7 @@ import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 
 import {
   isDatapoolScopeViolationError,
+  isDatastructureNotAvailableError,
   isNameConflictError,
   isNotDraftError,
   isPermissionsError,
@@ -162,6 +163,30 @@ describe('isNotDraftError', () => {
 
   it('returns false for non-axios errors', () => {
     expect(isNotDraftError(new Error('plain error'))).toBe(false)
+  })
+})
+
+describe('isDatastructureNotAvailableError', () => {
+  it.each([
+    'DataStructureVersion must be in AVAILABLE status for an AVAILABLE DataSource',
+    'The parent DataStructure must be in AVAILABLE status for an AVAILABLE DataSource',
+  ])('returns true for a 400 INVALID_INPUT error: %s', detail => {
+    const error = mockApiError(400, detail, 'urn:civitas:error:INVALID_INPUT')
+    expect(isDatastructureNotAvailableError(error)).toBe(true)
+  })
+
+  it('returns false for a 400 INVALID_INPUT error with a different detail', () => {
+    const error = mockApiError(400, 'Bad request', 'urn:civitas:error:INVALID_INPUT')
+    expect(isDatastructureNotAvailableError(error)).toBe(false)
+  })
+
+  it('returns false for non-400 status codes', () => {
+    const error = mockApiError(
+      409,
+      'DataStructureVersion must be in AVAILABLE status for an AVAILABLE DataSource',
+      'urn:civitas:error:INVALID_INPUT',
+    )
+    expect(isDatastructureNotAvailableError(error)).toBe(false)
   })
 })
 

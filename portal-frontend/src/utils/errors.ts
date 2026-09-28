@@ -48,6 +48,15 @@ export const isNotDraftError = (error: unknown) => {
   return !!problem && hasErrorType(problem, 'DATASET_NOT_EDITABLE')
 }
 
+export const isDatastructureNotAvailableError = (error: unknown) => {
+  const problem = problemWithStatus(error, 400)
+  return (
+    !!problem &&
+    hasErrorType(problem, 'INVALID_INPUT') &&
+    problem.detail.includes('must be in AVAILABLE status for an AVAILABLE DataSource')
+  )
+}
+
 export const isSagaInFlightError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
   return !!problem && hasErrorType(problem, 'SAGA_IN_FLIGHT')
