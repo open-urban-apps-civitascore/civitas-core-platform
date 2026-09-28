@@ -6,6 +6,5 @@
   "element": "urn:core:platform:civitas:element:taf10-grid:TAF10GridReading:1.0.0",
   "urls": ["mqtt://mosquitto:1883"],
   "topics": ["taf10/grid/+"],
-  "client_id": "minifi-taf10-grid",
   "qos": 1
 }

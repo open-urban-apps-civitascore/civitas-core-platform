@@ -48,6 +48,15 @@ export const isNotDraftError = (error: unknown) => {
   return !!problem && hasErrorType(problem, 'DATASET_NOT_EDITABLE')
 }
 
+export const isDatastructureNotAvailableError = (error: unknown) => {
+  const problem = problemWithStatus(error, 400)
+  return (
+    !!problem &&
+    hasErrorType(problem, 'INVALID_INPUT') &&
+    problem.detail.includes('must be in AVAILABLE status for an AVAILABLE DataSource')
+  )
+}
+
 export const isSagaInFlightError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
   return !!problem && hasErrorType(problem, 'SAGA_IN_FLIGHT')
@@ -55,7 +64,12 @@ export const isSagaInFlightError = (error: unknown) => {
 
 export const isResourceInUseError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
-  return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && problem.detail.includes('is referenced by')
+  return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && !problem.detail.includes('confirmDataLoss')
+}
+
+export const isPipelineClosureInvalidError = (error: unknown) => {
+  const problem = problemWithStatus(error, 422)
+  return !!problem && hasErrorType(problem, 'PIPELINE_CLOSURE_INVALID')
 }
 
 export const isUnconfirmedDataLossError = (error: unknown) => {

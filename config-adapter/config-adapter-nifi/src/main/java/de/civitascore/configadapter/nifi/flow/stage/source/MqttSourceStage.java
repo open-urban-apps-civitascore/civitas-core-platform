@@ -15,6 +15,7 @@ import static de.civitascore.configadapter.nifi.flow.stage.BindingSupport.trimme
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.SourceType;
@@ -25,12 +26,14 @@ import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -49,6 +52,9 @@ public final class MqttSourceStage implements SourceStage {
   public static final String MQTT_SSL_CONTEXT_SERVICE = "MQTT SSL Context Service";
 
   private static final String MQTT_SSL_CONTEXT_REFERENCE = "${CS:" + MQTT_SSL_CONTEXT_SERVICE + "}";
+
+  /** Alphanumeric only, to stay within the client ids every broker must accept [MQTT-3.1.3-5]. */
+  private static final String CLIENT_ID_PREFIX = "civitascore";
 
   private static final Set<String> PLAINTEXT_SCHEMES = Set.of("tcp", "ws", "mqtt");
   private static final Set<String> TLS_SCHEMES = Set.of("ssl", "mqtts", "wss");
@@ -110,12 +116,13 @@ public final class MqttSourceStage implements SourceStage {
 
   /**
    * Binds an MQTT datasource to ConsumeMQTT, using the portal's connector field names ({@code
-   * urls}/{@code topics} as lists, {@code user}, {@code client_id}, {@code qos}). Broker URI and
-   * Topic Filter are required — without them ConsumeMQTT would fall back to the fragment's demo
-   * broker/topic and silently consume from the wrong source, so a missing value fails the deploy.
+   * urls}/{@code topics} as lists, {@code user}, {@code qos}). Broker URI and Topic Filter are
+   * required — without them ConsumeMQTT would fall back to the fragment's demo broker/topic and
+   * silently consume from the wrong source, so a missing value fails the deploy.
    */
   @Override
-  public void bind(Datasource source, PlanContext out) throws FatalAdapterException {
+  public void bind(Datasource source, String sourceNodeKey, PlanContext out)
+      throws FatalAdapterException {
     Map<String, Object> original = source.getAdditionalProperties();
     Map<String, Object> decrypted = credentials.decrypt(original);
     // NiFi's Broker URI accepts a comma-separated list; Topic Filter is a single filter, so one
@@ -143,7 +150,7 @@ public final class MqttSourceStage implements SourceStage {
       out.putSourceProperty("SSL Context Service", MQTT_SSL_CONTEXT_REFERENCE);
     }
     putIfPresent(out::putSourceProperty, "Username", decrypted.get("user"));
-    putIfPresent(out::putSourceProperty, "Client ID", decrypted.get("client_id"));
+    out.putSourceProperty("Client ID", clientId(sourceNodeKey));
     putIfPresent(out::putSourceProperty, "Quality of Service", decrypted.get("qos"));
     bindProtocolVersion(out, decrypted.get("protocol_version"));
     bindSeconds(out, "Connection Timeout", decrypted.get("connect_timeout"));
@@ -163,11 +170,12 @@ public final class MqttSourceStage implements SourceStage {
   }
 
   /**
-   * Binds the trust anchor. A password parameter contributes only its <em>name</em> to the snapshot
-   * — the value lives in NiFi, supplied by the deployment, so no truststore secret passes through
-   * the adapter. A literal password (the JDK store's {@code changeit}) instead goes the post-upload
-   * sensitive route, never into the snapshot. A missing anchor fails the deploy instead of falling
-   * back to plaintext or to NiFi's node truststore.
+   * Checks the trust anchor and collects its literal password. A password parameter contributes
+   * only its <em>name</em> to the snapshot, applied with the other truststore properties in {@link
+   * #registerControllerServices} — the value lives in NiFi, supplied by the deployment, so no
+   * truststore secret passes through the adapter. A literal password (the JDK store's {@code
+   * changeit}) instead goes the post-upload sensitive route, never into the snapshot. A missing
+   * anchor fails the deploy instead of falling back to plaintext or to NiFi's node truststore.
    */
   private void bindTruststore(PlanContext out) throws FatalAdapterException {
     if (truststore.path().isEmpty() || truststore.type().isEmpty()) {
@@ -184,18 +192,24 @@ public final class MqttSourceStage implements SourceStage {
               + "' needs nifi.mqtt.truststore.parameter-context");
     }
     truststore
-        .sslContextProperties()
-        .forEach(
-            (key, value) -> out.putControllerServiceProperty(MQTT_SSL_CONTEXT_SERVICE, key, value));
-    truststore
         .sensitiveProperties()
         .forEach((key, value) -> out.putSensitive(MQTT_SSL_CONTEXT_SERVICE, key, value));
+  }
+
+  /** Hashed, because the key has neither the length nor the characters a client id allows. */
+  private static String clientId(String sourceNodeKey) {
+    UUID name = UUID.nameUUIDFromBytes(sourceNodeKey.getBytes(StandardCharsets.UTF_8));
+    return CLIENT_ID_PREFIX + CoreUrn.disambiguatorFor(name);
   }
 
   @Override
   public void registerControllerServices(BuildContext ctx) throws FatalAdapterException {
     if (tlsRequested(ctx)) {
       ctx.addControllerService(Fragment.MQTT_SSL_CONTEXT_SERVICE, MQTT_SSL_CONTEXT_SERVICE);
+      for (Map.Entry<String, String> property : truststore.sslContextProperties().entrySet()) {
+        ctx.setControllerServiceExpression(
+            MQTT_SSL_CONTEXT_SERVICE, property.getKey(), property.getValue());
+      }
     }
   }
 

@@ -231,17 +231,31 @@ export const buildMappingArtifacts = (pipeline: Pipeline): MappingArtifactReques
 }
 
 /**
- * Snapshot type for mapping change detection: maps nodeId → JSON-stringified artifact body.
+ * Snapshot entry for a single mapping node: tracks both the logical URN and the artifact body.
  */
-export type MappingSnapshot = Record<string, string>
+export interface MappingSnapshotEntry {
+  /** The mapping's logical CORE URN at snapshot time, or null for nodes never saved */
+  logicalUrn: string | null
+  /** JSON-stringified artifact body */
+  body: string
+}
 
 /**
- * Creates a snapshot of the current mapping artifact bodies for later change detection.
+ * Snapshot type for mapping change detection: maps nodeId → snapshot entry.
+ */
+export type MappingSnapshot = Record<string, MappingSnapshotEntry>
+
+/**
+ * Creates a snapshot of the current mapping artifacts for later change detection.
+ * The snapshot stores the logical URN and a JSON string of the artifact body.
  */
 export const createMappingSnapshot = (pipeline: Pipeline): MappingSnapshot => {
   const snapshot: MappingSnapshot = {}
-  for (const { nodeId, body } of buildMappingArtifacts(pipeline)) {
-    snapshot[nodeId] = JSON.stringify(body)
+  for (const { nodeId, logicalUrn, body } of buildMappingArtifacts(pipeline)) {
+    snapshot[nodeId] = {
+      logicalUrn: logicalUrn ?? null,
+      body: JSON.stringify(body),
+    }
   }
   return snapshot
 }
@@ -253,7 +267,18 @@ export const createMappingSnapshot = (pipeline: Pipeline): MappingSnapshot => {
 export const hasMappingChanged = (nodeId: string, body: MappingArtifactBody, snapshot: MappingSnapshot): boolean => {
   const entry = snapshot[nodeId]
   if (!entry) return true // new node, not in snapshot
-  return JSON.stringify(body) !== entry
+  return JSON.stringify(body) !== entry.body
+}
+
+/**
+ * Finds logical mapping URNs that were in the snapshot but whose node no longer exists in the
+ * current pipeline. A node that was never saved carries no URN and has no artifact to delete.
+ */
+export const getRemovedMappingUrns = (pipeline: Pipeline, snapshot: MappingSnapshot): string[] => {
+  const currentNodeIds = new Set(pipeline.nodes.map(n => n.id))
+  return Object.entries(snapshot)
+    .filter(([nodeId, entry]) => !currentNodeIds.has(nodeId) && entry.logicalUrn != null)
+    .map(([, entry]) => entry.logicalUrn as string)
 }
 
 // ============================================================================

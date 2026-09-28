@@ -273,12 +273,12 @@ class MqttConnectorHandlerTest {
       String encrypted = textEncryptor.encrypt("secret");
       Map<String, Object> config = new HashMap<>();
       config.put("password", encrypted);
-      config.put("client_id", "my-client");
+      config.put("user", "mqttuser");
 
       Map<String, Object> result = handler.maskSensitiveFields(config);
 
       assertThat(result.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
-      assertThat(result.get("client_id")).isEqualTo("my-client");
+      assertThat(result.get("user")).isEqualTo("mqttuser");
     }
   }
 

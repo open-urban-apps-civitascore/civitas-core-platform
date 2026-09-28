@@ -34,8 +34,6 @@ export const MqttDataSourceSchema = z
     urls: z.union([z.array(z.string()), z.null()]).optional(),
     /** MQTT topic filter(s) to subscribe to. Wildcards (+, #) are supported. */
     topics: z.union([z.array(z.string()), z.null()]).optional(),
-    /** Optional MQTT client ID. Auto-generated if omitted. */
-    client_id: z.union([z.string(), z.null()]).optional(),
     /** MQTT Quality of Service level: 0, 1 or 2. */
     qos: z.union([z.literal(0), z.literal(1), z.literal(2), z.null()]).optional(),
     /** MQTT protocol version: '3' (auto-select 3.1 or 3.1.1) or '5' (5.0). */

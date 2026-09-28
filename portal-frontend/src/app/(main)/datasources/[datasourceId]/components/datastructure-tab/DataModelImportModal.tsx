@@ -69,20 +69,17 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
   }, [open, selectedVersion])
 
   const apiParams = getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString })
-  apiParams.set('dataStructureStatus', DATASTRUCTURE_STATUS_TYPES.AVAILABLE)
 
   const { data: datastructuresData, isFetching: isFetchingDatasources } = useGetDatastructures({
     params: apiParams,
   })
 
-  const availableDatastructures = (datastructuresData?.data || []).map(datastructure => ({
+  const selectableDatastructures = (datastructuresData?.data || []).map(datastructure => ({
     ...datastructure,
-    dataStructureVersions: datastructure.dataStructureVersions.filter(
-      version => version.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
-    ),
+    dataStructureVersions: datastructure.dataStructureVersions.filter(version => version.version !== null),
   }))
 
-  const datastructures = mapDatastructuresApiToListData(availableDatastructures)
+  const datastructures = mapDatastructuresApiToListData(selectableDatastructures)
 
   const findSelectedVersion = (rowId: string | undefined): SelectedDatastructureVersion | undefined => {
     for (const datastructure of datastructures) {

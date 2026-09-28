@@ -128,6 +128,14 @@
       "AVAILABLE": "Verfügbar",
       "READY": "Fertig"
     },
+    "inUse": {
+      "columnHeader": "Verwendung",
+      "tooltip": "Wird derzeit verwendet. Die Bearbeitung ist eingeschränkt und das Löschen nicht möglich."
+    },
+    "draftBlockedModal": {
+      "title": "Status kann nicht auf Entwurf gesetzt werden",
+      "description": "Dieses datenbezogene Element wird derzeit verwendet und kann daher nicht auf Entwurf gesetzt werden."
+    },
     "exitModal": {
       "title": "Vor dem Beenden speichern?",
       "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
@@ -202,7 +210,6 @@
     "home": "Home",
     "menu-item": "Menüpunkt",
     "sub-item": "Unterpunkt",
-    "data-catalog": "Datenkatalog",
     "all-datasets": "Alle Datensätze",
     "documentation": "Dokumentation",
     "logout": "Abmelden",
@@ -551,6 +558,10 @@
       "title": "Datensatz löschen?",
       "description": "Diese Aktion kann nicht rückgängig gemacht werden. Dies wird den Datensatz und alle zugehörigen Daten dauerhaft löschen.",
       "confirm": "Löschen"
+    },
+    "releaseBlockedModal": {
+      "title": "Dataset kann nicht freigegeben werden",
+      "description": "Dieses Dataset verwendet datenbezogene Elemente, die sich noch im Status Entwurf befinden. Alle erforderlichen Elemente müssen zunächst auf Verfügbar gesetzt werden."
     }
   },
   "users": {
@@ -984,6 +995,7 @@
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
       "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
+      "datastructureNotAvailableError": "Die Datenquelle konnte nicht auf \"Verfügbar\" gesetzt werden. Bitte setzen Sie zuerst die Datenstruktur und ihre Version auf \"Verfügbar\".",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
     "connection": {
@@ -1040,10 +1052,6 @@
         },
         "topics": {
           "label": "Topic"
-        },
-        "clientId": {
-          "label": "Client ID",
-          "placeholder": "optional"
         },
         "qos": {
           "label": "QoS"
@@ -1221,7 +1229,6 @@
       "createSuccess": "Die Version der Datenstruktur wurde erfolgreich angelegt.",
       "updateSuccess": "Die Version der Datenstruktur wurde erfolgreich aktualisiert.",
       "isAvailableModelHint": "Die Versionsinformationen und die Strukturdefinition können nicht bearbeitet werden, da diese Version bereits den Status 'Verfügbar' hat.",
-      "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Version bereits verwendet wird.",
       "isLastAvailableVersion": "Kann nicht auf Entwurf gesetzt werden, da dies die letzte verfügbare Version einer verfügbaren Datenstruktur ist. Setzen Sie zuerst die Datenstruktur auf Entwurf."
     },
     "errors": {
@@ -1345,7 +1352,8 @@
       "details": "Datenstruktur-Details",
       "dataStructureName": "Datenstruktur",
       "versionNumber": "Version",
-      "anonymousDataStructure": "Anonyme Datenstruktur"
+      "anonymousDataStructure": "Anonyme Datenstruktur",
+      "status": "Status"
     },
     "mappingPanel": {
       "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
@@ -1359,7 +1367,10 @@
       "selectDatastructure": "Datenstruktur auswählen…",
       "inputDatastructure": "Eingangs-Datenstruktur",
       "outputDatastructure": "Ausgangs-Datenstruktur",
-      "openMappingEditor": "Mapping-Editor öffnen"
+      "openMappingEditor": "Mapping-Editor öffnen",
+      "details": "Referenzierte Datenstrukturen",
+      "inputStatus": "Status Eingangs-Datenstruktur",
+      "outputStatus": "Status Ausgangs-Datenstruktur"
     },
     "entitySelector": {
       "selectEntity": "Entität auswählen...",
@@ -1454,7 +1465,9 @@
       "notDraftError": "Der Datensatz muss im Entwurfsstatus sein, um Änderungen vorzunehmen.",
       "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut.",
       "sinkStillInUse": "{names} wurde gespeichert, ein entfernter Datenspeicher wird aber noch verwendet und kann nicht gelöscht werden.",
-      "sinkDeleteFailed": "{names} wurde gespeichert, ein entfernter Datenspeicher konnte aber nicht gelöscht werden."
+      "sinkDeleteFailed": "{names} wurde gespeichert, ein entfernter Datenspeicher konnte aber nicht gelöscht werden.",
+      "mappingStillInUse": "Ein aus Pipeline {name} entferntes Mapping kann nicht gelöscht werden, weil es noch von einer anderen Pipeline verwendet wird.",
+      "mappingCleanupFailed": "Ein aus Pipeline {name} entferntes Mapping konnte nicht gelöscht werden."
     },
     "tabs": {
       "closeTab": "Tab schließen",

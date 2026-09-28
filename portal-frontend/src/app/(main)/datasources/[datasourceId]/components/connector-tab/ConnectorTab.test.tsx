@@ -46,12 +46,12 @@ vi.mock('./connectorSources', () => ({
         label: { labelKey: 'Protocol Version' },
       },
       {
-        key: 'client_id',
+        key: 'keepalive',
         type: 'textArea',
         // Translated placeholder — exercises the translation-key path.
-        placeholderKey: 'client id',
+        placeholderKey: 'keepalive',
         required: false,
-        label: { labelKey: 'Client ID' },
+        label: { labelKey: 'Keepalive' },
       },
     ],
     SQL: [
@@ -97,7 +97,6 @@ const defaultValues: DatasourceFormDraft = {
   configuration: {
     urls: '',
     topics: '',
-    client_id: '',
     qos: '0',
     protocol_version: '3',
     connect_timeout: '',
@@ -160,8 +159,8 @@ describe('ConnectorTab (integration)', () => {
     expect(screen.getByRole('checkbox')).toBeInTheDocument()
     const qosSelect = screen.getByLabelText(/QoS/)
     expect(qosSelect).toBeInTheDocument()
-    expect(screen.getByLabelText('Client ID')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('client id')).toBeInTheDocument()
+    expect(screen.getByLabelText('Keepalive')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('keepalive')).toBeInTheDocument()
 
     fireEvent.click(qosSelect)
     await screen.findByText('1')

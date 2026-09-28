@@ -115,7 +115,6 @@ public class AssignmentFactory {
     assignment.setDataStructure(null);
     assignment.setDataSource(null);
     assignment.setDataPool(null);
-    assignment.setCatalog(null);
 
     if (scopeType == null) {
       Role role = assignment.getRole();
@@ -158,11 +157,6 @@ public class AssignmentFactory {
               dataPoolRepository
                   .findById(scopeId)
                   .orElseThrow(() -> new ResourceNotFoundException("DataPool", scopeId)));
-      case CATALOG ->
-          throw new InvalidInputException(
-              "Assignment",
-              scopeType.name(),
-              scopeType + " scope is not available in this release");
       default ->
           throw new InvalidInputException(
               "Assignment", "scopeType", "Unsupported scope type: " + scopeType);

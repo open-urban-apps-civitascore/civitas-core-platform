@@ -351,14 +351,41 @@ describe('VersionOverview - hasUserChanges Modal', () => {
   })
 
   describe('canSetDraft logic', () => {
-    it('disables DRAFT option when the version is in use', async () => {
+    const inUseByReleasedVersion: DatastructureVersion = {
+      ...mockVersion,
+      dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+      inUse: true,
+      inUseByReleased: true,
+    }
+
+    it('keeps DRAFT selectable when a released entity references the version', async () => {
       const user = userEvent.setup()
-      const inUseVersion: DatastructureVersion = { ...mockVersion, inUse: true }
-      renderComponent({ version: inUseVersion })
+      renderComponent({ version: inUseByReleasedVersion })
 
       await openStatusDropdown(user)
 
-      expect(screen.getByTestId('statusOption-draft')).toHaveAttribute('data-disabled')
+      expect(screen.getByTestId('statusOption-draft')).not.toHaveAttribute('data-disabled')
+    })
+
+    it('refuses the DRAFT selection and explains why when a released entity references the version', async () => {
+      const user = userEvent.setup()
+      renderComponent({ version: inUseByReleasedVersion })
+
+      await openStatusDropdown(user)
+      await user.click(screen.getByTestId('statusOption-draft'))
+
+      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
+      expect(screen.getByTestId('statusDropdown')).toHaveTextContent('Verfügbar')
+    })
+
+    it('keeps DRAFT selectable when only a draft entity references the version', async () => {
+      const user = userEvent.setup()
+      const draftReferencedVersion: DatastructureVersion = { ...mockVersion, inUse: true, inUseByReleased: false }
+      renderComponent({ version: draftReferencedVersion })
+
+      await openStatusDropdown(user)
+
+      expect(screen.getByTestId('statusOption-draft')).not.toHaveAttribute('data-disabled')
     })
 
     it('disables DRAFT option when this is the last available version in an available datastructure', async () => {
@@ -375,7 +402,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(screen.getByTestId('statusOption-draft')).toHaveAttribute('data-disabled')
     })
 
-    it('enables DRAFT option when version is not in use and not the last available version', async () => {
+    it('enables DRAFT option when the version has no released referrer and is not the last available version', async () => {
       const user = userEvent.setup()
       renderComponent()
 

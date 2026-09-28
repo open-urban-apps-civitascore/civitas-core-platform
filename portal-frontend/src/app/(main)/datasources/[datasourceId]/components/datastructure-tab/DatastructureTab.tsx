@@ -18,11 +18,12 @@ interface DatastructureTabProps {
   datasourceTitle: string
   selectedVersionId: string | null
   isReadOnly: boolean
-  isDatasourceInUse: boolean
+  isDatasourceInUseByReleased: boolean
   onSelectDatastructureVersion: (selection: RowSelectionState) => void
 }
 export const DatastructureTab = (props: DatastructureTabProps) => {
-  const { datasourceTitle, selectedVersionId, isReadOnly, isDatasourceInUse, onSelectDatastructureVersion } = props
+  const { datasourceTitle, selectedVersionId, isReadOnly, isDatasourceInUseByReleased, onSelectDatastructureVersion } =
+    props
   const t = useTranslations('datasources.dataModel.placeholder')
   const [isImportDatastructureModalOpen, setIsImportDatastructureModalOpen] = useState(false)
 
@@ -97,7 +98,9 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
         isMultiSessionMode={false}
         canExportModel={false}
         placeHolder={UmlCanvasPlaceholder}
-        onImportFromDatastructure={!isDatasourceInUse && !isReadOnly ? handleImportFromDatastructure : undefined}
+        onImportFromDatastructure={
+          !isDatasourceInUseByReleased && !isReadOnly ? handleImportFromDatastructure : undefined
+        }
       />
       <DataModelImportModal
         datasourceTitle={datasourceTitle}

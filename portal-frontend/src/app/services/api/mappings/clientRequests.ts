@@ -12,9 +12,10 @@ import type { MappingField } from '@/generated/core'
  *
  * - POST creates a brand-new logical Mapping (first version).
  * - PUT versions an existing logical Mapping (identified by its `logicalUrn`).
+ * - DELETE removes a logical Mapping, addressed by URN in the query string.
  *
- * Both return the logical URN and the freshly minted versioned URN; the pipeline node references the
- * mapping by its `versionedUrn`.
+ * POST and PUT return the logical URN and the freshly minted versioned URN; the pipeline node
+ * references the mapping by its `versionedUrn`.
  */
 
 const mappingsEndpoint = (datasetId: string) => `/datasets/${datasetId}/mappings`
@@ -76,5 +77,21 @@ export const useUpdateMapping = (datasetId: string) =>
         headers: { [API_REQUEST_HEADER]: 'true' },
         data,
         errorMessage: 'An error occurred while updating the mapping.',
+      }),
+  })
+
+/**
+ * Deletes a Mapping artifact of a dataset by its logical CORE URN.
+ * DELETE /v1/datasets/{datasetId}/mappings?urn={logicalUrn}
+ */
+export const useDeleteMapping = (datasetId: string) =>
+  useMutation<ApiServiceResponse<void>, unknown, string>({
+    mutationFn: (logicalUrn: string) =>
+      apiRequest<void>({
+        method: 'DELETE',
+        endpoint: mappingsEndpoint(datasetId),
+        params: new URLSearchParams({ urn: logicalUrn }),
+        headers: { [API_REQUEST_HEADER]: 'true' },
+        errorMessage: 'An error occurred while deleting the mapping.',
       }),
   })

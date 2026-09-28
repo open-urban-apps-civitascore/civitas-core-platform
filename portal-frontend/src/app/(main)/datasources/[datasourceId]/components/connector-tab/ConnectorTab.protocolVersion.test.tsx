@@ -21,7 +21,6 @@ const baseMqttConfiguration = {
   urls: '',
   protocol_version: '3',
   topics: '',
-  client_id: '',
   qos: '1',
   connect_timeout: '',
   keepalive: '',

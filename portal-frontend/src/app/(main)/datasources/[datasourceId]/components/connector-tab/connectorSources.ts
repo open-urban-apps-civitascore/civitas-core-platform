@@ -46,14 +46,6 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       required: true,
     },
     {
-      key: 'client_id',
-      type: 'input',
-      label: { labelKey: 'mqtt.clientId.label' },
-      placeholderKey: 'mqtt.clientId.placeholder',
-      defaultValue: '',
-      required: false,
-    },
-    {
       key: 'qos',
       type: 'select',
       label: { labelKey: 'mqtt.qos.label' },

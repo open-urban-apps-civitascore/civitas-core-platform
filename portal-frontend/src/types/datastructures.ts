@@ -49,6 +49,7 @@ export const DatastructureVersionApiResponseSchema = z.object({
   model: z.record(z.string(), z.unknown()).nullable(),
   styles: z.custom<UMLDiagram>().nullable(),
   inUse: z.boolean().optional(),
+  inUseByReleased: z.boolean().optional(),
   dataStructure: ItemSchema,
   createdAt: z.string(),
   modifiedAt: z.string(),
@@ -63,6 +64,8 @@ export const DatastructureVersionSummaryApiResponseSchema = z.object({
   createdAt: z.string(),
   modifiedAt: z.string(),
   dataStructureId: z.string(),
+  inUse: z.boolean().optional(),
+  inUseByReleased: z.boolean().optional(),
 })
 
 // The version is assigned by the registry on store, never authored: the form carries it only to
@@ -112,6 +115,7 @@ export type DatastructureVersionsListData = {
   status: DatastructureStatusType
   source: DatastructureVersionSource
   versionNumber: string | null
+  inUseByReleased?: boolean
 }
 
 // DATASTRUCTURE TYPES
@@ -124,6 +128,7 @@ export const DatastructureApiResponseSchema = z.object({
   createdFromDataSource: z.boolean(),
   assignments: z.array(AssignmentSchema).optional(),
   inUse: z.boolean().optional(),
+  inUseByReleased: z.boolean().optional(),
   createdAt: z.string(),
   modifiedAt: z.string(),
   dataStructureVersions: z.array(DatastructureVersionSummaryApiResponseSchema),
@@ -199,4 +204,5 @@ export type DatastructuresListData = {
   versionNumber: string | null
   versions: DatastructuresListData[]
   inUse?: boolean
+  inUseByReleased?: boolean
 }

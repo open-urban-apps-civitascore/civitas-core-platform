@@ -16,7 +16,6 @@ import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
-import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -28,7 +27,6 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
@@ -60,7 +58,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DataSinkRepository dataSinkRepository;
-  @Autowired private DistributionRepository distributionRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataStructureRepository dataStructureRepository;
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
@@ -83,7 +80,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     styleRepository.deleteAll();
     dataSinkRepository.deleteAll();
     pipelineRepository.deleteAll();
-    distributionRepository.deleteAll();
     dataSetRepository.deleteAll();
     dataStructureVersionRepository.deleteAll();
     dataStructureRepository.deleteAll();
@@ -110,13 +106,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     p.setDataSet(dataSet);
     p.setVersion(1L);
     return pipelineRepository.save(p);
-  }
-
-  private Distribution createDistribution(DataSet dataSet) {
-    Distribution d = new Distribution();
-    d.setDataSet(dataSet);
-    d.setAccessUrl("http://example.com/" + UUID.randomUUID().toString().substring(0, 8));
-    return distributionRepository.save(d);
   }
 
   private Group createGroup() {
@@ -222,23 +211,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
       entityManager.flush();
 
       assertThat(pipelineRepository.findById(pipelineId)).isEmpty();
-    }
-
-    @Test
-    @Transactional
-    @DisplayName("Deleting DataSet should cascade-delete its Distributions")
-    void deletingDataSet_shouldCascadeDeleteDistributions() {
-      DataSet dataSet = createDataSet();
-      Distribution distribution = createDistribution(dataSet);
-      UUID distributionId = distribution.getId();
-
-      entityManager.flush();
-      entityManager.clear();
-
-      dataSetRepository.deleteById(dataSet.getId());
-      entityManager.flush();
-
-      assertThat(distributionRepository.findById(distributionId)).isEmpty();
     }
 
     @Test

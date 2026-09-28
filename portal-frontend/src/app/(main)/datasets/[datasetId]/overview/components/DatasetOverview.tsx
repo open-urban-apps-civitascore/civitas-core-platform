@@ -19,6 +19,7 @@ import {
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FooterElement } from '@/components/form/FooterElement'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
+import { InfoModal } from '@/components/modals/info-modal/InfoModal'
 import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -43,7 +44,7 @@ import {
   DatasetUpdateApiData,
   DatasetUpdateApiSchema,
 } from '@/types/datasets'
-import { isDatapoolScopeViolationError, isSagaInFlightError } from '@/utils/errors'
+import { isDatapoolScopeViolationError, isPipelineClosureInvalidError, isSagaInFlightError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { mapDatasetToFormData } from '../../../utils/mappers'
@@ -86,6 +87,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit' || !canEditMetadata)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+  const [isReleaseBlockedModalOpen, setIsReleaseBlockedModalOpen] = useState(false)
 
   const updateDataset = usePatchDataset()
   const updateReadyMeta = useUpdateReadyDatasetMeta()
@@ -226,7 +228,11 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       router.refresh()
       return true
     } catch (error) {
-      if (isDatapoolScopeViolationError(error)) {
+      if (isPipelineClosureInvalidError(error)) {
+        setDataSetStatus(serverStatus)
+        router.refresh()
+        setIsReleaseBlockedModalOpen(true)
+      } else if (isDatapoolScopeViolationError(error)) {
         toast.error(t('messages.datasourceScopeViolation'))
       } else if (isSagaInFlightError(error)) {
         toast.error(t('messages.sagaInFlightError'))
@@ -447,6 +453,14 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         onConfirm={handleSaveAndExit}
         isLoading={isLoading}
         onOpenChange={setIsExitModalOpen}
+      />
+
+      <InfoModal
+        open={isReleaseBlockedModalOpen}
+        title={t('releaseBlockedModal.title')}
+        description={t('releaseBlockedModal.description')}
+        onOpenChange={setIsReleaseBlockedModalOpen}
+        onClose={() => setIsReleaseBlockedModalOpen(false)}
       />
     </PageContainer>
   )
