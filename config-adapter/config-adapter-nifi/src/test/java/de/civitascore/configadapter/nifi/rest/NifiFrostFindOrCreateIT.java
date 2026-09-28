@@ -148,9 +148,9 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     frost.start();
     projectId = createProject();
 
-    // NiFi auto-loads a NAR from its extensions directory. Without it the processor does not exist
-    // and NiFi leaves the flow invalid instead of failing the deployment, which reads like a
-    // defect of the adapter — hence the explicit skip above rather than a silent timeout here.
+    // NiFi loads the NAR at startup. Without it the processor does not exist and the deployment
+    // fails — hence the explicit skip above rather than a failure that reads like an adapter
+    // defect.
     startNifi(HOST_PORT, network, container -> installFrostNar(container, nar.get()));
   }
 

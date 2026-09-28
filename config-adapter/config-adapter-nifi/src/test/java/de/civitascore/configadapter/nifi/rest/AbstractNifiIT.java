@@ -374,10 +374,15 @@ abstract class AbstractNifiIT {
     }
   }
 
-  /** Copies the NAR into the directory NiFi auto-loads extensions from. */
+  /**
+   * Copies the NAR into {@code lib}, which NiFi loads before it answers a request. The {@code
+   * extensions} directory of the image is not read at all: its start script points the auto-loader
+   * at {@code nar_extensions}, and the auto-loader works after startup, so a test that deploys at
+   * once could still miss the processor.
+   */
   protected static void installFrostNar(GenericContainer<?> container, Path nar) {
     container.withCopyFileToContainer(
-        MountableFile.forHostPath(nar), "/opt/nifi/nifi-current/extensions/nifi-frost-nar.nar");
+        MountableFile.forHostPath(nar), "/opt/nifi/nifi-current/lib/nifi-frost-nar.nar");
   }
 
   /** Closes the HTTP client and stops NiFi. Subclasses stop their own containers separately. */
