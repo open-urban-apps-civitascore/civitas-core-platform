@@ -44,7 +44,7 @@ export type PostgisDataSinkPayload = {
      * not the raw version id). Required by the backend. Always the geo persistence node's own data
      * structure, also when a mapping feeds the sink.
      */
-    element?: string
+    element: string
   }
   /** Acknowledges that this update discards the sink's stored data, rebuilt on the next release (see backend guard). */
   confirmDataLoss?: boolean
