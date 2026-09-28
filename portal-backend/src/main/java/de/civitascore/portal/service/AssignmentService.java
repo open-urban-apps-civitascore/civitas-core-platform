@@ -157,7 +157,6 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
     return switch (scopeType) {
       case DATASOURCE -> getRepository().findAllByScopeTypeAndDataSourceId(scopeType, scopeId);
       case DATASET -> getRepository().findAllByScopeTypeAndDatasetId(scopeType, scopeId);
-      case CATALOG -> getRepository().findAllByScopeTypeAndCatalogId(scopeType, scopeId);
       case DATASTRUCTURE ->
           getRepository().findAllByScopeTypeAndDataStructureId(scopeType, scopeId);
       case DATAPOOL -> getRepository().findAllByScopeTypeAndDataPoolId(scopeType, scopeId);

@@ -58,20 +58,26 @@ Kafka. It handles project-level operations only:
 
 | Operation | Request | Compensation |
 |---|---|---|
-| `CREATE_PROJECT` | Name lookup, then `POST /Projects` if absent | `DELETE_PROJECT` |
+| `CREATE_PROJECT` | Dataset-id lookup, then `POST /Projects` if none is found | `DELETE_PROJECT` |
 | `UPDATE_PROJECT` | Reads the current name and description, then `PATCH /Projects({projectId})`, or creates the project when the DataSet has none | `RESTORE_PROJECT` |
 | `DELETE_PROJECT` | Deletes the project's Things, then `DELETE /Projects({projectId})` | — |
 | `RESTORE_PROJECT` | `PATCH /Projects({projectId})` with the captured previous state, or the delete when the update provisioned the project | — |
 
 - **The project name is unique per DataSet:** `"{datasetName} ({datasetId})"`. The portal permits
   duplicate display names while FROST enforces project-name uniqueness, so the id is part of the name
-  and a name match only ever resolves to that DataSet's own project.
+  and a name match only ever resolves to that DataSet's own project. The display-name portion is
+  cosmetic (FROST has no other notion of the portal's dataset name); only the datasetId suffix is
+  load-bearing, since it survives a dataset rename that the display-name portion does not.
 - **A project exists only for a DataSet with a FROST data sink.** The orchestrator gates `CREATE_PROJECT`
   and `UPDATE_PROJECT` on it and leaves `DELETE_PROJECT` ungated — see
   [../config-adapter-flowable/README.md](../config-adapter-flowable/README.md).
-- **`CREATE_PROJECT` finds or creates.** An existing project under the derived name is reused, keeping
-  its Things, Datastreams and Observations intact. A 409 or a duplicate-signalling 500 from the POST
-  re-runs the lookup as a race guard.
+- **`CREATE_PROJECT` finds or creates, surviving a rename across an unrelease.** The lookup matches on
+  the datasetId suffix of the name (`endswith(name,'({datasetId})')`), not the full name, so it still
+  finds the project even when the DataSet was renamed while unreleased — the exact-name portion would
+  miss it. A found project is reused and its name/description are PATCHed back in sync with the
+  DataSet's current values, keeping its Things, Datastreams and Observations intact instead of
+  orphaning them behind a second project. A 409 or a duplicate-signalling 500 from the POST re-runs the
+  dataset-id lookup as a race guard.
 - **`UPDATE_PROJECT` provisions what it cannot patch.** A DataSet released without a FROST sink has no
   project, so a later update creates one rather than failing, and its compensation deletes it rather than
   restoring a state never captured.

@@ -25,7 +25,7 @@ tests {
 docs {
   **Precondition:** `dataSetId` is set; dataset is in `READY` state.
 
-  Reverts the dataset to DRAFT status. Auto-generated distributions are removed.
+  Reverts the dataset to DRAFT status.
 
   **Expected Response**
   - Status: `200 OK`
@@ -35,5 +35,5 @@ docs {
 
   | System | Expected Change |
   |---|---|
-  | Backend | DataSet status → `DRAFT`; distributions removed |
+  | Backend | DataSet status → `DRAFT` |
 }

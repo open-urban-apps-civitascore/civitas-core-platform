@@ -128,7 +128,7 @@ components:
         scopeType:
           type: string
           description: Authorization scope level
-          enum: [TENANT, DATASET, DATASOURCE, DATASTRUCTURE, CATALOG, DATAPOOL]
+          enum: [TENANT, DATASET, DATASOURCE, DATASTRUCTURE, DATAPOOL]
           example: "TENANT"
         scopeId:
           type: string

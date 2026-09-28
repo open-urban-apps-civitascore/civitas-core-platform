@@ -25,6 +25,7 @@ import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSourceW
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.stretchedKey;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -1116,6 +1117,32 @@ class FlowDeploymentPlannerTest {
     }
   }
 
+  // A planner that handed the stage a constant would give every pipeline of one graph the same id.
+  @Test
+  void mqttClientIdDependsOnThePipelineId() throws Exception {
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      assertNotEquals(
+          consumeMqttClientId(resolver, "p-one"), consumeMqttClientId(resolver, "p-two"));
+    }
+  }
+
+  // A planner key that varied per deploy would open a new broker session on every redeploy.
+  @Test
+  void mqttClientIdIsTheSameOnEveryDeploy() throws Exception {
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      assertEquals(consumeMqttClientId(resolver, "p-one"), consumeMqttClientId(resolver, "p-one"));
+    }
+  }
+
+  private String consumeMqttClientId(CredentialResolver resolver, String pipelineId)
+      throws Exception {
+    String snapshot =
+        planner(resolver)
+            .plan(req(pipelineId, graphWithMapping(), mqttSource(null), postgisSink()))
+            .snapshotJson();
+    return processorOfType(snapshot, "ConsumeMQTT").path("properties").path("Client ID").asText();
+  }
+
   @Test
   void connectTimeoutAndKeepaliveAreBoundAsSeconds() throws Exception {
     // portal sends durations like "5s"/"30s"; NiFi's Connection Timeout / Keep Alive want plain
@@ -1131,6 +1158,43 @@ class FlowDeploymentPlannerTest {
       assertTrue(snapshot.contains("\"Connection Timeout\":\"5\""));
       assertTrue(snapshot.contains("\"Keep Alive\":\"30\""));
     }
+  }
+
+  @Test
+  void mqttProtocolVersionIsBoundToTheNifiSpecificationValue() throws Exception {
+    for (Map.Entry<String, String> version : Map.of("3", "0", "5", "5").entrySet()) {
+      Datasource source = mqttSource(null);
+      source.handleUnknownProperty("protocol_version", version.getKey());
+      try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+        String snapshot =
+            planner(resolver)
+                .plan(req("p-mqtt-v" + version.getKey(), graphWithMapping(), source, postgisSink()))
+                .snapshotJson();
+        JsonNode mqtt = processorOfType(snapshot, "ConsumeMQTT");
+        assertEquals(
+            version.getValue(),
+            mqtt.path("properties").path("MQTT Specification Version").asText());
+      }
+    }
+  }
+
+  @Test
+  void legacyMqttSourceWithoutProtocolVersionUsesV3Auto() throws Exception {
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(req("p-mqtt-legacy", graphWithMapping(), mqttSource(null), postgisSink()))
+              .snapshotJson();
+      JsonNode mqtt = processorOfType(snapshot, "ConsumeMQTT");
+      assertEquals("0", mqtt.path("properties").path("MQTT Specification Version").asText());
+    }
+  }
+
+  @Test
+  void unsupportedMqttProtocolVersionIsRejected() throws Exception {
+    Datasource source = mqttSource(null);
+    source.handleUnknownProperty("protocol_version", "4");
+    assertPlanRejected(source, "p-mqtt-version-invalid");
   }
 
   @Test

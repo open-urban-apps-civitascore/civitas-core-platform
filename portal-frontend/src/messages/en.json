@@ -114,7 +114,6 @@
     },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
-      "commaSeparated": "comma-separated",
       "requiredInAvailable": "This field is required in the available mode.",
       "descriptionHint": "max. 150 characters",
       "creationSubtitle": "Only a name is required in the first step. Additional basic information can be added later.",
@@ -204,7 +203,6 @@
     "home": "Home",
     "menu-item": "Menu item",
     "sub-item": "Sub item",
-    "data-catalog": "Data catalog",
     "all-datasets": "All Datasets",
     "documentation": "Documentation",
     "logout": "Log out",
@@ -1036,7 +1034,65 @@
       "type": "Type",
       "typePlaceholder": "Select connector type",
       "connection": "Connection",
-      "establishConnection": "Establish Connection"
+      "establishConnection": "Establish Connection",
+      "mqtt": {
+        "urls": {
+          "label": "Brokers",
+          "hint": "comma-separated"
+        },
+        "protocolVersion": {
+          "label": "Protocol version",
+          "placeholder": "Select a version"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Password"
+        },
+        "topics": {
+          "label": "Topic"
+        },
+        "qos": {
+          "label": "QoS"
+        },
+        "connectTimeout": {
+          "label": "Connect Timeout"
+        },
+        "keepalive": {
+          "label": "Keepalive"
+        },
+        "tls": {
+          "label": "TLS Enabled"
+        }
+      },
+      "sql": {
+        "driver": {
+          "label": "Driver"
+        },
+        "dsn": {
+          "label": "DSN",
+          "placeholder": "Driver-specific connection string"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Password"
+        },
+        "table": {
+          "label": "Table",
+          "placeholder": "table"
+        },
+        "columns": {
+          "label": "Columns",
+          "hint": "comma-separated",
+          "placeholder": "* or col1, col2"
+        },
+        "where": {
+          "label": "WHERE"
+        }
+      }
     },
     "dataModel": {
       "placeholder": {
@@ -1264,6 +1320,22 @@
       "noPermission": "No permission to read datasources",
       "anonymousName": "Anonymous Data Source"
     },
+    "sink": {
+      "locked": {
+        "provisioned": {
+          "title": "Provisioned",
+          "description": "This Data storage has been provisioned and can no longer be edited or removed."
+        },
+        "inUseByLayer": {
+          "title": "In use",
+          "tooltip": "This Data storage is used by API layers. To edit or remove it, the layer assignments must be removed first."
+        }
+      },
+      "notRemovable": {
+        "provisioned": "Data storage can not be removed. This Data storage has been provisioned and can no longer be removed.",
+        "inUseByLayer": "Data storage can not be removed. This Data storage is used by API layers. Remove the layer assignments first."
+      }
+    },
     "frostPanel": {
       "details": "Sensor Data Storage Details",
       "serverName": "Server Name",
@@ -1416,8 +1488,10 @@
       "tableNameConflict": "Cannot save {names}: a geo persistence table name is already used by another data storage of this Dataset.",
       "dataSinkInUseError": "Cannot save {names}: a data storage is still used by at least one layer.",
       "unconfirmedDataLossError": "Cannot save {names}: the change would discard stored data.",
-      "notDraftError": "The Dataset must be in draft status to make changes.",
-      "sagaInFlightError": "The Dataset is currently being processed. Please try again later."
+      "notDraftError": "The dataset must be in draft status to make changes.",
+      "sagaInFlightError": "The dataset is currently being processed. Please try again later.",
+      "sinkStillInUse": "{names} was saved, but a removed data storage is still in use and cannot be deleted.",
+      "sinkDeleteFailed": "{names} was saved, but a removed data storage could not be deleted."
     },
     "tabs": {
       "closeTab": "Close tab",

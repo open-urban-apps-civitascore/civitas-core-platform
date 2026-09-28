@@ -18,16 +18,16 @@ vi.mock('./connectorSources', () => ({
       {
         key: 'urls',
         type: 'input',
+        // Literal placeholder — exercises the non-translated path.
         placeholder: 'mqtt://localhost',
         required: true,
-        label: { label: 'URLs', labelHint: 'hint' },
+        label: { labelKey: 'URLs', hintKey: 'hint' },
       },
       {
         key: 'tls',
         type: 'checkbox',
-        placeholder: '',
         required: false,
-        label: { label: 'TLS', labelHint: null },
+        label: { labelKey: 'TLS' },
       },
       {
         key: 'qos',
@@ -35,14 +35,23 @@ vi.mock('./connectorSources', () => ({
         placeholder: 'qos',
         required: false,
         options: ['0', '1', '2'],
-        label: { label: 'QoS', labelHint: null },
+        label: { labelKey: 'QoS' },
       },
       {
-        key: 'client_id',
+        key: 'protocol_version',
+        type: 'select',
+        placeholder: 'protocol version',
+        required: true,
+        options: ['3', '5'],
+        label: { labelKey: 'Protocol Version' },
+      },
+      {
+        key: 'keepalive',
         type: 'textArea',
-        placeholder: 'client id',
+        // Translated placeholder — exercises the translation-key path.
+        placeholderKey: 'keepalive',
         required: false,
-        label: { label: 'Client ID', labelHint: null },
+        label: { labelKey: 'Keepalive' },
       },
     ],
     SQL: [
@@ -51,28 +60,28 @@ vi.mock('./connectorSources', () => ({
         type: 'input',
         placeholder: 'postgres://test:test@host:5432/db',
         required: true,
-        label: { label: 'DSN', labelHint: null },
+        label: { labelKey: 'DSN' },
       },
       {
         key: 'table',
         type: 'input',
-        placeholder: 'my_table',
+        placeholderKey: 'my_table',
         required: true,
-        label: { label: 'Table', labelHint: null },
+        label: { labelKey: 'Table' },
       },
       {
         key: 'columns',
         type: 'input',
         placeholder: 'id,name,created_at',
         required: true,
-        label: { label: 'Columns', labelHint: null },
+        label: { labelKey: 'Columns' },
       },
       {
         key: 'init_files',
         type: 'input',
-        placeholder: 'init.sql',
+        placeholderKey: 'init.sql',
         required: false,
-        label: { label: 'Init Files', labelHint: null },
+        label: { labelKey: 'Init Files' },
       },
     ],
   },
@@ -88,8 +97,8 @@ const defaultValues: DatasourceFormDraft = {
   configuration: {
     urls: '',
     topics: '',
-    client_id: '',
     qos: '0',
+    protocol_version: '3',
     connect_timeout: '',
     keepalive: '',
     tls: false,
@@ -150,13 +159,26 @@ describe('ConnectorTab (integration)', () => {
     expect(screen.getByRole('checkbox')).toBeInTheDocument()
     const qosSelect = screen.getByLabelText(/QoS/)
     expect(qosSelect).toBeInTheDocument()
-    expect(screen.getByLabelText('Client ID')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('client id')).toBeInTheDocument()
+    expect(screen.getByLabelText('Keepalive')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('keepalive')).toBeInTheDocument()
 
     fireEvent.click(qosSelect)
     await screen.findByText('1')
     expect(screen.getByText('1')).toBeInTheDocument()
     expect(screen.getByText('2')).toBeInTheDocument()
+  })
+
+  it('renders the protocol version select field when MQTT is selected', async () => {
+    renderConnectorTab()
+
+    const protocolVersionSelect = screen.getByLabelText(/Protocol Version/)
+    expect(protocolVersionSelect).toBeInTheDocument()
+
+    // Default configured value is '3', already shown selected in the trigger — only the other
+    // option needs opening the dropdown to become visible, mirroring the qos select test above.
+    fireEvent.click(protocolVersionSelect)
+    await screen.findByText('5')
+    expect(screen.getByText('5')).toBeInTheDocument()
   })
 
   it('renders fields for a non-default connector type', () => {
@@ -176,12 +198,13 @@ describe('ConnectorTab (integration)', () => {
     expect(screen.getByLabelText(/Columns/)).toBeInTheDocument()
     expect(screen.getByLabelText(/Init Files/)).toBeInTheDocument()
     expect(screen.queryByLabelText(/URLs/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Protocol Version/)).not.toBeInTheDocument()
   })
 
   it('renders label hint when present', () => {
     renderConnectorTab()
 
-    expect(screen.getByText(/(info.hint)/)).toBeInTheDocument()
+    expect(screen.getByText(/\(hint\)/)).toBeInTheDocument()
   })
 
   it('works in draft mode', () => {
