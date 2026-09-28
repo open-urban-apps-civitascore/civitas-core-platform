@@ -11,6 +11,7 @@ package de.civitascore.configadapter.nifi.flow.stage.sink;
 
 import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.addAutoTerminated;
 import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.removeAutoTerminated;
+import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.setExpression;
 import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.setProp;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
@@ -358,7 +359,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     // malformed TimeInterval, a missing required property) answers 4xx with the reason in the body,
     // which InvokeHTTP captures into frost.response.body. Without it the operator sees only the
     // status code and cannot tell which field the mapping got wrong.
-    setProp(
+    setExpression(
         errorSink,
         "log-message",
         "Pipeline record dropped (cause in the failing processor's bulletin):"
@@ -446,7 +447,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     // every later empty-keyed record would silently converge on that garbage entity. Guard once
     // over all match keys and route offenders to the error sink.
     Processor keyGuard = ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, "unmatched", "staKeyGuard");
-    setProp(keyGuard, "missing", emptyKeyCondition(plan));
+    setExpression(keyGuard, "missing", emptyKeyCondition(plan));
     removeAutoTerminated(keyGuard, "unmatched");
 
     ctx.addProcessor(split);
@@ -530,7 +531,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
     if (plan.observationBody() != null) {
       Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "obsBody");
-      setProp(renderBody, "Replacement Value", plan.observationBody());
+      setExpression(renderBody, "Replacement Value", plan.observationBody());
       Processor post = loadFrostHttp(ctx, HttpResponseUse.CAPTURE_AND_END, "obsPost");
       setProp(post, "HTTP Method", "POST");
       setProp(post, "HTTP URL", base + "/Observations");
@@ -585,11 +586,11 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       throws FatalAdapterException {
     Processor get = loadFrostHttp(ctx, HttpResponseUse.READ_FROM_CONTENT, disc + "Get");
     setProp(get, "HTTP Method", "GET");
-    setProp(get, "HTTP URL", lookupUrl);
+    setExpression(get, "HTTP URL", lookupUrl);
     Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
     setProp(extractId, idAttribute, "$.value[0]['@iot.id']");
     Processor route = ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, "new", disc + "Route");
-    setProp(route, "new", "${" + idAttribute + ":isEmpty()}");
+    setExpression(route, "new", "${" + idAttribute + ":isEmpty()}");
 
     for (Processor p : List.of(get, extractId, route)) {
       ctx.addProcessor(p);
@@ -610,14 +611,14 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     Tail updated = buildPatchPath(ctx, disc, idAttribute, updateBody, postUrl, route, errorSink);
 
     Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", disc + "Body");
-    setProp(renderBody, "Replacement Value", body);
+    setExpression(renderBody, "Replacement Value", body);
     Processor post = loadFrostHttp(ctx, HttpResponseUse.CAPTURE_INTO_ATTRIBUTE, disc + "Post");
     setProp(post, "HTTP Method", "POST");
-    setProp(post, "HTTP URL", postUrl);
+    setExpression(post, "HTTP URL", postUrl);
     setProp(post, "Request Content-Type", "application/json");
     Processor reGet = loadFrostHttp(ctx, HttpResponseUse.READ_FROM_CONTENT, disc + "ReGet");
     setProp(reGet, "HTTP Method", "GET");
-    setProp(reGet, "HTTP URL", lookupUrl);
+    setExpression(reGet, "HTTP URL", lookupUrl);
     Processor reId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "ReId");
     setProp(reId, idAttribute, "$.value[0]['@iot.id']");
     // A POST that returns 2xx but whose re-GET cannot re-find the entity by its own match key
@@ -627,7 +628,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     // its own condition so "create unconfirmed" is logged as itself.
     Processor confirm =
         ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, "unconfirmed", disc + "Confirm");
-    setProp(confirm, "unconfirmed", "${" + idAttribute + ":isEmpty()}");
+    setExpression(confirm, "unconfirmed", "${" + idAttribute + ":isEmpty()}");
 
     for (Processor p : List.of(renderBody, post, reGet, reId, confirm)) {
       ctx.addProcessor(p);
@@ -666,11 +667,11 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       throws FatalAdapterException {
     Processor get = loadFrostHttp(ctx, HttpResponseUse.READ_FROM_CONTENT, disc + "Get");
     setProp(get, "HTTP Method", "GET");
-    setProp(get, "HTTP URL", navigationUrl + "?$top=1");
+    setExpression(get, "HTTP URL", navigationUrl + "?$top=1");
     Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
     setProp(extractId, idAttribute, "$.value[0]['@iot.id']");
     Processor route = ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, "new", disc + "Route");
-    setProp(route, "new", "${" + idAttribute + ":isEmpty()}");
+    setExpression(route, "new", "${" + idAttribute + ":isEmpty()}");
 
     for (Processor processor : List.of(get, extractId, route)) {
       ctx.addProcessor(processor);
@@ -685,10 +686,10 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     Tail updated = buildPatchPath(ctx, disc, idAttribute, body, entityUrl, route, errorSink);
 
     Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", disc + "Body");
-    setProp(renderBody, "Replacement Value", body);
+    setExpression(renderBody, "Replacement Value", body);
     Processor post = loadFrostHttp(ctx, HttpResponseUse.CAPTURE_INTO_ATTRIBUTE, disc + "Post");
     setProp(post, "HTTP Method", "POST");
-    setProp(post, "HTTP URL", navigationUrl);
+    setExpression(post, "HTTP URL", navigationUrl);
     setProp(post, "Request Content-Type", "application/json");
     ctx.addProcessor(renderBody);
     ctx.addProcessor(post);
@@ -714,11 +715,11 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       throws FatalAdapterException {
     Processor get = loadFrostHttp(ctx, HttpResponseUse.READ_FROM_CONTENT, disc + "Get");
     setProp(get, "HTTP Method", "GET");
-    setProp(get, "HTTP URL", navigationUrl);
+    setExpression(get, "HTTP URL", navigationUrl);
     Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
     setProp(extractId, idAttribute, "$['@iot.id']");
     Processor route = ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, "missing", disc + "Route");
-    setProp(route, "missing", "${" + idAttribute + ":isEmpty()}");
+    setExpression(route, "missing", "${" + idAttribute + ":isEmpty()}");
 
     for (Processor processor : List.of(get, extractId, route)) {
       ctx.addProcessor(processor);
@@ -745,10 +746,10 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       Processor errorSink)
       throws FatalAdapterException {
     Processor updateBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", disc + "UpdateBody");
-    setProp(updateBody, "Replacement Value", body);
+    setExpression(updateBody, "Replacement Value", body);
     Processor patch = loadFrostHttp(ctx, HttpResponseUse.CAPTURE_INTO_ATTRIBUTE, disc + "Patch");
     setProp(patch, "HTTP Method", "PATCH");
-    setProp(patch, "HTTP URL", entityUrl + "(${" + idAttribute + "})");
+    setExpression(patch, "HTTP URL", entityUrl + "(${" + idAttribute + "})");
     setProp(patch, "Request Content-Type", "application/json");
     ctx.addProcessor(updateBody);
     ctx.addProcessor(patch);
@@ -830,7 +831,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
                 "${frost.id:isEmpty()}"));
 
     Processor restore = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "thingRestore");
-    setProp(restore, "Replacement Value", "${frost.body}");
+    setExpression(restore, "Replacement Value", "${frost.body}");
     Processor post = loadFrostHttp(ctx, HttpResponseUse.END, "thingPost");
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", base + "/Things");
@@ -838,10 +839,10 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
     Processor updateRestore =
         ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "thingUpdateRestore");
-    setProp(updateRestore, "Replacement Value", "${frost.body}");
+    setExpression(updateRestore, "Replacement Value", "${frost.body}");
     Processor patch = loadFrostHttp(ctx, HttpResponseUse.CAPTURE_AND_END, "thingPatch");
     setProp(patch, "HTTP Method", "PATCH");
-    setProp(patch, "HTTP URL", base + "/Things(${frost.id})");
+    setExpression(patch, "HTTP URL", base + "/Things(${frost.id})");
     setProp(patch, "Request Content-Type", "application/json");
 
     ctx.addProcessor(restore);
@@ -892,7 +893,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     ctx.addConnection(route, errorSink, "unmatched");
 
     Processor restore = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "obsRestore");
-    setProp(restore, "Replacement Value", "${frost.body}");
+    setExpression(restore, "Replacement Value", "${frost.body}");
     // Merge the resolved Datastream id as the first key of the observation object: a regex replace
     // of the leading brace injects "Datastream":{"@iot.id":<id>},. This assumes the observation is
     // a non-empty JSON object (a STA Observation always carries at least `result`, so it is never
@@ -901,7 +902,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     Processor inject = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "obsInject");
     setProp(inject, "Replacement Strategy", "Regex Replace");
     setProp(inject, "Search Value", "^\\{");
-    setProp(inject, "Replacement Value", "{\"Datastream\":{\"@iot.id\":${frost.id}},");
+    setExpression(inject, "Replacement Value", "{\"Datastream\":{\"@iot.id\":${frost.id}},");
     Processor post = loadFrostHttp(ctx, HttpResponseUse.END, "obsPost");
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", base + "/Observations");
@@ -957,14 +958,14 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
     Processor get = loadFrostHttp(ctx, HttpResponseUse.READ_FROM_CONTENT, disc + "Get");
     setProp(get, "HTTP Method", "GET");
-    setProp(get, "HTTP URL", leg.getUrl());
+    setExpression(get, "HTTP URL", leg.getUrl());
 
     Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
     setProp(extractId, "frost.id", "$.value[0]['@iot.id']");
 
     Processor route =
         ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, leg.routeRelationship(), disc + "Route");
-    setProp(route, leg.routeRelationship(), leg.routeCondition());
+    setExpression(route, leg.routeRelationship(), leg.routeCondition());
 
     for (Processor p : List.of(split, extractBody, extractRef, get, extractId, route)) {
       ctx.addProcessor(p);

@@ -73,9 +73,9 @@ import org.testcontainers.utility.MountableFile;
  *   <li><b>MQTT (non-STA payload)</b>: the STA bodies are rendered from mapped record fields —
  *       Thing find-or-create stays idempotent across re-deliveries, the observation lands typed on
  *       the pre-provisioned Datastream (with an explicitly deep-inserted FeatureOfInterest and the
- *       optional {@code resultQuality}/{@code validTime} fields), and tenant values containing
- *       NiFi-EL/backreference syntax ({@code ${HOSTNAME}}, {@code $1}, {@code
- *       ${SINGLE_USER_CREDENTIALS_PASSWORD}}) arrive <i>literally</i> in FROST — the
+ *       optional {@code resultQuality}/{@code validTime} fields), a data value containing
+ *       NiFi-EL/backreference syntax ({@code ${NIFI_SECURITY_USER_OIDC_CLIENT_SECRET}}, {@code $1})
+ *       and a const value containing bare {@code $} arrive <i>literally</i> in FROST — the
  *       injection-hardening proof for the template path.
  *   <li><b>SQL (table rows)</b>: a multi-record batch is split into individual STA elements ({@code
  *       $[*]}), deduplicating the Thing across rows and re-reads.
@@ -104,14 +104,11 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String CREATABLE_TOPIC = "civitas/it/frost-creatable";
   private static final String REF_CREATE = "REF-CREATE-1";
 
-  // EL/backreference-shaped tenant values: they must arrive in FROST byte-identically, never
-  // expanded against the NiFi environment or interpreted as a regex backreference. Both referenced
-  // env vars ARE set in the container (HOSTNAME always; NIFI_SECURITY_USER_OIDC_CLIENT_SECRET holds
-  // exactly the secret the assertion below forbids from leaking), so an expansion bug would be
-  // caught here.
-  private static final String INJECTION_NAME = "Station ${HOSTNAME} $1";
-  private static final String INJECTION_DESCRIPTION =
-      "unit ${NIFI_SECURITY_USER_OIDC_CLIENT_SECRET}";
+  // The container sets the referenced env var, so an EL expansion of the payload name would leak a
+  // real secret; the const description passes the deploy check because no '{' follows its '$'.
+  private static final String INJECTION_NAME =
+      "Station ${NIFI_SECURITY_USER_OIDC_CLIENT_SECRET} $1";
+  private static final String INJECTION_DESCRIPTION = "unit US$5 $1";
 
   private static final String REF_MAP = "REF-MAP-1";
   private static final String DS_MAP = "DS-MAP-1";
@@ -286,14 +283,12 @@ class NifiFrostMappingIT extends AbstractNifiIT {
       assertEquals(1, countThings(REF_MAP), "re-delivered message must reuse the Thing");
     }
 
-    // Injection hardening: the tenant-supplied name (data path) and const description (mapping
-    // path) must arrive literally — no EL expansion, no $1 backreference, no leaked env secret.
     JsonNode thing = thingByReference(REF_MAP);
     assertEquals(INJECTION_NAME, thing.path("name").asText(), "EL in a data value must stay data");
     assertEquals(
         INJECTION_DESCRIPTION,
         thing.path("description").asText(),
-        "EL in a const value must stay literal (\\$ escaped as \\$\\$)");
+        "a bare $ in a const value must reach FROST unchanged");
     assertFalse(
         thing.toString().contains(OIDC_CLIENT_SECRET),
         "the NiFi OIDC client secret must never leak into FROST");

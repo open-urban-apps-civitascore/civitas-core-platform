@@ -27,6 +27,7 @@ import de.civitascore.configadapter.nifi.graph.NodeKind;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
 import de.civitascore.configadapter.nifi.mapping.SinkPreRegionPlan;
+import de.civitascore.configadapter.nifi.mapping.UnsafePropertyValueException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -119,22 +120,26 @@ public class FlowDeploymentPlanner {
     }
 
     PlanContext out = new PlanContext();
-    sourceStage.bind(source, sourceNodeKey(request.pipelineId(), path.source()), out);
-    bindSink(sinkStage, sink, out);
-
     String processGroupName = "pipeline-" + request.pipelineId();
-    String snapshot =
-        flowBuilder.build(
-            new FlowBuildSpec(
-                processGroupName,
-                sourceType,
-                out.sourceProperties(),
-                sink.type(),
-                out.sinkProperties(),
-                chain.units(),
-                out.controllerServiceProperties(),
-                sourceCron.orElse(null),
-                chain.sinkPreRegion()));
+    String snapshot;
+    try {
+      sourceStage.bind(source, sourceNodeKey(request.pipelineId(), path.source()), out);
+      bindSink(sinkStage, sink, out);
+      snapshot =
+          flowBuilder.build(
+              new FlowBuildSpec(
+                  processGroupName,
+                  sourceType,
+                  out.sourceProperties(),
+                  sink.type(),
+                  out.sinkProperties(),
+                  chain.units(),
+                  out.controllerServiceProperties(),
+                  sourceCron.orElse(null),
+                  chain.sinkPreRegion()));
+    } catch (UnsafePropertyValueException e) {
+      throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
+    }
 
     return new DeploymentPlan(processGroupName, snapshot, Map.copyOf(out.sensitive()));
   }

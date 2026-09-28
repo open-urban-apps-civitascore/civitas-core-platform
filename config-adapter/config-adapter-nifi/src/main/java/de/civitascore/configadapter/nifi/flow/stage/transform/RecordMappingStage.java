@@ -9,7 +9,6 @@
  */
 package de.civitascore.configadapter.nifi.flow.stage.transform;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
 import de.civitascore.configadapter.nifi.flow.stage.Fragment;
@@ -91,8 +90,7 @@ public final class RecordMappingStage implements TransformStage {
       Processor processor =
           ctx.loadProcessor(
               Fragment.UPDATE_RECORD, "success", discriminator(group.getKey().name()));
-      applyMapping(
-          (ObjectNode) processor.node().get("properties"), group.getKey(), group.getValue());
+      applyMapping(processor, group.getKey(), group.getValue());
       result.add(processor);
       failureSources.add(processor);
     }
@@ -132,7 +130,7 @@ public final class RecordMappingStage implements TransformStage {
     Processor guard =
         ctx.loadProcessor(
             Fragment.ROUTE_ON_ATTRIBUTE, "unmatched", discriminator(FORK_GUARD_DISCRIMINATOR));
-    BuildContext.setProp(guard, FORK_GUARD_FAILURE_PROPERTY, NO_RECORDS);
+    BuildContext.setExpression(guard, FORK_GUARD_FAILURE_PROPERTY, NO_RECORDS);
     BuildContext.removeAutoTerminated(guard, "unmatched");
     return guard;
   }
@@ -141,23 +139,13 @@ public final class RecordMappingStage implements TransformStage {
     return chainIndex == 0 ? seed : seed + ":" + chainIndex;
   }
 
-  private void applyMapping(
-      ObjectNode props,
+  private static void applyMapping(
+      Processor processor,
       ReplacementStrategy strategy,
       List<UpdateRecordProperty> mappingProperties) {
-    List<String> stale = new ArrayList<>();
-    props
-        .fieldNames()
-        .forEachRemaining(
-            name -> {
-              if (name.startsWith("/")) {
-                stale.add(name);
-              }
-            });
-    stale.forEach(props::remove);
-    props.put(STRATEGY_PROPERTY, strategy.nifiValue());
+    BuildContext.setProp(processor, STRATEGY_PROPERTY, strategy.nifiValue());
     for (UpdateRecordProperty property : mappingProperties) {
-      props.put(property.recordPath(), property.value());
+      BuildContext.setProp(processor, property.recordPath(), property.value());
     }
   }
 }

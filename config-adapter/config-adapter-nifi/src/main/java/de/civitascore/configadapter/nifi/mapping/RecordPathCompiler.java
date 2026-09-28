@@ -128,13 +128,11 @@ public class RecordPathCompiler {
       // the literal-value strategy. The builder groups properties by strategy into separate
       // UpdateRecord processors.
       return new UpdateRecordProperty(
-          destination,
-          NifiExpressionLanguage.escape(String.valueOf(constant.value())),
-          ReplacementStrategy.LITERAL_VALUE);
+          destination, String.valueOf(constant.value()), ReplacementStrategy.LITERAL_VALUE);
     }
     return new UpdateRecordProperty(
         destination,
-        NifiExpressionLanguage.escape(render(node, geometryEncoding, target, fork)),
+        render(node, geometryEncoding, target, fork),
         ReplacementStrategy.RECORD_PATH_VALUE);
   }
 
