@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -81,6 +81,22 @@ describe('DatastructuresTable', () => {
     renderTable()
     const rows = screen.getAllByRole('row')
     expect(rows).toHaveLength(3) // 1 header + 2 data rows
+  })
+
+  it('shows the Usage column and marks only the rows a released entity references', () => {
+    const [first, second] = mockDatastructures
+    renderTable({
+      ...defaultProps,
+      datastructures: [
+        { ...first, inUse: true, inUseByReleased: true },
+        { ...second, inUse: true, inUseByReleased: false },
+      ],
+    })
+    const rows = screen.getAllByRole('row')
+
+    expect(screen.getByRole('columnheader', { name: 'Verwendung' })).toBeDefined()
+    expect(within(rows[1]).getByTestId('inUseIndicator')).toBeInTheDocument()
+    expect(within(rows[2]).queryByTestId('inUseIndicator')).toBeNull()
   })
 
   describe('Permission gating', () => {

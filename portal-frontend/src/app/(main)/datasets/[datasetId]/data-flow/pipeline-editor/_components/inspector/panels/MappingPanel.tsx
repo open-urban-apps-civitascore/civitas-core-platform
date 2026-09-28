@@ -22,6 +22,7 @@ import { parseCompositeKey, useDatastructureVersionInfo } from '../../../_hooks/
 import type { MappingNodeData } from '../../../_types/nodes'
 import { emptyMappingConfig, type MappingConfig } from '../../mapping-editor/_types'
 import { MappingEditorModal } from '../../mapping-editor/MappingEditorModal'
+import { EntityMetadata } from '../components/EntityMetadata'
 
 interface SchemaSelection {
   datastructureId: string
@@ -76,6 +77,7 @@ interface MappingPanelProps {
 
 export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
   const t = useTranslations('pipelineEditor.mappingPanel')
+  const tStatus = useTranslations('common.status')
   const [isEditorOpen, setIsEditorOpen] = useState(false)
 
   const sourceKey =
@@ -84,9 +86,10 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
     data.targetDatastructureId && data.targetVersionId ? `${data.targetDatastructureId}/${data.targetVersionId}` : null
   const canOpen = Boolean(data.label.trim() && sourceKey && targetKey)
 
-  // Names are not stored on the node — resolve them from the version references at render time.
-  const { name: sourceName } = useDatastructureVersionInfo(sourceKey ?? undefined)
-  const { name: targetName } = useDatastructureVersionInfo(targetKey ?? undefined)
+  // Names and statuses are not stored on the node — resolve them from the version references at
+  // render time.
+  const { name: sourceName, status: sourceStatus } = useDatastructureVersionInfo(sourceKey ?? undefined)
+  const { name: targetName, status: targetStatus } = useDatastructureVersionInfo(targetKey ?? undefined)
 
   // The node is "configured" (deployable) ONLY after the field mapping has been saved (handleSave).
   // The name and the source/target selection alone never mark it configured — otherwise a node with
@@ -140,6 +143,14 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
         selectedKey={targetKey}
         name={targetName}
         onSelect={handleTarget}
+      />
+
+      <EntityMetadata
+        title={t('details')}
+        items={[
+          { label: t('inputStatus'), value: sourceStatus ? tStatus(sourceStatus) : undefined },
+          { label: t('outputStatus'), value: targetStatus ? tStatus(targetStatus) : undefined },
+        ]}
       />
 
       <Button className="w-full" disabled={!canOpen} onClick={() => setIsEditorOpen(true)}>

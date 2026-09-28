@@ -82,8 +82,7 @@ export const useDatastructure = ({
   const descriptionWatch = form.watch('description')
 
   const isDraftMode = datastructureStatus === DATASTRUCTURE_STATUS_TYPES.DRAFT
-  const isInUse = !!datastructure.inUse
-  const canSetDraft = !isInUse
+  const canSetDraft = !datastructure.inUseByReleased
 
   const hasAvailableVersion = useMemo(
     () =>

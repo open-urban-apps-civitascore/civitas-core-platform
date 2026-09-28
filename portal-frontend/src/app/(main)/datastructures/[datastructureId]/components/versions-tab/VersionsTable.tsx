@@ -2,6 +2,7 @@ import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable }
 import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
+import { InUseIndicator } from '@/components/in-use-indicator/InUseIndicator'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
@@ -70,6 +71,17 @@ export const VersionsTable = (props: VersionsTableProps) => {
     columnHelper.accessor('source', {
       header: t('tableHeaders.source'),
       cell: info => (info.getValue() ? tVersion(`source.${info.getValue()}`) : '-'),
+      meta: {
+        style: {
+          width: '5%',
+          minWidth: '100px',
+        },
+      },
+    }),
+    columnHelper.accessor('inUseByReleased', {
+      header: tCommon('inUse.columnHeader'),
+      cell: info => <InUseIndicator isInUseByReleased={!!info.getValue()} />,
+      enableSorting: false,
       meta: {
         style: {
           width: '5%',
