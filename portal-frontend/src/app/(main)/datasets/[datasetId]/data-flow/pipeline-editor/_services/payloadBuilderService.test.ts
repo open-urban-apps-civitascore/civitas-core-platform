@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { CONTRACT_URIS, contractErrors, type ContractKind } from '@/test-support/coreContracts'
-import { everyNodeTypePipeline, type FixtureNode, pipeline } from '@/test-support/pipelineFixtures'
+import {
+  everyNodeTypePipeline,
+  type FixtureNode,
+  mappingNode as mappingFixture,
+  pipeline,
+} from '@/test-support/pipelineFixtures'
 import { DATASINK_TYPES, type DataSinkPayload } from '@/types/datasinks'
 
 import type { Pipeline } from '../_types/pipeline'
@@ -15,6 +20,7 @@ import {
   isDestructiveDataSinkChange,
   MappingDocumentValidationError,
   PipelineModelValidationError,
+  updateNodeData,
 } from './payloadBuilderService'
 
 /**
@@ -533,5 +539,38 @@ describe('CORE-IR conformance of the artifacts sent to Model Forge', () => {
     }
     const [artifact] = buildMappingArtifacts(pipeline([node], []))
     expect(contractErrors('mapping', stamped('mapping', MAPPING_URN, artifact.body))).toEqual([])
+  })
+})
+
+// ============================================================================
+// The Mapping reference the Pipeline carries
+// ============================================================================
+
+describe('the Mapping reference the Pipeline carries', () => {
+  const VERSIONED = 'urn:core:platform:civitas:mapping:common:SrcToTgt:abcdef1234:1.0.0'
+  const LOGICAL = 'urn:core:platform:civitas:mapping:common:SrcToTgt:abcdef1234'
+
+  // Mirrors the save step: the mapping response returns both URNs and both are stashed on the node.
+  const afterMappingSave = () => {
+    const unsaved = pipeline([mappingFixture({ data: { mappingRef: undefined } })], [])
+    return updateNodeData(unsaved, 'map-1', { mappingRef: VERSIONED, mappingLogicalUrn: LOGICAL })
+  }
+
+  it('names the Mapping by its versioned URN', () => {
+    const { model } = buildPipelinePayload(afterMappingSave())
+    expect(model.nodes.find(n => n.id === 'map-1')).toMatchObject({ mappingRef: VERSIONED })
+  })
+
+  it('leaves the logical URN out of the CORE model', () => {
+    const { model } = buildPipelinePayload(afterMappingSave())
+    const node = model.nodes.find(n => n.id === 'map-1')
+    expect(node).not.toHaveProperty('mappingLogicalUrn')
+    expect(node).toEqual({
+      id: 'map-1',
+      kind: 'mapping',
+      label: 'Mapping',
+      mappingRef: VERSIONED,
+      'x-ui-position': { x: 50, y: 60 },
+    })
   })
 })
