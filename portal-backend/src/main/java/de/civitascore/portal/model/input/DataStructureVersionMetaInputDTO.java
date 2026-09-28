@@ -5,13 +5,12 @@ import lombok.EqualsAndHashCode;
 
 /**
  * The metadata of a data structure version: the fields that stay changeable while the version is
- * released. The model and its styles are not part of it.
+ * released. The model, its styles and the model name are not part of it: the model name repeats the
+ * diagram name in the styles.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataStructureVersionMetaInputDTO extends BaseInputDTO {
 
   private String description;
-
-  private String modelName;
 }

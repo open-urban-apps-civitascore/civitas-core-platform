@@ -235,7 +235,7 @@ class DataStructureVersionServiceTest {
   class UpdateReleasedMetaTests {
 
     @Test
-    @DisplayName("Should change description and modelName and keep the model pin")
+    @DisplayName("Should change description and keep the model pin")
     void updateReleasedMeta_whenNotInUse_keepsModelPin() {
       // A released version that no released entity uses is the case that could replace its model;
       // without this test a meta path routed through the full update would replace it.
@@ -249,7 +249,6 @@ class DataStructureVersionServiceTest {
 
       DataStructureVersionMetaInputDTO meta = new DataStructureVersionMetaInputDTO();
       meta.setDescription("New description");
-      meta.setModelName("NewModel");
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -257,7 +256,7 @@ class DataStructureVersionServiceTest {
       DataStructureVersion result = dataStructureVersionService.updateReleasedMeta(versionId, meta);
 
       assertThat(result.getDescription()).isEqualTo("New description");
-      assertThat(result.getModelName()).isEqualTo("NewModel");
+      assertThat(result.getModelName()).isEqualTo("OldModel");
       assertThat(result.getModelUrn())
           .isEqualTo("urn:core:platform:civitas:element:common:test:1.0.0");
       assertThat(result.getVersion()).isEqualTo("1.0.0");

@@ -88,7 +88,7 @@ public class DataStructureVersionController
   /** {@inheritDoc} */
   @Override
   protected List<String> getFieldsFixedAfterRelease() {
-    return List.of("model", "styles");
+    return List.of("model", "styles", "modelName");
   }
 
   /**
@@ -205,16 +205,17 @@ public class DataStructureVersionController
       operationId = "updateDataStructureVersionReleasedMeta",
       summary = "Update metadata of a released data structure version",
       description =
-          "Applies a JSON merge patch to the description and modelName of a released data"
-              + " structure version (AVAILABLE status). An omitted field keeps its value. The model"
-              + " and styles of a released version do not change; a request that contains either"
-              + " answers 400. For DRAFT versions, use PATCH"
+          "Applies a JSON merge patch to the description of a released data structure version"
+              + " (AVAILABLE status). An omitted field keeps its value. The model, styles and"
+              + " modelName of a released version do not change; a request that contains one of"
+              + " them answers 400. For DRAFT versions, use PATCH"
               + " /datastructures/{dataStructureId}/versions/{versionId} instead.")
   @ApiResponse(responseCode = "200", description = "Released version metadata updated successfully")
   @ApiResponse(
       responseCode = "400",
       description =
-          "Invalid input (e.g. version is DRAFT, or the request contains model or styles)",
+          "Invalid input (e.g. version is DRAFT, or the request contains model, styles or"
+              + " modelName)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "404",

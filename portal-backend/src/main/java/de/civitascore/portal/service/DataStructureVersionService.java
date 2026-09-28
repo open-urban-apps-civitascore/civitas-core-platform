@@ -182,7 +182,6 @@ public class DataStructureVersionService
           "Cannot update released metadata for a DRAFT DataStructureVersion.");
     }
     existingEntity.setDescription(meta.getDescription());
-    existingEntity.setModelName(meta.getModelName());
     return save(existingEntity);
   }
 

@@ -978,8 +978,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should change description and modelName via released/meta")
-    void shouldChangeDescriptionAndModelName() {
+    @DisplayName("Should change description via released/meta")
+    void shouldChangeDescription() {
       String path = getEndpoint() + "/" + releasedVersionId;
       DataStructureVersionOutputDTO before = getVersion(path);
 
@@ -987,16 +987,14 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           restTemplate.exchange(
               path + "/released/meta",
               HttpMethod.PATCH,
-              new HttpEntity<>(
-                  Map.of("description", "Updated description", "modelName", "UpdatedReleasedModel"),
-                  createAuthHeaders()),
+              new HttpEntity<>(Map.of("description", "Updated description"), createAuthHeaders()),
               getOutputTypeReference());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output).isNotNull();
       assertThat(output.getDescription()).isEqualTo("Updated description");
-      assertThat(output.getModelName()).isEqualTo("UpdatedReleasedModel");
+      assertThat(output.getModelName()).isEqualTo(before.getModelName());
       assertThat(output.getModel()).isEqualTo(before.getModel());
       assertThat(output.getVersion()).isEqualTo(before.getVersion());
       assertThat(output.getDataStructureVersionStatus())
@@ -1004,19 +1002,21 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"model", "styles"})
-    @DisplayName("Should reject model or styles via released/meta when not in use")
-    void shouldRejectModelOrStylesWhenNotInUse(String field) {
+    @ValueSource(strings = {"model", "styles", "modelName"})
+    @DisplayName("Should reject model, styles or modelName via released/meta when not in use")
+    void shouldRejectFieldFixedAfterReleaseWhenNotInUse(String field) {
       String path = getEndpoint() + "/" + releasedVersionId;
       DataStructureVersionOutputDTO before = getVersion(path);
 
       Map<String, Object> patch = new HashMap<>();
-      patch.put("modelName", "UpdatedReleasedModel");
+      patch.put("description", "Updated description");
       patch.put(
           field,
-          field.equals("model")
-              ? portalData.dataStructureVersionModel("ReleasedModel")
-              : Map.of("color", "red"));
+          switch (field) {
+            case "model" -> portalData.dataStructureVersionModel("ReleasedModel");
+            case "styles" -> Map.of("color", "red");
+            default -> "UpdatedReleasedModel";
+          });
 
       ResponseEntity<ProblemDetail> response =
           restTemplate.exchange(
@@ -1029,6 +1029,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDetail()).contains(field);
       DataStructureVersionOutputDTO after = getVersion(path);
+      assertThat(after.getDescription()).isEqualTo(before.getDescription());
       assertThat(after.getModelName()).isEqualTo(before.getModelName());
       assertThat(after.getModel()).isEqualTo(before.getModel());
       assertThat(after.getStyles()).isEqualTo(before.getStyles());

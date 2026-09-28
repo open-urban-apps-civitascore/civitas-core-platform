@@ -21,6 +21,8 @@ public class DataStructureVersionInputDTO extends DataStructureVersionMetaInputD
 
   @JsonIgnore private DataStructureVersionStatus dataStructureVersionStatus;
 
+  private String modelName;
+
   @Schema(description = "Data model definition as a JSON Schema document")
   private Map<String, Object> model;
 
