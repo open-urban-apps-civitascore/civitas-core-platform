@@ -251,6 +251,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
+      entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(null);
 
@@ -267,6 +268,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
+      entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.MQTT);
       entity.setDataStructureVersion(null);
@@ -284,6 +286,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
+      entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.MQTT);
       stubStoredConfiguration(entity, Map.of("topics", List.of("sensor/data"), "qos", 1));
@@ -304,6 +307,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
+      entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.MQTT);
       stubStoredConfiguration(
@@ -327,6 +331,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
+      entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.SQL);
       stubStoredConfiguration(
@@ -349,6 +354,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
+      entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.MQTT);
       // no configuration ever stored: the registry pin is null
@@ -1723,6 +1729,7 @@ class DataSourceServiceTest {
     DataSource entity = new DataSource();
     entity.setId(id);
     entity.setName("mqtt-source");
+    entity.setDescription("An MQTT data source");
     entity.setDataSourceStatus(DataSourceStatus.DRAFT);
     entity.setConnectorType(ConnectorType.MQTT);
     stubStoredConfiguration(
@@ -1736,6 +1743,7 @@ class DataSourceServiceTest {
     DataSource entity = new DataSource();
     entity.setId(id);
     entity.setName("sql-source");
+    entity.setDescription("A SQL data source");
     entity.setDataSourceStatus(DataSourceStatus.DRAFT);
     entity.setConnectorType(ConnectorType.SQL);
     stubStoredConfiguration(

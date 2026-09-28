@@ -14,7 +14,7 @@ public class DataStructureInputDTO extends BaseDataEntityInputDTO {
 
   @NotBlank(message = "Name is required") private String name;
 
-  private String description;
+  @NotBlank(message = "Description is required") private String description;
 
   @JsonIgnore private DataStructureStatus dataStructureStatus;
 

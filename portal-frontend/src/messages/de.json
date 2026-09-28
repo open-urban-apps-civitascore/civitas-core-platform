@@ -114,8 +114,9 @@
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
+      "requiredField": "Pflichtfeld",
       "descriptionHint": "max. 150 Zeichen",
-      "creationSubtitle": "Im ersten Schritt ist nur ein Name erforderlich. Weitere Basisinformationen können später ergänzt werden.",
+      "creationSubtitle": "Im ersten Schritt sind nur ein Name und eine Beschreibung erforderlich. Weitere Informationen können später ergänzt werden.",
       "notAvailable": "Nicht verfügbar"
     },
     "success": {

@@ -4,7 +4,15 @@ import { UMLDiagram, UMLEdge, UMLNode } from '@/components/uml-modeler/types/dia
 import { enumFromConst } from '@/utils/common'
 
 import { AssignmentSchema, AssignmentScopedInput } from './assignments'
-import { ItemSchema, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, MIN_NAME_LENGTH, STATUS_TYPES, WithId } from './common'
+import {
+  ItemSchema,
+  MAX_DESCRIPTION_LENGTH,
+  MAX_NAME_LENGTH,
+  MIN_DESCRIPTION_LENGTH,
+  MIN_NAME_LENGTH,
+  STATUS_TYPES,
+  WithId,
+} from './common'
 
 export const DATASTRUCTURE_STATUS_TYPES = {
   DRAFT: 'DRAFT',
@@ -153,7 +161,11 @@ export const DatastructureFormDraftSchema = z.object({
     .trim()
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
-  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
+  description: z
+    .string()
+    .trim()
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   dataStructureStatus: DatastructureStatusEnum,
 })
 
@@ -161,7 +173,7 @@ export const DatastructureFormAvailableSchema = DatastructureFormDraftSchema.ext
   description: z
     .string()
     .trim()
-    .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
     .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
 })
 
@@ -174,7 +186,11 @@ export const DatastructureCreateFormSchema = z.object({
     .trim()
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
-  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
+  description: z
+    .string()
+    .trim()
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
 })
 
 export const DatastructureCreateDataSchema = z.object({
@@ -184,7 +200,11 @@ export const DatastructureCreateDataSchema = z.object({
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
   createdFromDataSource: z.boolean(),
-  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
+  description: z
+    .string()
+    .trim()
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   assignments: z.array(AssignmentSchema).optional(),
 })
 

@@ -115,8 +115,9 @@
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
       "requiredInAvailable": "This field is required in the available mode.",
+      "requiredField": "Required field",
       "descriptionHint": "max. 150 characters",
-      "creationSubtitle": "Only a name is required in the first step. Additional basic information can be added later.",
+      "creationSubtitle": "Only a name and a description are required in the first step. Additional information can be added later.",
       "notAvailable": "Not available"
     },
     "success": {
