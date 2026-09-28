@@ -11,4 +11,6 @@ import org.springframework.stereotype.Repository;
 public interface PublishedStructureRepository extends JpaRepository<PublishedStructure, UUID> {
 
   Optional<PublishedStructure> findByPort(String port);
+
+  Optional<PublishedStructure> findByLogicalUrn(String logicalUrn);
 }

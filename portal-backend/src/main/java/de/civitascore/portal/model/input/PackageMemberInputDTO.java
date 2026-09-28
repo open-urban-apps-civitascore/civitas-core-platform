@@ -37,6 +37,10 @@ public class PackageMemberInputDTO {
   @Schema(description = "Display name, recorded in the install provenance")
   private String name;
 
+  @Schema(
+      description =
+          "Required for data structures, data sources and datasets, as the platform requires one;"
+              + " a CORE document's own 'description' serves when this is absent")
   private String description;
 
   @Size(max = 1024, message = "dataset must not exceed 1024 characters") @Schema(

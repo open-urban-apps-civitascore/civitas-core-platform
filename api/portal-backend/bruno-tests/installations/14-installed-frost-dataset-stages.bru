@@ -1,0 +1,29 @@
+meta {
+  name: Stage the SensorThings dataset (a published structure in the closure)
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/datasets/{{staDataSetId}}/stage
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  The closure of this flow reaches the platform-published ThingTree structure through the
+  mapping's target. The platform holds no data structure record for it, so the closure check asks
+  only that it resolves, which it does on every instance. Staging succeeding is the proof that a
+  package may map onto what the platform publishes.
+}
+
+tests {
+  test("should stage: a reference to a published structure blocks nothing", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.dataSetStatus).to.equal("READY");
+  });
+}

@@ -1,0 +1,170 @@
+meta {
+  name: Install a package whose mapping targets a platform-published structure
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/installations
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "datapoolId": "{{staDatapoolId}}",
+    "package": {
+      "id": "{{staPackageId}}",
+      "version": "1.0.0",
+      "title": "Soil moisture to SensorThings",
+      "members": [
+        {
+          "kind": "datastructure",
+          "urn": "{{staStructureUrn}}",
+          "name": "Soil moisture station",
+          "description": "Installed by the installations flow",
+          "content": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "{{staStructureUrn}}",
+            "title": "Soil moisture station",
+            "$defs": {
+              "Reading": {
+                "type": "object",
+                "properties": {
+                  "station": { "type": "string" },
+                  "tensionKpa": { "type": "number" },
+                  "measuredAt": { "type": "string", "format": "date-time" }
+                },
+                "required": ["station", "tensionKpa", "measuredAt"]
+              }
+            }
+          }
+        },
+        {
+          "kind": "datasource",
+          "urn": "{{staSourceUrn}}",
+          "name": "Soil sensor DB",
+          "description": "Installed by the installations flow",
+          "content": {
+            "connectionType": "sql",
+            "element": "{{staStructureUrn}}",
+            "driver": "postgres",
+            "dsn": "jdbc:postgresql://postgis:5432/core",
+            "table": "soil_readings",
+            "columns": ["station", "tensionKpa", "measuredAt"],
+            "user": "core",
+            "password": "not-a-real-password"
+          }
+        },
+        {
+          "kind": "dataset",
+          "urn": "{{staDataSetUrn}}",
+          "name": "Soil moisture as SensorThings",
+          "description": "Installed by the installations flow",
+          "content": { "openDataAccess": false }
+        },
+        {
+          "kind": "mapping",
+          "urn": "{{staMappingUrn}}",
+          "name": "Reading to ThingTree",
+          "content": {
+            "source": "{{staStructureUrn}}",
+            "target": "{{thingTreeUrn}}",
+            "fields": {
+              "name": { "op": "copy", "sourcePath": "$.station" }
+            }
+          }
+        },
+        {
+          "kind": "datasink",
+          "urn": "{{staSinkUrn}}",
+          "name": "FROST",
+          "content": {
+            "connectionType": "frost",
+            "port": "ThingTree"
+          }
+        },
+        {
+          "kind": "pipeline",
+          "urn": "{{staPipelineUrn}}",
+          "name": "Soil moisture to FROST",
+          "description": "Installed by the installations flow",
+          "content": {
+            "nodes": [
+              { "id": "start", "kind": "start" },
+              { "id": "read", "kind": "source", "sourceRef": "{{staSourceUrn}}" },
+              { "id": "map", "kind": "mapping", "mappingRef": "{{staMappingUrn}}" },
+              { "id": "write", "kind": "sink", "sinkRef": "{{staSinkUrn}}" },
+              { "id": "end", "kind": "end" }
+            ],
+            "edges": [
+              { "id": "e1", "source": "start", "target": "read" },
+              { "id": "e2", "source": "read", "target": "map" },
+              { "id": "e3", "source": "map", "target": "write" },
+              { "id": "e4", "source": "write", "target": "end" }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  The platform publishes the structures its FROST ports write (ThingTree, Things, Observations)
+  under URNs that are the same on every instance. A package that feeds FROST maps onto one of
+  them, so its mapping references a structure the package does not ship. The install keeps such
+  a reference as it is instead of refusing it; the FROST sink names its port and no element, as
+  the platform's own flows do. Case 14 stages the dataset to prove the closure holds.
+}
+
+script:pre-request {
+  const axios = require('axios');
+  const runId = bru.getVar('runId') || Date.now().toString(36);
+  bru.setVar('runId', runId);
+  bru.setVar('staPackageId', `urn:core:package:openurbanapps:soil_moisture_sta_${runId}`);
+  bru.setVar('staStructureUrn', `urn:core:standard:openurbanapps:datastructure:environment:soil_moisture_station:${runId}`);
+  bru.setVar('staSourceUrn', `urn:core:standard:openurbanapps:datasource:environment:soil_sensor_db_sta:${runId}`);
+  bru.setVar('staDataSetUrn', `urn:core:standard:openurbanapps:dataset:environment:soil_moisture_sta:${runId}`);
+  bru.setVar('staMappingUrn', `urn:core:standard:openurbanapps:mapping:environment:reading_to_thingtree:${runId}`);
+  bru.setVar('staSinkUrn', `urn:core:standard:openurbanapps:datasink:environment:frost:${runId}`);
+  bru.setVar('staPipelineUrn', `urn:core:standard:openurbanapps:pipeline:environment:soil_moisture_to_frost:${runId}`);
+
+  const headers = { Authorization: `Bearer ${bru.getVar('accessToken')}` };
+  const pool = await axios.post(
+    `${bru.getEnvVar('baseUrl')}/datapools`,
+    { name: `Install flow (sta) ${runId}`, description: 'Created by the installations flow' },
+    { headers }
+  );
+  bru.setVar('staDatapoolId', pool.data.id);
+
+  // The ThingTree structure is the platform's, read from where every client reads it.
+  const published = await axios.get(`${bru.getEnvVar('baseUrl')}/published-structures`, { headers });
+  // The list groups structures under the sink that publishes them.
+  const thingTree = published.data.flatMap(sink => sink.structures || []).find(s => s.key === 'ThingTree');
+  bru.setVar('thingTreeUrn', thingTree ? thingTree.urn : 'published-structure-ThingTree-not-found');
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar('staDataSetId', res.body.dataSetId);
+  }
+}
+
+tests {
+  test("should install the chain although the mapping targets a structure outside the package", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.artifacts.map(line => line.artifactType)).to.deep.equal(
+      ["DATA_STRUCTURE", "DATA_SOURCE", "DATA_SET", "MAPPING", "DATA_SINK", "PIPELINE"]);
+  });
+
+  test("should not record the published structure as something it created", function() {
+    const origins = res.body.artifacts.map(line => line.origin);
+    expect(origins).to.not.include(bru.getVar('thingTreeUrn'));
+    expect(res.body.artifacts[4].urn).to.have.string("urn:core:platform:civitas:datasink:common:");
+  });
+}

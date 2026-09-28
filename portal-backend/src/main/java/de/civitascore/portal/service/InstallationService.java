@@ -14,6 +14,7 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Installation;
 import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.entity.PublishedStructure;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
@@ -28,6 +29,7 @@ import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.modelregistry.DataStructureUrns;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.InstallationRepository;
+import de.civitascore.portal.repository.PublishedStructureRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
@@ -93,6 +95,7 @@ public class InstallationService {
   private final MappingService mappingService;
   private final DataSinkService dataSinkService;
   private final PipelineService pipelineService;
+  private final PublishedStructureRepository publishedStructureRepository;
   private final ModelRegistryGateway modelRegistryGateway;
 
   /**
@@ -203,10 +206,11 @@ public class InstallationService {
    */
   private InstalledArtifact installDataStructure(PackageMemberInputDTO member, Run run) {
     String name = displayName(member);
+    String description = requireDescription(member);
 
     DataStructureInputDTO structureInput = new DataStructureInputDTO();
     structureInput.setName(name);
-    structureInput.setDescription(member.getDescription());
+    structureInput.setDescription(description);
     structureInput.setCreatedFromDataSource(false);
     DataStructure shell = dataStructureService.create(structureInput);
 
@@ -216,7 +220,7 @@ public class InstallationService {
     DataStructureVersionInputDTO versionInput = new DataStructureVersionInputDTO();
     versionInput.setDataStructureId(shell.getId());
     versionInput.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-    versionInput.setDescription(member.getDescription());
+    versionInput.setDescription(description);
     versionInput.setModelName(name);
     versionInput.setModel(model);
     DataStructureVersion version = dataStructureVersionService.create(versionInput);
@@ -267,11 +271,16 @@ public class InstallationService {
             PackageMemberKind.DATASTRUCTURE,
             member,
             run);
+    if (structure.versionId() == null) {
+      // A platform-published structure resolves, but has no version a source could link.
+      throw new InvalidInputException(
+          ELEMENT, member.getUrn(), "'element' must reference a data structure of this package.");
+    }
+    // The document's own labels name the source; the connector schema knows neither key.
     Map<String, Object> configuration = new LinkedHashMap<>(content);
-    configuration.remove(CONNECTION_TYPE);
-    configuration.remove(ELEMENT);
-    configuration.remove(SCHEMA);
-    configuration.remove(STAMPED_ID);
+    configuration
+        .keySet()
+        .removeAll(List.of(CONNECTION_TYPE, ELEMENT, SCHEMA, STAMPED_ID, TITLE, DESCRIPTION));
 
     DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
     scope.setType(DatapoolScopeType.SPECIFIC);
@@ -279,7 +288,7 @@ public class InstallationService {
 
     DataSourceInputDTO input = new DataSourceInputDTO();
     input.setName(name);
-    input.setDescription(member.getDescription());
+    input.setDescription(requireDescription(member));
     input.setConnectorType(connectorType);
     input.setConfiguration(configuration);
     input.setDataStructureVersionId(structure.versionId());
@@ -317,7 +326,7 @@ public class InstallationService {
     String name = displayName(member);
     DataSetInputDTO input = new DataSetInputDTO();
     input.setName(name);
-    input.setDescription(member.getDescription());
+    input.setDescription(requireDescription(member));
     input.setDatapoolId(run.datapoolId);
     if (member.getContent().get(OPEN_DATA_ACCESS) instanceof Boolean openDataAccess) {
       input.setOpenDataAccess(openDataAccess);
@@ -572,9 +581,11 @@ public class InstallationService {
 
   /**
    * What a package URN became on this instance, checked against the kind the referring field
-   * expects. Only members of this package resolve — binding to artifacts installed earlier, by
-   * origin, is a later increment — and the order of kinds guarantees that whatever a member may
-   * reference has already been installed.
+   * expects. Members of this package resolve to their copies. A structure the platform publishes
+   * (the FROST port structures) resolves to itself: it carries the same URN on every instance and
+   * belongs to no package, so a reference to it is kept, not rewritten. Binding to artifacts
+   * installed earlier, by origin, is a later increment. The order of kinds guarantees that whatever
+   * a member may reference has already been installed.
    */
   private Minted resolveReference(
       String reference,
@@ -584,11 +595,17 @@ public class InstallationService {
       Run run) {
     Minted minted = run.minted.get(key(reference));
     if (minted == null) {
-      throw new InvalidInputException(
-          field,
-          member.getUrn(),
-          "Member '%s' references '%s' in '%s', which is not part of this package."
-              .formatted(member.getUrn(), reference, field));
+      minted =
+          publishedStructureRepository
+              .findByLogicalUrn(key(reference))
+              .map(InstallationService::published)
+              .orElseThrow(
+                  () ->
+                      new InvalidInputException(
+                          field,
+                          member.getUrn(),
+                          "Member '%s' references '%s' in '%s', which is not part of this package."
+                              .formatted(member.getUrn(), reference, field)));
     }
     if (minted.kind() != expected) {
       throw new InvalidInputException(
@@ -599,6 +616,38 @@ public class InstallationService {
                   member.getUrn(), reference, field, expected.name().toLowerCase(Locale.ROOT)));
     }
     return minted;
+  }
+
+  /**
+   * A published structure has no shell and no version of its own in the portal; mappings and
+   * pipeline nodes bind to its versioned URN, which is all they need.
+   */
+  private static Minted published(PublishedStructure structure) {
+    return new Minted(
+        PackageMemberKind.DATASTRUCTURE,
+        structure.getLogicalUrn(),
+        structure.getVersionedUrn(),
+        null,
+        null);
+  }
+
+  /**
+   * The platform requires a description on structures, sources and datasets; a package member of
+   * those kinds carries it on the member or, as CORE documents do, inside its content.
+   */
+  private static String requireDescription(PackageMemberInputDTO member) {
+    if (member.getDescription() != null && !member.getDescription().isBlank()) {
+      return member.getDescription();
+    }
+    if (member.getContent().get(DESCRIPTION) instanceof String description
+        && !description.isBlank()) {
+      return description;
+    }
+    throw new InvalidInputException(
+        DESCRIPTION,
+        member.getUrn(),
+        "Member '%s' needs a description; the platform requires one for %s."
+            .formatted(member.getUrn(), member.getKind().name().toLowerCase(Locale.ROOT)));
   }
 
   private static ConnectorType connectorType(String connectionType, PackageMemberInputDTO member) {
