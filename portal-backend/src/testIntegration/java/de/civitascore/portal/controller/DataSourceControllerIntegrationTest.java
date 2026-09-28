@@ -14,6 +14,7 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
+import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -1366,6 +1367,134 @@ class DataSourceControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       return response.getBody();
+    }
+  }
+
+  @Nested
+  @DisplayName("DataPool Scope Change Tests")
+  class DatapoolScopeChangeTests {
+
+    private DataPool usedPool;
+    private DataPool otherPool;
+
+    private void createPools() {
+      usedPool = portalData.dataPool();
+      otherPool = portalData.dataPool();
+    }
+
+    private void useInDataSetOfPool(DataSource dataSource, DataPool pool) {
+      DataSet dataSet = portalData.dataSet(b -> b.dataPool(pool));
+      portalData.pipeline(dataSet, b -> b.dataSources(Set.of(dataSource)));
+    }
+
+    private DataSource draftDataSourceUsedInPool() {
+      createPools();
+      DataSource dataSource =
+          portalData.dataSource(b -> b.datapoolScopeType(DatapoolScopeType.ALL));
+      useInDataSetOfPool(dataSource, usedPool);
+      return dataSource;
+    }
+
+    private DatapoolScopeInputDTO specificScope(DataPool pool) {
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(pool.getId()));
+      return scope;
+    }
+
+    private Map<String, Object> specificScopePatch(DataPool pool) {
+      return Map.of(
+          "datapoolScope",
+          Map.of("type", "SPECIFIC", "datapoolIds", List.of(pool.getId().toString())));
+    }
+
+    private void assertScopeViolationAndScopeUnchanged(
+        ResponseEntity<ProblemDetail> response, UUID id) {
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getProperties()).containsKey("offendingDataSourceIds");
+      assertThat(performGetById(id).getBody().getDatapoolScope().getType())
+          .isEqualTo(DatapoolScopeType.ALL);
+    }
+
+    @Test
+    @DisplayName("PUT on a DRAFT data source should reject a scope that excludes a using dataset")
+    void putDraft_whenScopeExcludesUsingDataSetPool_shouldRejectAndKeepScope() {
+      DataSource dataSource = draftDataSourceUsedInPool();
+      DataSourceInputDTO input = createUpdateInput();
+      input.setDatapoolScope(specificScope(otherPool));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSource.getId(),
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              input);
+
+      assertScopeViolationAndScopeUnchanged(response, dataSource.getId());
+    }
+
+    @Test
+    @DisplayName("PATCH on a DRAFT data source should reject a scope that excludes a using dataset")
+    void patchDraft_whenScopeExcludesUsingDataSetPool_shouldRejectAndKeepScope() {
+      DataSource dataSource = draftDataSourceUsedInPool();
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSource.getId(),
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              specificScopePatch(otherPool));
+
+      assertScopeViolationAndScopeUnchanged(response, dataSource.getId());
+    }
+
+    @Test
+    @DisplayName("PUT on a DRAFT data source should accept a narrowed scope that keeps the pool")
+    void putDraft_whenScopeKeepsUsingDataSetPool_shouldUpdateScope() {
+      DataSource dataSource = draftDataSourceUsedInPool();
+      DataSourceInputDTO input = createUpdateInput();
+      input.setDatapoolScope(specificScope(usedPool));
+
+      ResponseEntity<DataSourceOutputDTO> response = performUpdate(dataSource.getId(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDatapoolScope().getType())
+          .isEqualTo(DatapoolScopeType.SPECIFIC);
+      assertThat(response.getBody().getDatapoolScope().getDatapoolIds())
+          .containsExactly(usedPool.getId());
+    }
+
+    @Test
+    @DisplayName("PATCH on a DRAFT data source should accept a narrowed scope that keeps the pool")
+    void patchDraft_whenScopeKeepsUsingDataSetPool_shouldUpdateScope() {
+      DataSource dataSource = draftDataSourceUsedInPool();
+
+      ResponseEntity<DataSourceOutputDTO> response =
+          performPatch(dataSource.getId(), specificScopePatch(usedPool));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDatapoolScope().getType())
+          .isEqualTo(DatapoolScopeType.SPECIFIC);
+      assertThat(response.getBody().getDatapoolScope().getDatapoolIds())
+          .containsExactly(usedPool.getId());
+    }
+
+    @Test
+    @DisplayName("Released meta PATCH should reject a scope that excludes a using dataset")
+    void patchReleasedMeta_whenScopeExcludesUsingDataSetPool_shouldRejectAndKeepScope() {
+      createPools();
+      DataSource dataSource = createAvailableDataSource();
+      useInDataSetOfPool(dataSource, usedPool);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              specificScopePatch(otherPool));
+
+      assertScopeViolationAndScopeUnchanged(response, dataSource.getId());
     }
   }
 }

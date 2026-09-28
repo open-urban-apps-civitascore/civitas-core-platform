@@ -110,11 +110,7 @@ public class DataSourceService
 
   /**
    * Restricts the generic CRUD update to DRAFT data sources. A released (AVAILABLE) data source may
-   * only be changed through {@link #updateReleasedMeta(UUID, DataSourceMetaInputDTO)}, which is the
-   * single point that re-asserts the DataSource→DataPool scope rule for the datasets the source
-   * already feeds. Without this restriction the generic route would reach {@link
-   * #postConvertToEntity} — which applies a new datapool scope unconditionally — and silently
-   * bypass that guard.
+   * only be changed through {@link #updateReleasedMeta(UUID, DataSourceMetaInputDTO)}.
    *
    * @param id the data source ID
    * @param input the update input
@@ -433,7 +429,6 @@ public class DataSourceService
     }
     if (input.getDatapoolScope() != null) {
       applyDatapoolScope(entity, input.getDatapoolScope());
-      revalidateLinkedDatasetsAgainstNewScope(entity);
     }
 
     return save(entity);
@@ -457,6 +452,9 @@ public class DataSourceService
    *     for any dataset it feeds
    */
   private void revalidateLinkedDatasetsAgainstNewScope(DataSource dataSource) {
+    if (dataSource.getId() == null) {
+      return;
+    }
     List<DataSource> sources = List.of(dataSource);
     pipelineRepository
         .findByDataSourcesId(dataSource.getId())
@@ -508,6 +506,7 @@ public class DataSourceService
     if (scope.getType() == DatapoolScopeType.SPECIFIC) {
       entity.getScopedDataPools().addAll(resolveSpecificDatapools(scope));
     }
+    revalidateLinkedDatasetsAgainstNewScope(entity);
   }
 
   private void requireScopeTypePresent(DatapoolScopeInputDTO scope, UUID entityId) {
