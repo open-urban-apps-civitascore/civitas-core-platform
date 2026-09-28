@@ -12,8 +12,10 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.RoleType;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
@@ -35,6 +37,7 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.UserRepository;
+import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.service.DataSetService;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
@@ -1200,8 +1203,8 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should keep omitted fields when patching released dataset metadata")
     void shouldKeepOmittedFieldsWhenPatchingReleasedMeta() {
-      // Without this test an omitted openDataAccess could fall back to its input default again and
-      // close an open dataset.
+      // Without this test an omitted openDataAccess could fall back to its input default and close
+      // an open dataset.
       DataSet dataSet = createDataSetWithRelationships();
       dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
       dataSet.setOpenDataAccess(true);
@@ -1676,6 +1679,129 @@ class DataSetControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("Metadata Patch DataPool Tests")
+  class MetaPatchDataPoolTests {
+
+    private DataPool pool;
+    private DataPool otherPool;
+
+    private DataSet dataSetInPool(DataSetStatus status) {
+      pool = portalData.dataPool();
+      otherPool = portalData.dataPool();
+      return portalData.dataSet(b -> b.dataPool(pool).dataSetStatus(status));
+    }
+
+    private ResponseEntity<DataSetOutputDTO> patchMeta(
+        UUID dataSetId, String endpoint, Map<String, Object> patch) {
+      return exchange(
+          getEndpointPath() + "/" + dataSetId + "/" + endpoint,
+          HttpMethod.PATCH,
+          createAuthHeaders(),
+          patch,
+          getOutputTypeReference());
+    }
+
+    private UUID storedPoolId(UUID dataSetId) {
+      DataSetOutputDTO stored = performGetById(dataSetId).getBody();
+      assertThat(stored).isNotNull();
+      return stored.getDatapool() == null ? null : stored.getDatapool().getId();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName("Should keep the data pool when a metadata patch omits datapoolId")
+    void patchMeta_whenDatapoolIdOmitted_shouldKeepPool(String endpoint, DataSetStatus status) {
+      DataSet dataSet = dataSetInPool(status);
+
+      ResponseEntity<DataSetOutputDTO> response =
+          patchMeta(dataSet.getId(), endpoint, Map.of("name", "Renamed Pooled Dataset"));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      DataSetOutputDTO stored = performGetById(dataSet.getId()).getBody();
+      assertThat(stored).isNotNull();
+      assertThat(stored.getName()).isEqualTo("Renamed Pooled Dataset");
+      assertThat(stored.getDatapool()).isNotNull();
+      assertThat(stored.getDatapool().getId()).isEqualTo(pool.getId());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName("Should move the dataset to the data pool a metadata patch names")
+    void patchMeta_whenDatapoolIdChanged_shouldMoveToNewPool(
+        String endpoint, DataSetStatus status) {
+      DataSet dataSet = dataSetInPool(status);
+
+      ResponseEntity<DataSetOutputDTO> response =
+          patchMeta(dataSet.getId(), endpoint, Map.of("datapoolId", otherPool.getId()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(storedPoolId(dataSet.getId())).isEqualTo(otherPool.getId());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName("Should clear the data pool when a metadata patch sends datapoolId null")
+    void patchMeta_whenDatapoolIdNull_shouldClearPool(String endpoint, DataSetStatus status) {
+      DataSet dataSet = dataSetInPool(status);
+      Map<String, Object> patch = new HashMap<>();
+      patch.put("datapoolId", null);
+
+      ResponseEntity<DataSetOutputDTO> response = patchMeta(dataSet.getId(), endpoint, patch);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(storedPoolId(dataSet.getId())).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName("Should reject a move to a data pool the caller may not use and keep the pool")
+    void patchMeta_whenTargetPoolNotAllowed_shouldRejectAndKeepPool(
+        String endpoint, DataSetStatus status) {
+      DataSet dataSet = dataSetInPool(status);
+      HttpHeaders poolOnlyHeaders =
+          withHeaders(
+              h -> {
+                h.set(AllowedScopesFilter.HEADER_NAME, "");
+                h.set(AllowedScopesFilter.HEADER_NAME_POOL, pool.getId().toString());
+              });
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSet.getId() + "/" + endpoint,
+              HttpMethod.PATCH,
+              poolOnlyHeaders,
+              Map.of("datapoolId", otherPool.getId()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+      assertThat(storedPoolId(dataSet.getId())).isEqualTo(pool.getId());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName("Should reject a move that leaves a pipeline data source out of scope")
+    void patchMeta_whenDataSourceOutOfScopeForTargetPool_shouldRejectAndKeepPool(
+        String endpoint, DataSetStatus status) {
+      DataSet dataSet = dataSetInPool(status);
+      DataSource poolConfinedSource =
+          portalData.dataSource(
+              b -> b.datapoolScopeType(DatapoolScopeType.SPECIFIC).scopedDataPools(Set.of(pool)));
+      portalData.pipeline(dataSet, b -> b.dataSources(Set.of(poolConfinedSource)));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSet.getId() + "/" + endpoint,
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("datapoolId", otherPool.getId()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getProperties()).containsKey("offendingDataSourceIds");
+      assertThat(storedPoolId(dataSet.getId())).isEqualTo(pool.getId());
     }
   }
 
