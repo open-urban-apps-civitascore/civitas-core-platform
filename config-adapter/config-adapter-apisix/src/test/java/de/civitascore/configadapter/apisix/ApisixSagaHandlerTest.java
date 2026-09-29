@@ -503,18 +503,15 @@ class ApisixSagaHandlerTest {
     @DisplayName("rewrites FROST's @iot.* links onto the slug route's external endpoint")
     void shouldRewriteStaLinksToExternalEndpoint() {
       try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+        server.enqueue(created()); // shared upstream
+        server.enqueue(created()); // traffic route
 
         handler.handle(
             createPerApiCommand(true, List.of(Map.of("slug", "traffic", "standard", "STA"))));
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-            ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(2)).put(entityCaptor.capture());
-        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
+        // PUT order: shared upstream first, then the slug route.
+        takeRequest(); // upstream
+        Map<String, Object> routeBody = requestBodyAsMap(takeRequest());
 
         // Without the rewrite, a client following one of FROST's @iot.* links leaves the
         // gateway entirely (issue #336).
@@ -522,12 +519,13 @@ class ApisixSagaHandlerTest {
         Map<String, Object> responseRewrite =
             (Map<String, Object>) pluginsOf(routeBody).get("response-rewrite");
         assertNotNull(responseRewrite, "STA route rewrites FROST's self-referential links");
-        Object[] filters = (Object[]) responseRewrite.get("filters");
-        assertEquals(2, filters.length);
         @SuppressWarnings("unchecked")
-        Map<String, Object> projectScoped = (Map<String, Object>) filters[0];
+        List<Object> filters = (List<Object>) responseRewrite.get("filters");
+        assertEquals(2, filters.size());
         @SuppressWarnings("unchecked")
-        Map<String, Object> canonical = (Map<String, Object>) filters[1];
+        Map<String, Object> projectScoped = (Map<String, Object>) filters.get(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> canonical = (Map<String, Object>) filters.get(1);
         // The nextLink form repeats the project segment the regex_uri adds back, so it is
         // dropped here — before the canonical filter, which would otherwise double it.
         assertEquals("https?://[^/]+/v1\\.1/Projects\\(1\\)", projectScoped.get("regex"));
