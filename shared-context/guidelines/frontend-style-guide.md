@@ -1,4 +1,4 @@
-<!-- VENDORED from agent-context@4c3d61f9 — DO NOT EDIT HERE.
+<!-- VENDORED from agent-context@37494c39 — DO NOT EDIT HERE.
      Change it in civitas-connect/civitas-core/civitas-core-v2/agent-context, then run ./sync-to-targets.sh -->
 
 <!-- COPY — DO NOT EDIT HERE. Refresh with ./sync-guidelines.sh

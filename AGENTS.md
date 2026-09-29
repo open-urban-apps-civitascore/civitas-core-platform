@@ -55,6 +55,7 @@ rather than start — this close to a release, scatter costs more than it gains.
 
 ## Always read
 [Secure Development Guide](./shared-context/guidelines/ssdlc-distilled.md)
+[Supplemental, per-repository agent context](./per-project-agentcontext)
 [Supplemental, per-team agent context](./per-team-agentcontext)
 [Supplemental, per-developer agent context](./per-dev-agentcontext)
 
@@ -80,6 +81,18 @@ https://gitlab.com/civitas-connect/civitas-core/documentation - a Docusaurus rep
 # Language
 For all natural language communications, use ASD-STE100 Simplified Technical English (STE).
 
+# AI maturity labels
+Work results carry a label that says how much human control went into AI-assisted work
+(inspired by the Traffic Light Protocol). It applies to code, documentation, analyses and
+other artefacts. In GitLab the labels are scoped: `AI::RED`, `AI::AMBER`, `AI::GREEN`, `AI::WHITE`.
+
+| Label | Meaning |
+|---|---|
+| **AI:RED** | AI-generated, checked for plausibility only. A basis for discussion or a draft — not for production. |
+| **AI:AMBER** | AI-generated in large parts. Architecture and design worked out and understood together, hot spots reviewed — but not every line. A known risk of comprehension debt. |
+| **AI:GREEN** | AI-generated, reviewed and understood line by line. The author can explain every part. |
+| **AI:WHITE** | Written without substantial AI use. |
+
 # Glossary
 | Term | Meaning |
 |---|---|
@@ -87,9 +100,10 @@ For all natural language communications, use ASD-STE100 Simplified Technical Eng
 | **Data pool** (FKA Dataspace) | Groups related Datasets and carries permissions. |
 | **Dataset** | A single body of data within a Data pool. Also includes metadata, dataflow definitions and access configurations. |
 | **Data source** | A definition of how to integrate data from an external system into the platform. Uses various connectors. |
-| **Data structure** | A versioned schema or data model for data moving through the platform. Used for Data sources, Data storages and Mappings. |
-| **Pipeline** | A graph-based ETL definition of a data flow within a Dataset to extract data from a Data source, optionally map it and store it in a Data storage. |
-| **Data storage** | A definition of how to persist data inside the platform, e.g. in a database. |
+| **Data structure** | A versioned schema or data model for data moving through the platform. Used for Data sources, Data sinks and Mappings. |
+| **Pipeline** | A graph-based ETL definition of a data flow within a Dataset to extract data from a Data source, optionally map it and write it to a Data sink. |
+| **Data sink** | A definition of where a Pipeline writes its data. |
+| **Data storage** | A kind of Data sink that persists data inside the platform, e.g. in a database. FrostSink and PostGisSink are both Data storages. |
 | **Mapping** | A defition of how to transform data from a defined Data structure to another. |
 | **Connector** | A building block of a Data source providing access through various protocols or systems, e.g. SQL or MQTT. |
 | **Scope** | The reach of a permission: Tenant, Data pool, Data structure, Data source or Dataset. |
