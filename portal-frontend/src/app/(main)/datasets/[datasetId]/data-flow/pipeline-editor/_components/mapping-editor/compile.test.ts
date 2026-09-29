@@ -375,12 +375,12 @@ describe('The operation the Mapping editor offers', () => {
   })
 
   it.each(mappingFixtures)('$operation is unchanged after rehydration', fixture => {
-    const compiled = compileCanvas(fixture.nodes, fixture.edges)
-    const built = decompileConfig({ ...compiled }, fixtureSourceTree, fixture.targetTree)
+    const fields = { [fixture.targetPath]: expectedOperation[fixture.operation] }
+    const built = decompileConfig({ fields, positions: {} }, fixtureSourceTree, fixture.targetTree)
 
     const restored = built.nodes.find(node => node.type === 'transform')
     expect(restored?.data.defType).toBe(fixture.operation === 'copy' ? undefined : fixture.operation)
-    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(compiled.fields)
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(fields)
   })
 
   it('compiles a direct edge to the bare path, not a copy object', () => {
@@ -473,9 +473,9 @@ describe('nested operations', () => {
   })
 
   it.each(nestedFixtures)('$label is unchanged after rehydration', fixture => {
-    const compiled = compileCanvas(fixture.nodes, fixture.edges)
-    const built = decompileConfig({ ...compiled }, fixtureSourceTree, fixture.targetTree)
-    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(compiled.fields)
+    const fields = expectedFields[fixture.label]
+    const built = decompileConfig({ fields, positions: {} }, fixtureSourceTree, fixture.targetTree)
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(fields)
   })
 
   it('restores a transform chain feeding two target fields as one set of nodes', () => {
