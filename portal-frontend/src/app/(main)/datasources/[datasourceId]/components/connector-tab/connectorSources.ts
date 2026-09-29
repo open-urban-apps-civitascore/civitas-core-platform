@@ -143,8 +143,5 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       defaultValue: '',
       required: false,
     },
-    // Removed (issue #1779): prefix/suffix/init_statement and conn_max_* are Redpanda-Connect
-    // connector options the NiFi SQL source does not honor (the pool is platform-managed). Only the
-    // fields above are actually processed.
   ],
 }

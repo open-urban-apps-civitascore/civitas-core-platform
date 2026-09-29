@@ -93,7 +93,7 @@ public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
     return super.preSave(entity);
   }
 
-  /** Rejects bbox fields when bboxAutoCalculate is true. */
+  /** Leaving both bounding boxes null lets GeoServer compute the extent. */
   @Override
   protected LayerInputDTO preProcessCreateInput(LayerInputDTO input) {
     LayerInputDTO guarded = super.preProcessCreateInput(input);
@@ -109,19 +109,11 @@ public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
   }
 
   private void validateBboxConsistency(LayerInputDTO input) {
-    if (input.isBboxAutoCalculate()
-        && (input.getNativeBoundingBox() != null || input.getLatLonBoundingBox() != null)) {
+    if ((input.getNativeBoundingBox() == null) != (input.getLatLonBoundingBox() == null)) {
       throw new InvalidInputException(
           getEntityName(),
-          "bboxAutoCalculate",
-          "nativeBoundingBox and latLonBoundingBox must be null when bboxAutoCalculate is true");
-    }
-    if (!input.isBboxAutoCalculate()
-        && (input.getNativeBoundingBox() == null || input.getLatLonBoundingBox() == null)) {
-      throw new InvalidInputException(
-          getEntityName(),
-          "bboxAutoCalculate",
-          "nativeBoundingBox and latLonBoundingBox are both required when bboxAutoCalculate is false");
+          "nativeBoundingBox",
+          "nativeBoundingBox and latLonBoundingBox must be set together or both be null");
     }
   }
 

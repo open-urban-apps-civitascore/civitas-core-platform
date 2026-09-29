@@ -57,11 +57,6 @@ public class GroupController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "user-123")),
     @Parameter(
-        name = "parentGroupId",
-        description = "Filter by parent group ID (exact match).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "group-456")),
-    @Parameter(
         name = "memberIds",
         description = "Filter by member user ID(s), comma-separated.",
         in = ParameterIn.QUERY,
@@ -74,7 +69,7 @@ public class GroupController
   })
   /**
    * Retrieves a paginated list of groups with optional filtering by name, description, contact
-   * user, parent group, or free-text search.
+   * user, members, or free-text search.
    *
    * @param spec the group search/filter specification
    * @param pageable pagination and sorting parameters

@@ -174,13 +174,6 @@ export const SqlApiResponseSchema = z.object({
   table: z.string().nullable(),
   columns: z.array(z.string()).nullable(),
   where: z.string().nullable(),
-  prefix: z.string().nullable(),
-  suffix: z.string().nullable(),
-  init_statement: z.string().nullable(),
-  conn_max_idle_time: z.string().nullable(),
-  conn_max_life_time: z.string().nullable(),
-  conn_max_idle: z.number().int().nonnegative().nullable(),
-  conn_max_open: z.number().int().nonnegative().nullable(),
   user: z.string().nullable(),
   password: z.string().nullable(),
 })
@@ -194,11 +187,6 @@ const SqlBaseSchema = z.object({
   table: z.string().trim(),
   columns: z.string().trim(),
   where: z.string().trim(),
-  // prefix/suffix/init_statement are Redpanda-Connect query fields the NiFi engine does not honor;
-  // conn_max_* are its pool-tuning fields. The adapter rejects prefix/suffix/init_statement and
-  // ignores conn_max_*, and the form no longer offers any of them, so they are not part of the form
-  // schema. They remain in SqlApiResponseSchema so loading a legacy datasource that still carries
-  // them does not fail (unknown keys are stripped on save).
   user: z.string().trim(),
   password: z.string().trim(),
 })

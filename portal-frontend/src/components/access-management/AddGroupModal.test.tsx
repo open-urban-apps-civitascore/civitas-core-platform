@@ -15,7 +15,6 @@ const makeGroup = (id: string, name: string, description: string): Group => ({
   id,
   name,
   description,
-  roles: null,
   members: null,
   contactUser: null,
   createdAt: '2024-01-01',

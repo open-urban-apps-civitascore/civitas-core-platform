@@ -9,7 +9,5 @@ public enum PipelineRuntimeState {
   /** The pipeline is running and processing data. */
   OK,
   /** The pipeline failed to deploy or stopped processing (see the accompanying message). */
-  ERROR,
-  /** Health could not be determined; the default before any status has been received. */
-  UNKNOWN
+  ERROR
 }

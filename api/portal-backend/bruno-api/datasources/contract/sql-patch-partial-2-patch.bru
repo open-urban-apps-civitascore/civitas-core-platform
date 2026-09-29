@@ -35,7 +35,5 @@ tests {
     expect(res.body.configuration.password).to.equal("********");
     expect(res.body.configuration.table).to.equal("events");
     expect(res.body.configuration.columns).to.deep.equal(["*"]);
-    expect(res.body.configuration.conn_max_idle).to.equal(2);
-    expect(res.body.configuration.conn_max_open).to.equal(0);
   });
 }

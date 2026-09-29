@@ -40,17 +40,3 @@ export const mapGroupsApiToListData = (groups: Group[]): UserGroupsListData[] =>
     membersCount: group.members?.length || 0,
     contactUser: group.contactUser,
   }))
-
-// TODO: subgroups have been excluded from v2, so the implementation of subgroups has been commented out
-// export const flattenGroups = (groups: Group[]): Group[] => {
-//   const result: Group[] = []
-
-//   const processGroup = (group: Group) => {
-//     result.push({ ...group, subgroups: [] })
-//     group.subgroups?.forEach(processGroup)
-//   }
-
-//   groups.forEach(processGroup)
-
-//   return result
-// }

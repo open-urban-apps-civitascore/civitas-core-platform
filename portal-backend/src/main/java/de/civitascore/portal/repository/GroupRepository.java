@@ -13,37 +13,35 @@ import org.springframework.stereotype.Repository;
 public interface GroupRepository extends NamedEntityRepository<Group, UUID> {
 
   /**
-   * Find all groups that have not yet been synced to Keycloak, with {@code parentGroup} and {@code
-   * members} eagerly fetched. The Keycloak catch-up sync traverses the parent chain (for depth
-   * ordering and to read the parent's externalId) and reads members (to sync memberships) outside
-   * any surrounding transaction, so both associations must be loaded up front to avoid a {@link
+   * Find all groups that have not yet been synced to Keycloak, with {@code members} eagerly
+   * fetched. The Keycloak catch-up sync reads members (to sync memberships) outside any surrounding
+   * transaction, so they must be loaded up front to avoid a {@link
    * org.hibernate.LazyInitializationException}.
    *
    * @return groups without an externalId
    */
-  @EntityGraph(attributePaths = {"parentGroup", "members"})
+  @EntityGraph(attributePaths = {"members"})
   List<Group> findByExternalIdIsNull();
 
   /**
-   * Find all groups that have already been synced to Keycloak, with {@code members} and {@code
-   * parentGroup} eagerly fetched. Used by the one-shot group-member backfill, which builds each
-   * {@code GROUP_UPDATED} payload outside any surrounding transaction; {@code
-   * GroupService#buildGroupConfig} reads both associations, so fetching them up front avoids a
-   * {@link org.hibernate.LazyInitializationException} and a per-group lazy-load.
+   * Find all groups that have already been synced to Keycloak, with {@code members} eagerly
+   * fetched. Used by the one-shot group-member backfill, which builds each {@code GROUP_UPDATED}
+   * payload outside any surrounding transaction; {@code GroupService#buildGroupConfig} reads the
+   * members, so fetching them up front avoids a {@link org.hibernate.LazyInitializationException}
+   * and a per-group lazy-load.
    *
    * @return groups that already have an externalId
    */
-  @EntityGraph(attributePaths = {"parentGroup", "members"})
+  @EntityGraph(attributePaths = {"members"})
   List<Group> findByExternalIdIsNotNull();
 
   /**
    * Find a group by ID with related entities eagerly fetched.
    *
    * @param id the group ID
-   * @return the group with eagerly fetched contactUser, parentGroup, assignments, and assignment
-   *     roles
+   * @return the group with eagerly fetched contactUser, assignments, and assignment roles
    */
-  @EntityGraph(attributePaths = {"contactUser", "parentGroup", "assignments", "assignments.role"})
+  @EntityGraph(attributePaths = {"contactUser", "assignments", "assignments.role"})
   @Override
   @NonNull Optional<Group> findById(@NonNull UUID id);
 }

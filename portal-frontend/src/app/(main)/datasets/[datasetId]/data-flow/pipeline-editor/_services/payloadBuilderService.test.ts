@@ -437,14 +437,12 @@ describe('getRemovedMappingUrns', () => {
 
 describe('isDestructiveDataSinkChange', () => {
   const postgisPayload = (tableName: string, element: string): DataSinkPayload => ({
-    id: 'sink-1',
     dataSinkType: DATASINK_TYPES.POSTGIS,
     configuration: { tableName, element },
   })
 
   const snapshotFor = (payload: DataSinkPayload, entityId: string | null): DataSinkSnapshot => {
-    const { id: _id, ...comparable } = payload
-    return { 'node-1': { entityId, configJson: JSON.stringify(comparable) } }
+    return { 'node-1': { entityId, configJson: JSON.stringify(payload) } }
   }
 
   it('flags a tableName change on an existing sink', () => {

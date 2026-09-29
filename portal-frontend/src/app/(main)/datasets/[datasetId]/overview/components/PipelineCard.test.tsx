@@ -83,11 +83,6 @@ describe('PipelineCard', () => {
       expect(screen.queryByTestId('pipelineCardBadges-pipeline-1')).not.toBeInTheDocument()
     })
 
-    it('renders no badge row when runtimeStatus is UNKNOWN', () => {
-      renderComponent({ pipeline: makePipeline({ runtimeStatus: { state: 'UNKNOWN' } }) })
-      expect(screen.queryByTestId('pipelineCardBadges-pipeline-1')).not.toBeInTheDocument()
-    })
-
     it('renders connector badges even without a runtime status', () => {
       renderComponent({ badges: ['MQTT', 'FROST'] })
       expect(screen.getByTestId('pipelineCardBadges-pipeline-1')).toBeInTheDocument()

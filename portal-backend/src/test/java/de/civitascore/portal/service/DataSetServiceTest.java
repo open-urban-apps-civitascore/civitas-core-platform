@@ -2447,15 +2447,6 @@ class DataSetServiceTest {
   @DisplayName("participating artifact validation")
   class ParticipatingArtifactValidation {
 
-    private DataSet stageable(UUID id) {
-      DataSet ds = draftDataSet(id);
-      Pipeline pipeline = new Pipeline();
-      pipeline.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
-      pipeline.setDataSources(new HashSet<>(List.of(new DataSource())));
-      ds.getPipelines().add(pipeline);
-      return ds;
-    }
-
     /**
      * A READY dataset publishing no named API, so the map/API-surface check passes and the
      * participating-artifact validation is the only thing that can reject the release.
@@ -2467,23 +2458,6 @@ class DataSetServiceTest {
       ds.setPipelines(new HashSet<>());
       ds.setNamedApis(new HashSet<>());
       return ds;
-    }
-
-    @Test
-    @DisplayName("a dataset whose flows carry a defect is not staged")
-    void blockedStagingLeavesTheDatasetInDraft() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = stageable(id);
-      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
-      doThrow(new PipelineClosureValidationException(List.of(UUID.randomUUID())))
-          .when(pipelineClosureValidator)
-          .validate(any());
-
-      assertThatThrownBy(() -> createService().stage(id))
-          .isInstanceOf(PipelineClosureValidationException.class);
-
-      assertThat(ds.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
-      verify(dataSetRepository, never()).save(any());
     }
 
     @Test

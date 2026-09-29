@@ -29,7 +29,6 @@ export const useDatastructureCreation = () => {
     const createDatastructureData = {
       name: formData.name,
       description: formData.description,
-      createdFromDataSource: false,
       assignments: [],
     }
     const parsed = DatastructureCreateDataSchema.safeParse(createDatastructureData)

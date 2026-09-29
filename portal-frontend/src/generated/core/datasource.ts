@@ -97,20 +97,6 @@ export const SqlDataSourceSchema = z
     columns: z.union([z.array(z.string()), z.null()]).optional(),
     /** SQL WHERE clause. */
     where: z.union([z.string(), z.null()]).optional(),
-    /** SQL prefix prepended to the query (not honored by the NiFi engine). */
-    prefix: z.union([z.string(), z.null()]).optional(),
-    /** SQL suffix appended to the query (not honored by the NiFi engine). */
-    suffix: z.union([z.string(), z.null()]).optional(),
-    /** SQL executed on connection init (not honored by the NiFi engine). */
-    init_statement: z.union([z.string(), z.null()]).optional(),
-    /** Maximum idle time per connection, e.g. '10m'. */
-    conn_max_idle_time: z.union([z.string(), z.null()]).optional(),
-    /** Maximum lifetime per connection, e.g. '1h'. */
-    conn_max_life_time: z.union([z.string(), z.null()]).optional(),
-    /** Maximum number of idle connections. Default 2. */
-    conn_max_idle: z.number().int().optional(),
-    /** Maximum number of open connections. 0 = unlimited. Default 0. */
-    conn_max_open: z.number().int().optional(),
     /** Database login username. */
     user: z.union([z.string(), z.null()]).optional(),
     /** Database login password. Stored ENCRYPTED by the host; null/absent when unset. */

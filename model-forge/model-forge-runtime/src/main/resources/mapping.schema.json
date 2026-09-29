@@ -109,6 +109,27 @@
       },
       "additionalProperties": false
     },
+    "ToUuidFieldOperation": {
+      "description": "Converts the input string to a UUID.",
+      "type": "object",
+      "required": ["op", "input"],
+      "properties": {
+        "op":    { "type": "string", "const": "toUuid" },
+        "input": { "$ref": "#/$defs/MappingField", "description": "Value to convert — a JSONPath string or a nested operation." }
+      },
+      "additionalProperties": false
+    },
+    "ToDateTimeFieldOperation": {
+      "description": "Parses the input string into a date-time value using a date pattern.",
+      "type": "object",
+      "required": ["op", "input", "pattern"],
+      "properties": {
+        "op":      { "type": "string", "const": "toDateTime" },
+        "input":   { "$ref": "#/$defs/MappingField", "description": "String value to parse — a JSONPath string or a nested operation." },
+        "pattern": { "type": "string", "description": "Date pattern used to parse the input, e.g. \"yyyy-MM-dd'T'HH:mm:ssXXX\"." }
+      },
+      "additionalProperties": false
+    },
     "ToDateFieldOperation": {
       "description": "Parses the input string into a date/time value using a date pattern.",
       "type": "object",
@@ -151,6 +172,8 @@
         { "$ref": "#/$defs/ToStringFieldOperation" },
         { "$ref": "#/$defs/ToIntFieldOperation" },
         { "$ref": "#/$defs/ToFloatFieldOperation" },
+        { "$ref": "#/$defs/ToUuidFieldOperation" },
+        { "$ref": "#/$defs/ToDateTimeFieldOperation" },
         { "$ref": "#/$defs/ToDateFieldOperation" },
         { "$ref": "#/$defs/FormatFieldOperation" },
         { "$ref": "#/$defs/GeoPointFieldOperation" }

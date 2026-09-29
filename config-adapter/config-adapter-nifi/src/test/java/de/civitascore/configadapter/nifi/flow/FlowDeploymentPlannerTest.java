@@ -63,28 +63,6 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
-  void unsupportedRedpandaQueryFieldsAreRejected() throws Exception {
-    // #5: prefix/suffix/init_statement are Redpanda Connect concepts the NiFi mapping cannot honor
-    // —
-    // fail loud rather than silently drop them
-    for (String field : List.of("prefix", "suffix", "init_statement")) {
-      Datasource source = sqlSourceBasic();
-      source.handleUnknownProperty(field, "SELECT 1");
-      try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
-        FatalAdapterException ex =
-            assertThrows(
-                FatalAdapterException.class,
-                () ->
-                    planner(resolver)
-                        .plan(
-                            req("p-sql-" + field, graphWithMapping(), source, postgisSinkWithPk())),
-                "must reject unsupported field: " + field);
-        assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
-      }
-    }
-  }
-
-  @Test
   void whereWithCursorPlaceholderIsRejected() throws Exception {
     // #5: the Redpanda cursor idiom (":last_id") is not bound by NiFi and would be invalid SQL
     Datasource source = sqlSourceBasic();

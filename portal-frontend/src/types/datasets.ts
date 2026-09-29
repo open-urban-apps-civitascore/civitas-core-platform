@@ -35,7 +35,7 @@ export type PipelineBasicInfo = {
 }
 
 export type PipelineRuntimeStatus = {
-  state: 'OK' | 'ERROR' | 'UNKNOWN'
+  state: 'OK' | 'ERROR'
   message?: string | null
   sanitizedStacktrace?: string | null
   occurredAt?: string | null
@@ -63,7 +63,7 @@ export const DatasetApiResponseSchema = z.object({
       description: z.string().optional(),
       runtimeStatus: z
         .object({
-          state: z.enum(['OK', 'ERROR', 'UNKNOWN']),
+          state: z.enum(['OK', 'ERROR']),
           message: z.string().nullable().optional(),
           sanitizedStacktrace: z.string().nullable().optional(),
           occurredAt: z.string().nullable().optional(),

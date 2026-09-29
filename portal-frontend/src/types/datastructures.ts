@@ -104,7 +104,6 @@ export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormD
 
 export const DatastructureVersionCreateSchema = z.object({
   description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
-  dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum.optional(),
   modelName: z.string().trim().nullable().optional(),
   model: z.record(z.string(), z.unknown()).nullable().optional(),
@@ -137,7 +136,6 @@ export const DatastructureApiResponseSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   dataStructureStatus: DatastructureStatusEnum,
-  createdFromDataSource: z.boolean(),
   assignments: z.array(AssignmentSchema).optional(),
   inUse: z.boolean().optional(),
   inUseByReleased: z.boolean().optional(),
@@ -199,7 +197,6 @@ export const DatastructureCreateDataSchema = z.object({
     .trim()
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
-  createdFromDataSource: z.boolean(),
   description: z
     .string()
     .trim()
@@ -212,7 +209,6 @@ export type DatastructureCreateFormData = z.infer<typeof DatastructureCreateForm
 export type DatastructureCreateData = z.infer<typeof DatastructureCreateDataSchema>
 
 export type DatastructurePutData = DatastructureFormDraft & {
-  createdFromDataSource: boolean
   assignments?: AssignmentScopedInput[]
 }
 export type DatastructurePatchData = Partial<DatastructureCreateData> & WithId

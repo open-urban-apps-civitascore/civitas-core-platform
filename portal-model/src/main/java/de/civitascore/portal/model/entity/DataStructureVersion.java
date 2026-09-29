@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -42,9 +43,10 @@ public class DataStructureVersion extends BaseEntity {
   @Column(name = "data_structure_version_status", nullable = false)
   @NotNull private DataStructureVersionStatus dataStructureVersionStatus;
 
+  @Builder.Default
   @Enumerated(EnumType.STRING)
   @Column(name = "data_structure_version_source", nullable = false)
-  private DataStructureVersionSource dataStructureVersionSource;
+  private DataStructureVersionSource dataStructureVersionSource = DataStructureVersionSource.OWN;
 
   // Assigned by Model Forge when the model is stored; null while a draft has no model yet.
   @Column(name = "version")

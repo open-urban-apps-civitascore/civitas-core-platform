@@ -22,9 +22,6 @@ public class DataStructureOutputDTO extends BaseOutputDTO {
   @Schema(example = "ACTIVE")
   private DataStructureStatus dataStructureStatus;
 
-  @Schema(description = "Whether this was auto-generated from a data source")
-  private Boolean createdFromDataSource;
-
   private List<DataStructureVersionUsageSummaryDTO> dataStructureVersions = new ArrayList<>();
 
   @Schema(

@@ -461,7 +461,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     revalidatePipelineDataSourcesAgainstPool(dataSet);
-    pipelineClosureValidator.validate(dataSet.getPipelines());
 
     dataSet.setDataSetStatus(DataSetStatus.READY);
     return dataSetRepository.save(dataSet);
@@ -533,9 +532,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
     revalidatePipelineDataSourcesAgainstPool(dataSet);
     verifyPublishedSurfacesAreServable(dataSet);
-    // Re-asserted here and not only at staging: this is the transition that provisions
-    // infrastructure, and registry state can drift through routes that do not pass the in-use
-    // guard refusing to unrelease an artifact a flow still reaches.
     pipelineClosureValidator.validate(dataSet.getPipelines());
 
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);

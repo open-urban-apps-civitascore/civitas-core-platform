@@ -66,19 +66,14 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "john.doe@example.com")),
     @Parameter(
-        name = "active",
-        description = "Filter by active status.",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "boolean", example = "true")),
-    @Parameter(
         name = "q",
         description = "Search in full name, or email (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "john doe, john@doe.com"))
   })
   /**
-   * Retrieves a paginated list of users with optional filtering by first name, last name, email,
-   * active status, or free-text search.
+   * Retrieves a paginated list of users with optional filtering by first name, last name, email, or
+   * free-text search.
    *
    * @param spec the user search/filter specification
    * @param pageable pagination and sorting parameters

@@ -588,11 +588,6 @@
       "phone": "Telefonnummer",
       "email": "E-Mail",
       "group": "Gruppe",
-      "status": {
-        "title": "Status",
-        "active": "Aktiv",
-        "inactive": "Inaktiv"
-      },
       "selectTitle": "Titel wählen..."
     },
     "detailsTabs": {
@@ -679,8 +674,7 @@
     "detailsTabs": {
       "info": "Basisinformationen",
       "roles": "Rollen",
-      "users": "User",
-      "subgroups": "Untergruppen"
+      "users": "User"
     },
     "details": {
       "baseInfo": "Basisinformationen",
