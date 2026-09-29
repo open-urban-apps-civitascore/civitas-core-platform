@@ -36,7 +36,16 @@ body:json {
               { "id": "e2", "source": "read", "target": "map" },
               { "id": "e3", "source": "map", "target": "write" },
               { "id": "e4", "source": "write", "target": "end" }
-            ]
+            ],
+            "x-ui-styles": {
+              "nodes": [
+                {
+                  "id": "read",
+                  "type": "dataSource",
+                  "data": { "entityId": "00000000-0000-0000-0000-000000000000" }
+                }
+              ]
+            }
           }
         },
         {
@@ -121,6 +130,9 @@ docs {
   pipeline, listed out of order on purpose. The pipeline's node references and the sink's element
   are package URNs; the install rewrites every one of them to the copy it made. Case 11 proves the
   chain by staging the dataset.
+
+  The pipeline also carries editor styles from the instance that made the package. They name a
+  data source by an id that does not exist here. Case 15 proves that the install does not keep them.
 }
 
 script:pre-request {

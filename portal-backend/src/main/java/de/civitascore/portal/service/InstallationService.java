@@ -444,9 +444,13 @@ public class InstallationService {
    * what the closure walk and the flow compiler read — and the shells of the sources and sinks it
    * reaches are handed to the service as the links it maintains. The service checks that every
    * source is released for the dataset's pool, stores the model and links the flow's whole closure
-   * into the dataset's manifest. An editor layout the package carries as {@code x-ui-styles} rides
-   * along as the pipeline's styles; without one, the canvas has to derive its layout from the
-   * model.
+   * into the dataset's manifest.
+   *
+   * <p>The pipeline is stored without styles. The styles of a pipeline are the working state of the
+   * editor: they hold the ids of the sources and sinks of the instance that wrote them, and the
+   * editor builds the model from them on each save. Styles from a package would thus name artifacts
+   * that do not exist here. The layout travels in the model, as {@code x-ui-position} on each node,
+   * and the editor derives its graph from the model.
    */
   private InstalledArtifact installPipeline(PackageMemberInputDTO member, Run run) {
     String name = displayName(member);
@@ -454,7 +458,7 @@ public class InstallationService {
     Map<String, Object> model = new LinkedHashMap<>(member.getContent());
     model.remove(SCHEMA);
     model.remove(STAMPED_ID);
-    Object styles = model.remove(UI_STYLES);
+    model.remove(UI_STYLES);
 
     Set<UUID> sourceIds = new LinkedHashSet<>();
     Set<UUID> sinkIds = new LinkedHashSet<>();
@@ -465,7 +469,6 @@ public class InstallationService {
     input.setName(name);
     input.setDescription(member.getDescription());
     input.setModel(model);
-    input.setStyles(styles instanceof Map<?, ?> layout ? stringKeyed(layout) : null);
     input.setDataSourceIds(sourceIds);
     input.setDataSinkIds(sinkIds);
     Pipeline pipeline = pipelineService.create(input);
