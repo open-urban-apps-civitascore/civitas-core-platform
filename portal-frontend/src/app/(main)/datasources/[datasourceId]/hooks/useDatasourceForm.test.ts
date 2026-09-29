@@ -52,18 +52,16 @@ describe('useDatasourceForm', () => {
   })
 
   describe('canSetDraft', () => {
-    it('forbids setting an in-use data source back to draft and explains why', () => {
+    it('forbids setting an in-use data source back to draft', () => {
       const { result } = renderDatasourceForm(buildDatasource({ inUseByReleased: true }))
 
       expect(result.current.canSetDraft).toBe(false)
-      expect(result.current.statusHint).toBe('datasources.messages.isInUseStatusHint')
     })
 
     it('allows setting a data source no pipeline uses back to draft', () => {
       const { result } = renderDatasourceForm(buildDatasource({ inUseByReleased: false }))
 
       expect(result.current.canSetDraft).toBe(true)
-      expect(result.current.statusHint).toBeUndefined()
     })
 
     it('allows draft for a data source only draft pipelines use', () => {

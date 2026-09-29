@@ -980,9 +980,6 @@
       "title": "Datenquelle kann nicht gelöscht werden",
       "description": "Diese Datenquelle hat den Status \"Verfügbar\" und kann nicht gelöscht werden. Bitte setzen Sie den Status zuerst auf \"Entwurf\"."
     },
-    "messages": {
-      "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Datenquelle bereits in einer aktiven Pipeline verwendet wird."
-    },
     "errors": {
       "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
       "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)",

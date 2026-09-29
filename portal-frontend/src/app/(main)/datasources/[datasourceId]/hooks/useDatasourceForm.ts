@@ -312,8 +312,6 @@ export const useDatasourceForm = (
     form.reset(defaultValues)
   }
 
-  const statusHint = !canSetDraft ? t('messages.isInUseStatusHint') : undefined
-
   return {
     areAssignmentsDirty,
     areDatapoolsDirty,
@@ -326,7 +324,6 @@ export const useDatasourceForm = (
     canStage,
     canSetDraft,
     isConnectorLocked,
-    statusHint,
     completedTabs,
     submitDatasource,
     resetToInitialState,

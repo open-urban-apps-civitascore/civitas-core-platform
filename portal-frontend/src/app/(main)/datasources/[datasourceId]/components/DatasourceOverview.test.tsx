@@ -473,14 +473,15 @@ describe('DatasourceOverview', () => {
       await user.click(await screen.findByTestId('statusOption-draft'))
     }
 
-    it('disables the Draft option while a released entity references the data source', async () => {
+    it('refuses the Draft selection and explains why', async () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       mockCanSetDraft = false
       render(<DatasourceOverview {...defaultProps} datasource={inUseDatasource} />)
 
-      await userEvent.setup().click(screen.getByTestId('statusDropdown'))
+      await selectDraft()
 
-      expect(await screen.findByTestId('statusOption-draft')).toHaveAttribute('aria-disabled', 'true')
+      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
+      expect(mockHandleStatusChange).not.toHaveBeenCalled()
     })
 
     it('applies the Draft selection when no released entity references the data source', async () => {
@@ -489,6 +490,7 @@ describe('DatasourceOverview', () => {
 
       await selectDraft()
 
+      expect(screen.queryByTestId('infoModal')).not.toBeInTheDocument()
       expect(mockHandleStatusChange).toHaveBeenCalledWith('DRAFT')
     })
   })

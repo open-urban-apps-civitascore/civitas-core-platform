@@ -988,9 +988,6 @@
       "title": "Data source cannot be deleted",
       "description": "This Data source has the status \"Available\" and cannot be deleted. Please set it to \"Draft\" first."
     },
-    "messages": {
-      "isInUseStatusHint": "Can not be set to draft since this Data source is already in use by an active pipeline."
-    },
     "errors": {
       "invalidDsn": "Enter a valid URI (e.g. postgres://host:5432/db)",
       "invalidBrokerUrl": "Enter a valid broker URL (e.g. tcp://broker:1883)",
