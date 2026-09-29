@@ -39,6 +39,7 @@ const buildDatasource = (overrides: Partial<Datasource> = {}): Datasource => ({
   configuration: { urls: ['tcp://broker:1883'], topics: ['sensor/data'], qos: 1 },
   dataStructureVersion: null,
   inUse: false,
+  inUseByReleased: false,
   datapoolScope: { type: DATAPOOL_SCOPE_TYPES.ALL },
   ...overrides,
 })
@@ -52,22 +53,29 @@ describe('useDatasourceForm', () => {
 
   describe('canSetDraft', () => {
     it('forbids setting an in-use data source back to draft and explains why', () => {
-      const { result } = renderDatasourceForm(buildDatasource({ inUse: true }))
+      const { result } = renderDatasourceForm(buildDatasource({ inUseByReleased: true }))
 
       expect(result.current.canSetDraft).toBe(false)
       expect(result.current.statusHint).toBe('datasources.messages.isInUseStatusHint')
     })
 
     it('allows setting a data source no pipeline uses back to draft', () => {
-      const { result } = renderDatasourceForm(buildDatasource({ inUse: false }))
+      const { result } = renderDatasourceForm(buildDatasource({ inUseByReleased: false }))
 
       expect(result.current.canSetDraft).toBe(true)
       expect(result.current.statusHint).toBeUndefined()
     })
 
+    it('allows draft for a data source only draft pipelines use', () => {
+      const { result } = renderDatasourceForm(buildDatasource({ inUse: true, inUseByReleased: false }))
+
+      expect(result.current.canSetDraft).toBe(true)
+      expect(result.current.isConnectorLocked).toBe(false)
+    })
+
     it('allows draft for a data source that is already in draft', () => {
       const { result } = renderDatasourceForm(
-        buildDatasource({ dataSourceStatus: DATASOURCE_STATUS_TYPES.DRAFT, inUse: false }),
+        buildDatasource({ dataSourceStatus: DATASOURCE_STATUS_TYPES.DRAFT, inUseByReleased: false }),
       )
 
       expect(result.current.canSetDraft).toBe(true)
@@ -80,11 +88,16 @@ describe('useDatasourceForm', () => {
       [DATASOURCE_STATUS_TYPES.AVAILABLE, false, false],
       [DATASOURCE_STATUS_TYPES.DRAFT, true, false],
       [DATASOURCE_STATUS_TYPES.DRAFT, false, false],
-    ] as const)('status=%s and inUse=%s locks the connector: %s', (dataSourceStatus, inUse, expected) => {
-      const { result } = renderDatasourceForm(buildDatasource({ dataSourceStatus, inUse }))
+    ] as const)(
+      'status=%s and inUseByReleased=%s locks the connector: %s',
+      (dataSourceStatus, inUseByReleased, expected) => {
+        const { result } = renderDatasourceForm(
+          buildDatasource({ dataSourceStatus, inUse: inUseByReleased, inUseByReleased }),
+        )
 
-      expect(result.current.isConnectorLocked).toBe(expected)
-    })
+        expect(result.current.isConnectorLocked).toBe(expected)
+      },
+    )
   })
 
   describe('automatic revert to draft on incomplete data', () => {
@@ -93,7 +106,7 @@ describe('useDatasourceForm', () => {
     const incomplete = { dataStructureVersion: null, description: '' } as Partial<Datasource>
 
     it('reverts an AVAILABLE data source that is not in use', async () => {
-      const { result } = renderDatasourceForm(buildDatasource({ ...incomplete, inUse: false }))
+      const { result } = renderDatasourceForm(buildDatasource({ ...incomplete, inUseByReleased: false }))
 
       await waitFor(() =>
         expect(result.current.dataSourceStatus).toBe<DatasourceStatusType>(DATASOURCE_STATUS_TYPES.DRAFT),
@@ -103,7 +116,7 @@ describe('useDatasourceForm', () => {
     })
 
     it('keeps an in-use data source on AVAILABLE, since the unrelease would be rejected', async () => {
-      const { result } = renderDatasourceForm(buildDatasource({ ...incomplete, inUse: true }))
+      const { result } = renderDatasourceForm(buildDatasource({ ...incomplete, inUseByReleased: true }))
 
       await waitFor(() => expect(result.current.canStage).toBe(false))
       expect(result.current.dataSourceStatus).toBe<DatasourceStatusType>(DATASOURCE_STATUS_TYPES.AVAILABLE)

@@ -112,18 +112,20 @@ export const useDatasourceForm = (
   const isDraftMode = dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
   const hasStatusChanged = dataSourceStatus !== datasource.dataSourceStatus
 
-  // A data source a pipeline still reads from cannot be unreleased — the backend rejects
-  // POST /unrelease with 409 RESOURCE_IN_USE. Gate the option here so the transition is refused
-  // before the user stages an unsaveable change.
-  const isInUse = !!datasource.inUse
-  const canSetDraft = !isInUse
+  // A data source a released dataset's pipeline still reads from cannot be unreleased — the backend
+  // rejects POST /unrelease with 409 RESOURCE_IN_USE (requireNoReleasedReferrer). Draft referrers do
+  // not block it. Gate the option here so the transition is refused before the user stages an
+  // unsaveable change.
+  const isInUseByReleased = datasource.inUseByReleased
+  const canSetDraft = !isInUseByReleased
 
   // The connector is pinned only on the released path. The backend runs the in-use constraints
-  // inside updateReleasedMeta, which a data source reaches only while it is AVAILABLE; a DRAFT one
-  // still goes through the plain PATCH, and that accepts technical changes from an in-use source.
+  // inside updateReleasedMeta, which a data source reaches only while it is AVAILABLE, and only for
+  // released referrers; a DRAFT one still goes through the plain PATCH, which accepts technical
+  // changes from an in-use source.
   // Gate on the persisted status — the same value handleUpdateValues routes on — so the UI is
   // neither stricter nor looser than the API.
-  const isConnectorLocked = isInUse && datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
+  const isConnectorLocked = isInUseByReleased && datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
 
   // Zod v4 discriminatedUnion safeParse can throw on stale keys
   const canStage = useMemo(() => {
