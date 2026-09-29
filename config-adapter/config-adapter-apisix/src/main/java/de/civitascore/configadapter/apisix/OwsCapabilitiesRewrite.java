@@ -9,7 +9,6 @@
  */
 package de.civitascore.configadapter.apisix;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,9 +36,6 @@ final class OwsCapabilitiesRewrite {
   /** OWS service endpoints GeoServer emits in its capabilities self-URLs ({@code .../{ws}/wfs}). */
   private static final String OWS_SERVICE_ALTERNATION = "wfs|wms|wcs|wps|wmts|ows|gwc";
 
-  private static final String HEADERS_KEY = "headers";
-  private static final String REMOVE_KEY = "remove";
-
   private static final String OWS_PATH_SUFFIX = "/ows";
 
   private OwsCapabilitiesRewrite() {}
@@ -60,18 +56,18 @@ final class OwsCapabilitiesRewrite {
       return;
     }
 
-    Map<String, Object> filter = new HashMap<>();
-    filter.put(
-        "regex",
-        "https?://[^/]+" + regexEscape(workspacePath) + "/(" + OWS_SERVICE_ALTERNATION + ")");
-    filter.put("scope", "global");
-    filter.put("replace", "https://" + apiHost + externalPath);
+    ResponseRewrites.install(
+        plugins,
+        List.of(
+            ResponseRewrites.filter(
+                "https?://[^/]+"
+                    + ResponseRewrites.regexEscape(workspacePath)
+                    + "/("
+                    + OWS_SERVICE_ALTERNATION
+                    + ")",
+                "https://" + apiHost + externalPath)));
 
-    Map<String, Object> responseRewrite = new HashMap<>();
-    responseRewrite.put("filters", new Object[] {filter});
-    plugins.put("response-rewrite", responseRewrite);
-
-    stripRequestBodyEncoding(proxyRewrite);
+    ResponseRewrites.stripRequestBodyEncoding(proxyRewrite);
   }
 
   /**
@@ -84,27 +80,5 @@ final class OwsCapabilitiesRewrite {
       return null;
     }
     return upstreamPath.substring(0, upstreamPath.length() - OWS_PATH_SUFFIX.length());
-  }
-
-  /**
-   * Add {@code Accept-Encoding} to {@code proxy-rewrite.headers.remove} (idempotent union) so the
-   * upstream returns an uncompressed body the {@code response-rewrite} filter can match.
-   */
-  @SuppressWarnings("unchecked")
-  private static void stripRequestBodyEncoding(Map<String, Object> proxyRewrite) {
-    Object existing = proxyRewrite.get(HEADERS_KEY);
-    Map<String, Object> headers =
-        existing instanceof Map ? new HashMap<>((Map<String, Object>) existing) : new HashMap<>();
-    List<String> remove = RouteAuthConfigurer.readStringList(headers.get(REMOVE_KEY));
-    if (!remove.contains("Accept-Encoding")) {
-      remove.add("Accept-Encoding");
-    }
-    headers.put(REMOVE_KEY, remove);
-    proxyRewrite.put(HEADERS_KEY, headers);
-  }
-
-  /** Escape PCRE metacharacters in a literal path used inside a {@code response-rewrite} regex. */
-  private static String regexEscape(String literal) {
-    return literal.replaceAll("([.^$*+?()\\[\\]{}|\\\\])", "\\\\$1");
   }
 }
