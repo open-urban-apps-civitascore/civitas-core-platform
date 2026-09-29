@@ -767,7 +767,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     isReadOnly,
   ])
 
-  useRegisterUnsavedChanges(hasAnyDirtySession, saveAllPipelines)
+  useRegisterUnsavedChanges(hasAnyDirtySession && !isReadOnly, saveAllPipelines)
 
   // ===== Context Value =====
   const contextValue: ActivePipelineContextValue = useMemo(
