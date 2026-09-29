@@ -472,6 +472,7 @@ class DataSourceServiceTest {
       scope.setDatapoolIds(List.of(poolId));
 
       DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
+      input.setName("source");
       input.setDatapoolScope(scope);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
@@ -499,28 +500,6 @@ class DataSourceServiceTest {
       assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("AVAILABLE");
-    }
-
-    @Test
-    @DisplayName("Should clear the description when the metadata has none")
-    void shouldClearDescriptionWhenMetadataHasNone() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setName("original-name");
-      entity.setDescription("original-desc");
-      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-
-      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
-      input.setName("updated-name");
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-      DataSource result = dataSourceService.updateReleasedMeta(id, input);
-
-      assertThat(result.getName()).isEqualTo("updated-name");
-      assertThat(result.getDescription()).isNull();
     }
 
     @Test

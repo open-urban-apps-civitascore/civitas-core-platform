@@ -339,8 +339,7 @@ public class DataSetService
   }
 
   /**
-   * Updates the metadata of a released dataset. The {@code namedApis} set is not metadata: the only
-   * path to change it is unrelease → edit in DRAFT → release. For AVAILABLE datasets with existing
+   * Updates the metadata of a released dataset. For AVAILABLE datasets with existing
    * infrastructure, triggers a saga UPDATE if no saga is currently in-flight.
    *
    * @param id the dataset ID

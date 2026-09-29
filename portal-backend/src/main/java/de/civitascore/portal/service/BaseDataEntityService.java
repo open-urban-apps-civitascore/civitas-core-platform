@@ -97,8 +97,8 @@ public abstract class BaseDataEntityService<
    * Returns the current metadata of the entity, which a metadata patch starts from.
    *
    * @param entity the entity
-   * @return the metadata, with {@code assignments} and any other field a patch may omit left {@code
-   *     null}
+   * @return the metadata, with {@code assignments} and any other field whose {@code null} means
+   *     keep left {@code null}
    */
   public abstract M toMetaInput(E entity);
 

@@ -415,9 +415,7 @@ public class DataSourceService
           getEntityName(), id, "Only data sources in AVAILABLE status can have metadata updated");
     }
 
-    if (input.getName() != null) {
-      entity.setName(input.getName());
-    }
+    entity.setName(input.getName());
     entity.setDescription(input.getDescription());
     if (input.getAssignments() != null) {
       Set<Assignment> assignments =
@@ -440,12 +438,12 @@ public class DataSourceService
   }
 
   /**
-   * Re-asserts the DataSource→DataPool scope rule after this DataSource's own scope was narrowed,
-   * for every dataset it already feeds. Narrowing a bound DataSource (e.g. {@code ALL → SPECIFIC}
-   * excluding a pool it is linked into, or {@code → NONE}) would otherwise reach the same persisted
-   * state the pipeline-write validation rejects, without any path re-checking it. Each referencing
-   * pipeline is validated against its own dataset's datapool; the managed DataSource already
-   * carries the new scope.
+   * Re-asserts the DataSource→DataPool scope rule after this DataSource's own scope was set, for
+   * every dataset it already feeds; a data source without an ID feeds none yet. Narrowing a bound
+   * DataSource (e.g. {@code ALL → SPECIFIC} excluding a pool it is linked into, or {@code → NONE})
+   * would otherwise reach the same persisted state the pipeline-write validation rejects, without
+   * any path re-checking it. Each referencing pipeline is validated against its own dataset's
+   * datapool; the managed DataSource already carries the new scope.
    *
    * @param dataSource the DataSource whose scope has just been changed
    * @throws de.civitascore.portal.util.DataSourceScopeViolationException if it is now out of scope
