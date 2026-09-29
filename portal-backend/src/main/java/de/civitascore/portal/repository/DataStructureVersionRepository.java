@@ -4,7 +4,6 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -24,16 +23,6 @@ public interface DataStructureVersionRepository extends BaseRepository<DataStruc
   @EntityGraph(attributePaths = {"dataStructure"})
   @Override
   @NonNull Optional<DataStructureVersion> findById(@NonNull UUID id);
-
-  /**
-   * Find all data structure versions matching the given data structure ID and version string. Used
-   * for uniqueness validation when creating new versions.
-   *
-   * @param id the parent data structure ID
-   * @param version the version string to match
-   * @return matching data structure versions
-   */
-  Set<DataStructureVersion> findAllByDataStructureIdAndVersion(UUID id, String version);
 
   /**
    * Finds any version whose {@code modelUrn} begins with the given prefix — typically the logical

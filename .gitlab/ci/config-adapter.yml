@@ -241,6 +241,16 @@ integration-test-config-adapter-nifi:
   extends: .integration-test-config-adapter
   variables:
     MODULES: config-adapter-nifi
+  # The FROST ITs deploy a flow that uses PutFrostRecord, so the NiFi container has to carry the
+  # NAR. It is built here when it is absent rather than pulled from the extensions lane: that lane
+  # runs on its own change rules, and a shard that silently skips its FROST tests whenever the
+  # extensions did not change would look green for the wrong reason. The ITs find the NAR in the
+  # sibling build tree without further wiring.
+  before_script:
+    - |
+      if ! ls nifi-extensions/nifi-frost-nar/target/*.nar >/dev/null 2>&1; then
+        mvn $MAVEN_CLI_OPTS -f nifi-extensions/pom.xml package           -DskipTests -DskipITs -Dspotless.check.skip=true           -Dpmd.skip=true -Dcpd.skip=true -Dspotbugs.skip=true
+      fi
 
 integration-test-config-adapter-gateway-idm:
   extends: .integration-test-config-adapter

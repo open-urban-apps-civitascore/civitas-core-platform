@@ -3,13 +3,7 @@ import { z } from 'zod'
 
 // ── $defs ──────────────────────────────────────────────────────────────────
 
-/**
- * A single field mapping rule.
- * MANUAL PATCH: `toUuid`/`toDateTime` are missing from the backend CORE JSON Schema
- * (model-forge-runtime) even though the mapping editor's transform palette already offers both as
- * live, selectable operations — added here so this override is lost on the next
- * `npm run generate:core-types` until that source is fixed.
- */
+/** A single field mapping rule. */
 export const MappingOperationSchema: z.ZodType = z.lazy(() =>
   z.discriminatedUnion('op', [
     CopyFieldOperationSchema,

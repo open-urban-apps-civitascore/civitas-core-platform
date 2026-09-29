@@ -12,11 +12,15 @@ import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useState } from 'react'
 
-import { DataModelImportModal } from '@/app/(main)/datasources/[datasourceId]/components/datastructure-tab/DataModelImportModal'
+import {
+  DataModelImportModal,
+  type SelectedDatastructureVersion,
+} from '@/app/(main)/datasources/[datasourceId]/components/datastructure-tab/DataModelImportModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
+import { buildDataStructureUrn } from '@/utils/urn'
 
 import { useActivePipeline } from '../../../_hooks/use-active-pipeline'
 import { parseCompositeKey, useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
@@ -31,15 +35,22 @@ interface GeoPersistencePanelProps {
 
 export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, onUpdate }) => {
   const t = useTranslations('pipelineEditor')
+  const tStatus = useTranslations('common.status')
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canReadDatastructures } = useDatasetPermissionsById(datasetId)
-  const { selectedNode, pipelineUsingTableName } = useActivePipeline()
+  const { selectedNode, pipelineUsingTableName, getSinkLocks } = useActivePipeline()
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+
+  const { provisioned: isProvisioned, inUseByLayer: isUsedByLayer } = getSinkLocks(data.entityId)
 
   const conflictingPipeline = selectedNode ? pipelineUsingTableName(selectedNode.id, data.tableName) : null
   const hasInvalidCharacters = data.tableName !== '' && !isValidTableName(data.tableName)
 
-  const { name: dataStructureName, versionNumber } = useDatastructureVersionInfo(data.dataStructureVersionId)
+  const {
+    name: dataStructureName,
+    versionNumber,
+    status: dataStructureVersionStatus,
+  } = useDatastructureVersionInfo(data.dataStructureVersionId)
 
   const handleTableNameChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,11 +64,13 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
   )
 
   const handleSelectVersion = useCallback(
-    (selection: Record<string, boolean>) => {
+    (selection: Record<string, boolean>, selectedVersion?: SelectedDatastructureVersion) => {
       const selectedKey = Object.keys(selection).find(key => selection[key])
-      if (selectedKey && parseCompositeKey(selectedKey)) {
+      if (selectedKey && parseCompositeKey(selectedKey) && selectedVersion) {
+        const { datastructureId, name, version } = selectedVersion
         onUpdate({
           dataStructureVersionId: selectedKey,
+          dataStructureUrn: buildDataStructureUrn(name, datastructureId, version),
           configured: isValidTableName(data.tableName),
         })
       }
@@ -91,14 +104,22 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
         )}
       </div>
 
-      <div className="space-y-2">
-        <Label>{t('geoPersistencePanel.dataStructureVersion')}</Label>
-        <Button variant="outline" size="sm" className="w-full" onClick={() => setIsImportModalOpen(true)}>
-          {data.dataStructureVersionId
-            ? t('geoPersistencePanel.changeDataStructure')
-            : t('geoPersistencePanel.importDataStructure')}
-        </Button>
-      </div>
+      {!isProvisioned && (
+        <div className="space-y-2">
+          <Label>{t('geoPersistencePanel.dataStructureVersion')}</Label>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            disabled={isUsedByLayer}
+            onClick={() => setIsImportModalOpen(true)}
+          >
+            {data.dataStructureVersionId
+              ? t('geoPersistencePanel.changeDataStructure')
+              : t('geoPersistencePanel.importDataStructure')}
+          </Button>
+        </div>
+      )}
 
       {data.dataStructureVersionId && (
         <>
@@ -107,6 +128,10 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
             items={[
               { label: t('geoPersistencePanel.dataStructureName'), value: dataStructureName },
               { label: t('geoPersistencePanel.versionNumber'), value: versionNumber },
+              {
+                label: t('geoPersistencePanel.status'),
+                value: dataStructureVersionStatus ? tStatus(dataStructureVersionStatus) : undefined,
+              },
             ]}
           />
           {canReadDatastructures && parseCompositeKey(data.dataStructureVersionId) && (

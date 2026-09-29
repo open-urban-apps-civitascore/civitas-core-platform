@@ -3,7 +3,14 @@ import { JSX, ReactNode } from 'react'
 import { z } from 'zod'
 
 import { AssignmentScopedInputSchema } from './assignments'
-import { ItemType, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, STATUS_TYPES, WithId } from './common'
+import {
+  ItemType,
+  MAX_DESCRIPTION_LENGTH,
+  MAX_NAME_LENGTH,
+  MIN_DESCRIPTION_LENGTH,
+  STATUS_TYPES,
+  WithId,
+} from './common'
 import { DatapoolItem, DatapoolItemSchema } from './datapools'
 import { NamedApiPayloadSchema, NamedApiSchema } from './namedApis'
 
@@ -28,7 +35,7 @@ export type PipelineBasicInfo = {
 }
 
 export type PipelineRuntimeStatus = {
-  state: 'OK' | 'ERROR' | 'UNKNOWN'
+  state: 'OK' | 'ERROR'
   message?: string | null
   sanitizedStacktrace?: string | null
   occurredAt?: string | null
@@ -56,7 +63,7 @@ export const DatasetApiResponseSchema = z.object({
       description: z.string().optional(),
       runtimeStatus: z
         .object({
-          state: z.enum(['OK', 'ERROR', 'UNKNOWN']),
+          state: z.enum(['OK', 'ERROR']),
           message: z.string().nullable().optional(),
           sanitizedStacktrace: z.string().nullable().optional(),
           occurredAt: z.string().nullable().optional(),
@@ -119,7 +126,7 @@ export const DatasetBaseFormSchema = z.object({
   description: z
     .string()
     .trim()
-    .min(1, 'common.errors.descriptionRequired')
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
     .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   openDataAccess: z.boolean(),
   datapoolId: z.string().nullable(),
@@ -135,9 +142,8 @@ export const DatasetCreateFormSchema = z.object({
   description: z
     .string()
     .trim()
-    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength')
-    .optional()
-    .or(z.literal('')),
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
 })
 
 export type DatasetCreateFormData = z.input<typeof DatasetCreateFormSchema>
@@ -150,9 +156,8 @@ export const DatasetFormDraftSchema = DatasetBaseFormSchema.partial().extend({
   description: z
     .string()
     .trim()
-    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength')
-    .optional()
-    .or(z.literal('')),
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
 })
 
 export type DatasetFormDraft = z.input<typeof DatasetFormDraftSchema>
@@ -165,7 +170,7 @@ export const DatasetFormAvailableSchema = z.object({
   description: z
     .string()
     .trim()
-    .min(1, 'common.errors.descriptionRequired')
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
     .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   openDataAccess: z.boolean(),
   datapoolId: z.string().nullable(),
@@ -188,7 +193,7 @@ export type CompletionStepParam = 'access-management' | 'data-flow' | 'apis'
 export type CompletionStepData = {
   title: string
   description?: string
-  isCompleted: CheckedState
+  isCompleted?: CheckedState
   buttons: {
     text: string
     routeParam: CompletionStepParam

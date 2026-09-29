@@ -24,6 +24,7 @@ const mockDatasource = (overrides?: Partial<Datasource>): Datasource => ({
   configuration: null,
   dataStructureVersion: null,
   inUse: false,
+  inUseByReleased: false,
   ...overrides,
 })
 
@@ -48,9 +49,9 @@ beforeEach(() => {
 
 describe('useDataSourceEntities', () => {
   describe('params: always set', () => {
-    it('always sends dataSourceStatus=AVAILABLE', () => {
+    it('does not filter by status, so a draft pipeline can reference a draft data source', () => {
       renderHook(() => useDataSourceEntities({ datapoolId: 'some-id' }))
-      expect(getCalledParams().get(DATASOURCE_FILTER_PARAMS.dataSourceStatus)).toBe(DATASOURCE_STATUS_TYPES.AVAILABLE)
+      expect(getCalledParams().get(DATASOURCE_FILTER_PARAMS.dataSourceStatus)).toBeNull()
     })
 
     it('always sends size=2000', () => {

@@ -121,7 +121,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       // version cannot be given a number of its own. Refusing says so instead of yielding a
       // version that shares another's number while claiming to be a new one.
       DataStructureVersionInputDTO first = new DataStructureVersionInputDTO();
-      first.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       first.setDescription("first");
       first.setModelName("SharedShape");
       first.setModel(portalData.dataStructureVersionModel("SharedShape"));
@@ -135,7 +134,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
       DataStructureVersionInputDTO second = new DataStructureVersionInputDTO();
-      second.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       second.setDescription("second, same content");
       second.setModelName("SharedShape");
       second.setModel(portalData.dataStructureVersionModel("SharedShape"));
@@ -156,7 +154,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @DisplayName("Should create data structure version successfully with valid data")
     void shouldCreateDataStructureVersionSuccessfully() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDescription("Third version with new features");
       input.setModel(portalData.dataStructureVersionModel("Model3"));
       input.setModelName("TestModel3");
@@ -190,7 +187,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .as("Status should be set to DRAFT by preProcessCreateInput hook")
           .isEqualTo(DataStructureVersionStatus.DRAFT);
       assertThat(output.getDataStructureVersionSource())
-          .as("Source should match input")
+          .as("Source is set by the backend, the input does not carry it")
           .isEqualTo(DataStructureVersionSource.OWN);
       assertThat(output.getModel())
           .as("Model (JSON Schema) should be persisted and returned")
@@ -213,7 +210,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @DisplayName("Should create a DRAFT version without a model")
     void shouldCreateVersionWithoutModel() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setModelName("NoModelYet");
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
@@ -231,32 +227,11 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should fail to create version with missing required source")
-    void shouldFailToCreateVersionWithMissingSource() {
-      // dataStructureVersionSource is the only required client field (the version string is
-      // assigned by Model Forge and no longer part of the input).
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpoint(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              String.class);
-
-      assertThat(response.getStatusCode())
-          .as("Should return BAD_REQUEST status")
-          .isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
     @DisplayName("Should reject a model that is not a conforming JSON Schema")
     void shouldRejectNonConformingModel() {
       // portal-backend does not validate the model itself; the registry refuses it on the way in.
       // Without this, a break anywhere in that chain would persist an invalid model behind a 2xx.
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setModelName("NonConforming");
       input.setModel(Map.of("type", "object", "properties", Map.of("t", Map.of("type", "nubmer"))));
 
@@ -295,12 +270,10 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       otherDataStructure.setName("Other Data Structure");
       otherDataStructure.setDescription("Should not be used");
       otherDataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
-      otherDataStructure.setCreatedFromDataSource(false);
       otherDataStructure = dataStructureRepository.save(otherDataStructure);
       UUID otherDataStructureId = otherDataStructure.getId();
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setModel(portalData.dataStructureVersionModel("Model5"));
       // Try to set a different dataStructureId - should be ignored due to @JsonIgnore
       input.setDataStructureId(otherDataStructureId);
@@ -368,7 +341,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     void shouldReturnNullModelWhenNoneSet() {
       DataStructureVersion versionWithoutModel = new DataStructureVersion();
       versionWithoutModel.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      versionWithoutModel.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       versionWithoutModel.setVersion("3.0.0");
       versionWithoutModel.setDataStructure(
           dataStructureRepository.findById(dataStructureId).orElseThrow());
@@ -424,7 +396,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @DisplayName("Should update data structure version successfully")
     void shouldUpdateDataStructureVersionSuccessfully() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDescription("Updated description with a replaced model");
       input.setModel(portalData.dataStructureVersionModel("Model1Updated"));
       input.setModelName("TestModel1-Updated");
@@ -466,7 +437,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     void shouldReturn404WhenUpdatingNonExistent() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       ResponseEntity<String> response =
           restTemplate.exchange(
@@ -484,7 +454,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @DisplayName("Should maintain dataStructureId on update")
     void shouldMaintainDataStructureIdOnUpdate() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
@@ -509,7 +478,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       // The version string is assigned by Model Forge; an update that carries no model stores
       // nothing in the registry, so the existing pin (version + URN) must survive the update.
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDescription("Metadata-only update");
 
       ResponseEntity<String> response =
@@ -717,7 +685,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     void shouldFailToReleaseVersionWithoutModel() {
       DataStructureVersion versionWithoutModel = new DataStructureVersion();
       versionWithoutModel.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      versionWithoutModel.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       versionWithoutModel.setVersion("3.0.0");
       versionWithoutModel.setModelName("TestModel3");
       versionWithoutModel.setDataStructure(
@@ -916,7 +883,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     void shouldAllowUnreleasingWhenMultipleReleasedVersionsExist() {
       DataStructureVersion version3 = new DataStructureVersion();
       version3.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version3.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       version3.setModelName("TestModel3");
       version3.setDataStructure(dataStructureRepository.findById(dataStructureId).orElseThrow());
       version3 = dataStructureVersionRepository.save(version3);
@@ -1013,7 +979,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
         "Should allow full update (version, styles, modelName) via released/meta when not in use")
     void shouldAllowFullUpdateWhenNotInUse() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setModelName("UpdatedReleasedModel");
       // PUT /released/meta is a full replace (SET_TO_NULL); a released version must always retain a
       // non-empty model, so the model is sent here.
@@ -1053,7 +1018,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     void shouldUpdateModelWhenNotInUse() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setModel(portalData.dataStructureVersionModel("UpdatedModel"));
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
@@ -1075,7 +1039,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     void shouldFailToUpdateReleasedMetaForDraftVersion() {
       DataStructureVersion draftVersion = new DataStructureVersion();
       draftVersion.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      draftVersion.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       draftVersion.setModelName("TestModel4");
       draftVersion.setDataStructure(
           dataStructureRepository.findById(dataStructureId).orElseThrow());
@@ -1102,7 +1065,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @DisplayName("Should return 404 when updating released meta for non-existent version")
     void shouldReturn404WhenUpdatingReleasedMetaForNonExistentVersion() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       ResponseEntity<String> response =
           restTemplate.exchange(
@@ -1147,7 +1109,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       dataStructureVersionRepository.save(version1);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       ResponseEntity<String> response =
           restTemplate.exchange(
@@ -1177,24 +1138,63 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       ds.setName("InUse Data Structure");
       ds.setDescription("Data structure with in-use version");
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-      ds.setCreatedFromDataSource(false);
       ds = dataStructureRepository.save(ds);
       inUseDataStructureId = ds.getId();
 
       DataStructureVersion version = new DataStructureVersion();
       version.setDataStructure(ds);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-      version.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       version.setModelName("InUse Model");
       version = dataStructureVersionRepository.save(version);
       version = portalData.attachModel(version, portalData.dataStructureVersionModel("InUse"));
       inUseVersionId = version.getId();
 
+      pinDataSource(version, DataSourceStatus.AVAILABLE);
+    }
+
+    private void pinDataSource(DataStructureVersion version, DataSourceStatus status) {
       DataSource dataSource = new DataSource();
       dataSource.setName("ds_referencing_" + UUID.randomUUID().toString().substring(0, 8));
-      dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
+      dataSource.setDataSourceStatus(status);
       dataSource.setDataStructureVersion(version);
       dataSourceRepository.save(dataSource);
+    }
+
+    @Test
+    @DisplayName("Should report inUseByReleased=false and accept a model change when a draft pins")
+    void shouldAcceptModelChangeWhenOnlyADraftPins() {
+      DataStructureVersion draftPinned = new DataStructureVersion();
+      draftPinned.setDataStructure(
+          dataStructureRepository.findById(inUseDataStructureId).orElseThrow());
+      draftPinned.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      draftPinned.setModelName("Draft pinned");
+      draftPinned = dataStructureVersionRepository.save(draftPinned);
+      draftPinned =
+          portalData.attachModel(draftPinned, portalData.dataStructureVersionModel("Before"));
+      pinDataSource(draftPinned, DataSourceStatus.DRAFT);
+      String path = "/datastructures/" + inUseDataStructureId + "/versions/" + draftPinned.getId();
+
+      ResponseEntity<DataStructureVersionOutputDTO> read =
+          restTemplate.exchange(
+              path,
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+      assertThat(read.getBody()).isNotNull();
+      assertThat(read.getBody().isInUse()).isTrue();
+      assertThat(read.getBody().isInUseByReleased()).isFalse();
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setModel(portalData.dataStructureVersionModel("After"));
+      ResponseEntity<DataStructureVersionOutputDTO> updated =
+          restTemplate.exchange(
+              path + "/released/meta",
+              HttpMethod.PUT,
+              new HttpEntity<>(input, createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(updated.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(updated.getBody().getModel()).containsEntry("title", "After");
     }
 
     @Test
@@ -1247,6 +1247,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getBody().isInUse())
           .as("inUse should be true when a DataSource references this version")
           .isTrue();
+      assertThat(response.getBody().isInUseByReleased())
+          .as("inUseByReleased should be true when an AVAILABLE DataSource pins this version")
+          .isTrue();
     }
 
     @Test
@@ -1254,7 +1257,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     void shouldProtectStructuralFieldsWhenInUse() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setModel(portalData.dataStructureVersionModel("SHOULD_NOT_CHANGE"));
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setModelName("UpdatedModelName");
 
       input.setStyles(Collections.singletonMap("color", "green"));
@@ -1295,7 +1297,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           dataStructureRepository.findById(inUseDataStructureId).orElseThrow());
       notInUseVersion.setVersion("2.0.0");
       notInUseVersion.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      notInUseVersion.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       notInUseVersion = dataStructureVersionRepository.save(notInUseVersion);
 
       ResponseEntity<DataStructureVersionOutputDTO> response =

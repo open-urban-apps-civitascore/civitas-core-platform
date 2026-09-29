@@ -82,8 +82,7 @@ export const useDatastructure = ({
   const descriptionWatch = form.watch('description')
 
   const isDraftMode = datastructureStatus === DATASTRUCTURE_STATUS_TYPES.DRAFT
-  const isInUse = !!datastructure.inUse
-  const canSetDraft = !isInUse
+  const canSetDraft = !datastructure.inUseByReleased
 
   const hasAvailableVersion = useMemo(
     () =>
@@ -158,7 +157,6 @@ export const useDatastructure = ({
       if (datastructure.dataStructureStatus === STATUS_TYPES.AVAILABLE)
         response = await updateReleasedDatastructure.mutateAsync({
           ...values,
-          createdFromDataSource: datastructure.createdFromDataSource,
           ...assignmentsPatch,
         })
       else

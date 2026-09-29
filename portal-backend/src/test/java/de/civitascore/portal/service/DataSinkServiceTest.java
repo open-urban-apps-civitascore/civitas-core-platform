@@ -371,6 +371,65 @@ class DataSinkServiceTest {
     }
 
     @Test
+    @DisplayName("Should accept a FROST config carrying a port")
+    void shouldAcceptFrostConfigWithPort() {
+      UUID dataSetId = UUID.randomUUID();
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSinkType(DataSinkType.FROST);
+      // The port is what a modeller selects on the sink node, and the only way it reaches the
+      // configuration is this endpoint.
+      input.setConfiguration(Map.of("port", "Things"));
+
+      DataSink entity = new DataSink();
+      when(dataSinkMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      when(dataSinkRepository.save(any())).thenReturn(entity);
+
+      assertThat(dataSinkService.create(input)).isSameAs(entity);
+    }
+
+    @Test
+    @DisplayName("Should accept a FROST config carrying a port and an element")
+    void shouldAcceptFrostConfigWithPortAndElement() {
+      UUID dataSetId = UUID.randomUUID();
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSinkType(DataSinkType.FROST);
+      input.setConfiguration(Map.of("port", "ThingTree", "element", ELEMENT_URN));
+
+      DataSink entity = new DataSink();
+      when(dataSinkMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      when(dataSinkRepository.save(any())).thenReturn(entity);
+
+      assertThat(dataSinkService.create(input)).isSameAs(entity);
+    }
+
+    @Test
+    @DisplayName("Should throw InvalidInputException for a port outside the closed set")
+    void shouldThrowWhenFrostPortUnknown() {
+      UUID dataSetId = UUID.randomUUID();
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSinkType(DataSinkType.FROST);
+      input.setConfiguration(Map.of("port", "Everything"));
+
+      DataSink entity = new DataSink();
+      when(dataSinkMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+
+      // An unknown port must not pass through: the deploy engine writes it into a processor
+      // property, where it would fail far from where it was entered.
+      assertThatThrownBy(() -> dataSinkService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Everything");
+    }
+
+    @Test
     @DisplayName("Should accept a FROST config referencing an existing element")
     void shouldAcceptFrostConfigWithExistingElement() {
       UUID dataSetId = UUID.randomUUID();
@@ -732,11 +791,12 @@ class DataSinkServiceTest {
 
     private DataSink existingPostgisSink(boolean provisioned) {
       DataSet ds = dataSet(UUID.randomUUID());
-      ds.setProvisioned(provisioned);
+      ds.setProvisioned(true);
       DataSink sink = new DataSink();
       sink.setId(UUID.randomUUID());
       sink.setDataSet(ds);
       sink.setDataSinkType(DataSinkType.POSTGIS);
+      sink.setProvisioned(provisioned);
       sink.setConfigurationUrn(STORED_VERSIONED_URN);
       lenient()
           .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
@@ -758,11 +818,12 @@ class DataSinkServiceTest {
 
     private DataSink existingFrostSink(boolean provisioned, String element) {
       DataSet ds = dataSet(UUID.randomUUID());
-      ds.setProvisioned(provisioned);
+      ds.setProvisioned(true);
       DataSink sink = new DataSink();
       sink.setId(UUID.randomUUID());
       sink.setDataSet(ds);
       sink.setDataSinkType(DataSinkType.FROST);
+      sink.setProvisioned(provisioned);
       sink.setConfigurationUrn(STORED_VERSIONED_URN);
       lenient()
           .when(modelRegistryGateway.fetchPayload(STORED_VERSIONED_URN))
@@ -773,7 +834,7 @@ class DataSinkServiceTest {
     }
 
     @Test
-    @DisplayName("rejects a FROST element change on a provisioned dataset")
+    @DisplayName("rejects a FROST element change on a provisioned sink")
     void rejectsFrostVersionChangeWithoutConfirmation() {
       DataSink sink = existingFrostSink(true, "v1");
       when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
@@ -789,7 +850,7 @@ class DataSinkServiceTest {
     }
 
     @Test
-    @DisplayName("rejects a destructive change on a provisioned dataset without confirmDataLoss")
+    @DisplayName("rejects a destructive change on a provisioned sink without confirmDataLoss")
     void rejectsDestructiveChangeWithoutConfirmation() {
       DataSink sink = existingPostgisSink(true);
       when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
@@ -818,8 +879,12 @@ class DataSinkServiceTest {
           .isNotInstanceOf(ResourceInUseException.class);
     }
 
+    /**
+     * The dataset-level flag is set, so a guard that still read it would ask for a sink added in
+     * DRAFT after the release, which has no table yet.
+     */
     @Test
-    @DisplayName("does not raise the data-loss guard on a never-provisioned dataset")
+    @DisplayName("does not raise the data-loss guard on a never-provisioned sink")
     void allowsDestructiveChangeWhenNotProvisioned() {
       DataSink sink = existingPostgisSink(false);
       when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));

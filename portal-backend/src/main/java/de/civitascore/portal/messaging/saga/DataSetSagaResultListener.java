@@ -164,9 +164,6 @@ public class DataSetSagaResultListener {
         status.get("occurredAt") == null
             ? null
             : Instant.parse(String.valueOf(status.get("occurredAt"))),
-        status.get("correlationId") == null
-            ? null
-            : UUID.fromString(String.valueOf(status.get("correlationId"))),
         status.get("eventId") == null
             ? null
             : UUID.fromString(String.valueOf(status.get("eventId"))));

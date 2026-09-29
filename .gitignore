@@ -11,7 +11,7 @@ gl-dependency-scanning.json
 **/maven.graph.json
 .DS_Store
 
-/.idea/
+.idea/
 /test-results/
 **/.DS_Store
 errorlogs.txt
@@ -25,6 +25,9 @@ api/**/node_modules/
 
 # NiFi JDBC drivers (downloaded at dev startup)
 dev-environment/nifi/drivers/*.jar
+
+# NiFi extensions (built from nifi-extensions/, copied in at dev startup)
+dev-environment/nifi/extensions/*.nar
 
 # Local Claude Code state. CLAUDE.md is no longer ignored: the agent context
 # is now distributed into this repo from the agent-context project.

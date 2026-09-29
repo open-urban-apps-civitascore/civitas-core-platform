@@ -13,7 +13,6 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
-import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -53,6 +52,17 @@ class DataStructureVersionServiceTest {
   @Mock private DataStructureService dataStructureService;
   @Mock private DataSourceRepository dataSourceRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private ArtifactUsageLookup artifactUsageLookup;
+
+  private static final ArtifactUsageLookup.ArtifactUsage IN_USE_BY_RELEASED =
+      new ArtifactUsageLookup.ArtifactUsage(
+          true,
+          List.of(
+              new ArtifactUsageLookup.ReleasedReferrer(
+                  ArtifactUsageLookup.ReferrerKind.MAPPING,
+                  "urn:core:platform:civitas:mapping:common:Map:5tt3mnq2wa")));
+  private static final ArtifactUsageLookup.ArtifactUsage IN_USE_BY_DRAFTS =
+      new ArtifactUsageLookup.ArtifactUsage(true, List.of());
 
   @InjectMocks private DataStructureVersionService dataStructureVersionService;
 
@@ -67,6 +77,9 @@ class DataStructureVersionServiceTest {
                 "urn:core:platform:civitas:element:common:test",
                 "urn:core:platform:civitas:element:common:test:1.0.0",
                 "1.0.0"));
+    lenient()
+        .when(artifactUsageLookup.of(any(DataStructureVersion.class)))
+        .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of()));
   }
 
   @Nested
@@ -74,8 +87,8 @@ class DataStructureVersionServiceTest {
   class UnreleaseInUseTests {
 
     @Test
-    @DisplayName("Should block unrelease when version is in use by a DataSource")
-    void shouldBlockUnreleaseWhenInUse() {
+    @DisplayName("Should block unrelease when a released entity references the version")
+    void shouldBlockUnreleaseWhenInUseByReleased() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
@@ -86,15 +99,16 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(ds);
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
+      when(artifactUsageLookup.of(version)).thenReturn(IN_USE_BY_RELEASED);
 
       assertThatThrownBy(() -> dataStructureVersionService.unrelease(versionId))
-          .isInstanceOf(ResourceInUseException.class);
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("a Mapping used by a released Dataset");
     }
 
     @Test
-    @DisplayName("Should block unrelease when the registry still holds a reference")
-    void shouldBlockUnreleaseWhenStillReferenced() {
+    @DisplayName("Should allow unrelease when only drafts reference the version")
+    void shouldAllowUnreleaseWhenInUseByDraftsOnly() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
@@ -103,13 +117,20 @@ class DataStructureVersionServiceTest {
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructure(ds);
-      version.setModelUrn(MODEL_URN);
+
+      DataStructureVersion otherVersion = new DataStructureVersion();
+      otherVersion.setId(UUID.randomUUID());
+      otherVersion.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      otherVersion.setDataStructure(ds);
+      ds.setDataStructureVersions(Set.of(version, otherVersion));
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(BLOCKER_URN));
+      when(artifactUsageLookup.of(version)).thenReturn(IN_USE_BY_DRAFTS);
+      when(dataStructureVersionRepository.save(version)).thenReturn(version);
 
-      assertThatThrownBy(() -> dataStructureVersionService.unrelease(versionId))
-          .isInstanceOf(ResourceInUseException.class);
+      dataStructureVersionService.unrelease(versionId);
+
+      verify(dataStructureVersionRepository).save(version);
     }
 
     @Test
@@ -134,7 +155,6 @@ class DataStructureVersionServiceTest {
       ds.setDataStructureVersions(Set.of(version, otherVersion));
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
 
       dataStructureVersionService.unrelease(versionId);
@@ -233,13 +253,11 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(ds);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "New")));
       input.setStyles(new HashMap<>(Map.of("color", "red")));
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
       when(dataStructureVersionRepository.save(any())).thenReturn(version);
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
 
@@ -258,8 +276,10 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Should block model and structural changes via updateReleasedMeta when in use")
-    void shouldBlockStructuralChangesWhenInUse() {
+    @DisplayName(
+        "Should block model and structural changes via updateReleasedMeta when a released entity"
+            + " references the version")
+    void shouldBlockStructuralChangesWhenInUseByReleased() {
       UUID versionId = UUID.randomUUID();
       UUID dataStructureId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
@@ -275,14 +295,13 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(ds);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "SHOULD_NOT_CHANGE")));
       input.setStyles(new HashMap<>(Map.of("color", "red")));
       input.setModelName("UpdatedModelName");
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
+      when(artifactUsageLookup.of(version)).thenReturn(IN_USE_BY_RELEASED);
       when(dataStructureVersionRepository.save(any())).thenReturn(version);
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
 
@@ -299,6 +318,38 @@ class DataStructureVersionServiceTest {
       assertThat(input.getModelName())
           .as("ModelName is editable while in use")
           .isEqualTo("UpdatedModelName");
+    }
+
+    @Test
+    @DisplayName("Should store a model change via updateReleasedMeta when only drafts reference it")
+    void shouldAllowStructuralChangesWhenInUseByDraftsOnly() {
+      UUID versionId = UUID.randomUUID();
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure ds = new DataStructure();
+      ds.setId(dataStructureId);
+      ds.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setVersion("1.0.0");
+      version.setModelUrn("urn:core:platform:civitas:element:common:test:1.0.0");
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructure(ds);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureId(dataStructureId);
+      input.setModel(new HashMap<>(Map.of("title", "New")));
+
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
+      when(artifactUsageLookup.of(version)).thenReturn(IN_USE_BY_DRAFTS);
+      when(dataStructureVersionRepository.save(any())).thenReturn(version);
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
+
+      dataStructureVersionService.updateReleasedMeta(versionId, input);
+
+      verify(modelRegistryGateway)
+          .storeModel(any(), any(), eq(Map.of("title", "New")), any(), any(), any());
     }
 
     @Test
@@ -335,12 +386,10 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(ds);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(null);
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
 
       assertThatThrownBy(() -> dataStructureVersionService.updateReleasedMeta(versionId, input))
           .isInstanceOf(InvalidInputException.class)
@@ -420,13 +469,11 @@ class DataStructureVersionServiceTest {
       dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "Observation")));
       input.setStyles(new HashMap<>(Map.of("color", "blue")));
 
       DataStructureVersion newEntity = new DataStructureVersion();
-      newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
@@ -462,12 +509,10 @@ class DataStructureVersionServiceTest {
       dataStructure.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "Observation")));
 
       DataStructureVersion newEntity = new DataStructureVersion();
-      newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       newEntity.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
 
       when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
@@ -503,7 +548,6 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(dataStructure);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "Arrived late")));
 
@@ -535,12 +579,10 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(dataStructure);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "Replaced")));
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
       when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
 
@@ -559,11 +601,9 @@ class DataStructureVersionServiceTest {
       dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
 
       DataStructureVersion newEntity = new DataStructureVersion();
-      newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);

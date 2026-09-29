@@ -38,9 +38,6 @@ export const LayerSchema = LayerBaseSchema.extend({
   id: z.uuid(),
   datasetId: z.uuid(),
   defaultStyleId: z.uuid().nullable(),
-  geometryType: z.string(),
-  nativeCRS: z.string(),
-  bboxAutoCalculate: z.boolean(),
   nativeBoundingBox: BoundingBoxResponseSchema.nullable(),
   latLonBoundingBox: BoundingBoxResponseSchema.nullable(),
   createdAt: z.string(),
@@ -97,14 +94,12 @@ export const LayerFormSchema = z
     geometryColumnRef: z.string().min(1, 'common.errors.required'),
     nativeCRS: z.string().min(1, 'common.errors.required'),
     crs: z.string().min(1, 'common.errors.required'),
-    bboxAutoCalculate: z.boolean(),
     nativeBoundingBox: BoundingBoxFormFieldsSchema,
     latLonBoundingBox: BoundingBoxFormFieldsSchema,
     defaultStyleId: z.string().nullable(),
     alternativeStyleIds: z.array(z.string()),
   })
   .superRefine((data, ctx) => {
-    if (data.bboxAutoCalculate) return
     const result = BoundingBoxStrictSchema.safeParse(data.nativeBoundingBox)
     if (!result.success) {
       result.error.issues.forEach(issue => {
@@ -125,7 +120,6 @@ export const LayersFormSchema = z.array(LayerFormSchema).superRefine((layers, ct
 
 export const LayerPayloadSchema = LayerBaseSchema.extend({
   defaultStyleId: z.uuid().optional().nullable(),
-  bboxAutoCalculate: z.boolean(),
   nativeBoundingBox: BoundingBoxPayloadSchema.nullable(),
   latLonBoundingBox: BoundingBoxPayloadSchema.nullable(),
 })

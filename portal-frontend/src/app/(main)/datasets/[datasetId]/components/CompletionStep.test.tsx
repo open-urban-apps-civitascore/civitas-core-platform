@@ -55,6 +55,22 @@ describe('CompletionStep', () => {
     expect(screen.queryByTestId('completionStepContent')).not.toBeInTheDocument()
   })
 
+  it('renders no completion circle when isCompleted is undefined', async () => {
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <CompletionStep
+          datasetId="1"
+          step={{
+            title: 'Test Title',
+            buttons: [{ text: 'Test Button', routeParam: 'metadata' }],
+          }}
+        />
+      </NextIntlClientProvider>,
+    )
+    expect(screen.queryByTestId('circleCheck')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('circle')).not.toBeInTheDocument()
+  })
+
   it('renders disabled button correctly', async () => {
     render(
       <NextIntlClientProvider locale="de" messages={messages}>

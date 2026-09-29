@@ -11,6 +11,7 @@ include:
   - .gitlab/ci/frontend.yml
   - .gitlab/ci/backend.yml
   - .gitlab/ci/config-adapter.yml
+  - .gitlab/ci/nifi-extensions.yml
   - .gitlab/ci/portal-model.yml
   - .gitlab/ci/renovate.yml
   - .gitlab/ci/authz.yml

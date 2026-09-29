@@ -20,12 +20,6 @@ class DataSetEntityTest {
     return dataSet;
   }
 
-  private Distribution distributionWithId(UUID id) {
-    Distribution distribution = new Distribution();
-    distribution.setId(id);
-    return distribution;
-  }
-
   private Pipeline pipelineWithId(UUID id) {
     Pipeline pipeline = new Pipeline();
     pipeline.setId(id);
@@ -85,38 +79,6 @@ class DataSetEntityTest {
       assertThat(dataSet.getPublicUrl()).isNull();
       assertThat(dataSet.getPipelineIds()).isNull();
       assertThat(dataSet.getNamedApis()).isEmpty();
-    }
-  }
-
-  @Nested
-  @DisplayName("setDistributions()")
-  class SetDistributionsTests {
-
-    @Test
-    @DisplayName("Should clear and add new distributions")
-    void shouldClearAndAddDistributions() {
-      DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      Distribution old = distributionWithId(UUID.randomUUID());
-      dataSet.setDistributions(Set.of(old));
-
-      Distribution new1 = distributionWithId(UUID.randomUUID());
-      Distribution new2 = distributionWithId(UUID.randomUUID());
-      dataSet.setDistributions(Set.of(new1, new2));
-
-      assertThat(dataSet.getDistributions()).containsExactlyInAnyOrder(new1, new2);
-      assertThat(dataSet.getDistributions()).doesNotContain(old);
-    }
-
-    @Test
-    @DisplayName("Should clear distributions when null is passed")
-    void shouldClearWhenNull() {
-      DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      Distribution dist = distributionWithId(UUID.randomUUID());
-      dataSet.setDistributions(Set.of(dist));
-
-      dataSet.setDistributions(null);
-
-      assertThat(dataSet.getDistributions()).isEmpty();
     }
   }
 

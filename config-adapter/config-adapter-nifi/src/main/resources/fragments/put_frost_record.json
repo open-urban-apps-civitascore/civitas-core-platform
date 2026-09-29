@@ -1,0 +1,96 @@
+{
+  "name": "FrostPublish",
+  "comments": "",
+  "type": "de.civitascore.nifi.frost.PutFrostRecord",
+  "bundle": {
+    "group": "de.civitas-core",
+    "artifact": "nifi-frost-nar",
+    "version": "1.0.0"
+  },
+  "properties": {
+    "Port": null,
+    "FROST Base URL": null,
+    "FROST Project Id": null,
+    "Web Client Service Provider": null,
+    "Basic Auth Username": null,
+    "Basic Auth Password": null,
+    "Records per Request": "1"
+  },
+  "propertyDescriptors": {
+    "Port": {
+      "name": "Port",
+      "displayName": "Port",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "FROST Base URL": {
+      "name": "FROST Base URL",
+      "displayName": "FROST Base URL",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "FROST Project Id": {
+      "name": "FROST Project Id",
+      "displayName": "FROST Project Id",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Web Client Service Provider": {
+      "name": "Web Client Service Provider",
+      "displayName": "Web Client Service Provider",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Basic Auth Username": {
+      "name": "Basic Auth Username",
+      "displayName": "Basic Auth Username",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Basic Auth Password": {
+      "name": "Basic Auth Password",
+      "displayName": "Basic Auth Password",
+      "identifiesControllerService": false,
+      "sensitive": true,
+      "dynamic": false
+    },
+    "Records per Request": {
+      "name": "Records per Request",
+      "displayName": "Records per Request",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "position": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "style": {},
+  "autoTerminatedRelationships": [
+    "failure",
+    "retry",
+    "success"
+  ],
+  "scheduledState": "ENABLED",
+  "schedulingPeriod": "0 sec",
+  "schedulingStrategy": "TIMER_DRIVEN",
+  "executionNode": "ALL",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "componentType": "PROCESSOR",
+  "retryCount": 10,
+  "retriedRelationships": [
+    "retry"
+  ],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins"
+}

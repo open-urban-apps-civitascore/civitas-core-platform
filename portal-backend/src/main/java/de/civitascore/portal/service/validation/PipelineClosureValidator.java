@@ -26,9 +26,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
 /**
- * Refuses to let a Data Set be staged or released while an artifact its flows depend on cannot
- * carry a release. Provisioning configures NiFi, FROST, PostGIS, GeoServer and APISIX, so an
- * artifact that proves unusable afterwards has to be undone through saga compensation.
+ * Refuses to let a Data Set be released while an artifact its flows depend on cannot carry a
+ * release. Provisioning configures NiFi, FROST, PostGIS, GeoServer and APISIX, so an artifact that
+ * proves unusable afterwards has to be undone through saga compensation.
  *
  * <p>A Pipeline with a stored model participates; one without contributes no flow. Its Data sources
  * are the ones referenced on the Pipeline itself, and the registry walk starts at its model and

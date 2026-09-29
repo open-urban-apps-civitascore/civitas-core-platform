@@ -10,7 +10,6 @@
 package de.civitascore.configadapter.nifi.rest;
 
 import static org.awaitility.Awaitility.await;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -37,6 +36,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import okhttp3.Request;
@@ -55,12 +55,13 @@ import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
 /**
- * End-to-end wiring test for the FROST <b>find-or-create</b> sub-flow built by {@link
- * NifiFlowBuilder}: deploys the real MQTT→find-or-create flow onto an actual NiFi 2.9.0, publishes
- * an STA-envelope message, and asserts against a stubbed HTTP endpoint (WireMock) that NiFi looks
- * the Thing up by reference and POSTs it only when absent. This validates the hand-authored
- * fragments, the lookup URL/Expression-Language and the POST/route wiring on real NiFi. True
- * idempotency against a real FROST-Server is covered by {@code NifiFrostFindOrCreateIT}.
+ * End-to-end wiring test for the FROST sink flow built by {@link NifiFlowBuilder}: deploys the real
+ * MQTT → ConvertRecord → SplitJson → PutFrostRecord flow onto an actual NiFi 2.9.0, publishes a
+ * record in the structure of the Things port, and asserts against a stubbed HTTP endpoint
+ * (WireMock) that the record reaches the FROST batch endpoint, and that a refused or unreadable one
+ * reaches the error sink. This validates the fragments and their wiring on real NiFi. What FROST
+ * does with the batch is covered against a real FROST server by {@code NifiFrostFindOrCreateIT} and
+ * {@code PutFrostRecordIT}.
  *
  * <p>Topology (one Docker network): Mosquitto (alias {@code mqtt}) ← NiFi → WireMock (alias {@code
  * sink}); the WireMock request journal captures what NiFi did. Each test uses its own base path so
@@ -72,12 +73,9 @@ class NifiDataFlowIT extends AbstractNifiIT {
   // The FROST project id the deployed flows are scoped to (required by the builder).
   private static final String PROJECT_ID = "1";
   private static final String MQTT_TRUSTSTORE_PASSWORD = "mqtt-test-changeit";
-  private static final String ENVELOPE =
-      "{\"things\":[{\"name\":\"Sensor S1\",\"properties\":{\"reference\":\"S1\"}}]}";
-  private static final String ENVELOPE_OBS =
-      "{\"things\":[],\"observations\":[{\"result\":21.5,"
-          + "\"phenomenonTime\":\"2026-01-01T00:00:00Z\","
-          + "\"parameters\":{\"reference\":\"DS-REF-1\",\"name\":\"DS-1\"}}]}";
+  // A record in the structure of the Things port: without a Mapping it must arrive in that shape.
+  private static final String THING =
+      "{\"name\":\"Sensor S1\",\"description\":\"A sensor\",\"properties\":{\"reference\":\"S1\"}}";
 
   private static Network network;
   private static GenericContainer<?> mosquitto;
@@ -122,17 +120,22 @@ class NifiDataFlowIT extends AbstractNifiIT {
             .waitingFor(Wait.forHttp("/__admin/health").forStatusCode(200).forStatusCode(404));
     sink.start();
 
+    // The FROST sink writes through PutFrostRecord, so NiFi needs the NAR.
+    Optional<Path> nar = frostNar();
+    assumeTrue(nar.isPresent(), "FROST NAR not built — skipping NiFi data-flow IT");
     startNifi(
         HOST_PORT,
         network,
-        container ->
-            container
-                .withCopyFileToContainer(
-                    MountableFile.forHostPath(mqttTruststore), "/opt/certs/mqtt-truststore.p12")
-                // Mirror the apache-nifi-helm node-truststore contract used in deployment.
-                .withEnv("TRUSTSTORE_PATH", "/opt/certs/mqtt-truststore.p12")
-                .withEnv("TRUSTSTORE_TYPE", "PKCS12")
-                .withEnv("TRUSTSTORE_PASSWORD", MQTT_TRUSTSTORE_PASSWORD));
+        container -> {
+          container
+              .withCopyFileToContainer(
+                  MountableFile.forHostPath(mqttTruststore), "/opt/certs/mqtt-truststore.p12")
+              // Mirror the apache-nifi-helm node-truststore contract used in deployment.
+              .withEnv("TRUSTSTORE_PATH", "/opt/certs/mqtt-truststore.p12")
+              .withEnv("TRUSTSTORE_TYPE", "PKCS12")
+              .withEnv("TRUSTSTORE_PASSWORD", MQTT_TRUSTSTORE_PASSWORD);
+          installFrostNar(container, nar.get());
+        });
   }
 
   @AfterAll
@@ -150,88 +153,45 @@ class NifiDataFlowIT extends AbstractNifiIT {
   }
 
   @Test
-  void findOrCreatePostsNewThingWhenLookupIsEmpty() throws Exception {
+  void anMqttRecordReachesTheFrostBatchEndpoint() throws Exception {
     String basePath = "/new";
-    stub(getStub(thingsPath(basePath), "{\"value\":[]}"));
-    stub(postStub(thingsPath(basePath), 201));
+    stub(batchStub(basePath, 200));
     deployFrost("pipeline-frost-new", "civitas/it/thing-new", basePath);
 
-    // NiFi must look the Thing up by reference and — finding none — POST the Thing.
+    // The message becomes a record, the record one batch request carrying its reference.
     publishUntil(
         "civitas/it/thing-new",
         "civitas-it-new",
-        () -> postedBodyContains(thingsPath(basePath), "\"reference\":\"S1\""));
+        () -> postedBodyContains(batchPath(basePath), "S1"));
   }
 
   @Test
   void tlsMqttUsesNifiEnvironmentTruststoreAndReachesSink() throws Exception {
     String basePath = "/tls";
     String topic = "civitas/it/tls";
-    stub(getStub(thingsPath(basePath), "{\"value\":[]}"));
-    stub(postStub(thingsPath(basePath), 201));
+    stub(batchStub(basePath, 200));
     deployFrost("pipeline-frost-tls", topic, basePath, "ssl://mqtt:8883", true);
 
-    publishUntilTls(
-        topic,
-        "civitas-it-tls",
-        () -> postedBodyContains(thingsPath(basePath), "\"reference\":\"S1\""));
+    publishUntilTls(topic, "civitas-it-tls", () -> postedBodyContains(batchPath(basePath), "S1"));
   }
 
   @Test
-  void findOrCreateSkipsPostWhenThingExists() throws Exception {
-    String basePath = "/exists";
-    stub(getStub(thingsPath(basePath), "{\"value\":[{\"@iot.id\":42}]}"));
-    stub(postStub(thingsPath(basePath), 201));
-    deployFrost("pipeline-frost-exists", "civitas/it/thing-exists", basePath);
-
-    // The lookup resolves an existing @iot.id, so the Thing must NOT be re-created.
-    publishUntil(
-        "civitas/it/thing-exists", "civitas-it-exists", () -> getReceived(thingsPath(basePath)));
-    // Deliberate dwell: once the lookup has landed there is no positive signal for "no POST
-    // followed", so the elapsed time is what gives a wrong POST a chance to show up.
-    Thread.sleep(Duration.ofSeconds(5).toMillis());
-    assertFalse(
-        postedTo(thingsPath(basePath)), "an existing Thing must not be POSTed again (idempotency)");
-  }
-
-  @Test
-  void findOrCreateLinksObservationToResolvedDatastream() throws Exception {
-    String basePath = "/obs";
-    stub(getStub(basePath + "/Datastreams", "{\"value\":[{\"@iot.id\":99}]}"));
-    stub(postStub(basePath + "/Observations", 201));
-    deployFrost("pipeline-frost-obs", "civitas/it/obs", basePath);
-
-    // NiFi resolves the Datastream by reference+name (the lookup query must carry the extracted
-    // reference), merges its @iot.id into the observation and POSTs it to /Observations.
-    publishUntil(
-        "civitas/it/obs",
-        "civitas-it-obs",
-        ENVELOPE_OBS,
-        () ->
-            getReceivedWithQuery(basePath + "/Datastreams", "DS-REF-1")
-                && postedBodyContains(basePath + "/Observations", "\"@iot.id\":99")
-                && postedBodyContains(basePath + "/Observations", "\"result\":21.5"));
-  }
-
-  @Test
-  void frostWriteFailureRaisesErrorBulletin() throws Exception {
+  void aBatchFrostRefusesRaisesAnErrorBulletin() throws Exception {
     String basePath = "/fail";
-    stub(getStub(thingsPath(basePath), "{\"value\":[]}"));
-    stub(postStub(thingsPath(basePath), 500));
+    stub(batchStub(basePath, 400));
     deployFrost("pipeline-frost-fail", "civitas/it/thing-fail", basePath);
 
-    // A failing POST (HTTP 500) must route to the LogMessage error sink (WARN bulletin), not
+    // A refused batch must route the record to the LogMessage error sink (WARN bulletin), not
     // vanish.
     publishUntil("civitas/it/thing-fail", "civitas-it-fail", this::errorSinkRaisedABulletin);
   }
 
   @Test
-  void malformedEnvelopeRaisesErrorBulletinInsteadOfVanishing() throws Exception {
+  void anUnreadableMessageRaisesAnErrorBulletinInsteadOfVanishing() throws Exception {
     deployFrost("pipeline-frost-malformed", "civitas/it/malformed", "/malformed");
 
-    // A malformed STA envelope cannot be split; that SplitJson 'failure' must reach the LogMessage
-    // error sink (no GET/POST is ever stubbed because the message never gets that far) rather than
-    // being silently dropped.
+    // A message that is no JSON cannot become a record; the ConvertRecord 'failure' must reach the
+    // LogMessage error sink rather than being silently dropped.
     publishUntil(
         "civitas/it/malformed",
         "civitas-it-malformed",
@@ -251,14 +211,9 @@ class NifiDataFlowIT extends AbstractNifiIT {
     Map<String, String> sourceProperties = new LinkedHashMap<>();
     sourceProperties.put("Broker URI", brokerUri);
     sourceProperties.put("Topic Filter", topic);
-    Map<String, Map<String, String>> controllerServiceProperties = Map.of();
     if (tls) {
       sourceProperties.put(
           "SSL Context Service", "${CS:" + MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE + "}");
-      controllerServiceProperties =
-          Map.of(
-              MqttSourceStage.MQTT_SSL_CONTEXT_SERVICE,
-              MqttTruststoreConfig.nodeTruststore().sslContextProperties());
     }
     String snapshot =
         NifiTestFixtures.flowBuilder()
@@ -272,9 +227,11 @@ class NifiDataFlowIT extends AbstractNifiIT {
                         FrostSinkStage.FROST_BASE_URL,
                         "http://sink:8080" + basePath,
                         FrostSinkStage.FROST_PROJECT_ID,
-                        PROJECT_ID),
+                        PROJECT_ID,
+                        FrostSinkStage.FROST_PORT,
+                        "Things"),
                     List.of(),
-                    controllerServiceProperties,
+                    Map.of(),
                     null,
                     null));
     if (tls) {
@@ -303,17 +260,18 @@ class NifiDataFlowIT extends AbstractNifiIT {
     client.deployFlow(new DeploymentPlan(pipelineId, snapshot, Map.of()));
   }
 
-  /** The Thing legs are project-scoped; Datastream/Observation stubs stay at the base path. */
-  private static String thingsPath(String basePath) {
-    return basePath + "/Projects(" + PROJECT_ID + ")/Things";
+  /** The one endpoint PutFrostRecord writes to: every record of a batch goes there. */
+  private static String batchPath(String basePath) {
+    return basePath + "/$batch";
   }
 
   /**
-   * Publishes the STA envelope repeatedly until the condition holds (NiFi consumes asynchronously).
+   * Publishes the Things-port record repeatedly until the condition holds (NiFi consumes
+   * asynchronously).
    */
   private void publishUntil(String topic, String clientId, AwaitCondition condition)
       throws Exception {
-    publishUntil(topic, clientId, ENVELOPE, condition);
+    publishUntil(topic, clientId, THING, condition);
   }
 
   private void publishUntil(String topic, String clientId, String payload, AwaitCondition condition)
@@ -342,7 +300,7 @@ class NifiDataFlowIT extends AbstractNifiIT {
           .ignoreExceptions()
           .until(
               () -> {
-                publisher.publish(topic, ENVELOPE);
+                publisher.publish(topic, THING);
                 return condition.check();
               });
     }
@@ -415,21 +373,14 @@ class NifiDataFlowIT extends AbstractNifiIT {
     boolean check() throws Exception;
   }
 
-  private static String getStub(String urlPath, String jsonBody) {
-    return "{\"request\":{\"method\":\"GET\",\"urlPath\":\""
-        + urlPath
-        + "\"},\"response\":{\"status\":200,\"headers\":{\"Content-Type\":"
-        + "\"application/json\"},\"body\":\""
-        + jsonBody.replace("\"", "\\\"")
-        + "\"}}";
-  }
-
-  private static String postStub(String urlPath, int status) {
+  /** A batch endpoint that answers with the given status and an empty batch response. */
+  private static String batchStub(String basePath, int status) {
     return "{\"request\":{\"method\":\"POST\",\"urlPath\":\""
-        + urlPath
+        + batchPath(basePath)
         + "\"},\"response\":{\"status\":"
         + status
-        + ",\"body\":\"{\\\"@iot.id\\\":1}\"}}";
+        + ",\"headers\":{\"Content-Type\":\"application/json\"},"
+        + "\"body\":\"{\\\"responses\\\":[]}\"}}";
   }
 
   private void stub(String mappingJson) throws Exception {
@@ -456,41 +407,6 @@ class NifiDataFlowIT extends AbstractNifiIT {
       if ("POST".equals(request.path("method").asText())
           && request.path("url").asText().contains(path)
           && request.path("body").asText().contains(substring)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private boolean postedTo(String path) throws Exception {
-    for (JsonNode entry : journal()) {
-      JsonNode request = entry.path("request");
-      if ("POST".equals(request.path("method").asText())
-          && request.path("url").asText().contains(path)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private boolean getReceivedWithQuery(String pathSubstring, String querySubstring)
-      throws Exception {
-    for (JsonNode entry : journal()) {
-      JsonNode request = entry.path("request");
-      if ("GET".equals(request.path("method").asText())
-          && request.path("url").asText().contains(pathSubstring)
-          && request.path("url").asText().contains(querySubstring)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private boolean getReceived(String path) throws Exception {
-    for (JsonNode entry : journal()) {
-      JsonNode request = entry.path("request");
-      if ("GET".equals(request.path("method").asText())
-          && request.path("url").asText().contains(path)) {
         return true;
       }
     }

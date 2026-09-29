@@ -332,8 +332,16 @@ services:
     # into the image instead.
     build:
       context: ../nifi
+      # The FROST NAR the build-frost-nar-api-test job builds. The saga collections deploy FROST
+      # Pipelines, which write through PutFrostRecord. Run `mvn -f nifi-extensions/pom.xml package`
+      # first when starting this stack by hand.
+      additional_contexts:
+        frostnar: ../../nifi-extensions/nifi-frost-nar/target
       dockerfile_inline: |
         FROM apache/nifi:2.9.0
+        # lib/, not the auto-load directory: NiFi loads lib/ before it answers a request, so the
+        # first deployment already finds PutFrostRecord.
+        COPY --from=frostnar --chown=nifi:nifi *.nar /opt/nifi/nifi-current/lib/
         USER root
         RUN mkdir -p /opt/nifi/drivers \
           && curl -fsSL -o /opt/nifi/drivers/postgresql.jar \
@@ -474,7 +482,6 @@ services:
       KEYCLOAK_ISSUER_URI: http://keycloak:8080
       KEYCLOAK_REALM: civitas-core
       KEYCLOAK_TARGET_REALM: civitas-core
-      APP_URL: http://portal-backend:8089
       SERVER_PORT: 8089
       SPRING_PROFILES_ACTIVE: local,postgres,init
     depends_on:

@@ -13,19 +13,51 @@ import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
 import { DatastructureVersionFormData } from '@/types/datastructures'
 
+/**
+ * The published structures the version was built from. The version is what matters — a later
+ * version of a structure does not change this one — so it is read off the pinned URN and the
+ * whole URN stays available as the title.
+ */
+const ImportedStructures = ({ urns, label }: { urns: string[]; label: string }) => (
+  <div className="space-y-1">
+    <p className="text-sm font-medium">{label}</p>
+    <ul className="text-muted-foreground space-y-0.5 text-sm">
+      {urns.map(urn => (
+        <li key={urn} title={urn}>
+          {nameOf(urn)} {versionOf(urn)}
+        </li>
+      ))}
+    </ul>
+  </div>
+)
+
+/** The name segment of a CORE URN. */
+const nameOf = (urn: string): string => urn.split(':')[6] ?? urn
+
+/** The version segment of a CORE URN, or nothing when it carries none. */
+const versionOf = (urn: string): string => {
+  const segments = urn.split(':')
+  return segments.length > 8 ? segments[8] : ''
+}
+
 interface VersionInfoTabProps {
   form: UseFormReturn<DatastructureVersionFormData>
   isReadOnly?: boolean
   isAvailable: boolean
+  /**
+   * The published structures this version was built from, each pinned at the version it was
+   * loaded at. Not a form field: the version records them, and nobody types them.
+   */
+  importedStructureUrns?: string[]
 }
 
 export const VersionInfoTab = (props: VersionInfoTabProps) => {
-  const { form, isReadOnly = false, isAvailable } = props
+  const { form, isReadOnly = false, isAvailable, importedStructureUrns = [] } = props
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
 
   return (
-    <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement />}>
+    <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement areAllFieldsRequired />}>
       <Form {...form}>
         <form
           className="max-w-300 flex flex-col"
@@ -48,6 +80,12 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
               disabled
             />
           </DetailsFieldContainer>
+
+          {importedStructureUrns.length > 0 && (
+            <DetailsFieldContainer className="max-w-300">
+              <ImportedStructures urns={importedStructureUrns} label={t('versionInfo.builtFrom')} />
+            </DetailsFieldContainer>
+          )}
 
           <DetailsFieldContainer className="max-w-300">
             <FormTextArea

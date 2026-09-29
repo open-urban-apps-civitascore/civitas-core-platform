@@ -132,3 +132,42 @@ describe('isRelationshipAllowedBetween', () => {
     expect(isRelationshipAllowedBetween('enumeration', 'class', 'composition')).toBe(true)
   })
 })
+
+describe('diagramReducer — MERGE_STRUCTURE', () => {
+  it('adds the loaded classes, their relations and the pins in one action', () => {
+    const existing = diagram([node('n1', 'Dataset', true)])
+    const loaded = node('n2', 'Thing')
+    const edge = {
+      id: 'e1',
+      source: 'n2',
+      target: 'n1',
+      type: 'composition',
+      data: { relationship: { id: 'r1', type: 'composition', source: 'n2', target: 'n1' } },
+    } as unknown as UMLDiagram['edges'][number]
+    const pins = [{ urn: 'urn:core:platform:civitas:datastructure:frost:Things:0123456789:1.0.0', name: 'Things' }]
+
+    const merged = diagramReducer(existing, {
+      type: 'MERGE_STRUCTURE',
+      payload: { nodes: [loaded], edges: [edge], importedStructures: pins },
+    })
+
+    // One action, because the provider recomputes every dispatch from the diagram of the current
+    // render — a second action in the same handler would drop what this one added.
+    expect(merged.nodes).toHaveLength(2)
+    expect(merged.edges).toHaveLength(1)
+    expect(merged.importedStructures).toEqual(pins)
+    // The change is the modeller's to save.
+    expect(merged.isDirty).toBe(true)
+  })
+
+  it('leaves the existing root designation alone', () => {
+    const existing = diagram([node('n1', 'Dataset', true)])
+
+    const merged = diagramReducer(existing, {
+      type: 'MERGE_STRUCTURE',
+      payload: { nodes: [node('n2', 'Thing')], edges: [], importedStructures: [] },
+    })
+
+    expect(rootFlags(merged)).toEqual([true, undefined])
+  })
+})

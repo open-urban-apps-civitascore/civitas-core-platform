@@ -98,6 +98,7 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useGetPipelines: () => ({ data: { data: [] } }),
+  useDeletePipeline: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('@/app/services/api/datasources/clientRequests', () => ({
@@ -808,6 +809,61 @@ describe('DatasetOverview', () => {
       expect(screen.getByTestId('apiCardMenuView-my-api')).toBeInTheDocument()
       expect(screen.queryByTestId('apiCardMenuEdit-my-api')).not.toBeInTheDocument()
       expect(screen.queryByTestId('apiCardMenuDelete-my-api')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Release blocked by a draft dependency', () => {
+    const PIPELINE_CLOSURE_INVALID = 'urn:civitas:error:PIPELINE_CLOSURE_INVALID'
+
+    const releaseDraftDataset = async () => {
+      renderComponent({
+        dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
+        groupCount: 1,
+        roleCount: 1,
+      })
+      clickEditButton()
+
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('AVAILABLE'))
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+    }
+
+    it('explains the refusal and leaves the Dataset in its previous status', async () => {
+      mockStageDataset.mockRejectedValueOnce(
+        mockApiError(422, 'Pipeline closure validation failed', PIPELINE_CLOSURE_INVALID),
+      )
+
+      await releaseDraftDataset()
+
+      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
+      expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('reports the refusal when the closure only fails at release, after staging succeeded', async () => {
+      mockStageDataset.mockResolvedValueOnce(undefined)
+      mockReleaseDataset.mockRejectedValueOnce(
+        mockApiError(422, 'Pipeline closure validation failed', PIPELINE_CLOSURE_INVALID),
+      )
+
+      await releaseDraftDataset()
+
+      await waitFor(() => {
+        expect(mockStageDataset).toHaveBeenCalledWith('test-id')
+        expect(mockReleaseDataset).toHaveBeenCalledWith('test-id')
+      })
+      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
+      expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('falls back to the transition toast for any other failure', async () => {
+      mockStageDataset.mockRejectedValueOnce(mockApiError(500, 'Boom'))
+
+      await releaseDraftDataset()
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalled())
+      expect(screen.queryByTestId('infoModal')).not.toBeInTheDocument()
     })
   })
 })

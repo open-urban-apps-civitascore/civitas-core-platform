@@ -4,9 +4,11 @@ import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 
 import {
   isDatapoolScopeViolationError,
+  isDatastructureNotAvailableError,
   isNameConflictError,
   isNotDraftError,
   isPermissionsError,
+  isPipelineClosureInvalidError,
   isResourceInUseError,
   isSagaInFlightError,
   isTableNameConflictError,
@@ -164,6 +166,30 @@ describe('isNotDraftError', () => {
   })
 })
 
+describe('isDatastructureNotAvailableError', () => {
+  it.each([
+    'DataStructureVersion must be in AVAILABLE status for an AVAILABLE DataSource',
+    'The parent DataStructure must be in AVAILABLE status for an AVAILABLE DataSource',
+  ])('returns true for a 400 INVALID_INPUT error: %s', detail => {
+    const error = mockApiError(400, detail, 'urn:civitas:error:INVALID_INPUT')
+    expect(isDatastructureNotAvailableError(error)).toBe(true)
+  })
+
+  it('returns false for a 400 INVALID_INPUT error with a different detail', () => {
+    const error = mockApiError(400, 'Bad request', 'urn:civitas:error:INVALID_INPUT')
+    expect(isDatastructureNotAvailableError(error)).toBe(false)
+  })
+
+  it('returns false for non-400 status codes', () => {
+    const error = mockApiError(
+      409,
+      'DataStructureVersion must be in AVAILABLE status for an AVAILABLE DataSource',
+      'urn:civitas:error:INVALID_INPUT',
+    )
+    expect(isDatastructureNotAvailableError(error)).toBe(false)
+  })
+})
+
 const SAGA_IN_FLIGHT = 'urn:civitas:error:SAGA_IN_FLIGHT'
 
 describe('isSagaInFlightError', () => {
@@ -209,10 +235,19 @@ describe('isResourceInUseError', () => {
     expect(isResourceInUseError(error)).toBe(true)
   })
 
-  it('returns true when a data source unrelease is refused because a pipeline reads from it', () => {
+  it('returns true when a mapping is still referenced by a pipeline', () => {
     const error = mockApiError(
       409,
-      'Cannot unrelease DataSource because it is referenced by a Pipeline.',
+      'Cannot delete urn:core:mapping:x — still referenced by: urn:core:pipeline:y',
+      RESOURCE_IN_USE,
+    )
+    expect(isResourceInUseError(error)).toBe(true)
+  })
+
+  it('returns true when a data source is pinned to a data structure version', () => {
+    const error = mockApiError(
+      409,
+      'Cannot modify DataStructureVersion because a DataSource is pinned to it.',
       RESOURCE_IN_USE,
     )
     expect(isResourceInUseError(error)).toBe(true)
@@ -283,5 +318,24 @@ describe('isUnconfirmedDataLossError', () => {
 
   it('returns false for non-axios errors', () => {
     expect(isUnconfirmedDataLossError(new Error('plain error'))).toBe(false)
+  })
+})
+
+const PIPELINE_CLOSURE_INVALID = 'urn:civitas:error:PIPELINE_CLOSURE_INVALID'
+
+describe('isPipelineClosureInvalidError', () => {
+  it('returns true for a 422 closure rejection', () => {
+    const error = mockApiError(422, 'Pipeline closure validation failed', PIPELINE_CLOSURE_INVALID)
+    expect(isPipelineClosureInvalidError(error)).toBe(true)
+  })
+
+  it('returns false for a 422 error with a different type', () => {
+    const error = mockApiError(422, 'Scope violation', 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION')
+    expect(isPipelineClosureInvalidError(error)).toBe(false)
+  })
+
+  it('returns false for another status carrying the same type', () => {
+    const error = mockApiError(409, 'Pipeline closure validation failed', PIPELINE_CLOSURE_INVALID)
+    expect(isPipelineClosureInvalidError(error)).toBe(false)
   })
 })

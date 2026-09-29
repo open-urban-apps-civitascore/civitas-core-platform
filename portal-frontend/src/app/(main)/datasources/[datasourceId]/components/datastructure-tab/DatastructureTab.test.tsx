@@ -45,7 +45,7 @@ const defaultProps = {
   datasourceTitle: 'Test Datasource',
   selectedVersionId: null,
   isReadOnly: false,
-  isDatasourceInUse: false,
+  isDatasourceInUseByReleased: false,
   onSelectDatastructureVersion: vi.fn(),
 }
 

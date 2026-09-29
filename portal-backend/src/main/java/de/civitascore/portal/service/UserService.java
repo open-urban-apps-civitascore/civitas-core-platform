@@ -229,15 +229,4 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   protected String getConfigPath() {
     return "/users";
   }
-
-  /**
-   * Extracts the entity ID from the user, used for correlation in config adapter events.
-   *
-   * @param entity the user entity
-   * @return the user's UUID
-   */
-  @Override
-  protected UUID getEntityId(User entity) {
-    return entity.getId();
-  }
 }

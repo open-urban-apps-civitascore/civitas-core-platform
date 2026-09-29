@@ -209,6 +209,33 @@ test_users_me_denied_without_auth if {
 	result.reason == "authentication_required"
 }
 
+# Test: the list of published structures is readable by any authenticated user
+test_published_structures_allowed_for_authenticated if {
+	result := authz.decision with http.send as mock_send_authenticated_no_groups
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/published-structures")
+	result.allow == true
+	result.reason == "authenticated_endpoint"
+}
+
+# Test: one published structure is readable too — this is the {id} substitution, and a typo in
+# the pattern entry would otherwise leave the document endpoint an unknown_endpoint while the
+# list works.
+test_published_structure_document_allowed_for_authenticated if {
+	result := authz.decision with http.send as mock_send_authenticated_no_groups
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/published-structures/ThingTree")
+	result.allow == true
+	result.reason == "authenticated_endpoint"
+}
+
+# Test: published structures denied for unauthenticated request (no X-Userinfo header)
+test_published_structures_denied_without_auth if {
+	result := authz.decision with input as portal_request_no_auth("GET", "/v1/published-structures")
+	result.allow == false
+	result.reason == "authentication_required"
+}
+
 # =============================================================================
 # ERROR CASE TESTS
 # =============================================================================

@@ -1,6 +1,5 @@
 package de.civitascore.portal.repository;
 
-import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import java.util.Collection;
 import java.util.List;
@@ -21,36 +20,16 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
   // pipeline.
   @EntityGraph(
       attributePaths = {
-        "owner",
         "pipelines",
         "pipelines.runtimeStatus",
         "pipelines.dataSources",
-        "distributions",
         "namedApis"
       })
   @Override
   @NonNull Optional<DataSet> findById(@NonNull UUID id);
 
-  /**
-   * Check if any dataset with the given statuses references the specified data source via its
-   * pipelines.
-   *
-   * @param dataSourceId the data source ID to check
-   * @param statuses the dataset statuses to include in the check
-   * @return true if at least one matching dataset exists
-   */
-  boolean existsByPipelinesDataSourcesIdAndDataSetStatusIn(
-      UUID dataSourceId, Collection<DataSetStatus> statuses);
-
   /** Variant for saga trigger publishing: also fetches {@code pipelines.dataSources}. */
-  @EntityGraph(
-      attributePaths = {
-        "owner",
-        "pipelines",
-        "pipelines.dataSources",
-        "distributions",
-        "namedApis"
-      })
+  @EntityGraph(attributePaths = {"pipelines", "pipelines.dataSources", "namedApis"})
   @Query("SELECT d FROM DataSet d WHERE d.id = :id")
   Optional<DataSet> findByIdWithPipelineDataSources(@Param("id") UUID id);
 
@@ -69,4 +48,16 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
    * @return true if at least one dataset is assigned
    */
   boolean existsByDataPoolId(UUID dataPoolId);
+
+  /** Whether each dataset is released, keyed by its manifest's logical URN. */
+  @Query(
+      "SELECT new de.civitascore.portal.repository.ReferrerReleaseState(d.manifestLogicalUrn,"
+          + " CASE WHEN d.dataSetStatus ="
+          + " de.civitascore.portal.model.embedded.DataSetStatus.AVAILABLE"
+          + " OR d.pendingSagaType ="
+          + " de.civitascore.portal.model.embedded.PendingSagaType.UNRELEASE"
+          + " THEN true ELSE false END)"
+          + " FROM DataSet d WHERE d.manifestLogicalUrn IN :urns")
+  List<ReferrerReleaseState> findReleaseStatesByManifestLogicalUrnIn(
+      @Param("urns") Collection<String> urns);
 }

@@ -3,7 +3,14 @@ import z from 'zod'
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
 import { AssignmentScopedInput } from './assignments'
-import { MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, MIN_NAME_LENGTH, STATUS_TYPES, WithId } from './common'
+import {
+  MAX_DESCRIPTION_LENGTH,
+  MAX_NAME_LENGTH,
+  MIN_DESCRIPTION_LENGTH,
+  MIN_NAME_LENGTH,
+  STATUS_TYPES,
+  WithId,
+} from './common'
 import { ConnectorApiToFormSchema, ConnectorLooseSchema, ConnectorStrictSchema } from './connectors'
 import { DatastructureVersionSummaryApiResponseSchema } from './datastructures'
 
@@ -26,14 +33,22 @@ export type FormFieldType = 'input' | 'textArea' | 'select' | 'checkbox'
 
 export type FormInputType = 'text' | 'password'
 
+// Keys are relative to the `datasources.connectorTab` namespace, e.g. `mqtt.urls.label`.
+export type ConnectorFieldLabel = { labelKey: string; hintKey?: string }
+
 export type ConnectorField = {
   key: string
   type: FormFieldType
   inputType?: FormInputType
-  label: { label: string; labelHint: string | null }
+  label: ConnectorFieldLabel
   options?: string[]
   defaultValue?: unknown
   required?: boolean
+  // Set `placeholderKey` to use a translation string for the placeholder
+  // or `placeholder` to set a literal string (for non-translateable technical
+  // terms such as URIs, durations, SQL statements).
+  // `placeholderKey` is a translation key relative to `datasources.connectorTab`.
+  placeholderKey?: string
   placeholder?: string
   rows?: number
   expert?: boolean
@@ -66,6 +81,7 @@ export const DatasourceApiResponseSchema = z.object({
   configuration: z.record(z.string(), z.unknown()).nullable(),
   dataStructureVersion: DatastructureVersionSummaryApiResponseSchema.nullable(),
   inUse: z.boolean(),
+  inUseByReleased: z.boolean(),
   datapoolScope: DatapoolScopeSchema,
   // Versioned CORE URN of this DataSource's configuration artifact in Model Forge; used as the
   // pipeline node's `sourceRef`. Absent on drafts that have no configuration yet.
@@ -82,7 +98,11 @@ export const DatasourceBaseFormSchema = z.object({
     .trim()
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
-  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
+  description: z
+    .string()
+    .trim()
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   dataSourceStatus: DatasourceStatusSchema,
   connectorType: ConnectorTypeSchema.optional(),
   configuration: z.record(z.string(), z.unknown()).optional(),
@@ -104,7 +124,7 @@ export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({
   description: z
     .string()
     .trim()
-    .min(1, 'common.errors.required')
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
     .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   connectorType: ConnectorTypeSchema,
   configuration: z.record(z.string(), z.unknown()),
@@ -143,7 +163,11 @@ export const DatasourceCreateFormSchema = z.object({
     .trim()
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
-  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
+  description: z
+    .string()
+    .trim()
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
 })
 
 export type DatasourceCreateData = z.infer<typeof DatasourceCreateFormSchema>

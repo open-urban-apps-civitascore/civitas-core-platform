@@ -102,7 +102,6 @@ public class UserInitializer {
       user.setLastName(entry.getLastName());
       user.setEmail(entry.getEmail());
       user.setTitle(entry.getTitle());
-      user.setActive(true);
 
       if (entry.getExternalId() != null) {
         user.setExternalId(entry.getExternalId());

@@ -55,10 +55,7 @@ public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, UUID> {
     return (I) roleMapper.toInput(entity);
   }
 
-  /**
-   * {@inheritDoc} Computes and sets group and user counts by traversing assignments and group
-   * hierarchies.
-   */
+  /** {@inheritDoc} Computes and sets group and user counts by traversing assignments. */
   @Override
   public RoleOutputDTO enrichDto(RoleOutputDTO dto, Role entity) {
     dto.setGroupCount(0L);
@@ -68,11 +65,6 @@ public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, UUID> {
         assignmentService.findAllByRoleId(entity.getId()).stream()
             .map(Assignment::getGroup)
             .collect(Collectors.toSet());
-    groups.addAll(
-        groups.stream()
-            .map(Group::getChildGroupsRecursive)
-            .flatMap(Set::stream)
-            .collect(Collectors.toSet()));
 
     Set<User> members =
         groups.stream().flatMap(group -> group.getMembers().stream()).collect(Collectors.toSet());

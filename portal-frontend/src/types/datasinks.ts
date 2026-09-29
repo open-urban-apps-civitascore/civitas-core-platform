@@ -25,28 +25,31 @@ export type DataSink = {
    * pipeline node's `sinkRef`. Absent on sinks that carry no configuration (e.g. FROST passthrough).
    */
   configurationUrn?: string
+  /** True once the sink's storage has been provisioned. */
+  provisioned?: boolean
+  /** True while a Layer references this sink. */
+  inUseByLayer?: boolean
   createdAt: string
   modifiedAt: string
 }
 
 export type PostgisDataSinkPayload = {
-  id: string | null
   dataSinkType: typeof DATASINK_TYPES.POSTGIS
   configuration: {
     tableName: string
     /**
      * Versioned CORE URN of the DataStructure whose rows are written to the table (the backend's
      * PostgisConfiguration.element, a Model-Forge soft reference — the same resolution FROST uses,
-     * not the raw version id). Required by the backend; absent only when no mapping feeds the sink.
+     * not the raw version id). Required by the backend. Always the geo persistence node's own data
+     * structure, also when a mapping feeds the sink.
      */
-    element?: string
+    element: string
   }
   /** Acknowledges that this update discards the sink's stored data, rebuilt on the next release (see backend guard). */
   confirmDataLoss?: boolean
 }
 
 export type FrostDataSinkPayload = {
-  id: string | null
   dataSinkType: typeof DATASINK_TYPES.FROST
   /**
    * Empty for a passthrough pipeline; a mapped pipeline references its final mapping's Thing-shaped

@@ -15,10 +15,12 @@ import {
   ConnectionMode,
   type EdgeChange,
   type NodeChange,
+  type OnBeforeDelete,
   type OnSelectionChangeParams,
 } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useMemo } from 'react'
+import { toast } from 'sonner'
 
 import { CanvasScaffold } from '@/components/node-editor/canvas/CanvasScaffold'
 
@@ -48,12 +50,27 @@ interface PipelineCanvasProps {
  */
 export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
-  const { pipeline, dispatch, addNode, addEdge, validateConnection, hideValidationPanel } = useActivePipeline()
+  const {
+    pipeline,
+    dispatch,
+    addNode,
+    addEdge,
+    validateConnection,
+    hideValidationPanel,
+    getSinkLockReason,
+    getSelectionLockReason,
+  } = useActivePipeline()
   const { isReadOnly } = useReadOnly()
   const canEdit = !isReadOnly
 
   const nodeTypes = useMemo(() => pipelineNodeTypes, [])
   const edgeTypes = useMemo(() => pipelineEdgeTypes, [])
+
+  // `deletable` is a React Flow prop, not pipeline state, so it is set at the canvas boundary.
+  const nodes = useMemo(
+    () => pipeline?.nodes.map(node => ({ ...node, deletable: getSinkLockReason(node) === null })) ?? [],
+    [pipeline?.nodes, getSinkLockReason],
+  )
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => dispatch({ type: 'NODE_CHANGES', payload: changes }),
@@ -80,6 +97,16 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
     [addNode],
   )
 
+  // React Flow hides locked nodes from onBeforeDelete, so the reason comes from the selection.
+  const onBeforeDelete: OnBeforeDelete = useCallback(
+    async ({ nodes, edges }) => {
+      const lockReason = getSelectionLockReason(pipeline?.nodes ?? [])
+      if (lockReason) toast.error(t(`sink.notRemovable.${lockReason}`))
+      return { nodes, edges }
+    },
+    [getSelectionLockReason, pipeline?.nodes, t],
+  )
+
   // Hide validation panel when the user makes a selection (latest action wins).
   const onReactFlowSelectionChange = useCallback(
     ({ nodes, edges }: OnSelectionChangeParams) => {
@@ -98,7 +125,7 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
 
   return (
     <CanvasScaffold
-      nodes={pipeline.nodes}
+      nodes={nodes}
       edges={pipeline.edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
@@ -107,6 +134,7 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
       onConnect={onConnect}
       onDropNode={onDropNode}
       onReactFlowSelectionChange={onReactFlowSelectionChange}
+      onBeforeDelete={onBeforeDelete}
       isValidConnection={connection => validateConnection(connection as Connection)}
       canEdit={canEdit}
       connectionMode={ConnectionMode.Loose}

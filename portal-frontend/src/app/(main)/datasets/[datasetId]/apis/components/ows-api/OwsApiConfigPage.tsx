@@ -53,7 +53,6 @@ const defaultLayer: LayerFormData = {
   geometryColumnRef: '',
   nativeCRS: '',
   crs: '',
-  bboxAutoCalculate: false,
   nativeBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: '' },
   latLonBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: 'EPSG:4326' },
   defaultStyleId: '',
@@ -127,15 +126,9 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
 
   const layers = useMemo(
     () =>
-      mapApiLayerToFormData(layersData?.data || []).map(layer => {
-        // setting the nativeLayer here is necessary since in the API response it gets returned as null
-        // TODO: remove this section once this is fixed in the backend
-        if (!layer.nativeCRS && layer.dataSinkId) {
-          const nativeCRS = getNativeCRSFromDataSink(layer.dataSinkId, postgisDataSinks, postgisDatastructures)
-          return { ...layer, nativeCRS }
-        }
-        return layer
-      }),
+      mapApiLayerToFormData(layersData?.data || [], dataSinkId =>
+        getNativeCRSFromDataSink(dataSinkId, postgisDataSinks, postgisDatastructures),
+      ),
     [layersData, postgisDataSinks, postgisDatastructures],
   )
   const apiStyles = useMemo(() => stylesData?.data || [], [stylesData])

@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS users
     email       VARCHAR(255)                NOT NULL,
     phone       VARCHAR(255),
     external_id VARCHAR(255),
-    active      BOOLEAN                     NOT NULL,
     CONSTRAINT pk_users PRIMARY KEY (id)
 );
 
@@ -28,7 +27,6 @@ CREATE TABLE IF NOT EXISTS groups
     created_by      UUID,
     modified_by     UUID,
     contact_user_id UUID,
-    parent_group_id UUID,
     CONSTRAINT pk_groups PRIMARY KEY (id)
 );
 
@@ -76,7 +74,6 @@ CREATE TABLE IF NOT EXISTS assignments
     data_source_id       UUID,
     dataset_id           UUID,
     datapool_id          UUID,
-    catalog_id           UUID,
     CONSTRAINT pk_assignments PRIMARY KEY (id)
 );
 

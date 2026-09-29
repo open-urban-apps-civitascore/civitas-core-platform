@@ -36,6 +36,7 @@ import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import de.civitascore.configadapter.nifi.mapping.ValueNode;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -344,11 +345,10 @@ public final class NifiTestFixtures {
     Datasource source = new Datasource();
     source.setId("a1");
     source.setType("MQTT");
-    // the portal connector shape: urls/topics are lists, user/client_id/qos scalars
+    // the portal connector shape: urls/topics are lists, user/qos scalars
     source.handleUnknownProperty("urls", List.of("tcp://mosquitto:1883"));
     source.handleUnknownProperty("topics", List.of("sensors/+/temp"));
     source.handleUnknownProperty("user", "mqttuser");
-    source.handleUnknownProperty("client_id", "civitas-it");
     source.handleUnknownProperty("qos", 1);
     source.handleUnknownProperty("password", encryptedPassword);
     return source;
@@ -487,7 +487,9 @@ public final class NifiTestFixtures {
             FrostSinkStage.FROST_BASE_URL,
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
-            "7"),
+            "7",
+            FrostSinkStage.FROST_PORT,
+            SinkPort.THING_TREE.label()),
         // FROST: the source delivers the STA envelope; no record mapping (find-or-create works on
         // the raw JSON).
         List.of(),
@@ -511,7 +513,7 @@ public final class NifiTestFixtures {
     fields.put("$.description", new ValueNode.ConstNode("registered station", null));
     FrostMappingCompiler.FrostCompilation compilation =
         new FrostMappingCompiler(new RecordPathCompiler())
-            .compile(new MappingConfig(null, null, fields), STA_KEYS);
+            .compile(new MappingConfig(null, null, fields), STA_KEYS, SinkPort.THING_TREE);
     return new FlowBuildSpec(
         "pipeline-frost-thing-only",
         SourceType.MQTT,
@@ -521,7 +523,9 @@ public final class NifiTestFixtures {
             FrostSinkStage.FROST_BASE_URL,
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
-            "7"),
+            "7",
+            FrostSinkStage.FROST_PORT,
+            SinkPort.THING_TREE.label()),
         compiled(compilation),
         Map.of(),
         null,
@@ -546,7 +550,7 @@ public final class NifiTestFixtures {
     fields.put("$.Datastreams[].properties.reference", new ValueNode.CopyNode("$.ref"));
     FrostMappingCompiler.FrostCompilation compilation =
         new FrostMappingCompiler(new RecordPathCompiler())
-            .compile(new MappingConfig(null, null, fields), STA_KEYS);
+            .compile(new MappingConfig(null, null, fields), STA_KEYS, SinkPort.THING_TREE);
     return new FlowBuildSpec(
         "pipeline-frost-mapping",
         SourceType.MQTT,
@@ -556,7 +560,9 @@ public final class NifiTestFixtures {
             FrostSinkStage.FROST_BASE_URL,
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
-            "7"),
+            "7",
+            FrostSinkStage.FROST_PORT,
+            SinkPort.THING_TREE.label()),
         compiled(compilation),
         Map.of(),
         null,
@@ -584,7 +590,7 @@ public final class NifiTestFixtures {
         new ValueNode.CopyNode("$.measurements[].measuredValues[].ts"));
     FrostMappingCompiler.FrostCompilation compilation =
         new FrostMappingCompiler(new RecordPathCompiler())
-            .compile(new MappingConfig(null, null, fields), STA_KEYS);
+            .compile(new MappingConfig(null, null, fields), STA_KEYS, SinkPort.THING_TREE);
     return new FlowBuildSpec(
         "pipeline-frost-fanout",
         SourceType.MQTT,
@@ -594,7 +600,9 @@ public final class NifiTestFixtures {
             FrostSinkStage.FROST_BASE_URL,
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
-            "7"),
+            "7",
+            FrostSinkStage.FROST_PORT,
+            SinkPort.THING_TREE.label()),
         compiled(compilation),
         Map.of(),
         null,
@@ -637,7 +645,7 @@ public final class NifiTestFixtures {
     fields.put("$.Datastreams[].properties.reference", new ValueNode.CopyNode("$.ref"));
     FrostMappingCompiler.FrostCompilation compilation =
         new FrostMappingCompiler(new RecordPathCompiler())
-            .compile(new MappingConfig(null, null, fields), STA_KEYS);
+            .compile(new MappingConfig(null, null, fields), STA_KEYS, SinkPort.THING_TREE);
     return new FlowBuildSpec(
         "pipeline-frost-related-updates",
         SourceType.MQTT,
@@ -647,7 +655,9 @@ public final class NifiTestFixtures {
             FrostSinkStage.FROST_BASE_URL,
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
-            "7"),
+            "7",
+            FrostSinkStage.FROST_PORT,
+            SinkPort.THING_TREE.label()),
         compiled(compilation),
         Map.of(),
         null,

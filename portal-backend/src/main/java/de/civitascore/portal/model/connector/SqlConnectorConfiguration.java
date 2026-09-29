@@ -36,34 +36,6 @@ public class SqlConnectorConfiguration implements ConnectorConfiguration {
   @Schema(description = "SQL WHERE clause.", example = "id > :last_id")
   private String where;
 
-  @Schema(description = "SQL prefix prepended to the query.")
-  private String prefix;
-
-  @Schema(description = "SQL suffix appended to the query.")
-  private String suffix;
-
-  @JsonProperty("init_statement")
-  @Schema(description = "SQL statement executed on connection init.")
-  private String initStatement;
-
-  @JsonProperty("conn_max_idle_time")
-  @Schema(description = "Maximum idle time per connection.", example = "10m")
-  private String connMaxIdleTime;
-
-  @JsonProperty("conn_max_life_time")
-  @Schema(description = "Maximum lifetime per connection.", example = "1h")
-  private String connMaxLifeTime;
-
-  @JsonProperty("conn_max_idle")
-  @Schema(description = "Maximum number of idle connections. Default: 2.", example = "2")
-  private int connMaxIdle = 2;
-
-  @JsonProperty("conn_max_open")
-  @Schema(
-      description = "Maximum number of open connections. 0 = unlimited. Default: 0.",
-      example = "0")
-  private int connMaxOpen = 0;
-
   @Schema(description = "Database username.", example = "dbuser")
   private String user;
 

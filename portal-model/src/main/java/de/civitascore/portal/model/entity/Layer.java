@@ -70,9 +70,6 @@ public class Layer extends DataSetOwnedEntity {
   @Column(name = "crs")
   private String crs;
 
-  @Column(name = "bbox_auto_calculate", nullable = false)
-  private boolean bboxAutoCalculate = true;
-
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "native_bounding_box", columnDefinition = "jsonb")
   private Map<String, Object> nativeBoundingBox;

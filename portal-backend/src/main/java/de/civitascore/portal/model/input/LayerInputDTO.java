@@ -34,7 +34,6 @@ public class LayerInputDTO extends DataSetOwnedInputDTO {
   private UUID defaultStyleId;
   private List<UUID> alternativeStyleIds;
   private String crs;
-  private boolean bboxAutoCalculate = true;
   private Map<String, Object> nativeBoundingBox;
   private Map<String, Object> latLonBoundingBox;
 }

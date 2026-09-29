@@ -12,11 +12,9 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
-import de.civitascore.portal.model.entity.Catalog;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
-import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -24,7 +22,6 @@ import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
 import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
@@ -50,7 +47,6 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private DataSetService dataSetService;
   @Autowired private PortalTestDataFactory portalData;
   @Autowired private DataSetRepository dataSetRepository;
-  @Autowired private CatalogRepository catalogRepository;
   @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private LayerRepository layerRepository;
 
@@ -99,18 +95,6 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     Pipeline pipeline2 = createPipelineForDataSet(dataSet, "Pipeline 2");
     dataSet.getPipelines().addAll(Set.of(pipeline1, pipeline2));
 
-    Distribution distribution1 = createDistributionForDataSet(dataSet, "/api/v1/traffic");
-    Distribution distribution2 = createDistributionForDataSet(dataSet, "/api/v1/weather");
-    dataSet.getDistributions().addAll(Set.of(distribution1, distribution2));
-
-    Catalog catalog1 = createInitialCatalog("Catalog 1");
-    Catalog catalog2 = createInitialCatalog("Catalog 2");
-    catalog1.getDataSets().add(dataSet);
-    catalog2.getDataSets().add(dataSet);
-    catalogRepository.save(catalog1);
-    catalogRepository.save(catalog2);
-    dataSet.getCatalogs().addAll(Set.of(catalog1, catalog2));
-
     Assignment assignment1 = createAssignmentForDataSet(dataSet, "Test Assignment 1");
     Assignment assignment2 = createAssignmentForDataSet(dataSet, "Test Assignment 2");
     dataSet.getAssignments().addAll(Set.of(assignment1, assignment2));
@@ -140,26 +124,6 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
               assertThat(pipeline.getDataSet()).isNotNull();
               assertThat(pipeline.getDataSet().getId()).isEqualTo(dataSetId);
             });
-
-    assertThat(retrievedDataSet.getDistributions())
-        .isNotNull()
-        .hasSize(2)
-        .extracting(Distribution::getAccessUrl)
-        .containsExactlyInAnyOrder(distribution1.getAccessUrl(), distribution2.getAccessUrl());
-
-    retrievedDataSet
-        .getDistributions()
-        .forEach(
-            distribution -> {
-              assertThat(distribution.getDataSet()).isNotNull();
-              assertThat(distribution.getDataSet().getId()).isEqualTo(dataSetId);
-            });
-
-    assertThat(retrievedDataSet.getCatalogs())
-        .isNotNull()
-        .hasSize(2)
-        .extracting(Catalog::getName)
-        .containsExactlyInAnyOrder(catalog1.getName(), catalog2.getName());
 
     assertThat(retrievedDataSet.getAssignments())
         .isNotNull()
@@ -198,15 +162,6 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
                     .description("Test pipeline for " + name)
                     .dataSources(new HashSet<>(Set.of(ds1, ds2, ds3))));
     return portalData.attachPipelineDefinition(pipeline, createSampleModel(), createSampleStyles());
-  }
-
-  private Distribution createDistributionForDataSet(DataSet dataSet, String apiPath) {
-    return portalData.distribution(
-        b -> b.accessUrl("http://localhost:8080" + apiPath).dataSet(dataSet));
-  }
-
-  private Catalog createInitialCatalog(String name) {
-    return portalData.catalog(b -> b.name(name + "_" + System.currentTimeMillis()));
   }
 
   private Assignment createAssignmentForDataSet(DataSet dataSet, String roleName) {
@@ -297,13 +252,14 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       patchAssignments(dataSet.getId(), group.getId(), dataRole.getId());
 
-      assertThat(assignmentRepository.findAllByGroupId(group.getId()))
+      assertThat(
+              assignmentRepository.findAllByScopeTypeAndDatasetId(
+                  ScopeType.DATASET, dataSet.getId()))
           .singleElement()
           .satisfies(
               a -> {
+                assertThat(a.getGroup().getId()).isEqualTo(group.getId());
                 assertThat(a.getRole().getId()).isEqualTo(dataRole.getId());
-                assertThat(a.getScopeType()).isEqualTo(ScopeType.DATASET);
-                assertThat(a.getDataset().getId()).isEqualTo(dataSet.getId());
               });
     }
   }

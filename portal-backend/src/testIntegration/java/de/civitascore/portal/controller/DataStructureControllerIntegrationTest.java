@@ -1,6 +1,7 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
@@ -17,6 +18,7 @@ import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
+import de.civitascore.portal.model.output.summary.DataStructureVersionUsageSummaryDTO;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.List;
@@ -62,7 +64,6 @@ class DataStructureControllerIntegrationTest
     DataStructureInputDTO input = new DataStructureInputDTO();
     input.setName("test_datastructure_" + System.currentTimeMillis());
     input.setDescription("A test data structure for integration testing");
-    input.setCreatedFromDataSource(false);
     return input;
   }
 
@@ -78,7 +79,6 @@ class DataStructureControllerIntegrationTest
     DataStructureInputDTO input = new DataStructureInputDTO();
     input.setName("Updated Data Structure");
     input.setDescription("Updated description");
-    input.setCreatedFromDataSource(false);
     return input;
   }
 
@@ -107,7 +107,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("New Data Structure");
       input.setDescription("A new test data structure");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performCreate(input);
 
@@ -125,9 +124,6 @@ class DataStructureControllerIntegrationTest
       assertThat(output.getDataStructureStatus())
           .as("Status should be set to DRAFT by preCreate hook")
           .isEqualTo(DataStructureStatus.DRAFT);
-      assertThat(output.getCreatedFromDataSource())
-          .as("CreatedFromDataSource should match input")
-          .isFalse();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
 
       assertThat(response.getHeaders().getLocation())
@@ -141,7 +137,20 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setDescription("Missing name");
       input.setDataStructureStatus(DataStructureStatus.DRAFT);
-      input.setCreatedFromDataSource(false);
+
+      ResponseEntity<DataStructureOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST status")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should fail to create data structure with blank description")
+    void shouldFailToCreateDataStructureWithBlankDescription() {
+      DataStructureInputDTO input = new DataStructureInputDTO();
+      input.setName("Missing description");
+      input.setDescription("  ");
 
       ResponseEntity<DataStructureOutputDTO> response = performCreate(input);
 
@@ -170,7 +179,6 @@ class DataStructureControllerIntegrationTest
       input.setName("Shared Data Structure Name");
       input.setDescription("First one");
       input.setDataStructureStatus(DataStructureStatus.DRAFT);
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> firstResponse = performCreate(input);
       assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -242,9 +250,6 @@ class DataStructureControllerIntegrationTest
       assertThat(version1.getDataStructureVersionStatus())
           .as("Version should have a status")
           .isNotNull();
-      assertThat(version1.getDataStructureVersionSource())
-          .as("Version should have a source")
-          .isNotNull();
     }
 
     @Test
@@ -305,7 +310,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Updated Data Structure");
       input.setDescription("Updated description");
-      input.setCreatedFromDataSource(true);
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(dataStructureId, input);
 
@@ -317,7 +321,6 @@ class DataStructureControllerIntegrationTest
       assertThat(output.getName()).isEqualTo("Updated Data Structure");
       assertThat(output.getDescription()).isEqualTo("Updated description");
       assertThat(output.getDataStructureStatus()).isEqualTo(DataStructureStatus.DRAFT);
-      assertThat(output.getCreatedFromDataSource()).isTrue();
     }
 
     @Test
@@ -325,8 +328,8 @@ class DataStructureControllerIntegrationTest
     void shouldReturn404WhenUpdatingNonExistent() {
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Non-existent");
+      input.setDescription("a description");
       input.setDataStructureStatus(DataStructureStatus.DRAFT);
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(UUID.randomUUID(), input);
 
@@ -343,7 +346,22 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("");
       input.setDescription("Empty name");
-      input.setCreatedFromDataSource(false);
+
+      ResponseEntity<DataStructureOutputDTO> response = performUpdate(dataStructureId, input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST status")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should fail to update data structure with blank description")
+    void shouldFailToUpdateWithBlankDescription() {
+      UUID dataStructureId = createTestEntity();
+
+      DataStructureInputDTO input = new DataStructureInputDTO();
+      input.setName("Still has a name");
+      input.setDescription("  ");
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(dataStructureId, input);
 
@@ -375,7 +393,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Trying to update released with regular PUT");
       input.setDescription("This should fail");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(dataStructure.getId(), input);
 
@@ -682,7 +699,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Updated Released Data Structure");
       input.setDescription("Updated description for released data structure");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
@@ -721,7 +737,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Trying to update draft");
       input.setDescription("This should fail");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
@@ -742,7 +757,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Non-existent");
       input.setDescription("Does not exist");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
@@ -775,7 +789,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("");
       input.setDescription("Blank name should fail");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
@@ -860,7 +873,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Data Structure With Assignments");
       input.setDescription("Test");
-      input.setCreatedFromDataSource(false);
       input.setAssignments(Set.of(assignment));
 
       ResponseEntity<DataStructureOutputDTO> createResponse = performCreate(input);
@@ -895,7 +907,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO createInput = new DataStructureInputDTO();
       createInput.setName("Data Structure For Update " + System.currentTimeMillis());
       createInput.setDescription("Test");
-      createInput.setCreatedFromDataSource(false);
       createInput.setAssignments(Set.of(assignment1));
 
       ResponseEntity<DataStructureOutputDTO> createResponse = performCreate(createInput);
@@ -908,7 +919,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO updateInput = new DataStructureInputDTO();
       updateInput.setName(createInput.getName());
       updateInput.setDescription("Updated");
-      updateInput.setCreatedFromDataSource(false);
       updateInput.setAssignments(Set.of(assignment2));
 
       performUpdate(id, updateInput);
@@ -952,7 +962,31 @@ class DataStructureControllerIntegrationTest
                       .modelName("InUse Model"));
 
       portalData.dataSource(
+          b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE).dataStructureVersion(version));
+    }
+
+    @Test
+    @DisplayName("Should unrelease a data structure whose versions only drafts reference")
+    void shouldUnreleaseWhenOnlyDraftsReference() {
+      DataStructure ds =
+          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion version =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      portalData.dataSource(
           b -> b.dataSourceStatus(DataSourceStatus.DRAFT).dataStructureVersion(version));
+
+      ResponseEntity<DataStructureOutputDTO> response =
+          exchange(
+              ENDPOINT + "/" + ds.getId() + "/unrelease",
+              HttpMethod.POST,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().isInUse()).isTrue();
+      assertThat(response.getBody().isInUseByReleased()).isFalse();
     }
 
     @Test
@@ -991,6 +1025,43 @@ class DataStructureControllerIntegrationTest
       assertThat(response.getBody().isInUse())
           .as("inUse should be true when a DataSource references a version")
           .isTrue();
+      assertThat(response.getBody().isInUseByReleased())
+          .as("inUseByReleased should be true when an AVAILABLE DataSource pins a version")
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("Should report inUse and inUseByReleased on each version row")
+    void shouldReportUsageOnEachVersionRow() {
+      DataStructure ds =
+          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion releasedUse =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      DataStructureVersion draftUse =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      DataStructureVersion unused =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.DRAFT));
+      portalData.dataSource(
+          b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE).dataStructureVersion(releasedUse));
+      portalData.dataSource(
+          b -> b.dataSourceStatus(DataSourceStatus.DRAFT).dataStructureVersion(draftUse));
+
+      ResponseEntity<DataStructureOutputDTO> response = performGetById(ds.getId());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDataStructureVersions())
+          .extracting(
+              DataStructureVersionUsageSummaryDTO::getId,
+              DataStructureVersionUsageSummaryDTO::getDataStructureId,
+              DataStructureVersionUsageSummaryDTO::isInUse,
+              DataStructureVersionUsageSummaryDTO::isInUseByReleased)
+          .containsExactlyInAnyOrder(
+              tuple(releasedUse.getId(), ds.getId(), true, true),
+              tuple(draftUse.getId(), ds.getId(), true, false),
+              tuple(unused.getId(), ds.getId(), false, false));
     }
 
     @Test

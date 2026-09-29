@@ -64,9 +64,6 @@ test.describe.skip('Edit User Page', async () => {
     for (const field of await fields.all()) {
       await expect(field).toBeDisabled()
     }
-
-    await expect(page.getByTestId('activeStatusLabel')).toBeVisible()
-    await expect(page.getByTestId('activeStatus')).toContainText('Active')
   })
 
   test('enables user editing on edit button click', async ({ page }) => {
@@ -75,7 +72,6 @@ test.describe.skip('Edit User Page', async () => {
     await page.getByTestId('editButton').click()
     await expect(page.getByTestId('cancelButton')).toBeVisible()
     await expect(page.getByTestId('confirmButton')).toBeVisible()
-    await expect(page.getByTestId('activeStatusLabel')).toBeHidden()
 
     const fields = page.locator('[data-test-element="formField"]')
     await expect(fields).toHaveCount(formFieldsCount)
@@ -125,7 +121,6 @@ test.describe.skip('Edit User Page', async () => {
     await page.getByTestId('lastNameTextField').fill(`edited ${user.lastName}`)
     await pickSelectOption(page, 'department', 'Placeholder')
     await page.getByTestId('positionDescriptionTextArea').fill('edited description')
-    await page.getByTestId('activeSwitch').click()
 
     await page.getByTestId('confirmButton').click()
     await page.waitForLoadState('networkidle')
@@ -139,7 +134,6 @@ test.describe.skip('Edit User Page', async () => {
     expect(`edited ${user.lastName}`).toContain(lastName)
     await expect(page.getByTestId('pageHeader')).toContainText(`edited ${user.firstName} edited ${user.lastName}`)
     await expect(page.getByTestId('departmentSelectTrigger')).toContainText('Select department...')
-    await expect(page.getByTestId('activeStatus')).toContainText('Inactive')
 
     // verify if page gets set back to readonly view
     await expect(page.getByTestId('editButton')).toBeVisible()

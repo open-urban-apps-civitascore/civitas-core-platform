@@ -18,7 +18,6 @@ import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataPoolRepository;
-import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
@@ -60,12 +59,12 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final ConnectorHandlerRegistry connectorHandlerRegistry;
   private final AssignmentFactory assignmentFactory;
   private final DataStructureVersionService dataStructureVersionService;
-  private final DataSetRepository dataSetRepository;
   private final PipelineRepository pipelineRepository;
   private final DataPoolRepository dataPoolRepository;
   private final ModelRegistryGateway modelRegistryGateway;
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
+  private final ArtifactUsageLookup artifactUsageLookup;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -389,28 +388,26 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
 
   @Override
   protected void validateUnrelease(DataSource entity) {
-    validateNotInUse(entity.getId(), "unrelease");
+    artifactUsageLookup.of(entity).requireNoReleasedReferrer(getEntityName(), entity.getId());
   }
 
-  private void validateNotInUse(UUID id, String operation) {
+  private void validateNotInUse(UUID id) {
     if (pipelineRepository.existsByDataSourcesId(id)) {
       throw new ResourceInUseException(
-          getEntityName(),
-          id,
-          "Cannot " + operation + " DataSource because it is referenced by a Pipeline.");
+          getEntityName(), id, "Cannot delete DataSource because it is referenced by a Pipeline.");
     }
   }
 
   /**
    * Updates metadata of an AVAILABLE data source. Allows name, description, and assignment changes.
    * Technical fields (connector type, configuration, data structure version) can only be changed
-   * when the data source is not referenced by any READY or AVAILABLE dataset.
+   * while no Pipeline of an AVAILABLE dataset references the data source.
    *
    * @param id the data source ID
    * @param input the partial update input
    * @return the updated data source
-   * @throws InvalidInputException if the data source is not AVAILABLE or violates in-use
-   *     constraints
+   * @throws InvalidInputException if the data source is not AVAILABLE, or a technical field is
+   *     changed while a released dataset uses it
    */
   @Override
   @Transactional
@@ -422,10 +419,10 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
           getEntityName(), id, "Only data sources in AVAILABLE status can have metadata updated");
     }
 
-    boolean inUse = pipelineRepository.existsByDataSourcesId(id);
+    boolean inUseByReleased = artifactUsageLookup.of(entity).inUseByReleased();
 
-    if (inUse) {
-      validateInUseConstraints(input, entity);
+    if (inUseByReleased) {
+      validateTechnicalFieldsUnchanged(input, entity);
     }
 
     if (input.getName() != null) {
@@ -444,12 +441,10 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
     if (input.getDatapoolScope() != null) {
       applyDatapoolScope(entity, input.getDatapoolScope());
-      if (inUse) {
-        revalidateLinkedDatasetsAgainstNewScope(entity);
-      }
+      revalidateLinkedDatasetsAgainstNewScope(entity);
     }
 
-    if (!inUse) {
+    if (!inUseByReleased) {
       applyTechnicalFields(input, entity);
     }
 
@@ -477,18 +472,18 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
                 datapoolScopeValidator.validate(sources, pipeline.getDataSet().getDataPool()));
   }
 
-  private void validateInUseConstraints(DataSourceInputDTO input, DataSource entity) {
+  private void validateTechnicalFieldsUnchanged(DataSourceInputDTO input, DataSource entity) {
     if (input.getConnectorType() != null && input.getConnectorType() != entity.getConnectorType()) {
       throw new InvalidInputException(
           getEntityName(),
           entity.getId(),
-          "Cannot change connector type of a data source that is in use");
+          "Cannot change connector type of a data source that a released dataset uses");
     }
     if (input.getConfiguration() != null) {
       throw new InvalidInputException(
           getEntityName(),
           entity.getId(),
-          "Cannot change configuration of a data source that is in use");
+          "Cannot change configuration of a data source that a released dataset uses");
     }
     UUID existingDsvId =
         entity.getDataStructureVersion() != null ? entity.getDataStructureVersion().getId() : null;
@@ -497,7 +492,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       throw new InvalidInputException(
           getEntityName(),
           entity.getId(),
-          "Cannot change data structure version of a data source that is in use");
+          "Cannot change data structure version of a data source that a released dataset uses");
     }
   }
 
@@ -547,7 +542,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
     // A draft may be referenced too, and postDelete drops the Model Forge artifact before the
     // foreign key aborts the commit, which would leave the surviving row pinned to a dead URN.
-    validateNotInUse(id, "delete");
+    validateNotInUse(id);
 
     return entity;
   }
@@ -628,24 +623,6 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       throw new InvalidInputException(
           getEntityName(), entity.getId(), "Invalid configuration: " + String.join("; ", errors));
     }
-  }
-
-  /**
-   * Returns the data structure version linked to the given data source, or {@code null} if none is
-   * linked.
-   *
-   * @param dataSourceId the data source ID
-   * @return the linked {@link DataStructureVersion}, or {@code null}
-   * @throws de.civitascore.portal.util.ResourceNotFoundException if the data source does not exist
-   */
-  @Transactional(readOnly = true)
-  public DataStructureVersion findLinkedDataStructureVersion(UUID dataSourceId) {
-    DataSource dataSource = findByIdOrThrow(dataSourceId);
-    if (dataSource.getDataStructureVersion() == null) {
-      return null;
-    }
-    return dataStructureVersionService.findByIdOrThrow(
-        dataSource.getDataStructureVersion().getId());
   }
 
   /**

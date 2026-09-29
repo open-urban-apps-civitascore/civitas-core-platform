@@ -15,8 +15,12 @@ const hasSemanticNodeChanges = (changes: NodeChange[]) =>
 
 const hasSemanticEdgeChanges = (changes: EdgeChange[]) => changes.some(change => change.type !== 'select')
 
+// Placeholder name a new diagram and its session carry until the user names the model.
+// The tab bar compares against it to show the placeholder instead of the literal.
+export const DEFAULT_DIAGRAM_NAME = 'Untitled Diagram'
+
 // Initial empty diagram state
-export const createEmptyDiagram = (name = 'Untitled Diagram'): UMLDiagram => ({
+export const createEmptyDiagram = (name = DEFAULT_DIAGRAM_NAME): UMLDiagram => ({
   id: crypto.randomUUID(),
   name,
   nodes: [],
@@ -195,6 +199,16 @@ export const diagramReducer = (state: UMLDiagram, action: DiagramAction): UMLDia
       return {
         ...state,
         isDirty: false,
+      }
+
+    case 'MERGE_STRUCTURE':
+      return {
+        ...state,
+        nodes: [...state.nodes, ...action.payload.nodes],
+        edges: [...state.edges, ...action.payload.edges],
+        importedStructures: action.payload.importedStructures,
+        lastModified: new Date(),
+        isDirty: true,
       }
 
     case 'MARK_DIRTY':

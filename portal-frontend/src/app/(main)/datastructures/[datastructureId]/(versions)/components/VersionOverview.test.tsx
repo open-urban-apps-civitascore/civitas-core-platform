@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent, { UserEvent } from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
@@ -9,6 +10,13 @@ import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureVersion } from '@/types/datastructures'
 
 import { VersionOverview } from './VersionOverview'
+
+// The modeller's toolbar asks the platform which structures it publishes. This test is about the
+// version form, so the request is answered with nothing rather than attempted.
+vi.mock('@/app/services/api/published-structures/clientRequests', () => ({
+  useGetPublishedStructures: () => ({ data: undefined, isLoading: false }),
+  useGetPublishedStructure: () => ({ data: undefined }),
+}))
 
 vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
@@ -63,7 +71,6 @@ const mockDatastructure: Datastructure = {
   dataStructureVersions: [],
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
-  createdFromDataSource: false,
 }
 
 const mockVersion: DatastructureVersion = {
@@ -169,9 +176,13 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
   const renderComponent = (props = {}) => {
     return render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <VersionOverview {...defaultProps} {...props} />
-      </NextIntlClientProvider>,
+      // The structure tab carries the modeller's toolbar, which reads the structures the platform
+      // publishes — so the tree needs the query client the app provides around it.
+      <QueryClientProvider client={new QueryClient()}>
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <VersionOverview {...defaultProps} {...props} />
+        </NextIntlClientProvider>
+      </QueryClientProvider>,
     )
   }
 
@@ -182,10 +193,17 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(screen.getByText('Edit Version')).toBeInTheDocument()
     })
 
-    it('renders tab navigation', () => {
+    it('renders tab navigation with structure tab first', () => {
       renderComponent()
-      expect(screen.getByTestId('tab-versionInfo')).toBeInTheDocument()
-      expect(screen.getByTestId('tab-structure')).toBeInTheDocument()
+      const tabs = screen.getAllByRole('tab')
+      expect(tabs[0]).toHaveAttribute('data-testid', 'tab-structure')
+      expect(tabs[1]).toHaveAttribute('data-testid', 'tab-versionInfo')
+    })
+
+    it('defaults to the structure tab when no subTabValue is set', () => {
+      mockSubTabValue = ''
+      renderComponent()
+      expect(screen.getByTestId('umlModeler')).toBeInTheDocument()
     })
   })
 
@@ -344,14 +362,41 @@ describe('VersionOverview - hasUserChanges Modal', () => {
   })
 
   describe('canSetDraft logic', () => {
-    it('disables DRAFT option when the version is in use', async () => {
+    const inUseByReleasedVersion: DatastructureVersion = {
+      ...mockVersion,
+      dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+      inUse: true,
+      inUseByReleased: true,
+    }
+
+    it('keeps DRAFT selectable when a released entity references the version', async () => {
       const user = userEvent.setup()
-      const inUseVersion: DatastructureVersion = { ...mockVersion, inUse: true }
-      renderComponent({ version: inUseVersion })
+      renderComponent({ version: inUseByReleasedVersion })
 
       await openStatusDropdown(user)
 
-      expect(screen.getByTestId('statusOption-draft')).toHaveAttribute('data-disabled')
+      expect(screen.getByTestId('statusOption-draft')).not.toHaveAttribute('data-disabled')
+    })
+
+    it('refuses the DRAFT selection and explains why when a released entity references the version', async () => {
+      const user = userEvent.setup()
+      renderComponent({ version: inUseByReleasedVersion })
+
+      await openStatusDropdown(user)
+      await user.click(screen.getByTestId('statusOption-draft'))
+
+      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
+      expect(screen.getByTestId('statusDropdown')).toHaveTextContent('Verfügbar')
+    })
+
+    it('keeps DRAFT selectable when only a draft entity references the version', async () => {
+      const user = userEvent.setup()
+      const draftReferencedVersion: DatastructureVersion = { ...mockVersion, inUse: true, inUseByReleased: false }
+      renderComponent({ version: draftReferencedVersion })
+
+      await openStatusDropdown(user)
+
+      expect(screen.getByTestId('statusOption-draft')).not.toHaveAttribute('data-disabled')
     })
 
     it('disables DRAFT option when this is the last available version in an available datastructure', async () => {
@@ -368,7 +413,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(screen.getByTestId('statusOption-draft')).toHaveAttribute('data-disabled')
     })
 
-    it('enables DRAFT option when version is not in use and not the last available version', async () => {
+    it('enables DRAFT option when the version has no released referrer and is not the last available version', async () => {
       const user = userEvent.setup()
       renderComponent()
 
@@ -818,20 +863,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         nodes: [{ ...mockVersionWithModel.styles!.nodes[0], selected: true }],
       },
     }
-
-    it('enables the save button after the diagram was renamed', async () => {
-      const user = userEvent.setup()
-      renderComponent({ version: mockVersionWithModel })
-
-      expect(screen.getByTestId('confirmButton')).toBeDisabled()
-
-      await user.dblClick(screen.getByText('Test Model'))
-      const diagramNameInput = screen.getByDisplayValue('Test Model')
-      await user.clear(diagramNameInput)
-      await user.type(diagramNameInput, 'Renamed Model{Enter}')
-
-      await waitFor(() => expect(screen.getByTestId('confirmButton')).toBeEnabled())
-    })
 
     it('enables the save button after a class was renamed in the inspector', async () => {
       const user = userEvent.setup()

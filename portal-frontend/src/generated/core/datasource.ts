@@ -34,10 +34,10 @@ export const MqttDataSourceSchema = z
     urls: z.union([z.array(z.string()), z.null()]).optional(),
     /** MQTT topic filter(s) to subscribe to. Wildcards (+, #) are supported. */
     topics: z.union([z.array(z.string()), z.null()]).optional(),
-    /** Optional MQTT client ID. Auto-generated if omitted. */
-    client_id: z.union([z.string(), z.null()]).optional(),
     /** MQTT Quality of Service level: 0, 1 or 2. */
     qos: z.union([z.literal(0), z.literal(1), z.literal(2), z.null()]).optional(),
+    /** MQTT protocol version: '3' (auto-select 3.1 or 3.1.1) or '5' (5.0). */
+    protocol_version: z.union([z.literal('3'), z.literal('5'), z.null()]).optional(),
     /** Connection timeout, e.g. '5s'. */
     connect_timeout: z.union([z.string(), z.null()]).optional(),
     /** Keep-alive interval, e.g. '30s'. */
@@ -97,20 +97,6 @@ export const SqlDataSourceSchema = z
     columns: z.union([z.array(z.string()), z.null()]).optional(),
     /** SQL WHERE clause. */
     where: z.union([z.string(), z.null()]).optional(),
-    /** SQL prefix prepended to the query (not honored by the NiFi engine). */
-    prefix: z.union([z.string(), z.null()]).optional(),
-    /** SQL suffix appended to the query (not honored by the NiFi engine). */
-    suffix: z.union([z.string(), z.null()]).optional(),
-    /** SQL executed on connection init (not honored by the NiFi engine). */
-    init_statement: z.union([z.string(), z.null()]).optional(),
-    /** Maximum idle time per connection, e.g. '10m'. */
-    conn_max_idle_time: z.union([z.string(), z.null()]).optional(),
-    /** Maximum lifetime per connection, e.g. '1h'. */
-    conn_max_life_time: z.union([z.string(), z.null()]).optional(),
-    /** Maximum number of idle connections. Default 2. */
-    conn_max_idle: z.number().int().optional(),
-    /** Maximum number of open connections. 0 = unlimited. Default 0. */
-    conn_max_open: z.number().int().optional(),
     /** Database login username. */
     user: z.union([z.string(), z.null()]).optional(),
     /** Database login password. Stored ENCRYPTED by the host; null/absent when unset. */

@@ -12,6 +12,7 @@ export const mockDatasources: Datasource[] = [
     configuration: null,
     dataStructureVersion: null,
     inUse: false,
+    inUseByReleased: false,
     datapoolScope: { type: DATAPOOL_SCOPE_TYPES.NONE },
   },
   {
@@ -25,6 +26,7 @@ export const mockDatasources: Datasource[] = [
     configuration: null,
     dataStructureVersion: null,
     inUse: false,
+    inUseByReleased: false,
     datapoolScope: { type: DATAPOOL_SCOPE_TYPES.NONE },
   },
   {
@@ -38,6 +40,7 @@ export const mockDatasources: Datasource[] = [
     configuration: null,
     dataStructureVersion: null,
     inUse: false,
+    inUseByReleased: false,
     datapoolScope: { type: DATAPOOL_SCOPE_TYPES.NONE },
   },
 ]

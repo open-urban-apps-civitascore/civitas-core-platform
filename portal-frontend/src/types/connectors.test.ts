@@ -5,7 +5,7 @@ import { ConnectorApiToFormSchema, ConnectorFormToApiSchema, MqttLooseSchema, Mq
 const loose = (urls: string, tls: boolean) => MqttLooseSchema.safeParse({ urls, tls })
 
 const strict = (urls: string, tls: boolean) =>
-  MqttStrictSchema.safeParse({ urls, tls, topics: 'sensors/+/temperature', qos: 1 })
+  MqttStrictSchema.safeParse({ urls, tls, topics: 'sensors/+/temperature', qos: 1, protocol_version: '3' })
 
 describe.each([
   ['loose', loose],
@@ -59,6 +59,28 @@ describe.each([
 })
 
 describe('MQTT connector transformations', () => {
+  it.each(['3', '5'] as const)('accepts MQTT protocol version %s', protocol_version => {
+    expect(
+      MqttStrictSchema.safeParse({
+        urls: 'tcp://broker.example:1883',
+        topics: 'sensors/#',
+        qos: 1,
+        protocol_version,
+      }).success,
+    ).toBe(true)
+  })
+
+  it('rejects unsupported MQTT protocol versions', () => {
+    expect(
+      MqttStrictSchema.safeParse({
+        urls: 'tcp://broker.example:1883',
+        topics: 'sensors/#',
+        qos: 1,
+        protocol_version: '4',
+      }).success,
+    ).toBe(false)
+  })
+
   it('maps the form TLS switch to tls.enabled', () => {
     const result = ConnectorFormToApiSchema.parse({
       connectorType: CONNECTOR_TYPES.MQTT,
@@ -71,9 +93,20 @@ describe('MQTT connector transformations', () => {
   it('maps tls.enabled from the API to the form switch', () => {
     const result = ConnectorApiToFormSchema.parse({
       connectorType: CONNECTOR_TYPES.MQTT,
-      configuration: { urls: ['ssl://broker.example:8883'], tls: { enabled: true } },
+      configuration: { urls: ['ssl://broker.example:8883'], tls: { enabled: true }, protocol_version: '3' },
     })
 
     expect(result.configuration.tls).toBe(true)
+  })
+
+  it('rejects an API response without a protocol version', () => {
+    // The backend always resolves a concrete protocol_version (defaulting legacy datasources to
+    // MQTT v3 itself), so the frontend no longer needs — or accepts — a missing value here.
+    expect(
+      ConnectorApiToFormSchema.safeParse({
+        connectorType: CONNECTOR_TYPES.MQTT,
+        configuration: { urls: ['tcp://broker.example:1883'], tls: { enabled: false } },
+      }).success,
+    ).toBe(false)
   })
 })

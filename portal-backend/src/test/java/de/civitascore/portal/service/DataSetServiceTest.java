@@ -1628,6 +1628,34 @@ class DataSetServiceTest {
       assertThat(saved.getValue().isProvisioned()).isTrue();
     }
 
+    @ParameterizedTest
+    @EnumSource(
+        value = PendingSagaType.class,
+        names = {"CREATE", "UPDATE"})
+    @DisplayName("provisioning saga: marks every sink of the dataset provisioned")
+    void provisioningSagaMarksEverySinkProvisioned(PendingSagaType sagaType) {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(sagaType);
+      DataSink postgis = new DataSink();
+      postgis.setDataSinkType(DataSinkType.POSTGIS);
+      DataSink frost = new DataSink();
+      frost.setDataSinkType(DataSinkType.FROST);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(postgis, frost));
+
+      createService()
+          .handleSagaCompleted(
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
+
+      assertThat(List.of(postgis, frost)).extracting(DataSink::isProvisioned).containsOnly(true);
+      verify(dataSinkRepository).save(postgis);
+      verify(dataSinkRepository).save(frost);
+    }
+
     @Test
     @DisplayName("CREATE: marks a dataset with no FROST project provisioned")
     void createMarksProvisionedWithoutFrostProject() {
@@ -2340,93 +2368,8 @@ class DataSetServiceTest {
   }
 
   @Nested
-  @DisplayName("Membership")
-  class MembershipAndOrphans {
-
-    private static final String MANIFEST_URN =
-        "urn:core:platform:civitas:dataset:common:test:abcdefghij";
-    private static final String MEMBER_URN =
-        "urn:core:platform:civitas:datastructure:common:Thing:xyz1234567:1.0.0";
-
-    private DataSet dataSetWithManifest(UUID id) {
-      DataSet ds = draftDataSet(id);
-      ds.setManifestLogicalUrn(MANIFEST_URN);
-      return ds;
-    }
-
-    @Test
-    void linkMember_whenManifestAndUrnPresent_linksInRegistry() {
-      UUID id = UUID.randomUUID();
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(dataSetWithManifest(id)));
-
-      createService().linkMember(id, MEMBER_URN);
-
-      verify(modelRegistryGateway).linkToDataSet(MANIFEST_URN, MEMBER_URN);
-    }
-
-    @Test
-    void linkMember_whenDatasetMissing_throwsNotFound() {
-      UUID id = UUID.randomUUID();
-      when(dataSetRepository.findById(id)).thenReturn(Optional.empty());
-
-      assertThatThrownBy(() -> createService().linkMember(id, MEMBER_URN))
-          .isInstanceOf(ResourceNotFoundException.class);
-      verify(modelRegistryGateway, never()).linkToDataSet(any(), any());
-    }
-
-    @Test
-    void linkMember_whenManifestMissing_throwsInvalidInput() {
-      UUID id = UUID.randomUUID();
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(draftDataSet(id)));
-
-      assertThatThrownBy(() -> createService().linkMember(id, MEMBER_URN))
-          .isInstanceOf(InvalidInputException.class);
-      verify(modelRegistryGateway, never()).linkToDataSet(any(), any());
-    }
-
-    @Test
-    void linkMember_whenUrnBlank_throwsInvalidInput() {
-      UUID id = UUID.randomUUID();
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(dataSetWithManifest(id)));
-
-      assertThatThrownBy(() -> createService().linkMember(id, "  "))
-          .isInstanceOf(InvalidInputException.class);
-      verify(modelRegistryGateway, never()).linkToDataSet(any(), any());
-    }
-
-    @Test
-    void unlinkMember_whenManifestAndUrnPresent_unlinksInRegistry() {
-      UUID id = UUID.randomUUID();
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(dataSetWithManifest(id)));
-
-      createService().unlinkMember(id, MEMBER_URN);
-
-      verify(modelRegistryGateway).unlinkFromDataSet(MANIFEST_URN, MEMBER_URN);
-    }
-
-    @Test
-    void unlinkMember_whenManifestMissing_isNoOp() {
-      UUID id = UUID.randomUUID();
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(draftDataSet(id)));
-
-      createService().unlinkMember(id, MEMBER_URN);
-
-      verify(modelRegistryGateway, never()).unlinkFromDataSet(any(), any());
-    }
-  }
-
-  @Nested
   @DisplayName("participating artifact validation")
   class ParticipatingArtifactValidation {
-
-    private DataSet stageable(UUID id) {
-      DataSet ds = draftDataSet(id);
-      Pipeline pipeline = new Pipeline();
-      pipeline.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
-      pipeline.setDataSources(new HashSet<>(List.of(new DataSource())));
-      ds.getPipelines().add(pipeline);
-      return ds;
-    }
 
     /**
      * A READY dataset publishing no named API, so the map/API-surface check passes and the
@@ -2439,23 +2382,6 @@ class DataSetServiceTest {
       ds.setPipelines(new HashSet<>());
       ds.setNamedApis(new HashSet<>());
       return ds;
-    }
-
-    @Test
-    @DisplayName("a dataset whose flows carry a defect is not staged")
-    void blockedStagingLeavesTheDatasetInDraft() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = stageable(id);
-      when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
-      doThrow(new PipelineClosureValidationException(List.of(UUID.randomUUID())))
-          .when(pipelineClosureValidator)
-          .validate(any());
-
-      assertThatThrownBy(() -> createService().stage(id))
-          .isInstanceOf(PipelineClosureValidationException.class);
-
-      assertThat(ds.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
-      verify(dataSetRepository, never()).save(any());
     }
 
     @Test

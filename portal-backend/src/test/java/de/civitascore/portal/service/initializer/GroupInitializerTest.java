@@ -278,50 +278,6 @@ class GroupInitializerTest {
           .as("Timed-out future must be cancelled to free the publisher's correlation entry")
           .isTrue();
     }
-
-    @Test
-    @DisplayName("syncs parents before children across separate depth layers")
-    void shouldSyncParentBeforeChild() {
-      Group parent = group("Parent");
-      Group child = group("Child");
-      child.setParentGroup(parent);
-
-      // Order in the repository result is intentionally child-first to verify the initializer
-      // does NOT rely on the input order.
-      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of(child, parent));
-      when(configEventPublisher.publishGroupCreated(eq("test-realm"), any(GroupConfig.class)))
-          .thenReturn(CompletableFuture.completedFuture(successResult("kc-parent")))
-          .thenReturn(CompletableFuture.completedFuture(successResult("kc-child")));
-
-      initializer.initialize();
-
-      ArgumentCaptor<GroupConfig> captor = ArgumentCaptor.forClass(GroupConfig.class);
-      verify(configEventPublisher, times(2))
-          .publishGroupCreated(eq("test-realm"), captor.capture());
-      assertThat(captor.getAllValues().get(0).getName())
-          .as("Parent must be published first so its externalId exists for the child layer")
-          .isEqualTo("Parent");
-      assertThat(captor.getAllValues().get(1).getName()).isEqualTo("Child");
-    }
-
-    @Test
-    @DisplayName("depth() returns a finite value even when the parent chain has a cycle")
-    void shouldGuardAgainstCyclicParentChain() {
-      // Synthetic cycle: a → b → a. FK constraints prevent this in production, but the guard
-      // means a corrupt DB row cannot wedge initialize() in an infinite loop.
-      Group a = group("a");
-      Group b = group("b");
-      a.setParentGroup(b);
-      b.setParentGroup(a);
-
-      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of(a));
-      when(configEventPublisher.publishGroupCreated(eq("test-realm"), any(GroupConfig.class)))
-          .thenReturn(CompletableFuture.completedFuture(successResult("kc-a")));
-
-      // If the cycle guard is missing, this call hangs in depth() and the test times out.
-      org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
-          java.time.Duration.ofSeconds(2), () -> initializer.initialize());
-    }
   }
 
   @Nested
@@ -441,24 +397,6 @@ class GroupInitializerTest {
       verify(configEventPublisher, times(2))
           .publishGroupUpdated(eq("test-realm"), any(GroupConfig.class));
       verify(groupRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("propagates the parent's externalId as parentId for a child group")
-    void shouldIncludeParentIdForChildGroup() {
-      Group parent = syncedGroup("Parent", "kc-parent");
-      Group child = syncedGroup("Child", "kc-child");
-      child.setParentGroup(parent);
-      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
-      when(groupRepository.findByExternalIdIsNotNull()).thenReturn(List.of(child));
-      when(configEventPublisher.publishGroupUpdated(eq("test-realm"), any(GroupConfig.class)))
-          .thenReturn(CompletableFuture.completedFuture(successResult("kc-child")));
-
-      backfillOnInitializer().initialize();
-
-      ArgumentCaptor<GroupConfig> captor = ArgumentCaptor.forClass(GroupConfig.class);
-      verify(configEventPublisher).publishGroupUpdated(eq("test-realm"), captor.capture());
-      assertThat(captor.getValue().getParentId()).isEqualTo("kc-parent");
     }
   }
 
