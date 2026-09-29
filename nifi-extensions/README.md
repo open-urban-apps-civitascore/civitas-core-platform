@@ -31,8 +31,9 @@ follows the NiFi baseline, not the repository.
 
 ## Install into the development NiFi
 
-`dev-environment/nifi/extensions` is mounted into the NiFi container's extensions directory, and
-NiFi loads a NAR dropped there without a restart.
+`start-portal-dev.sh` builds the NAR and copies it to `dev-environment/nifi/extensions`. That
+directory is mounted as the NiFi container's NAR autoload directory, and NiFi loads a NAR dropped
+there without a restart. To install a changed NAR into a running NiFi:
 
 ```bash
 mvn -q package -DskipTests
