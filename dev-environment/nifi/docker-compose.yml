@@ -75,8 +75,8 @@ services:
       - nifi_state:/opt/nifi/nifi-current/state
       - nifi_logs:/opt/nifi/nifi-current/logs
       - nifi_conf:/opt/nifi/nifi-current/conf
-      # Drop the Postgres JDBC driver here so NiFi can load it (see README).
-      - ./extensions:/opt/nifi/nifi-current/extensions
+      # nifi.properties loads NARs only from ./lib and its autoload directory, so the mount targets the latter.
+      - ./extensions:/opt/nifi/nifi-current/nar_extensions
       - ./drivers:/opt/nifi/drivers:ro
     healthcheck:
       test:
