@@ -1030,7 +1030,7 @@
       "typePlaceholder": "Konnektortyp auswählen",
       "connection": "Verbindung",
       "establishConnection": "Verbindung herstellen",
-      "inUseHint": "Der Konnektor kann nicht geändert werden, da eine Pipeline diese Datenquelle bereits verwendet.",
+      "inUseHint": "Der Konnektor kann nicht geändert werden, da ein verfügbarer Datensatz diese Datenquelle in seiner Pipeline verwendet.",
       "mqtt": {
         "urls": {
           "label": "Broker",

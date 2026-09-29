@@ -1043,7 +1043,7 @@
       "typePlaceholder": "Select connector type",
       "connection": "Connection",
       "establishConnection": "Establish Connection",
-      "inUseHint": "The connector can not be changed since a Pipeline already uses this Data source.",
+      "inUseHint": "The connector can not be changed since an available Dataset uses this Data source in its Pipeline.",
       "mqtt": {
         "urls": {
           "label": "Brokers",
