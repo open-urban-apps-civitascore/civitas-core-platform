@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PIPELINE_NODE_TYPES } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
+import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
 import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 import { PipelineBasicInfo } from '@/types/datasets'
@@ -48,6 +49,10 @@ vi.mock('@/app/services/api/datasources/clientRequests', () => ({
   useGetDatasources: vi.fn().mockReturnValue({ data: { data: [] } }),
 }))
 
+vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
+  useGetDataSinks: vi.fn().mockReturnValue({ data: { data: [] } }),
+}))
+
 vi.mock('sonner', () => ({
   toast: { error: vi.fn() },
 }))
@@ -73,6 +78,7 @@ describe('PipelineList', () => {
     vi.clearAllMocks()
     vi.mocked(useGetPipelines).mockReturnValue({ data: { data: [] } } as never)
     vi.mocked(useGetDatasources).mockReturnValue({ data: { data: [] } } as never)
+    vi.mocked(useGetDataSinks).mockReturnValue({ data: { data: [] } } as never)
   })
 
   describe('Empty state', () => {
@@ -148,6 +154,49 @@ describe('PipelineList', () => {
       renderComponent({ pipelines: [makePipeline({ id: 'p1' })] })
       expect(screen.queryByText('MQTT')).not.toBeInTheDocument()
       expect(screen.queryByText('FROST')).not.toBeInTheDocument()
+    })
+
+    describe('for a pipeline without a stored graph (an installed package)', () => {
+      const installedPipeline = { id: 'p1', styles: null, dataSourceIds: ['ds-1'], dataSinkIds: ['sink-1'] }
+
+      beforeEach(() => {
+        vi.mocked(useGetPipelines).mockReturnValue({ data: { data: [installedPipeline] } } as never)
+        vi.mocked(useGetDatasources).mockReturnValue({
+          data: { data: [{ id: 'ds-1', connectorType: 'SQL' }] },
+        } as never)
+        vi.mocked(useGetDataSinks).mockReturnValue({
+          data: { data: [{ id: 'sink-1', dataSinkType: 'POSTGIS' }] },
+        } as never)
+      })
+
+      it('derives the badges from the data source and the data sink the pipeline is linked to', () => {
+        renderComponent({ pipelines: [makePipeline({ id: 'p1' })] })
+        expect(screen.getByText('SQL')).toBeInTheDocument()
+        expect(screen.getByText('POSTGIS')).toBeInTheDocument()
+      })
+
+      it('asks for the data sinks of the dataset', () => {
+        renderComponent({ pipelines: [makePipeline({ id: 'p1' })] })
+        expect(useGetDataSinks).toHaveBeenLastCalledWith('dataset-123', { isEnabled: true })
+      })
+
+      it('shows no badge for a data sink of another pipeline', () => {
+        vi.mocked(useGetDataSinks).mockReturnValue({
+          data: { data: [{ id: 'sink-of-another-pipeline', dataSinkType: 'FROST' }] },
+        } as never)
+
+        renderComponent({ pipelines: [makePipeline({ id: 'p1' })] })
+        expect(screen.queryByText('FROST')).not.toBeInTheDocument()
+      })
+    })
+
+    it('does not ask for the data sinks when each pipeline has a stored graph', () => {
+      vi.mocked(useGetPipelines).mockReturnValue({
+        data: { data: [{ id: 'p1', styles: { nodes: [{ id: 'n1', type: PIPELINE_NODE_TYPES.Start, data: {} }] } }] },
+      } as never)
+
+      renderComponent({ pipelines: [makePipeline({ id: 'p1' })] })
+      expect(useGetDataSinks).toHaveBeenLastCalledWith('dataset-123', { isEnabled: false })
     })
   })
 

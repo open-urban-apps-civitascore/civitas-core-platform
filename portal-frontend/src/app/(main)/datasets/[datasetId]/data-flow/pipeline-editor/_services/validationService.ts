@@ -24,6 +24,7 @@ import {
   isFrostNodeData,
   isGeoPersistenceNodeData,
   isMappingNodeData,
+  type MappingNodeData,
 } from '../_types/nodes'
 import { type Pipeline, PIPELINE_NODE_TYPES, type PipelineNode } from '../_types/pipeline'
 import { normalizeTableName, type TableNameOwners } from './dataSinkNameService'
@@ -1035,6 +1036,18 @@ const isNonEmptyMappingValue = (value: unknown): boolean =>
   typeof value === 'string' ? value.trim() !== '' : value != null
 
 /**
+ * True for a mapping that was stored through the API and not through the mapping editor, as an
+ * installed package does it. The node then holds the reference, but no field assignments and no
+ * snapshot of the required fields. The content is in the registry and was checked when it was
+ * stored. The editor cannot reach this state on its own: a save in the mapping editor always writes
+ * the snapshot.
+ */
+const isMappingStoredOutsideEditor = (data: MappingNodeData): boolean => {
+  const assignedFields = Object.keys(data.mappingConfig?.fields ?? {})
+  return Boolean(data.mappingRef) && assignedFields.length === 0
+}
+
+/**
  * Rule: a mapping must assign every REQUIRED target field with a non-empty value. The required
  * paths are snapshotted on the node at mapping-save time ({@code targetRequiredFields}, written only
  * by the editor's save). A {@code configured} mapping node WITHOUT that snapshot was therefore never
@@ -1062,6 +1075,8 @@ const validateMappingCoversRequiredTargetFields: ValidationRule = {
       const required = node.data.targetRequiredFields
 
       if (required === undefined) {
+        // Nothing to compare: the assignments are behind the reference, not on the node.
+        if (isMappingStoredOutsideEditor(node.data)) return
         errors.push({
           id: crypto.randomUUID(),
           type: 'node',

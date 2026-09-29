@@ -97,6 +97,15 @@ vi.mock('@/app/services/api/mappings/clientRequests', () => ({
   useDeleteMapping: vi.fn(),
 }))
 
+const mockPipelineDatasources = vi.hoisted(() => ({
+  entities: [] as { id: string; name: string; connectorType: string | null; configurationUrn?: string | null }[],
+  isLoading: false,
+}))
+
+vi.mock('../../_hooks/use-pipeline-datasources', () => ({
+  usePipelineDatasources: () => mockPipelineDatasources,
+}))
+
 // Capture the latest WarningModal props so tests can drive the data-loss dialog (confirm/discard).
 const warningModalRef = vi.hoisted(() => ({
   current: null as { open?: boolean; onConfirm?: () => void; onDiscard?: () => void } | null,
@@ -226,6 +235,8 @@ beforeEach(() => {
 
   mockReadOnly.isReadOnly = false
   mockDatasetPermissions.canDeletePipeline = true
+  mockPipelineDatasources.entities = []
+  mockPipelineDatasources.isLoading = false
 
   vi.mocked(buildDataSinkPayloads).mockReturnValue([])
   vi.mocked(buildMappingArtifacts).mockReturnValue([])
@@ -357,6 +368,134 @@ describe('PipelineEditorProviderComponent', () => {
     })
   })
 
+  describe('pipeline without a stored graph', () => {
+    const SOURCE_URN = 'urn:core:platform:civitas:datasource:common:CounterFeed:aa11bb22cc:1.0.0'
+    const SINK_URN = 'urn:core:platform:civitas:datasink:common:TrafficTable:dd33ee44ff:1.0.0'
+    const STRUCTURE_URN = 'urn:core:platform:civitas:datastructure:common:Traffic:0011223344:1.0.0'
+
+    // What an installed package leaves behind: a model, the links to its source and sink, no styles.
+    const installedPipeline = {
+      id: 'installed-pipeline-1',
+      name: 'Installed Pipeline',
+      description: '',
+      styles: null,
+      dataSources: [],
+      apis: [],
+      dataSinks: [],
+      dataSourceIds: ['source-1'],
+      dataSinkIds: ['sink-1'],
+      model: {
+        nodes: [
+          { id: 'n-start', kind: 'start', label: 'Start' },
+          { id: 'n-source', kind: 'source', label: 'Counter feed', sourceRef: SOURCE_URN },
+          { id: 'n-sink', kind: 'sink', label: 'Traffic table', sinkRef: SINK_URN },
+          { id: 'n-end', kind: 'end', label: 'End' },
+        ],
+        edges: [
+          { id: 'e1', source: 'n-start', target: 'n-source' },
+          { id: 'e2', source: 'n-source', target: 'n-sink' },
+          { id: 'e3', source: 'n-sink', target: 'n-end' },
+        ],
+      },
+      createdAt: '2024-01-01T00:00:00Z',
+      modifiedAt: '2024-01-01T00:00:00Z',
+    } as unknown as PipelineOutputDTO
+
+    const dataSinksLoaded = {
+      data: {
+        data: [
+          {
+            id: 'sink-1',
+            dataSinkType: 'POSTGIS',
+            configurationUrn: SINK_URN,
+            configuration: {
+              tableName: 'traffic',
+              element: STRUCTURE_URN,
+              dataStructureVersion: { id: 'version-1', dataStructureId: 'structure-1' },
+            },
+          },
+        ],
+      },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useGetDataSinks>
+
+    beforeEach(() => {
+      vi.mocked(useGetPipelines).mockReturnValue({
+        data: { data: [installedPipeline] },
+        isLoading: false,
+      } as unknown as ReturnType<typeof useGetPipelines>)
+      mockPipelineDatasources.entities = [
+        { id: 'source-1', name: 'Counter feed', connectorType: 'MQTT', configurationUrn: SOURCE_URN },
+      ]
+    })
+
+    it('draws the pipeline from its model, with the node types of the editor', () => {
+      vi.mocked(useGetDataSinks).mockReturnValue(dataSinksLoaded)
+
+      renderProvider()
+
+      const nodes = contextRef.current?.pipeline?.nodes ?? []
+      expect(nodes.map(node => node.type)).toEqual([
+        PIPELINE_NODE_TYPES.Start,
+        PIPELINE_NODE_TYPES.DataSource,
+        PIPELINE_NODE_TYPES.GeoPersistence,
+        PIPELINE_NODE_TYPES.End,
+      ])
+      expect(contextRef.current?.pipeline?.edges).toHaveLength(3)
+    })
+
+    it('binds the source and the sink to their backend ids, so a save updates them', () => {
+      vi.mocked(useGetDataSinks).mockReturnValue(dataSinksLoaded)
+
+      renderProvider()
+
+      const nodes = contextRef.current?.pipeline?.nodes ?? []
+      expect(nodes.find(node => node.id === 'n-source')?.data).toMatchObject({
+        entityId: 'source-1',
+        configurationUrn: SOURCE_URN,
+        configured: true,
+      })
+      expect(nodes.find(node => node.id === 'n-sink')?.data).toMatchObject({
+        entityId: 'sink-1',
+        configurationUrn: SINK_URN,
+        tableName: 'traffic',
+        dataStructureVersionId: 'structure-1/version-1',
+        dataStructureUrn: STRUCTURE_URN,
+        configured: true,
+      })
+    })
+
+    it('does not mark the pipeline as changed', () => {
+      vi.mocked(useGetDataSinks).mockReturnValue(dataSinksLoaded)
+
+      renderProvider()
+
+      expect(contextRef.current?.isDirty).toBe(false)
+    })
+
+    it('waits for the data sinks before it loads the pipeline', () => {
+      vi.mocked(useGetDataSinks).mockReturnValue({
+        data: undefined,
+        isLoading: true,
+      } as unknown as ReturnType<typeof useGetDataSinks>)
+
+      renderProvider()
+
+      expect(contextRef.current?.isLoadingEditor).toBe(true)
+      expect(contextRef.current?.pipeline?.id).toBeUndefined()
+    })
+
+    it('waits for the data sources before it loads the pipeline', () => {
+      vi.mocked(useGetDataSinks).mockReturnValue(dataSinksLoaded)
+      mockPipelineDatasources.isLoading = true
+
+      renderProvider()
+
+      expect(contextRef.current?.isLoadingEditor).toBe(true)
+      expect(contextRef.current?.pipeline?.id).toBeUndefined()
+    })
+  })
+
   describe('isLoadingEditor', () => {
     it('reflects the loading state of the pipelines query', () => {
       vi.mocked(useGetPipelines).mockReturnValue({
@@ -422,6 +561,64 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       expect(contextRef.current?.isDirty).toBe(false)
+    })
+
+    describe('the size the canvas measured for a node', () => {
+      const measured = { type: 'dimensions' as const, id: 'node-1', dimensions: { width: 180, height: 52 } }
+      const sessionWithNode = (overrides?: Partial<PipelineSession>) =>
+        makeSession({ pipeline: { ...createEmptyPipeline('Test'), nodes: [makeNode('node-1')] }, ...overrides })
+
+      it('is stored on the node', () => {
+        renderProvider(sessionWithNode())
+
+        act(() => {
+          contextRef.current?.dispatch({ type: 'NODE_CHANGES', payload: [measured] })
+        })
+
+        expect(contextRef.current?.pipeline?.nodes[0].measured).toEqual({ width: 180, height: 52 })
+      })
+
+      it('does not count as a change of the user', () => {
+        renderProvider(sessionWithNode())
+
+        act(() => {
+          contextRef.current?.dispatch({ type: 'NODE_CHANGES', payload: [measured] })
+        })
+
+        expect(contextRef.current?.isDirty).toBe(false)
+        expect(contextRef.current?.hasAnyDirtySession).toBe(false)
+      })
+
+      it('leaves a session with unsaved changes as it is', () => {
+        renderProvider(sessionWithNode({ isDirty: true }))
+
+        act(() => {
+          contextRef.current?.dispatch({ type: 'NODE_CHANGES', payload: [measured] })
+        })
+
+        expect(contextRef.current?.isDirty).toBe(true)
+      })
+
+      it('counts as a change when the user moved a node in the same step', () => {
+        renderProvider(sessionWithNode())
+        const moved = { type: 'position' as const, id: 'node-1', position: { x: 40, y: 80 } }
+
+        act(() => {
+          contextRef.current?.dispatch({ type: 'NODE_CHANGES', payload: [measured, moved] })
+        })
+
+        expect(contextRef.current?.isDirty).toBe(true)
+      })
+
+      it('counts as a change when the user resizes the node', () => {
+        renderProvider(sessionWithNode())
+
+        act(() => {
+          contextRef.current?.dispatch({ type: 'NODE_CHANGES', payload: [{ ...measured, resizing: true }] })
+        })
+
+        expect(contextRef.current?.isDirty).toBe(true)
+      })
     })
   })
 

@@ -186,6 +186,10 @@ export interface PipelineOutputDTO {
   dataSources: number[]
   apis: string[]
   dataSinks: DataSinkPayload[]
+  /** Backend ids of the data sources the pipeline is linked to. */
+  dataSourceIds?: string[]
+  /** Backend ids of the data sinks the pipeline is linked to. */
+  dataSinkIds?: string[]
   model: object
 }
 

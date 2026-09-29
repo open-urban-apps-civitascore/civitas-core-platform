@@ -19,6 +19,7 @@ import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
+  useGetDataSinks,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useCreateMapping, useDeleteMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
@@ -43,8 +44,10 @@ import {
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import { useDataSinkLocks } from '../../_hooks/use-datasink-locks'
+import { usePipelineDatasources } from '../../_hooks/use-pipeline-datasources'
 import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import { tableNameOwnerOutsideNode, tableNameOwnersOutsideSession } from '../../_services/dataSinkNameService'
+import { type ModelHydrationContext, needsModelHydration } from '../../_services/modelHydrationService'
 import {
   buildDataSinkPayloads,
   buildMappingArtifacts,
@@ -82,6 +85,16 @@ import type { ActivePipelineContextValue, PipelineStats } from '../../_types/con
 import type { PipelineNodeData } from '../../_types/nodes'
 import type { NodeCreationContext, Pipeline, PipelineEdge, PipelineNode, PipelineNodeType } from '../../_types/pipeline'
 import type { UsePipelineSessionReturn } from '../../_types/session'
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/** True for node changes that only report the size the canvas measured, not a resize by the user. */
+const isMeasurementOnly = (action: PipelineReducerAction): boolean => {
+  if (action.type !== 'NODE_CHANGES' || action.payload.length === 0) return false
+  return action.payload.every(change => change.type === 'dimensions' && !change.resizing)
+}
 
 // ============================================================================
 // Props
@@ -137,6 +150,18 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   const { getSinkLocks, getSinkLockReason, getSelectionLockReason, isLoading: isLoadingSinkLocks } = useDataSinkLocks()
 
+  // ===== Lookups for pipelines that have a model but no stored graph =====
+  // Such a pipeline is drawn from its model. The model holds references only, so the data sinks
+  // and data sources of the dataset are necessary to find the ids and the types behind them.
+  const dataSinksQuery = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
+  const { entities: dataSources, isLoading: isLoadingDataSources } = usePipelineDatasources()
+
+  const isHydrationPending = useMemo(() => {
+    const pipelineDTOs = pipelinesQuery.data?.data ?? []
+    const isHydrationNecessary = pipelineDTOs.some(needsModelHydration)
+    return isHydrationNecessary && (dataSinksQuery.isLoading || isLoadingDataSources)
+  }, [pipelinesQuery.data, dataSinksQuery.isLoading, isLoadingDataSources])
+
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
 
@@ -168,6 +193,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   useEffect(() => {
     if (hasLoadedRef.current) return
     if (!pipelinesQuery.data?.data) return
+    // The sessions load one time only, so the load waits until the lookups are there.
+    if (isHydrationPending) return
 
     hasLoadedRef.current = true
     const pipelineDTOs = pipelinesQuery.data.data
@@ -177,8 +204,14 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       return
     }
 
+    const hydration: ModelHydrationContext = {
+      dataSinks: dataSinksQuery.data?.data ?? [],
+      dataSources,
+      createDefaultData: type => getNodeDef(type)?.createDefaultData(),
+    }
+
     // Convert backend DTOs to sessions
-    const sessions = pipelineDTOs.map(dto => createSessionFromBackendDTO(dto))
+    const sessions = pipelineDTOs.map(dto => createSessionFromBackendDTO(dto, hydration))
     // Preselect the session whose backend pipeline id matches the ?pipeline= search param,
     // so deep-links from the dataset overview open the right tab.
     const matchedSession = requestedPipelineId ? sessions.find(s => s.pipeline.id === requestedPipelineId) : undefined
@@ -205,7 +238,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         mappingSnapshotsRef.current[session.id] = {}
       }
     }
-  }, [pipelinesQuery.data, sessionManager, requestedPipelineId])
+  }, [pipelinesQuery.data, sessionManager, requestedPipelineId, isHydrationPending, dataSinksQuery.data, dataSources])
 
   // ===== Validation State =====
   const [validationResult, setValidationResult] = useState<ValidationResultWithNodeStatus | null>(null)
@@ -254,6 +287,14 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const dispatch = useCallback(
     (action: PipelineReducerAction) => {
       if (!activeSession) return
+
+      // The canvas measures each node after it drew it and reports the size as a node change. That
+      // is not an edit. A pipeline that is drawn from its model has no stored sizes, so without this
+      // it would show unsaved changes as soon as it opens.
+      if (isMeasurementOnly(action)) {
+        sessionManager.syncSessionPipeline(activeSession.id, previous => pipelineReducerWithReactFlow(previous, action))
+        return
+      }
 
       // Apply the reducer against the latest pipeline via an updater rather than the
       // closure-captured value. This lets multiple synchronous dispatches compose — e.g.
@@ -480,8 +521,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const isDeleting = deletePipelineMutation.isPending
 
   // ===== Loading State =====
-  // Without the locks every node looks deletable, so the editor waits for them too.
-  const isLoadingEditor = pipelinesQuery.isLoading || isLoadingSinkLocks
+  // Without the locks every node looks deletable, so the editor waits for them too. It also waits
+  // for the lookups of a pipeline that is drawn from its model, or the canvas would show empty first.
+  const isLoadingEditor = pipelinesQuery.isLoading || isLoadingSinkLocks || isHydrationPending
 
   // ===== Cross-session state =====
   const hasAnyDirtySession = useMemo(() => sessionManager.sessions.some(s => s.isDirty), [sessionManager.sessions])

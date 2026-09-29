@@ -26,6 +26,9 @@ const URN_TYPE_ELEMENT = 'element'
 
 const DISAMBIGUATOR_LENGTH = 10
 
+/** The segments of a logical URN, from `urn` to the disambiguator. A version follows as the ninth. */
+const LOGICAL_URN_SEGMENT_COUNT = 8
+
 const UMLAUT_TRANSLITERATIONS: Record<string, string> = {
   ä: 'ae',
   ö: 'oe',
@@ -113,6 +116,17 @@ export const buildDataStructureUrn = (name: string, datastructureId: string, ver
  */
 export const buildDataStructureLogicalUrn = (name: string, datastructureId: string): string =>
   buildCoreUrn(URN_TYPE_DATASTRUCTURE, name, datastructureId)
+
+/**
+ * Returns the logical (version-free) form of a CORE URN. A URN without a version comes back
+ * unchanged. Use it to compare two references to the same artifact: a stored reference keeps the
+ * version it had when it was written, and the artifact can have a newer version now.
+ */
+export const toLogicalUrn = (urn: string): string => {
+  const segments = urn.split(':')
+  const logicalSegments = segments.slice(0, LOGICAL_URN_SEGMENT_COUNT)
+  return logicalSegments.join(':')
+}
 
 /**
  * Builds the versioned CORE URN for an Element that shares a DataStructure's disambiguator + version

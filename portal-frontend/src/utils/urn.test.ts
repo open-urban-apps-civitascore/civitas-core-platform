@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildDataStructureUrn, buildElementModelUrn, toPascalCaseName } from './urn'
+import { buildDataStructureUrn, buildElementModelUrn, toLogicalUrn, toPascalCaseName } from './urn'
 
 describe('toPascalCaseName', () => {
   it('joins words into PascalCase', () => {
@@ -64,6 +64,22 @@ describe('buildDataStructureUrn', () => {
 
   it('throws when the version is missing', () => {
     expect(() => buildDataStructureUrn('Weather Model', id, '')).toThrow()
+  })
+})
+
+describe('toLogicalUrn', () => {
+  const logical = 'urn:core:platform:civitas:datasink:common:TrafficTable:2dmtus8w40'
+
+  it('removes the version of a versioned URN', () => {
+    expect(toLogicalUrn(`${logical}:1.0.0`)).toBe(logical)
+  })
+
+  it('returns a logical URN unchanged', () => {
+    expect(toLogicalUrn(logical)).toBe(logical)
+  })
+
+  it('gives the same result for two versions of one artifact', () => {
+    expect(toLogicalUrn(`${logical}:1.0.0`)).toBe(toLogicalUrn(`${logical}:2.3.0`))
   })
 })
 

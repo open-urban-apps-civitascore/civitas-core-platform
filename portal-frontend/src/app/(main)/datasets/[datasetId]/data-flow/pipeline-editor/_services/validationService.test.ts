@@ -144,6 +144,25 @@ describe('validateMappingCoversRequiredTargetFields', () => {
     const result = validatePipeline(pipelineWith([mappingNode({}, undefined, false)]))
     expect(result.errors.some(error => error.messageKey === MAPPING_NOT_SAVED_KEY)).toBe(false)
   })
+
+  describe('a mapping that was stored through the API (an installed package)', () => {
+    const MAPPING_REF = 'urn:core:platform:civitas:mapping:common:CountToTraffic:5566778899:1.0.0'
+
+    const storedMapping = (fields: Record<string, unknown>): TestNode => {
+      const node = mappingNode(fields, undefined)
+      return { ...node, data: { ...node.data, mappingRef: MAPPING_REF } }
+    }
+
+    it('accepts the node: its assignments are behind the reference, not on the node', () => {
+      const result = validatePipeline(pipelineWith([storedMapping({})]))
+      expect(result.errors.some(error => error.messageKey === MAPPING_NOT_SAVED_KEY)).toBe(false)
+    })
+
+    it('reports the node again as soon as it holds assignments without a snapshot', () => {
+      const result = validatePipeline(pipelineWith([storedMapping({ '$.name': '$.station' })]))
+      expect(result.errors.some(error => error.messageKey === MAPPING_NOT_SAVED_KEY)).toBe(true)
+    })
+  })
 })
 
 // Skipped while validateFrostMappingCoversStaGroups is commented out of VALIDATION_RULES.

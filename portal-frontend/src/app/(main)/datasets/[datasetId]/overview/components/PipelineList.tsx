@@ -9,6 +9,7 @@ import {
   PIPELINE_NODE_TYPES,
   PipelineOutputDTO,
 } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
+import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
 import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
@@ -16,11 +17,49 @@ import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { PipelineBasicInfo } from '@/types/datasets'
-import { DATASINK_TYPES } from '@/types/datasinks'
+import { DATASINK_TYPES, type DataSinkType } from '@/types/datasinks'
 
 import { PipelineCard } from './PipelineCard'
 
-const getPipelineBadges = (dto: PipelineOutputDTO, datasourceConnectors: Map<string, string>): string[] => {
+const hasStoredNodes = (dto: PipelineOutputDTO): boolean => {
+  const storedNodes = dto.styles?.nodes ?? []
+  return storedNodes.length > 0
+}
+
+/**
+ * The badges of a pipeline that has no graph stored by the editor, as an installed package leaves
+ * it. The pipeline still names its data sources and data sinks by id, so the badges come from those.
+ */
+const getBadgesOfLinkedEntities = (
+  dto: PipelineOutputDTO,
+  datasourceConnectors: Map<string, string>,
+  dataSinkTypes: Map<string, DataSinkType>,
+): string[] => {
+  const connectors = new Set<string>()
+  for (const dataSourceId of dto.dataSourceIds ?? []) {
+    const connector = datasourceConnectors.get(dataSourceId)
+    if (connector) connectors.add(connector)
+  }
+
+  const sinkTypes = new Set<DataSinkType>()
+  for (const dataSinkId of dto.dataSinkIds ?? []) {
+    const sinkType = dataSinkTypes.get(dataSinkId)
+    if (sinkType) sinkTypes.add(sinkType)
+  }
+
+  const badges: string[] = Array.from(connectors)
+  if (sinkTypes.has(DATASINK_TYPES.FROST)) badges.push(DATASINK_TYPES.FROST)
+  if (sinkTypes.has(DATASINK_TYPES.POSTGIS)) badges.push(DATASINK_TYPES.POSTGIS)
+  return badges
+}
+
+const getPipelineBadges = (
+  dto: PipelineOutputDTO,
+  datasourceConnectors: Map<string, string>,
+  dataSinkTypes: Map<string, DataSinkType>,
+): string[] => {
+  if (!hasStoredNodes(dto)) return getBadgesOfLinkedEntities(dto, datasourceConnectors, dataSinkTypes)
+
   const nodes = dto.styles?.nodes ?? []
   const connectors = new Set<string>()
 
@@ -57,6 +96,9 @@ export const PipelineList = ({ datasetId, pipelines, canCreatePipeline, canDelet
   const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
   const { data: pipelinesData } = useGetPipelines(datasetId)
   const { data: datasourcesData } = useGetDatasources({ isEnabled: canReadDatasources })
+  // Only a pipeline without a stored graph needs the data sinks, so a dataset without one asks for nothing.
+  const hasPipelineWithoutGraph = (pipelinesData?.data ?? []).some(dto => !hasStoredNodes(dto))
+  const { data: dataSinksData } = useGetDataSinks(datasetId, { isEnabled: hasPipelineWithoutGraph })
   const seenErrors = useRef(new Set<string>())
 
   useEffect(() => {
@@ -83,13 +125,21 @@ export const PipelineList = ({ datasetId, pipelines, canCreatePipeline, canDelet
     return map
   }, [datasourcesData?.data])
 
+  const dataSinkTypes = useMemo(() => {
+    const map = new Map<string, DataSinkType>()
+    for (const sink of dataSinksData?.data ?? []) {
+      map.set(sink.id, sink.dataSinkType)
+    }
+    return map
+  }, [dataSinksData?.data])
+
   const badgesByPipelineId = useMemo(() => {
     const map = new Map<string, string[]>()
     for (const dto of pipelinesData?.data ?? []) {
-      map.set(dto.id, getPipelineBadges(dto, datasourceConnectors))
+      map.set(dto.id, getPipelineBadges(dto, datasourceConnectors, dataSinkTypes))
     }
     return map
-  }, [pipelinesData?.data, datasourceConnectors])
+  }, [pipelinesData?.data, datasourceConnectors, dataSinkTypes])
 
   return (
     <div className="py-3 mb-6">

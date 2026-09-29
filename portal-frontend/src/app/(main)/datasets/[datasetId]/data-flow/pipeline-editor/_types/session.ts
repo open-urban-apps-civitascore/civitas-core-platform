@@ -59,6 +59,7 @@ export type PipelineSessionAction =
   | { type: 'SWITCH_SESSION'; payload: { sessionId: string } }
   | { type: 'UPDATE_SESSION_NAME'; payload: { sessionId: string; name: string } }
   | { type: 'UPDATE_SESSION_PIPELINE'; payload: { sessionId: string; pipeline: Pipeline | PipelineUpdater } }
+  | { type: 'SYNC_SESSION_PIPELINE'; payload: { sessionId: string; pipeline: PipelineUpdater } }
   | { type: 'MARK_SESSION_DIRTY'; payload: { sessionId: string } }
   | { type: 'MARK_SESSION_CLEAN'; payload: { sessionId: string } }
   | { type: 'LOAD_SESSIONS'; payload: { sessions: PipelineSession[]; activeSessionId: string | null } }
@@ -81,6 +82,11 @@ export interface PipelineSessionActions {
   updateSessionName: (sessionId: string, name: string) => void
   /** Updates the pipeline in a session. Accepts a value or an updater derived from the current pipeline. */
   updateSessionPipeline: (sessionId: string, pipeline: Pipeline | PipelineUpdater) => void
+  /**
+   * Updates the pipeline in a session for a change that is not an edit, such as the size the canvas
+   * measured for a node. The session keeps its state: a session without changes stays without them.
+   */
+  syncSessionPipeline: (sessionId: string, pipeline: PipelineUpdater) => void
   /** Marks a session as having unsaved changes */
   markSessionDirty: (sessionId: string) => void
   /** Marks a session as saved (no pending changes) */
