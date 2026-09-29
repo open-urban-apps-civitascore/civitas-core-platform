@@ -67,7 +67,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
   const { isReadOnly } = useReadOnly()
   const router = useRouter()
   const params = useParams<{ datasetId: string }>()
-  const { canEditPipeline: canEdit, canCreatePipeline: canCreate } = useDatasetPermissionsById(params.datasetId)
+  const { canCreatePipeline: canCreate } = useDatasetPermissionsById(params.datasetId)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const handleExit = useCallback(() => {
@@ -124,13 +124,6 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
     [sessionManager],
   )
 
-  const handleRenameSession = useCallback(
-    (sessionId: string, newName: string) => {
-      sessionManager.updateSessionName(sessionId, newName)
-    },
-    [sessionManager],
-  )
-
   return (
     <>
       <PageHeader
@@ -147,9 +140,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
               sessions={sessionManager.sessions}
               activeSessionId={sessionManager.activeSessionId}
               onSelectSession={handleSelectSession}
-              onRenameSession={handleRenameSession}
               onCreateSession={handleCreateSession}
-              canEdit={canEdit}
               canCreate={canCreate}
             />
           </div>

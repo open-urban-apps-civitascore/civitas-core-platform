@@ -10,7 +10,6 @@
 
 import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useCallback, useState } from 'react'
 
 import type { PipelineSession } from '../../_types/session'
 
@@ -22,38 +21,9 @@ interface TabProps {
   session: PipelineSession
   isActive: boolean
   onSelect: (sessionId: string) => void
-  onRename: (sessionId: string, newName: string) => void
-  canEdit: boolean
 }
 
-const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onRename, canEdit }) => {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editName, setEditName] = useState(session.name)
-
-  const handleDoubleClick = useCallback(() => {
-    if (!canEdit) return
-    setIsEditing(true)
-    setEditName(session.name)
-  }, [canEdit, session.name])
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        onRename(session.id, editName.trim() || session.name)
-        setIsEditing(false)
-      } else if (e.key === 'Escape') {
-        setEditName(session.name)
-        setIsEditing(false)
-      }
-    },
-    [session.id, session.name, editName, onRename],
-  )
-
-  const handleBlur = useCallback(() => {
-    onRename(session.id, editName.trim() || session.name)
-    setIsEditing(false)
-  }, [session.id, session.name, editName, onRename])
-
+const Tab: React.FC<TabProps> = ({ session, isActive, onSelect }) => {
   return (
     <div
       className={`
@@ -66,26 +36,13 @@ const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onRename, canEdi
         }
       `}
       onClick={() => onSelect(session.id)}
-      onDoubleClick={handleDoubleClick}
     >
       {/* Tab Content */}
       <div className="min-w-0 flex-1">
-        {isEditing ? (
-          <input
-            type="text"
-            value={editName}
-            onChange={e => setEditName(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={handleBlur}
-            className="w-full border-none bg-transparent text-sm outline-none"
-            autoFocus
-          />
-        ) : (
-          <span className="flex items-center truncate text-sm">
-            {session.name}
-            {session.isDirty && <span className="ml-1 text-primary">•</span>}
-          </span>
-        )}
+        <span className="flex items-center truncate text-sm">
+          {session.name}
+          {session.isDirty && <span className="ml-1 text-primary">•</span>}
+        </span>
       </div>
     </div>
   )
@@ -99,10 +56,8 @@ interface PipelineTabBarProps {
   sessions: PipelineSession[]
   activeSessionId: string | null
   onSelectSession: (sessionId: string) => void
-  onRenameSession: (sessionId: string, newName: string) => void
   onCreateSession: () => void
-  /** When false, tabs cannot be created or renamed (user lacks edit permission). */
-  canEdit?: boolean
+  /** When false, a new tab cannot be created (user lacks edit permission). */
   canCreate?: boolean
 }
 
@@ -114,9 +69,7 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
   sessions,
   activeSessionId,
   onSelectSession,
-  onRenameSession,
   onCreateSession,
-  canEdit = true,
   canCreate = true,
 }) => {
   const t = useTranslations('pipelineEditor')
@@ -131,8 +84,6 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
             session={session}
             isActive={session.id === activeSessionId}
             onSelect={onSelectSession}
-            onRename={onRenameSession}
-            canEdit={canEdit}
           />
         ))}
       </div>
