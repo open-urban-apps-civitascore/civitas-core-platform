@@ -102,7 +102,7 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
 
   return (
     <div className="flex h-full flex-col gap-4">
-      {isDatasourceReleased && !isReadOnly && <InfoBox text={tDataModel('releasedInfo')} />}
+      {isDatasourceReleased && !isReadOnly && <InfoBox text={tDataModel('availableInfo')} />}
       <UmlModeler
         className="min-h-0"
         isReadOnly={true}

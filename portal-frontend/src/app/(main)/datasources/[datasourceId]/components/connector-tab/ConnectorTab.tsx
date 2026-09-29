@@ -65,7 +65,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
     <div>
       {isDatasourceReleased && !isReadOnly && (
         <div className="mb-6">
-          <InfoBox text={t('releasedInfo')} />
+          <InfoBox text={t('availableInfo')} />
         </div>
       )}
       <ContentCard className={cn('h-full overflow-auto mb-6')} footerElement={<FooterElement />}>

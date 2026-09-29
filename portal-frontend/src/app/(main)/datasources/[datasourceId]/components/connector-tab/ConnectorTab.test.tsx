@@ -312,12 +312,12 @@ describe('ConnectorTab (integration)', () => {
 
     it('shows the released info in edit mode', () => {
       renderConnectorTab(undefined, false, true)
-      expect(screen.getByText('releasedInfo')).toBeInTheDocument()
+      expect(screen.getByText('availableInfo')).toBeInTheDocument()
     })
 
     it('shows no released info for a draft data source', () => {
       renderConnectorTab(undefined, false, false)
-      expect(screen.queryByText('releasedInfo')).not.toBeInTheDocument()
+      expect(screen.queryByText('availableInfo')).not.toBeInTheDocument()
     })
   })
 })

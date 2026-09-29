@@ -94,12 +94,12 @@ describe('DatastructureTab', () => {
     renderComponent({ ...defaultProps, isDatasourceReleased: true })
 
     expect(screen.queryByLabelText('Open menu')).not.toBeInTheDocument()
-    expect(screen.getByText('releasedInfo')).toBeInTheDocument()
+    expect(screen.getByText('availableInfo')).toBeInTheDocument()
   })
 
   it('shows no released info for a draft data source', () => {
     renderComponent()
 
-    expect(screen.queryByText('releasedInfo')).not.toBeInTheDocument()
+    expect(screen.queryByText('availableInfo')).not.toBeInTheDocument()
   })
 })
