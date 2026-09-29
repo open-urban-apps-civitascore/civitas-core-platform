@@ -84,6 +84,7 @@ const mockForm = {
 
 const mockSubmitDatasource = vi.fn()
 const mockHandleStatusChange = vi.fn()
+let mockCanSetDraft = true
 
 vi.mock('../hooks/useDatasourceForm', () => ({
   useDatasourceForm: () => ({
@@ -93,6 +94,7 @@ vi.mock('../hooks/useDatasourceForm', () => ({
     hasStatusChanged: false,
     handleStatusChange: mockHandleStatusChange,
     canStage: false,
+    canSetDraft: mockCanSetDraft,
     completedTabs: [],
     submitDatasource: mockSubmitDatasource,
     resetToInitialState: vi.fn(),
@@ -230,6 +232,7 @@ describe('DatasourceOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockSearchParams = new URLSearchParams()
+    mockCanSetDraft = true
     mockForm.formState.isDirty = false
     mockCurrentUser([
       PERMISSION_NAMES.DATASOURCE_UPDATE,
@@ -470,14 +473,14 @@ describe('DatasourceOverview', () => {
       await user.click(await screen.findByTestId('statusOption-draft'))
     }
 
-    it('refuses the Draft selection and explains why', async () => {
+    it('disables the Draft option while a released entity references the data source', async () => {
       mockSearchParams = new URLSearchParams('mode=edit')
+      mockCanSetDraft = false
       render(<DatasourceOverview {...defaultProps} datasource={inUseDatasource} />)
 
-      await selectDraft()
+      await userEvent.setup().click(screen.getByTestId('statusDropdown'))
 
-      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
-      expect(mockHandleStatusChange).not.toHaveBeenCalled()
+      expect(await screen.findByTestId('statusOption-draft')).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('applies the Draft selection when no released entity references the data source', async () => {
@@ -486,7 +489,6 @@ describe('DatasourceOverview', () => {
 
       await selectDraft()
 
-      expect(screen.queryByTestId('infoModal')).not.toBeInTheDocument()
       expect(mockHandleStatusChange).toHaveBeenCalledWith('DRAFT')
     })
   })
