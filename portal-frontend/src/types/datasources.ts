@@ -172,6 +172,6 @@ export const DatasourceCreateFormSchema = z.object({
 
 export type DatasourceCreateData = z.infer<typeof DatasourceCreateFormSchema>
 export type DatasourcePatchData = Partial<DatasourceFormDraft> & WithId & { assignments?: AssignmentScopedInput[] }
-export type DatasourcePutData = Pick<DatasourceFormDraft, 'name'> &
+export type DatasourceMetaPatchData = Pick<DatasourceFormDraft, 'name'> &
   Partial<Pick<DatasourceFormDraft, 'description' | 'datapoolScope'>> &
   WithId & { assignments?: AssignmentScopedInput[] }

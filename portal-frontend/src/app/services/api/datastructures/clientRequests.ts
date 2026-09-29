@@ -6,8 +6,8 @@ import { GetListInput, WithId } from '@/types/common'
 import {
   Datastructure,
   DatastructureCreateFormData,
+  DatastructureMetaPatchData,
   DatastructurePatchData,
-  DatastructurePutData,
 } from '@/types/datastructures'
 
 const key = 'datastructures'
@@ -37,7 +37,7 @@ export const useUpdateDatastructure = () =>
   })
 
 export const useUpdateDatastructureReleased = () =>
-  useUpdateMutation<Datastructure, DatastructurePutData>({
+  useUpdateMutation<Datastructure, DatastructureMetaPatchData>({
     method: 'PATCH',
     key,
     endpoint: ({ id }) => `/datastructures/${id}/released/meta`,

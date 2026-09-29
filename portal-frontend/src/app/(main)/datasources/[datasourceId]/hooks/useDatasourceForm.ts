@@ -25,8 +25,8 @@ import {
   DatasourceFormAvailableSchema,
   DatasourceFormDraft,
   DatasourceFormDraftSchema,
+  DatasourceMetaPatchData,
   DatasourcePatchData,
-  DatasourcePutData,
   DatasourceStatusType,
   DatasourceTab,
 } from '@/types/datasources'
@@ -190,7 +190,7 @@ export const useDatasourceForm = (
     }
   }
 
-  const toReleasedPayload = (values: DatasourcePatchData): DatasourcePutData => {
+  const toReleasedPayload = (values: DatasourcePatchData): DatasourceMetaPatchData => {
     const { id, description, datapoolScope, assignments } = values
     return { id, name: nameWatch, description, datapoolScope, assignments }
   }
