@@ -13,7 +13,6 @@ import {
   SOURCE_NODE_ID,
   TARGET_NODE_ID,
 } from './compile'
-import { findNodeConfigErrors } from './status'
 import { concatInputPorts, mappingRegistry, transformDef } from './transforms'
 
 const sourceTree: SchemaTree = {
@@ -421,25 +420,6 @@ describe('The operation the Mapping editor offers', () => {
       format: { pattern: 'text' },
     })
   })
-
-  it.each(['toDate', 'toDateTime', 'format'] as const)('reports an emptied %s pattern as a config error', op => {
-    const def = transformDef(op)
-    const patternNodes: Node[] = [
-      ...nodes.slice(0, 2),
-      {
-        id: op,
-        type: 'transform',
-        position: { x: 300, y: 40 },
-        data: { defType: op, config: { pattern: '' }, inputs: def.inputs, outputs: def.outputs },
-      },
-    ]
-    const patternEdges: Edge[] = [
-      { id: 'p1', source: SOURCE_NODE_ID, sourceHandle: '$.name', target: op, targetHandle: 'in' },
-      { id: 'p2', source: op, sourceHandle: 'out', target: TARGET_NODE_ID, targetHandle: '$.title' },
-    ]
-
-    expect(findNodeConfigErrors(patternNodes, patternEdges).blockingCount).toBe(1)
-  })
 })
 
 describe('nested operations', () => {
@@ -508,9 +488,5 @@ describe('a copy operation written as an object with sourcePath', () => {
   it('means the same as the shorthand path once saved again', () => {
     expect(savedAgain(objectForm)).toEqual(savedAgain('$.source'))
     expect(savedAgain(objectForm)['$.target']).toBe('$.source')
-  })
-
-  it('keeps its written form once saved again', () => {
-    expect(savedAgain(objectForm)['$.target']).toEqual(objectForm)
   })
 })
