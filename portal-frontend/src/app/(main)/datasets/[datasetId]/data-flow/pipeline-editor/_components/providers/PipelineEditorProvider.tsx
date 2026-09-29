@@ -433,6 +433,15 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     setShouldShowValidationPanel(false)
   }, [])
 
+  // ===== Pipeline Operations: Rename =====
+  const renamePipeline = useCallback(
+    (newName: string) => {
+      if (!activeSession) return
+      sessionManager.updateSessionName(activeSession.id, newName.trim() || pipeline.name)
+    },
+    [activeSession, pipeline.name, sessionManager],
+  )
+
   // ===== Pipeline Operations: Delete =====
   const deletePipeline = useCallback(() => {
     if (!activeSession) return
@@ -814,6 +823,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       hideValidationPanel,
 
       // Pipeline operations
+      renamePipeline,
       deletePipeline,
       isDeleting,
       isLoadingEditor,
@@ -859,6 +869,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       canSave,
       shouldShowValidationPanel,
       hideValidationPanel,
+      renamePipeline,
       deletePipeline,
       isDeleting,
       isLoadingEditor,

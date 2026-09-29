@@ -103,6 +103,8 @@ export interface ActivePipelineContextValue {
   hideValidationPanel: () => void
 
   // ===== Pipeline Operations =====
+  /** Rename the active pipeline. Persisted on the next Save All, like any other edit. */
+  renamePipeline: (newName: string) => void
   /** Delete the active pipeline from backend and remove its tab */
   deletePipeline: () => void
   /** Whether a delete operation is currently in progress */
