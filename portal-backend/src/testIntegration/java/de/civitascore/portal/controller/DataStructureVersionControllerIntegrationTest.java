@@ -20,6 +20,7 @@ import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -1002,8 +1003,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"model", "styles", "modelName"})
-    @DisplayName("Should reject model, styles or modelName via released/meta when not in use")
+    @ValueSource(strings = {"model", "styles", "modelName", "importedStructureUrns"})
+    @DisplayName("Should reject a field other than description via released/meta when not in use")
     void shouldRejectFieldFixedAfterReleaseWhenNotInUse(String field) {
       String path = getEndpoint() + "/" + releasedVersionId;
       DataStructureVersionOutputDTO before = getVersion(path);
@@ -1015,6 +1016,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           switch (field) {
             case "model" -> portalData.dataStructureVersionModel("ReleasedModel");
             case "styles" -> Map.of("color", "red");
+            case "importedStructureUrns" -> List.of("urn:example:imported:1.0.0");
             default -> "UpdatedReleasedModel";
           });
 

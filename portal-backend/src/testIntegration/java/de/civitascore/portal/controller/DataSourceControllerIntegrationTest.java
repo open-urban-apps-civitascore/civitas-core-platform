@@ -457,6 +457,22 @@ class DataSourceControllerIntegrationTest
       assertThat(response.getBody().getName()).isEqualTo(originalName);
       assertThat(response.getBody().getDescription()).isEqualTo("New description");
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"assignments", "datapoolScope"})
+    @DisplayName("Should reject an explicit null for a field that cannot hold null with PATCH")
+    void shouldRejectExplicitNullWithPatch(String field) {
+      UUID id = createTestEntity();
+      Map<String, Object> patch = new HashMap<>();
+      patch.put(field, null);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.PATCH, createAuthHeaders(), patch);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getDetail()).contains(field);
+    }
   }
 
   @Nested
@@ -1160,6 +1176,44 @@ class DataSourceControllerIntegrationTest
               String.class);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"assignments", "datapoolScope"})
+    @DisplayName("Should reject an explicit null for a field that cannot hold null")
+    void shouldRejectExplicitNullInMetaPatch(String field) {
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
+      Map<String, Object> metaUpdate = new HashMap<>();
+      metaUpdate.put(field, null);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id + "/released/meta",
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              metaUpdate);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getDetail()).contains(field);
+    }
+
+    @Test
+    @DisplayName("Should reject a field that the data source input does not have")
+    void shouldRejectUnknownFieldInMetaPatch() {
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id + "/released/meta",
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("name", "updated-name", "dataSourceStatus", "DRAFT"));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getDetail()).contains("dataSourceStatus");
+      assertThat(performGetById(id).getBody().getName()).isNotEqualTo("updated-name");
     }
 
     @ParameterizedTest

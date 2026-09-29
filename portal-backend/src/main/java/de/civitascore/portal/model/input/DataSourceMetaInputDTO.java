@@ -1,5 +1,7 @@
 package de.civitascore.portal.model.input;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -19,5 +21,6 @@ public class DataSourceMetaInputDTO extends BaseDataEntityInputDTO {
   @NotBlank(message = "Description is required") private String description;
 
   @Schema(description = "Datapool scope configuration. Defaults to ALL if omitted on create.")
+  @JsonSetter(nulls = Nulls.FAIL)
   private DatapoolScopeInputDTO datapoolScope;
 }

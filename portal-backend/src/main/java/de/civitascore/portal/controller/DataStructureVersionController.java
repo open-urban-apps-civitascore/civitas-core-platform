@@ -17,7 +17,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -83,12 +82,6 @@ public class DataStructureVersionController
   @Override
   protected DataStructureVersionAssembler getAssembler() {
     return dataStructureVersionAssembler;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  protected List<String> getFieldsFixedAfterRelease() {
-    return List.of("model", "styles", "modelName");
   }
 
   /**
@@ -206,16 +199,16 @@ public class DataStructureVersionController
       summary = "Update metadata of a released data structure version",
       description =
           "Applies a JSON merge patch to the description of a released data structure version"
-              + " (AVAILABLE status). An omitted field keeps its value. The model, styles and"
-              + " modelName of a released version do not change; a request that contains one of"
-              + " them answers 400. For DRAFT versions, use PATCH"
+              + " (AVAILABLE status). An omitted field keeps its value. The description is the only"
+              + " field of a released version that can change; a request that contains any other"
+              + " field answers 400. For DRAFT versions, use PATCH"
               + " /datastructures/{dataStructureId}/versions/{versionId} instead.")
   @ApiResponse(responseCode = "200", description = "Released version metadata updated successfully")
   @ApiResponse(
       responseCode = "400",
       description =
-          "Invalid input (e.g. version is DRAFT, or the request contains model, styles or"
-              + " modelName)",
+          "Invalid input (e.g. version is DRAFT, or the request contains a field other than"
+              + " description)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "404",

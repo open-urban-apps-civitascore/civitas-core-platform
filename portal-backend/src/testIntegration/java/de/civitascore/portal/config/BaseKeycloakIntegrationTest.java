@@ -30,7 +30,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @ActiveProfiles("test-integration")
 @AutoConfigureTestRestTemplate
 @Testcontainers
-@Import({PortalTestDataFactory.class, InfraTestDataFactory.class})
+@Import({
+  PortalTestDataFactory.class,
+  InfraTestDataFactory.class,
+  OmitNullRequestFieldsConfiguration.class
+})
 @Slf4j(access = AccessLevel.PROTECTED)
 public abstract class BaseKeycloakIntegrationTest {
 

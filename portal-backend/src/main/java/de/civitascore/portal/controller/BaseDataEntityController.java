@@ -164,8 +164,8 @@ public abstract class BaseDataEntityController<
       summary = "Update released metadata",
       description =
           "Applies a JSON merge patch to the metadata of a released entity. An omitted field keeps"
-              + " its value. A field that cannot change after release answers 400; any other field"
-              + " that is not metadata has no effect. Only works on entities that are not in DRAFT"
+              + " its value. A field that is not metadata answers 400, and so does null for"
+              + " assignments or datapoolScope. Only works on entities that are not in DRAFT"
               + " status.")
   public ResponseEntity<O> updateReleasedMeta(
       @PathVariable UUID id, @RequestBody JsonNode updates) {

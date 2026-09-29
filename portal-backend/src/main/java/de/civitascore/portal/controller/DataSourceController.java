@@ -14,7 +14,6 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.IOException;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -58,12 +57,6 @@ public class DataSourceController
   @Override
   protected ScopeType getScopeType() {
     return ScopeType.DATASOURCE;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  protected List<String> getFieldsFixedAfterRelease() {
-    return List.of("connectorType", "configuration", "dataStructureVersionId");
   }
 
   @Parameters({
