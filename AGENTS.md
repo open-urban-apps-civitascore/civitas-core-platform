@@ -102,8 +102,8 @@ other artefacts. In GitLab the labels are scoped: `AI::RED`, `AI::AMBER`, `AI::G
 | **Data source** | A definition of how to integrate data from an external system into the platform. Uses various connectors. |
 | **Data structure** | A versioned schema or data model for data moving through the platform. Used for Data sources, Data sinks and Mappings. |
 | **Pipeline** | A graph-based ETL definition of a data flow within a Dataset to extract data from a Data source, optionally map it and write it to a Data sink. |
-| **Data sink** | A definition of where a Pipeline writes its data. |
-| **Data storage** | A kind of Data sink that persists data inside the platform, e.g. in a database. FrostSink and PostGisSink are both Data storages. |
+| **Data sink** | A definition of where a Pipeline writes its data. Technical 'in code' term for data storage |
+| **Data storage** | A kind of Data sink that persists data inside the platform, e.g. in a database. FrostSink and PostGisSink are both Data storages. User facing version of data sinks |
 | **Mapping** | A defition of how to transform data from a defined Data structure to another. |
 | **Connector** | A building block of a Data source providing access through various protocols or systems, e.g. SQL or MQTT. |
 | **Scope** | The reach of a permission: Tenant, Data pool, Data structure, Data source or Dataset. |
