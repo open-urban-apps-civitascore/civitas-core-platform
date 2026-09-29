@@ -6,8 +6,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * How far the participating-artifact walk run before staging or release may follow references,
- * bound from the {@code dataset.closure-validation.*} namespace.
+ * How far the participating-artifact walk run before release may follow references, bound from the
+ * {@code dataset.closure-validation.*} namespace.
  *
  * <p>The bound exists because the traversal is work performed on a caller's request: a deliberately
  * deep dependency graph must not be usable to occupy the backend. It is passed to Model Forge's

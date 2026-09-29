@@ -205,8 +205,9 @@ public class DataSetController
       operationId = "stageDataSet",
       summary = "Stage a dataset",
       description =
-          "Validates the dataset's pipeline configuration and the artifacts participating in its"
-              + " flows, then transitions status from DRAFT to READY.")
+          "Validates the dataset's pipeline configuration, then transitions status from DRAFT to"
+              + " READY. The artifacts participating in its flows may still be DRAFT; release"
+              + " validates them.")
   @ApiResponse(
       responseCode = "200",
       description = "The dataset is staged",
@@ -219,10 +220,7 @@ public class DataSetController
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "422",
-      description =
-          "A pipeline DataSource is out of the dataset's datapool scope, an artifact"
-              + " participating in a pipeline's flow cannot carry a release, or a flow reaches"
-              + " further than the walk is configured to follow",
+      description = "A pipeline DataSource is out of the dataset's datapool scope",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> stage(@PathVariable UUID id) {
     DataSet ready = dataSetService.stage(id);
