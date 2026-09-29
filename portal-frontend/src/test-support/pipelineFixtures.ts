@@ -209,6 +209,18 @@ export const savablePipeline = (sink: FixtureNode): Pipeline =>
     ],
   )
 
+/** A savable pipeline without a mapping: the source feeds the given sink directly. */
+export const passthroughPipeline = (sink: FixtureNode): Pipeline =>
+  pipeline(
+    [startNode(), cronNode(), dataSourceNode(), sink, endNode()],
+    [
+      { source: 'start-1', target: 'cron-1' },
+      { source: 'cron-1', target: 'src-1' },
+      { source: 'src-1', target: sink.id },
+      { source: sink.id, target: 'end-1' },
+    ],
+  )
+
 /** The response the backend returns for a saved pipeline, sent through JSON like a real one. */
 export const savedAs = (source: Pipeline): PipelineOutputDTO => {
   const payload = buildPipelinePayload(source)

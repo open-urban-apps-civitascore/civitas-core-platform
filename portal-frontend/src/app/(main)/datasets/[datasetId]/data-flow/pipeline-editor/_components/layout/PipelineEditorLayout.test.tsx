@@ -24,6 +24,7 @@ import messages from '@/messages/de.json'
 import {
   frostNode,
   geoPersistenceNode,
+  passthroughPipeline,
   savablePipeline,
   savedAs,
   TARGET_STRUCTURE_URN,
@@ -139,8 +140,8 @@ const sinks = [
   ['FROST', frostNode()],
 ] as const
 
-const loadPipeline = (sink: ReturnType<typeof frostNode>) => {
-  const saved = savablePipeline(sink)
+const loadPipeline = (sink: ReturnType<typeof frostNode>, build = savablePipeline) => {
+  const saved = build(sink)
   // Pre-selected: the inspector shows the selected node, and React Flow needs pointer events to select.
   const loaded = { ...saved, nodes: saved.nodes.map(node => ({ ...node, selected: node.id === 'cron-1' })) }
   const response = savedAs(loaded)
@@ -188,6 +189,15 @@ describe('saving from the Pipeline editor', () => {
       })
     },
   )
+
+  it.each(sinks)('saves a %s pipeline without a mapping', async (_label, sink) => {
+    loadPipeline(sink, passthroughPipeline)
+
+    await editCronAndSave()
+
+    const { data } = await savedPipeline()
+    expect(data.model.nodes.map(node => node.kind)).toEqual(['start', 'cron', 'source', 'sink', 'end'])
+  })
 
   const newSinks = [
     [
