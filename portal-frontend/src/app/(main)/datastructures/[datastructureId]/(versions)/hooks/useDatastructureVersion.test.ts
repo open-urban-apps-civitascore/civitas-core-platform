@@ -9,6 +9,7 @@ import {
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
+import { rel } from '@/test-support/datastructureFixtures'
 import { DATASTRUCTURE_STATUS_TYPES, type DatastructureVersion } from '@/types/datastructures'
 
 import { useDatastructureVersion } from './useDatastructureVersion'
@@ -118,6 +119,17 @@ const singleEnumDiagram = () =>
     isDirty: false,
   }) as unknown as UMLDiagram
 
+/** Two classes composing each other: every class is embedded, so the diagram has no root. */
+const rootlessDiagram = () =>
+  ({
+    id: 'diagram-1',
+    name: 'Struct',
+    nodes: [classNode('a', 'Alpha'), classNode('b', 'Beta')],
+    edges: [rel('ab', 'composition', 'a', 'b'), rel('ba', 'composition', 'b', 'a')],
+    lastModified: new Date(0),
+    isDirty: false,
+  }) as unknown as UMLDiagram
+
 /** The same two unconnected classes, but with one designated as root — a savable staged state. */
 const designatedRootDiagram = () => {
   const alpha = classNode('a', 'Alpha')
@@ -189,8 +201,11 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     vi.clearAllMocks()
   })
 
-  it('refuses to release a version whose diagram yields no model', async () => {
-    const { hook, updateVersion, updateStatus } = setup(version())
+  it.each([
+    ['several root candidates', invalidDiagram(), 'ambiguousRoot'],
+    ['no root', rootlessDiagram(), 'noRoot'],
+  ])('refuses to release a version whose diagram has %s and names that reason', async (_label, styles, reason) => {
+    const { hook, updateVersion, updateStatus } = setup(version({ styles }))
 
     act(() => hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.AVAILABLE))
     let saved: boolean | undefined
@@ -199,7 +214,9 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     })
 
     expect(saved).toBe(false)
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
+    expect(toast.error).toHaveBeenCalledWith(
+      `datastructureVersions.errors.saveInvalidModel|umlModeler.rootValidation.${reason}`,
+    )
     expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
     expect(updateStatus.mutateAsync).not.toHaveBeenCalled()
   })
