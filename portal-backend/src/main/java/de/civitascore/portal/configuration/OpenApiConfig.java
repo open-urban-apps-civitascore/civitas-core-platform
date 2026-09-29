@@ -390,8 +390,9 @@ public class OpenApiConfig {
   }
 
   /**
-   * Replaces the opaque {@code JsonNode} request body on PATCH endpoints with the same InputDTO
-   * schema used by PUT, but with all fields optional (no {@code required} array).
+   * Replaces the request body of PATCH endpoints with a copy of the InputDTO schema that has all
+   * fields optional (no {@code required} array). The InputDTO is the one used by PUT on the same
+   * path, or, without a PUT, the one the PATCH declares itself.
    */
   @Bean
   public OpenApiCustomizer patchSchemaCustomizer() {
@@ -408,13 +409,14 @@ public class OpenApiConfig {
     var opsMap = pathItem.readOperationsMap();
     var putOp = opsMap.get(PathItem.HttpMethod.PUT);
     var patchOp = opsMap.get(PathItem.HttpMethod.PATCH);
-    if (putOp == null || patchOp == null) return;
-    if (putOp.getRequestBody() == null || patchOp.getRequestBody() == null) return;
+    if (patchOp == null || patchOp.getRequestBody() == null) return;
 
-    String putRef = extractSchemaRef(putOp);
-    if (putRef == null) return;
+    var sourceOp = putOp != null && putOp.getRequestBody() != null ? putOp : patchOp;
+    String sourceRef = extractSchemaRef(sourceOp);
+    if (sourceRef == null) return;
 
-    String inputName = putRef.substring(putRef.lastIndexOf('/') + 1);
+    String inputName = sourceRef.substring(sourceRef.lastIndexOf('/') + 1);
+    if (inputName.equals("JsonNode")) return;
     String patchName = "Patch" + inputName;
 
     Schema<?> originalSchema = openApi.getComponents().getSchemas().get(inputName);

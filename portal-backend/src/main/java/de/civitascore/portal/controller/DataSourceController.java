@@ -11,9 +11,11 @@ import de.civitascore.portal.service.DataSourceService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.IOException;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -21,6 +23,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
@@ -57,6 +61,14 @@ public class DataSourceController
   @Override
   protected ScopeType getScopeType() {
     return ScopeType.DATASOURCE;
+  }
+
+  @Override
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content = @Content(schema = @Schema(implementation = DataSourceMetaInputDTO.class)))
+  public ResponseEntity<DataSourceOutputDTO> updateReleasedMeta(
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
+    return super.updateReleasedMeta(id, updates);
   }
 
   @Parameters({

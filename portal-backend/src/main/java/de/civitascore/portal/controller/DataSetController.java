@@ -287,6 +287,8 @@ public class DataSetController
       responseCode = "409",
       description = "Conflict (saga is in-flight for this dataset)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content = @Content(schema = @Schema(implementation = DataSetMetaInputDTO.class)))
   public ResponseEntity<DataSetOutputDTO> updateReleasedMeta(
       @PathVariable UUID id, @RequestBody JsonNode updates) {
     return super.updateReleasedMeta(id, updates);
@@ -317,6 +319,8 @@ public class DataSetController
       responseCode = "422",
       description = "A datapool switch leaves a pipeline DataSource out of scope",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content = @Content(schema = @Schema(implementation = DataSetMetaInputDTO.class)))
   public ResponseEntity<DataSetOutputDTO> updateReadyMeta(
       @PathVariable UUID id, @RequestBody JsonNode updates) {
     DataSet updated = dataSetService.updateReadyMeta(id, patchMeta(id, updates));

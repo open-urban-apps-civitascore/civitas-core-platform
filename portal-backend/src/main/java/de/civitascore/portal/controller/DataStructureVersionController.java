@@ -218,6 +218,8 @@ public class DataStructureVersionController
       responseCode = "409",
       description = "Conflict (e.g. unique constraint violation)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content = @Content(schema = @Schema(implementation = DataStructureVersionMetaInputDTO.class)))
   public ResponseEntity<DataStructureVersionOutputDTO> updateReleasedMeta(
       @PathVariable UUID dataStructureId,
       @PathVariable UUID versionId,
